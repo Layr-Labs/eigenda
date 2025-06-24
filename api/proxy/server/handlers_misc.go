@@ -14,8 +14,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 )
 
 const (
@@ -110,7 +110,7 @@ func (svr *Server) writeJSON(w http.ResponseWriter, r *http.Request, response in
 	if err != nil {
 		svr.log.Error("failed to marshal response to json", "method", r.Method, "path", r.URL.Path, "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "failed to marshal response: %v", err)
+		_, _ = fmt.Fprintf(w, "failed to marshal response to json: %v", err)
 		return
 	}
 

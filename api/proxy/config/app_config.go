@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/config/v2/eigendaflags"
-	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/Layr-Labs/eigenda-proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/urfave/cli/v2"
 )
 

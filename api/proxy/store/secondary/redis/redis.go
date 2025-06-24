@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/go-redis/redis/v8"
 )
 

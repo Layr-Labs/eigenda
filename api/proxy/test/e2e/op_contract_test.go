@@ -3,13 +3,13 @@ package e2e
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	eigendav2store "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
-	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	_ "github.com/Layr-Labs/eigenda/api/clients/v2/verification" // imported for docstring link
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
+	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum/go-ethereum/rlp"

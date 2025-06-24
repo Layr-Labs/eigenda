@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/server/middleware"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/api/proxy/server/middleware"
 	"github.com/gorilla/mux"
 )
 

@@ -3,7 +3,7 @@ package verify
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/urfave/cli/v2"
 )
 

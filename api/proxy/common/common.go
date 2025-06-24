@@ -36,7 +36,7 @@ func ParseBytesAmount(s string) (uint64, error) {
 	numStr := s
 	unit := ""
 	for i, r := range s {
-		if !('0' <= r && r <= '9' || r == '.') {
+		if !('0' <= r && r <= '9' || r == '.') { //nolint:staticcheck // QF1001 cleaner this way than applying DeMorgan's law
 			numStr = s[:i]
 			unit = s[i:]
 			break

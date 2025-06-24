@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	_ "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
-	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	_ "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

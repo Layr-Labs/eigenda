@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/urfave/cli/v2"
 )
 

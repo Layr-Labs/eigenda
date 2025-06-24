@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 

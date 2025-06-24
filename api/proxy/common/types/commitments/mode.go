@@ -3,7 +3,7 @@ package commitments
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 )
 
 type CommitmentMode string

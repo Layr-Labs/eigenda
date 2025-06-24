@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/avast/retry-go/v4"

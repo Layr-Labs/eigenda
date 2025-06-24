@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/stretchr/testify/require"

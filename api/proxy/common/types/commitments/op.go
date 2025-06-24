@@ -1,7 +1,7 @@
 package commitments
 
 import (
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 

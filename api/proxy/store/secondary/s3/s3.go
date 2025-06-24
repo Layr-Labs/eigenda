@@ -10,7 +10,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/minio/minio-go/v7"
@@ -113,7 +114,7 @@ func (s *Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 		}
 		return nil, err
 	}
-	defer result.Close()
+	defer core.CloseLogOnError(result, "minio GetObject", nil)
 	data, err := io.ReadAll(result)
 	if err != nil {
 		return nil, err

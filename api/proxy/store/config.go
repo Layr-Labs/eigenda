@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 )
 
 type Config struct {

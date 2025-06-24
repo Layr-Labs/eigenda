@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/avast/retry-go/v4"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -291,7 +291,7 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 	}
 
 	// Actual Recency Check
-	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) {
+	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) { //nolint:staticcheck // we want equation to always show positive inequality
 		return NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
 	}
 	return nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 )
 
 // BackendType ... Storage backend type

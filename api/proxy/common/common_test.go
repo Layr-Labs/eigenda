@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 )
 
 func TestParseByteAmount(t *testing.T) {

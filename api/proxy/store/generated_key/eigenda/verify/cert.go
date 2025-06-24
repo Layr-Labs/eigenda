@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
 	edsm_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertVerifierLegacy"
 	"github.com/Layr-Labs/eigensdk-go/logging"

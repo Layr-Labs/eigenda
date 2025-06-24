@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	common "github.com/Layr-Labs/eigenda-proxy/common"
-	certs "github.com/Layr-Labs/eigenda-proxy/common/types/certs"
-	commitments "github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	common "github.com/Layr-Labs/eigenda/api/proxy/common"
+	certs "github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	commitments "github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	gomock "go.uber.org/mock/gomock"
 )
 

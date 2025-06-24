@@ -1,17 +1,17 @@
 package config
 
 import (
-	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
-	eigenda_v2_flags "github.com/Layr-Labs/eigenda-proxy/config/v2/eigendaflags"
-	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	eigenda_v2_flags "github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
+	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/store"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 
-	"github.com/Layr-Labs/eigenda-proxy/logging"
-	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
-	"github.com/Layr-Labs/eigenda-proxy/store/secondary/redis"
-	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda/api/proxy/logging"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/urfave/cli/v2"
 )
 

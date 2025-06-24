@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Layr-Labs/eigenda-proxy/config"
-	proxy_metrics "github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/Layr-Labs/eigenda-proxy/store/builder"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
+	"github.com/Layr-Labs/eigenda/api/proxy/config"
+	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 

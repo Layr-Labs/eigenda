@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 )
 
 // Error handling middleware (innermost) transforms internal errors to HTTP errors,

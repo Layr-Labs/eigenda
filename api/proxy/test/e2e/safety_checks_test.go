@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
-	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -251,7 +251,7 @@ func testOversizedBlobRequestErrors(t *testing.T, dispersalBackend common.EigenD
 	require.Empty(t, blobInfo)
 	require.Error(t, err)
 
-	oversizedError := false
+	var oversizedError bool
 	// error returned from EigenDA V1 disperser
 	if strings.Contains(err.Error(), "blob size cannot exceed") {
 		oversizedError = true

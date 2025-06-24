@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 )
 
 // withMetrics is a middleware that records metrics for the route path.

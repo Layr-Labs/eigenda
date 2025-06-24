@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 

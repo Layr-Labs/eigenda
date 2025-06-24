@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
-	eigendav2store "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
