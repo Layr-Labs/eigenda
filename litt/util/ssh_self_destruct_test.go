@@ -12,8 +12,8 @@ import (
 )
 
 func TestSSHContainerSelfDestruct(t *testing.T) {
-	//t.Skip("This test takes 5+ minutes to run - only enable for manual testing")
-	
+	t.Skip("This test takes 5+ minutes to run - only enable for manual testing")
+
 	ctx := context.Background()
 
 	// Create Docker client
