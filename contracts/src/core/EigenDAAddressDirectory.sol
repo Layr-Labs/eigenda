@@ -3,9 +3,9 @@ pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
-import {IEigenDAAddressDirectory} from "src/core/interfaces/IEigenDAAddressDirectory.sol";
+import {IEigenDADirectory} from "src/core/interfaces/IEigenDAAddressDirectory.sol";
 
-contract EigenDAAddressDirectory is OwnableUpgradeable, IEigenDAAddressDirectory {
+contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
     using AddressDirectoryLib for string;
     using AddressDirectoryLib for bytes32;
 
@@ -13,12 +13,12 @@ contract EigenDAAddressDirectory is OwnableUpgradeable, IEigenDAAddressDirectory
         _transferOwnership(_initialOwner);
     }
 
-    /// @inheritdoc IEigenDAAddressDirectory
+    /// @inheritdoc IEigenDADirectory
     function addAddress(string memory name, address value) external onlyOwner {
         bytes32 key = name.getKey();
 
         if (value == address(0)) {
-            revert InvalidAddress(name);
+            revert ZeroAddress();
         }
         if (key.getAddress() != address(0)) {
             revert AddressAlreadyExists(name);
@@ -29,38 +29,46 @@ contract EigenDAAddressDirectory is OwnableUpgradeable, IEigenDAAddressDirectory
         emit AddressAdded(name, key, value);
     }
 
-    /// @inheritdoc IEigenDAAddressDirectory
+    /// @inheritdoc IEigenDADirectory
     function replaceAddress(string memory name, address value) external onlyOwner {
         bytes32 key = name.getKey();
         address oldValue = key.getAddress();
 
-        require(oldValue != address(0), "Address does not exist");
-        require(value != address(0), "Invalid address");
-        require(oldValue != value, "Address already set");
+        if (oldValue == address(0)) {
+            revert AddressNotAdded(name);
+        }
+        if (value == address(0)) {
+            revert ZeroAddress();
+        }
+        if (oldValue == value) {
+            revert NewValueIsOldValue(value);
+        }
 
         key.setAddress(value);
 
         emit AddressReplaced(name, key, oldValue, value);
     }
 
-    /// @inheritdoc IEigenDAAddressDirectory
+    /// @inheritdoc IEigenDADirectory
     function removeAddress(string memory name) external onlyOwner {
         bytes32 key = name.getKey();
         address existingAddress = key.getAddress();
 
-        require(existingAddress != address(0), "Address does not exist");
+        if (existingAddress == address(0)) {
+            revert AddressNotAdded(name);
+        }
 
         key.setAddress(address(0));
 
         emit AddressRemoved(name, key);
     }
 
-    /// @inheritdoc IEigenDAAddressDirectory
+    /// @inheritdoc IEigenDADirectory
     function getAddress(string memory name) external view returns (address) {
         return name.getKey().getAddress();
     }
 
-    /// @inheritdoc IEigenDAAddressDirectory
+    /// @inheritdoc IEigenDADirectory
     function getAddress(bytes32 key) external view returns (address) {
         return key.getAddress();
     }

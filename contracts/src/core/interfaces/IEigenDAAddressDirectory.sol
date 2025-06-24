@@ -2,12 +2,13 @@
 pragma solidity ^0.8.9;
 
 /// @notice Interface for the EigenDA Directory
-///         This contract is currently responsible just for managing a directory of addresses by name.
+///         This interface currently only includes functions for managing a directory of addresses by name.
 ///         In the future, it may be extended to include access control as well.
 interface IEigenDADirectory {
     error AddressAlreadyExists(string name);
-    error AddressDoesNotExist(string name);
-    error InvalidAddress(string name);
+    error AddressNotAdded(string name);
+    error ZeroAddress();
+    error NewValueIsOldValue(address value);
 
     event AddressAdded(string name, bytes32 indexed key, address indexed value);
     event AddressReplaced(string name, bytes32 indexed key, address indexed oldValue, address indexed newValue);
