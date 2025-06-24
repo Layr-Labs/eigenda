@@ -48,7 +48,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func RunScan(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %v", err)
 		}
-		defer file.Close()
+		defer core.CloseLogOnError(file, file.Name(), logger)
 
 		err = displayResultsToWriter(quorumMetrics, operatorIdToAddress, config.TopN, config.OutputFormat, bufio.NewWriter(file))
 		if err != nil {
@@ -180,14 +180,15 @@ func displayResultsToWriter(results map[uint8]*quorumscan.QuorumMetrics, operato
 	}
 
 	// Display block number at the top
-	if outputFormat == "table" {
-		_, err := writer.WriteString(fmt.Sprintf("Block Number: %d\n\n", blockNumber))
+	switch outputFormat {
+	case "table":
+		_, err := fmt.Fprintf(writer, "Block Number: %d\n\n", blockNumber)
 		if err != nil {
 			return err
 		}
-	} else if outputFormat == "csv" {
+	case "csv":
 		// Print CSV header with block number in first row
-		_, err := writer.WriteString(fmt.Sprintf("BLOCK_NUMBER,%d\n", blockNumber))
+		_, err := fmt.Fprintf(writer, "BLOCK_NUMBER,%d\n", blockNumber)
 		if err != nil {
 			return err
 		}
@@ -195,9 +196,9 @@ func displayResultsToWriter(results map[uint8]*quorumscan.QuorumMetrics, operato
 		if err != nil {
 			return err
 		}
-	} else {
+	default:
 		// For any other format, still display the block number
-		_, err := writer.WriteString(fmt.Sprintf("Block Number: %d\n\n", blockNumber))
+		_, err := fmt.Fprintf(writer, "Block Number: %d\n\n", blockNumber)
 		if err != nil {
 			return err
 		}
@@ -250,13 +251,13 @@ func displayResultsToWriter(results map[uint8]*quorumscan.QuorumMetrics, operato
 			}
 
 			if outputFormat == "csv" {
-				_, err := writer.WriteString(fmt.Sprintf("%d,%s,%s,%s,%s,%.2f%%\n",
+				_, err := fmt.Fprintf(writer, "%d,%s,%s,%s,%s,%.2f%%\n",
 					quorum,
 					op.id,
 					operatorIdToAddress[op.id],
 					socket,
 					humanizeEth(stakeInEth),
-					op.pct))
+					op.pct)
 				if err != nil {
 					return err
 				}
@@ -277,12 +278,12 @@ func displayResultsToWriter(results map[uint8]*quorumscan.QuorumMetrics, operato
 			}
 		} else if outputFormat == "csv" && total_operators > 0 {
 			// Add total row for CSV
-			_, err := writer.WriteString(fmt.Sprintf("TOTAL,%d,%d,%d,%s,%.2f%%\n",
+			_, err := fmt.Fprintf(writer, "TOTAL,%d,%d,%d,%s,%.2f%%\n",
 				total_operators,
 				total_operators,
 				total_operators,
 				humanizeEth(total_stake),
-				total_stake_pct))
+				total_stake_pct)
 			if err != nil {
 				return err
 			}

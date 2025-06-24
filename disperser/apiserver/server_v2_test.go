@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -589,7 +588,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 	chainReader.On("GetBlockStaleMeasure", tmock.Anything).Return(uint32(10), nil)
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
-	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,

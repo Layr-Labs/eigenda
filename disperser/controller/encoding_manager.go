@@ -110,7 +110,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		ticker := time.NewTicker(e.EncodingManagerConfig.OnchainStateRefreshInterval)
+		ticker := time.NewTicker(e.OnchainStateRefreshInterval)
 		defer ticker.Stop()
 
 		for {

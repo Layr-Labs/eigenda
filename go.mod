@@ -1,6 +1,13 @@
 module github.com/Layr-Labs/eigenda
 
-go 1.21.13
+// We currently do not make use of any go1.24 features, but want to
+// use weak pointers for littdb, which is why we have this minimum version.
+go 1.24
+
+// We pin the compiler version to ensure determinism across local machines and CI.
+// This should be updated periodically when new minor releases are made.
+// See https://tip.golang.org/doc/devel/release#go1.24.0
+toolchain go1.24.4
 
 require (
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
