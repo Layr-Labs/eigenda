@@ -30,6 +30,7 @@ type Config struct {
 	// below fields are only required if VerifyCerts is true
 	RPCURL               string
 	SvcManagerAddr       string
+	CertVerifierV1Addr   string // used if enabling custom quorums/thresholds
 	EthConfirmationDepth uint64
 	WaitForFinalization  bool
 	MaxBlobSizeBytes     uint64

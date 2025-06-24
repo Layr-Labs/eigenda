@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	v1_verifier_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	edsm_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertVerifierLegacy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -21,6 +22,13 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/exp/slices"
 )
+
+// SecurityParamReader is an interface used reading quorums and thresholds from either
+// the EigenDAServiceManager or EigenDACertVerifierV1 contracts
+type SecurityParamReader interface {
+	QuorumAdversaryThresholdPercentages(opts *bind.CallOpts) ([]byte, error)
+	QuorumNumbersRequired(opts *bind.CallOpts) ([]uint8, error)
+}
 
 // CertVerifier verifies the DA certificate against on-chain EigenDA contracts
 // to ensure disperser returned fields haven't been tampered with
@@ -34,9 +42,12 @@ type CertVerifier struct {
 	// (typically 64 blocks in happy case).
 	ethConfirmationDepth uint64
 	waitForFinalization  bool
-	manager              *edsm_binding.ContractEigenDAServiceManagerCaller
-	ethClient            *ethclient.Client
-	// The two fields below are fetched from the EigenDAServiceManager contract in the constructor.
+	svcManagerCaller     *edsm_binding.ContractEigenDAServiceManagerCaller
+
+	securityParamReader SecurityParamReader
+	ethClient           *ethclient.Client
+	// The two fields below are fetched from the EigenDAServiceManager contract or
+	// the EigenDACertVerifierV1 (if configured) in the constructor.
 	// They are used to verify the quorums in the received certificates.
 	// See getQuorumParametersAtLatestBlock for more details.
 	quorumsRequired           []uint8
@@ -57,20 +68,36 @@ func NewCertVerifier(cfg *Config, log logging.Logger) (*CertVerifier, error) {
 		return nil, fmt.Errorf("failed to dial ETH RPC node: %s", err.Error())
 	}
 
-	// construct caller binding
-	m, err := edsm_binding.NewContractEigenDAServiceManagerCaller(common.HexToAddress(cfg.SvcManagerAddr), client)
+	// construct caller bindings
+	svcManagerCaller, err := edsm_binding.NewContractEigenDAServiceManagerCaller(
+		common.HexToAddress(cfg.SvcManagerAddr), client)
 	if err != nil {
 		return nil, err
 	}
 
-	quorumsRequired, quorumAdversaryThresholds, err := getQuorumParametersAtLatestBlock(m)
+	// If the user has specified a custom cert verifier, use it.
+	var securityParamReader SecurityParamReader = svcManagerCaller
+	if cfg.CertVerifierV1Addr != "" {
+		log.Infof("Using custom EigenDACertVerifierV1 contract for cert verification at address: %s", cfg.CertVerifierV1Addr)
+		certVerifierCallerV1, err := v1_verifier_binding.NewContractEigenDACertVerifierV1Caller(
+			common.HexToAddress(cfg.CertVerifierV1Addr), client,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EigenDACertVerifierV1 caller: %w", err)
+		}
+
+		securityParamReader = certVerifierCallerV1
+	}
+
+	quorumsRequired, quorumAdversaryThresholds, err := getQuorumParametersAtLatestBlock(securityParamReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch quorum parameters from EigenDAServiceManager: %w", err)
 	}
 
 	return &CertVerifier{
 		log:                       log,
-		manager:                   m,
+		svcManagerCaller:          svcManagerCaller,
+		securityParamReader:       securityParamReader,
 		ethConfirmationDepth:      cfg.EthConfirmationDepth,
 		ethClient:                 client,
 		quorumsRequired:           quorumsRequired,
@@ -198,7 +225,7 @@ func (cv *CertVerifier) retrieveBatchMetadataHash(
 	batchID uint32,
 	blockNumber *big.Int,
 ) ([32]byte, error) {
-	onchainHash, err := cv.manager.BatchIdToBatchMetadataHash(
+	onchainHash, err := cv.svcManagerCaller.BatchIdToBatchMetadataHash(
 		&bind.CallOpts{Context: ctx, BlockNumber: blockNumber},
 		batchID,
 	)
@@ -228,17 +255,17 @@ func (cv *CertVerifier) retrieveBatchMetadataHash(
 // in the past,
 // which was not ideal. So we decided to make these parameters immutable, and cache them here.
 func getQuorumParametersAtLatestBlock(
-	manager *edsm_binding.ContractEigenDAServiceManagerCaller,
+	reader SecurityParamReader,
 ) ([]uint8, map[uint8]uint8, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	requiredQuorums, err := manager.QuorumNumbersRequired(&bind.CallOpts{Context: ctx})
+	requiredQuorums, err := reader.QuorumNumbersRequired(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch QuorumNumbersRequired from EigenDAServiceManager: %w", err)
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	thresholds, err := manager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{Context: ctx})
+	thresholds, err := reader.QuorumAdversaryThresholdPercentages(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"failed to fetch QuorumAdversaryThresholdPercentages from EigenDAServiceManager: %w",
