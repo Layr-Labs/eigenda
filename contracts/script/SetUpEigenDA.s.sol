@@ -90,9 +90,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             UsageAuthorizationTypes.QuorumConfig memory paymentConfig0 = UsageAuthorizationTypes.QuorumConfig({
                 token: address(deployedStrategyArray[0].underlyingToken()),
                 recipient: addressConfig.eigenDACommunityMultisig,
-                reservationSymbolsPerSecond: 452198,
-                onDemandSymbolsPerSecond: 452198,
-                onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
+                reservationSymbolsPerSecond: 4521980,
+                onDemandSymbolsPerSecond: 131072,
+                onDemandPricePerSymbol: 0.447 gwei
             });
             UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(0, paymentConfig0);
             UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandEnabled(0, true);
@@ -101,18 +101,17 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             UsageAuthorizationTypes.QuorumConfig memory paymentConfig1 = UsageAuthorizationTypes.QuorumConfig({
                 token: address(deployedStrategyArray[1].underlyingToken()),
                 recipient: addressConfig.eigenDACommunityMultisig,
-                reservationSymbolsPerSecond: 452198,
-                onDemandSymbolsPerSecond: 452198,
-                onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
+                reservationSymbolsPerSecond: 4521980,
+                onDemandSymbolsPerSecond: 131072,
+                onDemandPricePerSymbol: 0.447 gwei
             });
             UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(1, paymentConfig1);
-            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandEnabled(1, false);
 
             // Add reservations
             uint64 schedulePeriod = 3600;
             uint64 currentPeriod = uint64(block.timestamp) / schedulePeriod;
             uint64 alignedStartTimestamp = (currentPeriod + 1) * schedulePeriod;
-            uint64 alignedEndTimestamp = (currentPeriod + 1000) * schedulePeriod;
+            uint64 alignedEndTimestamp = (currentPeriod + 5) * schedulePeriod;
 
             UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
                 symbolsPerSecond: 452198,

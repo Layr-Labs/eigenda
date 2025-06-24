@@ -3,6 +3,7 @@ package apiserver_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math"
@@ -357,7 +358,7 @@ func TestRetrieveBlob(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
-		fmt.Println("requestID", requestID)
+		fmt.Println("requestID", hex.EncodeToString(requestID))
 
 		// Simulate blob confirmation so that we can retrieve the blob
 		securityParams := []*core.SecurityParam{
@@ -615,7 +616,7 @@ func setup() {
 		panic("failed to create allowlist file")
 	}
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}

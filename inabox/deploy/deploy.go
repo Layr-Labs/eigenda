@@ -185,7 +185,7 @@ func (env *Config) DeployExperiment() {
 	if err != nil {
 		log.Panicf("error opening file: %v", err)
 	}
-	defer f.Close()
+	defer core.CloseLogOnError(f, f.Name(), nil)
 	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts
@@ -421,6 +421,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
 		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
+		"NODE_USAGE_AUTHORIZATION_REGISTRY=" + operator.NODE_USAGE_AUTHORIZATION_REGISTRY,
 		"NODE_NUM_CONFIRMATIONS=0",
 	}
 

@@ -18,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	bat "github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
-	batmock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -130,7 +129,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	encoderClient := disperser.NewLocalEncoderClient(p)
 	finalizer := batchermock.NewFinalizer()
 	ethClient := &cmock.MockEthClient{}
-	txnManager := batmock.NewTxnManager()
+	txnManager := batchermock.NewTxnManager()
 
 	b, err := bat.NewBatcher(config, timeoutConfig, blobStore, dispatcher, cst, asgn, encoderClient, agg, ethClient, finalizer, transactor, txnManager, logger, metrics, handleBatchLivenessChan)
 	assert.NoError(t, err)

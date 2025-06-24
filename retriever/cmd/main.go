@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
@@ -74,7 +73,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("failed to parse the command line flags: %v", err)
 	}
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		log.Fatalf("failed to create logger: %v", err)
 	}
@@ -126,7 +125,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		clientConfig := validator.DefaultClientConfig()
+		clientConfig := clientsv2.DefaultClientConfig()
 		clientConfig.ConnectionPoolSize = config.NumConnections
 
 		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig, nil)

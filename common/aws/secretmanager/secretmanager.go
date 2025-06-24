@@ -31,7 +31,7 @@ func ReadStringFromSecretManager(ctx context.Context, secretName, region string)
 	}
 
 	// Decrypts secret using the associated KMS key.
-	var secretString string = *result.SecretString
+	secretString := *result.SecretString
 
 	return secretString, nil
 }

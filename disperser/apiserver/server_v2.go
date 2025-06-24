@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -267,7 +266,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	onchainState := &OnchainState{
 		QuorumCount:           quorumCount,
 		RequiredQuorums:       requiredQuorums,
-		BlobVersionParameters: v2.NewBlobVersionParameterMap(blobParams),
+		BlobVersionParameters: corev2.NewBlobVersionParameterMap(blobParams),
 		TTL:                   time.Duration((storeDurationBlocks+blockStaleMeasure)*12) * time.Second,
 	}
 

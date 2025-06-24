@@ -47,9 +47,9 @@ type Config struct {
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
 
-	BLSOperatorStateRetrieverAddr    string
-	EigenDAServiceManagerAddr        string
-	UsageAuthorizationRegistryAddr   string
+	BLSOperatorStateRetrieverAddr   string
+	EigenDAServiceManagerAddr       string
+	UsageAuthorizationRegistryAddr  string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
 

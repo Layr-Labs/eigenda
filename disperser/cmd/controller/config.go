@@ -103,9 +103,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
-		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
-		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		MetricsPort:                    ctx.GlobalInt(flags.MetricsPortFlag.Name),
+		ControllerReadinessProbePath:   ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
+		ControllerHealthProbePath:      ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

@@ -101,7 +101,7 @@ func CreateOperatorQuorumIntervals(
 			// TODO(jianoaix): Having quorum addition and removal in the same block is a valid case.
 			// Come up a followup fix to handle this special case.
 			if added[i].BlockNumber == removed[j].BlockNumber {
-				msg := "Not yet supported: operator was adding and removing quorums at the " +
+				msg := "not yet supported: operator was adding and removing quorums at the " +
 					"same block, operator: %s, block number: %d"
 				return nil, fmt.Errorf(msg, op, added[i].BlockNumber)
 			}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -36,7 +37,7 @@ func (c *clientV2) EncodeBlob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial encoder: %w", err)
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "encoder client connection", nil)
 
 	// Create client
 	client := pb.NewEncoderClient(conn)

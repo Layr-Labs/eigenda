@@ -10,7 +10,6 @@ import (
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -216,7 +215,7 @@ func createStore(t *testing.T) *node.Store {
 	logger := testutils.GetLogger()
 	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	tx := &coremock.MockWriter{}
-	dat, _ := mock.MakeChainDataMock(map[uint8]int{
+	dat, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 6,
 		1: 3,
 	})

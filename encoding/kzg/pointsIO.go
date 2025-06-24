@@ -335,7 +335,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 // from is inclusive, to is exclusive
 func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	if to <= from {
-		return nil, fmt.Errorf("The range to read is invalid, from: %v, to: %v", from, to)
+		return nil, fmt.Errorf("the range to read is invalid, from: %v, to: %v", from, to)
 	}
 	g2f, err := os.Open(filepath)
 	if err != nil {

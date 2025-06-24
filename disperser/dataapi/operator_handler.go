@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -226,7 +227,7 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	if err != nil {
 		return false, err.Error()
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, fmt.Sprintf("grpc connection to %s", socket), nil)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -279,11 +280,15 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		stakeRanked[quorum] = make([]*OperatorStake, 0)
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				weiToEth := new(big.Float).SetFloat64(1e18)
+				stakeAmountEth := new(big.Float).Quo(&op.StakeAmount, weiToEth)
+				stakeAmount, _ := stakeAmountEth.Float64()
 				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
 					StakePercentage: op.StakeShare / 100.0,
 					Rank:            i + 1,
+					StakeAmount:     stakeAmount,
 				})
 			}
 		}

@@ -93,7 +93,7 @@ func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool,
 	if err != nil {
 		return "unreachable"
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "connection to node", logger)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var reply *node.NodeInfoReply

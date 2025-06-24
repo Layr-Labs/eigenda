@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
@@ -125,7 +126,7 @@ func testMigration(t *testing.T, migrationPath string) {
 
 	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() { core.CloseLogOnError(db, "littdb", nil) })
 
 	table, err := db.GetTable("test")
 	require.NoError(t, err)

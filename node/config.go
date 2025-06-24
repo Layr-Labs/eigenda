@@ -66,9 +66,9 @@ type Config struct {
 	DbPath                          string
 	LogPath                         string
 	ID                              core.OperatorID
-	BLSOperatorStateRetrieverAddr    string
-	EigenDAServiceManagerAddr        string
-	UsageAuthorizationRegistryAddr   string
+	BLSOperatorStateRetrieverAddr   string
+	EigenDAServiceManagerAddr       string
+	UsageAuthorizationRegistryAddr  string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string

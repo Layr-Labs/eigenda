@@ -228,7 +228,7 @@ func newTestServer(t *testing.T) *churner.Server {
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,
 		},
-		LoggerConfig:                  common.DefaultLoggerConfig(),
+		LoggerConfig:                  *common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
 		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
 		ChurnApprovalInterval:         15 * time.Minute,

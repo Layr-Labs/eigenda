@@ -256,6 +256,7 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
 	if quorumReservations, ok := pcs.ReservedPayments[accountID]; ok {
+		pcs.logger.Debug("found reserved payments in cache", "accountID", accountID, "quorumNumbers", quorumNumbers, "quorumReservations", quorumReservations)
 		// Check if all quorums are present
 		allFound := true
 		for _, quorumNumber := range quorumNumbers {
@@ -272,11 +273,12 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
+	pcs.logger.Debug("not all quorum numbers found in cache, pulling reserved payments from chain", "accountID", accountID, "quorumNumbers", quorumNumbers)
 	allRes, err := pcs.tx.GetReservedPayments(ctx, []gethcommon.Address{accountID}, quorumNumbers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reserved payment: %w", err)
 	}
-
+	pcs.logger.Debug("pulled reserved payments from chain", "accountID", accountID, "quorumNumbers", quorumNumbers, "allRes", allRes)
 	pcs.ReservationsLock.Lock()
 	defer pcs.ReservationsLock.Unlock()
 
@@ -293,7 +295,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 			res[quorumNumber] = reservation
 		}
 	}
-
+	pcs.logger.Debug("updated reserved payments in cache", "accountID", accountID, "quorumNumbers", quorumNumbers, "res", res)
 	return res, nil
 }
 
