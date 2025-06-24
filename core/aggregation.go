@@ -261,7 +261,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"operatorID", operatorIDHex,
 			"operatorAddress", operatorAddr,
 			"socket", socket,
-			"quorumIDs", fmt.Sprint(operatorQuorums),
+			"quorumIDs", fmt.Sprint(operatorQuorums), //nolint:staticcheck // printing byte slices is fine here
 			"batchHeaderHash", batchHeaderHashHex,
 			"attestationLatencyMs", r.AttestationLatencyMs)
 	}

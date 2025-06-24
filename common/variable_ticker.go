@@ -298,5 +298,5 @@ func (t *VariableTicker) computeInflectionFrequency() float64 {
 	//
 	// Combine equations c and e (i.e. invert the period to get the frequency):
 	// f) Fi = 2A / (sqrt(4A + F0^2) - F0)
-	return (2 * t.acceleration) / (math.Sqrt(4*t.acceleration+math.Pow(t.currentFrequency, 2)) - t.currentFrequency)
+	return (2 * t.acceleration) / (math.Sqrt(4*t.acceleration+t.currentFrequency*t.currentFrequency) - t.currentFrequency)
 }

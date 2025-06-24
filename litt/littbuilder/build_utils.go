@@ -235,7 +235,7 @@ func buildLogger(config *litt.Config) (logging.Logger, error) {
 		return config.Logger, nil
 	}
 
-	return common.NewLogger(*config.LoggerConfig)
+	return common.NewLogger(config.LoggerConfig)
 }
 
 // buildMetrics creates a new metrics object based on the configuration. If the returned server is not nil,

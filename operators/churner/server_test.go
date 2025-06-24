@@ -11,10 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,7 +27,7 @@ var (
 	quorumIds                      = []uint32{0, 1}
 	logger                         = testutils.GetLogger()
 	transactorMock                 = &coremock.MockWriter{}
-	mockIndexer                    = &indexermock.MockIndexedChainState{}
+	mockIndexer                    = &coremock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -63,7 +61,7 @@ func TestChurn(t *testing.T) {
 	signature := keyPair.SignMessage(requestHash)
 	request.OperatorRequestSignature = signature.Serialize()
 
-	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&dacore.IndexedOperatorInfo{
 		PubkeyG1: keyPair.PubKey,
 	}, nil)
 
@@ -120,7 +118,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	signature := keyPair.SignMessage(requestHash)
 	request.OperatorRequestSignature = signature.Serialize()
 
-	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&dacore.IndexedOperatorInfo{
 		PubkeyG1: keyPair.PubKey,
 	}, nil)
 
@@ -165,7 +163,7 @@ func setupMockWriter() {
 
 func newTestServer(t *testing.T) *churner.Server {
 	config := &churner.Config{
-		LoggerConfig: common.DefaultLoggerConfig(),
+		LoggerConfig: *common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,

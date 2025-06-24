@@ -52,20 +52,23 @@ func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore 
 
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	if serverVersion == 1 {
+	switch serverVersion {
+	case 1:
 		if store, ok := blobMetadataStore.(*blobstore.BlobMetadataStore); ok {
 			reg.MustRegister(NewDynamoDBCollector(store, logger))
 		} else {
 			// Skip registering metrics if the store is not a blobstore.BlobMetadataStore
 			logger.Warn("blobMetadataStore is not a blobstore.BlobMetadataStore")
 		}
-	} else if serverVersion == 2 {
+	case 2:
 		if store, ok := blobMetadataStore.(blobstorev2.MetadataStore); ok {
 			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, reg, logger))
 		} else {
 			// Skip registering metrics if the store is not a blobstorev2.MetadataStore
 			logger.Warn("blobMetadataStore is not a blobstorev2.MetadataStore")
 		}
+	default:
+		panic(fmt.Sprintf("unsupported server version %d", serverVersion))
 	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
