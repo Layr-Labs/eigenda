@@ -16,5 +16,5 @@ func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) ([]b
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 	signature := keys.SignMessage(([32]byte)(hash))
-	return signature.G1Point.Serialize(), nil
+	return signature.Serialize(), nil
 }

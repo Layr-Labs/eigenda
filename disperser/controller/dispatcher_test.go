@@ -16,7 +16,6 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -128,10 +127,10 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	// Test that the blob metadata status are updated
 	bm0, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[0])
 	require.NoError(t, err)
-	require.Equal(t, v2.Complete, bm0.BlobStatus)
+	require.Equal(t, commonv2.Complete, bm0.BlobStatus)
 	bm1, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[1])
 	require.NoError(t, err)
-	require.Equal(t, v2.Complete, bm1.BlobStatus)
+	require.Equal(t, commonv2.Complete, bm1.BlobStatus)
 
 	// Get batch header
 	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objs.blobKeys[0])
@@ -232,12 +231,12 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	for _, blobKey := range failedObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Failed, bm.BlobStatus)
+		require.Equal(t, commonv2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range successfulObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Complete, bm.BlobStatus)
+		require.Equal(t, commonv2.Complete, bm.BlobStatus)
 	}
 	components.BlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(failedObjs.blobKeys)+len(successfulObjs.blobKeys))
 
@@ -335,12 +334,12 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	for _, blobKey := range objsInBothQuorum.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Failed, bm.BlobStatus)
+		require.Equal(t, commonv2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range objsInQuorum1.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Failed, bm.BlobStatus)
+		require.Equal(t, commonv2.Failed, bm.BlobStatus)
 	}
 
 	// Get batch header
@@ -402,7 +401,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 	}
 
 	for _, key := range objs.blobKeys {
-		err := blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		err := blobMetadataStore.UpdateBlobStatus(ctx, key, commonv2.GatheringSignatures)
 		require.NoError(t, err)
 	}
 
@@ -468,7 +467,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.True(t, verified)
 
 	for _, key := range objs.blobKeys {
-		err = blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		err = blobMetadataStore.UpdateBlobStatus(ctx, key, commonv2.GatheringSignatures)
 		require.NoError(t, err)
 	}
 
@@ -497,7 +496,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	_, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.NoError(t, err)
 	for i := 0; i < int(maxBatchSize); i++ {
-		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], v2.GatheringSignatures)
+		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], commonv2.GatheringSignatures)
 		require.NoError(t, err)
 	}
 
@@ -524,7 +523,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
-	err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[maxBatchSize], v2.GatheringSignatures)
+	err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[maxBatchSize], commonv2.GatheringSignatures)
 	require.NoError(t, err)
 
 	// cursor should be reset and pick up stale blob
@@ -612,7 +611,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 type testObjects struct {
 	blobHedaers   []*corev2.BlobHeader
 	blobKeys      []corev2.BlobKey
-	blobMetadatas []*v2.BlobMetadata
+	blobMetadatas []*commonv2.BlobMetadata
 	blobCerts     []*corev2.BlobCertificate
 }
 
@@ -620,14 +619,14 @@ func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore
 	ctx := context.Background()
 	headers := make([]*corev2.BlobHeader, numObjects)
 	keys := make([]corev2.BlobKey, numObjects)
-	metadatas := make([]*v2.BlobMetadata, numObjects)
+	metadatas := make([]*commonv2.BlobMetadata, numObjects)
 	certs := make([]*corev2.BlobCertificate, numObjects)
 	for i := 0; i < numObjects; i++ {
 		keys[i], headers[i] = newBlob(t, quorumNumbers)
 		now := time.Now()
-		metadatas[i] = &v2.BlobMetadata{
+		metadatas[i] = &commonv2.BlobMetadata{
 			BlobHeader: headers[i],
-			BlobStatus: v2.Encoded,
+			BlobStatus: commonv2.Encoded,
 			Expiry:     uint64(now.Add(time.Hour).Unix()),
 			NumRetries: 0,
 			UpdatedAt:  uint64(now.UnixNano()) - uint64(i),

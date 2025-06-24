@@ -239,7 +239,7 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig.SRSOrder, v.KzgConfig.G2Path)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.SRSOrder, v.G2Path)
 	if err != nil {
 		return err
 	}

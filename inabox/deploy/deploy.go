@@ -185,7 +185,7 @@ func (env *Config) DeployExperiment() {
 	if err != nil {
 		log.Panicf("error opening file: %v", err)
 	}
-	defer f.Close()
+	defer core.CloseLogOnError(f, f.Name(), nil)
 	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts
