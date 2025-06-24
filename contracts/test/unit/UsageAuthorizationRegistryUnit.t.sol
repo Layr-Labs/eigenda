@@ -95,7 +95,7 @@ contract UsageAuthorizationRegistryUnit is Test {
             })
         );
         vm.prank(QUORUM_OWNER_0);
-        usageAuthorizationRegistry.setQuorumPaymentConfig(
+        usageAuthorizationRegistry.setQuorumConfig(
             0,
             UsageAuthorizationTypes.QuorumConfig({
                 token: address(token),
@@ -603,7 +603,16 @@ contract UsageAuthorizationRegistryUnit is Test {
         amount = bound(amount, 1, type(uint80).max);
         token.mint(payer, amount);
         vm.prank(OWNER);
-        usageAuthorizationRegistry.setOnDemandEnabled(quorumId, false);
+        usageAuthorizationRegistry.setQuorumProtocolConfig(
+            quorumId,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: MIN_NUM_SYMBOLS,
+                reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
+                reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
+                onDemandRateLimitWindow: ON_DEMAND_RATE_LIMIT_WINDOW,
+                onDemandEnabled: false
+            })
+        );
 
         vm.prank(payer);
         token.approve(address(usageAuthorizationRegistry), amount);
@@ -635,10 +644,16 @@ contract UsageAuthorizationRegistryUnit is Test {
         );
 
         vm.expectRevert();
-        usageAuthorizationRegistry.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setOnDemandEnabled(0, true);
+        usageAuthorizationRegistry.setQuorumProtocolConfig(
+            0,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: MIN_NUM_SYMBOLS,
+                reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
+                reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
+                onDemandRateLimitWindow: ON_DEMAND_RATE_LIMIT_WINDOW,
+                onDemandEnabled: true
+            })
+        );
     }
 
     /// @notice Tests that these functions are properly gated to the quorum owner.
@@ -657,22 +672,7 @@ contract UsageAuthorizationRegistryUnit is Test {
         );
 
         vm.expectRevert();
-        usageAuthorizationRegistry.setMinNumSymbols(0, MIN_NUM_SYMBOLS);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setReservationRateLimitWindow(0, RESERVATION_RATE_LIMIT_WINDOW);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setOnDemandRateLimitWindow(0, ON_DEMAND_RATE_LIMIT_WINDOW);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setOnDemandEnabled(0, true);
-
-        vm.expectRevert();
-        usageAuthorizationRegistry.setQuorumPaymentConfig(
+        usageAuthorizationRegistry.setQuorumConfig(
             0,
             UsageAuthorizationTypes.QuorumConfig({
                 token: address(token),

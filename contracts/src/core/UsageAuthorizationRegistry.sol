@@ -84,28 +84,11 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
     }
 
     /// @inheritdoc IUsageAuthorizationRegistry
-    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols) external onlyOwner {
-        ps().quorum[quorumId].protocolCfg.minNumSymbols = minNumSymbols;
-    }
-
-    /// @inheritdoc IUsageAuthorizationRegistry
-    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) external onlyOwner {
-        ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = reservationAdvanceWindow;
-    }
-
-    /// @inheritdoc IUsageAuthorizationRegistry
-    function setReservationRateLimitWindow(uint64 quorumId, uint64 reservationRateLimitWindow) external onlyOwner {
-        ps().quorum[quorumId].protocolCfg.reservationRateLimitWindow = reservationRateLimitWindow;
-    }
-
-    /// @inheritdoc IUsageAuthorizationRegistry
-    function setOnDemandRateLimitWindow(uint64 quorumId, uint64 onDemandRateLimitWindow) external onlyOwner {
-        ps().quorum[quorumId].protocolCfg.onDemandRateLimitWindow = onDemandRateLimitWindow;
-    }
-
-    /// @inheritdoc IUsageAuthorizationRegistry
-    function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyOwner {
-        ps().quorum[quorumId].protocolCfg.onDemandEnabled = enabled;
+    function setQuorumProtocolConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumProtocolConfig memory protocolCfg)
+        external
+        onlyOwner
+    {
+        ps().quorum[quorumId].protocolCfg = protocolCfg;
     }
 
     /// QUORUM OWNER
@@ -128,7 +111,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
     }
 
     /// @inheritdoc IUsageAuthorizationRegistry
-    function setQuorumPaymentConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumConfig memory paymentConfig)
+    function setQuorumConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumConfig memory paymentConfig)
         external
         onlyQuorumOwner(quorumId)
     {

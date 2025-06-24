@@ -69,15 +69,43 @@ interface IUsageAuthorizationRegistry {
         UsageAuthorizationTypes.Reservation memory reservation
     ) external;
 
-    /// @notice Used by the quorum owner to set the quorum configuration.
+    /// OWNER
+
+    /// @notice Transfers ownership of the contract to a new owner.
+    /// @param newOwner The address of the new owner.
+    function transferOwnership(address newOwner) external;
+
+    /// @notice Initializes a new quorum with the given ID, owner, and protocol configuration.
+    /// @param quorumId The ID of the new quorum.
+    /// @param newOwner The address of the new owner of the quorum.
+    /// @param protocolCfg The protocol configuration for the new quorum.
+    function initializeQuorum(
+        uint64 quorumId,
+        address newOwner,
+        UsageAuthorizationTypes.QuorumProtocolConfig memory protocolCfg
+    ) external;
+
+    /// @notice Sets the protocol configuration for a quorum.
     /// @param quorumId The ID of the quorum.
-    /// @param config The new protocol configuration for the quorum.
-    function setQuorumPaymentConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumConfig memory config) external;
+    /// @param protocolCfg The new protocol configuration for the quorum.
+    /// @dev This function can only be called by the contract owner.
+    function setQuorumProtocolConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumProtocolConfig memory protocolCfg)
+        external;
+
+    /// QUORUM OWNER
 
     /// @notice Used by the quorum owner to transfer ownership of the quorum to a new owner.
     /// @param quorumId The ID of the quorum.
     /// @param newOwner The address of the new owner of the quorum.
     function transferQuorumOwnership(uint64 quorumId, address newOwner) external;
+
+    /// @notice Sets the quorum configuration for a quorum.
+    /// @param quorumId The ID of the quorum.
+    /// @param cfg The new quorum configuration.
+    /// @dev This function can only be called by the quorum owner.
+    function setQuorumConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumConfig memory cfg) external;
+
+    /// GETTERS
 
     /// @notice Gets the on demand deposit of a given account for a given quorum.
     /// @param quorumId The ID of the quorum.
@@ -115,43 +143,4 @@ interface IUsageAuthorizationRegistry {
     /// @param period The period for which to get the reserved symbols.
     /// @return The number of reserved symbols for the specified quorum and period.
     function getQuorumReservedSymbols(uint64 quorumId, uint64 period) external view returns (uint64);
-
-    /// @notice Transfers ownership of the contract to a new owner.
-    /// @param newOwner The address of the new owner.
-    function transferOwnership(address newOwner) external;
-
-    /// @notice Initializes a new quorum with the given ID, owner, and protocol configuration.
-    /// @param quorumId The ID of the new quorum.
-    /// @param newOwner The address of the new owner of the quorum.
-    /// @param protocolCfg The protocol configuration for the new quorum.
-    function initializeQuorum(
-        uint64 quorumId,
-        address newOwner,
-        UsageAuthorizationTypes.QuorumProtocolConfig memory protocolCfg
-    ) external;
-
-    /// @notice Sets the minimum number of symbols required for a quorum.
-    /// @param quorumId The ID of the quorum.
-    /// @param minNumSymbols The new minimum number of symbols required for the quorum.
-    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols) external;
-
-    /// @notice Sets the reservation rate limit window for a quorum.
-    /// @param quorumId The ID of the quorum.
-    /// @param reservationRateLimitWindow The new reservation rate limit window in seconds.
-    function setReservationRateLimitWindow(uint64 quorumId, uint64 reservationRateLimitWindow) external;
-
-    /// @notice Sets the reservation advance window for a quorum. Reservations cannot extend beyond the current time plus this window.
-    /// @param quorumId The ID of the quorum.
-    /// @param reservationAdvanceWindow The new reservation advance window in seconds.
-    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) external;
-
-    /// @notice Sets the on-demand rate limit window for a quorum.
-    /// @param quorumId The ID of the quorum.
-    /// @param onDemandRateLimitWindow The new on-demand rate limit window in seconds.
-    function setOnDemandRateLimitWindow(uint64 quorumId, uint64 onDemandRateLimitWindow) external;
-
-    /// @notice Sets the on-demand enabled status for a quorum.
-    /// @param quorumId The ID of the quorum.
-    /// @param enabled Whether on-demand usage is enabled for the quorum.
-    function setOnDemandEnabled(uint64 quorumId, bool enabled) external;
 }
