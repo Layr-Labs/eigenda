@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 
@@ -13,8 +14,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
-
-// PaymentAccounts (For reservations and on-demand payments)
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
@@ -435,4 +434,64 @@ func (pvp *PaymentVaultParams) PaymentVaultParamsToProtobuf() (*disperser_rpc.Pa
 		QuorumProtocolConfigs: quorumProtocolConfigs,
 		OnDemandQuorumNumbers: onDemandQuorumNumbers,
 	}, nil
+}
+
+// ReservationsFromProtobuf converts protobuf reservations to native types
+func ReservationsFromProtobuf(pbReservations map[uint32]*disperser_rpc.QuorumReservation) map[core.QuorumID]*core.ReservedPayment {
+	if pbReservations == nil {
+		return nil
+	}
+
+	reservations := make(map[core.QuorumID]*core.ReservedPayment)
+	for quorumNumber, reservation := range pbReservations {
+		if reservation == nil {
+			continue
+		}
+		quorumID := core.QuorumID(quorumNumber)
+		reservations[quorumID] = &core.ReservedPayment{
+			SymbolsPerSecond: reservation.GetSymbolsPerSecond(),
+			StartTimestamp:   uint64(reservation.GetStartTimestamp()),
+			EndTimestamp:     uint64(reservation.GetEndTimestamp()),
+		}
+	}
+	return reservations
+}
+
+// CumulativePaymentFromProtobuf converts protobuf payment bytes to *big.Int
+func CumulativePaymentFromProtobuf(paymentBytes []byte) *big.Int {
+	if paymentBytes == nil {
+		return nil
+	}
+	return new(big.Int).SetBytes(paymentBytes)
+}
+
+// ConvertPaymentStateFromProtobuf converts a protobuf GetPaymentStateForAllQuorumsReply to native types
+func ConvertPaymentStateFromProtobuf(paymentStateProto *disperser_rpc.GetPaymentStateForAllQuorumsReply) (
+	*PaymentVaultParams,
+	map[core.QuorumID]*core.ReservedPayment,
+	*big.Int,
+	*big.Int,
+	QuorumPeriodRecords,
+	error,
+) {
+	if paymentStateProto == nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("payment state cannot be nil")
+	}
+
+	paymentVaultParams, err := PaymentVaultParamsFromProtobuf(paymentStateProto.GetPaymentVaultParams())
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("error converting payment vault params: %w", err)
+	}
+
+	reservations := ReservationsFromProtobuf(paymentStateProto.GetReservations())
+
+	cumulativePayment := CumulativePaymentFromProtobuf(paymentStateProto.GetCumulativePayment())
+	onchainCumulativePayment := CumulativePaymentFromProtobuf(paymentStateProto.GetOnchainCumulativePayment())
+
+	var periodRecords QuorumPeriodRecords
+	if paymentStateProto.GetPeriodRecords() != nil {
+		periodRecords = FromProtoRecords(paymentStateProto.GetPeriodRecords())
+	}
+
+	return paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, nil
 }
