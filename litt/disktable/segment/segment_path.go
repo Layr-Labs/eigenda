@@ -98,41 +98,21 @@ func (p *SegmentPath) SnapshottingEnabled() bool {
 }
 
 // MakeDirectories creates the necessary directories described by the SegmentPath if they do not already exist.
-func (p *SegmentPath) MakeDirectories() error {
-	exists, err := util.Exists(p.segmentDirectory)
+func (p *SegmentPath) MakeDirectories(fsync bool) error {
+	err := util.EnsureDirectoryExists(p.segmentDirectory, fsync)
 	if err != nil {
-		return fmt.Errorf("failed to check if segment directory exists: %w", err)
-	}
-	if !exists {
-		err := os.MkdirAll(p.segmentDirectory, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create segment directory: %w", err)
-		}
-	}
-
-	exists, err = util.Exists(p.hardlinkPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if segment directory exists: %w", err)
+		return fmt.Errorf("failed to ensure segment directory exists: %w", err)
 	}
 
 	if p.SnapshottingEnabled() {
-		if !exists {
-			err := os.MkdirAll(p.hardlinkPath, 0755)
-			if err != nil {
-				return fmt.Errorf("failed to create segment directory: %w", err)
-			}
-		}
-
-		exists, err = util.Exists(p.softlinkPath)
+		err = util.EnsureDirectoryExists(p.hardlinkPath, fsync)
 		if err != nil {
-			return fmt.Errorf("failed to check if segment directory exists: %w", err)
+			return fmt.Errorf("failed to ensure hard link directory exists: %w", err)
 		}
 
-		if !exists {
-			err := os.MkdirAll(p.softlinkPath, 0755)
-			if err != nil {
-				return fmt.Errorf("failed to create segment directory: %w", err)
-			}
+		err = util.EnsureDirectoryExists(p.softlinkPath, fsync)
+		if err != nil {
+			return fmt.Errorf("failed to ensure soft link directory exists: %w", err)
 		}
 	}
 

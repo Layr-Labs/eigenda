@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -230,6 +229,30 @@ func ErrIfNotWritableDirectory(dirPath string) error {
 	return nil
 }
 
+// Returns an error if the given path exists, otherwise returns nil.
+func ErrIfExists(path string) error { // TODO test
+	exists, err := Exists(path)
+	if err != nil {
+		return fmt.Errorf("failed to check if path %s exists: %w", path, err)
+	}
+	if exists {
+		return fmt.Errorf("path %s already exists", path)
+	}
+	return nil
+}
+
+// Returns an error if the given path does not exist, otherwise returns nil.
+func ErrIfNotExists(path string) error { // TODO test
+	exists, err := Exists(path)
+	if err != nil {
+		return fmt.Errorf("failed to check if path %s exists: %w", path, err)
+	}
+	if !exists {
+		return fmt.Errorf("path %s does not exist", path)
+	}
+	return nil
+}
+
 // Exists checks if a file or directory exists at the given path. More aesthetically pleasant than os.Stat.
 func Exists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -281,10 +304,10 @@ func SyncParentDirectory(path string) error {
 	return SyncDirectory(filepath.Dir(path))
 }
 
-// CopyRegularFile copies a regular file from src to dst, preserving permissions and timestamps.
-func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.Time, fsync bool) error {
+// CopyRegularFile copies a regular file from src to dst.
+func CopyRegularFile(src string, dst string, fsync bool) error {
 	// Ensure parent directory exists
-	if err := EnsureParentDirExists(dst, 0755, fsync); err != nil {
+	if err := EnsureParentDirectoryExists(dst, fsync); err != nil {
 		return err
 	}
 
@@ -309,7 +332,7 @@ func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 	}
 
 	// Create destination file
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}
@@ -318,11 +341,6 @@ func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 	// Copy content
 	if _, err = io.Copy(out, in); err != nil {
 		return fmt.Errorf("failed to copy file content from %s to %s: %w", src, dst, err)
-	}
-
-	// Preserve timestamps
-	if err = os.Chtimes(dst, modTime, modTime); err != nil {
-		return fmt.Errorf("failed to preserve timestamps for %s: %w", dst, err)
 	}
 
 	// Sync if requested
@@ -338,16 +356,16 @@ func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 	return nil
 }
 
-// EnsureParentDirExists ensures the parent directory of the given path exists and is writable.
+// EnsureParentDirectoryExists ensures the parent directory of the given path exists and is writable.
 // Creates parent directories if they don't exist.
-func EnsureParentDirExists(path string, mode os.FileMode, fsync bool) error {
-	return EnsureDirectoryExists(filepath.Dir(path), mode, fsync)
+func EnsureParentDirectoryExists(path string, fsync bool) error {
+	return EnsureDirectoryExists(filepath.Dir(path), fsync)
 }
 
 // EnsureDirectoryExists ensures a directory exists with the given permissions.
 // If the directory already exists, it verifies it has write permissions.
 // If fsync is true, all newly created directories are synced to disk.
-func EnsureDirectoryExists(dirPath string, mode os.FileMode, fsync bool) error {
+func EnsureDirectoryExists(dirPath string, fsync bool) error {
 	// Convert to absolute path to ensure clean processing
 	absPath, err := filepath.Abs(dirPath)
 	if err != nil {
@@ -390,7 +408,7 @@ func EnsureDirectoryExists(dirPath string, mode os.FileMode, fsync bool) error {
 		dirToCreate := pathsToCreate[i]
 
 		// Create the directory
-		if err := os.Mkdir(dirToCreate, mode); err != nil {
+		if err := os.Mkdir(dirToCreate, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dirToCreate, err)
 		}
 

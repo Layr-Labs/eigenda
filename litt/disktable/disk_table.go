@@ -87,6 +87,9 @@ type DiskTable struct {
 
 	// Set to true when the table is destroyed. This is used to prevent double destroying.
 	destroyed atomic.Bool
+
+	// If true then ensure file operations are synced to disk.
+	fsync bool
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -115,7 +118,7 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to build segment paths: %w", err)
 	}
 	for _, segmentPath := range segmentPaths {
-		err = segmentPath.MakeDirectories()
+		err = segmentPath.MakeDirectories(config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create segment directories: %w", err)
 		}
@@ -181,6 +184,7 @@ func NewDiskTable(
 		keymapPath:     keymapPath,
 		keymapTypeFile: keymapTypeFile,
 		metrics:        metrics,
+		fsync:          config.Fsync,
 	}
 
 	// Load segments.
@@ -328,15 +332,10 @@ func (d *DiskTable) repairSnapshot(
 	segments map[uint32]*segment.Segment) (*BoundaryFile, error) {
 
 	symlinkTableDirectory := path.Join(symlinkDirectory, d.name)
-	exists, err := util.Exists(symlinkTableDirectory)
+
+	err := util.EnsureDirectoryExists(symlinkTableDirectory, d.fsync)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if symlink table directory exists: %w", err)
-	}
-	if !exists {
-		err = os.MkdirAll(symlinkTableDirectory, 0755)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create symlink table directory: %w", err)
-		}
+		return nil, fmt.Errorf("failed to ensure symlink table directory exists: %w", err)
 	}
 
 	upperBoundSnapshotFile, err := LoadBoundaryFile(false, symlinkTableDirectory)
@@ -353,7 +352,7 @@ func (d *DiskTable) repairSnapshot(
 	defer lock.Release()
 
 	symlinkSegmentsDirectory := path.Join(symlinkTableDirectory, segment.SegmentDirectory)
-	exists, err = util.Exists(symlinkSegmentsDirectory)
+	exists, err := util.Exists(symlinkSegmentsDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if symlink segments directory exists: %w", err)
 	}

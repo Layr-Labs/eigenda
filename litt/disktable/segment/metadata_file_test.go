@@ -19,7 +19,7 @@ func TestUnsealedSerialization(t *testing.T) {
 	timestamp := rand.Uint64()
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	m := &metadataFile{
 		index:              index,
@@ -66,7 +66,7 @@ func TestSealedSerialization(t *testing.T) {
 	timestamp := rand.Uint64()
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	m := &metadataFile{
 		index:              index,
@@ -112,7 +112,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	index := rand.Uint32()
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestSealing(t *testing.T) {
 	index := rand.Uint32()
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)

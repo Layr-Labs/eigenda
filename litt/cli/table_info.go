@@ -111,12 +111,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 	}
 
 	for _, segmentPath := range segmentPaths {
-		exists, err := util.Exists(segmentPath.SegmentDirectory())
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment directory %s exists: %v",
-				segmentPath.SegmentDirectory(), err)
-		}
-		if !exists {
+		if err = util.ErrIfNotExists(segmentPath.SegmentDirectory()); err != nil {
 			return nil, fmt.Errorf("segment directory %s does not exist", segmentPath.SegmentDirectory())
 		}
 	}

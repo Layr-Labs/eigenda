@@ -1,17 +1,12 @@
 package main
 
 import (
-	"context"
-	"os"
 	"path"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
-	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
@@ -375,7 +370,8 @@ func TestRebaseSnapshot(t *testing.T) {
 
 	destinationDir := path.Join(testDir, "destination")
 
-	// Begin the rebase without shutting down the DB. Lock files on the snapshot directory shouldn't interfere.
+	// Begin the rebase without shutting down the DB. Lock files on the snapshot directory shouldn't interfere,
+	// but we still expect it to fail, since we don't support rebasing a snapshot directory.
 	err = rebase(
 		logger,
 		[]string{snapshotDir},
@@ -383,95 +379,18 @@ func TestRebaseSnapshot(t *testing.T) {
 		true,
 		false,
 		false)
-	require.NoError(t, err, "failed to rebase DB")
-
-	// Verify the data in the DB old copy of the DB. This shouldn't have led to any data loss.
-	for tableName := range expectedData {
-		table, err := db.GetTable(tableName)
-		require.NoError(t, err, "failed to get table %s", tableName)
-		for key := range expectedData[tableName] {
-			value, ok, err := table.Get([]byte(key))
-			require.NoError(t, err, "failed to get key %s in table %s", key, tableName)
-			require.True(t, ok, "key %s not found in table %s", key, tableName)
-			require.Equal(t, expectedData[tableName][key], value,
-				"value for key %s in table %s does not match expected value", key, tableName)
-		}
-	}
+	require.Error(t, err)
 
 	err = db.Close()
 	require.NoError(t, err, "failed to close DB after rebase")
 
-	// Inspect the destination directory. None of these files should be symlinks.
-	err = filepath.Walk(destinationDir, func(filePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Check if the file is a symlink
-		if info.Mode()&os.ModeSymlink != 0 {
-			require.Fail(t, "found symlink at %s, but expected no symlinks in destination directory", filePath)
-		}
-
-		return nil
-	})
-	require.NoError(t, err, "failed to walk destination directory %s", destinationDir)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
-
-	// For each table, inspect the segment files in the destination directory, compared with the segment files
-	// in the snapshot directory. The contents should match exactly (other than the fact that the original files are
-	// symlinks.
-	for _, tableName := range tableNames {
-		newSegmentPath, err := segment.NewSegmentPath(destinationDir, "", tableName)
-		require.NoError(t, err, "failed to create segment path for new directory")
-		newFirstSegmentIndex, newLastSegmentIndex, newSegments, err := segment.GatherSegmentFiles(
-			logger,
-			errorMonitor,
-			[]*segment.SegmentPath{newSegmentPath},
-			time.Now(),
-			false,
-			false)
-		require.NoError(t, err)
-
-		snapshotSegmentPath, err := segment.NewSegmentPath(snapshotDir, "", tableName)
-		require.NoError(t, err, "failed to create segment path for snapshot directory")
-		snapshotFirstSegmentIndex, snapshotLastSegmentIndex, snapshotSegments, err := segment.GatherSegmentFiles(
-			logger,
-			errorMonitor,
-			[]*segment.SegmentPath{snapshotSegmentPath},
-			time.Now(),
-			false,
-			false)
-		require.NoError(t, err)
-
-		require.Equal(t, newFirstSegmentIndex, snapshotFirstSegmentIndex)
-		require.Equal(t, newLastSegmentIndex, snapshotLastSegmentIndex)
-
-		for index := newFirstSegmentIndex; index <= newLastSegmentIndex; index++ {
-			newSegment := newSegments[index]
-			snapshotSegment := snapshotSegments[index]
-
-			newSegmentFiles := newSegment.GetFilePaths()
-			snapshotSegmentFiles := snapshotSegment.GetFilePaths()
-
-			// Compare each pair of files to ensure the bytes match exactly
-			require.Equal(t, len(newSegmentFiles), len(snapshotSegmentFiles),
-				"segment %d should have same number of files in both directories", index)
-
-			for i, newFile := range newSegmentFiles {
-				snapshotFile := snapshotSegmentFiles[i]
-
-				// Read contents of both files
-				newContent, err := os.ReadFile(newFile)
-				require.NoError(t, err, "failed to read new segment file %s", newFile)
-
-				snapshotContent, err := os.ReadFile(snapshotFile)
-				require.NoError(t, err, "failed to read snapshot segment file %s", snapshotFile)
-
-				// Compare file contents byte-for-byte
-				require.Equal(t, snapshotContent, newContent,
-					"file contents should match exactly between %s and %s", newFile, snapshotFile)
-			}
-		}
-	}
+	// It won't matter that the DB is closed, we still expect the rebase to fail.
+	err = rebase(
+		logger,
+		[]string{snapshotDir},
+		[]string{destinationDir},
+		true,
+		false,
+		false)
+	require.Error(t, err)
 }

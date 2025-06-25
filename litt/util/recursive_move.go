@@ -56,13 +56,8 @@ func RecursiveMove(
 
 // moveFile handles moving a single file
 func moveFile(source string, destination string, preserveOriginal bool, fsync bool) error {
-	sourceInfo, err := os.Stat(source)
-	if err != nil {
-		return fmt.Errorf("failed to stat source file: %w", err)
-	}
-
 	// Ensure parent directory exists
-	if err := EnsureParentDirExists(destination, sourceInfo.Mode(), fsync); err != nil {
+	if err := EnsureParentDirectoryExists(destination, fsync); err != nil {
 		return fmt.Errorf("failed to ensure parent directory exists: %w", err)
 	}
 
@@ -75,13 +70,13 @@ func moveFile(source string, destination string, preserveOriginal bool, fsync bo
 		// Rename failed (likely different filesystem), fall back to copy+delete
 	}
 
-	err = ErrIfSymlink(source)
+	err := ErrIfSymlink(source)
 	if err != nil {
 		return fmt.Errorf("symlinks not supported: %w", err)
 	}
 
 	// Copy the file
-	if err := CopyRegularFile(source, destination, sourceInfo.Mode(), sourceInfo.ModTime(), fsync); err != nil {
+	if err := CopyRegularFile(source, destination, fsync); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)
 	}
 
@@ -115,7 +110,7 @@ func recursiveMoveDirectory(
 ) error {
 
 	// Create destination directory if it doesn't exist
-	if err := EnsureDirectoryExists(destination, 0755, fsync); err != nil {
+	if err := EnsureDirectoryExists(destination, fsync); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
@@ -138,11 +133,6 @@ func recursiveMoveDirectory(
 
 		destPath := filepath.Join(destination, relPath)
 
-		info, err := d.Info()
-		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", path, err)
-		}
-
 		err = ErrIfSymlink(path)
 		if err != nil {
 			return fmt.Errorf("symlinks not supported: %w", err)
@@ -150,7 +140,7 @@ func recursiveMoveDirectory(
 
 		if d.IsDir() {
 			// Create directory at destination
-			if err := EnsureDirectoryExists(destPath, info.Mode(), fsync); err != nil {
+			if err := EnsureDirectoryExists(destPath, fsync); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
 			}
 		} else {

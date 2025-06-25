@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -103,21 +102,11 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
-	var err error
 
 	for _, rootPath := range config.Paths {
-		exists, err := util.Exists(rootPath)
+		err := util.EnsureDirectoryExists(rootPath, config.Fsync)
 		if err != nil {
-			return nil, fmt.Errorf("error checking if path %s exists: %w", rootPath, err)
-		}
-		if !exists {
-			err = os.MkdirAll(rootPath, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("error creating path %s: %w", rootPath, err)
-			}
-			config.Logger.Infof("Created directory %s", rootPath)
-		} else {
-			config.Logger.Infof("Using existing directory %s", rootPath)
+			return nil, fmt.Errorf("error ensuring directory %s exists: %w", rootPath, err)
 		}
 	}
 

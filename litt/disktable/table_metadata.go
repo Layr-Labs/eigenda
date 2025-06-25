@@ -61,11 +61,7 @@ func newTableMetadata(
 func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMetadata, error) {
 	mPath := metadataPath(tableDirectory)
 
-	exists, err := util.Exists(mPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if table metadata file exists: %v", err)
-	}
-	if !exists {
+	if err := util.ErrIfNotExists(mPath); err != nil {
 		return nil, fmt.Errorf("table metadata file does not exist: %s", mPath)
 	}
 

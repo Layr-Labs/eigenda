@@ -50,7 +50,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
@@ -198,7 +198,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
@@ -355,7 +355,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
-	err = segmentPath.MakeDirectories()
+	err = segmentPath.MakeDirectories(false)
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,

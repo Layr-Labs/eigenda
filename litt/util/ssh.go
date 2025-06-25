@@ -36,11 +36,7 @@ func NewSSHSession(
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	exists, err := Exists(keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if key exists: %v", err)
-	}
-	if !exists {
+	if err := ErrIfNotExists(keyPath); err != nil {
 		return nil, fmt.Errorf("private key does not exist at path: %s", keyPath)
 	}
 

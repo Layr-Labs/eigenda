@@ -83,15 +83,9 @@ func rebase(
 	for _, dest := range destinations {
 		destinationSet[dest] = struct{}{}
 
-		exists, err := util.Exists(dest)
+		err := util.EnsureDirectoryExists(dest, fsync)
 		if err != nil {
-			return fmt.Errorf("error checking if destination path %s exists: %w", dest, err)
-		}
-		if !exists {
-			err = os.MkdirAll(dest, 0755)
-			if err != nil {
-				return fmt.Errorf("error creating destination path %s: %w", dest, err)
-			}
+			return fmt.Errorf("error ensuring destination path %s exists: %w", dest, err)
 		}
 	}
 
@@ -276,7 +270,7 @@ func transferDataInTable(
 	segmentFileCount *atomic.Int64,
 ) error {
 
-	err := createDestinationTableDirectories(destinations, tableName)
+	err := createDestinationTableDirectories(destinations, tableName, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to create destination table directories for table %s: %w", tableName, err)
 	}
@@ -387,20 +381,14 @@ func deleteSnapshotDirectory(logger logging.Logger, source string, tableName str
 }
 
 // In the destination directories, create directories for the tables (if they don't exist).
-func createDestinationTableDirectories(destinations []string, tableName string) error {
+func createDestinationTableDirectories(destinations []string, tableName string, fsync bool) error {
 	for _, destination := range destinations {
 		destinationTableDir := filepath.Join(destination, tableName)
-		exists, err := util.Exists(destinationTableDir)
+
+		err := util.EnsureDirectoryExists(destinationTableDir, fsync)
 		if err != nil {
-			return fmt.Errorf("failed to check if destination table directory %s exists: %w",
+			return fmt.Errorf("failed to ensure destination table directory %s exists: %w",
 				destinationTableDir, err)
-		}
-		if !exists {
-			err = os.MkdirAll(destinationTableDir, 0755)
-			if err != nil {
-				return fmt.Errorf("failed to create destination table directory %s: %w",
-					destinationTableDir, err)
-			}
 		}
 	}
 
