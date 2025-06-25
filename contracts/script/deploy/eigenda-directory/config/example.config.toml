@@ -1,3 +1,6 @@
 
+# This field should be populated with the contract names for use in contract lookups.
 contractNames = ["EXAMPLE", "EXAMPLE2"]
+
+# This field should be populated with the addresses of the contracts in the same order as in contractNames.
 contractAddresses = ["0xfC4C575ea3f8316D38F83076Cf765f7B8DeaFC58", "0xF2d1511E53AeAE16213EcA7963A103cB5CEc2b18"]
