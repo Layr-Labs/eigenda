@@ -83,7 +83,8 @@ func init() {
 
 // startMinIOContainer starts a MinIO container and sets the minioEndpoint global variable
 func startMinIOContainer() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// TODO: we should pass in the test.Test here and using t.Context() instead of creating a new context.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	minioContainer, err := miniotc.Run(
@@ -107,7 +108,8 @@ func startMinIOContainer() error {
 
 // startRedisContainer starts a Redis container and sets the redisEndpoint global variable
 func startRedisContainer() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// TODO: we should pass in the test.Test here and using t.Context() instead of creating a new context.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	redisContainer, err := redistc.Run(
