@@ -1,11 +1,18 @@
 [tools]
-# Core Dependencies
-go = "1.21"
+
+# The exact version here doesn't matter because the `go` command is forward compatible,
+# meaning that it will automatically download a golang version (as a module) to match the
+# go and toolchain versions specified in the go.mod file.
+# See https://go.dev/blog/toolchain for more details.
+# We still want *some* go version here so that the `go` command is available though.
+go = "1.24"
 
 # Tooling Dependencies
-"go:github.com/golangci/golangci-lint/cmd/golangci-lint" = "1.60.3"
-"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.14.0"
-# Belive yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
+golangci-lint = "2.1.6"
+# abigen v2 was release in v1.15.6: https://github.com/ethereum/go-ethereum/releases/tag/v1.15.6
+# So we need to keep this version below 1.15.6 until we're ready to upgrade and fix whatever breaks.
+"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.15.0"
+# Believe yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
 # TODO: document exactly why these are needed.
 node = "20.18.1"
 yarn = "1.22.22"

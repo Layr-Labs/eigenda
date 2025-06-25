@@ -10,10 +10,12 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
@@ -84,7 +86,7 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -107,14 +109,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 
 	// Initialize NTP synced clock
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-	logger = logger.With("component", "DisperserClient")
-
-	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger.With("component", "DisperserClient"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NTP clock: %w", err)
 	}
@@ -136,15 +131,21 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		c.accountant = NewAccountant(accountId)
 	}
 
-	paymentState, err := c.GetPaymentState(ctx)
+	paymentStateProto, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
-	err = c.accountant.SetPaymentState(paymentState)
+	// Convert protobuf types to native Go types using meterer conversion function
+	paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, err := meterer.ConvertPaymentStateFromProtobuf(paymentStateProto)
+	if err != nil {
+		return fmt.Errorf("error converting payment state from protobuf: %w", err)
+	}
+
+	err = c.accountant.SetPaymentState(paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords)
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
@@ -211,7 +212,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, c.ntpClock.Now().UnixNano(), uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(c.ntpClock.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
@@ -298,6 +299,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
+		// TODO: rollback payment for the accountant if the blob fails to disperse
+		// because ondemand request hits global ratelimit.
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
 	}
 
@@ -363,7 +366,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -381,12 +384,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
-	request := &disperser_rpc.GetPaymentStateRequest{
+	request := &disperser_rpc.GetPaymentStateForAllQuorumsRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.client.GetPaymentStateForAllQuorums(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.

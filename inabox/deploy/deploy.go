@@ -53,19 +53,11 @@ func (env *Config) getKeyString(name string) string {
 // generateV1CertVerifierDeployConfig generates the input config used for deploying the V1 CertVerifier
 // NOTE: this will be killed in the future with eventual deprecation of V1
 func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient) V1CertVerifierDeployConfig {
-	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
-	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-
 	config := V1CertVerifierDeployConfig{
-		ThresholdRegistry: thresholdRegistryAddr.String(),
-		ServiceManager:    env.EigenDA.ServiceManager,
+		ServiceManager:                env.EigenDA.ServiceManager,
+		RequiredQuorums:               []uint32{0, 1},
+		RequiredAdversarialThresholds: []uint32{33, 33},
+		RequiredConfirmationQuorums:   []uint32{55, 55},
 	}
 
 	return config
@@ -168,7 +160,7 @@ func (env *Config) deployEigenDAContracts() {
 
 	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
 	//       can be deprecated.
-	writeFile("script/deploy/certverifier/config/inabox_deploy_config_v1.json", data)
+	writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data)
 	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"})
 
 	data = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
@@ -193,7 +185,7 @@ func (env *Config) DeployExperiment() {
 	if err != nil {
 		log.Panicf("error opening file: %v", err)
 	}
-	defer f.Close()
+	defer core.CloseLogOnError(f, f.Name(), nil)
 	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts

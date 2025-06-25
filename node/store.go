@@ -441,14 +441,15 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				return nil, err
 			}
 
-			if format == core.GnarkBundleEncodingFormat {
+			switch format {
+			case core.GnarkBundleEncodingFormat:
 				rawBundle, ok := rawBundles[quorumID]
 				if ok {
 					size += int64(len(rawBundle))
 					keys = append(keys, key)
 					batch.Put(key, rawBundle)
 				}
-			} else if format == core.GobBundleEncodingFormat {
+			case core.GobBundleEncodingFormat:
 				if len(rawChunks[quorumID]) != len(bundle) {
 					return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
 				}
@@ -467,7 +468,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					keys = append(keys, key)
 					batch.Put(key, chunkBytes)
 				}
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
 			}
 		}
