@@ -176,8 +176,12 @@ FROM alpine:3.22 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin
 ENTRYPOINT ["blobapi"]
 
+# proxy doesn't follow the same pattern as the others, because we keep it in the same
+# format as when it was a separate repo: https://github.com/Layr-Labs/eigenda-proxy/blob/main/Dockerfile
 FROM alpine:3.22 AS proxy
-COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy /usr/local/bin
+WORKDIR /app
+COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
 COPY --from=proxy-builder /app/api/proxy/resources/ /app/resources/
-EXPOSE 4242 7300
-ENTRYPOINT ["eigenda-proxy"]
+# default ports for data and metrics
+EXPOSE 3100 7300
+ENTRYPOINT ["./eigenda-proxy"]
