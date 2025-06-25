@@ -491,6 +491,7 @@ func TestPushSnapshot(t *testing.T) {
 			time.Now(),
 			false,
 			false)
+		require.NoError(t, err)
 		highestSegmentIndexForTable[tableName] = highestSegmentIndex
 	}
 	ok, err := errorMonitor.IsOk()
@@ -617,6 +618,7 @@ func TestPushSnapshot(t *testing.T) {
 			"unexpected file: %s", path)
 		return nil
 	})
+	require.NoError(t, err)
 
 	// There should also not be any segment files in the hard link directories.
 	err = filepath.Walk(sourceRoot, func(path string, info os.FileInfo, err error) error {
@@ -635,6 +637,7 @@ func TestPushSnapshot(t *testing.T) {
 			"unexpected file: %s", path)
 		return nil
 	})
+	require.NoError(t, err)
 
 	// Reopen the old DB, verify no data is missing.
 	db, err = littbuilder.NewDB(config)

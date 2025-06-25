@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -49,11 +50,10 @@ func rebaseCommand(ctx *cli.Context) error {
 		}
 	}
 
-	deep := !ctx.Bool("shallow")
 	preserveOriginal := ctx.Bool("preserve")
 	verbose := !ctx.Bool("quiet")
 
-	return rebase(logger, sources, destinations, deep, preserveOriginal, true, verbose)
+	return rebase(logger, sources, destinations, preserveOriginal, true, verbose)
 }
 
 // rebase moves LittDB database files from one location to another (locally). This function is idempotent. If it
@@ -62,7 +62,6 @@ func rebase(
 	logger logging.Logger,
 	sources []string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -120,17 +119,8 @@ func rebase(
 
 	if symlinkFound {
 		// If any of the segment files are symlinks, that means that we are dealing with a snapshot.
-		if len(sources) > 1 {
-			return fmt.Errorf(
-				"snapshot detected (source files contain symlinks), but multiple source paths provided. " +
-					"Snapshots are not supported if they are spread over multiple paths")
-		}
-		if !preserveOriginal || !deep {
-			return fmt.Errorf(
-				"snapshot detected (source files contain symlinks). When rebasing from a snapshot, " +
-					"--shallow is not allowed, and --preserve is required")
-
-		}
+		return errors.New(
+			"snapshot detected (source files contain symlinks). Rebasing from a snapshot is not supported")
 	}
 
 	// For each directory that is going away, transfer its data to the new destination.
@@ -139,7 +129,6 @@ func rebase(
 			logger,
 			source,
 			destinations,
-			deep,
 			preserveOriginal,
 			fsync,
 			verbose,
@@ -214,7 +203,6 @@ func transferDataInDirectory(
 	logger logging.Logger,
 	source string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -252,7 +240,6 @@ func transferDataInDirectory(
 			source,
 			child.Name(),
 			destinations,
-			deep,
 			preserveOriginal,
 			fsync,
 			verbose,
@@ -282,7 +269,6 @@ func transferDataInTable(
 	source string,
 	tableName string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -295,12 +281,12 @@ func transferDataInTable(
 		return fmt.Errorf("failed to create destination table directories for table %s: %w", tableName, err)
 	}
 
-	err = transferKeymap(source, tableName, destinations, deep, preserveOriginal, fsync, verbose)
+	err = transferKeymap(source, tableName, destinations, preserveOriginal, fsync, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to transfer keymap for table %s: %w", tableName, err)
 	}
 
-	err = transferTableMetadata(source, tableName, destinations, deep, preserveOriginal, fsync, verbose)
+	err = transferTableMetadata(source, tableName, destinations, preserveOriginal, fsync, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to transfer table metadata for table %s: %w", tableName, err)
 	}
@@ -309,7 +295,6 @@ func transferDataInTable(
 		source,
 		tableName,
 		destinations,
-		deep,
 		preserveOriginal,
 		fsync,
 		verbose,
@@ -427,7 +412,6 @@ func transferKeymap(
 	source string,
 	tableName string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -456,7 +440,7 @@ func transferKeymap(
 		_ = writer.Flush()
 	}
 
-	err = util.RecursiveMove(sourceKeymapPath, destinationKeymapPath, deep, preserveOriginal, fsync)
+	err = util.RecursiveMove(sourceKeymapPath, destinationKeymapPath, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy keymap from %s to %s: %w",
 			sourceKeymapPath, destinationKeymapPath, err)
@@ -470,7 +454,6 @@ func transferSegmentData(
 	source string,
 	tableName string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -501,7 +484,6 @@ func transferSegmentData(
 			segmentFilePath,
 			tableName,
 			destinations,
-			deep,
 			preserveOriginal,
 			fsync,
 			verbose,
@@ -530,7 +512,6 @@ func transferSegmentFile(
 	segmentFilePath string,
 	tableName string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -554,7 +535,7 @@ func transferSegmentFile(
 		_ = writer.Flush()
 	}
 
-	err = util.RecursiveMove(segmentFilePath, destinationSegmentPath, deep, preserveOriginal, fsync)
+	err = util.RecursiveMove(segmentFilePath, destinationSegmentPath, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy segment file from %s to %s: %w",
 			segmentFilePath, destinationSegmentPath, err)
@@ -568,7 +549,6 @@ func transferTableMetadata(
 	source string,
 	tableName string,
 	destinations []string,
-	deep bool,
 	preserveOriginal bool,
 	fsync bool,
 	verbose bool,
@@ -600,7 +580,7 @@ func transferTableMetadata(
 		_ = writer.Flush()
 	}
 
-	err = util.RecursiveMove(sourceMetadataPath, destinationMetadataPath, deep, preserveOriginal, fsync)
+	err = util.RecursiveMove(sourceMetadataPath, destinationMetadataPath, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy table metadata from %s to %s: %w",
 			sourceMetadataPath, destinationMetadataPath, err)

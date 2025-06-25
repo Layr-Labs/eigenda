@@ -22,7 +22,6 @@ func rebaseTest(
 	sourceDirs uint64,
 	destDirs uint64,
 	overlap uint64,
-	shallow bool,
 	preserveOriginal bool,
 	verbose bool,
 ) {
@@ -145,7 +144,7 @@ func rebaseTest(
 	}
 
 	// Rebasing with the DB still open should fail.
-	err = rebase(logger, sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
+	err = rebase(logger, sourceDirList, destDirList, preserveOriginal, false, verbose)
 	require.Error(t, err)
 
 	// None of the source dirs should have been deleted.
@@ -173,7 +172,7 @@ func rebaseTest(
 	err = db.Close()
 	require.NoError(t, err, "failed to close DB")
 
-	err = rebase(logger, sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
+	err = rebase(logger, sourceDirList, destDirList, preserveOriginal, false, verbose)
 	require.NoError(t, err, "failed to rebase DB")
 
 	// Verify the new directories.
@@ -231,19 +230,11 @@ func TestRebase1to1(t *testing.T) {
 	t.Run("deep", func(t *testing.T) {
 		// This is the only test that runs with verbose= true. We want to make sure this doesn't crash,
 		// but don't want too much spam in the logs.
-		rebaseTest(t, sourceDirs, destDirs, 0, false, false, true)
+		rebaseTest(t, sourceDirs, destDirs, 0, false, true)
 	})
 
 	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, false, false)
-	})
-
-	t.Run("deep preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, true, false)
-	})
-
-	t.Run("shallow preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, true, false)
+		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
 	})
 }
 
@@ -253,20 +244,12 @@ func TestRebase1toN(t *testing.T) {
 	sourceDirs := uint64(1)
 	destDirs := uint64(4)
 
-	t.Run("deep", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, false, false)
+	t.Run("preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
 	})
 
-	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, false, false)
-	})
-
-	t.Run("deep preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, true, false)
-	})
-
-	t.Run("shallow preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, true, false)
+	t.Run("do not preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, false, false)
 	})
 }
 
@@ -276,20 +259,12 @@ func TestRebaseNto1(t *testing.T) {
 	sourceDirs := uint64(4)
 	destDirs := uint64(1)
 
-	t.Run("deep", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, false, false)
+	t.Run("preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
 	})
 
-	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, false, false)
-	})
-
-	t.Run("deep preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, true, false)
-	})
-
-	t.Run("shallow preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, true, false)
+	t.Run("do not preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, false, false)
 	})
 }
 
@@ -299,20 +274,12 @@ func TestRebaseNtoN(t *testing.T) {
 	sourceDirs := uint64(4)
 	destDirs := uint64(4)
 
-	t.Run("deep", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, false, false)
+	t.Run("preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
 	})
 
-	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, false, false)
-	})
-
-	t.Run("deep preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, false, true, false)
-	})
-
-	t.Run("shallow preserve", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, true, false)
+	t.Run("do not preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, false, false)
 	})
 }
 
@@ -322,12 +289,12 @@ func TestRebaseNtoNOverlap(t *testing.T) {
 	sourceDirs := uint64(4)
 	destDirs := uint64(4)
 
-	t.Run("deep", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 2, false, false, false)
+	t.Run("preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
 	})
 
-	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 2, true, false, false)
+	t.Run("do not preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, false, false)
 	})
 }
 
@@ -413,7 +380,6 @@ func TestRebaseSnapshot(t *testing.T) {
 		logger,
 		[]string{snapshotDir},
 		[]string{destinationDir},
-		true,
 		true,
 		false,
 		false)

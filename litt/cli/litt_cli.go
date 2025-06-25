@@ -54,7 +54,7 @@ func buildCLIParser() *cli.App {
 				Action: tableInfoCommand,
 			},
 			{
-				Name:  "rebase",
+				Name:  "rebase", // TODO fix documentation
 				Usage: "Restructure LittDB file system layout.",
 				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
 					"--dest <destination-path1> ... --dest <destination-pathN>",
@@ -70,13 +70,6 @@ func buildCLIParser() *cli.App {
 						Aliases:  []string{"d"},
 						Usage:    "Destination paths for the rebased LittDB, at least one is required.",
 						Required: true,
-					},
-					&cli.BoolFlag{
-						Name:    "shallow",
-						Aliases: []string{"S"},
-						Usage: "If true, then copies are made shallowly " +
-							"(e.g. with symlinks and hardlinks, where possible). ",
-						Required: false,
 					},
 					&cli.BoolFlag{
 						Name:     "preserve",

@@ -67,7 +67,7 @@ func createKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := util.VerifyFileProperties(filePath)
+	exists, _, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
@@ -115,7 +115,7 @@ func loadKeyFile(
 
 	filePath := keys.path()
 
-	exists, size, err := util.VerifyFileProperties(filePath)
+	exists, size, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
