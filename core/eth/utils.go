@@ -16,7 +16,7 @@ import (
 var (
 	maxNumberOfQuorums = 192
 
-	// ErrPaymentDoesNotExist is returned when a payment/deposit does not exist (is zero)
+	// ErrPaymentDoesNotExist is returned when a reservation/deposit does not exist (is zero)
 	ErrPaymentDoesNotExist = errors.New("payment does not exist")
 )
 
