@@ -218,9 +218,13 @@ func buildTable(
 		return nil, fmt.Errorf("error creating table: %w", err)
 	}
 
-	tableCache := cache.NewFIFOCache[string, []byte](config.CacheSize, cacheWeight)
-	tableCache = cache.NewThreadSafeCache(tableCache)
-	cachedTable := tablecache.NewCachedTable(table, tableCache)
+	writeCache := cache.NewFIFOCache[string, []byte](config.WriteCacheSize, cacheWeight, metrics.GetWriteCacheMetrics())
+	writeCache = cache.NewThreadSafeCache(writeCache)
+
+	readCache := cache.NewFIFOCache[string, []byte](config.ReadCacheSize, cacheWeight, metrics.GetReadCacheMetrics())
+	readCache = cache.NewThreadSafeCache(readCache)
+
+	cachedTable := tablecache.NewCachedTable(table, writeCache, readCache, metrics)
 
 	return cachedTable, nil
 }
@@ -231,7 +235,7 @@ func buildLogger(config *litt.Config) (logging.Logger, error) {
 		return config.Logger, nil
 	}
 
-	return common.NewLogger(*config.LoggerConfig)
+	return common.NewLogger(config.LoggerConfig)
 }
 
 // buildMetrics creates a new metrics object based on the configuration. If the returned server is not nil,
@@ -244,29 +248,33 @@ func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMe
 	var registry *prometheus.Registry
 	var server *http.Server
 
-	if config.MetricsRegistry == nil && config.MetricsEnabled {
-		registry = prometheus.NewRegistry()
-		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-		registry.MustRegister(collectors.NewGoCollector())
+	if config.MetricsEnabled {
+		if config.MetricsRegistry == nil {
+			registry = prometheus.NewRegistry()
+			registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+			registry.MustRegister(collectors.NewGoCollector())
 
-		logger.Infof("Starting metrics server at port %d", config.MetricsPort)
-		addr := fmt.Sprintf(":%d", config.MetricsPort)
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(
-			registry,
-			promhttp.HandlerOpts{},
-		))
-		server = &http.Server{
-			Addr:    addr,
-			Handler: mux,
-		}
-
-		go func() {
-			err := server.ListenAndServe()
-			if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
-				logger.Errorf("metrics server error: %v", err)
+			logger.Infof("Starting metrics server at port %d", config.MetricsPort)
+			addr := fmt.Sprintf(":%d", config.MetricsPort)
+			mux := http.NewServeMux()
+			mux.Handle("/metrics", promhttp.HandlerFor(
+				registry,
+				promhttp.HandlerOpts{},
+			))
+			server = &http.Server{
+				Addr:    addr,
+				Handler: mux,
 			}
-		}()
+
+			go func() {
+				err := server.ListenAndServe()
+				if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+					logger.Errorf("metrics server error: %v", err)
+				}
+			}()
+		} else {
+			registry = config.MetricsRegistry
+		}
 	}
 
 	return metrics.NewLittDBMetrics(registry, config.MetricsNamespace), server

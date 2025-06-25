@@ -1,6 +1,10 @@
 package util
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/dchest/siphash"
+)
 
 // Perm64 computes A permutation (invertible function) on 64 bits.
 // The constants were found by automated search, to
@@ -53,7 +57,16 @@ func Perm64Bytes(b []byte) uint64 {
 	return x
 }
 
-// HashKey hashes a key using perm64 and a salt.
-func HashKey(key []byte, salt uint32) uint32 {
+// LegacyHashKey hash a key using the original littDB hash function. Once all data stored using the original
+// hash function is deleted, this function can be removed.
+func LegacyHashKey(key []byte, salt uint32) uint32 {
 	return uint32(Perm64(Perm64Bytes(key) ^ uint64(salt)))
+}
+
+// HashKey hashes a key using perm64 and a salt.
+func HashKey(key []byte, salt [16]byte) uint32 {
+	leftSalt := binary.BigEndian.Uint64(salt[:8])
+	rightSalt := binary.BigEndian.Uint64(salt[8:])
+	hash := siphash.Hash(leftSalt, rightSalt, key)
+	return uint32(hash)
 }

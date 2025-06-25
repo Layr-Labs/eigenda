@@ -320,7 +320,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -394,7 +394,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -458,35 +458,36 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
-	fatalErrorHandler := table.(*DiskTable).fatalErrorHandler
+	errorMonitor := table.(*DiskTable).errorMonitor
 
 	// Delete a file in the middle of the sequence of segments.
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		fatalErrorHandler,
+		errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
 
 	filePath := ""
-	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
-	} else if typeToDelete == "value" {
-		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
-		shard := rand.Uint32Range(0, shardingFactor)
-		filePath = fmt.Sprintf(
-			"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
-	} else {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
-	}
-
+		switch typeToDelete {
+		case "key":
+			filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
+		case "value":
+			shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+			shard := rand.Uint32Range(0, shardingFactor)
+			filePath = fmt.Sprintf(
+				"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
+		default:
+			filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
+		}
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -575,16 +576,17 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -597,17 +599,17 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 
 	// Delete a file in the initial segment.
 	filePath := ""
-	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.KeyFileExtension)
-	} else if typeToDelete == "value" {
-		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
-		shard := rand.Uint32Range(0, shardingFactor)
-		filePath = fmt.Sprintf(
-			"%s/table/segments/%d-%d%s",
-			directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
-	} else {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+		switch typeToDelete {
+		case "key":
+			filePath = fmt.Sprintf("%s/table/segments/%d%s",
+				directory, lowestSegmentIndex, segment.KeyFileExtension)
+		case "value":
+			shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+			shard := rand.Uint32Range(0, shardingFactor)
+			filePath = fmt.Sprintf(
+				"%s/table/segments/%d-%d%s",
+				directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
+		default:		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
 	exists, err := util.Exists(filePath)
@@ -694,7 +696,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -764,16 +766,17 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -786,14 +789,15 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 
 	// Delete a file in the final segment.
 	filePath := ""
-	if typeToDelete == "key" {
+	switch typeToDelete {
+	case "key":
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeyFileExtension)
-	} else if typeToDelete == "value" {
+	case "value":
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
 		filePath = fmt.Sprintf(
 			"%s/table/segments/%d-%d%s", directory, highestSegmentIndex, shard, segment.ValuesFileExtension)
-	} else {
+	default:
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
 	}
 	exists, err := util.Exists(filePath)
@@ -811,7 +815,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -888,7 +892,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -963,9 +967,10 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data to be truncated.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeyFileExtension)
@@ -981,16 +986,17 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	// Truncate the last key file.
@@ -1041,7 +1047,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1118,7 +1124,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1185,9 +1191,10 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeyFileExtension)
@@ -1203,16 +1210,17 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	// Truncate a random shard of the last value file.
@@ -1281,7 +1289,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1358,7 +1366,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1428,9 +1436,10 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data left unflushed.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeyFileExtension)
@@ -1445,16 +1454,17 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the keymap to simulate keys that have not
@@ -1485,7 +1495,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1571,7 +1581,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// do bad things if it is going to. Nothing bad should happen if the GC is implemented correctly.
 	time.Sleep(50 * time.Millisecond)
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1611,7 +1621,7 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
@@ -1660,7 +1670,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
@@ -1723,7 +1733,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -1833,7 +1843,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1943,7 +1953,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		if i == restartIteration {
 			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
 
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -2030,7 +2040,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 
 	err = table.Close()
@@ -2137,10 +2147,18 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 		// Once in a while, scan the table and verify that all expected values are present.
 		// Don't do this every time for the sake of test runtime.
 		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+
+			// Force garbage collection to run in order to remove expired values from counts.
+			err = table.Flush()
+			require.NoError(t, err)
+			err = (table).(*DiskTable).RunGC()
+			require.NoError(t, err)
+
 			// Remove expired values from the expected values.
 			newlyExpiredKeys := make([]string, 0)
 			for key, creationTime := range creationTimes {
-				if newTime.Sub(creationTime) > ttl {
+				age := newTime.Sub(creationTime)
+				if age > ttl {
 					newlyExpiredKeys = append(newlyExpiredKeys, key)
 				}
 			}
@@ -2183,7 +2201,74 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	err = table.RunGC()
 	require.NoError(t, err)
 
+	// disable garbage collection
+	err = table.SetTTL(0)
+	require.NoError(t, err)
+	err = table.Flush()
+	require.NoError(t, err)
+
+	// Write some data that won't expire, just to be sure that the table is not empty.
+	for i := 0; i < 10; i++ {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 128)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
+
+	err = table.Flush()
+	require.NoError(t, err)
+
 	reportedSize := table.Size()
+	reportedKeyCount := table.KeyCount()
+
+	// The exact key count is hard to predict for the sake of this unit test, since GC is "lazy" and may not
+	// immediately remove all values that are legal to be removed. But at the very least, all unexpired
+	// values should be present, and the key count should not exceed the number of total inserted values.
+	require.GreaterOrEqual(t, reportedKeyCount, uint64(len(expectedValues)))
+	require.LessOrEqual(t, reportedKeyCount, uint64(len(expectedValues)+len(expiredValues)))
+
+	err = table.Close()
+	require.NoError(t, err)
+
+	// Walk the "directory" file tree and calculate the actual size of the table.
+	// There is some asynchrony in file deletion, so we retry a reasonable number of times.
+	testutils.AssertEventuallyTrue(t, func() bool {
+		actualSize := uint64(0)
+
+		err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				// files may be deleted in the middle of the walk
+				return nil
+			}
+			if info.IsDir() {
+				// directory sizes are not factored into the table size
+				return nil
+			}
+			if strings.Contains(path, "keymap") {
+				// table size does not currently include the keymap size
+				return nil
+			}
+			actualSize += uint64(info.Size())
+			return nil
+		})
+		require.NoError(t, err)
+		return actualSize == reportedSize
+	}, time.Second)
+
+	// Restart the table. The size should be accurately reported.
+	table, err = tableBuilder.builder(clock, tableName, []string{directory})
+	require.NoError(t, err)
+
+	newReportedSize := table.Size()
+	newReportedKeyCount := table.KeyCount()
+
+	// New size should be greater than the old size, since GC is disabled and
+	// we will have started a new segment upon restart.
+	require.LessOrEqual(t, reportedSize, newReportedSize)
+
+	// The number of keys should be the same as before.
+	require.Equal(t, reportedKeyCount, newReportedKeyCount)
 
 	err = table.Close()
 	require.NoError(t, err)
@@ -2211,8 +2296,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 		})
 		require.NoError(t, err)
 
-		return actualSize == reportedSize
-		//require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
+		return actualSize == newReportedSize
 	}, time.Second)
 }
 

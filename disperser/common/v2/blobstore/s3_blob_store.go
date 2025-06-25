@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/pkg/errors"
 )
@@ -29,7 +28,7 @@ func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []by
 	_, err := b.s3Client.HeadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
 	if err == nil {
 		b.logger.Warnf("blob already exists in bucket %s: %s", b.bucketName, key)
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	err = b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
@@ -45,7 +44,7 @@ func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, er
 	data, err := b.s3Client.DownloadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
 	if errors.Is(err, s3.ErrObjectNotFound) {
 		b.logger.Warnf("blob not found in bucket %s: %s", b.bucketName, key)
-		return nil, common.ErrBlobNotFound
+		return nil, ErrBlobNotFound
 	}
 
 	if err != nil {

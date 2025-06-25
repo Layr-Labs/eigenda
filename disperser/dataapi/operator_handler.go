@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -10,9 +11,14 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/gammazero/workerpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection/grpc_reflection_v1"
+)
+
+const (
+	livenessCheckPoolSize = 64
 )
 
 // OperatorHandler handles operations to collect and process operators info.
@@ -26,6 +32,7 @@ type OperatorHandler struct {
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
 	subgraphClient    SubgraphClient
+	quorumIds         []uint8
 }
 
 // OperatorList wraps a set of operators with their IDs and addresses.
@@ -77,7 +84,18 @@ func (o *OperatorList) GetID(address string) (core.OperatorID, bool) {
 	return id, exists
 }
 
-func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *OperatorHandler {
+func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) (*OperatorHandler, error) {
+	// Determine valid set of quorum IDs at startup
+	currentBlock, err := chainReader.GetCurrentBlockNumber(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	quorumCount, err := chainReader.GetQuorumCount(context.Background(), uint32(currentBlock))
+	if err != nil {
+		return nil, err
+	}
+	quorumIds := eth.GetAllQuorumIDs(quorumCount)
+
 	return &OperatorHandler{
 		logger:            logger,
 		metrics:           metrics,
@@ -85,56 +103,82 @@ func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 		chainState:        chainState,
 		indexedChainState: indexedChainState,
 		subgraphClient:    subgraphClient,
-	}
+		quorumIds:         quorumIds,
+	}, nil
 }
 
-func (oh *OperatorHandler) ProbeV2OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
-	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
+func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operatorId string) ([]*OperatorLiveness, error) {
+	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
-		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return &OperatorPortCheckResponse{}, err
+		return nil, err
 	}
 
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
+	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), oh.quorumIds)
+	if err != nil {
+		return nil, err
+	}
 
-	retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
-	retrievalSocket := operatorSocket.GetV2RetrievalSocket()
-	if retrievalSocket == "" {
-		retrievalStatus = "v2 retrieval port is not registered"
-	} else {
-		retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-		if retrievalPortOpen {
-			retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 3*time.Second)
+	numResults := 1
+	if len(operatorId) == 0 {
+		numResults = len(state.IndexedOperators)
+	}
+	resultCh := make(chan *OperatorLiveness, numResults)
+	wp := workerpool.New(livenessCheckPoolSize)
+	for opID, opInfo := range state.IndexedOperators {
+		opID, opInfo := opID, opInfo
+		if len(operatorId) > 0 && opID.Hex() != operatorId {
+			continue
 		}
+		wp.Submit(func() {
+			var (
+				dispersalOnline bool
+				dispersalStatus string
+				retrievalOnline bool
+				retrievalStatus string
+			)
+
+			operatorSocket := core.OperatorSocket(opInfo.Socket)
+
+			retrievalSocket := operatorSocket.GetV2RetrievalSocket()
+			if retrievalSocket == "" {
+				retrievalStatus = "v2 retrieval port is not registered"
+			} else {
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 2*time.Second)
+				}
+			}
+
+			dispersalSocket := operatorSocket.GetV2DispersalSocket()
+			if dispersalSocket == "" {
+				dispersalStatus = "v2 dispersal port is not registered"
+			} else {
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 2*time.Second)
+				}
+			}
+
+			opLiveness := &OperatorLiveness{
+				OperatorId:      opID.Hex(),
+				DispersalSocket: dispersalSocket,
+				DispersalStatus: dispersalStatus,
+				DispersalOnline: dispersalOnline,
+				RetrievalSocket: retrievalSocket,
+				RetrievalOnline: retrievalOnline,
+				RetrievalStatus: retrievalStatus,
+			}
+			resultCh <- opLiveness
+		})
 	}
 
-	dispersalOnline, dispersalStatus := false, "v2 dispersal port closed or unreachable"
-	dispersalSocket := operatorSocket.GetV2DispersalSocket()
-	if dispersalSocket == "" {
-		dispersalStatus = "v2 dispersal port is not registered"
-	} else {
-		dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
-		if dispersalPortOpen {
-			dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 3*time.Second)
-		}
+	wp.StopWait()
+	close(resultCh)
+
+	results := make([]*OperatorLiveness, 0, numResults)
+	for res := range resultCh {
+		results = append(results, res)
 	}
 
-	// Create the metadata regardless of online status
-	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:      operatorId,
-		DispersalSocket: dispersalSocket,
-		DispersalStatus: dispersalStatus,
-		DispersalOnline: dispersalOnline,
-		RetrievalSocket: retrievalSocket,
-		RetrievalOnline: retrievalOnline,
-		RetrievalStatus: retrievalStatus,
-	}
-
-	// Log the online status
-	oh.logger.Info("v2 operator port check response", "response", portCheckResponse)
-
-	// Send the metadata to the results channel
-	return portCheckResponse, nil
+	return results, nil
 }
 
 func (oh *OperatorHandler) ProbeV1OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
@@ -183,7 +227,7 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	if err != nil {
 		return false, err.Error()
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, fmt.Sprintf("grpc connection to %s", socket), nil)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -222,7 +266,8 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 }
 
 func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operatorId string, currentBlock uint32) (*OperatorsStakeResponse, error) {
-	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), []core.QuorumID{0, 1, 2})
+
+	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), oh.quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed operator state: %w", err)
 	}
@@ -235,11 +280,15 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		stakeRanked[quorum] = make([]*OperatorStake, 0)
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				weiToEth := new(big.Float).SetFloat64(1e18)
+				stakeAmountEth := new(big.Float).Quo(&op.StakeAmount, weiToEth)
+				stakeAmount, _ := stakeAmountEth.Float64()
 				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
 					StakePercentage: op.StakeShare / 100.0,
 					Rank:            i + 1,
+					StakeAmount:     stakeAmount,
 				})
 			}
 		}
@@ -280,7 +329,8 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	}
 
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
-	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, s.quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
@@ -300,7 +350,6 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 
 	s.logger.Info("Semver scan completed", "semverReport", semverReport)
 	return semverReport, nil
-
 }
 
 // CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the

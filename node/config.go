@@ -36,9 +36,6 @@ var (
 		0: "eth_quorum",
 		1: "eignen_quorum",
 	}
-	SemVer    = "0.0.0"
-	GitCommit = ""
-	GitDate   = ""
 )
 
 // Config contains all of the configuration information for a DA node.
@@ -50,6 +47,8 @@ type Config struct {
 	InternalDispersalPort           string
 	V2DispersalPort                 string
 	V2RetrievalPort                 string
+	InternalV2DispersalPort         string
+	InternalV2RetrievalPort         string
 	EnableNodeApi                   bool
 	NodeApiPort                     string
 	EnableMetrics                   bool
@@ -60,8 +59,6 @@ type Config struct {
 	ExpirationPollIntervalSec       uint64
 	LevelDBDisableSeeksCompactionV1 bool
 	LevelDBSyncWritesV1             bool
-	LevelDBDisableSeeksCompactionV2 bool
-	LevelDBSyncWritesV2             bool
 	EnableTestMode                  bool
 	OverrideBlockStaleMeasure       uint64
 	OverrideStoreDurationBlocks     uint64
@@ -108,6 +105,55 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
+
+	// The size of the pool where chunks are downloaded from the relay network.
+	DownloadPoolSize int
+
+	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
+	LittDBDoubleWriteProtection bool
+
+	// The percentage of the total memory to use for the write cache in littDB as a fraction of 1.0, where 1.0
+	// means that all available memory will be used for the write cache (don't actually use 1.0, that leaves no buffer
+	// for other stuff). Ignored if LittDBWriteCacheSizeGB is set.
+	LittDBWriteCacheSizeFraction float64
+
+	// The size of the cache for storing recently written chunks in littDB, in gigabytes. Ignored if 0. If set,
+	// this config value overrides the LittDBWriteCacheSizeFraction value.
+	LittDBWriteCacheSizeGB float64
+
+	// The percentage of the total memory to use for the read cache in littDB as a fraction of 1.0, where 1.0
+	// means that all available memory will be used for the read cache (don't actually use 1.0, that leaves no buffer
+	// for other stuff). Ignored if LittDBReadCacheSizeGB is set.
+	LittDBReadCacheSizeFraction float64
+
+	// The size of the cache for storing recently read chunks in littDB, in gigabytes. Ignored if 0. If set,
+	// this config value overrides the LittDBReadCacheSizeFraction value.
+	LittDBReadCacheSizeGB float64
+
+	// The list of paths to the littDB storage directories. Data is spread across these directories.
+	// Directories do not need to be on the same filesystem.
+	LittDBStoragePaths []string
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes per second.
+	GetChunksHotCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes.
+	GetChunksHotBurstLimitMB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes per second.
+	GetChunksColdCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes.
+	GetChunksColdBurstLimitMB float64
+
+	// Defines a safety buffer for the garbage collector. If non-zero, then the garbage collector will be instructed
+	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
+	// from OOM-killing the process.
+	GCSafetyBufferSizeGB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -261,6 +307,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
 	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
+	internalV2DispersalPort := ctx.GlobalString(flags.InternalV2DispersalPortFlag.Name)
+	internalV2RetrievalPort := ctx.GlobalString(flags.InternalV2RetrievalPortFlag.Name)
+	if internalV2DispersalPort == "" {
+		internalV2DispersalPort = v2DispersalPort
+	}
+	if internalV2RetrievalPort == "" {
+		internalV2RetrievalPort = v2RetrievalPort
+	}
+
 	if v2Enabled {
 		if v2DispersalPort == "" {
 			return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
@@ -282,6 +337,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		InternalRetrievalPort:               internalRetrievalFlag,
 		V2DispersalPort:                     v2DispersalPort,
 		V2RetrievalPort:                     v2RetrievalPort,
+		InternalV2DispersalPort:             internalV2DispersalPort,
+		InternalV2RetrievalPort:             internalV2RetrievalPort,
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
@@ -295,8 +352,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
 		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
 		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
-		LevelDBDisableSeeksCompactionV2:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV2Flag.Name),
-		LevelDBSyncWritesV2:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV2Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
@@ -329,5 +384,16 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		LittDBWriteCacheSizeGB:              ctx.GlobalFloat64(flags.LittDBWriteCacheSizeGBFlag.Name),
+		LittDBWriteCacheSizeFraction:        ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
+		LittDBReadCacheSizeGB:               ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name),
+		LittDBReadCacheSizeFraction:         ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
+		LittDBStoragePaths:                  ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
+		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:            ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
+		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
 	}, nil
 }

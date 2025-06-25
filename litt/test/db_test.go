@@ -70,7 +70,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
 	config.KeymapType = keymap.MemKeymapType
-	config.CacheSize = 1000
+	config.WriteCacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
 	config.Fsync = false // fsync is too slow for unit test workloads
@@ -83,7 +83,7 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
 	config.KeymapType = keymap.UnsafeLevelDBKeymapType
-	config.CacheSize = 1000
+	config.WriteCacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
 	config.Fsync = false // fsync is too slow for unit test workloads

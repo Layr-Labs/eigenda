@@ -36,10 +36,10 @@ var (
 	}
 	QuorumIDsFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "quorum-ids"),
-		Usage:    "Comma-separated list of quorum IDs to scan (default: 0,1,2)",
+		Usage:    "Comma-separated list of quorum IDs to scan (default: all)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "QUORUM_IDS"),
-		Value:    "0,1,2",
+		Value:    "",
 	}
 	TopNFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "top"),
@@ -47,6 +47,17 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TOP"),
 		Value:    0,
+	}
+	OutputFormatFlag = cli.StringFlag{
+		Name:     "output-format",
+		Usage:    "Output format (table/csv)",
+		Value:    "table",
+		Required: false,
+	}
+	OutputFileFlag = cli.StringFlag{
+		Name:     "output-file",
+		Usage:    "Write output to a file instead of stdout",
+		Required: false,
 	}
 )
 
@@ -59,6 +70,8 @@ var optionalFlags = []cli.Flag{
 	BlockNumberFlag,
 	QuorumIDsFlag,
 	TopNFlag,
+	OutputFormatFlag,
+	OutputFileFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

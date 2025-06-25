@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -63,14 +64,27 @@ type db struct {
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
 func NewDB(config *litt.Config) (litt.DB, error) {
 	var err error
-	config.Logger, err = buildLogger(config)
-	if err != nil {
-		return nil, fmt.Errorf("error building logger: %w", err)
+
+	if config.Logger == nil {
+		config.Logger, err = buildLogger(config)
+		if err != nil {
+			return nil, fmt.Errorf("error building logger: %w", err)
+		}
 	}
 
 	err = config.SanityCheck()
 	if err != nil {
 		return nil, fmt.Errorf("error checking config: %w", err)
+	}
+
+	err = config.SanitizePaths()
+	if err != nil {
+		return nil, fmt.Errorf("error expanding tildes in config: %w", err)
+	}
+
+	if !config.Fsync {
+		config.Logger.Warnf(
+			"Fsync is disabled. Ok for unit tests that need to run fast, NOT OK FOR PRODUCTION USE.")
 	}
 
 	tableBuilder := func(
@@ -88,20 +102,24 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
-	logger, err := buildLogger(config)
-	if err != nil {
-		return nil, fmt.Errorf("error building logger: %w", err)
+	var err error
+
+	if config.Logger == nil {
+		config.Logger, err = buildLogger(config)
+		if err != nil {
+			return nil, fmt.Errorf("error building logger: %w", err)
+		}
 	}
 
 	var dbMetrics *metrics.LittDBMetrics
 	var metricsServer *http.Server
 	if config.MetricsEnabled {
-		dbMetrics, metricsServer = buildMetrics(config, logger)
+		dbMetrics, metricsServer = buildMetrics(config, config.Logger)
 	}
 
 	database := &db{
 		ctx:           config.CTX,
-		logger:        logger,
+		logger:        config.Logger,
 		clock:         config.Clock,
 		ttl:           config.TTL,
 		gcPeriod:      config.GCPeriod,
@@ -114,8 +132,6 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 	if config.MetricsEnabled {
 		go database.gatherMetrics(config.MetricsUpdateInterval)
 	}
-
-	logger.Infof("LittDB started, current data size: %d", database.Size())
 
 	return database, nil
 }
@@ -161,16 +177,18 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 	if !ok {
 		if !d.isTableNameValid(name) {
 			return nil, fmt.Errorf(
-				"table name %s is invalid, must be at least one character long and "+
-					"contain only letters, numbers, and underscores, and dashes.", name)
+				"table name '%s' is invalid, must be at least one character long and "+
+					"contain only letters, numbers, and underscores, and dashes", name)
 		}
 
 		var err error
-		d.logger.Infof("creating table %s", name)
 		table, err = d.tableBuilder(d.ctx, d.logger, name, d.metrics)
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
 		}
+		d.logger.Infof(
+			"Table '%s' initialized, table contains %d key-value pairs and has a size of %s.",
+			name, table.KeyCount(), util.PrettyPrintBytes(table.Size()))
 
 		d.tables[name] = table
 	}
@@ -184,7 +202,9 @@ func (d *db) DropTable(name string) error {
 
 	table, ok := d.tables[name]
 	if !ok {
-		return fmt.Errorf("table %s does not exist", name)
+		// Table does not exist, nothing to do.
+		d.logger.Infof("table %s does not exist, cannot drop", name)
+		return nil
 	}
 
 	d.logger.Infof("dropping table %s", name)
@@ -242,6 +262,7 @@ func (d *db) gatherMetrics(interval time.Duration) {
 	}
 
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	for !d.stopped.Load() {
 		select {

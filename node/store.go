@@ -40,8 +40,7 @@ type Store struct {
 	metrics *Metrics
 }
 
-// NewLevelDBStore creates a new Store object with a db at the provided path and the given logger.
-// TODO(jianoaix): parameterize this so we can switch between different database backends.
+// NewLevelDBStore creates a new Store object with a levelDB at the provided path and the given logger.
 func NewLevelDBStore(
 	path string,
 	logger logging.Logger,
@@ -51,8 +50,7 @@ func NewLevelDBStore(
 	syncWrites bool,
 	storeDurationBlocks uint32) (*Store, error) {
 
-	// Create the db at the path. This is currently hardcoded to use
-	// levelDB.
+	// Create the DB at the path.
 	var db kvstore.Store[[]byte]
 	var err error
 	if metrics != nil {
@@ -443,14 +441,15 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				return nil, err
 			}
 
-			if format == core.GnarkBundleEncodingFormat {
+			switch format {
+			case core.GnarkBundleEncodingFormat:
 				rawBundle, ok := rawBundles[quorumID]
 				if ok {
 					size += int64(len(rawBundle))
 					keys = append(keys, key)
 					batch.Put(key, rawBundle)
 				}
-			} else if format == core.GobBundleEncodingFormat {
+			case core.GobBundleEncodingFormat:
 				if len(rawChunks[quorumID]) != len(bundle) {
 					return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
 				}
@@ -469,7 +468,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					keys = append(keys, key)
 					batch.Put(key, chunkBytes)
 				}
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
 			}
 		}

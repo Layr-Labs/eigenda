@@ -2,10 +2,12 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"strconv"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/exp/constraints"
 )
 
@@ -36,4 +38,16 @@ func ValidatePort(portStr string) error {
 		return fmt.Errorf("port number out of valid range (1-65535)")
 	}
 	return err
+}
+
+// CloseLogOnError attempts to close the given io.Closer and logs an error if it fails.
+// Meant to be called in a defer statement: defer CloseLogOnError(c, "nameOfResourceToClose", log).
+func CloseLogOnError(c io.Closer, name string, log logging.Logger) {
+	if closeErr := c.Close(); closeErr != nil {
+		if log != nil {
+			log.Errorf("failed to close %s: %s", name, closeErr.Error())
+		} else {
+			fmt.Printf("failed to close %s: %s", name, closeErr.Error())
+		}
+	}
 }

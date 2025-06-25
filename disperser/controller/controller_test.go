@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -46,6 +48,11 @@ var (
 	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 
 	mockCommitment = encoding.BlobCommitments{}
+
+	heartbeatChan      = make(chan time.Time, 10) // Stores last 10 heartbeats
+	heartbeatsReceived []time.Time
+	mu                 sync.Mutex
+	doneListening      = make(chan struct{})
 )
 
 func TestMain(m *testing.M) {
@@ -57,7 +64,7 @@ func TestMain(m *testing.M) {
 
 func setup(m *testing.M) {
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -150,6 +157,21 @@ func setup(m *testing.M) {
 }
 
 func teardown() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(heartbeatsReceived) == 0 {
+		logger.Error("Expected heartbeats, but none were received")
+	}
+
+	close(heartbeatChan) // Ensure the goroutine exits properly
+
+	select {
+	case <-doneListening:
+	default:
+		close(doneListening)
+	}
+
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}

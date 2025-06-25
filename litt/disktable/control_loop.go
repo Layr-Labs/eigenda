@@ -1,6 +1,5 @@
 package disktable
 
-import "C"
 import (
 	"fmt"
 	"math/rand"
@@ -22,8 +21,8 @@ type controlLoop struct {
 	// diskTable is the disk table that this control loop is associated with.
 	diskTable *DiskTable
 
-	// fatalErrorHandler is used to react to fatal errors anywhere in the disk table.
-	fatalErrorHandler *util.FatalErrorHandler
+	// errorMonitor is used to react to fatal errors anywhere in the disk table.
+	errorMonitor *util.ErrorMonitor
 
 	// controllerChannel is the channel for messages sent to the control loop.
 	controllerChannel chan any
@@ -60,7 +59,7 @@ type controlLoop struct {
 	targetFileSize uint32
 
 	// The maximum number of keys in a segment.
-	maxKeyCount uint64
+	maxKeyCount uint32
 
 	// The target size for key files.
 	targetKeyFileSize uint64
@@ -112,17 +111,18 @@ type controlLoop struct {
 // database being in a panicked state. Only types defined in control_loop_messages.go are permitted to be sent
 // to the control loop.
 func (c *controlLoop) enqueue(request controlLoopMessage) error {
-	return util.SendIfNotFatal(c.fatalErrorHandler, c.controllerChannel, request)
+	return util.Send(c.errorMonitor, c.controllerChannel, request)
 }
 
 // run runs the control loop for the disk table. It has sole responsibility for scheduling all operations that
 // mutate the data in the disk table.
 func (c *controlLoop) run() {
 	ticker := time.NewTicker(c.garbageCollectionPeriod)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-c.fatalErrorHandler.ImmediateShutdownRequired():
+		case <-c.errorMonitor.ImmediateShutdownRequired():
 			c.diskTable.logger.Infof("context done, shutting down disk table control loop")
 			return
 		case message := <-c.controllerChannel:
@@ -139,7 +139,7 @@ func (c *controlLoop) run() {
 				c.doGarbageCollection()
 				req.completionChan <- struct{}{}
 			} else {
-				c.fatalErrorHandler.Panic(fmt.Errorf("Unknown control message type %T", message))
+				c.errorMonitor.Panic(fmt.Errorf("unknown control message type %T", message))
 				return
 			}
 		case <-ticker.C:
@@ -157,13 +157,15 @@ func (c *controlLoop) doGarbageCollection() {
 		return
 	}
 
-	if c.metrics != nil {
-		defer func() {
+	defer func() {
+		if c.metrics != nil {
 			end := c.clock()
 			delta := end.Sub(start)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
-		}()
-	}
+
+		}
+		c.updateCurrentSize()
+	}()
 
 	for index := c.lowestSegmentIndex; index <= c.highestSegmentIndex; index++ {
 		seg := c.segments[index]
@@ -182,7 +184,7 @@ func (c *controlLoop) doGarbageCollection() {
 		// Segment is old enough to be deleted.
 		keys, err := seg.GetKeys()
 		if err != nil {
-			c.fatalErrorHandler.Panic(fmt.Errorf("failed to get keys: %w", err))
+			c.errorMonitor.Panic(fmt.Errorf("failed to get keys: %w", err))
 			return
 		}
 
@@ -193,13 +195,18 @@ func (c *controlLoop) doGarbageCollection() {
 			}
 			err = c.keymap.Delete(keys[keyIndex:lastIndex])
 			if err != nil {
-				c.fatalErrorHandler.Panic(fmt.Errorf("failed to delete keys: %w", err))
+				c.errorMonitor.Panic(fmt.Errorf("failed to delete keys: %w", err))
 				return
 			}
 		}
 
+		if seg.Size() > c.immutableSegmentSize {
+			c.logger.Errorf("segment %d size %d is larger than immutable segment size %d, "+
+				"reported DB size will not be accurate", index, seg.Size(), c.immutableSegmentSize)
+		}
+
 		c.immutableSegmentSize -= seg.Size()
-		c.keyCount.Add(-1 * int64(len(keys)))
+		c.keyCount.Add(-1 * int64(seg.KeyCount()))
 
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()
@@ -209,8 +216,6 @@ func (c *controlLoop) doGarbageCollection() {
 
 		c.lowestSegmentIndex++
 	}
-
-	c.updateCurrentSize()
 }
 
 // getReservedSegment returns the segment with the given index. Segment is reserved, and it is the caller's
@@ -245,7 +250,10 @@ func (c *controlLoop) getSegments() (map[uint32]*segment.Segment, error) {
 
 // updateCurrentSize updates the size of the table.
 func (c *controlLoop) updateCurrentSize() {
-	size := c.immutableSegmentSize + c.segments[c.highestSegmentIndex].Size() + segment.MetadataSize
+	size := c.immutableSegmentSize +
+		c.segments[c.highestSegmentIndex].Size() +
+		c.metadata.Size()
+
 	c.size.Store(size)
 }
 
@@ -257,7 +265,7 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 		keyCount, keyFileSize, err := seg.Write(kv)
 		shardSize := seg.GetMaxShardSize()
 		if err != nil {
-			c.fatalErrorHandler.Panic(
+			c.errorMonitor.Panic(
 				fmt.Errorf("failed to write to segment %d: %w", c.highestSegmentIndex, err))
 			return
 		}
@@ -267,7 +275,7 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = c.expandSegments()
 			if err != nil {
-				c.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %w", err))
+				c.errorMonitor.Panic(fmt.Errorf("failed to expand segments: %w", err))
 				return
 			}
 		}
@@ -279,8 +287,6 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 // expandSegments seals the latest segment and creates a new mutable segment.
 func (c *controlLoop) expandSegments() error {
 	now := c.clock()
-
-	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
 
 	// Seal the previous segment.
 	flushLoopResponseChan := make(chan struct{}, 1)
@@ -297,20 +303,27 @@ func (c *controlLoop) expandSegments() error {
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
 	// in a brief interruption in new write work being sent to the segment, expanding the number of segments is
 	// infrequent, even for very high throughput workloads.
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, flushLoopResponseChan)
+	_, err = util.Await(c.errorMonitor, flushLoopResponseChan)
 	if err != nil {
 		return fmt.Errorf("failed to seal segment: %w", err)
 	}
 
+	// Record the size of the segment.
+	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
+
 	// Create a new segment.
+	salt := [16]byte{}
+	_, err = c.saltShaker.Read(salt[:])
+	if err != nil {
+		return fmt.Errorf("failed to read salt: %w", err)
+	}
 	newSegment, err := segment.CreateSegment(
 		c.logger,
-		c.fatalErrorHandler,
+		c.errorMonitor,
 		c.highestSegmentIndex+1,
 		c.segmentDirectories,
-		now,
 		c.metadata.GetShardingFactor(),
-		c.saltShaker.Uint32(),
+		salt,
 		c.fsync)
 	if err != nil {
 		return err
@@ -337,7 +350,7 @@ func (c *controlLoop) handleFlushRequest(req *controlLoopFlushRequest) {
 	// it becomes the responsibility of the flush loop to wait for the flush to complete.
 	flushWaitFunction, err := c.segments[c.highestSegmentIndex].Flush()
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to flush segment %d: %w", c.highestSegmentIndex, err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to flush segment %d: %w", c.highestSegmentIndex, err))
 		return
 	}
 
@@ -363,14 +376,14 @@ func (c *controlLoop) handleControlLoopSetShardingFactorRequest(req *controlLoop
 	}
 	err := c.metadata.SetShardingFactor(req.shardingFactor)
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to set sharding factor: %w", err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to set sharding factor: %w", err))
 		return
 	}
 
 	// This seals the current mutable segment and creates a new one. The new segment will have the new sharding factor.
 	err = c.expandSegments()
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %w", err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to expand segments: %w", err))
 		return
 	}
 }
@@ -388,7 +401,7 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 		return
 	}
 
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(c.errorMonitor, shutdownCompleteChan)
 	if err != nil {
 		c.logger.Errorf("failed to shutdown flush loop: %v", err)
 		return
@@ -397,21 +410,21 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 	// Seal the mutable segment
 	durableKeys, err := c.segments[c.highestSegmentIndex].Seal(c.clock())
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %w", err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to seal mutable segment: %w", err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = c.diskTable.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 
 	// Stop the keymap
 	err = c.keymap.Stop()
 	if err != nil {
-		c.fatalErrorHandler.Panic(fmt.Errorf("failed to stop keymap: %w", err))
+		c.errorMonitor.Panic(fmt.Errorf("failed to stop keymap: %w", err))
 		return
 	}
 

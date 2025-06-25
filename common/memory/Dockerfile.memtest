@@ -1,0 +1,13 @@
+FROM golang:1.24-alpine
+
+WORKDIR /app
+
+# Copy go.mod, go.sum and relevant files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy common package and its dependencies
+COPY common/ ./common/
+
+# Run the memory test
+CMD ["go", "test", "-v", "./common/memory", "-run", "TestGetMaximumAvailableMemory"]

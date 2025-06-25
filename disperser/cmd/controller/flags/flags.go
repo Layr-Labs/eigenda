@@ -35,10 +35,10 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
-	UseGraphFlag = cli.BoolFlag{
+	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
 		Usage:    "Whether to use the graph node",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_GRAPH"),
 	}
 	IndexerDataDirFlag = cli.StringFlag{
@@ -52,7 +52,8 @@ var (
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
 		Usage:    "Interval at which to pull from the queue",
-		Required: true,
+		Required: false,
+		Value:    2 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODING_PULL_INTERVAL"),
 	}
 	AvailableRelaysFlag = cli.IntSliceFlag{
@@ -121,20 +122,30 @@ var (
 	DispatcherPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dispatcher-pull-interval"),
 		Usage:    "Interval at which to pull from the queue",
-		Required: true,
+		Required: false,
+		Value:    1 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPATCHER_PULL_INTERVAL"),
 	}
 	AttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "attestation-timeout"),
 		Usage:    "Timeout for node requests",
-		Required: true,
+		Required: false,
+		Value:    45 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
 	}
 	BatchAttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "batch-attestation-timeout"),
 		Usage:    "Timeout for batch attestation requests",
-		Required: true,
+		Required: false,
+		Value:    55 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
+	}
+	SignatureTickIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signature-tick-interval"),
+		Usage:    "Interval at which new Attestations will be submitted as signature gathering progresses",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNATURE_TICK_INTERVAL"),
+		Value:    50 * time.Millisecond,
 	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
@@ -148,7 +159,7 @@ var (
 		Usage:    "Number of retries for node requests",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_REQUEST_RETRIES"),
-		Value:    3,
+		Value:    0,
 	}
 	NumConcurrentDispersalRequestsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "num-concurrent-dispersal-requests"),
@@ -169,7 +180,7 @@ var (
 		Usage:    "Max number of blobs to disperse in a batch",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BATCH_SIZE"),
-		Value:    128,
+		Value:    32,
 	}
 	MetricsPortFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
@@ -189,6 +200,36 @@ var (
 		Usage:    "Name of the key used to sign disperser requests (key must be stored in AWS KMS under this name)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
+	}
+	ControllerReadinessProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
+		Usage:    "File path for the readiness probe; created once the controller is fully started and ready to serve traffic",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_READINESS_PROBE_PATH"),
+		Value:    "/tmp/controller-ready",
+	}
+	ControllerHealthProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-health-probe-path"),
+		Usage:    "File path for the liveness (health) probe; updated regularly to indicate the controller is still alive and healthy",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
+		Value:    "/tmp/controller-health",
+	}
+	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
+		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
+		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
+			" metrics to better understand signing behavior.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
+		Value:    55,
+	}
+	defaultSigningThresholds                cli.StringSlice = []string{"0.55", "0.67"}
+	SignificantSigningMetricsThresholdsFlag                 = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "significant-signing-thresholds"),
+		Usage:    "Significant signing thresholds for metrics, each must be between 0.0 and 1.0",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
+		Value:    &defaultSigningThresholds,
 	}
 )
 
@@ -216,6 +257,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 
+	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
 	NumConcurrentDispersalRequestsFlag,
@@ -224,6 +266,10 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	ControllerReadinessProbePathFlag,
+	ControllerHealthProbePathFlag,
+	SignificantSigningThresholdPercentageFlag,
+	SignificantSigningMetricsThresholdsFlag,
 }
 
 var Flags []cli.Flag

@@ -47,9 +47,9 @@ func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, d
 	// zero out the unused slots
 	for i := len(indices) + 1; i < len(dst); i++ {
 		dst[i].SetZero()
-		
+
 	}
-	
+
 	dst[len(indices)].SetOne()
 	var negDi fr.Element
 
@@ -57,19 +57,19 @@ func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, d
 	frZero.SetZero()
 
 	for i, v := range indices {
-		
+
 		negDi.Sub(&frZero, &fs.ExpandedRootsOfUnity[v*domainStride])
-		
+
 		dst[i].Set(&negDi)
 		if i > 0 {
-			
+
 			dst[i].Add(&dst[i], &dst[i-1])
 			for j := i - 1; j > 0; j-- {
 				dst[j].Mul(&dst[j], &negDi)
-				
+
 				dst[j].Add(&dst[j], &dst[j-1])
 			}
-			
+
 			dst[0].Mul(&dst[0], &negDi)
 		}
 	}
@@ -79,11 +79,11 @@ func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, d
 // Copy all of the values of poly into out, and fill the remainder of out with zeroes.
 func padPoly(out []fr.Element, poly []fr.Element) {
 	for i := 0; i < len(poly); i++ {
-		
+
 		out[i].Set(&poly[i])
 	}
 	for i := len(poly); i < len(out); i++ {
-		
+
 		out[i].SetZero()
 	}
 }
@@ -136,7 +136,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 	for i := uint64(0); i < last; i++ {
 		p := ps[i]
 		for j := 0; j < len(p); j++ {
-			
+
 			pPadded[j].Set(&p[j])
 		}
 		if err := fs.InplaceFFT(pPadded, pEval, false); err != nil {
@@ -144,7 +144,7 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 		}
 		for j := uint64(0); j < n; j++ {
 			mulEvalPs[j].Mul(&mulEvalPs[j], &pEval[j])
-			
+
 		}
 	}
 	if err := fs.InplaceFFT(mulEvalPs, dst, true); err != nil {
@@ -278,26 +278,26 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 
 func EvalPolyAt(dst *fr.Element, coeffs []fr.Element, x *fr.Element) {
 	if len(coeffs) == 0 {
-		
+
 		dst.SetZero()
 		return
 	}
 	if x.IsZero() {
-		
+
 		dst.Set(&coeffs[0])
 		return
 	}
 	// Horner's method: work backwards, avoid doing more than N multiplications
 	// https://en.wikipedia.org/wiki/Horner%27s_method
 	var last fr.Element
-	
+
 	last.Set(&coeffs[len(coeffs)-1])
 	var tmp fr.Element
 	for i := len(coeffs) - 2; i >= 0; i-- {
 		tmp.Mul(&last, x)
-		
+
 		last.Add(&tmp, &coeffs[i])
 	}
-	
+
 	dst.Set(&last)
 }

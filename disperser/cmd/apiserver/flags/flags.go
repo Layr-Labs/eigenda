@@ -175,6 +175,27 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTH_PMT_REQUEST_MAX_FUTURE_AGE"),
 	}
+	NtpServerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ntp-server"),
+		Usage:    "NTP server to use for clock synchronization",
+		Required: false,
+		Value:    "pool.ntp.org",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NTP_SERVER"),
+	}
+	NtpSyncIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ntp-sync-interval"),
+		Usage:    "Interval for NTP synchronization",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NTP_SYNC_INTERVAL"),
+	}
+	ReservedOnly = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reserved-only"),
+		Usage:    "if true, only reserved dispersal requests are served; on-demand requests are rejected (default: true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
+		Hidden:   false,
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -271,6 +292,9 @@ var optionalFlags = []cli.Flag{
 	EnablePprof,
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
+	NtpServerFlag,
+	NtpSyncIntervalFlag,
+	ReservedOnly,
 }
 
 // Flags contains the list of configuration options available to the binary.

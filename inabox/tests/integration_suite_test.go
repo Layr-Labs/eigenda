@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
+	"math/rand"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,23 +14,39 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
-	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
+	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
+	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+
 	"github.com/Layr-Labs/eigenda/core"
+	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/ory/dockertest/v3"
 )
 
+/*
+These global vars are shared across tests in the integration suite to provide
+communication entrypoints into the local inabox test environment
+TODO: Put these into a testSuite object which is initialized per inabox E2E test. Currently this would only enable
+
+	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
+*/
 var (
 	templateName      string
 	testName          string
@@ -39,19 +57,28 @@ var (
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName   = "test-BlobMetadata"
-	bucketTableName     = "test-BucketStore"
-	metadataTableNameV2 = "test-BlobMetadata-v2"
-	logger              logging.Logger
-	ethClient           common.EthClient
-	rpcClient           common.RPCEthClient
-	mockRollup          *rollupbindings.ContractMockRollup
-	verifierContract    *verifierbindings.ContractEigenDACertVerifier
-	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.RetrievalClient
-	numConfirmations    int = 3
-	numRetries              = 0
-	chainReader         core.Reader
+	metadataTableName               = "test-BlobMetadata"
+	bucketTableName                 = "test-BucketStore"
+	metadataTableNameV2             = "test-BlobMetadata-v2"
+	logger                          logging.Logger
+	ethClient                       common.EthClient
+	rpcClient                       common.RPCEthClient
+	certBuilder                     *clientsv2.CertBuilder
+	routerCertVerifier              *verification.CertVerifier
+	staticCertVerifier              *verification.CertVerifier
+	eigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
+	eigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
+	eigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
+	deployerTransactorOpts          *bind.TransactOpts
+
+	retrievalClient clients.RetrievalClient
+
+	relayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
+	validatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
+	payloadDisperser           *payloaddispersal.PayloadDisperser
+	numConfirmations           int = 3
+	numRetries                     = 0
+	chainReader                core.Reader
 
 	cancel context.CancelFunc
 )
@@ -104,7 +131,8 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting anvil")
 		testConfig.StartAnvil()
 
-		if deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
+		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+		if ok && deployer.DeploySubgraphs {
 			fmt.Println("Starting graph node")
 			testConfig.StartGraphNode()
 		}
@@ -115,8 +143,7 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
-
-		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
 		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
@@ -124,7 +151,7 @@ var _ = BeforeSuite(func() {
 			PrivateKeyString: pk,
 			NumConfirmations: numConfirmations,
 			NumRetries:       numRetries,
-		}, gcommon.Address{}, logger)
+		}, gethcommon.Address{}, logger)
 		Expect(err).To(BeNil())
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
@@ -142,16 +169,125 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 
-		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		Expect(err).To(BeNil())
-		verifierContract, err = verifierbindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
+		err = setupRetrievalClients(testConfig)
 		Expect(err).To(BeNil())
-		err = setupRetrievalClient(testConfig)
+
+		fmt.Println("Building client verification and interaction components")
+
+		certBuilder, err = clientsv2.NewCertBuilder(
+			logger,
+			gethcommon.HexToAddress(testConfig.EigenDA.OperatorStateRetriever),
+			gethcommon.HexToAddress(testConfig.EigenDA.RegistryCoordinator),
+			ethClient,
+		)
+
 		Expect(err).To(BeNil())
+
+		routerAddressProvider, err := verification.BuildRouterAddressProvider(
+			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
+			ethClient,
+			logger)
+
+		Expect(err).To(BeNil())
+
+		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
+			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
+
+		Expect(err).To(BeNil())
+
+		staticCertVerifier, err = verification.NewCertVerifier(
+			logger,
+			ethClient,
+			staticAddressProvider)
+
+		Expect(err).To(BeNil())
+
+		routerCertVerifier, err = verification.NewCertVerifier(
+			logger,
+			ethClient,
+			routerAddressProvider)
+
+		Expect(err).To(BeNil())
+
+		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		Expect(err).To(BeNil())
+
+		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		Expect(err).To(BeNil())
+
+		chainID, err := ethClient.ChainID(context.Background())
+		Expect(err).To(BeNil())
+
+		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
+
+		err = setupPayloadDisperserWithRouter()
+		Expect(err).To(BeNil())
+
 	}
 })
 
-func setupRetrievalClient(testConfig *deploy.Config) error {
+func setupPayloadDisperserWithRouter() error {
+	// Set up the block monitor
+	blockMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*1)
+	if err != nil {
+		return err
+	}
+
+	// Set up the PayloadDisperser
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	if err != nil {
+		return err
+	}
+
+	disperserClientConfig := &clientsv2.DisperserClientConfig{
+		Hostname: "localhost",
+		Port:     "32005",
+	}
+
+	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserClientConfig, signer, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
+		DisperseBlobTimeout:    2 * time.Minute,
+		BlobCompleteTimeout:    2 * time.Minute,
+		BlobStatusPollInterval: 1 * time.Second,
+		ContractCallTimeout:    5 * time.Second,
+	}
+
+	payloadDisperser, err = payloaddispersal.NewPayloadDisperser(
+		logger,
+		payloadDisperserConfig,
+		disperserClient,
+		blockMonitor,
+		certBuilder,
+		routerCertVerifier,
+		nil,
+	)
+
+	return err
+}
+
+func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
+	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		log.Fatalf("invalid private key: %v", err)
+	}
+
+	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		log.Fatalf("failed to create transactor: %v", err)
+	}
+
+	return opts
+}
+
+func setupRetrievalClients(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
@@ -160,7 +296,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	}
 	var err error
 	if ethClient == nil {
-		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)
+		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
 		if err != nil {
 			return err
 		}
@@ -171,7 +307,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 			log.Fatalln("could not start tcp listener", err)
 		}
 	}
-	tx, err := eth.NewWriter(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
@@ -195,26 +331,69 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		LoadG2Points:    true,
 	}
 
-	v, err := verifier.NewVerifier(kzgConfig, nil)
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, 10)
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, kzgVerifier, 10)
 	if err != nil {
 		return err
 	}
 	chainReader, err = eth.NewReader(
 		logger,
 		ethClient,
-		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER,
 		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10)
 
-	return nil
+	clientConfig := validatorclientsv2.DefaultClientConfig()
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
+
+	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
+		RetrievalTimeout:    1 * time.Minute,
+	}
+
+	validatorRetrievalClientV2, err = payloadretrieval.NewValidatorPayloadRetriever(
+		logger,
+		validatorPayloadRetrieverConfig,
+		retrievalClientV2,
+		kzgVerifier.Srs.G1)
+
+	if err != nil {
+		return err
+	}
+
+	relayClientConfig := &relay.RelayClientConfig{
+		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit,
+	}
+
+	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+	if err != nil {
+		return err
+	}
+
+	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+	if err != nil {
+		return err
+	}
+
+	relayPayloadRetrieverConfig := payloadretrieval.RelayPayloadRetrieverConfig{
+		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
+		RelayTimeout:        5 * time.Second,
+	}
+
+	relayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
+		logger,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
+		relayPayloadRetrieverConfig,
+		relayClient,
+		kzgVerifier.Srs.G1)
+
+	return err
 }
 
 var _ = AfterSuite(func() {

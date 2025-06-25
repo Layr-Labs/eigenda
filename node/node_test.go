@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -29,7 +30,7 @@ var (
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
-		MaxNumOperators: 3537,
+		MaxNumOperators: 2048,
 	}
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
@@ -68,7 +69,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for db")
+		panic("failed to create a directory for levelDB")
 	}
 	tx := &coremock.MockWriter{}
 
@@ -92,16 +93,21 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 	if err != nil {
 		panic("failed to create a new levelDB store")
 	}
-	defer os.Remove(dbPath)
+	t.Cleanup(func() {
+		if err := os.Remove(dbPath); err != nil {
+			t.Log("failed to remove dbPath:", dbPath, "error:", err)
+		}
+	})
 	n := &node.Node{
-		Config:     config,
-		Logger:     logger,
-		KeyPair:    keyPair,
-		Metrics:    nil,
-		Store:      store,
-		ChainState: chainState,
-		Validator:  mockVal,
-		Transactor: tx,
+		Config:       config,
+		Logger:       logger,
+		KeyPair:      keyPair,
+		Metrics:      nil,
+		Store:        store,
+		ChainState:   chainState,
+		Validator:    mockVal,
+		Transactor:   tx,
+		DownloadPool: workerpool.New(1),
 	}
 	n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	return &components{
