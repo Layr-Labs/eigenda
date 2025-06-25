@@ -6,8 +6,6 @@ import (
 
 var _ Cache[string, string] = &weakCache[string, string]{}
 
-// TODO unit test
-
 // A weakCache wraps another cache. It uses weak pointers to hold values, making it so that the garbage collector
 // can reclaim memory used by values if there is extreme memory pressure.
 // Works with any type V - internally creates pointers for weak reference management.
