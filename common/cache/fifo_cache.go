@@ -28,6 +28,9 @@ type insertionRecord struct {
 	key any
 	// The time at which the key was added to the cache.
 	timestamp time.Time
+	// The weight of the key-value pair. Important to keep this around instead of recomputing in case the base
+	// type uses weak pointers or equivalent.
+	weight uint64
 }
 
 // NewFIFOCache creates a new FIFOCache. If the calculator is nil, the weight of each key-value pair will be 1.
@@ -71,6 +74,7 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		f.evictionQueue.Enqueue(&insertionRecord{
 			key:       key,
 			timestamp: time.Now(),
+			weight:    weight,
 		})
 	}
 
@@ -89,7 +93,7 @@ func (f *FIFOCache[K, V]) evict() {
 		next, _ := f.evictionQueue.Dequeue()
 		record := next.(*insertionRecord)
 		keyToEvict := record.key.(K)
-		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
+		weightToEvict := record.weight
 		delete(f.data, keyToEvict)
 		f.currentWeight -= weightToEvict
 		f.metrics.reportEviction(now.Sub(record.timestamp))

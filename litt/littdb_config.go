@@ -98,6 +98,10 @@ type Config struct {
 	// individually on each table by calling Table.SetReadCacheSize().
 	ReadCacheSize uint64
 
+	// If true, then the database cache will use weak pointers. This will permit cache memory to be freed earlier
+	// than it otherwise would be in the advent of high memory pressure.
+	WeakCache bool
+
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
 	Clock func() time.Time
@@ -170,6 +174,7 @@ func DefaultConfigNoPaths() *Config {
 		GCBatchSize:              10_000,
 		ShardingFactor:           8,
 		SaltShaker:               saltShaker,
+		WeakCache:                true,
 		KeymapType:               keymap.LevelDBKeymapType,
 		ControlChannelSize:       64,
 		TargetSegmentFileSize:    math.MaxUint32,

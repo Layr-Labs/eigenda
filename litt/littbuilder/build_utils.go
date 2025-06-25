@@ -28,11 +28,6 @@ var keymapBuilders = map[keymap.KeymapType]keymap.BuildKeymap{
 	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymap,
 }
 
-// cacheWeight is a function that calculates the weight of a cache entry.
-func cacheWeight(key string, value []byte) uint64 {
-	return uint64(len(key) + len(value))
-}
-
 // buildKeymap creates a new keymap based on the configuration.
 func buildKeymap(
 	config *litt.Config,
@@ -213,20 +208,54 @@ func buildTable(
 		tableRoots,
 		requiresReload,
 		metrics)
-
 	if err != nil {
 		return nil, fmt.Errorf("error creating table: %w", err)
 	}
 
-	writeCache := cache.NewFIFOCache[string, []byte](config.WriteCacheSize, cacheWeight, metrics.GetWriteCacheMetrics())
-	writeCache = cache.NewThreadSafeCache(writeCache)
-
-	readCache := cache.NewFIFOCache[string, []byte](config.ReadCacheSize, cacheWeight, metrics.GetReadCacheMetrics())
-	readCache = cache.NewThreadSafeCache(readCache)
-
+	readCache, writeCache := buildCaches(config, metrics)
 	cachedTable := tablecache.NewCachedTable(table, writeCache, readCache, metrics)
 
 	return cachedTable, nil
+}
+
+// cacheWeight is a function that calculates the weight of a cache entry.
+func cacheWeight(key string, value []byte) uint64 {
+	return uint64(len(key) + len(value))
+}
+
+// buildCaches creates read and write caches based on the configuration.
+func buildCaches(
+	config *litt.Config,
+	metrics *metrics.LittDBMetrics,
+) (readCache cache.Cache[string, []byte], writeCache cache.Cache[string, []byte]) {
+
+	if config.WeakCache {
+		writeCache = cache.NewWeakFIFOCache(
+			config.WriteCacheSize,
+			cacheWeight,
+			metrics.GetReadCacheMetrics())
+	} else {
+		writeCache = cache.NewFIFOCache[string, []byte](
+			config.WriteCacheSize,
+			cacheWeight,
+			metrics.GetWriteCacheMetrics())
+	}
+	writeCache = cache.NewThreadSafeCache(writeCache)
+
+	if config.WeakCache {
+		readCache = cache.NewWeakFIFOCache(
+			config.ReadCacheSize,
+			cacheWeight,
+			metrics.GetReadCacheMetrics())
+	} else {
+		readCache = cache.NewFIFOCache[string, []byte](
+			config.ReadCacheSize,
+			cacheWeight,
+			metrics.GetReadCacheMetrics())
+	}
+	readCache = cache.NewThreadSafeCache(readCache)
+
+	return readCache, writeCache
 }
 
 // buildLogger creates a new logger based on the configuration.

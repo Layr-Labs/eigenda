@@ -3,16 +3,18 @@ package cache
 import (
 	"testing"
 
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/rand"
 )
 
-func TestExpirationOrder(t *testing.T) {
-	tu.InitializeRandom()
+// A function that builds a cache
+type cacheBuilder func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int]
+
+func expirationOrderTest(t *testing.T, builder cacheBuilder) {
+	rand := random.NewTestRandom()
 
 	maxWeight := uint64(10 + rand.Intn(10))
-	c := NewFIFOCache[int, int](maxWeight, nil, nil)
+	c := builder(maxWeight, nil)
 
 	require.Equal(t, uint64(0), c.Weight())
 	require.Equal(t, 0, c.Size())
@@ -74,8 +76,33 @@ func TestExpirationOrder(t *testing.T) {
 	}
 }
 
-func TestWeightedValues(t *testing.T) {
-	tu.InitializeRandom()
+func TestExpirationOrder(t *testing.T) {
+	t.Run("FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		expirationOrderTest(t, builder)
+	})
+	t.Run("Thread Safe FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			base := NewFIFOCache[int, int](maxWeight, calculator, nil)
+			return NewThreadSafeCache[int, int](base)
+		}
+		expirationOrderTest(t, builder)
+	})
+	t.Run("Weak FIFO", func(t *testing.T) {
+		// We are using low enough memory that it is unlikely that the weak pointers
+		// will be garbage collected during the course of this test.
+
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewWeakFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		expirationOrderTest(t, builder)
+	})
+}
+
+func weightedValuesTest(t *testing.T, builder cacheBuilder) {
+	rand := random.NewTestRandom()
 
 	maxWeight := uint64(100 + rand.Intn(100))
 
@@ -134,4 +161,29 @@ func TestWeightedValues(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, v, value)
 	}
+}
+
+func TestWeightedValues(t *testing.T) {
+	t.Run("FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		weightedValuesTest(t, builder)
+	})
+	t.Run("Thread Safe FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			base := NewFIFOCache[int, int](maxWeight, calculator, nil)
+			return NewThreadSafeCache[int, int](base)
+		}
+		weightedValuesTest(t, builder)
+	})
+	t.Run("Weak FIFO", func(t *testing.T) {
+		// We are using low enough memory that it is unlikely that the weak pointers
+		// will be garbage collected during the course of this test.
+
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewWeakFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		weightedValuesTest(t, builder)
+	})
 }
