@@ -9,3 +9,5 @@ bin
 **/*.md
 .dockerignore
 **/Dockerfile
+**/*.pdf
+**/*.png
