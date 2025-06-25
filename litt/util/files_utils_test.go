@@ -444,6 +444,29 @@ func TestEnsureDirectoryExists(t *testing.T) {
 	}
 }
 
+func TestEnsureParentDirectoryExists(t *testing.T) {
+	testDir := t.TempDir()
+
+	directoryPath := filepath.Join(testDir, "foo", "bar", "baz")
+	filePath := filepath.Join(directoryPath, "data.txt")
+
+	err := EnsureParentDirExists(filePath, 0755, false)
+	require.NoError(t, err, "failed to create directory")
+
+	exists, err := Exists(directoryPath)
+	require.NoError(t, err, "failed to check if directory exists")
+	require.True(t, exists, "directory does not exist")
+
+	// Utility should not have created the file, just the parent.
+	exists, err = Exists(filePath)
+	require.NoError(t, err, "failed to check if file 1exists")
+	require.False(t, exists, "file should not exist")
+
+	// Calling the same method again should not cause an error.
+	err = EnsureParentDirExists(filePath, 0755, false)
+	require.NoError(t, err)
+}
+
 // Helper function to check if symlinks are supported in the current environment
 func supportsSymlinks() bool {
 	tempDir, err := os.MkdirTemp("", "symlink-test")
@@ -1347,4 +1370,25 @@ func TestErrIfSymlink(t *testing.T) {
 	require.NoError(t, err)
 	err = ErrIfSymlink(symlinkToTestDirPath)
 	require.Error(t, err, "Symlink to directory should raise an error")
+}
+
+// It's hard to know if the sync methods are actually doing what they should be doing. But at the very least,
+// ensure that they don't crash.
+func TestSync(t *testing.T) {
+	testDir := t.TempDir()
+
+	err := SyncDirectory(testDir)
+	require.NoError(t, err, "SyncDirectory should not return an error")
+
+	nestedDir := filepath.Join(testDir, "nested")
+	err = os.Mkdir(nestedDir, 0755)
+	require.NoError(t, err, "Creating nested directory should not return an error")
+	err = SyncParentDirectory(nestedDir)
+	require.NoError(t, err, "SyncParentDirectory should not return an error")
+
+	regularFilePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(regularFilePath, []byte("test content"), 0644)
+	require.NoError(t, err, "Creating regular file should not return an error")
+	err = SyncFile(regularFilePath)
+	require.NoError(t, err, "SyncFile should not return an error")
 }

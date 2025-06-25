@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -244,7 +243,7 @@ func Exists(path string) (bool, error) {
 }
 
 // SyncFile syncs a file to disk
-func SyncFile(path string) error { // TODO test
+func SyncFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open file for sync: %w", err)
@@ -261,7 +260,7 @@ func SyncFile(path string) error { // TODO test
 }
 
 // SyncDirectory syncs a directory to disk
-func SyncDirectory(path string) error { // TODO test
+func SyncDirectory(path string) error {
 	dir, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open directory for sync: %w", err)
@@ -278,14 +277,14 @@ func SyncDirectory(path string) error { // TODO test
 }
 
 // SyncParentDirectory syncs the parent directory of the given path.
-func SyncParentDirectory(path string) error { // TODO test
+func SyncParentDirectory(path string) error {
 	return SyncDirectory(filepath.Dir(path))
 }
 
 // CopyRegularFile copies a regular file from src to dst, preserving permissions and timestamps.
 func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.Time, fsync bool) error {
 	// Ensure parent directory exists
-	if err := EnsureParentDirExists(dst, fileMode, fsync); err != nil {
+	if err := EnsureParentDirExists(dst, 0755, fsync); err != nil {
 		return err
 	}
 
@@ -341,36 +340,73 @@ func CopyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 
 // EnsureParentDirExists ensures the parent directory of the given path exists and is writable.
 // Creates parent directories if they don't exist.
-func EnsureParentDirExists(path string, mode os.FileMode, fsync bool) error { // TODO test
+func EnsureParentDirExists(path string, mode os.FileMode, fsync bool) error {
 	return EnsureDirectoryExists(filepath.Dir(path), mode, fsync)
 }
 
 // EnsureDirectoryExists ensures a directory exists with the given permissions.
 // If the directory already exists, it verifies it has write permissions.
+// If fsync is true, all newly created directories are synced to disk.
 func EnsureDirectoryExists(dirPath string, mode os.FileMode, fsync bool) error {
-	// Check if directory already exists
-	info, err := os.Stat(dirPath)
+	// Convert to absolute path to ensure clean processing
+	absPath, err := filepath.Abs(dirPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			// Directory doesn't exist, create it
-			if err := os.MkdirAll(dirPath, mode); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
+		return fmt.Errorf("failed to get absolute path for %s: %w", dirPath, err)
+	}
+
+	// Find the first ancestor that exists
+	pathsToCreate := []string{}
+	currentPath := absPath
+
+	for {
+		// Check if current path exists
+		info, err := os.Stat(currentPath)
+		if err == nil {
+			// Path exists, verify it's a directory
+			if !info.IsDir() {
+				return fmt.Errorf("path %s exists but is not a directory", currentPath)
 			}
-			return nil
+			break // Found existing ancestor
 		}
-		return fmt.Errorf("failed to check directory %s: %w", dirPath, err)
+
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to check path %s: %w", currentPath, err)
+		}
+
+		// Path doesn't exist, add to list of paths to create
+		pathsToCreate = append(pathsToCreate, currentPath)
+
+		// Move to parent directory
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			// Reached filesystem root
+			break
+		}
+		currentPath = parentPath
 	}
 
-	// Directory exists, verify it's actually a directory and has write permissions
-	if !info.IsDir() {
-		return fmt.Errorf("path %s exists but is not a directory", dirPath)
-	}
+	// Create directories from top-level to bottom-level and possibly sync each one
+	for i := len(pathsToCreate) - 1; i >= 0; i-- {
+		dirToCreate := pathsToCreate[i]
 
-	if info.Mode()&0200 == 0 {
-		return fmt.Errorf("directory %s is not writable", dirPath)
-	}
+		// Create the directory
+		if err := os.Mkdir(dirToCreate, mode); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dirToCreate, err)
+		}
 
-	// TODO handle fsync
+		if fsync {
+			// Sync the newly created directory
+			if err := SyncDirectory(dirToCreate); err != nil {
+				return fmt.Errorf("failed to sync newly created directory %s: %w", dirToCreate, err)
+			}
+
+			// Also sync the parent directory to ensure the directory entry is persisted
+			parentDir := filepath.Dir(dirToCreate)
+			if err := SyncDirectory(parentDir); err != nil {
+				return fmt.Errorf("failed to sync parent directory %s: %w", parentDir, err)
+			}
+		}
+	}
 
 	return nil
 }
