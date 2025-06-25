@@ -138,6 +138,13 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 		reservation.EndTimestamp == 0
 }
 
+func CheckOnDemandPayment(payment *big.Int) error {
+	if payment.Cmp(big.NewInt(0)) == 0 {
+		return ErrPaymentDoesNotExist
+	}
+	return nil
+}
+
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
 // Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
 func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
