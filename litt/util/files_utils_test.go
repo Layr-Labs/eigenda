@@ -1285,3 +1285,66 @@ func TestSanitizePath(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSymlink(t *testing.T) {
+	testDir := t.TempDir()
+
+	nonExistentPath := "non-existent-file.txt"
+	isSymlink, err := IsSymlink(nonExistentPath)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Non-existent file should not be a symlink")
+
+	regularFilePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(regularFilePath, []byte("test content"), 0644)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(regularFilePath)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Regular file should not be a symlink")
+
+	isSymlink, err = IsSymlink(testDir)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Directory should not be a symlink")
+
+	symlinkToRegularFilePath := filepath.Join(testDir, "link-to-file.txt")
+	err = os.Symlink(regularFilePath, symlinkToRegularFilePath)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(symlinkToRegularFilePath)
+	require.NoError(t, err)
+	require.True(t, isSymlink, "Symlink to regular file should be detected as symlink")
+
+	symlinkToTestDirPath := filepath.Join(testDir, "link-to-dir")
+	err = os.Symlink(testDir, symlinkToTestDirPath)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(symlinkToTestDirPath)
+	require.NoError(t, err)
+	require.True(t, isSymlink, "Symlink to directory should be detected as symlink")
+}
+
+func TestErrIfSymlink(t *testing.T) {
+	testDir := t.TempDir()
+
+	nonExistentPath := "non-existent-file.txt"
+	err := ErrIfSymlink(nonExistentPath)
+	require.NoError(t, err, "Non-existent file should not be a symlink")
+
+	regularFilePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(regularFilePath, []byte("test content"), 0644)
+	require.NoError(t, err)
+	err = ErrIfSymlink(regularFilePath)
+	require.NoError(t, err, "Regular file should not raise an error for being a symlink")
+
+	err = ErrIfSymlink(testDir)
+	require.NoError(t, err, "Directory should not raise an error for being a symlink")
+
+	symlinkToRegularFilePath := filepath.Join(testDir, "link-to-file.txt")
+	err = os.Symlink(regularFilePath, symlinkToRegularFilePath)
+	require.NoError(t, err)
+	err = ErrIfSymlink(symlinkToRegularFilePath)
+	require.Error(t, err, "Symlink to regular file should raise an error")
+
+	symlinkToTestDirPath := filepath.Join(testDir, "link-to-dir")
+	err = os.Symlink(testDir, symlinkToTestDirPath)
+	require.NoError(t, err)
+	err = ErrIfSymlink(symlinkToTestDirPath)
+	require.Error(t, err, "Symlink to directory should raise an error")
+}

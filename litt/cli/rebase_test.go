@@ -227,14 +227,14 @@ func TestRebase1to1(t *testing.T) {
 	sourceDirs := uint64(1)
 	destDirs := uint64(1)
 
-	t.Run("deep", func(t *testing.T) {
+	t.Run("preserve", func(t *testing.T) {
 		// This is the only test that runs with verbose= true. We want to make sure this doesn't crash,
 		// but don't want too much spam in the logs.
-		rebaseTest(t, sourceDirs, destDirs, 0, false, true)
+		rebaseTest(t, sourceDirs, destDirs, 0, true, true)
 	})
 
-	t.Run("shallow", func(t *testing.T) {
-		rebaseTest(t, sourceDirs, destDirs, 0, true, false)
+	t.Run("do not preserve", func(t *testing.T) {
+		rebaseTest(t, sourceDirs, destDirs, 0, false, false)
 	})
 }
 

@@ -15,7 +15,7 @@ import (
 const SwapFileExtension = ".swap"
 
 // IsSymlink checks if the given path is a symlink.
-func IsSymlink(path string) (bool, error) { // TODO unit test
+func IsSymlink(path string) (bool, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -28,7 +28,7 @@ func IsSymlink(path string) (bool, error) { // TODO unit test
 }
 
 // ErrIfSymlink checks if the given path is a symlink and returns an error if it is.
-func ErrIfSymlink(path string) error { // TODO unit test
+func ErrIfSymlink(path string) error {
 	isSymlink, err := IsSymlink(path)
 	if err != nil {
 		return fmt.Errorf("failed to check if path %s is a symlink: %w", path, err)
