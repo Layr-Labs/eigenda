@@ -30,6 +30,7 @@ interface IEigenDADirectory {
     function removeAddress(string memory name) external;
 
     /// @notice Gets the address by keccak256 hash of the name.
+    /// @dev    This entry point is cheaper in gas because it avoids needing to compute the key from the name.
     function getAddress(bytes32 key) external view returns (address);
 
     /// @notice Gets the address by name.
