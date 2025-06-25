@@ -53,15 +53,18 @@ func CreateTestSuite(
 	if err := appConfig.Check(); err != nil {
 		panic(err)
 	}
-	configString, err := appConfig.StoreBuilderConfig.ToString()
-	if err != nil {
-		panic(fmt.Sprintf("convert config json to string: %v", err))
-	}
-
-	logger.Infof(
-		"Creating EigenDA proxy server for testSuite with config (\"*****\" fields are hidden): %v",
-		configString,
-	)
+	// Commenting out because it clutters the log outputs in CI too much.
+	// We should prob take in a *testing.T and use t.Logf instead, so that logs
+	// only appear when the test fails.
+	// configString, err := appConfig.StoreBuilderConfig.ToString()
+	// if err != nil {
+	// 	panic(fmt.Sprintf("convert config json to string: %v", err))
+	// }
+	//
+	// logger.Infof(
+	// 	"Creating EigenDA proxy server for testSuite with config (\"*****\" fields are hidden): %v",
+	// 	configString,
+	// )
 
 	storeManager, err := builder.BuildStoreManager(
 		ctx,
