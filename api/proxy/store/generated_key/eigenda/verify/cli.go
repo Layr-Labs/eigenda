@@ -11,6 +11,8 @@ import (
 )
 
 var (
+	EigenDACertVerifierV1FlagName = withFlagPrefix("cert-verifier-v1")
+
 	// cert verification flags
 	CertVerificationDisabledFlagName = withFlagPrefix("cert-verification-disabled")
 
@@ -41,6 +43,14 @@ func VerifierCLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:    "Whether to verify certificates received from EigenDA disperser.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFICATION_DISABLED")},
 			Value:    false,
+			Category: category,
+		},
+		&cli.StringFlag{
+			Name: EigenDACertVerifierV1FlagName,
+			Usage: `Address of EigenDACertVerifierV1 contract. Only necessary if using custom quorums/thresholds 
+					for certificate verification. If no address is provided then the default 
+					EigenDAServiceManager parameters will be uesd.`,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_V1")},
 			Category: category,
 		},
 	}
@@ -119,6 +129,7 @@ func ReadConfig(ctx *cli.Context, clientConfigV1 common.ClientConfigV1) Config {
 		// reuse some configs from the eigenda client
 		RPCURL:               clientConfigV1.EdaClientCfg.EthRpcUrl,
 		SvcManagerAddr:       clientConfigV1.EdaClientCfg.SvcManagerAddr,
+		CertVerifierV1Addr:   ctx.String(EigenDACertVerifierV1FlagName),
 		EthConfirmationDepth: clientConfigV1.EdaClientCfg.WaitForConfirmationDepth,
 		WaitForFinalization:  clientConfigV1.EdaClientCfg.WaitForFinalization,
 	}
