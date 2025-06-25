@@ -10,25 +10,25 @@ This file is a visual example of the release process outlined in [Release Proces
 
     <img src="images/02-release-branch.svg" alt="cut release branch release/0.10" />
 
-3. Commit `feature 3` to `master`
+3. Commit `bugfix 3` to `master`
 
-    <img src="images/03-feature.svg" alt="commit feature 3 to master" />
+    <img src="images/03-bugfix.svg" alt="commit bugfix 3 to master" />
 
-4. Cherry pick `feature 3` to `release/0.10`
+4. Cherry pick `bugfix 3` to `release/0.10`
 
-    <img src="images/04-cherry-pick.svg" alt="cherry pick feature 3 to release/0.10" />
+    <img src="images/04-cherry-pick.svg" alt="cherry pick bugfix 3 to release/0.10" />
 
 5. Create tag `v0.10.0-rc.1`
 
     <img src="images/05-rc-tag.svg" alt="create tag v0.10.0-rc.1" />
 
-6. Commit `feature 4` to `master`
+6. Commit `bugfix 4` to `master`
 
-    <img src="images/06-feature.svg" alt="commit feature 4 to master" />
+    <img src="images/06-bugfix.svg" alt="commit bugfix 4 to master" />
 
-7. Cherry pick `feature 4` to `release/0.10`
+7. Cherry pick `bugfix 4` to `release/0.10`
 
-    <img src="images/07-cherry-pick.svg" alt="cherry pick feature 4 to release/0.10" />
+    <img src="images/07-cherry-pick.svg" alt="cherry pick bugfix 4 to release/0.10" />
 
 8. Create tag `v0.10.0-rc.2`
 
