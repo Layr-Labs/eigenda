@@ -206,5 +206,31 @@
       "address": "0x130d8EA0052B45554e4C99079B84df292149Bd5E",
       "startBlock": 19839949
     }
+  },
+  "mainnet-beta": {
+    "RegistryCoordinator": {
+      "address": "0x964D17902e950281eAED56e162faD05510A5E4B6",
+      "startBlock": 22740040
+    },
+    "BLSApkRegistry": {
+      "address": "0xb1B31663F9Bf4029C02a49A7813Aaf54c4AC91C9",
+      "startBlock": 22740032
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0xb1B31663F9Bf4029C02a49A7813Aaf54c4AC91C9",
+      "startBlock": 22740032
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0x964D17902e950281eAED56e162faD05510A5E4B6",
+      "startBlock": 22740040
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0xb1B31663F9Bf4029C02a49A7813Aaf54c4AC91C9",
+      "startBlock": 22740032
+    },
+    "EjectionManager": {
+      "address": "0x6c50a60456576a009Aa27a6f171115Ca75428908",
+      "startBlock": 22740049
+    }
   }
 }
