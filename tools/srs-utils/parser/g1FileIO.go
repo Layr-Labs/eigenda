@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
@@ -103,7 +104,7 @@ func WriteG1PointsForEigenDA(points []bn254.G1Affine, from uint64, to uint64) er
 
 	g1w := bufio.NewWriter(g1f)
 
-	for i := uint64(0); i < n; i++ {
+	for i := range n {
 		pointInBytes := points[i].Bytes()
 		numWritten, err := g1w.Write(pointInBytes[:])
 		if numWritten != 32 || err != nil {
@@ -116,7 +117,7 @@ func WriteG1PointsForEigenDA(points []bn254.G1Affine, from uint64, to uint64) er
 		log.Println("Cannot flush points", err)
 		return err
 	}
-	g1f.Close()
+	core.CloseLogOnError(g1f, g1f.Name(), nil)
 	return nil
 
 }

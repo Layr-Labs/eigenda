@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -67,7 +68,7 @@ func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.
 			fmt.Println("Server is not running:", err)
 			return err
 		}
-		defer resp.Body.Close()
+		defer core.CloseLogOnError(resp.Body, "localstack response body", nil)
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("Server returned non-OK status: %s\n", resp.Status)

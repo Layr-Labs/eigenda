@@ -241,7 +241,7 @@ func TestSwappingKeyFile(t *testing.T) {
 	require.NotEqual(t, swapFilePath, originalFilePath)
 
 	// Replace the old file with the new one.
-	err = swapFile.atomicSwap()
+	err = swapFile.atomicSwap(false)
 	require.NoError(t, err)
 
 	// The old swap file should no longer be present.

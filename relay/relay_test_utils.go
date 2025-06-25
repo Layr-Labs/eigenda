@@ -52,7 +52,7 @@ const (
 )
 
 func setup(t *testing.T) {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	_, b, _, _ := runtime.Caller(0)
 	rootPath := filepath.Join(filepath.Dir(b), "..")
@@ -95,7 +95,7 @@ func changeDirectory(path string) {
 }
 
 func teardown() {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)

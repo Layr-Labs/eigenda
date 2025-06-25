@@ -371,7 +371,7 @@ func (w *retrievalWorker) retrieveBlobFromValidators() ([]byte, error) {
 	controlLoopTicker := time.NewTicker(w.config.ControlLoopPeriod)
 	defer controlLoopTicker.Stop()
 	for {
-		if w.getStatusCount(verified) >= w.minimumChunkCount {
+		if w.getStatusCount(verified) >= w.minimumChunkCount { //nolint:staticcheck // QF1006
 			// We've verified enough chunks to reconstruct the blob
 			break
 		}

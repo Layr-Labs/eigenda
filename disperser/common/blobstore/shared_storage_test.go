@@ -164,10 +164,13 @@ func TestSharedBlobStore(t *testing.T) {
 	assert.Equal(t, 2, len(allMetadata))
 	var blob1Metadata, blob2Metadata *disperser.BlobMetadata
 	for i, metadata := range allMetadata {
-		if metadata.BlobHash == metadata1.BlobHash {
+		switch metadata.BlobHash {
+		case metadata1.BlobHash:
 			blob1Metadata = allMetadata[i]
-		} else if metadata.BlobHash == updatedMetadata.BlobHash {
+		case updatedMetadata.BlobHash:
 			blob2Metadata = allMetadata[i]
+		default:
+			t.Fatalf("Unexpected blob hash in metadata: %s", metadata.BlobHash)
 		}
 	}
 	assert.NotNil(t, blob1Metadata)

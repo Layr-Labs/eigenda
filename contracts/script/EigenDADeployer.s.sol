@@ -33,6 +33,7 @@ import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRe
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {UsageAuthorizationRegistry} from "src/core/UsageAuthorizationRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
+import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {
     DeployOpenEigenLayer,
     ProxyAdmin,
@@ -40,6 +41,7 @@ import {
     TransparentUpgradeableProxy,
     IPauserRegistry
 } from "./DeployOpenEigenLayer.s.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
@@ -54,6 +56,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ProxyAdmin public eigenDAProxyAdmin;
     PauserRegistry public eigenDAPauserReg;
 
+    EigenDADirectory public eigenDADirectory;
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
     EigenDAThresholdRegistry public eigenDAThresholdRegistry;
@@ -70,6 +73,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
     UsageAuthorizationRegistry public usageAuthorizationRegistry;
 
+    EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
     EigenDACertVerifierRouter public eigenDACertVerifierRouterImplementation;
@@ -146,6 +150,17 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         emptyContract = new EmptyContract();
 
+        eigenDADirectoryImplementation = new EigenDADirectory();
+        eigenDADirectory = EigenDADirectory(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(eigenDADirectoryImplementation),
+                    address(eigenDAProxyAdmin),
+                    abi.encodeWithSelector(EigenDADirectory.initialize.selector, msg.sender)
+                )
+            )
+        );
+
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
@@ -153,44 +168,63 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME, address(eigenDAServiceManager));
         eigenDAThresholdRegistry = EigenDAThresholdRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME, address(eigenDAThresholdRegistry)
         );
         eigenDARelayRegistry = EigenDARelayRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-
+        eigenDADirectory.addAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME, address(eigenDARelayRegistry));
         eigenDACertVerifierRouter = EigenDACertVerifierRouter(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME, address(eigenDACertVerifierRouter)
         );
 
         registryCoordinator = RegistryCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(registryCoordinator));
         indexRegistry = IIndexRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.INDEX_REGISTRY_NAME, address(indexRegistry));
         stakeRegistry = IStakeRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME, address(stakeRegistry));
         apkRegistry = BLSApkRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, address(apkRegistry));
         socketRegistry = ISocketRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, address(socketRegistry));
 
         {
             paymentVault = IPaymentVault(
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
+            eigenDADirectory.addAddress(AddressDirectoryConstants.PAYMENT_VAULT_NAME, address(paymentVault));
 
             eigenDADisperserRegistry = IEigenDADisperserRegistry(
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
+            eigenDADirectory.addAddress(
+                AddressDirectoryConstants.DISPERSER_REGISTRY_NAME, address(eigenDADisperserRegistry)
+            );
 
             usageAuthorizationRegistry = UsageAuthorizationRegistry(
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+            );
+            eigenDADirectory.addAddress(
+                AddressDirectoryConstants.USAGE_AUTHORIZATION_REGISTRY_NAME, address(usageAuthorizationRegistry)
             );
 
             paymentVaultImplementation = new PaymentVault();
@@ -334,6 +368,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         );
 
         operatorStateRetriever = new OperatorStateRetriever();
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(operatorStateRetriever)
+        );
 
         // NOTE: will be deprecated in the future with subsequent release
         //       which removes the legacy V2 cert verifier entirely
@@ -345,6 +382,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_V2_NAME, address(legacyEigenDACertVerifier));
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
@@ -352,6 +390,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
 
         eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
 
@@ -380,5 +419,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 UsageAuthorizationRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig
             )
         );
+        eigenDADirectory.transferOwnership(addressConfig.eigenLayerCommunityMultisig);
     }
 }
