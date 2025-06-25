@@ -230,7 +230,7 @@ func ErrIfNotWritableDirectory(dirPath string) error {
 }
 
 // Returns an error if the given path exists, otherwise returns nil.
-func ErrIfExists(path string) error { // TODO test
+func ErrIfExists(path string) error {
 	exists, err := Exists(path)
 	if err != nil {
 		return fmt.Errorf("failed to check if path %s exists: %w", path, err)
@@ -242,7 +242,7 @@ func ErrIfExists(path string) error { // TODO test
 }
 
 // Returns an error if the given path does not exist, otherwise returns nil.
-func ErrIfNotExists(path string) error { // TODO test
+func ErrIfNotExists(path string) error {
 	exists, err := Exists(path)
 	if err != nil {
 		return fmt.Errorf("failed to check if path %s exists: %w", path, err)
@@ -332,7 +332,7 @@ func CopyRegularFile(src string, dst string, fsync bool) error {
 	}
 
 	// Create destination file
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}

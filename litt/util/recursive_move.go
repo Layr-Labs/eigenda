@@ -65,6 +65,15 @@ func moveFile(source string, destination string, preserveOriginal bool, fsync bo
 	if !preserveOriginal {
 		// Try simple rename first (works if on same filesystem)
 		if err := os.Rename(source, destination); err == nil {
+			if fsync {
+				if err := SyncDirectory(filepath.Dir(destination)); err != nil {
+					return fmt.Errorf("failed to sync parent directory: %w", err)
+				}
+				if err := SyncDirectory(filepath.Dir(source)); err != nil {
+					return fmt.Errorf("failed to sync parent directory: %w", err)
+				}
+			}
+
 			return nil
 		}
 		// Rename failed (likely different filesystem), fall back to copy+delete
