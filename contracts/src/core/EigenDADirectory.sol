@@ -35,7 +35,7 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
         address oldValue = key.getAddress();
 
         if (oldValue == address(0)) {
-            revert AddressNotAdded(name);
+            revert AddressDoesNotExist(name);
         }
         if (value == address(0)) {
             revert ZeroAddress();
@@ -55,7 +55,7 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
         address existingAddress = key.getAddress();
 
         if (existingAddress == address(0)) {
-            revert AddressNotAdded(name);
+            revert AddressDoesNotExist(name);
         }
 
         key.setAddress(address(0));
