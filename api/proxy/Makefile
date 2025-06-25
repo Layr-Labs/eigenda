@@ -25,7 +25,7 @@ disperse-test-blob:
 
 # Runs all tests, excluding e2e
 test-unit:
-	gotestsum --format pkgname-and-test-fails -- `go list ./... | grep -v ./test/e2e` -parallel 4
+	gotestsum --format pkgname-and-test-fails -- -short -parallel 4 ./...
 
 # E2E tests using local memstore, leveraging op-e2e framework. Also tests the standard client against the proxy.
 test-e2e-local:
