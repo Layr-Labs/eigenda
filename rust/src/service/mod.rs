@@ -1,22 +1,74 @@
+mod proxy;
+
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
+    common::HexHash,
     da::{DaSpec, RelevantBlobs, RelevantProofs},
     node::da::{DaService, SlotData, SubmitBlobReceipt},
 };
+use thiserror::Error;
 use tokio::sync::oneshot;
+use tracing::{debug, instrument};
 
 use crate::{
-    spec::{EigenDaSpec, EthereumBlockHeader},
+    service::proxy::{ProxyClient, ProxyError},
+    spec::{EigenDaSpec, EthereumBlockHeader, EthereumHash},
     verifier::EigenDaVerifier,
 };
 
+/// Configuration for the [`EigenDaService`].
 #[derive(Debug, JsonSchema, PartialEq)]
-pub struct EigenDaConfig;
+pub struct EigenDaConfig {
+    pub proxy_url: String,
+}
+
+/// Possible errors that can happen when using [`EigenDaService`].
+#[derive(Debug, Error)]
+pub enum EigenDaServiceError {
+    #[error("ProxyError: {0}")]
+    ProxyError(#[from] ProxyError),
+}
 
 #[derive(Clone)]
-pub struct EigenDaService;
+pub struct EigenDaService {
+    client: ProxyClient,
+}
+
+impl EigenDaService {
+    pub fn new(config: EigenDaConfig) -> Result<Self, EigenDaServiceError> {
+        let client = ProxyClient::new(config.proxy_url)?;
+
+        Ok(Self { client })
+    }
+}
+
+impl EigenDaService {
+    #[instrument(skip_all)]
+    async fn submit_blob(
+        &self,
+        blob: &[u8],
+        // TODO: Namespace the blob being submitted
+    ) -> Result<SubmitBlobReceipt<EthereumHash>, anyhow::Error> {
+        // Submit blob to the EigenDA
+        let certificate = self.client.store_blob(blob).await?;
+        debug!(?certificate, "Certificate was received");
+
+        // TODO: What should be used as a blob_hash?
+        let blob_hash = HexHash::new(todo!());
+
+        // TODO: The da_transaction_id is the transaction id on the L1 in which
+        // the blob was submitted in. In our case that should be a transaction
+        // in which the certificate was persisted on chain.
+        let da_transaction_id = todo!();
+
+        Ok(SubmitBlobReceipt {
+            blob_hash,
+            da_transaction_id,
+        })
+    }
+}
 
 #[async_trait]
 impl DaService for EigenDaService {
@@ -92,7 +144,11 @@ impl DaService for EigenDaService {
     ) -> oneshot::Receiver<
         Result<SubmitBlobReceipt<<Self::Spec as DaSpec>::TransactionId>, Self::Error>,
     > {
-        todo!()
+        let (tx, rx) = oneshot::channel();
+        let result = self.submit_blob(blob).await;
+        tx.send(result).expect("receiver exists");
+
+        rx
     }
 
     /// Sends a proof to the DA layer.
@@ -103,7 +159,11 @@ impl DaService for EigenDaService {
     ) -> oneshot::Receiver<
         Result<SubmitBlobReceipt<<Self::Spec as DaSpec>::TransactionId>, Self::Error>,
     > {
-        todo!()
+        let (tx, rx) = oneshot::channel();
+        let result = self.submit_blob(aggregated_proof_data).await;
+        tx.send(result).expect("receiver exists");
+
+        rx
     }
 
     /// Fetches all proofs at a specified block height.
