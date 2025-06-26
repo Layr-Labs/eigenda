@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/urfave/cli"
@@ -19,6 +20,7 @@ type Config struct {
 
 	Timeout                       time.Duration
 	NumConnections                int
+	AddressDirectoryAddr          string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
@@ -35,6 +37,14 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
+	// Validate that either address directory is provided OR both individual addresses are provided
+	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
+	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		LoggerConfig:    *loggerConfig,
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
@@ -44,8 +54,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		},
 		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
 		NumConnections:                ctx.Int(flags.NumConnectionsFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		EigenDAVersion:                version,
 	}, nil
 }

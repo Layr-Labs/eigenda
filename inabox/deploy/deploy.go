@@ -271,11 +271,11 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 		return fmt.Errorf("could not create logger: %v", err)
 	}
 
-	writer, err := eth.NewWriter(
+	// Use address directory for deployment scripts
+	writer, err := eth.NewWriterWithAddressDirectory(
 		logger,
 		ethClient,
-		env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER,
-		env.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+		env.EigenDA.Directory)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %v", err)
 	}

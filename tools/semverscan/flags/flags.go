@@ -15,20 +15,25 @@ const (
 )
 
 var (
-	/* Required Flags*/
+	/* Optional Flags*/
+	AddressDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
+		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
 		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
-	/* Optional Flags*/
 	TimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
 		Usage:    "Seconds to wait for GPRC response",
@@ -58,16 +63,16 @@ var (
 	}
 )
 
-var requiredFlags = []cli.Flag{
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
-}
+var requiredFlags = []cli.Flag{}
 
 var optionalFlags = []cli.Flag{
 	TimeoutFlag,
 	WorkersFlag,
 	OperatorIdFlag,
 	UseRetrievalClientFlag,
+	AddressDirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

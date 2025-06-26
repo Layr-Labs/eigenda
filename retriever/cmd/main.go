@@ -90,7 +90,12 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	tx, err := eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var tx *eth.Reader
+	if config.AddressDirectoryAddr != "" {
+		tx, err = eth.NewReaderWithAddressDirectory(logger, gethClient, config.AddressDirectoryAddr)
+	} else {
+		tx, err = eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

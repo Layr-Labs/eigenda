@@ -52,7 +52,12 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var transactor *eth.Reader
+	if config.AddressDirectoryAddr != "" {
+		transactor, err = eth.NewReaderWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
+	} else {
+		transactor, err = eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return err
 	}

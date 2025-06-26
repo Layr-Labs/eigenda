@@ -3,6 +3,7 @@ package ejections
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/tools/ejections/flags"
 	"github.com/urfave/cli"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	Skip             uint
 
 	EthClientConfig               geth.EthClientConfig
+	AddressDirectoryAddr          string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 }
@@ -28,6 +30,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 		First:                         ctx.Uint(flags.FirstFlag.Name),
 		Skip:                          ctx.Uint(flags.SkipFlag.Name),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 	}
@@ -41,6 +44,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
+	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr); err != nil {
+		return nil, err
+	}
 
 	return config, nil
 }

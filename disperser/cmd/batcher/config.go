@@ -4,6 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
@@ -29,8 +30,9 @@ type Config struct {
 
 	IndexerDataDir string
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	AddressDirectoryAddr          string
+	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
+	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	EnableGnarkBundleEncoding bool
 }
@@ -45,6 +47,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if !kmsConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
+
+	// Validate address configuration: either use address directory (preferred) or legacy individual addresses
+	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
+	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -83,8 +94,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,

@@ -217,11 +217,29 @@ func NewTestClient(
 
 	// Construct the relay client
 
-	ethReader, err := eth.NewReader(
-		logger,
-		ethClient,
+	// Validate address configuration
+	err = eth.ValidateAddressConfig(
+		config.AddressDirectoryAddr,
 		config.BLSOperatorStateRetrieverAddr,
 		config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address configuration: %w", err)
+	}
+
+	// Create eth reader using address directory if provided, otherwise use legacy addresses
+	var ethReader *eth.Reader
+	if config.AddressDirectoryAddr != "" {
+		ethReader, err = eth.NewReaderWithAddressDirectory(
+			logger,
+			ethClient,
+			config.AddressDirectoryAddr)
+	} else {
+		ethReader, err = eth.NewReader(
+			logger,
+			ethClient,
+			config.BLSOperatorStateRetrieverAddr,
+			config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}

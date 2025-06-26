@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -31,8 +32,9 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	AddressDirectoryAddr          string
+	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
+	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -50,6 +52,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
+
+	// Validate address configuration using shared validation
+	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
+	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
+
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+		return Config{}, err
+	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -61,8 +72,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
 		ServerVersion:                 version,
 		PrometheusConfig: prometheus.Config{

@@ -36,16 +36,22 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PULL_INTERVAL"),
 	}
+	AddressDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
+		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "Address of the BLS Operator State Retriever (legacy - use address-directory instead)",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "Address of the EigenDA Service Manager (legacy - use address-directory instead)",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	EncoderSocket = cli.StringFlag{

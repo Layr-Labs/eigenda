@@ -179,7 +179,12 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	tx, err := coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var tx *coreeth.Writer
+	if config.AddressDirectoryAddr != "" {
+		tx, err = coreeth.NewWriterWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
+	} else {
+		tx, err = coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return err
 	}

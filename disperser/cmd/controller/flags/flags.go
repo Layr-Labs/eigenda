@@ -26,14 +26,20 @@ var (
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
 		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
+	AddressDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
+		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
 	}
 	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
@@ -235,8 +241,6 @@ var (
 
 var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
@@ -270,6 +274,9 @@ var optionalFlags = []cli.Flag{
 	ControllerHealthProbePathFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
+	AddressDirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 var Flags []cli.Flag
