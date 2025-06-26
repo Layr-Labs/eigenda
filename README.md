@@ -18,7 +18,7 @@ If you're interested in integrating your rollup with EigenDA, please fill out th
 
 ## API Documentation
 
-The EigenDA public API is documented [here](https://github.com/Layr-Labs/eigenda/tree/master/api/docs).
+The EigenDA public API is documented [here](https://docs.eigencloud.xyz/products/eigenda/).
 
 ## Operating EigenDA Node
 
