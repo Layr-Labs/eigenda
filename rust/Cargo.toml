@@ -7,8 +7,12 @@ edition = "2024"
 sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "a25b7634c3a0eaa40acf57503508956a74291cdd" }
 
 anyhow = { version = "1.0.98", default-features = false }
+alloy = { version = "1.0.12", features = [
+    "full", # TODO: Use only needed features
+] }
 async-trait = "0.1.88"
 borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
+derive_more = { version = "2.0.1" }
 schemars = { version = "0.8.22", default-features = false, features = [
     "derive",
 ] }
@@ -17,6 +21,7 @@ serde = { version = "1.0.219", default-features = false, features = [
     "alloc",
     "derive",
 ] }
+serde_json = { version = "1.0.140" }
 tokio = { version = "1.45.1", features = ["sync"], optional = true }
 
 [dev-dependencies]
