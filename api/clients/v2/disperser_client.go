@@ -208,6 +208,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	err = c.initOncePopulateAccountant(ctx)
 	if err != nil {
+		c.accountantLock.Unlock()
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
 
