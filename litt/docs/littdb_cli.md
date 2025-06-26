@@ -213,10 +213,10 @@ USAGE:
 OPTIONS:
    --src value, -s value [ --src value, -s value ]  Source paths where the data is found, at least one is required.
    --dst value, -d value [ --dst value, -d value ]  Destination paths for the rebased LittDB, at least one is required.
-   --shallow, -S                                    If true, then copies are made shallowly (e.g. with symlinks and hardlinks, where possible).  (default: false)
    --preserve, -p                                   If enabled, then the old files are not removed. (default: false)
    --quiet, -q                                      Reduces the verbosity of the output. (default: false)
    --help, -h                                       show help
+
 ```
 
 Before rebasing, you must know two things:
@@ -230,11 +230,6 @@ directory to LittDB does not require a rebase, since LittDB can dynamically add 
 A rebase operation is idempotent. That is to say, running it more than once has the same effect as running it exactly 
 once. If your computer crashes half way though a rebase, simply run the same command again, and the rebase utility will
 pick up where it left off.
-
-For the vast majority of use cases, the flags `--shallow` and `--preserve` shouldn't be needed. By default, a rebase
-attempts to avoid making deep copies of data. If you are rebasing a file from one directory to another on the same
-physical volume, then the rebase will move the file instead of copying it. A rebase also deletes the old files by 
-default. These flags can be used to modify this behavior.
 
 Example:
 
