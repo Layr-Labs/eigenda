@@ -290,6 +290,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, err
 	}
 
+	return convertAllQuorumsReplyToLegacy(allQuorumsReply), nil
+}
+
+// TODO: describe the conversion logic and what this means for users.
+func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuorumsReply) *pb.GetPaymentStateReply {
 	// For PaymentVaultParams, use quorum 0 for protocol level parameters and on-demand quorum numbers
 	var paymentGlobalParams *pb.PaymentGlobalParams
 	if allQuorumsReply.PaymentVaultParams != nil &&
@@ -376,7 +381,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		Reservation:              reservation,
 		CumulativePayment:        allQuorumsReply.CumulativePayment,
 		OnchainCumulativePayment: allQuorumsReply.OnchainCumulativePayment,
-	}, nil
+	}
 }
 
 // GetPaymentStateForAllQuorums returns payment state for all quorums including vault parameters,
