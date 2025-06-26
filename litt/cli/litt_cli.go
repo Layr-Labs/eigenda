@@ -180,6 +180,88 @@ func buildCLIParser() *cli.App {
 				},
 				Action: pushCommand,
 			},
+			{ // TODO manually test this one
+				Name: "sync",
+				Usage: "Periodically run 'litt push' to keep a remote backup in sync with local data. " +
+					"Optionally calls 'litt prune' remotely to manage data retention.",
+				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
+					"--dst <remote-path1> ... --dst <remote-pathN> " +
+					"[-i path/to/key] [-p port] [--no-gc] [--quiet] [--threads 42] [--throttle 100]" +
+					"[--max-age 100000] [--litt-binary /path/to/remote/bin/litt] [--period 300]" +
+					"<user>@<host>",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the data is found, at least one is required.",
+						Required: true,
+					},
+					&cli.StringSliceFlag{
+						Name:     "dst",
+						Aliases:  []string{"d"},
+						Usage:    "Remote destination paths, at least one is required.",
+						Required: true,
+					},
+					&cli.Uint64Flag{
+						Name:    "port",
+						Aliases: []string{"p"},
+						Usage:   "SSH port to connect to the remote host.",
+						Value:   22,
+					},
+					&cli.StringFlag{
+						Name:    "key",
+						Aliases: []string{"i"},
+						Usage:   "Path to the SSH private key file for authentication.",
+						Value:   "~/.ssh/id_rsa",
+					},
+					&cli.BoolFlag{
+						Name:    "no-gc",
+						Aliases: []string{"n"},
+						Usage:   "If true, do not delete files pushed to the remote host.",
+					},
+					&cli.BoolFlag{
+						Name:     "quiet",
+						Aliases:  []string{"q"},
+						Usage:    "Reduces the verbosity of the output.",
+						Required: false,
+					},
+					&cli.Uint64Flag{
+						Name:    "threads",
+						Aliases: []string{"t"},
+						Usage:   "Number of parallel rsync operations.",
+						Value:   8,
+					},
+					&cli.Float64Flag{
+						Name:    "throttle",
+						Aliases: []string{"T"},
+						Usage:   "Max network utilization, in mb/s",
+						Value:   0,
+					},
+					&cli.Uint64Flag{
+						Name:    "max-age",
+						Aliases: []string{"a"},
+						Usage: "If non-zero, remotely run 'litt prune' to delete segments " +
+							"older than this age in seconds.",
+						Value:    0, // Default to 0, meaning no age limit
+						Required: false,
+					},
+					&cli.StringFlag{
+						Name:     "litt-binary",
+						Aliases:  []string{"b"},
+						Usage:    "The remote location of the 'litt' CLI binary to use for pruning.",
+						Value:    "litt",
+						Required: false,
+					},
+					&cli.Uint64Flag{
+						Name:     "period",
+						Aliases:  []string{"P"},
+						Usage:    "The period in seconds between sync operations.",
+						Value:    300,
+						Required: false,
+					},
+				},
+				Action: syncCommand,
+			},
 		},
 	}
 	return app

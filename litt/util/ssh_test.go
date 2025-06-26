@@ -2,6 +2,7 @@ package util
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -52,39 +53,12 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSSHSession_Ls(t *testing.T) {
-	t.Parallel()
-
-	container := SetupSSHTestContainer(t, "")
-	defer func() { _ = container.Cleanup() }()
-
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
-	session, err := NewSSHSession(
-		logger,
-		container.GetUser(),
-		container.GetHost(),
-		container.GetSSHPort(),
-		container.GetPrivateKeyPath(),
-		true)
-	require.NoError(t, err)
-	defer func() { _ = session.Close() }()
-
-	// Test listing home directory
-	files, err := session.Ls("/home/testuser")
-	require.NoError(t, err)
-	require.Contains(t, files, ".ssh")
-
-	// Test listing non-existent directory
-	_, err = session.Ls("/nonexistent")
-	require.Error(t, err)
-}
-
 func TestSSHSession_Mkdirs(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t, "")
+	dataDir := t.TempDir()
+
+	container := SetupSSHTestContainer(t, dataDir)
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -101,14 +75,24 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	defer func() { _ = session.Close() }()
 
 	// Test creating directory
-	testDir := "/mnt/test/newdir/subdir"
+	testDir := path.Join(container.GetDataDir(), "foo", "bar", "baz")
 	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Verify directory was created
-	files, err := session.Ls("/mnt/test/newdir")
+	// Verify directories were created
+	exists, err := Exists(path.Join(dataDir, "foo"))
 	require.NoError(t, err)
-	require.Contains(t, files, "subdir")
+	require.True(t, exists)
+	exists, err = Exists(path.Join(dataDir, "foo", "bar"))
+	require.NoError(t, err)
+	require.True(t, exists)
+	exists, err = Exists(path.Join(dataDir, "foo", "bar", "baz"))
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	// Recreating the same directory should not error.
+	err = session.Mkdirs(testDir)
+	require.NoError(t, err)
 }
 
 func TestSSHSession_FindFiles(t *testing.T) {

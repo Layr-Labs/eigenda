@@ -79,73 +79,21 @@ func (s *SSHSession) Close() error {
 	return nil
 }
 
-// RemoteLs executes "ls" on the remote machine and returns the list of files in the specified path.
-func (s *SSHSession) Ls(path string) ([]string, error) {
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-
-	session, err := s.client.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SSH session: %v", err)
-	}
-	defer func() {
-		_ = session.Close()
-	}()
-
-	session.Stdout = &stdoutBuf
-	session.Stderr = &stderrBuf
-
-	command := fmt.Sprintf("ls -a '%s'", path)
-	if s.verbose {
-		s.logger.Infof("Executing remotely: %s", command)
-	}
-
-	if err := session.Run(command); err != nil {
-		return nil, fmt.Errorf("failed to execute command '%s': %v, stderr: %s",
-			command, err, stderrBuf.String())
-	}
-
-	output := strings.TrimSpace(stdoutBuf.String())
-	if output == "" {
-		return []string{}, nil
-	}
-	files := strings.Split(output, "\n")
-	return files, nil
-}
-
 // Search for all files matching a regex inside a file tree at the specified root path.
 func (s *SSHSession) FindFiles(root string, extensions []string) ([]string, error) {
-
-	session, err := s.client.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SSH session: %v", err)
-	}
-	defer func() {
-		_ = session.Close()
-	}()
-
 	command := fmt.Sprintf("find \"%s\" -type f", root)
-	if s.verbose {
-		s.logger.Infof("Executing remotely: %s", command)
-	}
+	stdout, stderr, err := s.Exec(command)
 
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-	session.Stdout = &stdoutBuf
-	session.Stderr = &stderrBuf
-
-	err = session.Run(command)
 	if err != nil {
-		errString := stderrBuf.String()
-		if !strings.Contains(errString, "No such file or directory") {
+		if !strings.Contains(stderr, "No such file or directory") {
 			return nil, fmt.Errorf("failed to execute command '%s': %v, stderr: %s",
-				command, err, errString)
+				command, err, stderr)
 		}
 		// There are no files since the directory does not exist.
 		return []string{}, nil
 	}
 
-	files := strings.Split(stdoutBuf.String(), "\n")
+	files := strings.Split(stdout, "\n")
 
 	filteredFiles := make([]string, 0, len(files))
 	for _, file := range files {
@@ -165,25 +113,13 @@ func (s *SSHSession) FindFiles(root string, extensions []string) ([]string, erro
 
 // Mkdirs creates the specified directory on the remote machine, including any necessary parent directories.
 func (s *SSHSession) Mkdirs(path string) error {
-	session, err := s.client.NewSession()
+	_, stderr, err := s.Exec(fmt.Sprintf("mkdir -p %s", path))
 	if err != nil {
-		return fmt.Errorf("failed to create SSH session: %v", err)
-	}
-	defer func() {
-		_ = session.Close()
-	}()
-
-	command := fmt.Sprintf("mkdir -p '%s'", path)
-	if s.verbose {
-		s.logger.Infof("Executing remotely: %s", command)
-	}
-
-	var stderrBuf bytes.Buffer
-	session.Stderr = &stderrBuf
-
-	if err := session.Run(command); err != nil {
-		return fmt.Errorf("failed to create directory '%s': %v, stderr: %s",
-			path, err, stderrBuf.String())
+		if strings.Contains(stderr, "File exists") {
+			// Directory already exists, no error needed
+			return nil
+		}
+		return fmt.Errorf("failed to create directory '%s': %v, stderr: %s", path, err, stderr)
 	}
 
 	return nil
@@ -236,4 +172,31 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float6
 	}
 
 	return nil
+}
+
+// Exec executes a command on the remote machine and returns the output. Returns the result of stdout and stderr.
+func (s *SSHSession) Exec(command string) (stdout string, stderr string, err error) {
+	session, err := s.client.NewSession()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create SSH session: %v", err)
+	}
+	defer func() {
+		_ = session.Close()
+	}()
+
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	session.Stdout = &stdoutBuf
+	session.Stderr = &stderrBuf
+
+	if s.verbose {
+		s.logger.Infof("Executing remotely: %s", command)
+	}
+
+	if err = session.Run(command); err != nil {
+		return stdoutBuf.String(), stderrBuf.String(),
+			fmt.Errorf("failed to execute command '%s': %v", command, err)
+	}
+
+	return stdoutBuf.String(), stderrBuf.String(), nil
 }
