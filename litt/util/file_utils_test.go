@@ -1,16 +1,14 @@
 package util
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestVerifyFileProperties(t *testing.T) {
+func TestErrIfNotWritableFile(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
 
@@ -73,7 +71,7 @@ func TestVerifyFileProperties(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			path := tc.setup()
-			exists, size, err := VerifyFileProperties(path)
+			exists, size, err := ErrIfNotWritableFile(path)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -134,7 +132,7 @@ func TestExists(t *testing.T) {
 	}
 }
 
-func TestVerifyDirectoryWritable(t *testing.T) {
+func TestErrIfNotWritableDirectory(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
 
@@ -187,7 +185,7 @@ func TestVerifyDirectoryWritable(t *testing.T) {
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := verifyDirectoryWritable(tc.path)
+			err := ErrIfNotWritableDirectory(tc.path)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -230,12 +228,6 @@ func TestEnsureParentDirExists(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "parent is non-writable",
-			path:        filepath.Join(nonWritableDir, "new-file"),
-			expectError: true,
-			errorMsg:    "not writable",
-		},
-		{
 			name:        "multi-level parent doesn't exist",
 			path:        filepath.Join(tempDir, "new-dir", "subdir", "new-file"),
 			expectError: false,
@@ -251,7 +243,7 @@ func TestEnsureParentDirExists(t *testing.T) {
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ensureParentDirExists(tc.path)
+			err := EnsureParentDirectoryExists(tc.path, false)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -281,15 +273,6 @@ func TestCopyRegularFile(t *testing.T) {
 	sourceFile := filepath.Join(tempDir, "source-file")
 	content := []byte("test content")
 	err := os.WriteFile(sourceFile, content, 0640)
-	require.NoError(t, err)
-
-	// Set a specific modification time
-	modTime := time.Now().Add(-24 * time.Hour) // yesterday
-	err = os.Chtimes(sourceFile, modTime, modTime)
-	require.NoError(t, err)
-
-	// Get file info for permissions and modtime
-	sourceInfo, err := os.Stat(sourceFile)
 	require.NoError(t, err)
 
 	// Test cases
@@ -324,87 +307,17 @@ func TestCopyRegularFile(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := copyRegularFile(sourceFile, tc.destPath, sourceInfo.Mode(), sourceInfo.ModTime())
+			err := CopyRegularFile(sourceFile, tc.destPath, false)
 
 			if tc.expectError {
 				require.Error(t, err)
 			} else {
-				require.NoError(t, err)
-
-				// Verify the file was copied correctly
-				destInfo, err := os.Stat(tc.destPath)
 				require.NoError(t, err)
 
 				// Check content
 				destContent, err := os.ReadFile(tc.destPath)
 				require.NoError(t, err)
 				require.Equal(t, content, destContent)
-
-				// Check permissions (mask out the bits we don't care about for comparison)
-				// We only care about user, group, and world permissions (0777)
-				// This handles umask and platform differences
-				require.Equal(t, sourceInfo.Mode()&0777, destInfo.Mode()&0777)
-
-				// Check modification time
-				require.Equal(t, sourceInfo.ModTime().Unix(), destInfo.ModTime().Unix())
-			}
-		})
-	}
-}
-
-func TestCopySymlink(t *testing.T) {
-	// Skip on platforms that don't support symlinks (like Windows in some cases)
-	if !supportsSymlinks() {
-		t.Skip("Symlinks not supported on this platform/environment")
-	}
-
-	// Setup
-	tempDir := t.TempDir()
-
-	// Create a target file for the symlink
-	targetFile := filepath.Join(tempDir, "target-file")
-	err := os.WriteFile(targetFile, []byte("target content"), 0644)
-	require.NoError(t, err)
-
-	// Create a source symlink
-	sourceSymlink := filepath.Join(tempDir, "source-symlink")
-	err = os.Symlink(targetFile, sourceSymlink)
-	require.NoError(t, err)
-
-	// Test cases
-	tests := []struct {
-		name        string
-		destPath    string
-		expectError bool
-	}{
-		{
-			name:        "copy to a new location",
-			destPath:    filepath.Join(tempDir, "dest-symlink"),
-			expectError: false,
-		},
-		{
-			name:        "copy to a new subdirectory",
-			destPath:    filepath.Join(tempDir, "subdir", "dest-symlink"),
-			expectError: false,
-		},
-	}
-
-	// Run tests
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := copySymlink(sourceSymlink, tc.destPath)
-
-			if tc.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-
-				// Verify the symlink was created
-				linkDest, err := os.Readlink(tc.destPath)
-				require.NoError(t, err)
-
-				// Verify it points to the right target
-				require.Equal(t, targetFile, linkDest)
 			}
 		})
 	}
@@ -423,7 +336,6 @@ func TestEnsureDirectoryExists(t *testing.T) {
 	tests := []struct {
 		name        string
 		dirPath     string
-		mode        os.FileMode
 		setup       func(path string)
 		expectError bool
 		errorMsg    string
@@ -431,14 +343,12 @@ func TestEnsureDirectoryExists(t *testing.T) {
 		{
 			name:        "directory doesn't exist",
 			dirPath:     filepath.Join(tempDir, "new-dir"),
-			mode:        0755,
 			setup:       func(path string) {},
 			expectError: false,
 		},
 		{
 			name:    "directory already exists",
 			dirPath: filepath.Join(tempDir, "existing-dir"),
-			mode:    0755,
 			setup: func(path string) {
 				err := os.Mkdir(path, 0755)
 				require.NoError(t, err)
@@ -448,21 +358,9 @@ func TestEnsureDirectoryExists(t *testing.T) {
 		{
 			name:        "path exists but is a file",
 			dirPath:     regularFile,
-			mode:        0755,
 			setup:       func(path string) {},
 			expectError: true,
 			errorMsg:    "is not a directory",
-		},
-		{
-			name:    "directory exists but is non-writable",
-			dirPath: filepath.Join(tempDir, "non-writable-dir"),
-			mode:    0755,
-			setup: func(path string) {
-				err := os.Mkdir(path, 0500) // read & execute only
-				require.NoError(t, err)
-			},
-			expectError: true,
-			errorMsg:    "not writable",
 		},
 	}
 
@@ -471,7 +369,7 @@ func TestEnsureDirectoryExists(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setup(tc.dirPath)
 
-			err := ensureDirectoryExists(tc.dirPath, tc.mode)
+			err := EnsureDirectoryExists(tc.dirPath, false)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -502,139 +400,27 @@ func TestEnsureDirectoryExists(t *testing.T) {
 	}
 }
 
-func TestCopyDirectoryRecursively(t *testing.T) {
-	// Setup
-	tempDir := t.TempDir()
+func TestEnsureParentDirectoryExists(t *testing.T) {
+	testDir := t.TempDir()
 
-	// Create a source directory structure
-	sourceDir := filepath.Join(tempDir, "source")
-	err := os.Mkdir(sourceDir, 0755)
+	directoryPath := filepath.Join(testDir, "foo", "bar", "baz")
+	filePath := filepath.Join(directoryPath, "data.txt")
+
+	err := EnsureParentDirectoryExists(filePath, false)
+	require.NoError(t, err, "failed to create directory")
+
+	exists, err := Exists(directoryPath)
+	require.NoError(t, err, "failed to check if directory exists")
+	require.True(t, exists, "directory does not exist")
+
+	// Utility should not have created the file, just the parent.
+	exists, err = Exists(filePath)
+	require.NoError(t, err, "failed to check if file 1exists")
+	require.False(t, exists, "file should not exist")
+
+	// Calling the same method again should not cause an error.
+	err = EnsureParentDirectoryExists(filePath, false)
 	require.NoError(t, err)
-
-	// Create some files in the source directory
-	err = os.WriteFile(filepath.Join(sourceDir, "file1.txt"), []byte("file1 content"), 0644)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(sourceDir, "file2.txt"), []byte("file2 content"), 0644)
-	require.NoError(t, err)
-
-	// Create a subdirectory
-	subDir := filepath.Join(sourceDir, "subdir")
-	err = os.Mkdir(subDir, 0755)
-	require.NoError(t, err)
-
-	// Create files in the subdirectory
-	err = os.WriteFile(filepath.Join(subDir, "file3.txt"), []byte("file3 content"), 0644)
-	require.NoError(t, err)
-
-	// Create a symlink if supported
-	supportsLinks := supportsSymlinks()
-	var symlinkPath string
-	if supportsLinks {
-		symlinkPath = filepath.Join(sourceDir, "symlink")
-		err = os.Symlink(filepath.Join(sourceDir, "file1.txt"), symlinkPath)
-		require.NoError(t, err)
-	}
-
-	// Test cases
-	tests := []struct {
-		name        string
-		destDir     string
-		expectError bool
-	}{
-		{
-			name:        "copy to new destination",
-			destDir:     filepath.Join(tempDir, "dest"),
-			expectError: false,
-		},
-		{
-			name:        "copy to existing destination",
-			destDir:     filepath.Join(tempDir, "existing-dest"),
-			expectError: false,
-		},
-	}
-
-	// Run tests
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// For the "existing destination" test, create the directory first
-			if tc.name == "copy to existing destination" {
-				err := os.Mkdir(tc.destDir, 0755)
-				require.NoError(t, err)
-
-				// Add a pre-existing file
-				err = os.WriteFile(filepath.Join(tc.destDir, "existing.txt"), []byte("existing content"), 0644)
-				require.NoError(t, err)
-			}
-
-			err := CopyDirectoryRecursively(sourceDir, tc.destDir)
-
-			if tc.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-
-				// Verify the directory was copied correctly
-
-				// Check for file1.txt
-				content, err := os.ReadFile(filepath.Join(tc.destDir, "file1.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file1 content", string(content))
-
-				// Check for file2.txt
-				content, err = os.ReadFile(filepath.Join(tc.destDir, "file2.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file2 content", string(content))
-
-				// Check for subdirectory and its file
-				subDirPath := filepath.Join(tc.destDir, "subdir")
-				info, err := os.Stat(subDirPath)
-				require.NoError(t, err)
-				require.True(t, info.IsDir())
-
-				content, err = os.ReadFile(filepath.Join(subDirPath, "file3.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file3 content", string(content))
-
-				// Check for symlink if supported
-				if supportsLinks {
-					linkTarget, err := os.Readlink(filepath.Join(tc.destDir, "symlink"))
-					require.NoError(t, err)
-					require.Equal(t, filepath.Join(sourceDir, "file1.txt"), linkTarget)
-				}
-
-				// For the "existing destination" test, verify the pre-existing file is still there
-				if tc.name == "copy to existing destination" {
-					content, err = os.ReadFile(filepath.Join(tc.destDir, "existing.txt"))
-					require.NoError(t, err)
-					require.Equal(t, "existing content", string(content))
-				}
-			}
-		})
-	}
-}
-
-// Helper function to check if symlinks are supported in the current environment
-func supportsSymlinks() bool {
-	tempDir, err := os.MkdirTemp("", "symlink-test")
-	if err != nil {
-		return false
-	}
-	defer func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to clean up temp directory %s: %v\n", tempDir, err)
-		}
-	}()
-
-	source := filepath.Join(tempDir, "source")
-	target := filepath.Join(tempDir, "target")
-
-	err = os.WriteFile(source, []byte{}, 0644)
-	if err != nil {
-		return false
-	}
-
-	err = os.Symlink(source, target)
-	return err == nil
 }
 
 func TestAtomicWrite(t *testing.T) {
@@ -1024,11 +810,6 @@ func TestAtomicRenamePreservesPermissions(t *testing.T) {
 }
 
 func TestAtomicRenameWithSymlink(t *testing.T) {
-	// Skip on platforms that don't support symlinks
-	if !supportsSymlinks() {
-		t.Skip("Symlinks not supported on this platform/environment")
-	}
-
 	tempDir := t.TempDir()
 
 	// Create a target file
@@ -1056,43 +837,213 @@ func TestAtomicRenameWithSymlink(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-func TestAtomicRenameAcrossFilesystems(t *testing.T) {
-	// This test checks behavior when renaming across filesystem boundaries
-	// On most systems, this will fall back to copy+delete, but the function should still work
+const mixedSwapFilesTestName = "delete swap files in directory with mixed files"
+
+func TestDeleteOrphanedSwapFiles(t *testing.T) {
+	// Setup
 	tempDir := t.TempDir()
 
-	// Create source file
-	srcPath := filepath.Join(tempDir, "source.txt")
-	content := []byte("content for cross-filesystem test")
-	err := os.WriteFile(srcPath, content, 0644)
-	require.NoError(t, err)
+	// Test cases
+	tests := []struct {
+		name        string
+		setup       func() string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: mixedSwapFilesTestName,
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "mixed-files")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
 
-	// Try to rename to /tmp (likely different filesystem on many systems)
-	// If this fails due to cross-filesystem issues, that's expected behavior
-	tmpDir, err := os.MkdirTemp("", "atomic-rename-test-")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to clean up temp directory %s: %v\n", tmpDir, err)
-		}
-	})
+				// Create regular files
+				err = os.WriteFile(filepath.Join(testDir, "regular1.txt"), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "regular2.log"), []byte("content2"), 0644)
+				require.NoError(t, err)
 
-	dstPath := filepath.Join(tmpDir, "dest.txt")
+				// Create swap files
+				err = os.WriteFile(filepath.Join(testDir, "file1.txt"+SwapFileExtension), []byte("swap1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "file2.log"+SwapFileExtension), []byte("swap2"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "orphaned"+SwapFileExtension), []byte("orphaned"), 0644)
+				require.NoError(t, err)
 
-	err = AtomicRename(srcPath, dstPath, true)
-	// This might succeed or fail depending on the system
-	// If it succeeds, verify the file was moved correctly
-	if err == nil {
-		// Verify content
-		newContent, err := os.ReadFile(dstPath)
-		require.NoError(t, err)
-		require.Equal(t, content, newContent)
+				// Create a subdirectory (should be ignored)
+				subDir := filepath.Join(testDir, "subdir")
+				err = os.Mkdir(subDir, 0755)
+				require.NoError(t, err)
 
-		// Verify source no longer exists
-		_, err = os.Stat(srcPath)
-		require.True(t, os.IsNotExist(err))
+				// Create a swap file in subdirectory (should not be deleted by this call)
+				err = os.WriteFile(filepath.Join(subDir, "nested"+SwapFileExtension), []byte("nested"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "empty directory",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "empty-dir")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "directory with only swap files",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "only-swap")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+
+				// Create only swap files
+				err = os.WriteFile(filepath.Join(testDir, "swap1"+SwapFileExtension), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "swap2"+SwapFileExtension), []byte("content2"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "directory with no swap files",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "no-swap")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+
+				// Create only regular files
+				err = os.WriteFile(filepath.Join(testDir, "file1.txt"), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "file2.log"), []byte("content2"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "non-existent directory",
+			setup: func() string {
+				return filepath.Join(tempDir, "non-existent")
+			},
+			expectError: true,
+			errorMsg:    "failed to read directory",
+		},
+		{
+			name: "path is a file not directory",
+			setup: func() string {
+				filePath := filepath.Join(tempDir, "not-a-dir.txt")
+				err := os.WriteFile(filePath, []byte("content"), 0644)
+				require.NoError(t, err)
+				return filePath
+			},
+			expectError: true,
+			errorMsg:    "failed to read directory",
+		},
 	}
-	// If it fails, that's also acceptable for cross-filesystem renames
+
+	// Run tests
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dirPath := tc.setup()
+
+			// Count files before deletion for verification
+			var beforeFiles []string
+			if entries, err := os.ReadDir(dirPath); err == nil {
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						beforeFiles = append(beforeFiles, entry.Name())
+					}
+				}
+			}
+
+			err := DeleteOrphanedSwapFiles(dirPath)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+
+				// Verify that all swap files were deleted
+				entries, err := os.ReadDir(dirPath)
+				require.NoError(t, err)
+
+				var afterFiles []string
+				var afterSwapFiles []string
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						afterFiles = append(afterFiles, entry.Name())
+						if filepath.Ext(entry.Name()) == SwapFileExtension {
+							afterSwapFiles = append(afterSwapFiles, entry.Name())
+						}
+					}
+				}
+
+				// No swap files should remain
+				require.Empty(t, afterSwapFiles, "All swap files should be deleted")
+
+				// Regular files should remain unchanged
+				var beforeRegularFiles []string
+				var afterRegularFiles []string
+				for _, file := range beforeFiles {
+					if filepath.Ext(file) != SwapFileExtension {
+						beforeRegularFiles = append(beforeRegularFiles, file)
+					}
+				}
+				for _, file := range afterFiles {
+					if filepath.Ext(file) != SwapFileExtension {
+						afterRegularFiles = append(afterRegularFiles, file)
+					}
+				}
+				require.ElementsMatch(t, beforeRegularFiles, afterRegularFiles, "Regular files should be unchanged")
+
+				// Verify subdirectories are not affected
+				if tc.name == mixedSwapFilesTestName {
+					subDirPath := filepath.Join(dirPath, "subdir")
+					subEntries, err := os.ReadDir(subDirPath)
+					require.NoError(t, err)
+					require.Len(t, subEntries, 1, "Subdirectory should still contain its swap file")
+					require.Equal(t, "nested"+SwapFileExtension, subEntries[0].Name())
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteOrphanedSwapFilesPermissions(t *testing.T) {
+	// Test behavior with permission issues
+	tempDir := t.TempDir()
+
+	// Create a directory with swap files
+	testDir := filepath.Join(tempDir, "perm-test")
+	err := os.Mkdir(testDir, 0755)
+	require.NoError(t, err)
+
+	// Create a swap file
+	swapFile := filepath.Join(testDir, "test"+SwapFileExtension)
+	err = os.WriteFile(swapFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	// Make the directory read-only (no write permissions)
+	err = os.Chmod(testDir, 0555) // read + execute only
+	require.NoError(t, err)
+
+	// Attempt to delete swap files should fail
+	err = DeleteOrphanedSwapFiles(testDir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to remove swap file")
+
+	// Restore permissions for cleanup
+	err = os.Chmod(testDir, 0755)
+	require.NoError(t, err)
 }
 
 func TestSanitizePath(t *testing.T) {
@@ -1246,4 +1197,109 @@ func TestSanitizePath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsSymlink(t *testing.T) {
+	testDir := t.TempDir()
+
+	nonExistentPath := "non-existent-file.txt"
+	isSymlink, err := IsSymlink(nonExistentPath)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Non-existent file should not be a symlink")
+	err = ErrIfSymlink(nonExistentPath)
+	require.NoError(t, err, "Non-existent file should not be a symlink")
+
+	regularFilePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(regularFilePath, []byte("test content"), 0644)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(regularFilePath)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Regular file should not be a symlink")
+	err = ErrIfSymlink(regularFilePath)
+	require.NoError(t, err, "Regular file should not raise an error for being a symlink")
+
+	isSymlink, err = IsSymlink(testDir)
+	require.NoError(t, err)
+	require.False(t, isSymlink, "Directory should not be a symlink")
+	err = ErrIfSymlink(testDir)
+	require.NoError(t, err, "Directory should not raise an error for being a symlink")
+
+	symlinkToRegularFilePath := filepath.Join(testDir, "link-to-file.txt")
+	err = os.Symlink(regularFilePath, symlinkToRegularFilePath)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(symlinkToRegularFilePath)
+	require.NoError(t, err)
+	require.True(t, isSymlink, "Symlink to regular file should be detected as symlink")
+	err = ErrIfSymlink(symlinkToRegularFilePath)
+	require.Error(t, err, "Symlink to regular file should raise an error")
+
+	symlinkToTestDirPath := filepath.Join(testDir, "link-to-dir")
+	err = os.Symlink(testDir, symlinkToTestDirPath)
+	require.NoError(t, err)
+	isSymlink, err = IsSymlink(symlinkToTestDirPath)
+	require.NoError(t, err)
+	require.True(t, isSymlink, "Symlink to directory should be detected as symlink")
+	err = ErrIfSymlink(symlinkToTestDirPath)
+	require.Error(t, err, "Symlink to directory should raise an error")
+}
+
+// It's hard to know if the sync methods are actually doing what they should be doing. But at the very least,
+// ensure that they don't crash.
+func TestSync(t *testing.T) {
+	testDir := t.TempDir()
+
+	err := SyncPath(testDir)
+	require.NoError(t, err, "SyncPath should not return an error")
+
+	nestedDir := filepath.Join(testDir, "nested")
+	err = os.Mkdir(nestedDir, 0755)
+	require.NoError(t, err, "Creating nested directory should not return an error")
+	err = SyncParentPath(nestedDir)
+	require.NoError(t, err, "SyncParentPath should not return an error")
+
+	regularFilePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(regularFilePath, []byte("test content"), 0644)
+	require.NoError(t, err, "Creating regular file should not return an error")
+	err = SyncPath(regularFilePath)
+	require.NoError(t, err, "SyncPath should not return an error")
+}
+
+func TestErrIfExists(t *testing.T) {
+	testDir := t.TempDir()
+	err := os.MkdirAll(testDir, 0755)
+	require.NoError(t, err, "Failed to create test directory")
+
+	err = ErrIfExists(testDir)
+	require.Error(t, err)
+	err = ErrIfNotExists(testDir)
+	require.NoError(t, err, "Expected no error for existing directory")
+
+	fooPath := filepath.Join(testDir, "foo")
+	barPath := filepath.Join(testDir, "bar.txt")
+
+	err = ErrIfExists(fooPath)
+	require.NoError(t, err)
+	err = ErrIfNotExists(fooPath)
+	require.Error(t, err, "Expected error for non-existing directory")
+
+	err = ErrIfExists(barPath)
+	require.NoError(t, err)
+	err = ErrIfNotExists(barPath)
+	require.Error(t, err, "Expected error for non-existing file")
+
+	err = os.MkdirAll(fooPath, 0755)
+	require.NoError(t, err)
+
+	err = os.WriteFile(barPath, []byte("test content"), 0644)
+	require.NoError(t, err)
+
+	err = ErrIfExists(fooPath)
+	require.Error(t, err, "Expected error for existing directory")
+	err = ErrIfNotExists(fooPath)
+	require.NoError(t, err, "Expected no error for existing directory")
+
+	err = ErrIfExists(barPath)
+	require.Error(t, err, "Expected error for existing file")
+	err = ErrIfNotExists(barPath)
+	require.NoError(t, err, "Expected no error for existing file")
 }
