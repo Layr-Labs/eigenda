@@ -12,11 +12,7 @@ import (
 // If preserveOriginal is false, then the files at the source will be deleted when this method returns.
 // If preserveOriginal is true, then this function will leave behind a copy of the original files at the source.
 //
-// If not preserving the original, then this function may do clever things when the source and destination are on the
-// same filesystem (i.e. it will rename the files instead of copying them). If the source and destination are on
-// different filesystems, then this function will always copy the files.
-//
-// If this function encounters a symlink, it will copy the target of the symlink, not the symlink itself.
+// This function does not support symlinks. It will return an error if it encounters any symlinks in the source path.
 func RecursiveMove(
 	source string,
 	destination string,
@@ -66,11 +62,11 @@ func moveFile(source string, destination string, preserveOriginal bool, fsync bo
 		// Try simple rename first (works if on same filesystem)
 		if err := os.Rename(source, destination); err == nil {
 			if fsync {
-				if err := SyncDirectory(filepath.Dir(destination)); err != nil {
-					return fmt.Errorf("failed to sync parent directory: %w", err)
+				if err := SyncPath(filepath.Dir(destination)); err != nil {
+					return fmt.Errorf("failed to sync destination parent directory: %w", err)
 				}
-				if err := SyncDirectory(filepath.Dir(source)); err != nil {
-					return fmt.Errorf("failed to sync parent directory: %w", err)
+				if err := SyncPath(filepath.Dir(source)); err != nil {
+					return fmt.Errorf("failed to sync source parent directory: %w", err)
 				}
 			}
 
@@ -91,11 +87,11 @@ func moveFile(source string, destination string, preserveOriginal bool, fsync bo
 
 	// Sync if requested
 	if fsync {
-		if err := SyncFile(destination); err != nil {
+		if err := SyncPath(destination); err != nil {
 			return fmt.Errorf("failed to sync destination file: %w", err)
 		}
 		// sync parent directory
-		if err := SyncDirectory(filepath.Dir(destination)); err != nil {
+		if err := SyncPath(filepath.Dir(destination)); err != nil {
 			return fmt.Errorf("failed to sync parent directory: %w", err)
 		}
 	}
@@ -168,7 +164,7 @@ func recursiveMoveDirectory(
 
 	// Sync destination directory if requested
 	if fsync {
-		if err := SyncDirectory(destination); err != nil {
+		if err := SyncPath(destination); err != nil {
 			return fmt.Errorf("failed to sync destination directory: %w", err)
 		}
 	}
@@ -179,7 +175,7 @@ func recursiveMoveDirectory(
 			return fmt.Errorf("failed to remove source directory: %w", err)
 		}
 		if fsync {
-			if err := SyncDirectory(filepath.Dir(source)); err != nil {
+			if err := SyncPath(filepath.Dir(source)); err != nil {
 				return fmt.Errorf("failed to sync parent directory of source: %w", err)
 			}
 		}

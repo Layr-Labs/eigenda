@@ -154,7 +154,7 @@ func AtomicRename(oldPath string, newPath string, fsync bool) error {
 	return nil
 }
 
-// ErrIfNotWritableFile verifies that a path is either a regular file that with read+write permissions,
+// ErrIfNotWritableFile verifies that a path is either a regular file with read+write permissions,
 // or that it is legal to create a new regular file with read+write permissions in the parent directory.
 //
 // A file is considered to have the correct permissions/type if:
@@ -184,7 +184,7 @@ func ErrIfNotWritableFile(path string) (exists bool, size int64, err error) {
 
 			if parentInfo.Mode()&0700 != 0700 {
 				return false, -1, fmt.Errorf(
-					"parent directory %s has insufficent permissions", parentPath)
+					"parent directory %s has insufficient permissions", parentPath)
 			}
 
 			return false, -1, nil
@@ -198,7 +198,7 @@ func ErrIfNotWritableFile(path string) (exists bool, size int64, err error) {
 		return false, -1, fmt.Errorf("file %s is a directory", path)
 	}
 	if info.Mode()&0600 != 0600 {
-		return false, -1, fmt.Errorf("file %s has insufficent permissions", path)
+		return false, -1, fmt.Errorf("file %s has insufficient permissions", path)
 	}
 
 	return true, info.Size(), nil
@@ -265,46 +265,30 @@ func Exists(path string) (bool, error) {
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
 }
 
-// SyncFile syncs a file to disk
-func SyncFile(path string) error {
+// SyncFile syncs a file/directory
+func SyncPath(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("failed to open file for sync: %w", err)
+		return fmt.Errorf("failed to open path for sync: %w", err)
 	}
 	defer func() {
 		_ = file.Close()
 	}()
 
 	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file: %w", err)
+		return fmt.Errorf("failed to sync path: %w", err)
 	}
 
 	return nil
 }
 
-// SyncDirectory syncs a directory to disk
-func SyncDirectory(path string) error {
-	dir, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("failed to open directory for sync: %w", err)
-	}
-	defer func() {
-		_ = dir.Close()
-	}()
-
-	if err := dir.Sync(); err != nil {
-		return fmt.Errorf("failed to sync directory: %w", err)
-	}
-
-	return nil
+// SyncParentPath syncs the parent directory of the given path.
+func SyncParentPath(path string) error {
+	return SyncPath(filepath.Dir(path))
 }
 
-// SyncParentDirectory syncs the parent directory of the given path.
-func SyncParentDirectory(path string) error {
-	return SyncDirectory(filepath.Dir(path))
-}
-
-// CopyRegularFile copies a regular file from src to dst.
+// CopyRegularFile copies a regular file from src to dst. If a file already exists at dst, it will be removed
+// before copying.
 func CopyRegularFile(src string, dst string, fsync bool) error {
 	// Ensure parent directory exists
 	if err := EnsureParentDirectoryExists(dst, fsync); err != nil {
@@ -345,10 +329,10 @@ func CopyRegularFile(src string, dst string, fsync bool) error {
 
 	// Sync if requested
 	if fsync {
-		if err = SyncFile(dst); err != nil {
+		if err = SyncPath(dst); err != nil {
 			return fmt.Errorf("failed to sync destination file %s: %w", dst, err)
 		}
-		if err = SyncParentDirectory(dst); err != nil {
+		if err = SyncParentPath(dst); err != nil {
 			return fmt.Errorf("failed to sync parent directory of %s: %w", dst, err)
 		}
 	}
@@ -397,7 +381,7 @@ func EnsureDirectoryExists(dirPath string, fsync bool) error {
 		// Move to parent directory
 		parentPath := filepath.Dir(currentPath)
 		if parentPath == currentPath {
-			// Reached filesystem root
+			// Reached filesystem root. filepath.Dir("/") returns "/", so we stop here.
 			break
 		}
 		currentPath = parentPath
@@ -414,13 +398,13 @@ func EnsureDirectoryExists(dirPath string, fsync bool) error {
 
 		if fsync {
 			// Sync the newly created directory
-			if err := SyncDirectory(dirToCreate); err != nil {
+			if err := SyncPath(dirToCreate); err != nil {
 				return fmt.Errorf("failed to sync newly created directory %s: %w", dirToCreate, err)
 			}
 
 			// Also sync the parent directory to ensure the directory entry is persisted
 			parentDir := filepath.Dir(dirToCreate)
-			if err := SyncDirectory(parentDir); err != nil {
+			if err := SyncPath(parentDir); err != nil {
 				return fmt.Errorf("failed to sync parent directory %s: %w", parentDir, err)
 			}
 		}
