@@ -460,9 +460,11 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 			}
 
 			paymentVaultParams.QuorumProtocolConfigs[quorumID] = &disperser_rpc.PaymentQuorumProtocolConfig{
-				MinNumSymbols:              legacyReply.PaymentGlobalParams.MinNumSymbols,
+				MinNumSymbols: legacyReply.PaymentGlobalParams.MinNumSymbols,
+				// ReservationAdvanceWindow is not used offchain at the moment so it's okay to set to any value.
+				// It was added for consistency with the onchain data structure but get removed in the future.
 				ReservationAdvanceWindow:   legacyReply.PaymentGlobalParams.ReservationWindow,
-				ReservationRateLimitWindow: 0, // Not available in legacy format
+				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
 				OnDemandRateLimitWindow:    0, // Not available in legacy format
 				OnDemandEnabled:            len(legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers) > 0,
 			}
