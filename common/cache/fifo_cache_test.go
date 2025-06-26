@@ -121,6 +121,7 @@ func weightedValuesTest(t *testing.T, builder cacheBuilder) {
 	highestUndeletedKey := 0
 	expectedWeight := uint64(0)
 	for nextKey := 0; nextKey <= int(maxWeight); nextKey++ {
+
 		value := rand.Int()
 		c.Put(nextKey, value)
 		expectedValues[nextKey] = value
@@ -135,14 +136,6 @@ func weightedValuesTest(t *testing.T, builder cacheBuilder) {
 
 		require.Equal(t, expectedWeight, c.Weight())
 		require.Equal(t, len(expectedValues), c.Size())
-
-		// Update a random existing key. Shouldn't affect the weight or removal order.
-		for k := range expectedValues {
-			value = rand.Int()
-			c.Put(k, value)
-			expectedValues[k] = value
-			break
-		}
 
 		// verify that all expected values are present
 		for k, v := range expectedValues {
@@ -185,5 +178,109 @@ func TestWeightedValues(t *testing.T) {
 			return NewWeakFIFOCache[int, int](maxWeight, calculator, nil)
 		}
 		weightedValuesTest(t, builder)
+	})
+}
+
+func reinsertionTest(t *testing.T, builder cacheBuilder) {
+	rand := random.NewTestRandom()
+
+	maxWeight := uint64(100 + rand.Intn(100))
+
+	// For this test, weight is simply the key.
+	weightCalculator := func(key int, value int) uint64 {
+		return uint64(key)
+	}
+
+	c := NewFIFOCache[int, int](maxWeight, weightCalculator, nil)
+
+	expectedValues := make(map[int]int)
+
+	require.Equal(t, uint64(0), c.Weight())
+	require.Equal(t, 0, c.Size())
+
+	highestUndeletedKey := 0
+	expectedWeight := uint64(0)
+	var nextKey int
+	for ; nextKey <= int(maxWeight); nextKey++ {
+
+		expectedWeight += uint64(nextKey)
+		if expectedWeight > maxWeight {
+			// Don't add enough data to trigger an eviction yet.
+			break
+		}
+
+		value := rand.Int()
+		c.Put(nextKey, value)
+		expectedValues[nextKey] = value
+
+		// simulate the expected removal
+		for expectedWeight > maxWeight {
+			delete(expectedValues, highestUndeletedKey)
+			expectedWeight -= uint64(highestUndeletedKey)
+			highestUndeletedKey++
+		}
+
+		require.Equal(t, expectedWeight, c.Weight())
+		require.Equal(t, len(expectedValues), c.Size())
+
+		// verify that all expected values are present
+		for k, v := range expectedValues {
+			var ok bool
+			value, ok = c.Get(k)
+			require.True(t, ok)
+			require.Equal(t, v, value)
+		}
+	}
+
+	// Reinsert value 0. It is currently the first value scheduled to be garbage collected, but this should move
+	// it to the end of the queue.
+	value := rand.Int()
+	c.Put(0, value)
+	expectedValues[0] = value
+
+	// Insert a value with a weight that will fill up all capacity all by itself. If key 0 is at the front of the GC
+	// queue, then we'd expect for it to be a casualty of this operation. If it is correctly at the back of the queue
+	// now, then it will not be evicted (since key 0 has a weight of 0).
+	bigKey := int(maxWeight)
+	value = rand.Int()
+	expectedValues[bigKey] = value
+	c.Put(bigKey, value)
+
+	for k, v := range expectedValues {
+		value, ok := c.Get(k)
+
+		if k == 0 || k == bigKey {
+			// There should only be room for the big key and key 0
+			require.True(t, ok)
+			require.Equal(t, v, value)
+		} else {
+			// All other keys should have been evicted
+			require.False(t, ok)
+		}
+	}
+}
+
+func TestReinsertion(t *testing.T) {
+	t.Run("FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		reinsertionTest(t, builder)
+	})
+	t.Run("Thread Safe FIFO", func(t *testing.T) {
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			base := NewFIFOCache[int, int](maxWeight, calculator, nil)
+			return NewThreadSafeCache[int, int](base)
+		}
+		reinsertionTest(t, builder)
+	})
+	t.Run("Weak FIFO", func(t *testing.T) {
+		// We are using low enough memory that it is unlikely that the weak pointers
+		// will be garbage collected during the course of this test.
+
+		builder := func(maxWeight uint64, calculator func(key int, value int) uint64) Cache[int, int] {
+			return NewWeakFIFOCache[int, int](maxWeight, calculator, nil)
+		}
+		reinsertionTest(t, builder)
 	})
 }
