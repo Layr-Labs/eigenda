@@ -406,7 +406,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	return allQuorumsReply, nil
 }
 
-// this is true if we are targetting a disperser that hasn't upgraded to the new API yet.
+// this is true if we are targeting a disperser that hasn't upgraded to the new API yet.
 func isMethodNotFoundError(err error) bool {
 	if st, ok := status.FromError(err); ok {
 		return st.Code() == codes.Unimplemented
