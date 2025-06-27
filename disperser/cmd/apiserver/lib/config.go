@@ -8,12 +8,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
 
@@ -102,20 +102,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
 	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
 	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-
-	if addressDirectoryAddr == "" && (blsOperatorStateRetrieverAddr == "" || eigenDAServiceManagerAddr == "") {
-		return Config{}, fmt.Errorf("either address-directory must be provided, or both bls-operator-state-retriever and eigenda-service-manager addresses must be provided")
-	}
-
-	// Validate address formats
-	if addressDirectoryAddr != "" && !gethcommon.IsHexAddress(addressDirectoryAddr) {
-		return Config{}, fmt.Errorf("address-directory must be a valid hex address")
-	}
-	if blsOperatorStateRetrieverAddr != "" && !gethcommon.IsHexAddress(blsOperatorStateRetrieverAddr) {
-		return Config{}, fmt.Errorf("bls-operator-state-retriever must be a valid hex address")
-	}
-	if eigenDAServiceManagerAddr != "" && !gethcommon.IsHexAddress(eigenDAServiceManagerAddr) {
-		return Config{}, fmt.Errorf("eigenda-service-manager must be a valid hex address")
+	err = eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return Config{}, err
 	}
 
 	config := Config{

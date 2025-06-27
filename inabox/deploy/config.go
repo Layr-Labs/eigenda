@@ -189,7 +189,6 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		DISPERSER_SERVER_ADDRESS_DIRECTORY:           env.EigenDA.Directory,
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -228,7 +227,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		DISPERSER_SERVER_ADDRESS_DIRECTORY:           env.EigenDA.Directory,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
 
 		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
@@ -254,7 +252,6 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_PULL_INTERVAL:                 "5s",
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
-		BATCHER_ADDRESS_DIRECTORY:             env.EigenDA.Directory,
 		BATCHER_SRS_ORDER:                     "300000",
 		BATCHER_CHAIN_RPC:                     "",
 		BATCHER_PRIVATE_KEY:                   key[2:],
@@ -342,7 +339,6 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
 		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		CONTROLLER_ADDRESS_DIRECTORY:           env.EigenDA.Directory,
 		CONTROLLER_USE_GRAPH:                   "true",
 		CONTROLLER_GRAPH_URL:                   graphUrl,
 		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
@@ -378,7 +374,6 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_RELAY_KEYS:                            fmt.Sprint(ind),
 		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetriever,
 		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
-		RELAY_ADDRESS_DIRECTORY_ADDR:                env.EigenDA.Directory,
 		RELAY_PRIVATE_KEY:                           "123",
 		RELAY_GRAPH_URL:                             graphUrl,
 		RELAY_ONCHAIN_STATE_REFRESH_INTERVAL:        "1s",

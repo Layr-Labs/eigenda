@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/urfave/cli"
 )
@@ -193,8 +194,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	blsOperatorStateRetrieverAddr := ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name)
 	eigenDAServiceManagerAddr := ctx.GlobalString(EigenDAServiceManagerFlag.Name)
 
-	if addressDirectoryAddr == "" && (blsOperatorStateRetrieverAddr == "" || eigenDAServiceManagerAddr == "") {
-		return nil, errors.New("either address-directory must be provided, or both bls-operator-state-retriever and eigenda-service-manager must be provided")
+	err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Config{
