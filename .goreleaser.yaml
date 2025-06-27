@@ -1,0 +1,71 @@
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+
+git:
+  tag_sort: -version:creatordate
+
+builds:
+  - id: node
+    main: ./node/cmd/main.go
+    binary: node
+    flags:
+      - -v
+    ldflags:
+      - -X 'github.com/Layr-Labs/eigenda/node.SemVer={{ .Version }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitCommit={{ .ShortCommit }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Arch={{ .Arch }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Os={{ .Os }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Date }}'
+    # contains linux and darwin
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+  - id: node_plugin
+    main: ./node/plugin/cmd/main.go
+    binary: node_plugin
+    flags:
+      - -v
+    ldflags:
+      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.SemVer={{ .Version }}'
+      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.GitCommit={{ .ShortCommit }}'
+      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.Arch={{ .Arch }}'
+      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.Os={{ .Os }}'
+      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.GitDate={{ .Date }}'
+    # contains linux and darwin
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+release:
+  github:
+    owner: pschork
+    name: eigenda
+
+  draft: true
+
+archives:
+  - formats: [ 'tar.gz' ]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}

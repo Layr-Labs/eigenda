@@ -6,6 +6,7 @@ inabox/resources/kzg/SRSTables/*
 encoding/kzgrs/prover/data/SRSTable/*
 resources/srs/SRSTables/*
 
+dist
 **/bin/*
 coverage.*
 
