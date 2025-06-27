@@ -441,9 +441,12 @@ func (c *disperserClient) getPaymentStateFromLegacyAPI(
 // convertLegacyPaymentStateToNew converts the old GetPaymentStateReply to the new GetPaymentStateForAllQuorumsReply format
 func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateReply) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
 
+	if legacyReply.PaymentGlobalParams == nil {
+		return nil, fmt.Errorf("legacy payment state received from disperser does not contain global params")
+	}
 	// Convert PaymentGlobalParams to PaymentVaultParams
 	var paymentVaultParams *disperser_rpc.PaymentVaultParams
-	if legacyReply.PaymentGlobalParams != nil {
+	{
 		paymentVaultParams = &disperser_rpc.PaymentVaultParams{
 			QuorumPaymentConfigs:  make(map[uint32]*disperser_rpc.PaymentQuorumConfig),
 			QuorumProtocolConfigs: make(map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig),
@@ -478,6 +481,8 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 
 	// Convert aggregated period records to per-quorum format
 	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
+	// If no period records are available, return empty map
+	// This is possible if no reservations exist for the account
 	if len(legacyReply.PeriodRecords) > 0 {
 		// Apply the same period records to all relevant quorums
 		quorums := []uint32{0} // Default to quorum 0
@@ -494,6 +499,8 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 
 	// Convert aggregated reservation to per-quorum format
 	reservations := make(map[uint32]*disperser_rpc.QuorumReservation)
+	// If no reservation is available, return empty map
+	// This is possible if no reservations exist for the account
 	if legacyReply.Reservation != nil {
 		// Apply the reservation to all quorums mentioned in the reservation
 		quorums := legacyReply.Reservation.QuorumNumbers
