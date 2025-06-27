@@ -414,6 +414,11 @@ func isMethodNotFoundError(err error) bool {
 	return false
 }
 
+// getPaymentStateFromLegacyAPI retrieves the payment state from the legacy GetPaymentState grpc method.
+// It is needed until we have upgraded all dispersers (testnet and mainnet) to the new API.
+// Check those endpoints for GetPaymentStateForAllQuorums using:
+// `grpcurl disperser-testnet-holesky.eigenda.xyz:443 list disperser.v2.Disperser`
+// `grpcurl disperser.eigenda.xyz:443 list disperser.v2.Disperser`
 func (c *disperserClient) getPaymentStateFromLegacyAPI(
 	ctx context.Context, accountID gethcommon.Address, signature []byte, timestamp uint64,
 ) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
