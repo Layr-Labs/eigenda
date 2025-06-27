@@ -5,6 +5,7 @@ test/v1/testdata/*
 encoding/kzgrs/prover/data/SRSTable/*
 resources/srs/SRSTables/*
 
+dist
 **/bin/*
 coverage.*
 

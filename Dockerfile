@@ -109,19 +109,19 @@ WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -ldflags="-X main.version=${SEMVER} \
-                       -X main.gitCommit=${GITCOMMIT} \
-                       -X main.gitDate=${GITDATE}" \
-        -o ./bin/blobapi ./cmd/blobapi
+    -X main.gitCommit=${GITCOMMIT} \
+    -X main.gitDate=${GITDATE}" \
+    -o ./bin/blobapi ./cmd/blobapi
 
 # Proxy build stage
 FROM common-builder AS proxy-builder
 WORKDIR /app/api/proxy
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-        go build -ldflags="-X main.version=${SEMVER} \
-                       -X main.gitCommit=${GITCOMMIT} \
-                       -X main.gitDate=${GITDATE}" \
-        -o ./bin/eigenda-proxy ./cmd/server
+    go build -ldflags="-X main.version=${SEMVER} \
+    -X main.gitCommit=${GITCOMMIT} \
+    -X main.gitDate=${GITDATE}" \
+    -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
 FROM alpine:3.22 AS churner
@@ -152,8 +152,16 @@ FROM alpine:3.22 AS node
 COPY --from=node-builder /app/node/bin/node /usr/local/bin
 ENTRYPOINT ["node"]
 
+FROM alpine:3.22 AS node-goreleaser
+COPY node /usr/local/bin
+ENTRYPOINT ["node"]
+
 FROM alpine:3.22 AS nodeplugin
 COPY --from=node-plugin-builder /app/node/bin/nodeplugin /usr/local/bin
+ENTRYPOINT ["nodeplugin"]
+
+FROM alpine:3.22 AS nodeplugin-goreleaser
+COPY nodeplugin /usr/local/bin
 ENTRYPOINT ["nodeplugin"]
 
 FROM alpine:3.22 AS controller
@@ -182,6 +190,14 @@ FROM alpine:3.22 AS proxy
 WORKDIR /app
 COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
 COPY --from=proxy-builder /app/api/proxy/resources/ /app/resources/
+# default ports for data and metrics
+EXPOSE 3100 7300
+ENTRYPOINT ["./eigenda-proxy"]
+
+FROM alpine:3.22 AS proxy-goreleaser
+WORKDIR /app
+COPY eigenda-proxy .
+COPY api/proxy/resources/*.point resources/
 # default ports for data and metrics
 EXPOSE 3100 7300
 ENTRYPOINT ["./eigenda-proxy"]

@@ -1,0 +1,72 @@
+name: eigenda-goreleaser
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      previous_tag:
+        description: "Override GORELEASER_PREVIOUS_TAG"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  # issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@5cb1df66ed5e1fb3c670ea0b62fd17a76979826a #2.3.1
+        with:
+          version: ${{ env.MISE_VERSION }}
+          log_level: info
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          experimental: true # required for go-ethereum/cmd/abigen
+
+      - name: Login to ghcr
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 #3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # If the github.ref is not a release tag, set the snapshot flag to run a release build check
+      # When running on master, it will fail if it resolves a nonstandard tag (ie tag:contracts/mainnet/v2.0.0)
+      # so we set goreleaser tags to v0.0.0 to get a reliable build check
+      - name: Set snapshot flag
+        run: |
+          echo "SNAPSHOT_FLAG=--snapshot" >> $GITHUB_ENV
+          echo "GORELEASER_CURRENT_TAG=v0.0.0" >> $GITHUB_ENV
+          echo "GORELEASER_PREVIOUS_TAG=v0.0.0" >> $GITHUB_ENV
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+      # It's possible that goreleaser resolves the wrong previous tag (ie tag:contracts/mainnet/v2.0.0)
+      # so we allow workflow_dispatch to override the previous tag if needed
+      - name: Override previous tag
+        run: echo "GORELEASER_PREVIOUS_TAG=${{ inputs.previous_tag }}" >> $GITHUB_ENV
+        if: ${{ inputs.previous_tag != '' }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 #6.3.0
+        with:
+          distribution: goreleaser
+          # 'latest', 'nightly', or a semver
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}
+          GORELEASER_PREVIOUS_TAG: ${{ env.GORELEASER_PREVIOUS_TAG }}
