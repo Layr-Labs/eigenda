@@ -625,12 +625,22 @@ type GetPaymentStateReply struct {
 	// global payment vault parameters
 	PaymentGlobalParams *PaymentGlobalParams `protobuf:"bytes,1,opt,name=payment_global_params,json=paymentGlobalParams,proto3" json:"payment_global_params,omitempty"`
 	// off-chain account reservation usage records
+	// Should be empty if reservation.quorum_numbers is empty (i.e. no reservation exists for the account).
 	PeriodRecords []*PeriodRecord `protobuf:"bytes,2,rep,name=period_records,json=periodRecords,proto3" json:"period_records,omitempty"`
 	// on-chain account reservation setting
 	Reservation *Reservation `protobuf:"bytes,3,opt,name=reservation,proto3" json:"reservation,omitempty"`
-	// off-chain on-demand payment usage
+	// off-chain on-demand payment usage.
+	// The bytes are parsed to a big.Int value.
+	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
+	//
+	// This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
+	// Future work will support decentralized on-demand dispersals.
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 	// on-chain on-demand payment deposited
+	// The bytes are parsed to a big.Int value.
+	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
@@ -714,14 +724,23 @@ type GetPaymentStateForAllQuorumsReply struct {
 	// payment vault parameters with per-quorum configurations
 	PaymentVaultParams *PaymentVaultParams `protobuf:"bytes,1,opt,name=payment_vault_params,json=paymentVaultParams,proto3" json:"payment_vault_params,omitempty"`
 	// period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods
+	// Should contain the same number of entries as the `reservations` field.
 	PeriodRecords map[uint32]*PeriodRecords `protobuf:"bytes,2,rep,name=period_records,json=periodRecords,proto3" json:"period_records,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// reservations maps quorum IDs to the on-chain account reservation record
+	// Should contain the same number of entries as the `period_records` field.
 	Reservations map[uint32]*QuorumReservation `protobuf:"bytes,3,rep,name=reservations,proto3" json:"reservations,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only
-	// supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by
-	// dispersers unlimited to EigenLabs.
+	// off-chain on-demand payment usage.
+	// The bytes are parsed to a big.Int value.
+	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
+	//
+	// This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
+	// Future work will support decentralized on-demand dispersals.
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 	// on-chain on-demand payment deposited.
+	// The bytes are parsed to a big.Int value.
+	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
