@@ -45,7 +45,7 @@ func main() {
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
-	app.Version = fmt.Sprintf("%s-%s-%s", node.SemVer, node.GitCommit, node.GitDate)
+	app.Version = fmt.Sprintf("%s %s %s", node.SemVer, node.GitCommit, node.GitDate)
 	app.Description = "Run one time operations like avs opt-in/opt-out for EigenDA Node"
 	app.Action = pluginOps
 	err := app.Run(os.Args)

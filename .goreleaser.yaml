@@ -21,7 +21,7 @@ builds:
       - -X 'github.com/Layr-Labs/eigenda/node.GitCommit={{ .ShortCommit }}'
       - -X 'github.com/Layr-Labs/eigenda/node.Arch={{ .Arch }}'
       - -X 'github.com/Layr-Labs/eigenda/node.Os={{ .Os }}'
-      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Date }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Timestamp }}'
     # contains linux and darwin
     env:
       - CGO_ENABLED=0
@@ -37,11 +37,11 @@ builds:
     flags:
       - -v
     ldflags:
-      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.SemVer={{ .Version }}'
-      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.GitCommit={{ .ShortCommit }}'
-      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.Arch={{ .Arch }}'
-      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.Os={{ .Os }}'
-      - -X 'github.com/Layr-Labs/eigenda/nodeplugin.GitDate={{ .Date }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.SemVer={{ .Version }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitCommit={{ .ShortCommit }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Arch={{ .Arch }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.Os={{ .Os }}'
+      - -X 'github.com/Layr-Labs/eigenda/node.GitDate={{ .Timestamp }}'
     # contains linux and darwin
     env:
       - CGO_ENABLED=0
@@ -51,6 +51,74 @@ builds:
     goarch:
       - amd64
       - arm64
+
+dockers:
+  - image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:latest'
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--target=node"
+      - "--build-arg=SEMVER={{ .Version }}"
+      - "--build-arg=GITCOMMIT={{ .ShortCommit }}"
+      - "--build-arg=GITDATE={{ .Timestamp }}"
+      - "--platform=linux/amd64"
+    goos: linux
+    goarch: amd64
+    ids:
+      - node
+  - image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}-arm64'
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--target=node"
+      - "--build-arg=SEMVER={{ .Version }}"
+      - "--build-arg=GITCOMMIT={{ .ShortCommit }}"
+      - "--build-arg=GITDATE={{ .Timestamp }}"
+      - "--platform=linux/arm64"
+    goos: linux
+    goarch: arm64
+    ids:
+      - node
+  - image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:latest'
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--target=nodeplugin"
+      - "--platform=linux/amd64"
+    goos: linux
+    goarch: amd64
+    ids:
+      - node_plugin
+  - image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}-arm64'
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--target=nodeplugin"
+      - "--platform=linux/arm64"
+    goos: linux
+    goarch: arm64
+    ids:
+      - node_plugin
+
+docker_manifests:
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:latest'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:latest'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-node:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:latest'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:latest'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER | default "pschork" }}/eigenda/opr-nodeplugin:{{ .Version }}-arm64'
 
 release:
   github:
