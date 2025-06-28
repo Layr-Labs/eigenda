@@ -139,7 +139,7 @@ type QuorumEjectionParamsSet @entity(immutable: true) {
 
 ## Custom
 
-type Operator @entity(immutable: true) {
+type Operator @entity(immutable: false) {
   id: Bytes!
   operator: Bytes! # address
   pubkeyG1_X: BigInt! # uint256
