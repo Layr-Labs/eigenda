@@ -82,7 +82,12 @@ func RunController(ctx *cli.Context) error {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
-	chainReader, err := eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var chainReader *eth.Reader
+	if config.AddressDirectoryAddr != "" {
+		chainReader, err = eth.NewReaderWithAddressDirectory(logger, gethClient, config.AddressDirectoryAddr)
+	} else {
+		chainReader, err = eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return err
 	}

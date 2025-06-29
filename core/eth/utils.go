@@ -1,6 +1,7 @@
 package eth
 
 import (
+	"fmt"
 	"math/big"
 	"slices"
 
@@ -10,6 +11,7 @@ import (
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -175,4 +177,57 @@ func GetAllQuorumIDs(quorumCount uint8) []core.QuorumID {
 		quorumIDs[i] = core.QuorumID(i)
 	}
 	return quorumIDs
+}
+
+// ContractNames defines the standard contract names used in the address directory
+// TODO: consider auto-generating this from the address directory contract
+// These values must match exactly the constants defined in AddressDirectoryConstants.sol.
+var ContractNames = struct {
+	ServiceManager         string
+	OperatorStateRetriever string
+	RegistryCoordinator    string
+	BLSApkRegistry         string
+	IndexRegistry          string
+	StakeRegistry          string
+	SocketRegistry         string
+	PaymentVault           string
+	EjectionManager        string
+	RelayRegistry          string
+	ThresholdRegistry      string
+	DisperserRegistry      string
+}{
+	ServiceManager:         "SERVICE_MANAGER",
+	OperatorStateRetriever: "OPERATOR_STATE_RETRIEVER",
+	RegistryCoordinator:    "REGISTRY_COORDINATOR",
+	BLSApkRegistry:         "BLS_APK_REGISTRY",
+	IndexRegistry:          "INDEX_REGISTRY",
+	StakeRegistry:          "STAKE_REGISTRY",
+	SocketRegistry:         "SOCKET_REGISTRY",
+	PaymentVault:           "PAYMENT_VAULT",
+	EjectionManager:        "EJECTION_MANAGER",
+	RelayRegistry:          "RELAY_REGISTRY",
+	ThresholdRegistry:      "THRESHOLD_REGISTRY",
+	DisperserRegistry:      "DISPERSER_REGISTRY",
+}
+
+// ValidateAddressConfig validates that either address directory is provided OR both individual addresses are provided
+// and that all provided addresses are valid hex addresses.
+func ValidateAddressConfig(addressDirectory, blsOperatorStateRetriever, eigenDAServiceManager string) error {
+	// Validate that either address directory is provided OR both individual addresses are provided
+	if addressDirectory == "" && (blsOperatorStateRetriever == "" || eigenDAServiceManager == "") {
+		return fmt.Errorf("either address-directory must be provided, or both bls-operator-state-retriever and eigenda-service-manager addresses must be provided")
+	}
+
+	// Validate address formats
+	if addressDirectory != "" && !gethcommon.IsHexAddress(addressDirectory) {
+		return fmt.Errorf("address-directory must be a valid hex address")
+	}
+	if blsOperatorStateRetriever != "" && !gethcommon.IsHexAddress(blsOperatorStateRetriever) {
+		return fmt.Errorf("bls-operator-state-retriever must be a valid hex address")
+	}
+	if eigenDAServiceManager != "" && !gethcommon.IsHexAddress(eigenDAServiceManager) {
+		return fmt.Errorf("eigenda-service-manager must be a valid hex address")
+	}
+
+	return nil
 }

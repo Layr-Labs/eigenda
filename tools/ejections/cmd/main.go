@@ -68,7 +68,12 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var tx *eth.Reader
+	if config.AddressDirectoryAddr != "" {
+		tx, err = eth.NewReaderWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
+	} else {
+		tx, err = eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return err
 	}

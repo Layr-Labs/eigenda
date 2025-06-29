@@ -92,11 +92,12 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
-	reader, err := coreeth.NewReader(
-		logger,
-		client,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+	var reader *coreeth.Reader
+	if config.AddressDirectoryAddr != "" {
+		reader, err = coreeth.NewReaderWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
+	} else {
+		reader, err = coreeth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}

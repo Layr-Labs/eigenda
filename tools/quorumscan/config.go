@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/tools/quorumscan/flags"
 	"github.com/urfave/cli"
@@ -27,6 +28,7 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
+	AddressDirectoryAddr          string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 }
@@ -47,6 +49,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		QuorumIDs:                     quorumIDs,
@@ -65,5 +68,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
+
+	// Validate address configuration
+	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr); err != nil {
+		return nil, err
+	}
+
 	return config, nil
 }

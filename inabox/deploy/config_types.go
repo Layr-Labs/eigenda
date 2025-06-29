@@ -110,6 +110,7 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 // forge script/Deployer.s.sol:SetupEigenDA
 type EigenDAContract struct {
 	Deployer               string `yaml:"deployer"`
+	Directory              string `json:"eigenDADirectory"`
 	ServiceManager         string `json:"eigenDAServiceManager"`
 	OperatorStateRetriever string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`

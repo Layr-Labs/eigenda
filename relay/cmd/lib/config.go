@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -34,6 +35,7 @@ type Config struct {
 
 	// Configuration for the graph indexer.
 	EthClientConfig               geth.EthClientConfig
+	AddressDirectoryAddr          string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChainStateConfig              thegraph.Config
@@ -49,6 +51,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if len(relayKeys) == 0 {
 		return Config{}, fmt.Errorf("no relay keys specified")
 	}
+
+	// Validate that either address directory is provided OR both individual addresses are provided
+	addressDirectoryAddr := ctx.String(flags.AddressDirectoryAddrFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name)
+	eigenDAServiceManagerAddr := ctx.String(flags.EigenDAServiceManagerAddrFlag.Name)
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
 		Log:               *loggerConfig,
 		AWS:               awsClientConfig,
@@ -101,8 +112,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
-		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {

@@ -34,6 +34,7 @@ type Writer struct {
 
 var _ core.Writer = (*Writer)(nil)
 
+// NewWriter creates a new Writer using individual contract addresses (deprecated, use NewWriter instead)
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
@@ -56,6 +57,26 @@ func NewWriter(
 	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 
 	return e, err
+}
+
+// NewWriterWithAddressDirectory creates a new Writer using an address directory contract address
+func NewWriterWithAddressDirectory(
+	logger logging.Logger,
+	client common.EthClient,
+	addressDirectoryHexAddr string) (*Writer, error) {
+
+	r, err := NewReaderWithAddressDirectory(logger, client, addressDirectoryHexAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
+	}
+
+	e := &Writer{
+		ethClient: client,
+		logger:    logger.With("component", "Writer"),
+		Reader:    r,
+	}
+
+	return e, nil
 }
 
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.

@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
@@ -47,6 +48,7 @@ type Config struct {
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
 
+	AddressDirectoryAddr            string
 	BLSOperatorStateRetrieverAddr   string
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
@@ -96,6 +98,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		}
 	}
 
+	// Validate that either address directory is provided OR both individual addresses are provided
+	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
+	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
+	err = eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return Config{}, err
+	}
+
 	config := Config{
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
@@ -131,8 +142,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
-		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:            addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr:   blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:       eigenDAServiceManagerAddr,
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),

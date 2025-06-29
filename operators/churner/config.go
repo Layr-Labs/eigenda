@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	"github.com/urfave/cli"
@@ -16,8 +17,9 @@ type Config struct {
 	MetricsConfig    MetricsConfig
 	ChainStateConfig thegraph.Config
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	AddressDirectoryAddr          string
+	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
+	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -28,12 +30,22 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate address configuration: either use address directory (preferred) or legacy individual addresses
+	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
+	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
+	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		LoggerConfig:                  *loggerConfig,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
+		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{

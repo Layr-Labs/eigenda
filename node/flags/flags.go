@@ -156,16 +156,22 @@ var (
 		Usage:    "Password to decrypt ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
+	AddressDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
+		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ADDRESS_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "Address of the BLS Operator State Retriever (legacy - use address-directory instead)",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "Address of the EigenDA Service Manager (legacy - use address-directory instead)",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
@@ -563,6 +569,7 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	AddressDirectoryFlag,
 	RegisterAtNodeStartFlag,
 	ExpirationPollIntervalSecFlag,
 	ReachabilityPollIntervalSecFlag,

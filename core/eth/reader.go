@@ -8,10 +8,14 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/Layr-Labs/eigenda/common"
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
+	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADirectory"
 	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
@@ -25,10 +29,8 @@ import (
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pingcap/errors"
 
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
@@ -52,6 +54,7 @@ type ContractBindings struct {
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
+	AddressDirectory      *eigendadirectory.ContractEigenDADirectory
 }
 
 type Reader struct {
@@ -80,6 +83,44 @@ func NewReader(
 	return e, err
 }
 
+// NewReaderWithAddressDirectory creates a new Reader using an address directory contract address
+func NewReaderWithAddressDirectory(
+	logger logging.Logger,
+	client common.EthClient,
+	addressDirectoryHexAddr string) (*Reader, error) {
+
+	e := &Reader{
+		ethClient: client,
+		logger:    logger.With("component", "Reader"),
+	}
+
+	addressDirectoryAddr := gethcommon.HexToAddress(addressDirectoryHexAddr)
+	addressDirectory, err := eigendadirectory.NewContractEigenDADirectory(addressDirectoryAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch EigenDADirectory contract: %w", err)
+	}
+
+	// Convert contract names to keccak256 hashes as expected by the contract
+	operatorStateRetrieverKey := crypto.Keccak256Hash([]byte(ContractNames.OperatorStateRetriever))
+	blsOperatorStateRetrieverAddr, err := addressDirectory.GetAddress(&bind.CallOpts{}, operatorStateRetrieverKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operator state retriever address: %w", err)
+	}
+
+	serviceManagerKey := crypto.Keccak256Hash([]byte(ContractNames.ServiceManager))
+	eigenDAServiceManagerAddr, err := addressDirectory.GetAddress(&bind.CallOpts{}, serviceManagerKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address: %w", err)
+	}
+	err = e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
+	}
+	return e, nil
+}
+
+// updateContractBindings updates the contract bindings for the reader
+// TODO: move to use address directory contract once all contracts are written into the directory
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)

@@ -123,7 +123,12 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	var tx *eth.Writer
+	if config.AddressDirectoryAddr != "" {
+		tx, err = eth.NewWriterWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
+	} else {
+		tx, err = eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	}
 	if err != nil {
 		return nil, err
 	}
