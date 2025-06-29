@@ -1,12 +1,14 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/urfave/cli"
 )
 
@@ -133,4 +135,24 @@ func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 		return logging.NewTextSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
+}
+
+// InterceptorLogger returns a grpclogging.Logger that uses the provided logging.Logger.
+// grpclogging.Logger is an interface that allows logging gRPC interceptor messages.
+// Ref: https://github.com/grpc-ecosystem/go-grpc-middleware/blob/main/interceptors/logging/examples/slog/example_test.go
+func InterceptorLogger(logger logging.Logger) grpclogging.Logger {
+	return grpclogging.LoggerFunc(func(ctx context.Context, lvl grpclogging.Level, msg string, fields ...any) {
+		switch lvl {
+		case grpclogging.LevelDebug:
+			logger.Debug(msg, fields...)
+		case grpclogging.LevelInfo:
+			logger.Info(msg, fields...)
+		case grpclogging.LevelWarn:
+			logger.Warn(msg, fields...)
+		case grpclogging.LevelError:
+			logger.Error(msg, fields...)
+		default:
+			logger.Info(msg, fields...)
+		}
+	})
 }
