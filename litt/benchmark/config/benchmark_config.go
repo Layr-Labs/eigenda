@@ -82,6 +82,9 @@ type BenchmarkConfig struct {
 
 	// If true, fsync cohort files to ensure atomicity. Can be set to false for unit tests that need to be fast.
 	Fsync bool
+
+	// If non-zero, then the benchmark will run for this many seconds and then stop.
+	TimeLimitSeconds float64
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig.
@@ -111,6 +114,7 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 		StartupSleepFactorSeconds:   0.5,
 		MetricsLoggingPeriodSeconds: 60.0,
 		PanicOnReadFailure:          false,
+		TimeLimitSeconds:            0.0,
 	}
 }
 

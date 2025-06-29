@@ -17,6 +17,10 @@ func TestUnsealedSerialization(t *testing.T) {
 	shardingFactor := rand.Uint32()
 	salt := ([16]byte)(rand.Bytes(16))
 	timestamp := rand.Uint64()
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
 	m := &metadataFile{
 		index:              index,
 		segmentVersion:     LatestSegmentVersion,
@@ -24,12 +28,12 @@ func TestUnsealedSerialization(t *testing.T) {
 		salt:               salt,
 		lastValueTimestamp: timestamp,
 		sealed:             false,
-		parentDirectory:    directory,
+		segmentPath:        segmentPath,
 	}
-	err := m.write()
+	err = m.write()
 	require.NoError(t, err)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -60,6 +64,10 @@ func TestSealedSerialization(t *testing.T) {
 	shardingFactor := rand.Uint32()
 	salt := ([16]byte)(rand.Bytes(16))
 	timestamp := rand.Uint64()
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
 	m := &metadataFile{
 		index:              index,
 		segmentVersion:     LatestSegmentVersion,
@@ -67,9 +75,9 @@ func TestSealedSerialization(t *testing.T) {
 		salt:               salt,
 		lastValueTimestamp: timestamp,
 		sealed:             true,
-		parentDirectory:    directory,
+		segmentPath:        segmentPath,
 	}
-	err := m.write()
+	err = m.write()
 	require.NoError(t, err)
 
 	reportedSize := m.Size()
@@ -78,7 +86,7 @@ func TestSealedSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -102,14 +110,17 @@ func TestFreshFileSerialization(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, salt, directory, false)
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
+	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
 	require.Equal(t, LatestSegmentVersion, m.segmentVersion)
 	require.False(t, m.sealed)
 	require.Zero(t, m.lastValueTimestamp)
-	require.Equal(t, directory, m.parentDirectory)
 
 	reportedSize := m.Size()
 	stat, err := os.Stat(m.path())
@@ -117,7 +128,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -141,7 +152,11 @@ func TestSealing(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, salt, directory, false)
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
+	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)
 
 	// seal the file
@@ -156,10 +171,9 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, salt, m.salt)
 	require.Equal(t, uint32(1234), m.shardingFactor)
 	require.Equal(t, uint32(987), m.keyCount)
-	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
