@@ -13,4 +13,6 @@ import (
 type PayloadRetriever interface {
 	// GetPayload retrieves a payload from some backend, using the provided certificate
 	GetPayload(ctx context.Context, eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.Payload, error)
+	// Type returns the type of the payload retriever
+	Type() coretypes.PayloadRetrieverType
 }
