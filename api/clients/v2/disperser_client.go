@@ -17,7 +17,10 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type DisperserClientConfig struct {
@@ -390,7 +393,137 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentStateForAllQuorums(ctx, request)
+	allQuorumsReply, err := c.client.GetPaymentStateForAllQuorums(ctx, request)
+	if err != nil {
+		// Check if error is "method not found" or "unimplemented"
+		if isMethodNotFoundError(err) {
+			// Fall back to old method
+			return c.getPaymentStateFromLegacyAPI(ctx, accountID, signature, timestamp)
+		}
+		return nil, err
+	}
+
+	return allQuorumsReply, nil
+}
+
+// this is true if we are targeting a disperser that hasn't upgraded to the new API yet.
+func isMethodNotFoundError(err error) bool {
+	if st, ok := status.FromError(err); ok {
+		return st.Code() == codes.Unimplemented
+	}
+	return false
+}
+
+// getPaymentStateFromLegacyAPI retrieves the payment state from the legacy GetPaymentState grpc method.
+// It is needed until we have upgraded all dispersers (testnet and mainnet) to the new API.
+// Check those endpoints for GetPaymentStateForAllQuorums using:
+// `grpcurl disperser-testnet-holesky.eigenda.xyz:443 list disperser.v2.Disperser`
+// `grpcurl disperser.eigenda.xyz:443 list disperser.v2.Disperser`
+func (c *disperserClient) getPaymentStateFromLegacyAPI(
+	ctx context.Context, accountID gethcommon.Address, signature []byte, timestamp uint64,
+) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
+	// Convert old request/response format to new format
+	oldRequest := &disperser_rpc.GetPaymentStateRequest{
+		AccountId: accountID.Hex(),
+		Signature: signature,
+		Timestamp: timestamp,
+	}
+
+	oldResult, err := c.client.GetPaymentState(ctx, oldRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert old response to new response format
+	return convertLegacyPaymentStateToNew(oldResult)
+}
+
+// convertLegacyPaymentStateToNew converts the old GetPaymentStateReply to the new GetPaymentStateForAllQuorumsReply format
+func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateReply) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
+
+	if legacyReply.PaymentGlobalParams == nil {
+		return nil, fmt.Errorf("legacy payment state received from disperser does not contain global params")
+	}
+	// Convert PaymentGlobalParams to PaymentVaultParams
+	var paymentVaultParams *disperser_rpc.PaymentVaultParams
+	{
+		paymentVaultParams = &disperser_rpc.PaymentVaultParams{
+			QuorumPaymentConfigs:  make(map[uint32]*disperser_rpc.PaymentQuorumConfig),
+			QuorumProtocolConfigs: make(map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig),
+			OnDemandQuorumNumbers: legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers,
+		}
+
+		// Apply the global params to all quorums mentioned in on-demand quorum numbers
+		// If no on-demand quorums specified, apply to quorum 0 as default
+		quorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
+		if len(quorums) == 0 {
+			return nil, fmt.Errorf("no on-demand quorums specified in legacy payment state received from disperser")
+		}
+
+		for _, quorumID := range quorums {
+			paymentVaultParams.QuorumPaymentConfigs[quorumID] = &disperser_rpc.PaymentQuorumConfig{
+				ReservationSymbolsPerSecond: 0, // Not available in legacy format
+				OnDemandSymbolsPerSecond:    legacyReply.PaymentGlobalParams.GlobalSymbolsPerSecond,
+				OnDemandPricePerSymbol:      legacyReply.PaymentGlobalParams.PricePerSymbol,
+			}
+
+			paymentVaultParams.QuorumProtocolConfigs[quorumID] = &disperser_rpc.PaymentQuorumProtocolConfig{
+				MinNumSymbols: legacyReply.PaymentGlobalParams.MinNumSymbols,
+				// ReservationAdvanceWindow is not used offchain at the moment so it's okay to set to any value.
+				// It was added for consistency with the onchain data structure but get removed in the future.
+				ReservationAdvanceWindow:   legacyReply.PaymentGlobalParams.ReservationWindow,
+				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
+				OnDemandRateLimitWindow:    0, // Not available in legacy format
+				OnDemandEnabled:            len(legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers) > 0,
+			}
+		}
+	}
+
+	// Convert aggregated period records to per-quorum format
+	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
+	// If no period records are available, return empty map
+	// This is possible if no reservations exist for the account
+	if len(legacyReply.PeriodRecords) > 0 {
+		// Apply the same period records to all relevant quorums
+		quorums := []uint32{0} // Default to quorum 0
+		if legacyReply.Reservation != nil && len(legacyReply.Reservation.QuorumNumbers) > 0 {
+			quorums = legacyReply.Reservation.QuorumNumbers
+		}
+
+		for _, quorumID := range quorums {
+			periodRecords[quorumID] = &disperser_rpc.PeriodRecords{
+				Records: legacyReply.PeriodRecords,
+			}
+		}
+	}
+
+	// Convert aggregated reservation to per-quorum format
+	reservations := make(map[uint32]*disperser_rpc.QuorumReservation)
+	// If no reservation is available, return empty map
+	// This is possible if no reservations exist for the account
+	if legacyReply.Reservation != nil {
+		// Apply the reservation to all quorums mentioned in the reservation
+		quorums := legacyReply.Reservation.QuorumNumbers
+		if len(quorums) == 0 {
+			return nil, fmt.Errorf("no quorums specified in legacy reservation received from disperser")
+		}
+
+		for _, quorumID := range quorums {
+			reservations[quorumID] = &disperser_rpc.QuorumReservation{
+				SymbolsPerSecond: legacyReply.Reservation.SymbolsPerSecond,
+				StartTimestamp:   legacyReply.Reservation.StartTimestamp,
+				EndTimestamp:     legacyReply.Reservation.EndTimestamp,
+			}
+		}
+	}
+
+	return &disperser_rpc.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       paymentVaultParams,
+		PeriodRecords:            periodRecords,
+		Reservations:             reservations,
+		CumulativePayment:        legacyReply.CumulativePayment,
+		OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
+	}, nil
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
