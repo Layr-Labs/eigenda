@@ -85,6 +85,13 @@ func (store *levelDBStore) Get(key []byte) ([]byte, error) {
 		}
 		return nil, err
 	}
+	// TODO: document why this is needed.
+	// Added by Claude to fix a regression in TestRandomOperations that appeared when upgrading to go1.24,
+	// which somehow forced an update of github.com/syndtr/goleveldb from
+	// v1.0.1-0.20210819022825-2ae1ddf74ef7 to v1.0.1-0.20220614013038-64ee5596c38a
+	if data == nil {
+		data = []byte{}
+	}
 	return data, nil
 }
 
