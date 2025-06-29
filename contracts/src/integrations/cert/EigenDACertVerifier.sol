@@ -5,7 +5,7 @@ import {
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
     IVersionedEigenDACertVerifier
-} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -13,7 +13,7 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
-import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
+import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
 
 contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
     error InvalidSecurityThresholds();
