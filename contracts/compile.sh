@@ -27,6 +27,7 @@ forge clean
 forge build
 
 contracts="PaymentVault \
+  IUsageAuthorizationRegistry \
   SocketRegistry \
   AVSDirectory \
   DelegationManager \
@@ -49,6 +50,7 @@ contracts="PaymentVault \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
+  IEigenDADirectory \
   EigenDADisperserRegistry"
 
 for contract in $contracts; do
