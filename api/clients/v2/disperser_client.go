@@ -478,41 +478,37 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		}
 	}
 
-	// Convert aggregated period records to per-quorum format
-	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
-	// If no period records are available, return empty map
-	// This is possible if no reservations exist for the account
-	if len(legacyReply.PeriodRecords) > 0 {
-		// Apply the same period records to all relevant quorums
-		quorums := []uint32{0} // Default to quorum 0
-		if legacyReply.Reservation != nil && len(legacyReply.Reservation.QuorumNumbers) > 0 {
-			quorums = legacyReply.Reservation.QuorumNumbers
-		}
-
-		for _, quorumID := range quorums {
-			periodRecords[quorumID] = &disperser_rpc.PeriodRecords{
-				Records: legacyReply.PeriodRecords,
-			}
-		}
+	// If no reservation is available, return early with only payment vault params and cumulative payment info.
+	if legacyReply.Reservation == nil {
+		return &disperser_rpc.GetPaymentStateForAllQuorumsReply{
+			PaymentVaultParams:       paymentVaultParams,
+			CumulativePayment:        legacyReply.CumulativePayment,
+			OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
+		}, nil
 	}
 
-	// Convert aggregated reservation to per-quorum format
-	reservations := make(map[uint32]*disperser_rpc.QuorumReservation)
-	// If no reservation is available, return empty map
-	// This is possible if no reservations exist for the account
-	if legacyReply.Reservation != nil {
-		// Apply the reservation to all quorums mentioned in the reservation
-		quorums := legacyReply.Reservation.QuorumNumbers
-		if len(quorums) == 0 {
-			return nil, fmt.Errorf("no quorums specified in legacy reservation received from disperser")
-		}
+	// Otherwise there is a reservation available, so we need to convert it to the per-quorum format.
 
-		for _, quorumID := range quorums {
-			reservations[quorumID] = &disperser_rpc.QuorumReservation{
-				SymbolsPerSecond: legacyReply.Reservation.SymbolsPerSecond,
-				StartTimestamp:   legacyReply.Reservation.StartTimestamp,
-				EndTimestamp:     legacyReply.Reservation.EndTimestamp,
-			}
+	// We first make sure that the disperser returned valid data.
+	if len(legacyReply.PeriodRecords) == 0 {
+		return nil, fmt.Errorf("legacy payment state received from disperser does not contain period records")
+	}
+	if len(legacyReply.Reservation.QuorumNumbers) == 0 {
+		return nil, fmt.Errorf("legacy payment state received from disperser does not contain reservation quorums")
+	}
+
+	reservations := make(map[uint32]*disperser_rpc.QuorumReservation)
+	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
+
+	// Apply the reservation to all reservationQuorums mentioned in the reservation
+	for _, quorumID := range legacyReply.Reservation.QuorumNumbers {
+		reservations[quorumID] = &disperser_rpc.QuorumReservation{
+			SymbolsPerSecond: legacyReply.Reservation.SymbolsPerSecond,
+			StartTimestamp:   legacyReply.Reservation.StartTimestamp,
+			EndTimestamp:     legacyReply.Reservation.EndTimestamp,
+		}
+		periodRecords[quorumID] = &disperser_rpc.PeriodRecords{
+			Records: legacyReply.PeriodRecords,
 		}
 	}
 
