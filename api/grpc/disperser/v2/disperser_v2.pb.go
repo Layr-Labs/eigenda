@@ -481,6 +481,9 @@ func (x *BlobCommitmentReply) GetBlobCommitment() *common.BlobCommitment {
 }
 
 // GetPaymentStateRequest contains parameters to query the payment state of an account.
+// GetPaymentStateForAllQuorumsRequest is a separate message type even though it currently contains the same fields,
+// because we follow buf's best practices and linting rules which recommend every RPC having its own request and reply types,
+// to allow for evolution of the API without breaking changes: https://buf.build/docs/lint/rules/#rpc_no_server_streaming
 type GetPaymentStateRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
