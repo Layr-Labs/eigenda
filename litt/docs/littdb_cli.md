@@ -12,14 +12,13 @@ Clone the EigenDA repository:
 
 ```bash
 git clone https://github.com/Layr-Labs/eigenda.git
-````
-
+```
 Build the LittDB CLI:
 
 ```bash
 cd eigenda/litt
 make build
-````
+```
 
 The LittDB CLI binary will be located at `eigenda/litt/bin/litt`.
 
@@ -68,22 +67,7 @@ detect the problem and abort the operation.
 
 ## EigenDA Validator: Source Directories
 
-If you are running an EigenDA validator node, the source directories(s) are determined by the following flags:
-
-### Deprecated: `NODE_DB_PATH`
-
-If `NODE_LITT_DB_STORAGE_PATHS` is not set, then the source directory will be determined by the value of
-`NODE_DB_PATH`. The source directory will be `$NODE_DB_PATH/chunk_v2_litt`.
-
-Note that this pattern is deprecated. It is suggested that you use the LittDB CLI to refactor your DB as described
-[here](#eigenda-validator-refactoring-node_db_path).
-
-Example:
-```
-export NODE_DB_PATH=/data
-
-litt ls --src /data/chunk_v2_litt
-```
+If you are running an EigenDA validator node, the source directories are determined by the following flags:
 
 ### Recommended: `NODE_LITT_DB_STORAGE_PATHS`
 
@@ -96,51 +80,33 @@ export NODE_LITT_DB_STORAGE_PATHS="/data0,/data1,/data2"
 litt ls --src /data0 --src /data1 --src /data2
 ```
 
+### Deprecated: `NODE_DB_PATH`
+
+If `NODE_LITT_DB_STORAGE_PATHS` is not set, then the source directory will be determined by the value of
+`NODE_DB_PATH`. The source directory will be `$NODE_DB_PATH/chunk_v2_litt`.
+
+Note that this pattern is deprecated. It is suggested that you use the LittDB CLI to refactor your DB as described
+in the "bonus example" [here](#litt-rebase).
+
+Example:
+```
+export NODE_DB_PATH=/data
+
+litt ls --src /data/chunk_v2_litt
+```
+
 # Subcommands
 
 ## `littdb --help`
 
 Prints a help message.
 
-```
-NAME:
-   litt - LittDB command line interface
-
-USAGE:
-   litt [global options] command [command options]
-
-COMMANDS:
-   ls          List tables in a LittDB instance
-   table-info  Get information about a LittDB table. If the DB is spread across multiple paths, all paths must be provided.
-   rebase      Restructure LittDB file system layout.
-   benchmark   Run a LittDB benchmark.
-   prune       Delete data from a LittDB database/snapshot.
-   push        Push data to a remote location using ssh and rsync.
-   pull        Pull data from a remote location using ssh and rsync.
-   help, h     Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --debug, -d  Enable debug mode. Program will pause for a debugger to attach. (default: false)
-   --help, -h   show help
-```
 
 ## `litt ls`
 
 A utility for listing the names of all tables in a LittDB instance.
 
-To see the following help message, run `litt ls --help`.
-
-```
-NAME:
-   litt ls - List tables in a LittDB instance
-
-USAGE:
-   litt ls [command options] --src <path1> ... --src <pathN>
-
-OPTIONS:
-   --src value, -s value [ --src value, -s value ]  Source paths where the DB data is found, at least one is required.
-   --help, -h                                       show help
-```
+For documentation on command flags and configuration, run `litt ls --help`.
 
 Example:
 
@@ -160,19 +126,7 @@ tableC
 
 This utility provides information about the data contained in a LittDB table.
 
-To see the following help message, run `litt table-info --help`.
-
-``` 
-NAME:
-   litt table-info - Get information about a LittDB table. If the DB is spread across multiple paths, all paths must be provided.
-
-USAGE:
-   litt table-info [command options] --src <path1> ... --src <pathN> <table-name>
-
-OPTIONS:
-   --src value, -s value [ --src value, -s value ]  Source paths where the DB data is found, at least one is required.
-   --help, -h                                       show help
-```
+For documentation on command flags and configuration, run `litt table-info --help`.
 
 Example:
 
@@ -201,23 +155,7 @@ Jun 18 11:32:11.236 INF cli/table_info.go:87 Key map type:                LevelD
 LittDB can store data in multiple directories. Changing the number of directories after data has been written into 
 the DB is possible, but not easy to do by hand. The `litt rebase` utility automates this workflow.
 
-To see the following help message, run `litt rebase --help`.
-
-```
-NAME:
-   litt rebase - Restructure LittDB file system layout.
-
-USAGE:
-   litt rebase [command options] --src <source-path1> ... --src <source-pathN> --dest <destination-path1> ... --dest <destination-pathN>
-
-OPTIONS:
-   --src value, -s value [ --src value, -s value ]  Source paths where the data is found, at least one is required.
-   --dst value, -d value [ --dst value, -d value ]  Destination paths for the rebased LittDB, at least one is required.
-   --preserve, -p                                   If enabled, then the old files are not removed. (default: false)
-   --quiet, -q                                      Reduces the verbosity of the output. (default: false)
-   --help, -h                                       show help
-
-```
+For documentation on command flags and configuration, run `litt rebase --help`.
 
 Before rebasing, you must know two things:
 
@@ -281,21 +219,7 @@ The `litt prune` command is used to delete data from a LittDB database or snapsh
 automatically pruned, so if no action is taken, then the size of the snapshot on disk will grow indefinitely 
 (at least until you fill up your disk).
 
-To see the following help message, run `litt prune --help`.
-
-```
-NAME:
-   litt prune - Delete data from a LittDB database/snapshot.
-
-USAGE:
-   litt prune [command options] --src <path1> ... --src <pathN> --max-age <duration in seconds>
-
-OPTIONS:
-   --src value, -s value [ --src value, -s value ]      Source paths where the DB data is found, at least one is required.
-   --table value, -t value [ --table value, -t value ]  Prune this table. If not specified, all tables will be pruned.
-   --max-age value, -a value                            Maximum age of segments to keep, in seconds. Segments older than this will be deleted. (default: 0)
-   --help, -h                                           show help
-```
+For documentation on command flags and configuration, run `litt prune --help`.
 
 The `--max-age` flag is used to specify the maximum age of data to keep, and is specified in seconds.
 
@@ -315,26 +239,7 @@ directory, there are some nuances involved in doing so. The `litt push` command 
 push data from a LittDB snapshot to a remote location using `ssh` and `rsync`. The `litt push` utility also deletes
 data from the snapshot directory after it has been successfully pushed to the remote location.
 
-To see the following help message, run `litt push --help`.
-
-```
-NAME:
-   litt push - Push data to a remote location using ssh and rsync.
-
-USAGE:
-   litt push [command options] --src <source-path1> ... --src <source-pathN> --dst <remote-path1> ... --dst <remote-pathN> [-i path/to/key] [-p port] [--no-gc] [--quiet] [--threads 42] [--throttle 100]<user>@<host>
-
-OPTIONS:
-   --src value, -s value [ --src value, -s value ]  Source paths where the data is found, at least one is required.
-   --dst value, -d value [ --dst value, -d value ]  Remote destination paths, at least one is required.
-   --port value, -p value                           SSH port to connect to the remote host. (default: 22)
-   --key value, -i value                            Path to the SSH private key file for authentication. (default: "~/.ssh/id_rsa")
-   --no-gc, -n                                      If true, do not delete files pushed to the remote host. (default: false)
-   --quiet, -q                                      Reduces the verbosity of the output. (default: false)
-   --threads value, -t value                        Number of parallel rsync operations. (default: 8)
-   --throttle value, -T value                       Max network utilization, in mb/s (default: 0)
-   --help, -h                                       show help
-```
+For documentation on command flags and configuration, run `litt push --help`.
 
 Similar to the LittDB's capability to store data in multiple directories, the `litt push` command can also push data to
 multiple remote directories (on the same machine). This may be convenient if your data size is sufficiently large that
