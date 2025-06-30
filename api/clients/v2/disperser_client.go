@@ -470,7 +470,7 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 				MinNumSymbols: legacyReply.PaymentGlobalParams.MinNumSymbols,
 				// ReservationAdvanceWindow is not used offchain at the moment so it's okay to set to any value.
 				// It was added for consistency with the onchain data structure but get removed in the future.
-				ReservationAdvanceWindow:   legacyReply.PaymentGlobalParams.ReservationWindow,
+				ReservationAdvanceWindow:   0,
 				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
 				OnDemandRateLimitWindow:    0,    // Not available in legacy format
 				OnDemandEnabled:            true, // we are iterating over on-demand quorums, so this is always true
