@@ -35,6 +35,12 @@
       "startBlock": 1168409
     }
   },
+  "sepolia": {
+    "EigenDAServiceManager": {
+      "address": "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764",
+      "startBlock": 8153008
+    }
+  },
   "mainnet": {
     "EigenDAServiceManager": {
       "address": "0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0",
