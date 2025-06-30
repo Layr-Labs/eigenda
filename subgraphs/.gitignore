@@ -3,6 +3,7 @@
 **/tests/.bin
 **/tests/*.json
 **/build
+**/.docker
 
 eigenda-operator-state/networks.json
 eigenda-operator-state/subgraph.yaml
