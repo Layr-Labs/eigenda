@@ -472,8 +472,8 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 				// It was added for consistency with the onchain data structure but get removed in the future.
 				ReservationAdvanceWindow:   legacyReply.PaymentGlobalParams.ReservationWindow,
 				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
-				OnDemandRateLimitWindow:    0, // Not available in legacy format
-				OnDemandEnabled:            len(legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers) > 0,
+				OnDemandRateLimitWindow:    0,    // Not available in legacy format
+				OnDemandEnabled:            true, // we are iterating over on-demand quorums, so this is always true
 			}
 		}
 	}
