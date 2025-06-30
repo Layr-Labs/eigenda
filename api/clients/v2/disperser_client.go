@@ -422,7 +422,6 @@ func isMethodNotFoundError(err error) bool {
 func (c *disperserClient) getPaymentStateFromLegacyAPI(
 	ctx context.Context, accountID gethcommon.Address, signature []byte, timestamp uint64,
 ) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
-	// Convert old request/response format to new format
 	oldRequest := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
@@ -434,7 +433,6 @@ func (c *disperserClient) getPaymentStateFromLegacyAPI(
 		return nil, err
 	}
 
-	// Convert old response to new response format
 	return convertLegacyPaymentStateToNew(oldResult)
 }
 
