@@ -15,12 +15,12 @@ import (
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
-	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADirectory"
 	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
+	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -54,7 +54,7 @@ type ContractBindings struct {
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
-	AddressDirectory      *eigendadirectory.ContractEigenDADirectory
+	AddressDirectory      *eigendadirectory.ContractIEigenDADirectory
 }
 
 type Reader struct {
@@ -95,20 +95,18 @@ func NewReaderWithAddressDirectory(
 	}
 
 	addressDirectoryAddr := gethcommon.HexToAddress(addressDirectoryHexAddr)
-	addressDirectory, err := eigendadirectory.NewContractEigenDADirectory(addressDirectoryAddr, client)
+	addressDirectory, err := eigendadirectory.NewContractIEigenDADirectory(addressDirectoryAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch EigenDADirectory contract: %w", err)
 	}
 
 	// Convert contract names to keccak256 hashes as expected by the contract
-	operatorStateRetrieverKey := crypto.Keccak256Hash([]byte(ContractNames.OperatorStateRetriever))
-	blsOperatorStateRetrieverAddr, err := addressDirectory.GetAddress(&bind.CallOpts{}, operatorStateRetrieverKey)
+	blsOperatorStateRetrieverAddr, err := addressDirectory.GetAddress0(&bind.CallOpts{}, ContractNames.OperatorStateRetriever)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state retriever address: %w", err)
 	}
 
-	serviceManagerKey := crypto.Keccak256Hash([]byte(ContractNames.ServiceManager))
-	eigenDAServiceManagerAddr, err := addressDirectory.GetAddress(&bind.CallOpts{}, serviceManagerKey)
+	eigenDAServiceManagerAddr, err := addressDirectory.GetAddress0(&bind.CallOpts{}, ContractNames.ServiceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service manager address: %w", err)
 	}
@@ -120,7 +118,7 @@ func NewReaderWithAddressDirectory(
 }
 
 // updateContractBindings updates the contract bindings for the reader
-// TODO: move to use address directory contract once all contracts are written into the directory
+// TODO: update to use address directory contract once all contracts are written into the directory
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
