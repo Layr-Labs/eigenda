@@ -1412,6 +1412,8 @@ type PaymentQuorumProtocolConfig struct {
 	// min_num_symbols is the minimum number of symbols that must be charged for any request
 	MinNumSymbols uint64 `protobuf:"varint,1,opt,name=min_num_symbols,json=minNumSymbols,proto3" json:"min_num_symbols,omitempty"`
 	// reservation_advance_window is the window in seconds before a reservation starts that it can be activated
+	// It is added here for offchain to have access to all onchain data structs, but it isn't currently used,
+	// and might get removed in the future.
 	ReservationAdvanceWindow uint64 `protobuf:"varint,2,opt,name=reservation_advance_window,json=reservationAdvanceWindow,proto3" json:"reservation_advance_window,omitempty"`
 	// reservation_rate_limit_window is the time window in seconds for reservation rate limiting
 	ReservationRateLimitWindow uint64 `protobuf:"varint,3,opt,name=reservation_rate_limit_window,json=reservationRateLimitWindow,proto3" json:"reservation_rate_limit_window,omitempty"`

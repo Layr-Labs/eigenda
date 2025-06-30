@@ -362,6 +362,8 @@ message PaymentQuorumProtocolConfig {
   uint64 min_num_symbols = 1;
 
   // reservation_advance_window is the window in seconds before a reservation starts that it can be activated
+  // It is added here for offchain to have access to all onchain data structs, but it isn't currently used,
+  // and might get removed in the future.
   uint64 reservation_advance_window = 2;
 
   // reservation_rate_limit_window is the time window in seconds for reservation rate limiting
