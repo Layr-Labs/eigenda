@@ -1,11 +1,10 @@
 package clients
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -13,101 +12,60 @@ import (
 )
 
 type Accountant struct {
-	// on-chain states
-	accountID    gethcommon.Address
-	reservations map[core.QuorumID]*core.ReservedPayment
-	// OnDemand is initially only enabled on quorum 0. Accountant must be updated to be quorum specific
-	// after the protocol decides to support onDemand on custom quorums and decentralized ratelimiting.
-	onDemand *core.OnDemandPayment
+	// account identification
+	accountID gethcommon.Address
 
+	// payment system configuration
 	paymentVaultParams *meterer.PaymentVaultParams
 
-	// local accounting
-	// contains a fixed meterer.MinNumBins bins per quorum
-	periodRecords     meterer.QuorumPeriodRecords
-	cumulativePayment *big.Int
+	// unified ledger managing all account state (on-chain settings + local tracking)
+	accountLedger meterer.AccountLedger
 
-	// locks for concurrent access to period records
-	periodRecordsLock sync.Mutex
-	// lock for concurrent access to on-demand payment
-	onDemandLock sync.Mutex
+	// lock for concurrent access to account state
+	accountLock sync.Mutex
 }
 
 // NewAccountant initializes an accountant with the given account ID. The accountant must call SetPaymentState to populate the state.
 func NewAccountant(accountID gethcommon.Address) *Accountant {
-	reservations := make(map[core.QuorumID]*core.ReservedPayment)
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(0),
-	}
-	periodRecords := make(meterer.QuorumPeriodRecords)
 	return &Accountant{
-		accountID:    accountID,
-		reservations: reservations,
-		onDemand:     onDemand,
+		accountID: accountID,
 		paymentVaultParams: &meterer.PaymentVaultParams{
 			QuorumPaymentConfigs:  make(map[uint8]*core.PaymentQuorumConfig),
 			QuorumProtocolConfigs: make(map[uint8]*core.PaymentQuorumProtocolConfig),
 			OnDemandQuorumNumbers: make([]uint8, 0),
 		},
-		periodRecords:     periodRecords,
-		cumulativePayment: big.NewInt(0),
+		accountLedger: meterer.NewLocalAccountLedger(),
 	}
 }
 
 // ReservationUsage attempts to use the reservation for the requested quorums; if any quorum fails to use the reservation, the entire operation is rolled back.
 func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, paymentHeaderTimestampNs int64) error {
-	if err := meterer.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
-		return err
-	}
+	a.accountLock.Lock()
+	defer a.accountLock.Unlock()
 
-	a.periodRecordsLock.Lock()
-	defer a.periodRecordsLock.Unlock()
-
-	periodRecordsCopy := a.periodRecords.DeepCopy()
-
-	for _, quorumNumber := range quorumNumbers {
-		reservation, exists := a.reservations[quorumNumber]
-		if !exists {
-			// this case should never happen because ValidateReservations should have already checked this; handle it just in case
-			return fmt.Errorf("reservation not found for quorum %d", quorumNumber)
-		}
-		_, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(quorumNumber)
-		if err != nil {
-			return err
-		}
-		if err := periodRecordsCopy.UpdateUsage(quorumNumber, paymentHeaderTimestampNs, numSymbols, reservation, protocolConfig); err != nil {
-			return err
-		}
-	}
-
-	a.periodRecords = periodRecordsCopy
-	return nil
+	return a.accountLedger.RecordReservationUsage(
+		context.Background(),
+		a.accountID,
+		paymentHeaderTimestampNs,
+		numSymbols,
+		quorumNumbers,
+		a.paymentVaultParams,
+	)
 }
 
 // onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
 func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.QuorumID) (*big.Int, error) {
-	if err := meterer.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
-		return nil, err
-	}
+	a.accountLock.Lock()
+	defer a.accountLock.Unlock()
 
-	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
-	if err != nil {
-		return nil, err
-	}
-	symbolsCharged := meterer.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	paymentCharged := meterer.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
-
-	a.onDemandLock.Lock()
-	defer a.onDemandLock.Unlock()
-	// calculate the increment required to add to the cumulative payment
-	resultingPayment := new(big.Int).Add(a.cumulativePayment, paymentCharged)
-	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
-		a.cumulativePayment.Add(a.cumulativePayment, paymentCharged)
-		return a.cumulativePayment, nil
-	}
-
-	return nil, errors.New("insufficient ondemand payment")
+	return a.accountLedger.RecordOnDemandUsage(
+		context.Background(),
+		a.accountID,
+		numSymbols,
+		quorumNumbers,
+		a.paymentVaultParams,
+	)
 }
 
 // AccountBlob accountant generates payment information for a request. The accountant
@@ -170,33 +128,31 @@ func (a *Accountant) SetPaymentState(
 
 	a.paymentVaultParams = paymentVaultParams
 
+	// Create on-demand payment state
+	var onDemand *core.OnDemandPayment
 	if onchainCumulativePayment == nil {
-		a.onDemand = &core.OnDemandPayment{
+		onDemand = &core.OnDemandPayment{
 			CumulativePayment: big.NewInt(0),
 		}
 	} else {
-		a.onDemand = &core.OnDemandPayment{
+		onDemand = &core.OnDemandPayment{
 			CumulativePayment: new(big.Int).Set(onchainCumulativePayment),
 		}
 	}
 
-	if cumulativePayment == nil {
-		a.cumulativePayment = big.NewInt(0)
-	} else {
-		a.cumulativePayment = new(big.Int).Set(cumulativePayment)
+	// Set the complete account ledger state including on-chain settings and local tracking
+	accountState := meterer.AccountState{
+		Reservations:      reservations,
+		OnDemand:          onDemand,
+		PeriodRecords:     periodRecords,
+		CumulativePayment: cumulativePayment,
 	}
-
-	if reservations == nil {
-		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
-		a.periodRecords = make(meterer.QuorumPeriodRecords)
-	} else {
-		a.reservations = reservations
-		if periodRecords == nil {
-			a.periodRecords = make(meterer.QuorumPeriodRecords)
-		} else {
-			a.periodRecords = periodRecords
-		}
-	}
+	a.accountLedger.SetAccountState(accountState)
 
 	return nil
+}
+
+// GetPeriodRecords returns a copy of the current period records for testing purposes
+func (a *Accountant) GetPeriodRecords() meterer.QuorumPeriodRecords {
+	return a.accountLedger.GetAccountState().PeriodRecords
 }
