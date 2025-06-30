@@ -453,13 +453,15 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 			OnDemandQuorumNumbers: legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers,
 		}
 
-		// Apply the global params to all quorums mentioned in on-demand quorum numbers
-		quorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
-		if len(quorums) == 0 {
+		// Apply the global params to all quorums, both on-demand and reservation.
+		onDemandQuorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
+		if len(onDemandQuorums) == 0 {
 			return nil, fmt.Errorf("no on-demand quorums specified in legacy PaymentGlobalParams received from disperser")
 		}
+		reservationQuorums := legacyReply.Reservation.QuorumNumbers
+		allQuorums := append(reservationQuorums, onDemandQuorums...)
 
-		for _, quorumID := range quorums {
+		for _, quorumID := range allQuorums {
 			paymentVaultParams.QuorumPaymentConfigs[quorumID] = &disperser_rpc.PaymentQuorumConfig{
 				ReservationSymbolsPerSecond: 0, // Not available in legacy format
 				OnDemandSymbolsPerSecond:    legacyReply.PaymentGlobalParams.GlobalSymbolsPerSecond,
@@ -472,9 +474,12 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 				// It was added for consistency with the onchain data structure but get removed in the future.
 				ReservationAdvanceWindow:   0,
 				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
-				OnDemandRateLimitWindow:    0,    // Not available in legacy format
-				OnDemandEnabled:            true, // we are iterating over on-demand quorums, so this is always true
+				OnDemandRateLimitWindow:    0, // Not available in legacy format
 			}
+		}
+
+		for _, quorumID := range onDemandQuorums {
+			paymentVaultParams.QuorumProtocolConfigs[quorumID].OnDemandEnabled = true
 		}
 	}
 
