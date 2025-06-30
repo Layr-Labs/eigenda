@@ -733,7 +733,7 @@ type GetPaymentStateForAllQuorumsReply struct {
 	Reservations map[uint32]*QuorumReservation `protobuf:"bytes,3,rep,name=reservations,proto3" json:"reservations,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// off-chain on-demand payment usage.
 	// The bytes are parsed to a big.Int value.
-	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// This value should always be <= onchain_cumulative_payment.
 	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	//
 	// This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
@@ -741,7 +741,7 @@ type GetPaymentStateForAllQuorumsReply struct {
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 	// on-chain on-demand payment deposited.
 	// The bytes are parsed to a big.Int value.
-	// This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+	// This value should always be >= cumulative_payment.
 	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }

@@ -197,7 +197,7 @@ message GetPaymentStateForAllQuorumsReply {
   map<uint32, QuorumReservation> reservations = 3;
   // off-chain on-demand payment usage.
   // The bytes are parsed to a big.Int value.
-  // This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+  // This value should always be <= onchain_cumulative_payment.
   // See [common.v2.PaymentHeader.cumulative_payment] for more details.
   //
   // This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
@@ -205,7 +205,7 @@ message GetPaymentStateForAllQuorumsReply {
   bytes cumulative_payment = 4;
   // on-chain on-demand payment deposited.
   // The bytes are parsed to a big.Int value.
-  // This value should always be <= cumulative_payment, as the disperser cumulative_payment kept offchain is only periodically updated onchain.
+  // This value should always be >= cumulative_payment.
   // See [common.v2.PaymentHeader.cumulative_payment] for more details.
   bytes onchain_cumulative_payment = 5;
 }
