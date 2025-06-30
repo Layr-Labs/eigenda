@@ -454,7 +454,6 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		}
 
 		// Apply the global params to all quorums mentioned in on-demand quorum numbers
-		// If no on-demand quorums specified, apply to quorum 0 as default
 		quorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
 		if len(quorums) == 0 {
 			return nil, fmt.Errorf("no on-demand quorums specified in legacy payment state received from disperser")
