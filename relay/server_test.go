@@ -6,21 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/replay"
-	"github.com/docker/go-units"
-
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/relay/auth"
-	"github.com/Layr-Labs/eigenda/relay/mock"
-
-	"github.com/Layr-Labs/eigenda/relay/limiter"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/relay/auth"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/docker/go-units"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -130,7 +128,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 	chainReader := newMockChainReader()
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -140,6 +138,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -218,7 +217,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -229,6 +228,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -281,7 +281,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -293,6 +293,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -423,7 +424,7 @@ func TestReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -437,6 +438,7 @@ func TestReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -653,7 +655,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -663,6 +665,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -802,7 +805,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -817,6 +820,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -1107,7 +1111,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -1122,6 +1126,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,

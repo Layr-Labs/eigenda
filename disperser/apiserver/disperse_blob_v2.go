@@ -20,6 +20,7 @@ import (
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	start := time.Now()
+	metererSyncTime := s.ntpClock.Now() // Using NTP-synced time for metering
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
@@ -39,7 +40,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
+	if err := s.checkPaymentMeter(ctx, req, metererSyncTime); err != nil {
 		return nil, err
 	}
 
@@ -175,6 +176,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 
 	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
 		return nil, errors.New("payment metadata is required")
+	}
+
+	if s.ReservedOnly && blobHeader.PaymentMetadata.CumulativePayment.Sign() != 0 {
+		return nil, errors.New("on-demand payments are not supported by reserved-only mode disperser")
 	}
 
 	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0

@@ -48,14 +48,14 @@ func TestEigenDAClientConfig_CheckAndSetDefaults(t *testing.T) {
 				modifyConf: func(c *EigenDAClientConfig) {
 					c.EthRpcUrl = ""
 				},
-				expectedErr: "EigenDAClientConfig.EthRpcUrl not set. Needed to verify blob confirmed on-chain.",
+				expectedErr: "EigenDAClientConfig.EthRpcUrl not set: needed to verify blob confirmed on-chain",
 			},
 			{
 				name: "Missing SvcManagerAddr",
 				modifyConf: func(c *EigenDAClientConfig) {
 					c.SvcManagerAddr = ""
 				},
-				expectedErr: "EigenDAClientConfig.SvcManagerAddr not set. Needed to verify blob confirmed on-chain.",
+				expectedErr: "EigenDAClientConfig.SvcManagerAddr not set: needed to verify blob confirmed on-chain",
 			},
 		}
 

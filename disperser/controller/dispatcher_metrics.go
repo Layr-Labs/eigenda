@@ -2,9 +2,10 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
-	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,33 +16,35 @@ const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	handleBatchLatency          *prometheus.SummaryVec
-	newBatchLatency             *prometheus.SummaryVec
-	getBlobMetadataLatency      *prometheus.SummaryVec
-	getOperatorStateLatency     *prometheus.SummaryVec
-	getBlobCertificatesLatency  *prometheus.SummaryVec
-	buildMerkleTreeLatency      *prometheus.SummaryVec
-	putBatchHeaderLatency       *prometheus.SummaryVec
-	proofLatency                *prometheus.SummaryVec
-	putInclusionInfosLatency    *prometheus.SummaryVec
-	poolSubmissionLatency       *prometheus.SummaryVec
-	putDispersalRequestLatency  *prometheus.SummaryVec
-	sendChunksLatency           *prometheus.SummaryVec
-	sendChunksRetryCount        *prometheus.GaugeVec
-	putDispersalResponseLatency *prometheus.SummaryVec
-	handleSignaturesLatency     *prometheus.SummaryVec
-	receiveSignaturesLatency    *prometheus.SummaryVec
-	aggregateSignaturesLatency  *prometheus.SummaryVec
-	putAttestationLatency       *prometheus.SummaryVec
-	updateBatchStatusLatency    *prometheus.SummaryVec
-	blobE2EDispersalLatency     *prometheus.SummaryVec
-	completedBlobs              *prometheus.CounterVec
-	attestation                 *prometheus.GaugeVec
-	blobSetSize                 *prometheus.GaugeVec
+	sendChunksRetryCount         *prometheus.GaugeVec
+	processSigningMessageLatency *prometheus.SummaryVec
+	signingMessageChannelLatency *prometheus.SummaryVec
+	attestationUpdateLatency     *prometheus.SummaryVec
+	attestationBuildingLatency   *prometheus.SummaryVec
+	thresholdSignedToDoneLatency *prometheus.SummaryVec
+	aggregateSignaturesLatency   *prometheus.SummaryVec
+	putAttestationLatency        *prometheus.SummaryVec
+	attestationUpdateCount       *prometheus.SummaryVec
+	updateBatchStatusLatency     *prometheus.SummaryVec
+	blobE2EDispersalLatency      *prometheus.SummaryVec
+	completedBlobs               *prometheus.CounterVec
+	attestation                  *prometheus.GaugeVec
+	blobSetSize                  *prometheus.GaugeVec
+	batchStageTimer              *common.StageTimer
+	sendToValidatorStageTimer    *common.StageTimer
+	importantSigningThresholds   []float64
+	signatureThresholds          *prometheus.CounterVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
-func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
+//
+// importantSigningThresholds is a list of meaningful thresholds. Thresholds should be between 0.0 and 1.0.
+// A count of batches meeting each specified threshold is reported as a metric.
+func newDispatcherMetrics(
+	registry *prometheus.Registry,
+	importantSigningThresholds []float64,
+) (*dispatcherMetrics, error) {
+
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
 	attestation := promauto.With(registry).NewGaugeVec(
@@ -53,126 +56,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{"type", "quorum"},
 	)
 
-	handleBatchLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "handle_batch_latency_ms",
-			Help:       "The time required to handle a batch.",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	newBatchLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "new_batch_latency_ms",
-			Help:       "The time required to create a new batch (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getBlobMetadataLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_blob_metadata_latency_ms",
-			Help:       "The time required to get blob metadata (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getOperatorStateLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_operator_state_latency_ms",
-			Help:       "The time required to get the operator state (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getBlobCertificatesLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_blob_certificates_latency_ms",
-			Help:       "The time required to get blob certificates (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	buildMerkleTreeLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "build_merkle_tree_latency_ms",
-			Help:       "The time required to build the Merkle tree (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putBatchHeaderLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_batch_header_latency_ms",
-			Help:       "The time required to put the batch header (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	proofLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "proof_latency_ms",
-			Help:       "The time required to generate the proof (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putInclusionInfosLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_verification_infos_latency_ms",
-			Help:       "The time required to put the inclusion infos (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	poolSubmissionLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "pool_submission_latency_ms",
-			Help:       "The time required to submit a batch to the worker pool (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_dispersal_latency_ms",
-			Help:       "The time required to put the dispersal request (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	sendChunksLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "send_chunks_latency_ms",
-			Help:       "The time required to send chunks (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
 	sendChunksRetryCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: dispatcherNamespace,
@@ -182,34 +65,65 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putDispersalResponseLatency := promauto.With(registry).NewSummaryVec(
+	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
-			Name:       "put_dispersal_response_latency_ms",
-			Help:       "The time required to put the dispersal response (part of HandleBatch()).",
+			Name:       "process_signing_message_latency_ms",
+			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
 	)
 
-	handleSignaturesLatency := promauto.With(registry).NewSummaryVec(
+	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
-			Name:       "handle_signatures_latency_ms",
-			Help:       "The time required to handle signatures (part of HandleBatch()).",
+			Name:       "signing_message_channel_latency_ms",
+			Help:       "The time a signing message sits in the channel waiting to be processed (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
 	)
 
-	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
+	attestationUpdateLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
-			Name:       "receive_signatures_latency_ms",
-			Help:       "The time required to receive signatures (part of HandleSignatures()).",
+			Name:       "attestation_update_latency_ms",
+			Help:       "The time between the signature receiver yielding attestations (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
+	)
+
+	attestationBuildingLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "attestation_building_latency_ms",
+			Help:       "The time it takes for the signature receiver to build and send a single attestation (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	attestationUpdateCount := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "attestation_update_count",
+			Help:       "The number of updates to the batch attestation throughout the signature gathering process.",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	thresholdSignedToDoneLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "threshold_signed_to_done_latency_ms",
+			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
+				"of signature gathering",
+			Objectives: objectives,
+		},
+		[]string{"quorum"},
 	)
 
 	aggregateSignaturesLatency := promauto.With(registry).NewSummaryVec(
@@ -270,95 +184,83 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	return &dispatcherMetrics{
-		handleBatchLatency:          handleBatchLatency,
-		newBatchLatency:             newBatchLatency,
-		getBlobMetadataLatency:      getBlobMetadataLatency,
-		getOperatorStateLatency:     getOperatorStateLatency,
-		getBlobCertificatesLatency:  getBlobCertificatesLatency,
-		buildMerkleTreeLatency:      buildMerkleTreeLatency,
-		putBatchHeaderLatency:       putBatchHeaderLatency,
-		proofLatency:                proofLatency,
-		putInclusionInfosLatency:    putInclusionInfosLatency,
-		poolSubmissionLatency:       poolSubmissionLatency,
-		putDispersalRequestLatency:  putDispersalRequestLatency,
-		sendChunksLatency:           sendChunksLatency,
-		sendChunksRetryCount:        sendChunksRetryCount,
-		putDispersalResponseLatency: putDispersalResponseLatency,
-		handleSignaturesLatency:     handleSignaturesLatency,
-		receiveSignaturesLatency:    receiveSignaturesLatency,
-		aggregateSignaturesLatency:  aggregateSignaturesLatency,
-		putAttestationLatency:       putAttestationLatency,
-		updateBatchStatusLatency:    updateBatchStatusLatency,
-		blobE2EDispersalLatency:     blobE2EDispersalLatency,
-		completedBlobs:              completedBlobs,
-		attestation:                 attestation,
-		blobSetSize:                 blobSetSize,
+	batchStageTimer := common.NewStageTimer(registry, dispatcherNamespace, "batch", false)
+	sendToValidatorStageTimer := common.NewStageTimer(
+		registry,
+		dispatcherNamespace,
+		"send_to_validator",
+		false)
+
+	// Verify that thresholds are sane
+	for _, threshold := range importantSigningThresholds {
+		if threshold < 0 || threshold > 1 {
+			return nil, fmt.Errorf("threshold %f is not between 0.0 and 1.0", threshold)
+		}
 	}
-}
+	sort.Float64s(importantSigningThresholds)
 
-func (m *dispatcherMetrics) reportHandleBatchLatency(duration time.Duration) {
-	m.handleBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
+	// Add thresholds for 0.0 and 1.0, if missing.
+	if len(importantSigningThresholds) == 0 || importantSigningThresholds[0] != 0.0 {
+		importantSigningThresholds = append([]float64{0.0}, importantSigningThresholds...)
+	}
+	if importantSigningThresholds[len(importantSigningThresholds)-1] != 1.0 {
+		importantSigningThresholds = append(importantSigningThresholds, 1.0)
+	}
 
-func (m *dispatcherMetrics) reportNewBatchLatency(duration time.Duration) {
-	m.newBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
+	batchSigningThresholdCount := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "batch_signing_threshold_count",
+			Help:      "A count of batches that have reached various signature thresholds.",
+		},
+		[]string{"quorum", "threshold"},
+	)
 
-func (m *dispatcherMetrics) reportGetBlobMetadataLatency(duration time.Duration) {
-	m.getBlobMetadataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportGetOperatorStateLatency(duration time.Duration) {
-	m.getOperatorStateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportGetBlobCertificatesLatency(duration time.Duration) {
-	m.getBlobCertificatesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportBuildMerkleTreeLatency(duration time.Duration) {
-	m.buildMerkleTreeLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutBatchHeaderLatency(duration time.Duration) {
-	m.putBatchHeaderLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportProofLatency(duration time.Duration) {
-	m.proofLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutInclusionInfosLatency(duration time.Duration) {
-	m.putInclusionInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPoolSubmissionLatency(duration time.Duration) {
-	m.poolSubmissionLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutDispersalRequestLatency(duration time.Duration) {
-	m.putDispersalRequestLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportSendChunksLatency(duration time.Duration) {
-	m.sendChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+	return &dispatcherMetrics{
+		sendChunksRetryCount:         sendChunksRetryCount,
+		processSigningMessageLatency: processSigningMessageLatency,
+		signingMessageChannelLatency: signingMessageChannelLatency,
+		attestationUpdateLatency:     attestationUpdateLatency,
+		attestationBuildingLatency:   attestationBuildingLatency,
+		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
+		aggregateSignaturesLatency:   aggregateSignaturesLatency,
+		putAttestationLatency:        putAttestationLatency,
+		attestationUpdateCount:       attestationUpdateCount,
+		updateBatchStatusLatency:     updateBatchStatusLatency,
+		blobE2EDispersalLatency:      blobE2EDispersalLatency,
+		completedBlobs:               completedBlobs,
+		attestation:                  attestation,
+		blobSetSize:                  blobSetSize,
+		batchStageTimer:              batchStageTimer,
+		sendToValidatorStageTimer:    sendToValidatorStageTimer,
+		importantSigningThresholds:   importantSigningThresholds,
+		signatureThresholds:          batchSigningThresholdCount,
+	}, nil
 }
 
 func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
 	m.sendChunksRetryCount.WithLabelValues().Set(retries)
 }
 
-func (m *dispatcherMetrics) reportPutDispersalResponseLatency(duration time.Duration) {
-	m.putDispersalResponseLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
+	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration) {
-	m.handleSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+func (m *dispatcherMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
+	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {
-	m.receiveSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+func (m *dispatcherMetrics) reportAttestationUpdateLatency(duration time.Duration) {
+	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportAttestationBuildingLatency(duration time.Duration) {
+	m.attestationBuildingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Observe(
+		common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
@@ -367,6 +269,10 @@ func (m *dispatcherMetrics) reportAggregateSignaturesLatency(duration time.Durat
 
 func (m *dispatcherMetrics) reportPutAttestationLatency(duration time.Duration) {
 	m.putAttestationLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportAttestationUpdateCount(attestationCount float64) {
+	m.attestationUpdateCount.WithLabelValues().Observe(attestationCount)
 }
 
 func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
@@ -397,7 +303,11 @@ func (m *dispatcherMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+func (m *dispatcherMetrics) reportAttestation(
+	operatorCount map[core.QuorumID]int,
+	signerCount map[core.QuorumID]int,
+	quorumResults map[core.QuorumID]*core.QuorumResult) {
+
 	for quorumID, count := range operatorCount {
 		quorumStr := fmt.Sprintf("%d", quorumID)
 		signers, ok := signerCount[quorumID]
@@ -413,5 +323,40 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
+
+		m.reportSigningThreshold(quorumID, float64(quorumResult.PercentSigned)/100.0)
 	}
+}
+
+func (m *dispatcherMetrics) reportSigningThreshold(quorumID core.QuorumID, signingFraction float64) {
+	// First, determine the threshold to report. In order to be reported as threshold X, the signing fraction
+	// must be greater than or equal to X, but strictly less than the next highest threshold.
+	//
+	// For example, let's say important thresholds are [0, 0.55, 0.67, 0.80, 1.0]
+	// 0.55 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.56 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.66 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.67 signing -> threshold 0.67 (>= 0.67 but < 0.80)
+
+	var threshold float64
+	for i := len(m.importantSigningThresholds) - 1; i >= 0; i-- {
+		candidateThreshold := m.importantSigningThresholds[i]
+		if candidateThreshold <= signingFraction {
+			threshold = candidateThreshold
+			break
+		}
+	}
+
+	quorumString := fmt.Sprintf("%d", quorumID)
+	thresholdString := fmt.Sprintf("%f", threshold)
+
+	m.signatureThresholds.WithLabelValues(quorumString, thresholdString).Inc()
+}
+
+func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
+	return m.batchStageTimer.NewSequence()
+}
+
+func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
+	return m.sendToValidatorStageTimer.NewSequence()
 }

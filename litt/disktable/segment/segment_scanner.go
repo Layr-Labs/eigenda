@@ -51,7 +51,7 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 			var index uint32
 
 			switch extension {
-			case MetadataSwapExtension:
+			case MetadataSwapExtension, KeyFileSwapExtension:
 				garbageFiles = append(garbageFiles, filePath)
 				continue
 			case MetadataFileExtension:
@@ -143,12 +143,19 @@ func lookForMissingFiles(
 	metadataFiles map[uint32]string,
 	keyFiles map[uint32]string,
 	valueFiles map[uint32][]string,
+	fsync bool,
 ) (orphanedFiles []string, damagedSegments map[uint32]struct{}, error error) {
 
 	orphanedFiles = make([]string, 0)
 	damagedSegments = make(map[uint32]struct{})
 
 	for segment := lowestSegmentIndex; segment <= highestSegmentIndex; segment++ {
+
+		if segment == 0 && len(metadataFiles) == 0 && len(keyFiles) == 0 && len(valueFiles) == 0 {
+			// Special case, only happens when starting a table from scratch.
+			// Files aren't actually missing, so no need to log anything.
+			break
+		}
 
 		potentialOrphans := make([]string, 0)
 		segmentMissingFiles := false
@@ -200,7 +207,7 @@ func lookForMissingFiles(
 			metadataPath := metadataFiles[segment]
 			metadataDirectory := path.Dir(metadataPath)
 
-			metadata, err := loadMetadataFile(segment, []string{metadataDirectory})
+			metadata, err := loadMetadataFile(segment, []string{metadataDirectory}, fsync)
 			if err != nil {
 				return nil, nil,
 					fmt.Errorf("failed to load metadata file: %v", err)
@@ -289,9 +296,11 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 // orphaned files and checks for corrupted files. It creates a new mutable segment at the end.
 func GatherSegmentFiles(
 	logger logging.Logger,
-	fatalErrorHandler *util.FatalErrorHandler,
+	errorMonitor *util.ErrorMonitor,
 	rootDirectories []string,
-	now time.Time) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
+	now time.Time,
+	fsync bool,
+) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
 	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, err :=
@@ -320,7 +329,8 @@ func GatherSegmentFiles(
 		highestSegmentIndex,
 		metadataFiles,
 		keyFiles,
-		valueFiles)
+		valueFiles,
+		fsync)
 	if err != nil {
 		return 0, 0, nil,
 			fmt.Errorf("there are one or more missing files: %v", err)
@@ -344,7 +354,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := LoadSegment(logger, fatalErrorHandler, i, rootDirectories, now)
+			segment, err := LoadSegment(logger, errorMonitor, i, rootDirectories, now, fsync)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

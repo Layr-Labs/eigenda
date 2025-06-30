@@ -31,7 +31,7 @@ func newTestFetcher(baseTime time.Time) *testFetcher {
 }
 
 func roundUpToNextMinute(t time.Time) time.Time {
-	if t.Truncate(time.Minute) == t {
+	if t.Equal(t.Truncate(time.Minute)) {
 		return t
 	}
 	return t.Truncate(time.Minute).Add(time.Minute)
@@ -95,7 +95,7 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 		maxItems,
 		fetcher.fetch,
 		timestampFn,
-		dataapi.NewMetrics(uint(2), nil, "9001", testutils.GetLogger()).BatchFeedCacheMetrics,
+		dataapi.NewMetrics(uint(2), nil, nil, "9001", testutils.GetLogger()).BatchFeedCacheMetrics,
 	)
 
 	return cache, fetcher, baseTime

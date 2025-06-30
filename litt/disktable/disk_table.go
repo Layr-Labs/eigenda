@@ -35,11 +35,11 @@ type DiskTable struct {
 	// The logger for the disk table.
 	logger logging.Logger
 
-	// fatalErrorHandler is a struct that permits the DB to "panic". There are many goroutines that function under the
+	// errorMonitor is a struct that permits the DB to "panic". There are many goroutines that function under the
 	// hood, and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations,
 	// the desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
-	fatalErrorHandler *util.FatalErrorHandler
+	errorMonitor *util.ErrorMonitor
 
 	// The root directories for the disk table.
 	roots []string
@@ -158,7 +158,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := roots[0]
-		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
+		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor, config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %w", err)
 		}
@@ -172,11 +172,11 @@ func NewDiskTable(
 		}
 	}
 
-	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger, config.FatalErrorCallback)
+	errorMonitor := util.NewErrorMonitor(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
 		logger:             config.Logger,
-		fatalErrorHandler:  fatalErrorHandler,
+		errorMonitor:       errorMonitor,
 		clock:              config.Clock,
 		roots:              roots,
 		segmentDirectories: segDirs,
@@ -191,12 +191,19 @@ func NewDiskTable(
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
-			fatalErrorHandler,
+			errorMonitor,
 			table.segmentDirectories,
-			config.Clock())
+			config.Clock(),
+			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
+
+	keyCount := int64(0)
+	for _, seg := range segments {
+		keyCount += int64(seg.KeyCount())
+	}
+	table.keyCount.Store(keyCount)
 
 	immutableSegmentSize := uint64(0)
 	for _, seg := range segments {
@@ -212,14 +219,18 @@ func NewDiskTable(
 	} else {
 		nextSegmentIndex = highestSegmentIndex + 1
 	}
+	salt := [16]byte{}
+	_, err = config.SaltShaker.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read salt: %w", err)
+	}
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
-		fatalErrorHandler,
+		errorMonitor,
 		nextSegmentIndex,
 		segDirs,
-		config.Clock(),
 		metadata.GetShardingFactor(),
-		config.SaltShaker.Uint32(),
+		salt,
 		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
@@ -242,13 +253,13 @@ func NewDiskTable(
 
 	// Start the flush loop.
 	fLoop := &flushLoop{
-		logger:            config.Logger,
-		diskTable:         table,
-		fatalErrorHandler: fatalErrorHandler,
-		flushChannel:      make(chan any, tableFlushChannelCapacity),
-		metrics:           metrics,
-		clock:             config.Clock,
-		name:              name,
+		logger:       config.Logger,
+		diskTable:    table,
+		errorMonitor: errorMonitor,
+		flushChannel: make(chan any, tableFlushChannelCapacity),
+		metrics:      metrics,
+		clock:        config.Clock,
+		name:         name,
 	}
 	table.flushLoop = fLoop
 	go fLoop.run()
@@ -257,7 +268,7 @@ func NewDiskTable(
 	cLoop := &controlLoop{
 		logger:                  config.Logger,
 		diskTable:               table,
-		fatalErrorHandler:       fatalErrorHandler,
+		errorMonitor:            errorMonitor,
 		controllerChannel:       make(chan any, config.ControlChannelSize),
 		lowestSegmentIndex:      lowestSegmentIndex,
 		highestSegmentIndex:     highestSegmentIndex,
@@ -278,6 +289,7 @@ func NewDiskTable(
 		keymap:                  keymap,
 		flushLoop:               fLoop,
 		garbageCollectionPeriod: config.GCPeriod,
+		immutableSegmentSize:    immutableSegmentSize,
 	}
 	cLoop.threadsafeHighestSegmentIndex.Store(highestSegmentIndex)
 	table.controlLoop = cLoop
@@ -307,13 +319,9 @@ func (d *DiskTable) reloadKeymap(
 		d.logger.Infof("spent %v reloading keymap", d.clock().Sub(start))
 	}()
 
-	// It's possible that some of the data written near the end of the previous session was corrupted.
-	// Read data from the end until the first valid key/value pair is found.
-	isValid := false
+	batch := make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 
-	batch := make([]*types.KAPair, 0, keymapReloadBatchSize)
-
-	for i := highestSegmentIndex; i >= lowestSegmentIndex && i+1 != 0; i-- {
+	for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 		if !segments[i].IsSealed() {
 			// ignore unsealed segment, this will have been created in the current session and will not
 			// yet contain any data.
@@ -327,32 +335,15 @@ func (d *DiskTable) reloadKeymap(
 		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
 			key := keys[keyIndex]
 
-			if !isValid {
-				_, err = segments[i].Read(key.Key, key.Address)
-				if err == nil {
-					// we found a valid key/value pair. All subsequent keys are valid.
-					isValid = true
-				} else {
-					// This is not cause for alarm (probably).
-					// This can happen when the database is not cleanly shut down,
-					// and just means that some data near the end was not fully committed.
-					d.logger.Infof("truncated value for key %s with address %s for segment %d",
-						key.Key, key.Address, i)
+			batch = append(batch, key)
+			if len(batch) == keymapReloadBatchSize {
+				err = d.keymap.Put(batch)
+				if err != nil {
+					return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
 				}
-			}
-
-			if isValid {
-				batch = append(batch, key)
-				if len(batch) == keymapReloadBatchSize {
-					err = d.keymap.Put(batch)
-					if err != nil {
-						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
-					}
-					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
-				}
+				batch = make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 			}
 		}
-
 	}
 
 	if len(batch) > 0 {
@@ -388,11 +379,11 @@ func (d *DiskTable) Name() string {
 
 // Close stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Close() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
 
-	d.fatalErrorHandler.Shutdown()
+	d.errorMonitor.Shutdown()
 
 	shutdownCompleteChan := make(chan struct{}, 1)
 	request := &controlLoopShutdownRequest{
@@ -404,7 +395,7 @@ func (d *DiskTable) Close() error {
 		return fmt.Errorf("failed to send shutdown request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(d.errorMonitor, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %w", err)
 	}
@@ -414,8 +405,8 @@ func (d *DiskTable) Close() error {
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf("cannot process Destroy() request, DB is in panicked state due to error: %w", err)
 	}
 
 	err := d.Close()
@@ -489,8 +480,8 @@ func (d *DiskTable) Destroy() error {
 // SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting affects both new
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf("cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
 	}
 
 	err := d.metadata.SetTTL(ttl)
@@ -501,9 +492,9 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 }
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
+			"cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if shardingFactor == 0 {
@@ -521,29 +512,16 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	return nil
 }
 
-func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return nil, false, fmt.Errorf(
-			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
-	}
-
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
+			"cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
 	if value, ok := d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); ok {
 		bytes := value.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(bytes))
 		return bytes, true, nil
 	}
 
@@ -569,9 +547,59 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("failed to read data: %w", err)
 	}
 
-	dataSize = uint64(len(data))
-
 	return data, true, nil
+}
+
+func (d *DiskTable) CacheAwareGet(
+	key []byte,
+	onlyReadFromCache bool,
+) (value []byte, exists bool, hot bool, err error) {
+
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return nil, false, false, fmt.Errorf(
+			"cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
+	}
+
+	// First, check if the key is in the unflushed data map. If so, return it from there.
+	// Performance wise, this has equivalent semantics to reading the value from
+	// a cache, so we'd might as well count it as a cache hit.
+	var rawValue any
+	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
+		value = rawValue.([]byte)
+		return value, true, true, nil
+	}
+
+	// Look up the address of the data.
+	var address types.Address
+	address, exists, err = d.keymap.Get(key)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to get address: %w", err)
+	}
+	if !exists {
+		return nil, false, false, nil
+	}
+
+	if onlyReadFromCache {
+		// The value exists but we are not allowed to read it from disk.
+		return nil, true, false, nil
+	}
+
+	// Reserve the segment that contains the data.
+	seg, ok := d.controlLoop.getReservedSegment(address.Index())
+	if !ok {
+		// This can happen if there is a race between this thread and the GC thread, i.e.
+		// if we start reading a value just as the garbage collector decides to delete it.
+		return nil, false, false, nil
+	}
+	defer seg.Release()
+
+	// Read the data from disk.
+	value, err = seg.Read(key, address)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to read data: %w", err)
+	}
+
+	return value, true, false, nil
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
@@ -579,8 +607,8 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 }
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf("cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -602,6 +630,12 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 		}
 		if len(kv.Value) > math.MaxUint32 {
 			return fmt.Errorf("value is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Value))
+		}
+		if kv.Key == nil {
+			return fmt.Errorf("nil keys are not supported")
+		}
+		if kv.Value == nil {
+			return fmt.Errorf("nil values are not supported")
 		}
 
 		d.unflushedDataCache.Store(util.UnsafeBytesToString(kv.Key), kv.Value)
@@ -636,8 +670,8 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Flush() request, DB is in panicked state due to error: %w", err)
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf("cannot process Flush() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -657,7 +691,7 @@ func (d *DiskTable) Flush() error {
 		return fmt.Errorf("failed to send flush request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, flushReq.responseChan)
+	_, err = util.Await(d.errorMonitor, flushReq.responseChan)
 	if err != nil {
 		return fmt.Errorf("failed to flush: %w", err)
 	}
@@ -665,9 +699,20 @@ func (d *DiskTable) Flush() error {
 	return nil
 }
 
-func (d *DiskTable) SetCacheSize(_ uint64) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
+func (d *DiskTable) SetWriteCacheSize(size uint64) error {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf(
+			"cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
+	}
+
+	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
+	return nil
+}
+
+func (d *DiskTable) SetReadCacheSize(size uint64) error {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
+		return fmt.Errorf(
+			"cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
@@ -675,9 +720,9 @@ func (d *DiskTable) SetCacheSize(_ uint64) error {
 }
 
 func (d *DiskTable) RunGC() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process RunGC() request, DB is in panicked state due to error: %w", err)
+			"cannot process RunGC() request, DB is in panicked state due to error: %w", err)
 	}
 
 	request := &controlLoopGCRequest{
@@ -689,7 +734,7 @@ func (d *DiskTable) RunGC() error {
 		return fmt.Errorf("failed to send GC request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, request.completionChan)
+	_, err = util.Await(d.errorMonitor, request.completionChan)
 	if err != nil {
 		return fmt.Errorf("failed to await GC completion: %w", err)
 	}
@@ -699,7 +744,7 @@ func (d *DiskTable) RunGC() error {
 
 // writeKeysToKeymap flushes all keys to the keymap. Once they are flushed, it also removes the keys from the
 // unflushedDataCache.
-func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
+func (d *DiskTable) writeKeysToKeymap(keys []*types.ScopedKey) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil

@@ -71,7 +71,7 @@ func createValueFile(
 	}
 
 	filePath := values.path()
-	exists, _, err := util.VerifyFileProperties(filePath)
+	exists, _, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
@@ -120,7 +120,7 @@ func loadValueFile(
 	}
 
 	filePath := values.path()
-	exists, size, err := util.VerifyFileProperties(filePath)
+	exists, size, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
@@ -320,6 +320,11 @@ func (v *valueFile) delete() error {
 
 	err := os.Remove(v.path())
 	if err != nil {
+		if os.IsNotExist(err) {
+			// file does not exist, no work to be done
+			return nil
+		}
+
 		return fmt.Errorf("failed to delete value file: %v", err)
 	}
 

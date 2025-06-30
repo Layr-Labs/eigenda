@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -29,7 +30,8 @@ import (
 const (
 	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
 	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
+	certVerifierRouterAddress        = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
+	registryCoordinatorAddress       = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 	eigenDAServiceManagerAddress     = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 )
@@ -45,7 +47,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create kzg prover: %v", err)
 	}
 
-	disperserClient, err := createDisperserClient(privateKey, kzgProver)
+	disperserClient, err := createDisperserClient(logger, privateKey, kzgProver)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
@@ -53,6 +55,16 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 	certVerifier, err := createCertVerifier()
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
+	}
+
+	certBuilder, err := createCertBuilder()
+	if err != nil {
+		return nil, fmt.Errorf("create cert builder: %w", err)
+	}
+
+	blockNumMonitor, err := createBlockNumberMonitor()
+	if err != nil {
+		return nil, fmt.Errorf("create block number monitor: %w", err)
 	}
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
@@ -67,6 +79,8 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
+		blockNumMonitor,
+		certBuilder,
 		certVerifier,
 		nil,
 	)
@@ -135,13 +149,16 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		return nil, fmt.Errorf("create kzg verifier: %w", err)
 	}
 
+	clientConfig := validator.DefaultClientConfig()
+
 	// Create the retrieval client for fetching blobs from DA nodes
-	retrievalClient := clients.NewRetrievalClient(
+	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		chainState,
 		kzgVerifier,
-		10, // Number of concurrent connections to validators
+		clientConfig,
+		nil,
 	)
 
 	// Create the ValidatorPayloadRetriever config
@@ -161,8 +178,8 @@ func createRelayClient(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	relayRegistryAddress gethcommon.Address,
-) (clients.RelayClient, error) {
-	config := &clients.RelayClientConfig{
+) (relay.RelayClient, error) {
+	config := &relay.RelayClientConfig{
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit
 	}
@@ -172,13 +189,13 @@ func createRelayClient(
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}
 
-	return clients.NewRelayClient(
+	return relay.NewRelayClient(
 		config,
 		logger,
 		relayUrlProvider)
 }
 
-func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients.DisperserClient, error) {
+func createDisperserClient(logger logging.Logger, privateKey string, kzgProver *prover.Prover) (clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
@@ -191,6 +208,7 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 	}
 
 	return clients.NewDisperserClient(
+		logger,
 		disperserClientConfig,
 		signer,
 		kzgProver,
@@ -229,10 +247,57 @@ func createCertVerifier() (*verification.CertVerifier, error) {
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
+	routerAddressProvider, err := verification.BuildRouterAddressProvider(
+		gethcommon.HexToAddress(certVerifierRouterAddress),
+		ethClient,
+		logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create router address provider: %w", err)
+	}
+
 	return verification.NewCertVerifier(
 		logger,
 		ethClient,
-		verification.NewStaticCertVerifierAddressProvider(gethcommon.HexToAddress(certVerifierAddress)))
+		routerAddressProvider,
+	)
+}
+
+func createCertBuilder() (*clients.CertBuilder, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return clients.NewCertBuilder(
+		logger,
+		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(registryCoordinatorAddress),
+		ethClient,
+	)
+}
+
+func createBlockNumberMonitor() (*verification.BlockNumberMonitor, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		1*time.Second,
+	)
 }
 
 func createEthClient(logger logging.Logger) (*geth.EthClient, error) {

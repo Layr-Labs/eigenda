@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -151,6 +150,30 @@ func TestV2DisperseBlob(t *testing.T) {
 	})
 	assert.Nil(t, reply)
 	assert.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
+
+	// request with on-demand payments in reserved only mode
+	c.DispersalServerV2.ReservedOnly = true
+	ondemandReqProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID.Hex(),
+			Timestamp:         0,
+			CumulativePayment: big.NewInt(500).Bytes(),
+		},
+	}
+	blobHeader, err = corev2.BlobHeaderFromProtobuf(ondemandReqProto)
+	assert.NoError(t, err)
+	sig, err = signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Blob:       data,
+		Signature:  sig,
+		BlobHeader: ondemandReqProto,
+	})
+	assert.ErrorContains(t, err, "on-demand payments are not supported by reserved-only mode disperser")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -332,6 +355,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: validHeader,
 	})
 	assert.ErrorContains(t, err, "blob size too big")
+
 }
 
 func TestV2GetBlobStatus(t *testing.T) {
@@ -381,7 +405,11 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
 
-	// Complete blob status
+	// First transition to GatheringSignatures state
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
+	require.NoError(t, err)
+
+	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
@@ -487,16 +515,40 @@ func newTestServerV2(t *testing.T) *testComponents {
 	// append test name to each table name for an unique store
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
-	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
-	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
-	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
-	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
-	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint64(3), nil)
+	// Setup mock payment vault params for server v2 test
+	serverV2MockParams := &meterer.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+			0: {
+				OnDemandSymbolsPerSecond: 1009,
+				OnDemandPricePerSymbol:   2,
+			},
+			1: {
+				OnDemandSymbolsPerSecond: 1009,
+				OnDemandPricePerSymbol:   2,
+			},
+		},
+		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              3,
+				ReservationRateLimitWindow: 1,
+				OnDemandRateLimitWindow:    1,
+			},
+			1: {
+				MinNumSymbols:              3,
+				ReservationRateLimitWindow: 1,
+				OnDemandRateLimitWindow:    1,
+			},
+		},
+		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
+	}
+	mockState.On("GetPaymentGlobalParams").Return(serverV2MockParams, nil)
 
 	now := uint64(time.Now().Unix())
-	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
+		0: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+		1: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+	}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
-	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
@@ -518,7 +570,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		awsConfig,
 		table_names[0],
 		table_names[1],
@@ -527,7 +579,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 
@@ -536,13 +588,19 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 	chainReader.On("GetBlockStaleMeasure", tmock.Anything).Return(uint32(10), nil)
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
-	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,
-			MaxNumOperators: 3537,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
+
+	// Start NTP sync
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), "pool.ntp.org", 10*time.Second, logger)
+	if err != nil {
+		panic("failed to create NTP clock: " + err.Error())
+	}
 
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
@@ -563,6 +621,9 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
+		ntpClock,
+		// reserved only mode
+		false,
 	)
 	assert.NoError(t, err)
 

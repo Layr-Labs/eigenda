@@ -1,26 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {Pausable} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {IPauserRegistry} from
-    "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-
+    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {
     ServiceManagerBase,
     IAVSDirectory,
     IRewardsCoordinator,
     IServiceManager
-} from "../../lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
-import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
-import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "../../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
+} from "lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
-import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
-import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -31,9 +30,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * - freezing operators as the result of various "challenges"
  */
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
-
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
@@ -81,12 +77,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /**
      * @notice This function is used for
-     * - submitting data availabilty certificates,
+     * - submitting data availabilty certificates for EigenDA V1,
      * - check that the aggregate signature is valid,
      * - and check whether quorum has been achieved or not.
      */
     function confirmBatch(
-        BatchHeader calldata batchHeader,
+        DATypesV1.BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
@@ -106,7 +102,14 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
-        bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+        bytes32 reducedBatchHeaderHash = keccak256(
+            abi.encode(
+                DATypesV1.ReducedBatchHeader({
+                    blobHeadersRoot: batchHeader.blobHeadersRoot,
+                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                })
+            )
+        );
 
         // check the signature
         (QuorumStakeTotals memory quorumStakeTotals, bytes32 signatoryRecordHash) = checkSignatures(
@@ -129,9 +132,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
         // store the metadata hash
         uint32 batchIdMemory = batchId;
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
+        bytes32 batchHeaderHash = keccak256(abi.encode(batchHeader));
         batchIdToBatchMetadataHash[batchIdMemory] =
-            EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
+            keccak256(abi.encodePacked(batchHeaderHash, signatoryRecordHash, uint32(block.number)));
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 
@@ -190,7 +193,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+    function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }
 }

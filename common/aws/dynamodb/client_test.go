@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 
 func setup(m *testing.M) {
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -234,9 +234,15 @@ func TestBasicOperations(t *testing.T) {
 	}, expression.Name("Status").In(expression.Value("Confirmed")))
 	assert.NoError(t, err)
 
-	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
-		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
-	}, "BlobSize", 1000)
+	// Test increment using TransactAddBy
+	ops := []commondynamodb.TransactAddOp{{
+		Key: commondynamodb.Key{
+			"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+		},
+		Attr:  "BlobSize",
+		Value: 1000,
+	}}
+	err = dynamoClient.TransactAddBy(ctx, tableName, ops)
 	assert.NoError(t, err)
 
 	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
@@ -249,6 +255,34 @@ func TestBasicOperations(t *testing.T) {
 	assert.Equal(t, "0", fetchedItem["BlobIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "456", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
+
+	// Test decrement using TransactAddBy
+	ops = []commondynamodb.TransactAddOp{{
+		Key: commondynamodb.Key{
+			"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+		},
+		Attr:  "BlobSize",
+		Value: -500,
+	}}
+	err = dynamoClient.TransactAddBy(ctx, tableName, ops)
+	assert.NoError(t, err)
+
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "623", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+
+	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, "BlobSize", 1000)
+	assert.NoError(t, err)
+
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "1623", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)

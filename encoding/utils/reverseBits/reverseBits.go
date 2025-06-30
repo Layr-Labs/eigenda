@@ -28,8 +28,8 @@ const (
 )
 
 var ErrRBOInvalidLength = errors.New("length must be power of 2 for RBO")
-var ErrFrRBOListTooLarge = errors.New("Fr RBO list length too large") //lint:ignore ST1005 ignore noun
-var ErrG1RBOListTooLarge = errors.New("G1 RBO list length too large")
+var ErrFrRBOListTooLarge = errors.New("Fr RBO list length too large") //nolint:staticcheck // ST1005 ignore noun
+var ErrG1RBOListTooLarge = errors.New("G1 RBO list length too large") //nolint:staticcheck // ST1005 ignore noun
 
 // bitmagic: binary search through a uint32 to find the index (least bit being 0) of the first set bit.
 // Zero is a special case, it has a 0 bit index.
@@ -98,8 +98,7 @@ func ReverseBitsLimited(length uint32, value uint32) uint32 {
 }
 
 func ReverseBitOrder(length uint32, swap func(i, j uint32)) error {
-	if !(length > 0 || (length&(length-1) == 0)) {
-		// panic("length is not a power of 2")
+	if length == 0 || (length&(length-1) != 0) {
 		return ErrRBOInvalidLength
 	}
 	// swap bits:
@@ -124,11 +123,11 @@ func ReverseBitOrderFr(values []fr.Element) error {
 	var tmp fr.Element
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
-		
+
 		values[i].Set(&values[j])
-		
+
 		values[j].Set(&tmp)
-		
+
 	})
 	return err
 }

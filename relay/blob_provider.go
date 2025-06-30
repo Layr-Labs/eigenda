@@ -46,7 +46,7 @@ func newBlobProvider(
 	}
 
 	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](
-		cache2.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight),
+		cache2.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight, nil),
 		maxIOConcurrency,
 		server.fetchBlob,
 		metrics)

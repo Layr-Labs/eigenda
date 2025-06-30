@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -26,7 +28,7 @@ func Example_relayPayloadRetrieval() {
 	if err != nil {
 		panic(fmt.Sprintf("create payload disperser: %v", err))
 	}
-	defer payloadDisperser.Close()
+	defer payloadDisperser.Close() //nolint:errcheck // just an example, so we ignore the error
 
 	payload, err := createRandomPayload(4 * 1024) // (4KB of random data)
 	if err != nil {
@@ -45,10 +47,15 @@ func Example_relayPayloadRetrieval() {
 	if err != nil {
 		panic(fmt.Sprintf("create relay payload retriever: %v", err))
 	}
-	defer payloadRetriever.Close()
+	defer payloadRetriever.Close() //nolint:errcheck // just an example, so we ignore the error
+
+	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		panic("eigenDACert is not a EigenDACertV3")
+	}
 
 	// Retrieve the payload using the certificate
-	_, err = payloadRetriever.GetPayload(ctx, eigenDACert)
+	_, err = payloadRetriever.GetPayload(ctx, retrievableCert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}
@@ -63,10 +70,11 @@ func Example_relayPayloadRetrieval() {
 
 	verificationCtx, verificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer verificationCancel()
-	// VerifyCertV2 is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
-	// is valid: if this call doesn't return an error, then the eigenDA network has attested to the availability of the
+	// CheckDACert is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
+	// is valid: if this call doesn't return an error, then the EigenDA network has attested to the availability of the
 	// dispersed blob.
-	err = certVerifier.VerifyCertV2(verificationCtx, eigenDACert)
+
+	err = certVerifier.CheckDACert(verificationCtx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
 	}

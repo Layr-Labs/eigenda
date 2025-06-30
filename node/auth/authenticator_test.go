@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +31,6 @@ func TestValidRequest(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -66,7 +64,6 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -100,7 +97,6 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -126,7 +122,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	require.NoError(t, err)
 	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
 
-	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
+	// Non EigenLabs disperser is registered on-chain
 	publicKey1, privateKey1, err := rand.ECDSA()
 	require.NoError(t, err)
 	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
@@ -137,20 +133,13 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	chainReader.Mock.On("GetDisperserAddress", uint32(1234)).Return(
 		nil, errors.New("disperser not found"))
 
-	filterCallCount := atomic.Uint32{}
-
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
 		&chainReader,
 		10,
 		time.Minute,
-		func(id uint32) bool {
-			filterCallCount.Add(1)
-			return id != uint32(1)
-		},
 		start)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), filterCallCount.Load())
 
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
@@ -162,14 +151,16 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
-	require.Equal(t, uint32(2), filterCallCount.Load())
 
 	request.DisperserID = 1
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
-	require.Error(t, err)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	require.NoError(t, err)
+	expectedHash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	request.DisperserID = 1234
 	signature, err = SignStoreChunksRequest(privateKey1, request)
@@ -188,20 +179,19 @@ func TestKeyExpiry(t *testing.T) {
 	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
-	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+	mockChainReader := wmock.MockWriter{}
+	mockChainReader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
-		&chainReader,
+		&mockChainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
 	// Preloading the cache should have grabbed Disperser 0's key
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
@@ -216,7 +206,7 @@ func TestKeyExpiry(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	// Since time hasn't advanced, the authenticator shouldn't have fetched the key again
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	// Move time forward to just before the key expires.
 	now := start.Add(59 * time.Second)
@@ -225,7 +215,7 @@ func TestKeyExpiry(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	// The key should not yet have been fetched again.
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	// Move time forward to just after the key expires.
 	now = now.Add(2 * time.Second)
@@ -234,7 +224,7 @@ func TestKeyExpiry(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	// The key should have been fetched again.
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 2)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 2)
 }
 
 func TestKeyCacheSize(t *testing.T) {
@@ -244,7 +234,7 @@ func TestKeyCacheSize(t *testing.T) {
 
 	cacheSize := rand.Intn(10) + 2
 
-	chainReader := wmock.MockWriter{}
+	mockChainReader := wmock.MockWriter{}
 	keyMap := make(map[uint32]*ecdsa.PrivateKey, cacheSize+1)
 	for i := 0; i < cacheSize+1; i++ {
 		publicKey, privateKey, err := rand.ECDSA()
@@ -252,20 +242,19 @@ func TestKeyCacheSize(t *testing.T) {
 		disperserAddress := crypto.PubkeyToAddress(*publicKey)
 		keyMap[uint32(i)] = privateKey
 
-		chainReader.Mock.On("GetDisperserAddress", uint32(i)).Return(disperserAddress, nil)
+		mockChainReader.Mock.On("GetDisperserAddress", uint32(i)).Return(disperserAddress, nil)
 	}
 
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
-		&chainReader,
+		&mockChainReader,
 		cacheSize,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
 	// The authenticator will preload key 0 into the cache.
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	// Make a request for each key (except for the last one, which won't fit in the cache).
 	for i := 0; i < cacheSize; i++ {
@@ -283,7 +272,7 @@ func TestKeyCacheSize(t *testing.T) {
 	}
 
 	// All keys should have required exactly one read except from 0, which was preloaded.
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
 
 	// Make another request for each key. None should require a read from the chain.
 	for i := 0; i < cacheSize; i++ {
@@ -300,7 +289,7 @@ func TestKeyCacheSize(t *testing.T) {
 		require.Equal(t, expectedHash, hash)
 	}
 
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
 
 	// Make a request for the last key. This should require a read from the chain and will boot key 0 from the cache.
 	request := RandomStoreChunksRequest(rand)
@@ -315,7 +304,7 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
 
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+1)
+	mockChainReader.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+1)
 
 	// Make another request for key 0. This should require a read from the chain.
 	request = RandomStoreChunksRequest(rand)
@@ -330,5 +319,5 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
 
-	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+2)
+	mockChainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+2)
 }

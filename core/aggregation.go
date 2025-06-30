@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ type SigningMessage struct {
 	BatchHeaderHash [32]byte
 	// Undefined if this value <= 0.
 	AttestationLatencyMs float64
+	TimeReceived         time.Time
 	Err                  error
 }
 
@@ -259,7 +261,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"operatorID", operatorIDHex,
 			"operatorAddress", operatorAddr,
 			"socket", socket,
-			"quorumIDs", fmt.Sprint(operatorQuorums),
+			"quorumIDs", fmt.Sprint(operatorQuorums), //nolint:staticcheck // printing byte slices is fine here
 			"batchHeaderHash", batchHeaderHashHex,
 			"attestationLatencyMs", r.AttestationLatencyMs)
 	}
@@ -426,7 +428,7 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
+	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(PercentMultiplier))
 
 	return stakeThreshold
 }
@@ -437,7 +439,7 @@ func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big
 		return 0
 	}
 
-	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
+	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(PercentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())

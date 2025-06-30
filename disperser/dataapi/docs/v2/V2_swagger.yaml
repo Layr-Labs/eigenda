@@ -8,10 +8,16 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   core.G2Point:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -37,6 +43,10 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -57,15 +67,23 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -115,19 +133,6 @@ definitions:
         - $ref: '#/definitions/core.Signature'
         description: Sigma is the aggregate signature of all signers
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BatchHeader:
-    properties:
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
-        type: integer
-    type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobCertificate:
     properties:
       blobHeader:
@@ -161,53 +166,53 @@ definitions:
           type: integer
         type: array
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader:
     properties:
-      BlobKey:
-        items:
-          type: integer
-        type: array
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      blobIndex:
-        type: integer
-      inclusionProof:
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
+      batch_root:
+        type: string
+      reference_block_number:
         type: integer
     type: object
-  github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus:
-    enum:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    type: integer
-    x-enum-varnames:
-    - Queued
-    - Encoded
-    - GatheringSignatures
-    - Complete
-    - Failed
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo:
+    properties:
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
+      blob_index:
+        type: integer
+      blob_key:
+        type: string
+      inclusion_proof:
+        type: string
+    type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata:
+    properties:
+      blob_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
+      blob_size_bytes:
+        type: integer
+      blob_status:
+        type: string
+      expiry_unix_sec:
+        type: integer
+      requested_at:
+        type: integer
+      signature:
+        type: string
+    type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
       attestation_info:
         $ref: '#/definitions/v2.AttestationInfo'
       batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
     type: object
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
+        items:
+          type: integer
+        type: array
+      a1:
         items:
           type: integer
         type: array
@@ -267,7 +272,7 @@ definitions:
       attested_at:
         type: integer
       batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
       batch_header_hash:
         type: string
       quorum_numbers:
@@ -283,9 +288,17 @@ definitions:
     properties:
       batch_header_hash:
         type: string
+      blob_certificates:
+        items:
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate'
+        type: array
       blob_inclusion_infos:
         items:
-          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo'
+        type: array
+      blob_key:
+        items:
+          type: string
         type: array
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
@@ -297,7 +310,7 @@ definitions:
       batch_header_hash:
         type: string
       blob_inclusion_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo'
       blob_key:
         type: string
     type: object
@@ -320,45 +333,7 @@ definitions:
       blob_key:
         type: string
       blob_metadata:
-        $ref: '#/definitions/v2.BlobMetadata'
-    type: object
-  v2.BlobMetadata:
-    properties:
-      blobHeader:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      blobSize:
-        description: BlobSize is the size of the blob in bytes
-        type: integer
-      blobStatus:
-        allOf:
-        - $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus'
-        description: BlobStatus indicates the current status of the blob
-      expiry:
-        description: Expiry is Unix timestamp of the blob expiry in seconds from epoch
-        type: integer
-      fragmentSizeBytes:
-        description: FragmentSizeBytes is the maximum fragment size used to store
-          the chunk coefficients.
-        type: integer
-      numRetries:
-        description: NumRetries is the number of times the blob has been retried
-        type: integer
-      requestedAt:
-        description: RequestedAt is the Unix timestamp of when the blob was requested
-          in nanoseconds
-        type: integer
-      signature:
-        items:
-          type: integer
-        type: array
-      totalChunkSizeBytes:
-        description: TotalChunkSizeBytes is the total size of the file containing
-          all chunk coefficients for the blob.
-        type: integer
-      updatedAt:
-        description: UpdatedAt is the Unix timestamp of when the blob was last updated
-          in _nanoseconds_
-        type: integer
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata'
     type: object
   v2.BlobResponse:
     properties:
@@ -434,7 +409,7 @@ definitions:
   v2.OperatorDispersal:
     properties:
       batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
       batch_header_hash:
         type: string
       dispersed_at:
@@ -518,6 +493,8 @@ definitions:
         type: string
       rank:
         type: integer
+      stake_amount:
+        type: number
       stake_percentage:
         type: number
     type: object

@@ -128,6 +128,7 @@ type (
 		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
+		StakeAmount     float64 `json:"stake_amount"`
 	}
 
 	OperatorsStakeResponse struct {
@@ -245,7 +246,7 @@ func NewServer(
 	eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker,
 	eigenDAHttpServiceChecker EigenDAHttpServiceChecker,
 
-) *server {
+) (*server, error) {
 	// Initialize the health checker service for EigenDA services
 	if grpcConn == nil {
 		grpcConn = &GRPCDialerSkipTLS{}
@@ -260,6 +261,11 @@ func NewServer(
 	}
 
 	l := logger.With("component", "DataAPIServer")
+
+	operatorHandler, err := NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
+	}
 
 	return &server{
 		logger:                    l,
@@ -278,9 +284,9 @@ func NewServer(
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
-		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
+		operatorHandler:           operatorHandler,
 		metricsHandler:            NewMetricsHandler(promClient, V1),
-	}
+	}, nil
 }
 
 func (s *server) Start() error {

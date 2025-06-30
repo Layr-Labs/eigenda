@@ -12,17 +12,24 @@
 name: Buf Proto
 on:
   push:
+    paths:
+      - "api/proto/**"
+      - "api/buf.yaml"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  delete:
+    paths:
+      - "api/proto/**"
+      - "api/buf.yaml"
+
 permissions:
   contents: read
   pull-requests: write
+
 jobs:
   buf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
       - uses: bufbuild/buf-action@v1
         with:
           token: ${{ secrets.BUF_TOKEN }}

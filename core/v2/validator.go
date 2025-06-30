@@ -24,7 +24,7 @@ type ShardValidator interface {
 
 type BlobShard struct {
 	*BlobCertificate
-	Bundles core.Bundles
+	Bundle core.Bundle
 }
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
@@ -44,41 +44,36 @@ func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID, logger l
 	}
 }
 
-func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
-
-	// Check if the operator is a member of the quorum
-	if _, ok := operatorState.Operators[quorum]; !ok {
-		return nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorum)
-	}
+func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) (*Assignment, error) {
 
 	// Get the assignments for the quorum
-	assignment, err := GetAssignment(operatorState, blobParams, quorum, v.operatorID)
+
+	assignment, err := GetAssignmentForBlob(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, v.operatorID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate the number of chunks
-	if assignment.NumChunks == 0 {
-		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorum)
+	if assignment.NumChunks() == 0 {
+		return nil, fmt.Errorf("operator %s has no chunks assigned", v.operatorID.Hex())
 	}
-	if assignment.NumChunks != uint32(len(blob.Bundles[quorum])) {
-		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Bundles[quorum]), assignment.NumChunks, quorum)
+	if assignment.NumChunks() != uint32(len(blob.Bundle)) {
+		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)", len(blob.Bundle), assignment.NumChunks())
 	}
 
 	// Get the chunk length
 	chunkLength, err := GetChunkLength(uint32(blob.BlobHeader.BlobCommitments.Length), blobParams)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
+		return nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
 
-	chunks := blob.Bundles[quorum]
-	for _, chunk := range chunks {
+	for _, chunk := range blob.Bundle {
 		if uint32(chunk.Length()) != chunkLength {
-			return nil, nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d) for quorum %d", ErrChunkLengthMismatch, chunk.Length(), chunkLength, quorum)
+			return nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, chunk.Length(), chunkLength)
 		}
 	}
 
-	return chunks, &assignment, nil
+	return &assignment, nil
 }
 
 func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchHeader, blobCerts []*BlobCertificate) error {
@@ -102,17 +97,6 @@ func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchH
 	return nil
 }
 
-func filterOperatorStateQuorums(operatorState *core.OperatorState, quorums []core.QuorumID) map[core.QuorumID]struct{} {
-	filtered := make(map[core.QuorumID]struct{})
-	for _, quorum := range quorums {
-		if _, ok := operatorState.Operators[quorum]; ok {
-			filtered[quorum] = struct{}{}
-		}
-	}
-
-	return filtered
-}
-
 func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
 	if len(blobs) == 0 {
 		return fmt.Errorf("no blobs")
@@ -127,63 +111,52 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
-		relevantQuorums := filterOperatorStateQuorums(state, blob.BlobHeader.QuorumNumbers)
-		if len(blob.Bundles) != len(relevantQuorums) {
-			return fmt.Errorf("number of bundles (%d) does not match number of relevant quorums (%d)", len(blob.Bundles), len(relevantQuorums))
-		}
 
 		// Saved for the blob length validation
 		blobCommitmentList[k] = blob.BlobHeader.BlobCommitments
 
-		// for each quorum
-		for _, quorum := range blob.BlobHeader.QuorumNumbers {
-			blobParams, ok := blobVersionParams.Get(blob.BlobHeader.BlobVersion)
-			if !ok {
-				return fmt.Errorf("blob version %d not found", blob.BlobHeader.BlobVersion)
-			}
-			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, blobParams, state)
-			if errors.Is(err, ErrBlobQuorumSkip) {
-				v.logger.Warn("Skipping blob for quorum", "quorum", quorum, "err", err)
-				continue
-			} else if err != nil {
-				return err
-			}
+		blobParams, ok := blobVersionParams.Get(blob.BlobHeader.BlobVersion)
+		if !ok {
+			return fmt.Errorf("blob version %d not found", blob.BlobHeader.BlobVersion)
+		}
+		assignment, err := v.validateBlobParams(blob, blobParams, state)
+		if err != nil {
+			return err
+		}
 
-			// TODO: Define params for the blob
-			params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
+		params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
+		if err != nil {
+			return err
+		}
 
-			if err != nil {
-				return err
-			}
+		// Check the received chunks against the commitment
+		blobIndex := 0
+		subBatch, ok := subBatchMap[params]
+		if ok {
+			blobIndex = subBatch.NumBlobs
+		}
 
-			// Check the received chunks against the commitment
-			blobIndex := 0
-			subBatch, ok := subBatchMap[params]
-			if ok {
-				blobIndex = subBatch.NumBlobs
+		indices := assignment.GetIndices()
+		chunks := blob.Bundle
+		samples := make([]encoding.Sample, len(chunks))
+		for ind := range chunks {
+			samples[ind] = encoding.Sample{
+				Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
+				Chunk:           chunks[ind],
+				AssignmentIndex: uint(indices[ind]),
+				BlobIndex:       blobIndex,
 			}
+		}
 
-			indices := assignment.GetIndices()
-			samples := make([]encoding.Sample, len(chunks))
-			for ind := range chunks {
-				samples[ind] = encoding.Sample{
-					Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
-					Chunk:           chunks[ind],
-					AssignmentIndex: uint(indices[ind]),
-					BlobIndex:       blobIndex,
-				}
+		// update subBatch
+		if !ok {
+			subBatchMap[params] = &encoding.SubBatch{
+				Samples:  samples,
+				NumBlobs: 1,
 			}
-
-			// update subBatch
-			if !ok {
-				subBatchMap[params] = &encoding.SubBatch{
-					Samples:  samples,
-					NumBlobs: 1,
-				}
-			} else {
-				subBatch.Samples = append(subBatch.Samples, samples...)
-				subBatch.NumBlobs += 1
-			}
+		} else {
+			subBatch.Samples = append(subBatch.Samples, samples...)
+			subBatch.NumBlobs += 1
 		}
 	}
 

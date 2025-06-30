@@ -67,6 +67,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
+	InternalV2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-dispersal-port"),
+		Usage:    "Port at which node listens for v2 dispersal calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_DISPERSAL_PORT"),
+	}
+	InternalV2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-retrieval-port"),
+		Usage:    "Port at which node listens for v2 retrieval calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_RETRIEVAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -114,7 +126,7 @@ var (
 	}
 	DbPathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "db-path"),
-		Usage:    "Path for level db",
+		Usage:    "Path for level db. This is only used for V1, and will eventually be removed.",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
 	}
@@ -391,17 +403,83 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LevelDBDisableSeeksCompactionV2Flag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v2"),
-		Usage:    "Disable seeks compaction for LevelDB for v2",
+	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
+		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
+			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V2"),
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
 	}
-	LevelDBEnableSyncWritesV2Flag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-sync-writes-v2"),
-		Usage:    "Enable sync writes for LevelDB for v2",
+	LittDBWriteCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V2"),
+		Value:    0.45,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
+	}
+	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
+		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
+			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
+	}
+	LittDBReadCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB read cache.",
+		Required: false,
+		Value:    0.05,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_FRACTION"),
+	}
+	LittDBStoragePathsFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-storage-paths"),
+		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
+	}
+	DownloadPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
+		Usage:    "The size of the download pool. The default value is 16.",
+		Required: false,
+		Value:    16,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
+	}
+	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that hit the cache, unit is MB/s.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksHotBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-burst-limit-mb"),
+		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_BURST_LIMIT_MB"),
+	}
+	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
+		Required: false,
+		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
+		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
+		Required: false,
+		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
+	}
+	GCSafetyBufferSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -496,6 +574,8 @@ var optionalFlags = []cli.Flag{
 	NumBatchDeserializationWorkersFlag,
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
+	InternalV2DispersalPortFlag,
+	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
 	EcdsaKeyFileFlag,
@@ -525,8 +605,17 @@ var optionalFlags = []cli.Flag{
 	StoreChunksRequestMaxFutureAgeFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
-	LevelDBDisableSeeksCompactionV2Flag,
-	LevelDBEnableSyncWritesV2Flag,
+	DownloadPoolSizeFlag,
+	LittDBWriteCacheSizeGBFlag,
+	LittDBReadCacheSizeGBFlag,
+	LittDBWriteCacheSizeFractionFlag,
+	LittDBReadCacheSizeFractionFlag,
+	LittDBStoragePathsFlag,
+	GetChunksHotCacheReadLimitMBFlag,
+	GetChunksHotBurstLimitMBFlag,
+	GetChunksColdCacheReadLimitMBFlag,
+	GetChunksColdBurstLimitMBFlag,
+	GCSafetyBufferSizeGBFlag,
 }
 
 func init() {
