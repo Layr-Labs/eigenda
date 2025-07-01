@@ -61,6 +61,7 @@ If there are imports that are relevant only to a particular part of the project,
    - What is returned in the error case(s)?
    - What side effects does calling the function have?
    - Are there any performance implications that users should be aware of?
+   - Are there any performance optimizations that should/could be undertaken in the future?
 
 ### 3.3. Doc Files
 
