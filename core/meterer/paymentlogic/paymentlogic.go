@@ -11,12 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// GetReservationBinLimit returns the bin limit for a given reservation
-// Note: This is called per-quorum since reservation is for a single quorum.
-func GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
-	return GetBinLimit(reservation.SymbolsPerSecond, reservationWindow)
-}
-
 // GetBinLimit returns the bin limit given the bin interval and the symbols per second
 func GetBinLimit(symbolsPerSecond uint64, binInterval uint64) uint64 {
 	if symbolsPerSecond == 0 || binInterval == 0 {
