@@ -226,7 +226,7 @@ func buildEigenDAV2Backend(
 		return memstore_v2.New(ctx, log, config.MemstoreConfig, kzgProver.Srs.G1)
 	}
 
-	ethClient, err := buildEthClient(log, secrets)
+	ethClient, err := buildEthClient(ctx, log, secrets, config.ClientConfigV2.EigenDANetwork)
 	if err != nil {
 		return nil, fmt.Errorf("build eth client: %w", err)
 	}
@@ -389,7 +389,8 @@ func buildEigenDAV1Backend(
 	)
 }
 
-func buildEthClient(log logging.Logger, secretConfigV2 common.SecretConfigV2) (common_eigenda.EthClient, error) {
+func buildEthClient(ctx context.Context, log logging.Logger, secretConfigV2 common.SecretConfigV2,
+	expectedNetwork common.EigenDANetwork) (common_eigenda.EthClient, error) {
 	gethCfg := geth.EthClientConfig{
 		RPCURLs: []string{secretConfigV2.EthRPCURL},
 	}
@@ -397,6 +398,30 @@ func buildEthClient(log logging.Logger, secretConfigV2 common.SecretConfigV2) (c
 	ethClient, err := geth.NewClient(gethCfg, geth_common.Address{}, 0, log)
 	if err != nil {
 		return nil, fmt.Errorf("create geth client: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain ID from ETH RPC: %w", err)
+	}
+
+	log.Infof("Using chain id: %d", chainID.Uint64())
+
+	// Validate that the chain ID matches the expected network
+	if expectedNetwork != "" {
+		actualNetworks, err := common.EigenDANetworksFromChainID(chainID.String())
+		if err != nil {
+			return nil, fmt.Errorf("unknown chain ID %s: %w", chainID.String(), err)
+		}
+		if !slices.Contains(actualNetworks, expectedNetwork) {
+			return nil, fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC "+
+				"returned chain ID %s which corresponds to %s",
+				expectedNetwork, chainID.String(), actualNetworks)
+		}
+
+		log.Infof("Detected EigenDA network: %s. Will use for reading network default values if overrides "+
+			"aren't provided.", expectedNetwork.String())
 	}
 
 	return ethClient, nil

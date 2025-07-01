@@ -272,6 +272,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDAServiceManagerAddr:          serviceManagerAddress,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
+		EigenDANetwork:                     eigenDANetwork,
 	}, nil
 }
 
