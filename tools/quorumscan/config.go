@@ -28,7 +28,7 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	AddressDirectoryAddr          string
+	AddressDirectoryAddr string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -45,14 +45,14 @@ func ReadConfig(ctx *cli.Context) *Config {
 	}
 
 	return &Config{
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
-		QuorumIDs:                     quorumIDs,
-		BlockNumber:                   ctx.Uint64(flags.BlockNumberFlag.Name),
-		TopN:                          ctx.Uint(flags.TopNFlag.Name),
-		OutputFormat:                  ctx.String(flags.OutputFormatFlag.Name),
-		OutputFile:                    ctx.String(flags.OutputFileFlag.Name),
+		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:      geth.ReadEthClientConfig(ctx),
+		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		QuorumIDs:            quorumIDs,
+		BlockNumber:          ctx.Uint64(flags.BlockNumberFlag.Name),
+		TopN:                 ctx.Uint(flags.TopNFlag.Name),
+		OutputFormat:         ctx.String(flags.OutputFormatFlag.Name),
+		OutputFile:           ctx.String(flags.OutputFileFlag.Name),
 	}
 }
 

@@ -17,7 +17,7 @@ type Config struct {
 	MetricsConfig    MetricsConfig
 	ChainStateConfig thegraph.Config
 
-	AddressDirectoryAddr          string
+	AddressDirectoryAddr string
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -36,12 +36,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		LoggerConfig:                  *loggerConfig,
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		AddressDirectoryAddr:          addressDirectoryAddr,
-		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
-		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
+		EthClientConfig:       geth.ReadEthClientConfig(ctx),
+		LoggerConfig:          *loggerConfig,
+		ChainStateConfig:      thegraph.ReadCLIConfig(ctx),
+		AddressDirectoryAddr:  addressDirectoryAddr,
+		PerPublicKeyRateLimit: ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
+		ChurnApprovalInterval: ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),

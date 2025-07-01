@@ -34,9 +34,9 @@ type Config struct {
 	RelayConfig relay.Config
 
 	// Configuration for the graph indexer.
-	EthClientConfig               geth.EthClientConfig
-	AddressDirectoryAddr          string
-	ChainStateConfig              thegraph.Config
+	EthClientConfig      geth.EthClientConfig
+	AddressDirectoryAddr string
+	ChainStateConfig     thegraph.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -107,9 +107,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnablePprof:   ctx.Bool(flags.EnablePprofFlag.Name),
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
-		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
-		AddressDirectoryAddr:          addressDirectoryAddr,
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:      geth.ReadEthClientConfigRPCOnly(ctx),
+		AddressDirectoryAddr: addressDirectoryAddr,
+		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {
 		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)

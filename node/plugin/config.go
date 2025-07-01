@@ -135,22 +135,22 @@ var (
 )
 
 type Config struct {
-	PubIPProvider                 string
-	Operation                     string
-	EcdsaKeyFile                  string
-	BlsKeyFile                    string
-	EcdsaKeyPassword              string
-	BlsKeyPassword                string
-	BLSRemoteSignerUrl            string
-	BLSPublicKeyHex               string
-	BLSSignerCertFile             string
-	Socket                        string
-	QuorumIDList                  []core.QuorumID
-	ChainRpcUrl                   string
-	AddressDirectoryAddr          string
-	ChurnerUrl                    string
-	NumConfirmations              int
-	BLSSignerAPIKey               string
+	PubIPProvider        string
+	Operation            string
+	EcdsaKeyFile         string
+	BlsKeyFile           string
+	EcdsaKeyPassword     string
+	BlsKeyPassword       string
+	BLSRemoteSignerUrl   string
+	BLSPublicKeyHex      string
+	BLSSignerCertFile    string
+	Socket               string
+	QuorumIDList         []core.QuorumID
+	ChainRpcUrl          string
+	AddressDirectoryAddr string
+	ChurnerUrl           string
+	NumConfirmations     int
+	BLSSignerAPIKey      string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -184,21 +184,21 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		PubIPProvider:                 ctx.GlobalString(PubIPProviderFlag.Name),
-		Operation:                     op,
-		EcdsaKeyPassword:              ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
-		BlsKeyPassword:                ctx.GlobalString(BlsKeyPasswordFlag.Name),
-		EcdsaKeyFile:                  ctx.GlobalString(EcdsaKeyFileFlag.Name),
-		BlsKeyFile:                    ctx.GlobalString(BlsKeyFileFlag.Name),
-		BLSRemoteSignerUrl:            ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:               ctx.GlobalString(BLSPublicKeyHexFlag.Name),
-		BLSSignerCertFile:             ctx.GlobalString(BLSSignerCertFileFlag.Name),
-		Socket:                        ctx.GlobalString(SocketFlag.Name),
-		QuorumIDList:                  ids,
-		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
-		AddressDirectoryAddr:          addressDirectoryAddr,
-		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
-		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
-		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
+		PubIPProvider:        ctx.GlobalString(PubIPProviderFlag.Name),
+		Operation:            op,
+		EcdsaKeyPassword:     ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
+		BlsKeyPassword:       ctx.GlobalString(BlsKeyPasswordFlag.Name),
+		EcdsaKeyFile:         ctx.GlobalString(EcdsaKeyFileFlag.Name),
+		BlsKeyFile:           ctx.GlobalString(BlsKeyFileFlag.Name),
+		BLSRemoteSignerUrl:   ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:      ctx.GlobalString(BLSPublicKeyHexFlag.Name),
+		BLSSignerCertFile:    ctx.GlobalString(BLSSignerCertFileFlag.Name),
+		Socket:               ctx.GlobalString(SocketFlag.Name),
+		QuorumIDList:         ids,
+		ChainRpcUrl:          ctx.GlobalString(ChainRpcUrlFlag.Name),
+		AddressDirectoryAddr: addressDirectoryAddr,
+		ChurnerUrl:           ctx.GlobalString(ChurnerUrlFlag.Name),
+		NumConfirmations:     ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:      ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }

@@ -32,7 +32,7 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 
-	AddressDirectoryAddr          string
+	AddressDirectoryAddr string
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -62,15 +62,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoTableNameFlag.Name),
 		},
-		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
-		EthClientConfig:               ethClientConfig,
-		LoggerConfig:                  *loggerConfig,
-		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
-		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
-		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
-		AddressDirectoryAddr:          addressDirectoryAddr,
-		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
-		ServerVersion:                 version,
+		AwsClientConfig:              aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		EthClientConfig:              ethClientConfig,
+		LoggerConfig:                 *loggerConfig,
+		SocketAddr:                   ctx.GlobalString(flags.SocketAddrFlag.Name),
+		SubgraphApiBatchMetadataAddr: ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
+		SubgraphApiOperatorStateAddr: ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
+		AddressDirectoryAddr:         addressDirectoryAddr,
+		ServerMode:                   ctx.GlobalString(flags.ServerModeFlag.Name),
+		ServerVersion:                version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),

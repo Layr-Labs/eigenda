@@ -16,19 +16,19 @@ type Config struct {
 	First            uint
 	Skip             uint
 
-	EthClientConfig               geth.EthClientConfig
-	AddressDirectoryAddr          string
+	EthClientConfig      geth.EthClientConfig
+	AddressDirectoryAddr string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Days:                          ctx.Int(flags.DaysFlag.Name),
-		OperatorId:                    ctx.String(flags.OperatorIdFlag.Name),
-		SubgraphEndpoint:              ctx.String(flags.SubgraphEndpointFlag.Name),
-		First:                         ctx.Uint(flags.FirstFlag.Name),
-		Skip:                          ctx.Uint(flags.SkipFlag.Name),
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		Days:                 ctx.Int(flags.DaysFlag.Name),
+		OperatorId:           ctx.String(flags.OperatorIdFlag.Name),
+		SubgraphEndpoint:     ctx.String(flags.SubgraphEndpointFlag.Name),
+		First:                ctx.Uint(flags.FirstFlag.Name),
+		Skip:                 ctx.Uint(flags.SkipFlag.Name),
+		EthClientConfig:      geth.ReadEthClientConfig(ctx),
+		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
 	}
 }
 

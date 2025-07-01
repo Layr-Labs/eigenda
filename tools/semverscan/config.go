@@ -21,18 +21,18 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	AddressDirectoryAddr          string
+	AddressDirectoryAddr string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
-		Workers:                       ctx.Int(flags.WorkersFlag.Name),
-		OperatorId:                    ctx.String(flags.OperatorIdFlag.Name),
-		UseRetrievalClient:            ctx.Bool(flags.UseRetrievalClientFlag.Name),
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		Timeout:              ctx.Duration(flags.TimeoutFlag.Name),
+		Workers:              ctx.Int(flags.WorkersFlag.Name),
+		OperatorId:           ctx.String(flags.OperatorIdFlag.Name),
+		UseRetrievalClient:   ctx.Bool(flags.UseRetrievalClientFlag.Name),
+		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:      geth.ReadEthClientConfig(ctx),
+		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
 	}
 }
 
