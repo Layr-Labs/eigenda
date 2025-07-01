@@ -1,4 +1,4 @@
-import { newMockEvent, newMockCall } from "matchstick-as"
+import { newMockEvent } from "matchstick-as"
 import { ethereum, BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
 import { NewPubkeyRegistration as NewPubkeyRegistrationEvent, NewPubkeyRegistrationPubkeyG1Struct, NewPubkeyRegistrationPubkeyG2Struct } from "../generated/BLSApkRegistry_Operator/BLSApkRegistry"
 import { OperatorRegistered as OperatorRegisteredEvent, OperatorDeregistered as OperatorDeregisteredEvent } from "../generated/RegistryCoordinator_Operator/RegistryCoordinator"
@@ -108,12 +108,17 @@ export function createNewOperatorDeregisteredEvent(
   return newOperatorDeregisteredEvent
 }
 
-export function createNewOperatorEjectedEvent(operator: Address): OperatorEjected {
-  let newOperatorEjectedEvent = changetype<OperatorEjected>(newMockCall())
+export function createNewOperatorEjectedEvent(operatorId: Bytes, quorumNumber: number): OperatorEjected {
+  let newOperatorEjectedEvent = changetype<OperatorEjected>(newMockEvent())
   newOperatorEjectedEvent.parameters = new Array()
 
-  let operatorParam = new ethereum.EventParam("operator", ethereum.Value.fromAddress(operator))
-  newOperatorEjectedEvent.parameters.push(operatorParam)
+  newOperatorEjectedEvent.parameters.push(
+    new ethereum.EventParam("operatorId", ethereum.Value.fromFixedBytes(operatorId))
+  )
+  
+  newOperatorEjectedEvent.parameters.push(
+    new ethereum.EventParam("quorumNumber", ethereum.Value.fromI32(quorumNumber as i32))
+  )
 
   return newOperatorEjectedEvent
 }

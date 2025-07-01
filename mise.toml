@@ -17,6 +17,9 @@ golangci-lint = "2.1.6"
 node = "20.18.1"
 yarn = "1.22.22"
 
+# Used by the /preprocess-logs claude code slash command
+ripgrep = "latest"
+
 # Forge Dependencies
 forge = "v1.0.0"
 cast = "v1.0.0"

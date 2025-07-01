@@ -25,6 +25,7 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
         }
 
         key.setAddress(value);
+        AddressDirectoryLib.registerKey(name);
 
         emit AddressAdded(name, key, value);
     }
@@ -71,5 +72,13 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
     /// @inheritdoc IEigenDADirectory
     function getAddress(bytes32 key) external view returns (address) {
         return key.getAddress();
+    }
+
+    function getName(bytes32 key) external view returns (string memory) {
+        return AddressDirectoryLib.getName(key);
+    }
+
+    function getAllNames() external view returns (string[] memory) {
+        return AddressDirectoryLib.getNameList();
     }
 }
