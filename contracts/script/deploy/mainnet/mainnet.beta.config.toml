@@ -1,7 +1,7 @@
 ### CORE ###
 
 # This address gets all privileges at the end of the deployment.
-initialOwner = "0x002721B4790d97dC140a049936aA710152Ba92D5"
+initialOwner = "0x002721B4790d97dC140a049936aA710152Ba92D5" # DA Ops Multisig
 
 # Parameters shared across various deployed contracts
 [initParams.shared]
@@ -61,7 +61,9 @@ quorumEjectionParams = [
 
 # Parameters for the Threshold Registry contract
 [initParams.eigenDA.thresholdRegistry]
+# Hex format to match current on-chain format
 quorumAdversaryThresholdPercentages = "0x212121"
+# Hex format to match current on-chain format
 quorumConfirmationThresholdPercentages = "0x373737"
 quorumNumbersRequired = "0x0001"
 versionedBlobParams = [
