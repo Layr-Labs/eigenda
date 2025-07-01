@@ -94,27 +94,19 @@ func NewReaderWithAddressDirectory(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	addressDirectoryAddr := gethcommon.HexToAddress(addressDirectoryHexAddr)
-	addressDirectory, err := eigendadirectory.NewContractIEigenDADirectory(addressDirectoryAddr, client)
+	addressReader, err := NewAddressDirectoryReader(addressDirectoryHexAddr, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch EigenDADirectory contract: %w", err)
+		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 	}
 
-	// Convert contract names to keccak256 hashes as expected by the contract
-	blsOperatorStateRetrieverAddr, err := addressDirectory.GetAddress0(&bind.CallOpts{}, ContractNames.OperatorStateRetriever)
+	blsOperatorStateRetrieverAddr, err := addressReader.GetOperatorStateRetrieverAddress()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator state retriever address: %w", err)
-	}
-	if blsOperatorStateRetrieverAddr == gethcommon.HexToAddress("0x0") {
-		return nil, fmt.Errorf("operator state retriever address not found in address directory")
+		return nil, err
 	}
 
-	eigenDAServiceManagerAddr, err := addressDirectory.GetAddress0(&bind.CallOpts{}, ContractNames.ServiceManager)
+	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get service manager address: %w", err)
-	}
-	if eigenDAServiceManagerAddr == gethcommon.HexToAddress("0x0") {
-		return nil, fmt.Errorf("service manager address not found in address directory")
+		return nil, err
 	}
 
 	err = e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
