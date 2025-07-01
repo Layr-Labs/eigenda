@@ -83,11 +83,7 @@ func RunController(ctx *cli.Context) error {
 		return err
 	}
 	var chainReader *eth.Reader
-	if config.AddressDirectoryAddr != "" {
-		chainReader, err = eth.NewReaderWithAddressDirectory(logger, gethClient, config.AddressDirectoryAddr)
-	} else {
-		chainReader, err = eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	chainReader, err = eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
 	if err != nil {
 		return err
 	}
@@ -164,7 +160,7 @@ func RunController(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			gethClient,
 			rpcClient,
-			config.EigenDAServiceManagerAddr,
+			config.AddressDirectoryAddr,
 			logger,
 		)
 		if err != nil {

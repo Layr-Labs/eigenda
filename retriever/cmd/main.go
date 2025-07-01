@@ -91,14 +91,21 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	var tx *eth.Reader
-	if config.AddressDirectoryAddr != "" {
-		tx, err = eth.NewReaderWithAddressDirectory(logger, gethClient, config.AddressDirectoryAddr)
-	} else {
-		tx, err = eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
+
+	// Get service manager address from address directory for backward compatibility
+	addressReader, err := eth.NewAddressDirectoryReader(config.AddressDirectoryAddr, gethClient)
+	if err != nil {
+		log.Fatalln("could not create address directory reader", err)
+	}
+	serviceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	if err != nil {
+		log.Fatalln("could not get service manager address from address directory", err)
+	}
+	config.EigenDAServiceManagerAddr = serviceManagerAddr.Hex()
 	cs := eth.NewChainState(tx, gethClient)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)

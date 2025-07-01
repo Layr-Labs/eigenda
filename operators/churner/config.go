@@ -18,8 +18,6 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
-	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -31,11 +29,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	// Validate address configuration: either use address directory (preferred) or legacy individual addresses
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return nil, err
 	}
 
@@ -44,8 +40,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LoggerConfig:                  *loggerConfig,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		AddressDirectoryAddr:          addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{

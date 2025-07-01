@@ -93,11 +93,7 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	var reader *coreeth.Reader
-	if config.AddressDirectoryAddr != "" {
-		reader, err = coreeth.NewReaderWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
-	} else {
-		reader, err = coreeth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	reader, err = coreeth.NewReader(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}

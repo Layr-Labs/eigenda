@@ -36,8 +36,6 @@ type Config struct {
 	UseGraph                            bool
 
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
@@ -102,8 +100,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		UseGraph:                       ctx.GlobalBool(flags.UseGraphFlag.Name),
 
 		AddressDirectoryAddr:          ctx.GlobalString(flags.AddressDirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
@@ -112,7 +108,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
 	}
 
-	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr); err != nil {
 		return Config{}, err
 	}
 

@@ -32,18 +32,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "GRPC_PORT"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever (legacy - use address-directory instead)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager (legacy - use address-directory instead)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
-	}
 	AddressDirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
 		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
@@ -88,8 +76,6 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	AddressDirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	PerPublicKeyRateLimit,
 	MetricsHTTPPort,
 	ChurnApprovalInterval,

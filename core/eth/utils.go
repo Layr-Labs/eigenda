@@ -212,21 +212,9 @@ var ContractNames = struct {
 
 // ValidateAddressConfig validates that either address directory is provided OR both individual addresses are provided
 // and that all provided addresses are valid hex addresses.
-func ValidateAddressConfig(addressDirectory, blsOperatorStateRetriever, eigenDAServiceManager string) error {
-	// Check that either address directory is provided OR both individual addresses are provided
-	if addressDirectory == "" && (blsOperatorStateRetriever == "" || eigenDAServiceManager == "") {
-		return fmt.Errorf("either address-directory must be provided, or both bls-operator-state-retriever and eigenda-service-manager addresses must be provided")
-	}
-
-	// Validate address formats
+func ValidateAddressConfig(addressDirectory string) error {
 	if addressDirectory != "" && !gethcommon.IsHexAddress(addressDirectory) {
 		return fmt.Errorf("address-directory must be a valid hex address")
-	}
-	if blsOperatorStateRetriever != "" && !gethcommon.IsHexAddress(blsOperatorStateRetriever) {
-		return fmt.Errorf("bls-operator-state-retriever must be a valid hex address")
-	}
-	if eigenDAServiceManager != "" && !gethcommon.IsHexAddress(eigenDAServiceManager) {
-		return fmt.Errorf("eigenda-service-manager must be a valid hex address")
 	}
 
 	return nil

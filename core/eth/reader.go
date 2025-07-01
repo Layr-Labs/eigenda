@@ -68,25 +68,6 @@ var _ core.Reader = (*Reader)(nil)
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
-	blsOperatorStateRetrieverHexAddr string,
-	eigenDAServiceManagerHexAddr string) (*Reader, error) {
-
-	e := &Reader{
-		ethClient: client,
-		logger:    logger.With("component", "Reader"),
-	}
-
-	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
-
-	return e, err
-}
-
-// NewReaderWithAddressDirectory creates a new Reader using an address directory contract address
-func NewReaderWithAddressDirectory(
-	logger logging.Logger,
-	client common.EthClient,
 	addressDirectoryHexAddr string) (*Reader, error) {
 
 	e := &Reader{

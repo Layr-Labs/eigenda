@@ -21,8 +21,7 @@ type Config struct {
 	Timeout                       time.Duration
 	NumConnections                int
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	EigenDAServiceManagerAddr     string // Populated from address directory
 
 	EigenDAVersion int
 }
@@ -37,11 +36,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	// Validate that either address directory is provided OR both individual addresses are provided
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return nil, err
 	}
 
@@ -55,8 +52,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
 		NumConnections:                ctx.Int(flags.NumConnectionsFlag.Name),
 		AddressDirectoryAddr:          addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		EigenDAVersion:                version,
 	}, nil
 }

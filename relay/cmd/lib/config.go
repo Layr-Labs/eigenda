@@ -36,8 +36,6 @@ type Config struct {
 	// Configuration for the graph indexer.
 	EthClientConfig               geth.EthClientConfig
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
 	ChainStateConfig              thegraph.Config
 }
 
@@ -52,11 +50,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("no relay keys specified")
 	}
 
-	// Validate that either address directory is provided OR both individual addresses are provided
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.String(flags.AddressDirectoryAddrFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name)
-	eigenDAServiceManagerAddr := ctx.String(flags.EigenDAServiceManagerAddrFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return Config{}, err
 	}
 
@@ -113,8 +109,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		AddressDirectoryAddr:          addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {

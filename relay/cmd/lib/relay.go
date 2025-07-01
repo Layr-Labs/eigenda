@@ -56,11 +56,7 @@ func RunRelay(ctx *cli.Context) error {
 	}
 
 	var tx *eth.Writer
-	if config.AddressDirectoryAddr != "" {
-		tx, err = eth.NewWriterWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
-	} else {
-		tx, err = eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = eth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}

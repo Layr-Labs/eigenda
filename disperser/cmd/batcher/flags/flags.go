@@ -42,18 +42,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever (legacy - use address-directory instead)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager (legacy - use address-directory instead)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
-	}
 	EncoderSocket = cli.StringFlag{
 		Name:     "encoder-socket",
 		Usage:    "the http ip:port which the distributed encoder server is listening",
@@ -232,8 +220,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
 	PullIntervalFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
+
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,

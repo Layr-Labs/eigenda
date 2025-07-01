@@ -180,11 +180,7 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 	var tx *coreeth.Writer
-	if config.AddressDirectoryAddr != "" {
-		tx, err = coreeth.NewWriterWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
-	} else {
-		tx, err = coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = coreeth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return err
 	}
@@ -218,7 +214,7 @@ func RunBatcher(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			client,
 			rpcClient,
-			config.EigenDAServiceManagerAddr,
+			config.AddressDirectoryAddr,
 			logger,
 		)
 		if err != nil {

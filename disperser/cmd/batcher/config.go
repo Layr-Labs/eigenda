@@ -31,8 +31,6 @@ type Config struct {
 	IndexerDataDir string
 
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
-	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	EnableGnarkBundleEncoding bool
 }
@@ -48,11 +46,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
 
-	// Validate address configuration: either use address directory (preferred) or legacy individual addresses
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return Config{}, err
 	}
 
@@ -95,8 +91,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
 		AddressDirectoryAddr:          addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,

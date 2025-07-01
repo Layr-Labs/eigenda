@@ -113,18 +113,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHAIN_RPC"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     "bls-operator-state-retriever",
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     "eigenda-service-manager",
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
-	}
 	AddressDirectoryFlag = cli.StringFlag{
 		Name:     "address-directory",
 		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
@@ -160,8 +148,6 @@ type Config struct {
 	QuorumIDList                  []core.QuorumID
 	ChainRpcUrl                   string
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
 	ChurnerUrl                    string
 	NumConfirmations              int
 	BLSSignerAPIKey               string
@@ -189,12 +175,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, errors.New("unsupported operation type")
 	}
 
-	// Validate that either address directory is provided OR both individual addresses are provided
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(EigenDAServiceManagerFlag.Name)
 
-	err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	err := eth.ValidateAddressConfig(addressDirectoryAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -212,9 +196,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Socket:                        ctx.GlobalString(SocketFlag.Name),
 		QuorumIDList:                  ids,
 		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
-		AddressDirectoryAddr:          ctx.GlobalString(AddressDirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:          addressDirectoryAddr,
 		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
 		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
 		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),

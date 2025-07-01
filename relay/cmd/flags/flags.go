@@ -208,18 +208,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY_ADDR"),
 	}
-	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "Address of the BLS operator state retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
-	}
-	EigenDAServiceManagerAddrFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigen-da-service-manager-addr"),
-		Usage:    "Address of the Eigen DA service manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
-	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
 		Usage:    "Max number of items in the authentication key cache",
@@ -379,8 +367,6 @@ var optionalFlags = []cli.Flag{
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
 	AddressDirectoryAddrFlag,
-	BlsOperatorStateRetrieverAddrFlag,
-	EigenDAServiceManagerAddrFlag,
 }
 
 var Flags []cli.Flag

@@ -33,8 +33,6 @@ type Config struct {
 	AllowOrigins                 []string
 
 	AddressDirectoryAddr          string
-	BLSOperatorStateRetrieverAddr string // Legacy field, use AddressDirectoryAddr instead
-	EigenDAServiceManagerAddr     string // Legacy field, use AddressDirectoryAddr instead
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -53,12 +51,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
 
-	// Validate address configuration using shared validation
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
 
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return Config{}, err
 	}
 	config := Config{
@@ -73,8 +69,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
 		AddressDirectoryAddr:          addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     eigenDAServiceManagerAddr,
 		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
 		ServerVersion:                 version,
 		PrometheusConfig: prometheus.Config{

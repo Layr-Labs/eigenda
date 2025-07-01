@@ -88,11 +88,7 @@ func RunDataApi(ctx *cli.Context) error {
 	}
 
 	var tx *coreeth.Reader
-	if config.AddressDirectoryAddr != "" {
-		tx, err = coreeth.NewReaderWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
-	} else {
-		tx, err = coreeth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = coreeth.NewReader(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return err
 	}

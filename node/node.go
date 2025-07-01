@@ -124,11 +124,7 @@ func NewNode(
 
 	// Create Transactor
 	var tx *eth.Writer
-	if config.AddressDirectoryAddr != "" {
-		tx, err = eth.NewWriterWithAddressDirectory(logger, client, config.AddressDirectoryAddr)
-	} else {
-		tx, err = eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = eth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +209,16 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}
 
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	// Get service manager address from address directory
+	addressReader, err := eth.NewAddressDirectoryReader(config.AddressDirectoryAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+	}
+	serviceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address: %w", err)
+	}
+	eigenDAServiceManagerAddr := serviceManagerAddr
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -234,7 +239,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr,
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)

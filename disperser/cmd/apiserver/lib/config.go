@@ -49,8 +49,6 @@ type Config struct {
 	OnchainStateRefreshInterval time.Duration
 
 	AddressDirectoryAddr            string
-	BLSOperatorStateRetrieverAddr   string
-	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
 
@@ -98,11 +96,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		}
 	}
 
-	// Validate that either address directory is provided OR both individual addresses are provided
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-	err = eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	err = eth.ValidateAddressConfig(addressDirectoryAddr)
 	if err != nil {
 		return Config{}, err
 	}
@@ -143,8 +139,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		AddressDirectoryAddr:            addressDirectoryAddr,
-		BLSOperatorStateRetrieverAddr:   blsOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:       eigenDAServiceManagerAddr,
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),

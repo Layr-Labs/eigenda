@@ -28,12 +28,11 @@ import (
 // These constants are specific to the EigenDA holesky testnet. To execute the provided examples on a different
 // network, you will need to set these constants to the correct values, based on the chosen network.
 const (
-	ethRPCURL                  = "https://ethereum-holesky-rpc.publicnode.com"
-	disperserHostname          = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierRouterAddress  = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
-	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
-	addressDirectoryAddress    = "0x0000000000000000000000000000000000000000" // TODO: Replace with actual EigenDADirectory address when deployed
-	// Legacy addresses (use addressDirectoryAddress instead when available)
+	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
+	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
+	certVerifierRouterAddress        = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
+	registryCoordinatorAddress       = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
+	addressDirectoryAddress          = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 	eigenDAServiceManagerAddress     = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 )
@@ -331,21 +330,10 @@ func createKzgConfig() kzg.KzgConfig {
 }
 
 func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Reader, error) {
-	// Prefer address directory when available
-	if addressDirectoryAddress != "0x0000000000000000000000000000000000000000" {
-		ethReader, err := eth.NewReaderWithAddressDirectory(logger, ethClient, addressDirectoryAddress)
-		if err != nil {
-			return nil, fmt.Errorf("new reader with address directory: %w", err)
-		}
-		return ethReader, nil
-	}
-
-	// Fallback to legacy approach
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		blsOperatorStateRetrieverAddress,
-		eigenDAServiceManagerAddress,
+		addressDirectoryAddress,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader legacy: %w", err)

@@ -48,21 +48,9 @@ var (
 	}
 	AddressDirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
-	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
@@ -300,8 +288,6 @@ var optionalFlags = []cli.Flag{
 	NtpSyncIntervalFlag,
 	ReservedOnly,
 	AddressDirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

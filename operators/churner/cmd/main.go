@@ -74,11 +74,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	var tx *coreeth.Writer
-	if config.AddressDirectoryAddr != "" {
-		tx, err = coreeth.NewWriterWithAddressDirectory(logger, gethClient, config.AddressDirectoryAddr)
-	} else {
-		tx, err = coreeth.NewWriter(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
-	}
+	tx, err = coreeth.NewWriter(logger, gethClient, config.AddressDirectoryAddr)
 	if err != nil {
 		log.Fatalln("could not create new transactor", err)
 	}

@@ -68,8 +68,6 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	AddressDirectoryAddr            string
-	BLSOperatorStateRetrieverAddr   string // Legacy field, use AddressDirectoryAddr instead
-	EigenDAServiceManagerAddr       string // Legacy field, use AddressDirectoryAddr instead
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string
@@ -295,11 +293,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	v1Enabled := runtimeMode == flags.ModeV1Only || runtimeMode == flags.ModeV1AndV2
 	v2Enabled := runtimeMode == flags.ModeV2Only || runtimeMode == flags.ModeV1AndV2
 
-	// Validate address configuration: either use address directory (preferred) or legacy individual addresses
+	// Validate address directory configuration
 	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	blsOperatorStateRetrieverAddr := ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name)
-	eigenDAServiceManagerAddr := ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr, blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr); err != nil {
+	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
 		return nil, err
 	}
 
@@ -368,9 +364,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EthClientConfig:                     ethClientConfig,
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
-		AddressDirectoryAddr:                ctx.GlobalString(flags.AddressDirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		AddressDirectoryAddr:                addressDirectoryAddr,
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),

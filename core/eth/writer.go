@@ -34,38 +34,13 @@ type Writer struct {
 
 var _ core.Writer = (*Writer)(nil)
 
-// NewWriter creates a new Writer using individual contract addresses (deprecated, use NewWriter instead)
+// NewWriter creates a new Writer using an address directory contract address
 func NewWriter(
-	logger logging.Logger,
-	client common.EthClient,
-	blsOperatorStateRetrieverHexAddr string,
-	eigenDAServiceManagerHexAddr string) (*Writer, error) {
-
-	r := &Reader{
-		ethClient: client,
-		logger:    logger.With("component", "Reader"),
-	}
-
-	e := &Writer{
-		ethClient: client,
-		logger:    logger.With("component", "Writer"),
-		Reader:    r,
-	}
-
-	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
-
-	return e, err
-}
-
-// NewWriterWithAddressDirectory creates a new Writer using an address directory contract address
-func NewWriterWithAddressDirectory(
 	logger logging.Logger,
 	client common.EthClient,
 	addressDirectoryHexAddr string) (*Writer, error) {
 
-	r, err := NewReaderWithAddressDirectory(logger, client, addressDirectoryHexAddr)
+	r, err := NewReader(logger, client, addressDirectoryHexAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
 	}
