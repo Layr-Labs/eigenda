@@ -300,6 +300,15 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
 	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	onDemandQuorumNumbers, err := s.meterer.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
+	if err != nil {
+		s.logger.Warn("failed to get on-demand quorum numbers, use default", "err", err, "defaultRequiredQuorums", []uint8{0, 1})
+		onDemandQuorumNumbers = []uint8{0, 1} // default to 0 and 1 if not available
+	}
+	onDemandQuorumNumbersUint32 := make([]uint32, len(onDemandQuorumNumbers))
+	for i, v := range onDemandQuorumNumbers {
+		onDemandQuorumNumbersUint32[i] = uint32(v)
+	}
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
@@ -353,7 +362,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		MinNumSymbols:          minNumSymbols,
 		PricePerSymbol:         pricePerSymbol,
 		ReservationWindow:      reservationWindow,
-		OnDemandQuorumNumbers:  []uint32{0, 1},
+		OnDemandQuorumNumbers:  onDemandQuorumNumbersUint32,
 	}
 
 	// build reply
