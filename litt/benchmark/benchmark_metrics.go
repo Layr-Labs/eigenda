@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -182,8 +183,14 @@ func (m *metrics) logMetrics() {
 		readThroughput = uint64(float64(m.bytesRead.Load()) / elapsedTimeSeconds)
 	}
 
+	totalTime := ""
+	if m.config.TimeLimitSeconds > 0 {
+		totalTime = fmt.Sprintf(" / %s",
+			util.PrettyPrintTime(uint64(m.config.TimeLimitSeconds*float64(time.Second))))
+	}
+
 	m.logger.Infof("Benchmark Metrics (since most recent restart):\n"+
-		"    Elapsed Time:           %s\n\n"+
+		"    Elapsed Time:           %s%s\n\n"+
 		"    Write Throughput:       %s/s\n"+
 		"    Bytes Written:          %s\n"+
 		"    Write Count:            %s\n"+
@@ -198,6 +205,7 @@ func (m *metrics) logMetrics() {
 		"    Average Flush Latency:  %s\n"+
 		"    Longest Flush Duration: %s",
 		util.PrettyPrintTime(elapsedTimeNanoseconds),
+		totalTime,
 		util.PrettyPrintBytes(writeThroughput),
 		util.PrettyPrintBytes(bytesWritten),
 		util.CommaOMatic(writeCount),

@@ -1,10 +1,14 @@
 package litt
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
 )
+
+// TableNameRegex is a regular expression that matches valid table names.
+var TableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // Table is a key-value store with a namespace that does not overlap with other tables.
 // Values may be written to the table, but once written, they may not be changed or deleted (except via TTL).
@@ -114,6 +118,11 @@ type Table interface {
 	// of key length and the value length. Note that the actual in-memory footprint of the cache will be slightly
 	// larger than the cache size due to implementation overhead (e.g. pointers, slice headers, map entries, etc.).
 	SetReadCacheSize(size uint64) error
+}
+
+// isTableNameValid returns true if the table name is valid.
+func IsTableNameValid(name string) bool {
+	return TableNameRegex.MatchString(name)
 }
 
 // ManagedTable is a Table that can perform garbage collection on its data. This type should not be directly used
