@@ -454,7 +454,7 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		// Apply the global params to all quorums, both on-demand and reservation.
 		onDemandQuorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
 		if len(onDemandQuorums) == 0 {
-			return nil, fmt.Errorf("no on-demand quorums specified in legacy PaymentGlobalParams received from disperser")
+			onDemandQuorums = []uint32{0, 1} // Default to quorums 0 and 1 if not specified
 		}
 		reservationQuorums := legacyReply.Reservation.QuorumNumbers
 		// There may be overlapping quorums but it doesn't matter since we will apply the same global params to all of them.
