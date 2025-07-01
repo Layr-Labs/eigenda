@@ -105,11 +105,18 @@ func NewReaderWithAddressDirectory(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state retriever address: %w", err)
 	}
+	if blsOperatorStateRetrieverAddr == gethcommon.HexToAddress("0x0") {
+		return nil, fmt.Errorf("operator state retriever address not found in address directory")
+	}
 
 	eigenDAServiceManagerAddr, err := addressDirectory.GetAddress0(&bind.CallOpts{}, ContractNames.ServiceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service manager address: %w", err)
 	}
+	if eigenDAServiceManagerAddr == gethcommon.HexToAddress("0x0") {
+		return nil, fmt.Errorf("service manager address not found in address directory")
+	}
+
 	err = e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update contract bindings: %w", err)

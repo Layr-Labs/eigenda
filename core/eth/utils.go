@@ -213,15 +213,9 @@ var ContractNames = struct {
 // ValidateAddressConfig validates that either address directory is provided OR both individual addresses are provided
 // and that all provided addresses are valid hex addresses.
 func ValidateAddressConfig(addressDirectory, blsOperatorStateRetriever, eigenDAServiceManager string) error {
-	// Check if address directory is provided, otherwise validate individual addresses
-	if addressDirectory == "" {
-		if blsOperatorStateRetriever == "" && eigenDAServiceManager == "" {
-			return fmt.Errorf("address-directory is required when no individual addresses are provided")
-		} else if blsOperatorStateRetriever == "" {
-			return fmt.Errorf("bls-operator-state-retriever address is required when address-directory is not provided")
-		} else if eigenDAServiceManager == "" {
-			return fmt.Errorf("eigenda-service-manager address is required when address-directory is not provided")
-		}
+	// Check that either address directory is provided OR both individual addresses are provided
+	if addressDirectory == "" && (blsOperatorStateRetriever == "" || eigenDAServiceManager == "") {
+		return fmt.Errorf("either address-directory must be provided, or both bls-operator-state-retriever and eigenda-service-manager addresses must be provided")
 	}
 
 	// Validate address formats
