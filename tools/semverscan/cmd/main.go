@@ -55,8 +55,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	var tx *eth.Reader
-	tx, err = eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
+	tx, err := eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

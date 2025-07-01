@@ -13,13 +13,14 @@ const (
 )
 
 var (
-	/* Optional Flags*/
+	/* Required Flags*/
 	AddressDirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
 		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
 	}
+	/* Optional Flags*/
 	BlockNumberFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "block-number"),
 		Usage:    "Block number to query state from (default: latest)",
@@ -54,7 +55,9 @@ var (
 	}
 )
 
-var requiredFlags = []cli.Flag{}
+var requiredFlags = []cli.Flag{
+	AddressDirectoryFlag,
+}
 
 var optionalFlags = []cli.Flag{
 	BlockNumberFlag,
@@ -62,8 +65,6 @@ var optionalFlags = []cli.Flag{
 	TopNFlag,
 	OutputFormatFlag,
 	OutputFileFlag,
-	AddressDirectoryFlag,
-
 }
 
 // Flags contains the list of configuration options available to the binary.

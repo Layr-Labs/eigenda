@@ -38,6 +38,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
 	}
+	// This flag is kept for retriever's fetchBatchHeader; can later be removed by utilizing AddressDirectoryFlag
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 
 	/* Optional Flags*/
 	NumConnectionsFlag = cli.IntFlag{

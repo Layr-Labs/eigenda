@@ -15,13 +15,14 @@ const (
 )
 
 var (
-	/* Optional Flags*/
+	/* Required Flags*/
 	AddressDirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
 		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
 	}
+	/* Optional Flags*/
 	TimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
 		Usage:    "Seconds to wait for GPRC response",
@@ -51,15 +52,15 @@ var (
 	}
 )
 
-var requiredFlags = []cli.Flag{}
+var requiredFlags = []cli.Flag{
+	AddressDirectoryFlag,
+}
 
 var optionalFlags = []cli.Flag{
 	TimeoutFlag,
 	WorkersFlag,
 	OperatorIdFlag,
 	UseRetrievalClientFlag,
-	AddressDirectoryFlag,
-
 }
 
 // Flags contains the list of configuration options available to the binary.

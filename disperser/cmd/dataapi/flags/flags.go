@@ -141,6 +141,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
+	AddressDirectoryFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,
@@ -153,7 +154,6 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
-	AddressDirectoryFlag,
 	ServerModeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,

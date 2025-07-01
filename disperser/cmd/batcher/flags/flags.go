@@ -220,7 +220,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
 	PullIntervalFlag,
-
+	AddressDirectoryFlag,
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,

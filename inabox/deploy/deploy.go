@@ -270,7 +270,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	if err != nil {
 		return fmt.Errorf("could not create logger: %v", err)
 	}
-	// Use address directory for deployment scripts
+
 	writer, err := eth.NewWriter(
 		logger,
 		ethClient,

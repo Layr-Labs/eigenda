@@ -71,11 +71,11 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
+	AddressDirectoryFlag,
 	EnableMetrics,
 }
 
 var optionalFlags = []cli.Flag{
-	AddressDirectoryFlag,
 	PerPublicKeyRateLimit,
 	MetricsHTTPPort,
 	ChurnApprovalInterval,

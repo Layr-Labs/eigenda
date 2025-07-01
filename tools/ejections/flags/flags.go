@@ -57,6 +57,7 @@ var (
 
 var requiredFlags = []cli.Flag{
 	SubgraphEndpointFlag,
+	AddressDirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -64,8 +65,6 @@ var optionalFlags = []cli.Flag{
 	DaysFlag,
 	FirstFlag,
 	SkipFlag,
-	AddressDirectoryFlag,
-
 }
 
 // Flags contains the list of configuration options available to the binary.

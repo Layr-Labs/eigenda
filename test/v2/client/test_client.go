@@ -224,19 +224,11 @@ func NewTestClient(
 	}
 
 	// Create eth reader using address directory if provided, otherwise use legacy addresses
-	var ethReader *eth.Reader
-	if config.AddressDirectoryAddr != "" {
-		ethReader, err = eth.NewReader(
-			logger,
-			ethClient,
-			config.AddressDirectoryAddr)
-	} else {
-		ethReader, err = eth.NewReader(
-			logger,
-			ethClient,
-			config.BLSOperatorStateRetrieverAddr,
-			config.EigenDAServiceManagerAddr)
-	}
+	ethReader, err := eth.NewReader(
+		logger,
+		ethClient,
+		config.AddressDirectoryAddr,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}

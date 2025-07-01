@@ -549,13 +549,13 @@ var requiredFlags = []cli.Flag{
 	DbPathFlag,
 	BlsKeyFileFlag,
 	BlsKeyPasswordFlag,
+	AddressDirectoryFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
 	ChurnerUrlFlag,
 }
 
 var optionalFlags = []cli.Flag{
-	AddressDirectoryFlag,
 	RegisterAtNodeStartFlag,
 	ExpirationPollIntervalSecFlag,
 	ReachabilityPollIntervalSecFlag,

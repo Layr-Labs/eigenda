@@ -336,7 +336,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 		addressDirectoryAddress,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("new reader legacy: %w", err)
+		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
 	return ethReader, nil

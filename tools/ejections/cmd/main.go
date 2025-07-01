@@ -68,8 +68,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	var tx *eth.Reader
-	tx, err = eth.NewReader(logger, client, config.AddressDirectoryAddr)
+	tx, err := eth.NewReader(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return err
 	}

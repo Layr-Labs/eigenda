@@ -324,6 +324,7 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayKeysFlag,
+	AddressDirectoryAddrFlag,
 	EnableMetricsFlag,
 }
 
@@ -366,7 +367,6 @@ var optionalFlags = []cli.Flag{
 	PprofHttpPortFlag,
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
-	AddressDirectoryAddrFlag,
 }
 
 var Flags []cli.Flag

@@ -264,6 +264,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
+	AddressDirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -287,7 +288,6 @@ var optionalFlags = []cli.Flag{
 	NtpServerFlag,
 	NtpSyncIntervalFlag,
 	ReservedOnly,
-	AddressDirectoryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

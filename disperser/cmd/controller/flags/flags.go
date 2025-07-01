@@ -229,6 +229,7 @@ var (
 
 var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
+	AddressDirectoryFlag,
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
@@ -262,7 +263,6 @@ var optionalFlags = []cli.Flag{
 	ControllerHealthProbePathFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
-	AddressDirectoryFlag,
 }
 
 var Flags []cli.Flag

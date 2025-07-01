@@ -32,6 +32,7 @@ func main() {
 		plugin.SocketFlag,
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
+		plugin.AddressDirectoryFlag,
 		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
 		plugin.PubIPProviderFlag,
