@@ -62,7 +62,7 @@ recreate the keymap directory and reinitialize the keymap.
 There are three types of files that contain data for a segment
 
 - metadata: these files take the form `N.metadata`, where `N` is the segment number. These files contain a small amount
-  of metadata bout the segment.
+  of metadata about the segment.
 - keys: these files take the form `N.keys`, where `N` is the segment number. These files contain the keys for the
   segment.
 - values: these files take the form `N-M.values`, where `N` is the segment number and `M` is the shard number.
@@ -93,7 +93,7 @@ The data in the rolling snapshot directory are symlinks. This is needed since Li
 multiple physical volumes, and we really don't want to do a deep copy of the data in order to create a snapshot.
 LittDB files are immutable, so there is no risk of the data being "pulled out from under" the snapshot.
 
-The snapshot files point to hard linked copies of the segment files. For each volume, there is directory named
+The snapshot files point to hard linked copies of the segment files. For each volume, there is a directory named
 `snapshot` that contains these hard linked files. The reason for this is to protect the snapshot data from being
 deleted by the LittDB garbage collector. LittDB links the snapshot files, and it is the responsibility of the
 external user/tooling to delete the snapshot files when they are no longer needed (both the symlinks and the hard 

@@ -16,7 +16,7 @@ For each iteration, the database must fulfill the following requirements:
 Let's implement the simplest possible key-value store that satisfies the requirements above. It's going to be super
 slow. Ok, fine. We want simple.
 
-![](./resources/iteration1.png)
+![](resources/iteration1.png)
 
 When the user writes a key-value pair to the database, append the key and the value to the end of the file, along
 with a timestamp. When the user reads a key, scan the file from the beginning until you find the key and
@@ -33,14 +33,14 @@ In order to provide durability, ensure the file is fully flushed to disk before 
 
 Congratulations! You've written your very own database!
 
-![](./resources/iDidIt.png)
+![](resources/iDidIt.png)
 
 ## Iteration 2: Add a cache
 
 Reads against the database in 1 are slow. If there is any way we could reduce the number of times we have to iterate
 over the file, that would be great. Let's add an in-memory cache.
 
-![](./resources/iteration2.png)
+![](resources/iteration2.png)
 
 Let's assume we are using a thread safe map to implement the cache.
 
@@ -58,7 +58,7 @@ Reading recent values is a lot faster now. But if you miss the cache, things sta
 when you database holds 100TB. To address this, let's add an index that allows us to jump straight to the data we
 are looking for. For the sake of consistency with other parts of this document, let's call this index a "keymap".
 
-![](./resources/iteration3.png)
+![](resources/iteration3.png)
 
 Inside the keymap, maintain a mapping from each key to the offset in the file where the first byte of the value is
 stored.
@@ -88,7 +88,7 @@ In order to be thread safe, the solution above uses a global lock. While one thr
 unless they get lucky and find their data in the cache. It would be really nice if we could permit reads to continue
 uninterrupted while writes are happening in the background.
 
-![](./resources/iteration4.png)
+![](resources/iteration4.png)
 
 Create another key->value map called the "unflushed data map". Use a thread safe map implementation.
 
@@ -127,7 +127,7 @@ entire file must be rewritten in order to trim bytes from the beginning. And to 
 a global lock while we do it. To fix this, let's break apart the data file into multiple data files. We'll call each
 data file a "segment".
 
-![](./resources/iteration5.png)
+![](resources/iteration5.png)
 
 Decide on a maximum file size for each segment. Whenever a file gets "full", close it and open a new one. Let's assign
 each of these files a serial number starting with `0` and increasing monotonically. We'll call this serial number the
@@ -157,7 +157,7 @@ For each segment, let's create a metadata file. We'll put the timestamp of the l
 this file. As a result, we will no longer need to store timestamp information inside the value files, which will
 save us a few bytes per entry.
 
-![](./resources/iteration6.png)
+![](resources/iteration6.png)
 
 Now, all the garbage collector needs to read to decide when it is time to delete a segment is the metadata file for
 that segment.
@@ -173,7 +173,7 @@ From an optimization point of view, we can assume that in general keys will be m
 operations described above, we don't care about the values, only the keys. So lets separate the keys from the values
 to avoid having to read the values when we don't need them.
 
-![](./resources/iteration7.png)
+![](resources/iteration7.png)
 
 Everything works the same way as before. But instead of iterating huge segment files when deleting a segment
 or rebuilding the key map at startup, we only have to iterate over the key file. The key file is going to be
@@ -185,7 +185,7 @@ A highly desirable property for this database is the capability to spread its da
 In order to do this, we need to shard the data. That is to say, we need to break the data into smaller pieces and
 spread those pieces across multiple locations.
 
-![iteration8](./resources/iteration8.png)
+![iteration8](resources/iteration8.png)
 
 Key files and metadata files are small. For the sake of simplicity, let's not bother sharding those. Value files
 are big. Break apart value files, and have one value file per shard.
@@ -213,11 +213,11 @@ data in one table would not conflict with data in another table.
 
 This is simple! Let's just run a different DB instance for each table.
 
-![](./resources/iteration9.png)
+![](resources/iteration9.png)
 
 Since each table might want to have its own configuration, we can store that configuration in a metadata file for each
 table.
 
 ## Putting it all together: LittDB
 
-![littdb](./resources/littdb-big-picture.png)
+![littdb](resources/littdb-big-picture.png)
