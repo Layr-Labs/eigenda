@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -57,7 +57,7 @@ func NewAccountant(accountID gethcommon.Address) *Accountant {
 
 // ReservationUsage attempts to use the reservation for the requested quorums; if any quorum fails to use the reservation, the entire operation is rolled back.
 func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, paymentHeaderTimestampNs int64) error {
-	if err := paymentlogic.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
+	if err := payment_logic.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
 		return err
 	}
 
@@ -88,7 +88,7 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 // onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
 func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.QuorumID) (*big.Int, error) {
-	if err := paymentlogic.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
+	if err := payment_logic.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
 		return nil, err
 	}
 
@@ -96,8 +96,8 @@ func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.Quoru
 	if err != nil {
 		return nil, err
 	}
-	symbolsCharged := paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	paymentCharged := paymentlogic.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
+	symbolsCharged := payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	paymentCharged := payment_logic.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
 
 	a.onDemandLock.Lock()
 	defer a.onDemandLock.Unlock()

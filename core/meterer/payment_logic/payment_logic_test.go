@@ -1,4 +1,4 @@
-package paymentlogic
+package payment_logic_test
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,7 +70,7 @@ func TestGetBinLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetBinLimit(tt.symbolsPerSecond, tt.binInterval)
+			result := payment_logic.GetBinLimit(tt.symbolsPerSecond, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -122,7 +123,7 @@ func TestGetReservationPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetReservationPeriod(tt.timestamp, tt.binInterval)
+			result := payment_logic.GetReservationPeriod(tt.timestamp, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -169,7 +170,7 @@ func TestGetReservationPeriodByNanosecond(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetReservationPeriodByNanosecond(tt.nanosecondTimestamp, tt.binInterval)
+			result := payment_logic.GetReservationPeriodByNanosecond(tt.nanosecondTimestamp, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -210,7 +211,7 @@ func TestGetOverflowPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetOverflowPeriod(tt.reservationPeriod, tt.reservationWindow)
+			result := payment_logic.GetOverflowPeriod(tt.reservationPeriod, tt.reservationWindow)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -275,7 +276,7 @@ func TestSymbolsCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SymbolsCharged(tt.numSymbols, tt.minSymbols)
+			result := payment_logic.SymbolsCharged(tt.numSymbols, tt.minSymbols)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -328,7 +329,7 @@ func TestPaymentCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
+			result := payment_logic.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -386,7 +387,7 @@ func TestValidateQuorum(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateQuorum(tt.headerQuorums, tt.allowedQuorums)
+			err := payment_logic.ValidateQuorum(tt.headerQuorums, tt.allowedQuorums)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -416,7 +417,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            true,
@@ -427,7 +428,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) - reservationWindow,
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow) - reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            true,
@@ -438,7 +439,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) + reservationWindow,
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow) + reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
@@ -449,7 +450,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) - 2*reservationWindow,
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow) - 2*reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
@@ -460,7 +461,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(time.Hour).Unix()), // starts in future
 				EndTimestamp:   uint64(now.Add(2 * time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
@@ -471,7 +472,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 				StartTimestamp: uint64(now.Add(-2 * time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(-time.Hour).Unix()), // ended in past
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
@@ -480,7 +481,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateReservationPeriod(tt.reservation, tt.requestPeriod, tt.reservationWindow, tt.receivedTimestampNs)
+			result := payment_logic.ValidateReservationPeriod(tt.reservation, tt.requestPeriod, tt.reservationWindow, tt.receivedTimestampNs)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -524,7 +525,7 @@ func TestIsOnDemandPayment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsOnDemandPayment(tt.paymentMetadata)
+			result := payment_logic.IsOnDemandPayment(tt.paymentMetadata)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -639,7 +640,7 @@ func TestValidateReservations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateReservations(
+			err := payment_logic.ValidateReservations(
 				tt.reservations,
 				tt.quorumConfigs,
 				tt.quorumNumbers,

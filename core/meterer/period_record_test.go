@@ -6,7 +6,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -373,8 +373,8 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Calculate expected periods for setup
-			currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(tt.timestamp, tt.protocolConfig.ReservationRateLimitWindow)
-			overflowPeriod := paymentlogic.GetOverflowPeriod(currentPeriod, tt.protocolConfig.ReservationRateLimitWindow)
+			currentPeriod := payment_logic.GetReservationPeriodByNanosecond(tt.timestamp, tt.protocolConfig.ReservationRateLimitWindow)
+			overflowPeriod := payment_logic.GetOverflowPeriod(currentPeriod, tt.protocolConfig.ReservationRateLimitWindow)
 
 			// Setup initial records if needed
 			if tt.setupCurrentRecord {

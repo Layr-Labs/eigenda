@@ -1,4 +1,4 @@
-package paymentlogic
+package payment_logic
 
 import (
 	"errors"
@@ -11,13 +11,23 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// GetBinLimit returns the bin limit given the bin interval and the symbols per second
+// GetBinLimit returns the bin limit given the bin interval and the symbols per second.
+// The BinLimit serves to check if a reservation or global on-demand usage is within the rate limit.
+//
+// Parameters:
+// SymbolsPerSecond is the number of symbols that can be charged per second, and can be understood as the rate of a reservation or global on-demand usage.
+// BinInterval is the duration of a single bin in seconds.
+//
+// Returns:
+// BinLimit is the maximum number of symbols that can be charged in a single bin.
 func GetBinLimit(symbolsPerSecond uint64, binInterval uint64) uint64 {
+	// If the rate for this bin is 0 or the bin interval is 0, then the bin limit is 0.
+	// These two parameters should never be zero, but added for safety as to prevent division by zero in the overflow check.
 	if symbolsPerSecond == 0 || binInterval == 0 {
 		return 0
 	}
 
-	// Check for overflow before multiplication by comparing against the maximum safe value
+	// Check for overflow before multiplication by comparing against the maximum safe value.
 	if symbolsPerSecond > math.MaxUint64/binInterval {
 		return math.MaxUint64
 	}

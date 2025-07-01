@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -81,7 +81,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		return 0, fmt.Errorf("failed to get payment global params: %w", err)
 	}
 	// Validate against the payment method
-	if !paymentlogic.IsOnDemandPayment(&header) {
+	if !payment_logic.IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -106,7 +106,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	if err != nil {
 		return 0, fmt.Errorf("failed to get on-demand quorum config: %w", err)
 	}
-	symbolsCharged := paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	symbolsCharged := payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
 	return symbolsCharged, nil
 }
 
@@ -121,7 +121,7 @@ func (m *Meterer) serveReservationRequest(
 	receivedAt time.Time,
 ) error {
 	m.logger.Debug("Recording and validating reservation usage", "header", header, "reservation", reservations)
-	if err := paymentlogic.ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt.UnixNano()); err != nil {
+	if err := payment_logic.ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt.UnixNano()); err != nil {
 		return fmt.Errorf("invalid reservation: %w", err)
 	}
 
@@ -148,10 +148,10 @@ func (m *Meterer) incrementBinUsage(
 		if err != nil {
 			return fmt.Errorf("failed to get quorum config for quorum %d: %w", quorumID, err)
 		}
-		charges[quorumID] = paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+		charges[quorumID] = payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
 		quorumNumbers = append(quorumNumbers, quorumID)
 		reservationWindows[quorumID] = protocolConfig.ReservationRateLimitWindow
-		requestReservationPeriods[quorumID] = paymentlogic.GetReservationPeriodByNanosecond(header.Timestamp, protocolConfig.ReservationRateLimitWindow)
+		requestReservationPeriods[quorumID] = payment_logic.GetReservationPeriodByNanosecond(header.Timestamp, protocolConfig.ReservationRateLimitWindow)
 	}
 	// Batch increment all quorums for the current quorums' reservation period
 	// For each quorum, increment by its specific symbolsCharged value
@@ -169,7 +169,7 @@ func (m *Meterer) incrementBinUsage(
 	for quorumID, reservation := range reservations {
 		reservationWindow := reservationWindows[quorumID]
 		requestReservationPeriod := requestReservationPeriods[quorumID]
-		usageLimit := paymentlogic.GetBinLimit(reservation.SymbolsPerSecond, reservationWindow)
+		usageLimit := payment_logic.GetBinLimit(reservation.SymbolsPerSecond, reservationWindow)
 		newUsage, ok := updatedUsages[quorumID]
 		if !ok {
 			return fmt.Errorf("failed to get updated usage for quorum %d", quorumID)
@@ -181,8 +181,8 @@ func (m *Meterer) incrementBinUsage(
 			// Bin was already filled before this increment
 			return fmt.Errorf("bin has already been filled for quorum %d", quorumID)
 		}
-		overflowPeriod := paymentlogic.GetOverflowPeriod(requestReservationPeriod, reservationWindow)
-		if charges[quorumID] <= usageLimit && overflowPeriod <= paymentlogic.GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
+		overflowPeriod := payment_logic.GetOverflowPeriod(requestReservationPeriod, reservationWindow)
+		if charges[quorumID] <= usageLimit && overflowPeriod <= payment_logic.GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
 			// Needs to go to overflow bin
 			overflowAmounts[quorumID] = newUsage - usageLimit
 			overflowPeriods[quorumID] = overflowPeriod
@@ -220,7 +220,7 @@ func (m *Meterer) incrementBinUsage(
 func (m *Meterer) serveOnDemandRequest(ctx context.Context, globalParams *PaymentVaultParams, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64, headerQuorums []uint8, receivedAt time.Time) error {
 	m.logger.Debug("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 
-	if err := paymentlogic.ValidateQuorum(headerQuorums, globalParams.OnDemandQuorumNumbers); err != nil {
+	if err := payment_logic.ValidateQuorum(headerQuorums, globalParams.OnDemandQuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
@@ -234,8 +234,8 @@ func (m *Meterer) serveOnDemandRequest(ctx context.Context, globalParams *Paymen
 		return fmt.Errorf("failed to get payment config for on-demand quorum: %w", err)
 	}
 
-	symbolsCharged = paymentlogic.SymbolsCharged(symbolsCharged, protocolConfig.MinNumSymbols)
-	paymentCharged := paymentlogic.PaymentCharged(symbolsCharged, paymentConfig.OnDemandPricePerSymbol)
+	symbolsCharged = payment_logic.SymbolsCharged(symbolsCharged, protocolConfig.MinNumSymbols)
+	paymentCharged := payment_logic.PaymentCharged(symbolsCharged, paymentConfig.OnDemandPricePerSymbol)
 	oldPayment, err := m.MeteringStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -263,13 +263,13 @@ func (m *Meterer) incrementGlobalBinUsage(ctx context.Context, params *PaymentVa
 		return fmt.Errorf("failed to get quorum configs for on-demand quorum: %w", err)
 	}
 
-	globalPeriod := paymentlogic.GetReservationPeriod(receivedAt.Unix(), protocolConfig.OnDemandRateLimitWindow)
+	globalPeriod := payment_logic.GetReservationPeriod(receivedAt.Unix(), protocolConfig.OnDemandRateLimitWindow)
 
 	newUsage, err := m.MeteringStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > paymentlogic.GetBinLimit(paymentConfig.OnDemandSymbolsPerSecond, protocolConfig.OnDemandRateLimitWindow) {
+	if newUsage > payment_logic.GetBinLimit(paymentConfig.OnDemandSymbolsPerSecond, protocolConfig.OnDemandRateLimitWindow) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil

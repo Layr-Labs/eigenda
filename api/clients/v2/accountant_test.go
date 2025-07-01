@@ -11,7 +11,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -205,7 +205,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	baseTime := now.UnixNano()
 
 	// First call - use current period
-	currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(baseTime, reservationWindow)
+	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(baseTime, reservationWindow)
 	_, err = accountant.AccountBlob(baseTime, 800, quorums)
 	assert.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Second call - use previous period (which should be allowed by validation)
 	prevTime := baseTime - int64(reservationWindow)*time.Second.Nanoseconds()
-	prevPeriod := paymentlogic.GetReservationPeriodByNanosecond(prevTime, reservationWindow)
+	prevPeriod := payment_logic.GetReservationPeriodByNanosecond(prevTime, reservationWindow)
 	_, err = accountant.AccountBlob(prevTime, 300, quorums)
 	assert.NoError(t, err)
 
@@ -291,7 +291,7 @@ func TestAccountant_Concurrent(t *testing.T) {
 
 	// Check final state
 	for _, quorumNumber := range quorums {
-		currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
+		currentPeriod := payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
 		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(1000), record.Usage)
 	}
@@ -531,7 +531,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 
 	// Test rollback when a later quorum fails
 	nowNano := time.Now().UnixNano()
-	currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
+	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
 
 	// First update should succeed
 	moreUsedQuorum := uint8(1)
@@ -550,7 +550,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Equal(t, uint64(100), record.Usage)
 	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.periodRecords.GetRelativePeriodRecord(paymentlogic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(payment_logic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Use both quorums, more used quorum cannot overflow again
@@ -563,7 +563,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Equal(t, uint64(100), record.Usage)
 	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.periodRecords.GetRelativePeriodRecord(paymentlogic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(payment_logic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Test rollback when a quorum doesn't exist
