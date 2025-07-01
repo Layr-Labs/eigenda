@@ -28,28 +28,27 @@ func NewAddressDirectoryReader(addressDirectoryHexAddr string, client common.Eth
 	}, nil
 }
 
-// GetOperatorStateRetrieverAddress returns the operator state retriever address with validation
-func (r *AddressDirectoryReader) GetOperatorStateRetrieverAddress() (gethcommon.Address, error) {
-	addr, err := r.contract.GetAddress0(&bind.CallOpts{}, ContractNames.OperatorStateRetriever)
+// getAddressWithValidation is a private helper that gets an address from the directory
+// and validates it's not zero, returning a descriptive error if needed
+func (r *AddressDirectoryReader) getAddressWithValidation(contractName string, addressType string) (gethcommon.Address, error) {
+	addr, err := r.contract.GetAddress0(&bind.CallOpts{}, contractName)
 	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("failed to get operator state retriever address: %w", err)
+		return gethcommon.Address{}, fmt.Errorf("failed to get %s address: %w", addressType, err)
 	}
 	if addr == (gethcommon.Address{}) {
-		return gethcommon.Address{}, fmt.Errorf("operator state retriever address is zero - not deployed or registered in address directory")
+		return gethcommon.Address{}, fmt.Errorf("%s address is zero - not deployed or registered in address directory", addressType)
 	}
 	return addr, nil
 }
 
+// GetOperatorStateRetrieverAddress returns the operator state retriever address with validation
+func (r *AddressDirectoryReader) GetOperatorStateRetrieverAddress() (gethcommon.Address, error) {
+	return r.getAddressWithValidation(ContractNames.OperatorStateRetriever, "operator state retriever")
+}
+
 // GetServiceManagerAddress returns the service manager address with validation
 func (r *AddressDirectoryReader) GetServiceManagerAddress() (gethcommon.Address, error) {
-	addr, err := r.contract.GetAddress0(&bind.CallOpts{}, ContractNames.ServiceManager)
-	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("failed to get service manager address: %w", err)
-	}
-	if addr == (gethcommon.Address{}) {
-		return gethcommon.Address{}, fmt.Errorf("service manager address is zero - not deployed or registered in address directory")
-	}
-	return addr, nil
+	return r.getAddressWithValidation(ContractNames.ServiceManager, "service manager")
 }
 
 // TODO: add other getters for other contracts; they are not needed for the current usage
