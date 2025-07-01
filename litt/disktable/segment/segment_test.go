@@ -25,7 +25,7 @@ func countFilesInDirectory(t *testing.T, directory string) int {
 func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -48,11 +48,15 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	expectedLargestShardSize := uint64(0)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		1,
 		salt,
 		false)
@@ -140,7 +144,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -159,18 +163,18 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, 3, countFilesInDirectory(t, directory))
+	require.Equal(t, 3, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }
 
 func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -192,11 +196,15 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		shardCount,
 		salt,
 		false)
@@ -289,7 +297,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -311,19 +319,19 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, directory))
+	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }
 
 // Tests writing and reading, but allocates more shards than values written to force some shards to be empty.
 func TestWriteAndReadColdShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -345,11 +353,15 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories(false)
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		shardCount,
 		salt,
 		false)
@@ -408,7 +420,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -430,10 +442,73 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, directory))
+	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
+}
+
+func TestGetFilePaths(t *testing.T) {
+	rand := random.NewTestRandom()
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+
+	index := rand.Uint32()
+	shardingFactor := rand.Uint32Range(1, 10)
+	salt := make([]byte, 16)
+
+	segmentPath, err := NewSegmentPath(t.TempDir(), "", "table")
+	require.NoError(t, err)
+
+	err = os.MkdirAll(segmentPath.SegmentDirectory(), 0755)
+	require.NoError(t, err)
+
+	segment, err := CreateSegment(
+		logger,
+		errorMonitor,
+		index,
+		[]*SegmentPath{segmentPath},
+		shardingFactor,
+		([16]byte)(salt),
+		false)
+	require.NoError(t, err)
+
+	files := segment.GetFilePaths()
+	filesSet := make(map[string]struct{})
+	for _, file := range files {
+		filesSet[file] = struct{}{}
+	}
+
+	expectedCount := 0
+
+	// metadata
+	_, found := filesSet[segment.metadata.path()]
+	require.True(t, found)
+	expectedCount++
+
+	// key file
+	_, found = filesSet[segment.keys.path()]
+	require.True(t, found)
+	expectedCount++
+
+	// value files
+	for i := uint32(0); i < shardingFactor; i++ {
+		_, found = filesSet[segment.shards[i].path()]
+		require.True(t, found)
+		expectedCount++
+	}
+
+	// make sure there aren't any additional files
+	require.Equal(t, expectedCount, len(filesSet))
+
+	// Compare values to functions that return specific file paths.
+	require.Equal(t, segment.metadata.path(), segment.GetMetadataFilePath())
+	require.Equal(t, segment.keys.path(), segment.GetKeyFilePath())
+	valueFiles := segment.GetValueFilePaths()
+	for i := uint32(0); i < shardingFactor; i++ {
+		require.Equal(t, segment.shards[i].path(), valueFiles[i])
+	}
 }
