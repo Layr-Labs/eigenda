@@ -14,7 +14,8 @@ contractNames = [
     "RELAY_REGISTRY",
     "DISPERSER_REGISTRY",
     "PAYMENT_VAULT",
-    "CERT_VERIFIER"
+    "CERT_VERIFIER",
+    "CERT_VERIFIER_LEGACY_V2"
 ]
 
 # This field should be populated with the addresses of the contracts in the same order as in contractNames.
@@ -33,10 +34,11 @@ contractAddresses = [
     "0xE03c6623dC818c67e197F7C641AE678061835E9d", # DISPERSER_REGISTRY
     "0x4d2C6a77f96760363D1c0FD47fe269952A94f713", # PAYMENT_VAULT
     "0xD657303196621D50e430D30AcFb4eA8A781A928e", # CERT_VERIFIER
+    "0x9D901Ea8971287294b417277c6176fE8172Fec6F", # CERT_VERIFIER_LEGACY_V2
 ]
 
 # The address of the proxy admin contract that manages the upgradeability of the contracts.
-proxyAdminAddress = "0x21c86AcC996489513F9CBa81fdea22F6c283D19b"
+proxyAdmin = "0x21c86AcC996489513F9CBa81fdea22F6c283D19b"
 
 # The privileged account that can manage the contract directory.
 owner = "0x002721B4790d97dC140a049936aA710152Ba92D5"

@@ -40,7 +40,7 @@ contractAddresses = [
 ]
 
 # The address of the proxy admin contract that manages the upgradeability of the contracts.
-proxyAdminAddress = "0x8247EF5705d3345516286B72bFE6D690197C2E99"
+proxyAdmin = "0x8247EF5705d3345516286B72bFE6D690197C2E99"
 
 # The privileged account that can manage the contract directory.
 owner = "0x002721B4790d97dC140a049936aA710152Ba92D5"
