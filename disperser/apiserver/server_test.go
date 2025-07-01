@@ -39,6 +39,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -754,8 +755,8 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	// Setup mock payment vault params for server test
-	serverTestMockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+	serverTestMockParams := &payment.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*payment.PaymentQuorumConfig{
 			0: {
 				OnDemandSymbolsPerSecond: 4096,
 				OnDemandPricePerSymbol:   uint64(encoding.BYTES_PER_SYMBOL),
@@ -765,7 +766,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 				OnDemandPricePerSymbol:   uint64(encoding.BYTES_PER_SYMBOL),
 			},
 		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+		QuorumProtocolConfigs: map[core.QuorumID]*payment.PaymentQuorumProtocolConfig{
 			0: {
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 1,
@@ -779,11 +780,11 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 	mockState.On("GetPaymentGlobalParams").Return(serverTestMockParams, nil)
 	mockState.On("GetQuorumNumbers", tmock.Anything).Return([]core.QuorumID{0, 1}, nil)
-	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&payment.OnDemandPayment{
 		CumulativePayment: big.NewInt(3000),
 	}, nil)
-	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{
+	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*payment.ReservedPayment{
+		0: &payment.ReservedPayment{
 			SymbolsPerSecond: 2048,
 			StartTimestamp:   0,
 			EndTimestamp:     math.MaxUint32,
@@ -807,7 +808,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewDynamoDBMeteringStore(
+	store, err := meterer.NewDynamoDBPaymentOffchainState(
 		awsConfig,
 		table_names[0],
 		table_names[1],

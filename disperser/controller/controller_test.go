@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -193,7 +194,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 		BlobVersion:     0,
 		QuorumNumbers:   quorumNumbers,
 		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,

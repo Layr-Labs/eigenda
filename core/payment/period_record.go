@@ -1,18 +1,16 @@
-package meterer
+package payment
 
 import (
 	"errors"
 	"fmt"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
 )
 
-// QuorumPeriodRecords is a map of quorum number to a slice of period records
-type QuorumPeriodRecords map[core.QuorumID][]*PeriodRecord
+// QuorumPeriodRecords is a map from quorum number to a slice of period records
+type QuorumPeriodRecords map[uint8][]*PeriodRecord
 
-// PeriodRecord contains the index of the reservation period and the usage of the period
+// PeriodRecord represents a single period record for a quorum
 type PeriodRecord struct {
 	// Index is start timestamp of the period in seconds; it is always a multiple of the reservation window
 	Index uint32
@@ -22,13 +20,13 @@ type PeriodRecord struct {
 
 // updateRecord tracks a successful update for rollback purposes
 type UpdateRecord struct {
-	QuorumNumber core.QuorumID
+	QuorumNumber uint8
 	Period       uint64
 	Usage        uint64
 }
 
 // GetRelativePeriodRecord returns the period record for the given index and quorum number; if the record does not exist, it is initialized to 0
-func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber core.QuorumID) *PeriodRecord {
+func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *PeriodRecord {
 	if _, exists := pr[quorumNumber]; !exists {
 		pr[quorumNumber] = make([]*PeriodRecord, MinNumBins)
 	}
@@ -59,11 +57,11 @@ func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber
 // bins under strict conditions, and a sliding valid-period window ensures only
 // recent periods are accepted.
 func (pr QuorumPeriodRecords) UpdateUsage(
-	quorumNumber core.QuorumID,
+	quorumNumber uint8,
 	timestamp int64,
 	numSymbols uint64,
-	reservation *core.ReservedPayment,
-	protocolConfig *core.PaymentQuorumProtocolConfig,
+	reservation *ReservedPayment,
+	protocolConfig *PaymentQuorumProtocolConfig,
 ) error {
 	if reservation == nil {
 		return errors.New("reservation cannot be nil")
@@ -72,14 +70,14 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 		return errors.New("protocolConfig cannot be nil")
 	}
 
-	symbolUsage := paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	binLimit := paymentlogic.GetBinLimit(reservation.SymbolsPerSecond, protocolConfig.ReservationRateLimitWindow)
+	symbolUsage := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	binLimit := GetBinLimit(reservation.SymbolsPerSecond, protocolConfig.ReservationRateLimitWindow)
 
 	if symbolUsage > binLimit {
 		return errors.New("symbol usage exceeds bin limit")
 	}
 
-	currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
+	currentPeriod := GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
 	relativePeriodRecord := pr.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 	oldUsage := relativePeriodRecord.Usage
 	relativePeriodRecord.Usage += symbolUsage
@@ -94,7 +92,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	// overflow bin if we're over the limit
-	overflowPeriod := paymentlogic.GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
+	overflowPeriod := GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
 	overflowPeriodRecord := pr.GetRelativePeriodRecord(overflowPeriod, quorumNumber)
 	if overflowPeriodRecord.Usage == 0 {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
@@ -123,22 +121,24 @@ func (pr QuorumPeriodRecords) DeepCopy() QuorumPeriodRecords {
 	return copied
 }
 
-// FromProtoRecords converts protobuf period records to QuorumPeriodRecords
-func FromProtoRecords(protoRecords map[uint32]*disperser_rpc.PeriodRecords) QuorumPeriodRecords {
+// FromProtoRecords converts protobuf period records to native types
+func FromProtoRecords(pbRecords map[uint32]*disperser_rpc.PeriodRecords) QuorumPeriodRecords {
 	records := make(QuorumPeriodRecords)
-	for quorumNumber, protoRecord := range protoRecords {
-		records[core.QuorumID(quorumNumber)] = make([]*PeriodRecord, MinNumBins)
-		// Initialize all records to 0
-		for i := range records[core.QuorumID(quorumNumber)] {
-			records[core.QuorumID(quorumNumber)][i] = &PeriodRecord{
+	for quorumNumber, pbRecord := range pbRecords {
+		if pbRecord == nil {
+			continue
+		}
+		records[uint8(quorumNumber)] = make([]*PeriodRecord, MinNumBins)
+		for i := range records[uint8(quorumNumber)] {
+			records[uint8(quorumNumber)][i] = &PeriodRecord{
 				Index: uint32(i),
 				Usage: 0,
 			}
 		}
 		// Populate with values from server
-		for _, record := range protoRecord.GetRecords() {
+		for _, record := range pbRecord.GetRecords() {
 			idx := record.Index % uint32(MinNumBins)
-			records[core.QuorumID(quorumNumber)][idx] = &PeriodRecord{
+			records[uint8(quorumNumber)][idx] = &PeriodRecord{
 				Index: record.Index,
 				Usage: record.Usage,
 			}

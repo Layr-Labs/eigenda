@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -128,16 +129,16 @@ type Reader interface {
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 
 	// GetReservedPayments returns active reservations (end timestamp > current timestamp)
-	GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[QuorumID]*ReservedPayment, error)
+	GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[QuorumID]*payment.ReservedPayment, error)
 
 	// GetReservedPaymentByAccount returns active reservation by account ID
-	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[QuorumID]*ReservedPayment, error)
+	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[QuorumID]*payment.ReservedPayment, error)
 
 	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
+	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*payment.OnDemandPayment, error)
 
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
-	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*payment.OnDemandPayment, error)
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)

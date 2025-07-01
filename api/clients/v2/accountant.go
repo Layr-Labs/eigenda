@@ -8,24 +8,23 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type Accountant struct {
 	// on-chain states
 	accountID    gethcommon.Address
-	reservations map[core.QuorumID]*core.ReservedPayment
+	reservations map[core.QuorumID]*payment.ReservedPayment
 	// OnDemand is initially only enabled on quorum 0. Accountant must be updated to be quorum specific
 	// after the protocol decides to support onDemand on custom quorums and decentralized ratelimiting.
-	onDemand *core.OnDemandPayment
+	onDemand *payment.OnDemandPayment
 
-	paymentVaultParams *meterer.PaymentVaultParams
+	paymentVaultParams *payment.PaymentVaultParams
 
 	// local accounting
-	// contains a fixed meterer.MinNumBins bins per quorum
-	periodRecords     meterer.QuorumPeriodRecords
+	// contains a fixed payment.MinNumBins bins per quorum
+	periodRecords     payment.QuorumPeriodRecords
 	cumulativePayment *big.Int
 
 	// locks for concurrent access to period records
@@ -36,18 +35,18 @@ type Accountant struct {
 
 // NewAccountant initializes an accountant with the given account ID. The accountant must call SetPaymentState to populate the state.
 func NewAccountant(accountID gethcommon.Address) *Accountant {
-	reservations := make(map[core.QuorumID]*core.ReservedPayment)
-	onDemand := &core.OnDemandPayment{
+	reservations := make(map[core.QuorumID]*payment.ReservedPayment)
+	onDemand := &payment.OnDemandPayment{
 		CumulativePayment: big.NewInt(0),
 	}
-	periodRecords := make(meterer.QuorumPeriodRecords)
+	periodRecords := make(payment.QuorumPeriodRecords)
 	return &Accountant{
 		accountID:    accountID,
 		reservations: reservations,
 		onDemand:     onDemand,
-		paymentVaultParams: &meterer.PaymentVaultParams{
-			QuorumPaymentConfigs:  make(map[uint8]*core.PaymentQuorumConfig),
-			QuorumProtocolConfigs: make(map[uint8]*core.PaymentQuorumProtocolConfig),
+		paymentVaultParams: &payment.PaymentVaultParams{
+			QuorumPaymentConfigs:  make(map[uint8]*payment.PaymentQuorumConfig),
+			QuorumProtocolConfigs: make(map[uint8]*payment.PaymentQuorumProtocolConfig),
 			OnDemandQuorumNumbers: make([]uint8, 0),
 		},
 		periodRecords:     periodRecords,
@@ -57,7 +56,7 @@ func NewAccountant(accountID gethcommon.Address) *Accountant {
 
 // ReservationUsage attempts to use the reservation for the requested quorums; if any quorum fails to use the reservation, the entire operation is rolled back.
 func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, paymentHeaderTimestampNs int64) error {
-	if err := paymentlogic.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
+	if err := payment.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
 		return err
 	}
 
@@ -88,16 +87,16 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 // onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
 func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.QuorumID) (*big.Int, error) {
-	if err := paymentlogic.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
+	if err := payment.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
 		return nil, err
 	}
 
-	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
+	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(payment.OnDemandDepositQuorumID)
 	if err != nil {
 		return nil, err
 	}
-	symbolsCharged := paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	paymentCharged := paymentlogic.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
+	symbolsCharged := payment.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	paymentCharged := payment.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
 
 	a.onDemandLock.Lock()
 	defer a.onDemandLock.Unlock()
@@ -120,7 +119,7 @@ func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.Quoru
 func (a *Accountant) AccountBlob(
 	timestamp int64,
 	numSymbols uint64,
-	quorums []uint8) (*core.PaymentMetadata, error) {
+	quorums []uint8) (*payment.PaymentMetadata, error) {
 	if len(quorums) == 0 {
 		return nil, fmt.Errorf("no quorums provided")
 	}
@@ -131,7 +130,7 @@ func (a *Accountant) AccountBlob(
 	// Always try to use reservation first
 	rezErr := a.reservationUsage(numSymbols, quorums, timestamp)
 	if rezErr == nil {
-		return &core.PaymentMetadata{
+		return &payment.PaymentMetadata{
 			AccountID:         a.accountID,
 			Timestamp:         timestamp,
 			CumulativePayment: big.NewInt(0),
@@ -144,7 +143,7 @@ func (a *Accountant) AccountBlob(
 		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Reservation Error: %w, On-demand Error: %w", a.accountID.Hex(), rezErr, onDemandErr)
 	}
 
-	pm := &core.PaymentMetadata{
+	pm := &payment.PaymentMetadata{
 		AccountID:         a.accountID,
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
@@ -159,11 +158,11 @@ func (a *Accountant) AccountBlob(
 // fields are not present, we assume the account has no payment history and set accountant state
 // to use initial values.
 func (a *Accountant) SetPaymentState(
-	paymentVaultParams *meterer.PaymentVaultParams,
-	reservations map[core.QuorumID]*core.ReservedPayment,
+	paymentVaultParams *payment.PaymentVaultParams,
+	reservations map[core.QuorumID]*payment.ReservedPayment,
 	cumulativePayment *big.Int,
 	onchainCumulativePayment *big.Int,
-	periodRecords meterer.QuorumPeriodRecords,
+	periodRecords payment.QuorumPeriodRecords,
 ) error {
 	if paymentVaultParams == nil {
 		return fmt.Errorf("payment vault params cannot be nil")
@@ -172,11 +171,11 @@ func (a *Accountant) SetPaymentState(
 	a.paymentVaultParams = paymentVaultParams
 
 	if onchainCumulativePayment == nil {
-		a.onDemand = &core.OnDemandPayment{
+		a.onDemand = &payment.OnDemandPayment{
 			CumulativePayment: big.NewInt(0),
 		}
 	} else {
-		a.onDemand = &core.OnDemandPayment{
+		a.onDemand = &payment.OnDemandPayment{
 			CumulativePayment: new(big.Int).Set(onchainCumulativePayment),
 		}
 	}
@@ -188,12 +187,12 @@ func (a *Accountant) SetPaymentState(
 	}
 
 	if reservations == nil {
-		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
-		a.periodRecords = make(meterer.QuorumPeriodRecords)
+		a.reservations = make(map[core.QuorumID]*payment.ReservedPayment)
+		a.periodRecords = make(payment.QuorumPeriodRecords)
 	} else {
 		a.reservations = reservations
 		if periodRecords == nil {
-			a.periodRecords = make(meterer.QuorumPeriodRecords)
+			a.periodRecords = make(payment.QuorumPeriodRecords)
 		} else {
 			a.periodRecords = periodRecords
 		}

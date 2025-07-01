@@ -1,19 +1,18 @@
-package meterer_test
+package payment_test
 
 import (
 	"testing"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 	tests := []struct {
 		name               string
-		initialRecords     meterer.QuorumPeriodRecords
+		initialRecords     payment.QuorumPeriodRecords
 		index              uint64
 		quorumNumber       core.QuorumID
 		expectedIndex      uint32
@@ -23,7 +22,7 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 	}{
 		{
 			name:               "new quorum and record",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			index:              5,
 			quorumNumber:       core.QuorumID(1),
 			expectedIndex:      5,
@@ -33,8 +32,8 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 		},
 		{
 			name: "existing quorum, new record",
-			initialRecords: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): make([]*meterer.PeriodRecord, 3),
+			initialRecords: payment.QuorumPeriodRecords{
+				core.QuorumID(1): make([]*payment.PeriodRecord, 3),
 			},
 			index:              7,
 			quorumNumber:       core.QuorumID(1),
@@ -45,8 +44,8 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 		},
 		{
 			name: "existing quorum and record",
-			initialRecords: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			initialRecords: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					nil,
 					{Index: 4, Usage: 100},
 					nil,
@@ -61,7 +60,7 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 		},
 		{
 			name:               "index wraps around (modulo operation)",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			index:              10, // 10 % 3 = 1
 			quorumNumber:       core.QuorumID(2),
 			expectedIndex:      10,
@@ -71,7 +70,7 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 		},
 		{
 			name:               "zero index",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			index:              0,
 			quorumNumber:       core.QuorumID(0),
 			expectedIndex:      0,
@@ -103,12 +102,12 @@ func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 	tests := []struct {
 		name                  string
-		initialRecords        meterer.QuorumPeriodRecords
+		initialRecords        payment.QuorumPeriodRecords
 		quorumNumber          core.QuorumID
 		timestamp             int64
 		numSymbols            uint64
-		reservation           *core.ReservedPayment
-		protocolConfig        *core.PaymentQuorumProtocolConfig
+		reservation           *payment.ReservedPayment
+		protocolConfig        *payment.PaymentQuorumProtocolConfig
 		expectedError         string
 		expectedCurrentUsage  uint64
 		expectedOverflowUsage uint64
@@ -119,16 +118,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 	}{
 		{
 			name:           "symbol usage exceeds bin limit",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000, // 1 second in nanoseconds
 			numSymbols:     550,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 50, // This will create bin limit of 50 * 10 = 500
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              100, // min symbols is 100, so 550 -> 600
 				ReservationRateLimitWindow: 10,
 			},
@@ -136,16 +135,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "usage within bin limit",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              10,
 				ReservationRateLimitWindow: 10,
 			},
@@ -153,16 +152,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "usage with minimum symbols applied",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     5, // Below min symbols
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              20, // Min symbols enforced
 				ReservationRateLimitWindow: 10,
 			},
@@ -170,18 +169,18 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:               "usage exceeds limit but overflow available",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
 			timestamp:          1000000000000,
 			numSymbols:         80,
 			setupCurrentRecord: true,
 			currentRecordUsage: 30,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 10, // bin limit = 10 * 10 = 100
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -190,18 +189,18 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:               "current usage already at limit",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
 			timestamp:          1000000000000,
 			numSymbols:         10,
 			setupCurrentRecord: true,
 			currentRecordUsage: 100,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 10, // bin limit = 100
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -209,18 +208,18 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:               "current usage exceeds limit",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
 			timestamp:          1000000000000,
 			numSymbols:         10,
 			setupCurrentRecord: true,
 			currentRecordUsage: 150,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 10, // bin limit = 100
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -228,7 +227,7 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:                "overflow bin already in use",
-			initialRecords:      make(meterer.QuorumPeriodRecords),
+			initialRecords:      make(payment.QuorumPeriodRecords),
 			quorumNumber:        core.QuorumID(1),
 			timestamp:           1000000000000,
 			numSymbols:          80,
@@ -236,12 +235,12 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 			setupOverflowRecord: true,
 			currentRecordUsage:  30,
 			overflowRecordUsage: 50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 10, // bin limit = 100
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -249,16 +248,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "exactly at bin limit",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     100,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 10, // bin limit = 100
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -266,18 +265,18 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:               "zero usage (enforces min symbols)",
-			initialRecords:     make(meterer.QuorumPeriodRecords),
+			initialRecords:     make(payment.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
 			timestamp:          1000000000000,
 			numSymbols:         0,
 			setupCurrentRecord: true,
 			currentRecordUsage: 50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              5, // Min symbols enforced even for 0 input
 				ReservationRateLimitWindow: 10,
 			},
@@ -285,16 +284,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "negative timestamp",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      -1000000000000,
 			numSymbols:     50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -302,16 +301,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "large reservation window",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     1000,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 1,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10000, // Large window = large bin limit
 			},
@@ -319,16 +318,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "zero min symbols",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              0, // Zero min symbols
 				ReservationRateLimitWindow: 10,
 			},
@@ -336,16 +335,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "zero symbols per second (zero bin limit)",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
 			timestamp:      1000000000000,
 			numSymbols:     1,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 0, // Zero symbols per second
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -353,16 +352,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		},
 		{
 			name:           "different quorum numbers",
-			initialRecords: make(meterer.QuorumPeriodRecords),
+			initialRecords: make(payment.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(255), // Max quorum ID
 			timestamp:      1000000000000,
 			numSymbols:     50,
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   0,
 				EndTimestamp:     2000,
 			},
-			protocolConfig: &core.PaymentQuorumProtocolConfig{
+			protocolConfig: &payment.PaymentQuorumProtocolConfig{
 				MinNumSymbols:              1,
 				ReservationRateLimitWindow: 10,
 			},
@@ -373,8 +372,8 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Calculate expected periods for setup
-			currentPeriod := paymentlogic.GetReservationPeriodByNanosecond(tt.timestamp, tt.protocolConfig.ReservationRateLimitWindow)
-			overflowPeriod := paymentlogic.GetOverflowPeriod(currentPeriod, tt.protocolConfig.ReservationRateLimitWindow)
+			currentPeriod := payment.GetReservationPeriodByNanosecond(tt.timestamp, tt.protocolConfig.ReservationRateLimitWindow)
+			overflowPeriod := payment.GetOverflowPeriod(currentPeriod, tt.protocolConfig.ReservationRateLimitWindow)
 
 			// Setup initial records if needed
 			if tt.setupCurrentRecord {
@@ -417,16 +416,16 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 func TestQuorumPeriodRecords_DeepCopy(t *testing.T) {
 	tests := []struct {
 		name            string
-		originalRecords meterer.QuorumPeriodRecords
+		originalRecords payment.QuorumPeriodRecords
 	}{
 		{
 			name:            "empty records",
-			originalRecords: make(meterer.QuorumPeriodRecords),
+			originalRecords: make(payment.QuorumPeriodRecords),
 		},
 		{
 			name: "single quorum with records",
-			originalRecords: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			originalRecords: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					{Index: 0, Usage: 100},
 					{Index: 1, Usage: 200},
 					nil,
@@ -435,13 +434,13 @@ func TestQuorumPeriodRecords_DeepCopy(t *testing.T) {
 		},
 		{
 			name: "multiple quorums with mixed records",
-			originalRecords: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			originalRecords: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					{Index: 0, Usage: 100},
 					nil,
 					{Index: 2, Usage: 300},
 				},
-				core.QuorumID(2): []*meterer.PeriodRecord{
+				core.QuorumID(2): []*payment.PeriodRecord{
 					nil,
 					{Index: 4, Usage: 400},
 					{Index: 5, Usage: 500},
@@ -450,8 +449,8 @@ func TestQuorumPeriodRecords_DeepCopy(t *testing.T) {
 		},
 		{
 			name: "quorum with all nil records",
-			originalRecords: meterer.QuorumPeriodRecords{
-				core.QuorumID(3): []*meterer.PeriodRecord{
+			originalRecords: payment.QuorumPeriodRecords{
+				core.QuorumID(3): []*payment.PeriodRecord{
 					nil,
 					nil,
 					nil,
@@ -515,12 +514,12 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 	tests := []struct {
 		name         string
 		protoRecords map[uint32]*disperser_rpc.PeriodRecords
-		expected     meterer.QuorumPeriodRecords
+		expected     payment.QuorumPeriodRecords
 	}{
 		{
 			name:         "empty proto records",
 			protoRecords: make(map[uint32]*disperser_rpc.PeriodRecords),
-			expected:     make(meterer.QuorumPeriodRecords),
+			expected:     make(payment.QuorumPeriodRecords),
 		},
 		{
 			name: "single quorum with records",
@@ -532,8 +531,8 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 					},
 				},
 			},
-			expected: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			expected: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					{Index: 0, Usage: 100},
 					{Index: 1, Usage: 200},
 					{Index: 2, Usage: 0}, // Default initialized
@@ -555,13 +554,13 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 					},
 				},
 			},
-			expected: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			expected: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					{Index: 0, Usage: 0},   // Default
 					{Index: 1, Usage: 0},   // Default
 					{Index: 5, Usage: 500}, // Overwritten at index 2
 				},
-				core.QuorumID(2): []*meterer.PeriodRecord{
+				core.QuorumID(2): []*payment.PeriodRecord{
 					{Index: 3, Usage: 300}, // Overwritten at index 0
 					{Index: 7, Usage: 700}, // Overwritten at index 1
 					{Index: 2, Usage: 0},   // Default
@@ -579,8 +578,8 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 					},
 				},
 			},
-			expected: meterer.QuorumPeriodRecords{
-				core.QuorumID(0): []*meterer.PeriodRecord{
+			expected: payment.QuorumPeriodRecords{
+				core.QuorumID(0): []*payment.PeriodRecord{
 					{Index: 12, Usage: 1200}, // index 0
 					{Index: 10, Usage: 1000}, // index 1
 					{Index: 11, Usage: 1100}, // index 2
@@ -594,8 +593,8 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 					Records: []*disperser_rpc.PeriodRecord{},
 				},
 			},
-			expected: meterer.QuorumPeriodRecords{
-				core.QuorumID(1): []*meterer.PeriodRecord{
+			expected: payment.QuorumPeriodRecords{
+				core.QuorumID(1): []*payment.PeriodRecord{
 					{Index: 0, Usage: 0},
 					{Index: 1, Usage: 0},
 					{Index: 2, Usage: 0},
@@ -606,7 +605,7 @@ func TestQuorumPeriodRecords_FromProtoRecords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := meterer.FromProtoRecords(tt.protoRecords)
+			result := payment.FromProtoRecords(tt.protoRecords)
 
 			assert.Equal(t, len(tt.expected), len(result))
 

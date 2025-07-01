@@ -894,7 +894,7 @@
                 }
             }
         },
-        "core.PaymentMetadata": {
+        "payment.PaymentMetadata": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -1091,7 +1091,7 @@
                     "description": "PaymentMetadata contains the payment information for the blob",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/core.PaymentMetadata"
+                            "$ref": "#/definitions/payment.PaymentMetadata"
                         }
                     ]
                 },

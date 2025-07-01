@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/core/payment"
 	geth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,6 +51,6 @@ func VerifySignature(message []byte, accountAddr geth.Address, sig []byte) error
 }
 
 type PaymentSigner interface {
-	SignBlobPayment(header *PaymentMetadata) ([]byte, error)
+	SignBlobPayment(header *payment.PaymentMetadata) ([]byte, error)
 	GetAccountID() string
 }

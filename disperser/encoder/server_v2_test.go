@@ -12,6 +12,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
@@ -205,7 +206,7 @@ func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.Address{1},
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),

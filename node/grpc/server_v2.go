@@ -15,7 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -152,7 +152,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 		// TODO: move to blob authenticator later
 		for _, blob := range batch.BlobCertificates {
-			if paymentlogic.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
+			if payment.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
 				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
 				if in.DisperserID != api.EigenLabsDisperserID {
 					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
@@ -390,7 +390,7 @@ func (s *ServerV2) validateDispersalRequest(
 	}
 
 	blobHeader := blobCert.BlobHeader
-	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+	if blobHeader.PaymentMetadata == (payment.PaymentMetadata{}) {
 		return nil, errors.New("payment metadata is required")
 	}
 

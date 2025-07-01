@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -216,58 +215,5 @@ func TestChunksData(t *testing.T) {
 		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
 		_, err = gob.ToGnarkFormat()
 		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
-	}
-}
-
-func TestWithinTime(t *testing.T) {
-	tests := []struct {
-		name        string
-		start       time.Time
-		end         time.Time
-		checkTime   time.Time
-		wantInRange bool
-	}{
-		{
-			name:        "in range - current time in middle of range",
-			start:       time.Unix(100, 0),
-			end:         time.Unix(200, 0),
-			checkTime:   time.Unix(150, 0),
-			wantInRange: true,
-		},
-		{
-			name:        "in range - current time at start",
-			start:       time.Unix(100, 0),
-			end:         time.Unix(200, 0),
-			checkTime:   time.Unix(100, 0),
-			wantInRange: true,
-		},
-		{
-			name:        "in range - current time at end",
-			start:       time.Unix(100, 0),
-			end:         time.Unix(200, 0),
-			checkTime:   time.Unix(200, 0),
-			wantInRange: true,
-		},
-		{
-			name:        "out of range - current time before start",
-			start:       time.Unix(100, 0),
-			end:         time.Unix(200, 0),
-			checkTime:   time.Unix(99, 0),
-			wantInRange: false,
-		},
-		{
-			name:        "out of range - current time after end",
-			start:       time.Unix(100, 0),
-			end:         time.Unix(200, 0),
-			checkTime:   time.Unix(201, 0),
-			wantInRange: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			isInRange := core.WithinTime(tt.checkTime, tt.start, tt.end)
-			assert.Equal(t, tt.wantInRange, isInRange)
-		})
 	}
 }

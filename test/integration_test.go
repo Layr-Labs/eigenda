@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -226,19 +227,19 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	paymentLimit := big.NewInt(512)
 	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	}), mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-		1: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+	}), mock.Anything).Return(map[core.QuorumID]*payment.ReservedPayment{
+		0: &payment.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+		1: &payment.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
 	}, nil)
-	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.Anything, mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{}, errors.New("reservation not found"))
+	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.Anything, mock.Anything).Return(map[core.QuorumID]*payment.ReservedPayment{}, errors.New("reservation not found"))
 
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	})).Return(&core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
-	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{}, errors.New("payment not found"))
+	})).Return(&payment.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
+	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&payment.OnDemandPayment{}, errors.New("payment not found"))
 	// Setup mock payment vault params for integration test
-	integrationMockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+	integrationMockParams := &payment.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*payment.PaymentQuorumConfig{
 			0: {
 				OnDemandSymbolsPerSecond: 1024,
 				OnDemandPricePerSymbol:   1,
@@ -248,7 +249,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 				OnDemandPricePerSymbol:   1,
 			},
 		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+		QuorumProtocolConfigs: map[core.QuorumID]*payment.PaymentQuorumProtocolConfig{
 			0: {
 				MinNumSymbols:              128,
 				ReservationRateLimitWindow: 60,
@@ -302,7 +303,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to create global reservation table")
 	}
 
-	meteringStore, err := meterer.NewDynamoDBMeteringStore(
+	PaymentOffchainState, err := meterer.NewDynamoDBPaymentOffchainState(
 		clientConfig,
 		table_names[0],
 		table_names[1],
@@ -318,7 +319,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	mt := meterer.NewMeterer(meterer.Config{}, mockState, meteringStore, logger)
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, PaymentOffchainState, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{

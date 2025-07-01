@@ -1,4 +1,4 @@
-package paymentlogic
+package payment_test
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,7 +70,7 @@ func TestGetBinLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetBinLimit(tt.symbolsPerSecond, tt.binInterval)
+			result := payment.GetBinLimit(tt.symbolsPerSecond, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -122,7 +123,7 @@ func TestGetReservationPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetReservationPeriod(tt.timestamp, tt.binInterval)
+			result := payment.GetReservationPeriod(tt.timestamp, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -169,7 +170,7 @@ func TestGetReservationPeriodByNanosecond(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetReservationPeriodByNanosecond(tt.nanosecondTimestamp, tt.binInterval)
+			result := payment.GetReservationPeriodByNanosecond(tt.nanosecondTimestamp, tt.binInterval)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -210,7 +211,7 @@ func TestGetOverflowPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GetOverflowPeriod(tt.reservationPeriod, tt.reservationWindow)
+			result := payment.GetOverflowPeriod(tt.reservationPeriod, tt.reservationWindow)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -275,7 +276,7 @@ func TestSymbolsCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SymbolsCharged(tt.numSymbols, tt.minSymbols)
+			result := payment.SymbolsCharged(tt.numSymbols, tt.minSymbols)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -328,7 +329,7 @@ func TestPaymentCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
+			result := payment.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -386,7 +387,7 @@ func TestValidateQuorum(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateQuorum(tt.headerQuorums, tt.allowedQuorums)
+			err := payment.ValidateQuorum(tt.headerQuorums, tt.allowedQuorums)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -404,7 +405,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		reservation         *core.ReservedPayment
+		reservation         *payment.ReservedPayment
 		requestPeriod       uint64
 		reservationWindow   uint64
 		receivedTimestampNs int64
@@ -412,66 +413,66 @@ func TestValidateReservationPeriod(t *testing.T) {
 	}{
 		{
 			name: "valid - current period within reservation",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            true,
 		},
 		{
 			name: "valid - previous period within reservation",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) - reservationWindow,
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow) - reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            true,
 		},
 		{
 			name: "invalid - future period",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) + reservationWindow,
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow) + reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
 		},
 		{
 			name: "invalid - too old period",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(-time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow) - 2*reservationWindow,
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow) - 2*reservationWindow,
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
 		},
 		{
 			name: "invalid - before reservation start",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(time.Hour).Unix()), // starts in future
 				EndTimestamp:   uint64(now.Add(2 * time.Hour).Unix()),
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
 		},
 		{
 			name: "invalid - after reservation end",
-			reservation: &core.ReservedPayment{
+			reservation: &payment.ReservedPayment{
 				StartTimestamp: uint64(now.Add(-2 * time.Hour).Unix()),
 				EndTimestamp:   uint64(now.Add(-time.Hour).Unix()), // ended in past
 			},
-			requestPeriod:       GetReservationPeriodByNanosecond(nowNano, reservationWindow),
+			requestPeriod:       payment.GetReservationPeriodByNanosecond(nowNano, reservationWindow),
 			reservationWindow:   reservationWindow,
 			receivedTimestampNs: nowNano,
 			expected:            false,
@@ -480,7 +481,7 @@ func TestValidateReservationPeriod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateReservationPeriod(tt.reservation, tt.requestPeriod, tt.reservationWindow, tt.receivedTimestampNs)
+			result := payment.ValidateReservationPeriod(tt.reservation, tt.requestPeriod, tt.reservationWindow, tt.receivedTimestampNs)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -489,33 +490,33 @@ func TestValidateReservationPeriod(t *testing.T) {
 func TestIsOnDemandPayment(t *testing.T) {
 	tests := []struct {
 		name            string
-		paymentMetadata *core.PaymentMetadata
+		paymentMetadata *payment.PaymentMetadata
 		expected        bool
 	}{
 		{
 			name: "on-demand payment - positive amount",
-			paymentMetadata: &core.PaymentMetadata{
+			paymentMetadata: &payment.PaymentMetadata{
 				CumulativePayment: big.NewInt(100),
 			},
 			expected: true,
 		},
 		{
 			name: "not on-demand - zero payment",
-			paymentMetadata: &core.PaymentMetadata{
+			paymentMetadata: &payment.PaymentMetadata{
 				CumulativePayment: big.NewInt(0),
 			},
 			expected: false,
 		},
 		{
 			name: "not on-demand - negative payment",
-			paymentMetadata: &core.PaymentMetadata{
+			paymentMetadata: &payment.PaymentMetadata{
 				CumulativePayment: big.NewInt(-1),
 			},
 			expected: false,
 		},
 		{
 			name: "on-demand payment - large amount",
-			paymentMetadata: &core.PaymentMetadata{
+			paymentMetadata: &payment.PaymentMetadata{
 				CumulativePayment: new(big.Int).Mul(big.NewInt(1000000), big.NewInt(1000000)),
 			},
 			expected: true,
@@ -524,7 +525,7 @@ func TestIsOnDemandPayment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsOnDemandPayment(tt.paymentMetadata)
+			result := payment.IsOnDemandPayment(tt.paymentMetadata)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -535,20 +536,20 @@ func TestValidateReservations(t *testing.T) {
 	nowNano := now.UnixNano()
 
 	// Helper to create valid reservation
-	validReservation := &core.ReservedPayment{
+	validReservation := &payment.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   uint64(now.Add(-time.Hour).Unix()),
 		EndTimestamp:     uint64(now.Add(time.Hour).Unix()),
 	}
 
 	// Helper to create expired reservation
-	expiredReservation := &core.ReservedPayment{
+	expiredReservation := &payment.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   uint64(now.Add(-2 * time.Hour).Unix()),
 		EndTimestamp:     uint64(now.Add(-time.Hour).Unix()),
 	}
 
-	validQuorumConfigs := map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+	validQuorumConfigs := map[core.QuorumID]*payment.PaymentQuorumProtocolConfig{
 		0: {
 			ReservationRateLimitWindow: 60,
 			MinNumSymbols:              1,
@@ -561,8 +562,8 @@ func TestValidateReservations(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		reservations             map[core.QuorumID]*core.ReservedPayment
-		quorumConfigs            map[core.QuorumID]*core.PaymentQuorumProtocolConfig
+		reservations             map[core.QuorumID]*payment.ReservedPayment
+		quorumConfigs            map[core.QuorumID]*payment.PaymentQuorumProtocolConfig
 		quorumNumbers            []uint8
 		paymentHeaderTimestampNs int64
 		receivedTimestampNs      int64
@@ -571,7 +572,7 @@ func TestValidateReservations(t *testing.T) {
 	}{
 		{
 			name: "valid reservations",
-			reservations: map[core.QuorumID]*core.ReservedPayment{
+			reservations: map[core.QuorumID]*payment.ReservedPayment{
 				0: validReservation,
 				1: validReservation,
 			},
@@ -583,7 +584,7 @@ func TestValidateReservations(t *testing.T) {
 		},
 		{
 			name: "missing quorum config",
-			reservations: map[core.QuorumID]*core.ReservedPayment{
+			reservations: map[core.QuorumID]*payment.ReservedPayment{
 				0: validReservation,
 				2: validReservation, // quorum 2 not in configs
 			},
@@ -596,7 +597,7 @@ func TestValidateReservations(t *testing.T) {
 		},
 		{
 			name: "invalid quorum in header",
-			reservations: map[core.QuorumID]*core.ReservedPayment{
+			reservations: map[core.QuorumID]*payment.ReservedPayment{
 				0: validReservation,
 				1: validReservation,
 			},
@@ -609,7 +610,7 @@ func TestValidateReservations(t *testing.T) {
 		},
 		{
 			name: "inactive reservation",
-			reservations: map[core.QuorumID]*core.ReservedPayment{
+			reservations: map[core.QuorumID]*payment.ReservedPayment{
 				0: expiredReservation,
 			},
 			quorumConfigs:            validQuorumConfigs,
@@ -621,7 +622,7 @@ func TestValidateReservations(t *testing.T) {
 		},
 		{
 			name: "invalid reservation period",
-			reservations: map[core.QuorumID]*core.ReservedPayment{
+			reservations: map[core.QuorumID]*payment.ReservedPayment{
 				0: {
 					SymbolsPerSecond: 100,
 					StartTimestamp:   uint64(now.Add(-2 * time.Hour).Unix()),
@@ -639,7 +640,7 @@ func TestValidateReservations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateReservations(
+			err := payment.ValidateReservations(
 				tt.reservations,
 				tt.quorumConfigs,
 				tt.quorumNumbers,

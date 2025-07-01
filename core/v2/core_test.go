@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -116,7 +117,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, l
 			BlobVersion:     version,
 			QuorumNumbers:   quorums,
 			BlobCommitments: commitments,
-			PaymentMetadata: core.PaymentMetadata{
+			PaymentMetadata: payment.PaymentMetadata{
 				AccountID:         gethcommon.HexToAddress("0x123"),
 				Timestamp:         5,
 				CumulativePayment: big.NewInt(100),

@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/meterer/paymentlogic"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -374,7 +374,7 @@ func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuo
 	// Build period records by selecting highest usage for each period index across all quorums
 	var periodRecords []*pb.PeriodRecord
 	if len(allQuorumsReply.PeriodRecords) > 0 {
-		highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
+		highestPeriodRecords := make([]*pb.PeriodRecord, payment.MinNumBins)
 		for _, quorumRecords := range allQuorumsReply.PeriodRecords {
 			if quorumRecords == nil {
 				continue
@@ -383,7 +383,7 @@ func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuo
 				if record == nil {
 					continue
 				}
-				idx := record.Index % uint32(meterer.MinNumBins)
+				idx := record.Index % uint32(payment.MinNumBins)
 				if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
 					highestPeriodRecords[idx] = record
 				}
@@ -473,7 +473,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 				EndTimestamp:     uint32(reservation.EndTimestamp),
 			}
 			periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
-				Records: make([]*pb.PeriodRecord, meterer.MinNumBins),
+				Records: make([]*pb.PeriodRecord, payment.MinNumBins),
 			}
 			_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
 			if err != nil {
@@ -481,12 +481,12 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 				return nil, api.NewErrorInternal("failed to get quorum protocol config")
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
-			reservationCurrentPeriods = append(reservationCurrentPeriods, paymentlogic.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
+			reservationCurrentPeriods = append(reservationCurrentPeriods, payment.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
 		}
 	}
 
 	// Get off-chain period records for all reserved quorums
-	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, reservationQuorumIds, reservationCurrentPeriods, 3)
+	records, err := s.meterer.PaymentOffchainState.GetPeriodRecords(ctx, accountID, reservationQuorumIds, reservationCurrentPeriods, 3)
 	if err != nil {
 		s.logger.Error("failed to get period records", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInternal("failed to get period records")
@@ -499,7 +499,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 
 	// Get largest cumulative payment
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
+	largestCumulativePayment, err := s.meterer.PaymentOffchainState.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Error("failed to get largest cumulative payment", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInternal("failed to get largest cumulative payment")

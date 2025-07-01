@@ -20,7 +20,7 @@ definitions:
       "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
-  core.PaymentMetadata:
+  payment.PaymentMetadata:
     properties:
       account_id:
         description: AccountID is the ETH account address for the payer
@@ -158,7 +158,7 @@ definitions:
         type: integer
       paymentMetadata:
         allOf:
-        - $ref: '#/definitions/core.PaymentMetadata'
+        - $ref: '#/definitions/payment.PaymentMetadata'
         description: PaymentMetadata contains the payment information for the blob
       quorumNumbers:
         description: QuorumNumbers contains the quorums the blob is dispersed to

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -255,34 +256,34 @@ func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.O
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*payment.ReservedPayment, error) {
 	args := t.Called(ctx, accountIDs)
-	var value map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
+	var value map[gethcommon.Address]map[core.QuorumID]*payment.ReservedPayment
 	if args.Get(0) != nil {
-		value = args.Get(0).(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
+		value = args.Get(0).(map[gethcommon.Address]map[core.QuorumID]*payment.ReservedPayment)
 	}
 	return value, args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *MockWriter) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*payment.ReservedPayment, error) {
 	args := t.Called(ctx, accountID)
-	var value map[core.QuorumID]*core.ReservedPayment
+	var value map[core.QuorumID]*payment.ReservedPayment
 	if args.Get(0) != nil {
-		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
+		value = args.Get(0).(map[core.QuorumID]*payment.ReservedPayment)
 	}
 	return value, args.Error(1)
 }
 
-func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*payment.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.OnDemandPayment), args.Error(1)
+	return result.(map[gethcommon.Address]*payment.OnDemandPayment), args.Error(1)
 }
 
-func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*payment.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(*core.OnDemandPayment), args.Error(1)
+	return result.(*payment.OnDemandPayment), args.Error(1)
 }
 
 func (t *MockWriter) GetOperatorSocket(ctx context.Context, operatorID core.OperatorID) (string, error) {

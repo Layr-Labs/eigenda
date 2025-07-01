@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -114,7 +115,7 @@ func testHeader(t *testing.T, accountID gethcommon.Address) *corev2.BlobHeader {
 			Length:           50,
 		},
 		QuorumNumbers: []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),

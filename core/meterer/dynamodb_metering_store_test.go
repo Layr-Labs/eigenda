@@ -13,6 +13,7 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ import (
 
 type testContext struct {
 	ctx              context.Context
-	store            meterer.MeteringStore
+	store            payment.PaymentOffchainState
 	reservationTable string
 	onDemandTable    string
 	globalBinTable   string
@@ -45,7 +46,7 @@ func setupTest(t *testing.T) *testContext {
 	err = meterer.CreateGlobalReservationTable(clientConfig, tc.globalBinTable)
 	require.NoError(t, err)
 
-	tc.store, err = meterer.NewDynamoDBMeteringStore(
+	tc.store, err = meterer.NewDynamoDBPaymentOffchainState(
 		clientConfig,
 		tc.reservationTable,
 		tc.onDemandTable,
@@ -189,7 +190,7 @@ func TestUpdateGlobalBin(t *testing.T) {
 func TestAddOnDemandPayment(t *testing.T) {
 	withTestContext(t, func(t *testing.T, tc *testContext) {
 		accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
-		payment1 := core.PaymentMetadata{
+		payment1 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(100),
@@ -215,7 +216,7 @@ func TestAddOnDemandPayment(t *testing.T) {
 		assert.Equal(t, payment1.CumulativePayment.Int64(), cumulativePaymentVal)
 
 		// Test case: Add a larger payment with sufficient increment
-		payment2 := core.PaymentMetadata{
+		payment2 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(200),
@@ -237,7 +238,7 @@ func TestAddOnDemandPayment(t *testing.T) {
 		assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal)
 
 		// Test case: Add a larger payment but with insufficient increment
-		payment3 := core.PaymentMetadata{
+		payment3 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(250), // Only 50 more than previous 200
@@ -260,7 +261,7 @@ func TestAddOnDemandPayment(t *testing.T) {
 		assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal, "Payment should not have been updated")
 
 		// Test case: Add a smaller payment (should fail)
-		payment4 := core.PaymentMetadata{
+		payment4 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(150),
@@ -292,7 +293,7 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 		cumulativePayment := big.NewInt(1000)
 		paymentCharged := big.NewInt(500)
 
-		paymentMetadata := core.PaymentMetadata{
+		paymentMetadata := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: cumulativePayment,
@@ -311,7 +312,7 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 
 		// Add another payment
 		newCumulativePayment := big.NewInt(2000)
-		newPaymentMetadata := core.PaymentMetadata{
+		newPaymentMetadata := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: newCumulativePayment,
@@ -382,7 +383,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 		require.Equal(t, big.NewInt(0), largest, "Initial largest payment should be 0")
 
 		// Test case 2: Add first payment of 100 with charge of 100
-		payment1 := core.PaymentMetadata{
+		payment1 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(100),
@@ -396,7 +397,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 		require.Equal(t, big.NewInt(100), largest, "Largest payment should be 100")
 
 		// Test case 3: Add second payment of 300 with charge of 200 (cumulative)
-		payment2 := core.PaymentMetadata{
+		payment2 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(300),
@@ -410,7 +411,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 		require.Equal(t, big.NewInt(300), largest, "Largest payment should be 300")
 
 		// Test case 4: Try to add payment of 200 with charge of 100 - should fail since cumulative is less than previous
-		payment3 := core.PaymentMetadata{
+		payment3 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(200),
@@ -424,7 +425,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 		require.Equal(t, big.NewInt(300), largest, "Largest payment should still be 300")
 
 		// Test case 5: Add payment of 500 with insufficient charge (250) - should fail
-		payment4 := core.PaymentMetadata{
+		payment4 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(500),
@@ -438,7 +439,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 		require.Equal(t, big.NewInt(300), largest, "Largest payment should still be 300")
 
 		// Test case 6: Add valid payment of 500 with sufficient charge (200)
-		payment5 := core.PaymentMetadata{
+		payment5 := payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         time.Now().Unix(),
 			CumulativePayment: big.NewInt(500),

@@ -1,4 +1,4 @@
-package paymentlogic
+package payment
 
 import (
 	"errors"
@@ -7,9 +7,14 @@ import (
 	"math/big"
 	"slices"
 	"time"
-
-	"github.com/Layr-Labs/eigenda/core"
 )
+
+// OnDemandDepositQuorumID tracks the initial quorum that supports on-demand payment deposits on-chain
+var OnDemandDepositQuorumID = uint8(0)
+
+// OnDemandUsageQuorumIDs tracks the initial quorums that supports on-demand usage off-chain; having on-chain deposit on quorum 0
+// subsequently allows the depositer to use both quorum 0 and 1 off-chain for on-demand usage.
+var OnDemandUsageQuorumIDs = []uint8{0, 1}
 
 // GetBinLimit returns the bin limit given the bin interval and the symbols per second
 func GetBinLimit(symbolsPerSecond uint64, binInterval uint64) uint64 {
@@ -67,12 +72,20 @@ func SymbolsCharged(numSymbols uint64, minSymbols uint64) uint64 {
 		return numSymbols
 	}
 	// Round up to the nearest multiple of MinNumSymbols
-	roundedUp := core.RoundUpDivide(numSymbols, minSymbols) * minSymbols
+	roundedUp := RoundUpDivide(numSymbols, minSymbols) * minSymbols
 	// Check for overflow; this case should never happen
 	if roundedUp < numSymbols {
 		return math.MaxUint64
 	}
 	return roundedUp
+}
+
+// RoundUpDivide performs integer division with rounding up
+func RoundUpDivide(a, b uint64) uint64 {
+	if b == 0 {
+		return 0
+	}
+	return (a + b - 1) / b
 }
 
 // ValidateQuorum ensures that the quorums listed in the blobHeader are present within allowedQuorums
@@ -101,15 +114,15 @@ func ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 //   - Charges apply to ALL allowed quorums, even if not all are used
 //   - On-demand requests have special requirements: they must use ETH and EIGEN quorums only
 func ValidateReservations(
-	reservations map[core.QuorumID]*core.ReservedPayment,
-	quorumConfigs map[core.QuorumID]*core.PaymentQuorumProtocolConfig,
+	reservations map[uint8]*ReservedPayment,
+	quorumConfigs map[uint8]*PaymentQuorumProtocolConfig,
 	quorumNumbers []uint8,
 	paymentHeaderTimestampNs int64,
 	receivedTimestampNs int64,
 ) error {
 	reservationQuorums := make([]uint8, 0, len(reservations))
-	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
-	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
+	reservationWindows := make(map[uint8]uint64, len(reservations))
+	requestReservationPeriods := make(map[uint8]uint64, len(reservations))
 
 	// Gather quorums the user had an reservations on and relevant quorum configurations
 	for quorumID := range reservations {
@@ -126,7 +139,7 @@ func ValidateReservations(
 	}
 	// Validate the used reservations are active and is of valid periods
 	for _, quorumID := range quorumNumbers {
-		reservation := reservations[core.QuorumID(quorumID)]
+		reservation := reservations[uint8(quorumID)]
 		if !reservation.IsActiveByNanosecond(paymentHeaderTimestampNs) {
 			return errors.New("reservation not active")
 		}
@@ -140,7 +153,7 @@ func ValidateReservations(
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
 // Note: This is called per-quorum since reservation is for a single quorum.
-func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedTimestampNs int64) bool {
+func ValidateReservationPeriod(reservation *ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedTimestampNs int64) bool {
 	currentReservationPeriod := GetReservationPeriodByNanosecond(receivedTimestampNs, reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
@@ -155,6 +168,6 @@ func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReserva
 
 // IsOnDemandPayment explicitly determines if the payment is an on-demand payment by checking if the cumulative payment is greater than 0
 // If the cumulative payment is 0, it is not an on-demand payment, but a reservation payment.
-func IsOnDemandPayment(paymentMetadata *core.PaymentMetadata) bool {
+func IsOnDemandPayment(paymentMetadata *PaymentMetadata) bool {
 	return paymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) > 0
 }

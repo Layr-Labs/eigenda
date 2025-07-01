@@ -24,6 +24,7 @@ import (
 	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -805,12 +806,12 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 }
 
 // TODO: later add quorumIds specifications
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*payment.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 
-	reservationsMap := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
+	reservationsMap := make(map[gethcommon.Address]map[core.QuorumID]*payment.ReservedPayment)
 
 	// In the new API, we need to query reservations per quorum and account
 	// For now, there's only one reservation per account, applied to multiple quorums
@@ -839,7 +840,7 @@ func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 // TODO: this function should take in a list of quorumIds
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*payment.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
@@ -855,12 +856,12 @@ func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID geth
 	return ConvertToReservedPayments(reservation)
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*payment.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 
-	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
+	paymentsMap := make(map[gethcommon.Address]*payment.OnDemandPayment)
 
 	// TODO: update to use default of quorum 0 for deposits
 	// quorumId := uint64(0)
@@ -879,7 +880,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 			continue
 		}
 
-		paymentsMap[accountID] = &core.OnDemandPayment{
+		paymentsMap[accountID] = &payment.OnDemandPayment{
 			CumulativePayment: onDemandDeposit,
 		}
 	}
@@ -887,7 +888,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 	return paymentsMap, nil
 }
 
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*payment.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
@@ -905,7 +906,7 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 		return nil, err
 	}
 
-	return &core.OnDemandPayment{
+	return &payment.OnDemandPayment{
 		CumulativePayment: onDemandDeposit,
 	}, nil
 }
