@@ -21,9 +21,10 @@ NOTE: Be aware that whatever you add to this list is automatically loaded into c
    to provide project context, but only within reasonable limits.
 
 1. @Makefile contains commands for building, testing, and formatting
-2. @mise.toml describes project dependencies
-3. @.golangci.yml contains linting configuration
-4. @docs/CLAUDE.md causes doc files to be automatically imported
+2. @go.mod describes golang dependencies
+3. @mise.toml describes external tool dependencies
+4. @.golangci.yml contains linting configuration
+5. @docs/CLAUDE.md causes doc files to be automatically imported
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a CLAUDE.md
    file *in the relevant subdirectory*. Then the imports will only be processed when files within that directory are read.
