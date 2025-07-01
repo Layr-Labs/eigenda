@@ -18,17 +18,13 @@
 ## 2. File imports
 
 NOTE: Be aware that whatever you add to this list is automatically loaded into context (due to `@` annotation). It's helpful
-   to provide project context, but only within reasonable limits. See the [Anthropic docs](https://docs.anthropic.com/en/docs/claude-code/memory#claude-md-imports)
-   for more information.
+   to provide project context, but only within reasonable limits.
 
-| File Import                      | Description                          |
-|----------------------------------|--------------------------------------|
-| @Makefile                        | Build, test, and formatting commands |
-| @mise.toml                       | Dependency management                |
-| @.golangci.yml                   | Golang linting YAML                  |
-| @README.md                       | Main project README file             |
-| @docs/spec/src/**/*.md           | All project spec markdown files      |
-| @.claude/commands/*              | Project claude commands              |
+1. @Makefile contains commands for building, testing, and formatting
+2. @mise.toml describes project dependencies
+3. @.golangci.yml contains linting configuration
+4. @docs/CLAUDE.md causes doc files to be automatically imported
+5. @.claude/commands/* contains defined project commands
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a CLAUDE.md
    file *in the relevant subdirectory*. Then the imports will only be processed when files within that directory are read.
