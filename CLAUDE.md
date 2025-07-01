@@ -87,7 +87,7 @@ If there are imports that are relevant only to a particular part of the project,
 
 1. Forgetting to run `go mod tidy` after adding new dependencies.
 2. Not linting before committing code.
-3. Wrong working directory when running commands (ensure you're in project root).
+3. Wrong working directory when running commands.
 4. Large AI refactors in a single commit.
 5. Delegating test/spec writing entirely to AI (can lead to false confidence).
 
