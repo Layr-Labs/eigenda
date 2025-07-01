@@ -12,40 +12,58 @@ import (
 
 func TestGetBinLimit(t *testing.T) {
 	tests := []struct {
-		name              string
-		symbolsPerSecond  uint64
-		binInterval       uint64
-		expected          uint64
+		name             string
+		symbolsPerSecond uint64
+		binInterval      uint64
+		expected         uint64
 	}{
 		{
-			name:              "normal case",
-			symbolsPerSecond:  100,
-			binInterval:       60,
-			expected:          6000,
+			name:             "normal case",
+			symbolsPerSecond: 100,
+			binInterval:      60,
+			expected:         6000,
 		},
 		{
-			name:              "zero symbols per second",
-			symbolsPerSecond:  0,
-			binInterval:       60,
-			expected:          0,
+			name:             "zero symbols per second",
+			symbolsPerSecond: 0,
+			binInterval:      60,
+			expected:         0,
 		},
 		{
-			name:              "zero bin interval",
-			symbolsPerSecond:  100,
-			binInterval:       0,
-			expected:          0,
+			name:             "zero bin interval",
+			symbolsPerSecond: 100,
+			binInterval:      0,
+			expected:         0,
 		},
 		{
-			name:              "both zero",
-			symbolsPerSecond:  0,
-			binInterval:       0,
-			expected:          0,
+			name:             "both zero",
+			symbolsPerSecond: 0,
+			binInterval:      0,
+			expected:         0,
 		},
 		{
-			name:              "large values",
-			symbolsPerSecond:  math.MaxUint32,
-			binInterval:       100,
-			expected:          math.MaxUint32 * 100,
+			name:             "large values without overflow",
+			symbolsPerSecond: math.MaxUint32,
+			binInterval:      100,
+			expected:         math.MaxUint32 * 100,
+		},
+		{
+			name:             "overflow case - should handle gracefully",
+			symbolsPerSecond: math.MaxUint64,
+			binInterval:      2,
+			expected:         math.MaxUint64, // Overflow protection returns max value
+		},
+		{
+			name:             "edge case - near overflow boundary",
+			symbolsPerSecond: math.MaxUint64 / 2,
+			binInterval:      2,
+			expected:         math.MaxUint64 - 1, // Just under max value
+		},
+		{
+			name:             "overflow case - large factors",
+			symbolsPerSecond: math.MaxUint32 + 1,
+			binInterval:      math.MaxUint32 + 1,
+			expected:         math.MaxUint64, // Would overflow
 		},
 	}
 
@@ -159,10 +177,10 @@ func TestGetReservationPeriod(t *testing.T) {
 
 func TestGetReservationPeriodByNanosecond(t *testing.T) {
 	tests := []struct {
-		name                 string
-		nanosecondTimestamp  int64
-		binInterval          uint64
-		expected             uint64
+		name                string
+		nanosecondTimestamp int64
+		binInterval         uint64
+		expected            uint64
 	}{
 		{
 			name:                "negative timestamp",
@@ -206,10 +224,10 @@ func TestGetReservationPeriodByNanosecond(t *testing.T) {
 
 func TestGetOverflowPeriod(t *testing.T) {
 	tests := []struct {
-		name               string
-		reservationPeriod  uint64
-		reservationWindow  uint64
-		expected           uint64
+		name              string
+		reservationPeriod uint64
+		reservationWindow uint64
+		expected          uint64
 	}{
 		{
 			name:              "normal case",
@@ -365,11 +383,11 @@ func TestPaymentCharged(t *testing.T) {
 
 func TestValidateQuorum(t *testing.T) {
 	tests := []struct {
-		name            string
-		headerQuorums   []uint8
-		allowedQuorums  []uint8
-		expectError     bool
-		errorContains   string
+		name           string
+		headerQuorums  []uint8
+		allowedQuorums []uint8
+		expectError    bool
+		errorContains  string
 	}{
 		{
 			name:           "valid quorums - all allowed",
@@ -517,9 +535,9 @@ func TestValidateReservationPeriod(t *testing.T) {
 
 func TestIsOnDemandPayment(t *testing.T) {
 	tests := []struct {
-		name             string
-		paymentMetadata  *core.PaymentMetadata
-		expected         bool
+		name            string
+		paymentMetadata *core.PaymentMetadata
+		expected        bool
 	}{
 		{
 			name: "on-demand payment - positive amount",
@@ -657,8 +675,8 @@ func TestValidateReservations(t *testing.T) {
 					EndTimestamp:     uint64(now.Add(2 * time.Hour).Unix()), // active but wrong period
 				},
 			},
-			quorumConfigs:       validQuorumConfigs,
-			quorumNumbers:       []uint8{0},
+			quorumConfigs:            validQuorumConfigs,
+			quorumNumbers:            []uint8{0},
 			paymentHeaderTimestampNs: now.Add(-10 * time.Minute).UnixNano(), // too far in past for valid period
 			receivedTimestampNs:      nowNano,
 			expectError:              true,
