@@ -112,9 +112,15 @@ func NewDataTracker(
 	cohortDirectory := path.Join(config.MetadataDirectory, "cohorts")
 
 	// Create the cohort directory if it doesn't exist.
-	err := util.EnsureDirectoryExists(cohortDirectory, config.Fsync)
+	exists, err := util.Exists(cohortDirectory)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cohort directory: %w", err)
+		return nil, fmt.Errorf("failed to check if cohort directory exists: %w", err)
+	}
+	if !exists {
+		err = os.MkdirAll(cohortDirectory, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cohort directory: %w", err)
+		}
 	}
 
 	lowestCohortIndex, highestCohortIndex, cohorts, err := gatherCohorts(cohortDirectory)
