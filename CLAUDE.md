@@ -31,21 +31,29 @@ If there are imports that are relevant only to a particular part of the project,
 
 ---
 
-## 3. Coding standards
+## 3. Testing
 
-1. **Line Length**: 120 characters. This should also be observed for Markdown files, where manual newlines should be inserted.
-   - The line length limit may be ignored in cases where a line break hinders readability, e.g. URLs.
-2. **Imports**: Use `goimports` for sorted imports. Group standard library, third-party, and local imports.
-3. **Testing**: `*_test.go` files in same package; use `testify` for assertions.
+> Tests encode human intention, and must be guarded zealously.
 
-### 3.1. Error handling
+1. AI generated tests provide a false sense of security: they verify that the code does what it does, not what it _should_ do.
+2. If any AI is used to assist with writing tests, its involvement must be limited to the following tasks:
+   - Evaluating existing coverage
+   - Generating small bits of test logic, which must be carefully scrutinized by a human before being accepted. USE WITH CAUTION.
+3. Unit tests should be put in `*_test.go` files in same package.
+4. Use `testify` for assertions.
+
+---
+
+## 4. Coding standards
+
+### 4.1. Error handling
 
 1. Return errors explicitly; don't panic except for unrecoverable errors
    - Some exceptions can be made for test code, where returning an error adds more complexity than benefit.
 2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context
    - Ensure that `%w` is used for error wrapping, *not* `%v`
 
-### 3.2. Code Documentation
+### 4.2. Code Documentation
 
 1. Write docs for all exported functions/types in production code
 2. Write docs for unexported functions/types if they contain non-trivial logic. A good rule of thumb: if you can't understand everything
@@ -61,7 +69,7 @@ If there are imports that are relevant only to a particular part of the project,
    - Are there any performance implications that users should be aware of?
    - Are there any performance optimizations that should/could be undertaken in the future?
 
-### 3.3. Doc Files
+### 4.3. Doc Files
 
 1. **Hierarchical organization**: Hierarchical numbering for sections makes referencing easier.
 2. **Tabular format for key facts**: Tables are helpful for understanding data at a glance: use them where appropriate.
@@ -71,7 +79,7 @@ If there are imports that are relevant only to a particular part of the project,
 
 ---
 
-## 4. Directory-Specific CLAUDE.md Files
+## 5. Directory-Specific CLAUDE.md Files
 
 1. **Always check for `CLAUDE.md` files in specific directories** before working on code within them. These files contain targeted context.
 2. If a directory's `CLAUDE.md` is outdated or incorrect, **update it**.
@@ -83,7 +91,7 @@ If there are imports that are relevant only to a particular part of the project,
 
 ---
 
-## 5. Common pitfalls
+## 6. Common pitfalls
 
 1. Forgetting to run `go mod tidy` after adding new dependencies.
 2. Not linting before committing code.
@@ -93,7 +101,7 @@ If there are imports that are relevant only to a particular part of the project,
 
 ---
 
-## 6. Files to NOT modify
+## 7. Files to NOT modify
 
 These files and directories should generally not be modified without explicit permission:
 
@@ -109,7 +117,7 @@ These files and directories should generally not be modified without explicit pe
 
 ---
 
-## 7. AI Assistant Workflow: Step-by-Step Methodology
+## 8. AI Assistant Workflow: Step-by-Step Methodology
 
 When responding to user instructions, the AI assistant (Claude, Cursor, GPT, etc.) should follow this process
    to ensure clarity, correctness, and maintainability:
@@ -141,7 +149,7 @@ When responding to user instructions, the AI assistant (Claude, Cursor, GPT, etc
 12. **Session Boundaries**: If the user's request isn't directly related to the current context and can be
     safely started in a fresh session, suggest starting from scratch to avoid context confusion.
 
-## 8. AI Assistant User Interactions
+## 9. AI Assistant User Interactions
 
 1. When responding to a prompt with a list of items, number the list for easy reference.
 2. Use line numbers and file paths so that the user can easily find elements being referred to.
