@@ -68,6 +68,9 @@ If there are imports that are relevant only to a particular part of the project,
    - What side effects does calling the function have?
    - Are there any performance implications that users should be aware of?
    - Are there any performance optimizations that should/could be undertaken in the future?
+5. TODO comments should be added to denote future work
+   - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context can understand
+   - TODO comments that must be addressed prior to merging a PR should clearly be marked, e.g. `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
 
 ### 4.3. Doc Files
 
