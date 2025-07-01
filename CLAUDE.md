@@ -18,7 +18,8 @@
 ## 2. File imports
 
 NOTE: Be aware that whatever you add to this list is automatically loaded into context (due to `@` annotation). It's helpful
-   to provide project context, but only within reasonable limits.
+   to provide project context, but only within reasonable limits. See the [Anthropic docs](https://docs.anthropic.com/en/docs/claude-code/memory#claude-md-imports)
+   for more information.
 
 | File Import                      | Description                          |
 |----------------------------------|--------------------------------------|
