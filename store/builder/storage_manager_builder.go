@@ -406,21 +406,21 @@ func buildEthClient(ctx context.Context, log logging.Logger, secretConfigV2 comm
 		return nil, fmt.Errorf("failed to get chain ID from ETH RPC: %w", err)
 	}
 
-	log.Info("Using chain id: %d", chainID.Uint64())
+	log.Infof("Using chain id: %d", chainID.Uint64())
 
 	// Validate that the chain ID matches the expected network
 	if expectedNetwork != "" {
-		actualNetwork, err := common.EigenDANetworkFromChainID(chainID.String())
+		actualNetworks, err := common.EigenDANetworksFromChainID(chainID.String())
 		if err != nil {
 			return nil, fmt.Errorf("unknown chain ID %s: %w", chainID.String(), err)
 		}
-		if actualNetwork != expectedNetwork {
-			return nil, fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC"+
+		if !slices.Contains(actualNetworks, expectedNetwork) {
+			return nil, fmt.Errorf("network mismatch: expected %s (based on configuration), but ETH RPC "+
 				"returned chain ID %s which corresponds to %s",
-				expectedNetwork, chainID.String(), actualNetwork)
+				expectedNetwork, chainID.String(), actualNetworks)
 		}
 
-		log.Info("Detected EigenDA network: %s. Will use for reading network default values if overrides"+
+		log.Infof("Detected EigenDA network: %s. Will use for reading network default values if overrides "+
 			"aren't provided.", expectedNetwork.String())
 	}
 

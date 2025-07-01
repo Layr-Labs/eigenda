@@ -47,7 +47,8 @@ type ClientConfigV2 struct {
 	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.
 	RBNRecencyWindowSize uint64
 
-	// The EigenDA network that is being used. Used for validating chain ID matches network.
+	// The EigenDA network that is being used.
+	// It is optional, and when set will be used for validating that the eth-rpc chain ID matches the network.
 	EigenDANetwork EigenDANetwork
 }
 
