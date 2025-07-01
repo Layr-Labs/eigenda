@@ -52,14 +52,17 @@ contract DeployEigenDADirectory is Script {
         );
     }
 
+    struct AddressConfig {
+        string name;
+        address value;
+    }
+
     function _populateDirectory() internal virtual {
-        string[] memory names = cfg.readStringArray(".contractNames");
-        address[] memory values = cfg.readAddressArray(".contractAddresses");
+        bytes memory addressConfigsRaw = stdToml.parseRaw(cfg, ".addressConfigs");
+        AddressConfig[] memory addressConfigs = abi.decode(addressConfigsRaw, (AddressConfig[]));
 
-        require(names.length == values.length, "Names and addresses length mismatch");
-
-        for (uint256 i; i < names.length; i++) {
-            directory.addAddress(names[i], values[i]);
+        for (uint256 i; i < addressConfigs.length; i++) {
+            directory.addAddress(addressConfigs[i].name, addressConfigs[i].value);
         }
     }
 }

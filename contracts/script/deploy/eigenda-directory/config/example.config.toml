@@ -1,9 +1,10 @@
-
-# This field should be populated with the contract names for use in contract lookups.
-contractNames = ["EXAMPLE", "EXAMPLE2"]
-
-# This field should be populated with the addresses of the contracts in the same order as in contractNames.
-contractAddresses = ["0xfC4C575ea3f8316D38F83076Cf765f7B8DeaFC58", "0xF2d1511E53AeAE16213EcA7963A103cB5CEc2b18"]
+# This file contains the configuration for deploying the EigenDA Directory contract.
+addressConfigs = [
+    [
+        { 0_name = "EXAMPLE", 1_address = "0xfC4C575ea3f8316D38F83076Cf765f7B8DeaFC58" },
+        { 0_name = "EXAMPLE2", 1_address = "0xF2d1511E53AeAE16213EcA7963A103cB5CEc2b18" }
+    ]
+]
 
 # The address of the proxy admin contract that manages the upgradeability of the contracts.
 proxyAdmin = "0x9Fd7E279f5bD692Dc04792151E14Ad814FC60eC1"
