@@ -2,6 +2,7 @@ package disperser
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -27,14 +28,14 @@ func (m *LocalEncoderClient) EncodeBlob(ctx context.Context, data []byte, encodi
 	defer m.mu.Unlock()
 	commits, chunks, err := m.prover.EncodeAndProve(data, encodingParams)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("prover.EncodeAndProve: %w", err)
 	}
 
 	bytes := make([][]byte, 0, len(chunks))
 	for _, c := range chunks {
 		serialized, err := c.Serialize()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("serialize chunk: %w", err)
 		}
 		bytes = append(bytes, serialized)
 	}

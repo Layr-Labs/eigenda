@@ -8,7 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -16,8 +17,14 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.SignedBatch, error) {
-	convertedBatchHeader, err := BatchHeaderProtoToBinding(inputBatch.GetHeader())
+/*
+	NOTE: Two binding types are used here to represent the same data since legacy EigenDACertVerifierV2
+	binding and IEigenDACertTypeBindings leverage the same structs but are not currently interchangeable.
+	This can be changed in the future to use a single binding type once the legacy contract is deprecated.
+*/
+
+func SignedBatchProtoToV2CertBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.EigenDATypesV2SignedBatch, error) {
+	convertedBatchHeader, err := BatchHeaderProtoToV2CertVerifierBinding(inputBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header: %s", err)
 	}
@@ -27,7 +34,7 @@ func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEi
 		return nil, fmt.Errorf("convert attestation: %s", err)
 	}
 
-	outputSignedBatch := &contractEigenDACertVerifier.SignedBatch{
+	outputSignedBatch := &contractEigenDACertVerifier.EigenDATypesV2SignedBatch{
 		BatchHeader: *convertedBatchHeader,
 		Attestation: *convertedAttestation,
 	}
@@ -35,7 +42,7 @@ func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEi
 	return outputSignedBatch, nil
 }
 
-func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEigenDACertVerifier.BatchHeaderV2, error) {
+func BatchHeaderProtoToV2CertVerifierBinding(inputHeader *commonv2.BatchHeader) (*contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2, error) {
 	var outputBatchRoot [32]byte
 
 	inputBatchRoot := inputHeader.GetBatchRoot()
@@ -52,15 +59,28 @@ func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEige
 			math.MaxUint32)
 	}
 
-	convertedHeader := &contractEigenDACertVerifier.BatchHeaderV2{
+	convertedHeader := &contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2{
 		BatchRoot:            outputBatchRoot,
 		ReferenceBlockNumber: uint32(inputReferenceBlockNumber),
 	}
 
 	return convertedHeader, nil
 }
+func BatchHeaderProtoToIEigenDATypesBinding(inputHeader *commonv2.BatchHeader) (*certTypesBinding.EigenDATypesV2BatchHeaderV2, error) {
+	verifierBatchHeaderBinding, err := BatchHeaderProtoToV2CertVerifierBinding(inputHeader)
+	if err != nil {
+		return nil, err
+	}
 
-func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*contractEigenDACertVerifier.Attestation, error) {
+	convertedHeader := &certTypesBinding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot:            verifierBatchHeaderBinding.BatchRoot,
+		ReferenceBlockNumber: verifierBatchHeaderBinding.ReferenceBlockNumber,
+	}
+
+	return convertedHeader, nil
+}
+
+func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*contractEigenDACertVerifier.EigenDATypesV2Attestation, error) {
 	if len(inputAttestation.QuorumApks) != len(inputAttestation.QuorumNumbers) {
 		return nil, fmt.Errorf(
 			"quorum apks and quorum numbers must have the same length (apks: %d, numbers: %d)",
@@ -100,7 +120,7 @@ func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*cont
 	for i, quorumNumber := range sortedQuorumNumbers {
 		sortedQuorumAPKs[i] = quorumAPKMap[core.QuorumID(quorumNumber)]
 	}
-	convertedAttestation := &contractEigenDACertVerifier.Attestation{
+	convertedAttestation := &contractEigenDACertVerifier.EigenDATypesV2Attestation{
 		NonSignerPubkeys: nonSignerPubkeys,
 		QuorumApks:       sortedQuorumAPKs,
 		Sigma:            *sigma,
@@ -111,34 +131,63 @@ func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*cont
 	return convertedAttestation, nil
 }
 
-func InclusionInfoProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDACertVerifier.BlobInclusionInfo, error) {
+func InclusionInfoProtoToIEigenDATypesBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*certTypesBinding.EigenDATypesV2BlobInclusionInfo, error) {
+	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
+	if err != nil {
+		return nil, fmt.Errorf("convert blob certificate: %s", err)
+	}
+
+	blobCertificateTypesBinding := &certTypesBinding.EigenDATypesV2BlobCertificate{
+		BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
+			Version:       convertedBlobCertificate.BlobHeader.Version,
+			QuorumNumbers: convertedBlobCertificate.BlobHeader.QuorumNumbers,
+			Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
+				Commitment:       certTypesBinding.BN254G1Point(convertedBlobCertificate.BlobHeader.Commitment.Commitment),
+				LengthCommitment: certTypesBinding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthCommitment),
+				LengthProof:      certTypesBinding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthProof),
+				Length:           convertedBlobCertificate.BlobHeader.Commitment.Length,
+			},
+			PaymentHeaderHash: convertedBlobCertificate.BlobHeader.PaymentHeaderHash,
+		},
+		Signature: convertedBlobCertificate.Signature,
+		RelayKeys: convertedBlobCertificate.RelayKeys,
+	}
+
+	return &certTypesBinding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: *blobCertificateTypesBinding,
+		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
+		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
+	}, nil
+}
+
+func InclusionInfoProtoToV2CertVerifierBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo, error) {
 	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {
 		return nil, fmt.Errorf("convert blob certificate: %s", err)
 	}
 
-	return &contractEigenDACertVerifier.BlobInclusionInfo{
+	return &contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo{
 		BlobCertificate: *convertedBlobCertificate,
 		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
 		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
 	}, nil
 }
 
-func blobCertificateProtoToBinding(inputCertificate *commonv2.BlobCertificate) (*contractEigenDACertVerifier.BlobCertificate, error) {
+func blobCertificateProtoToBinding(inputCertificate *commonv2.BlobCertificate) (*contractEigenDACertVerifier.EigenDATypesV2BlobCertificate, error) {
 	convertedBlobHeader, err := blobHeaderProtoToBinding(inputCertificate.GetBlobHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert blob header: %s", err)
 	}
 
-	return &contractEigenDACertVerifier.BlobCertificate{
+	return &contractEigenDACertVerifier.EigenDATypesV2BlobCertificate{
 		BlobHeader: *convertedBlobHeader,
 		Signature:  inputCertificate.GetSignature(),
 		RelayKeys:  inputCertificate.GetRelayKeys(),
 	}, nil
 }
 
-func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenDACertVerifier.BlobHeaderV2, error) {
+func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenDACertVerifier.EigenDATypesV2BlobHeaderV2, error) {
 	inputVersion := inputHeader.GetVersion()
 	if inputVersion > math.MaxUint16 {
 		return nil, fmt.Errorf(
@@ -166,7 +215,7 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		return nil, fmt.Errorf("hash payment header: %s", err)
 	}
 
-	return &contractEigenDACertVerifier.BlobHeaderV2{
+	return &contractEigenDACertVerifier.EigenDATypesV2BlobHeaderV2{
 		Version:           uint16(inputVersion),
 		QuorumNumbers:     quorumNumbers,
 		Commitment:        *convertedBlobCommitment,
@@ -174,7 +223,7 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 	}, nil
 }
 
-func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*contractEigenDACertVerifier.BlobCommitment, error) {
+func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*contractEigenDACertVerifier.EigenDATypesV2BlobCommitment, error) {
 	convertedCommitment, err := bytesToBN254G1Point(inputCommitment.GetCommitment())
 	if err != nil {
 		return nil, fmt.Errorf("convert commitment to g1 point: %s", err)
@@ -190,7 +239,7 @@ func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*cont
 		return nil, fmt.Errorf("convert length proof to g2 point: %s", err)
 	}
 
-	return &contractEigenDACertVerifier.BlobCommitment{
+	return &contractEigenDACertVerifier.EigenDATypesV2BlobCommitment{
 		Commitment:       *convertedCommitment,
 		LengthCommitment: *convertedLengthCommitment,
 		LengthProof:      *convertedLengthProof,
@@ -199,7 +248,7 @@ func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*cont
 }
 
 // BlobCommitmentBindingToProto converts a BlobCommitment binding into a common.BlobCommitment protobuf
-func BlobCommitmentBindingToProto(inputCommitment *contractEigenDACertVerifier.BlobCommitment) *common.BlobCommitment {
+func BlobCommitmentBindingToProto(inputCommitment *contractEigenDACertVerifier.EigenDATypesV2BlobCommitment) *common.BlobCommitment {
 	return &common.BlobCommitment{
 		Commitment:       bn254G1PointToBytes(&inputCommitment.Commitment),
 		LengthCommitment: bn254G2PointToBytes(&inputCommitment.LengthCommitment),
@@ -293,7 +342,7 @@ func repeatedBytesToBN254G1Points(repeatedBytes [][]byte) ([]contractEigenDACert
 // BlobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
 // encoding.BlobCommitments type
 func BlobCommitmentsBindingToInternal(
-	blobCommitmentBinding *contractEigenDACertVerifier.BlobCommitment,
+	blobCommitmentBinding *contractEigenDACertVerifier.EigenDATypesV2BlobCommitment,
 ) (*encoding.BlobCommitments, error) {
 
 	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(BlobCommitmentBindingToProto(blobCommitmentBinding))

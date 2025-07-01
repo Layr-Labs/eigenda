@@ -1,5 +1,5 @@
 {
-  "SRSPath": "~/.test-v2/srs",
+  "SRSPath": "../../../resources/srs",
   "KeyPath": "~/.test-v2/testnet-private-key.txt",
   "DisperserHostname": "disperser-testnet-holesky.eigenda.xyz",
   "DisperserPort": 443,
@@ -8,12 +8,15 @@
   ],
   "BLSOperatorStateRetrieverAddr":          "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7",
   "EigenDAServiceManagerAddr":              "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
-  "EigenDACertVerifierAddressQuorums0_1":   "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162",
+  "EigenDACertVerifierAddressQuorums0_1":   "0xd305aeBcdEc21D00fDF8796CE37d0e74836a6B6e",
   "EigenDACertVerifierAddressQuorums0_1_2": "",
   "EigenDACertVerifierAddressQuorums2":     "",
+  "EigenDARegistryCoordinatorAddress": "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490",
   "SubgraphURL": "https://subgraph.satsuma-prod.com/b0b35e5616aa/eigenlabs/eigenda-operator-state-holesky/version/v0.7.0/api",
   "SRSOrder": 268435456,
   "MaxBlobSize": 16777216,
   "MetricsPort": 9101,
-  "DisableMetrics": true
+  "DisableMetrics": true,
+  "ValidatorReadConnectionPoolSize": 20,
+  "ValidatorReadComputePoolSize": 20
 }

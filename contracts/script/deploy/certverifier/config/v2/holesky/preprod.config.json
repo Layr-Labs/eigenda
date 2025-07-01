@@ -1,0 +1,10 @@
+{
+    "eigenDAServiceManager": "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
+    "eigenDAThresholdRegistry": "0x41AEE4A23770045e9977CC9f964d3380D6Ff9e4E",
+    "defaultSecurityThresholds": {
+        "0_confirmationThreshold": 55,
+        "1_adversaryThreshold": 33
+    },
+
+    "quorumNumbersRequired": "0x0001"
+}

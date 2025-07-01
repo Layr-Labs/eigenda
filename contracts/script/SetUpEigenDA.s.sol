@@ -10,10 +10,9 @@ import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol"
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 
-import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
-import {PaymentVault} from "../src/payments/PaymentVault.sol";
-import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
-import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
+import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {PaymentVault} from "src/core/PaymentVault.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -194,7 +193,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
         vm.serializeAddress(output, "blsApkRegistry", address(apkRegistry));
         vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
-        vm.serializeAddress(output, "certVerifier", address(eigenDACertVerifier));
+        vm.serializeAddress(output, "eigenDALegacyCertVerifier", address(legacyEigenDACertVerifier));
+        vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
+        vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

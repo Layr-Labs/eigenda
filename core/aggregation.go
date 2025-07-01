@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ type SigningMessage struct {
 	BatchHeaderHash [32]byte
 	// Undefined if this value <= 0.
 	AttestationLatencyMs float64
+	TimeReceived         time.Time
 	Err                  error
 }
 
@@ -42,7 +44,7 @@ type QuorumAttestation struct {
 	QuorumAggPubKey map[QuorumID]*G1Point
 	// SignersAggPubKey is the aggregated public key for all of the operators that signed the message by each quorum
 	SignersAggPubKey map[QuorumID]*G2Point
-	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum, 
+	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum,
 	// mirroring the SignersAggPubKey.
 	AggSignature map[QuorumID]*Signature
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
@@ -69,13 +71,18 @@ type SignatureAggregation struct {
 	QuorumResults map[QuorumID]*QuorumResult
 }
 
-// SignatureAggregator is an interface for aggregating the signatures returned by DA nodes 
+// SignatureAggregator is an interface for aggregating the signatures returned by DA nodes
 // so that they can be verified by the DA contract
 type SignatureAggregator interface {
-	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, 
+	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan,
 	// and then returns the attestation result by quorum.
+	//
+	// This function accepts two contexts. ctx is the background context. attestationCtx is a context that is cancelled
+	// once the attestation period is over. If the attestationCtx is cancelled, the function will stop waiting for
+	// responses and return the result of the signatures received so far.
 	ReceiveSignatures(
 		ctx context.Context,
+		attestationCtx context.Context,
 		state *IndexedOperatorState,
 		message [32]byte,
 		messageChan chan SigningMessage,
@@ -116,6 +123,7 @@ var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
 func (a *StdSignatureAggregator) ReceiveSignatures(
 	ctx context.Context,
+	attestationCtx context.Context,
 	state *IndexedOperatorState,
 	message [32]byte,
 	messageChan chan SigningMessage,
@@ -151,7 +159,23 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
-		r := <-messageChan
+
+		var r SigningMessage
+
+		var contextExpired bool
+		select {
+		case r = <-messageChan:
+		case <-attestationCtx.Done():
+			remainingReplies := numOperators - numReply
+			a.Logger.Warnf(
+				"global batch attestation time exceeded, no further signatures will be "+
+					"accepted for batch %x. Uncollected signature count: %d", message, remainingReplies)
+			contextExpired = true
+		}
+		if contextExpired {
+			break
+		}
+
 		if seen := signerMap[r.Operator]; seen {
 			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
 			continue
@@ -237,7 +261,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"operatorID", operatorIDHex,
 			"operatorAddress", operatorAddr,
 			"socket", socket,
-			"quorumIDs", fmt.Sprint(operatorQuorums),
+			"quorumIDs", fmt.Sprint(operatorQuorums), //nolint:staticcheck // printing byte slices is fine here
 			"batchHeaderHash", batchHeaderHashHex,
 			"attestationLatencyMs", r.AttestationLatencyMs)
 	}
@@ -272,7 +296,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			continue
 		}
 
-		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key 
+		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key
 		// sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[quorumID] = quorumAggKey
@@ -404,7 +428,7 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
+	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(PercentMultiplier))
 
 	return stakeThreshold
 }
@@ -415,7 +439,7 @@ func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big
 		return 0
 	}
 
-	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
+	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(PercentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())

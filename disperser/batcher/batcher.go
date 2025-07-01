@@ -40,12 +40,15 @@ type QuorumInfo struct {
 }
 
 type TimeoutConfig struct {
-	EncodingTimeout     time.Duration
-	AttestationTimeout  time.Duration
-	ChainReadTimeout    time.Duration
-	ChainWriteTimeout   time.Duration
-	ChainStateTimeout   time.Duration
-	TxnBroadcastTimeout time.Duration
+	EncodingTimeout time.Duration
+	// The time allowed for a particular validator to provide a signature for a batch.
+	AttestationTimeout time.Duration
+	// The time allowed for collecting any and all signatures for a batch.
+	BatchAttestationTimeout time.Duration
+	ChainReadTimeout        time.Duration
+	ChainWriteTimeout       time.Duration
+	ChainStateTimeout       time.Duration
+	TxnBroadcastTimeout     time.Duration
 }
 
 type Config struct {
@@ -512,7 +515,11 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	// Dispatch encoded batch
 	log.Debug("Dispatching encoded batch...")
 	stageTimer = time.Now()
-	update := b.Dispatcher.DisperseBatch(ctx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
+
+	attestationCtx, cancel := context.WithTimeout(ctx, b.BatchAttestationTimeout)
+	defer cancel()
+
+	update := b.Dispatcher.DisperseBatch(attestationCtx, batch.State, batch.EncodedBlobs, batch.BatchHeader)
 	log.Debug("DisperseBatch took",
 		"duration", time.Since(stageTimer))
 	b.observeBlobAge("attestation_requested", batch)
@@ -540,7 +547,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log.Debug("Aggregating signatures...")
 
 	stageTimer = time.Now()
-	quorumAttestation, err := b.Aggregator.ReceiveSignatures(ctx, batch.State, headerHash, update)
+	quorumAttestation, err := b.Aggregator.ReceiveSignatures(ctx, attestationCtx, batch.State, headerHash, update)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error receiving and validating signatures: %w", err)

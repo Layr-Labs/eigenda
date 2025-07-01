@@ -1,6 +1,6 @@
 # System Architecture
 
-![image](../../../assets/architecture.png)
+![image](../assets/architecture.png)
 
 ## Core Components
 
@@ -68,7 +68,7 @@ The [assignment module](./architecture/assignment.md) is nothing more than a rul
 
 ### Signature verification and bridging
 
-[Bridging module](./architecture/bridging.md)
+See the integration [contracts](../integration/spec/4-contracts.md) section for details on how the attestation is bridged to the consumer protocol, such as that of the rollup.
 
 ## Network Layer
 

@@ -9,9 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -20,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -51,7 +51,7 @@ type EncodingManager struct {
 	*EncodingManagerConfig
 
 	// components
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	pool              common.WorkerPool
 	encodingClient    disperser.EncoderClientV2
 	chainReader       core.Reader
@@ -65,18 +65,20 @@ type EncodingManager struct {
 	// blobSet is shared with Dispatcher which removes blobs from this queue as they are packaged for dispersal
 	blobSet BlobSet
 
-	metrics *encodingManagerMetrics
+	metrics                *encodingManagerMetrics
+	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 }
 
 func NewEncodingManager(
 	config *EncodingManagerConfig,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	encodingClient disperser.EncoderClientV2,
 	chainReader core.Reader,
 	logger logging.Logger,
 	registry *prometheus.Registry,
 	blobSet BlobSet,
+	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
 		len(config.AvailableRelays) == 0 ||
@@ -87,15 +89,16 @@ func NewEncodingManager(
 		return nil, fmt.Errorf("NumRelayAssignment (%d) cannot be greater than NumRelays (%d)", config.NumRelayAssignment, len(config.AvailableRelays))
 	}
 	return &EncodingManager{
-		EncodingManagerConfig: config,
-		blobMetadataStore:     blobMetadataStore,
-		pool:                  pool,
-		encodingClient:        encodingClient,
-		chainReader:           chainReader,
-		logger:                logger.With("component", "EncodingManager"),
-		cursor:                nil,
-		metrics:               newEncodingManagerMetrics(registry),
-		blobSet:               blobSet,
+		EncodingManagerConfig:  config,
+		blobMetadataStore:      blobMetadataStore,
+		pool:                   pool,
+		encodingClient:         encodingClient,
+		chainReader:            chainReader,
+		logger:                 logger.With("component", "EncodingManager"),
+		cursor:                 nil,
+		metrics:                newEncodingManagerMetrics(registry),
+		blobSet:                blobSet,
+		controllerLivenessChan: controllerLivenessChan,
 	}, nil
 }
 
@@ -107,7 +110,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		ticker := time.NewTicker(e.EncodingManagerConfig.OnchainStateRefreshInterval)
+		ticker := time.NewTicker(e.OnchainStateRefreshInterval)
 		defer ticker.Stop()
 
 		for {
@@ -168,6 +171,9 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 //
 // WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
+	// Signal Liveness to indicate no stall
+	healthcheck.SignalHeartbeat("encodingManager", e.controllerLivenessChan, e.logger)
+
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {

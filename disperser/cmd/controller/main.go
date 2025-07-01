@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
@@ -35,6 +37,8 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -59,9 +63,14 @@ func RunController(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Reset readiness probe upon start-up
+	if err := os.Remove(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to clean up readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -77,12 +86,6 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	blobMetadataStore := blobstore.NewBlobMetadataStore(
-		dynamoClient,
-		logger,
-		config.DynamoDBTableName,
-	)
 
 	metricsRegistry := prometheus.NewRegistry()
 	metricsRegistry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -100,6 +103,19 @@ func RunController(ctx *cli.Context) error {
 		Handler: mux,
 	}
 
+	baseBlobMetadataStore := blobstore.NewBlobMetadataStore(
+		dynamoClient,
+		logger,
+		config.DynamoDBTableName,
+	)
+	blobMetadataStore := blobstore.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
+
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -115,6 +131,7 @@ func RunController(ctx *cli.Context) error {
 		logger,
 		metricsRegistry,
 		encodingManagerBlobSet,
+		controllerLivenessChan,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -188,6 +205,7 @@ func RunController(ctx *cli.Context) error {
 		metricsRegistry,
 		beforeDispatch,
 		dispatcherBlobSet,
+		controllerLivenessChan,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -214,6 +232,28 @@ func RunController(ctx *cli.Context) error {
 		err := metricsServer.ListenAndServe()
 		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
 			logger.Errorf("metrics metricsServer error: %v", err)
+		}
+	}()
+
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
+	}
+
+	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
+		logger.Warn("Failed to create healthProbe file: %v", err)
+	}
+
+	// Start heartbeat monitor
+	go func() {
+		err := healthcheck.HeartbeatMonitor(
+			config.ControllerHealthProbePath,
+			controllerMaxStallDuration,
+			controllerLivenessChan,
+			logger,
+		)
+		if err != nil {
+			logger.Warn("Heartbeat monitor exited with error", "err", err)
 		}
 	}()
 

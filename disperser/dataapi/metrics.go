@@ -44,19 +44,31 @@ type Metrics struct {
 	logger   logging.Logger
 }
 
-func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
-	reg := prometheus.NewRegistry()
+	if reg == nil {
+		reg = prometheus.NewRegistry()
+	}
+
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	if serverVersion == 1 {
+	switch serverVersion {
+	case 1:
 		if store, ok := blobMetadataStore.(*blobstore.BlobMetadataStore); ok {
 			reg.MustRegister(NewDynamoDBCollector(store, logger))
+		} else {
+			// Skip registering metrics if the store is not a blobstore.BlobMetadataStore
+			logger.Warn("blobMetadataStore is not a blobstore.BlobMetadataStore")
 		}
-	} else if serverVersion == 2 {
-		if store, ok := blobMetadataStore.(*blobstorev2.BlobMetadataStore); ok {
-			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, logger))
+	case 2:
+		if store, ok := blobMetadataStore.(blobstorev2.MetadataStore); ok {
+			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, reg, logger))
+		} else {
+			// Skip registering metrics if the store is not a blobstorev2.MetadataStore
+			logger.Warn("blobMetadataStore is not a blobstorev2.MetadataStore")
 		}
+	default:
+		panic(fmt.Sprintf("unsupported server version %d", serverVersion))
 	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
@@ -275,14 +287,14 @@ type BlobStatusMetrics struct {
 
 // BlobMetadataStoreV2Collector collects metrics from the blob metadata store.
 type BlobMetadataStoreV2Collector struct {
-	blobMetadataStore *blobstorev2.BlobMetadataStore
+	blobMetadataStore blobstorev2.MetadataStore
 	statusMetrics     map[commonv2.BlobStatus]*BlobStatusMetrics
 	logger            logging.Logger
 	ctx               context.Context
 	cancel            context.CancelFunc
 }
 
-func NewBlobMetadataStoreV2Collector(blobMetadataStore *blobstorev2.BlobMetadataStore, logger logging.Logger) *BlobMetadataStoreV2Collector {
+func NewBlobMetadataStoreV2Collector(blobMetadataStore blobstorev2.MetadataStore, registry *prometheus.Registry, logger logging.Logger) *BlobMetadataStoreV2Collector {
 	ctx, cancel := context.WithCancel(context.Background())
 	collector := &BlobMetadataStoreV2Collector{
 		blobMetadataStore: blobMetadataStore,
@@ -307,7 +319,6 @@ func NewBlobMetadataStoreV2Collector(blobMetadataStore *blobstorev2.BlobMetadata
 				},
 			},
 		)
-		prometheus.MustRegister(gauge)
 		collector.statusMetrics[status] = &BlobStatusMetrics{
 			gauge:        gauge,
 			currentValue: 0,

@@ -2,9 +2,11 @@ package cache
 
 import (
 	"context"
-	"golang.org/x/sync/semaphore"
 	"sync"
 	"time"
+
+	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
+	"golang.org/x/sync/semaphore"
 )
 
 // CacheAccessor is an interface for accessing a resource that is cached. It assumes that cache misses
@@ -46,7 +48,7 @@ type cacheAccessor[K comparable, V any] struct {
 	lookupsInProgress map[K]*accessResult[V]
 
 	// cache is the underlying cache that this wrapper manages.
-	cache Cache[K, V]
+	cache cachecommon.Cache[K, V]
 
 	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
 	concurrencyLimiter chan struct{}
@@ -70,7 +72,7 @@ type cacheAccessor[K comparable, V any] struct {
 // If metrics is not nil, it will be used to record metrics about the cache accessor's performance.
 // If nil, no metrics will be recorded.
 func NewCacheAccessor[K comparable, V any](
-	cache Cache[K, V],
+	cache cachecommon.Cache[K, V],
 	concurrencyLimit int,
 	accessor Accessor[K, V],
 	metrics *CacheAccessorMetrics) (CacheAccessor[K, V], error) {
@@ -167,17 +169,16 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 			c.concurrencyLimiter <- struct{}{}
 		}
 
-		value, err := c.accessor(key)
-
-		if c.concurrencyLimiter != nil {
-			<-c.concurrencyLimiter
-		}
-
 		if c.metrics != nil {
 			start := time.Now()
 			defer func() {
 				c.metrics.ReportCacheMissLatency(time.Since(start))
 			}()
+		}
+		value, err := c.accessor(key)
+
+		if c.concurrencyLimiter != nil {
+			<-c.concurrencyLimiter
 		}
 
 		c.cacheLock.Lock()

@@ -37,7 +37,9 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
-	MetricsPort int
+	MetricsPort                  int
+	ControllerReadinessProbePath string
+	ControllerHealthProbePath    string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -80,11 +82,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
-			PullInterval:           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
-			FinalizationBlockDelay: ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
-			NodeRequestTimeout:     ctx.GlobalDuration(flags.NodeRequestTimeoutFlag.Name),
-			NumRequestRetries:      ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
-			MaxBatchSize:           int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
+			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
+			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
+			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchAttestationTimeout:               ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			SignatureTickInterval:                 ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
+			NumRequestRetries:                     ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
+			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
+			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
+			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
 		},
 		NumConcurrentEncodingRequests:  ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		NumConcurrentDispersalRequests: ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
@@ -96,6 +102,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
+		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
+		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
@@ -54,9 +56,17 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	if config.GCSafetyBufferSizeGB > 0 {
+		safetyBuffer := uint64(config.GCSafetyBufferSizeGB * float64(units.GiB))
+		err = memory.SetGCMemorySafetyBuffer(logger, safetyBuffer)
+		if err != nil {
+			return fmt.Errorf("failed to set memory limit: %w", err)
+		}
 	}
 
 	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProviders...)

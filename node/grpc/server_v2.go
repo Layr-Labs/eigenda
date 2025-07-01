@@ -5,16 +5,19 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
+	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -27,13 +30,14 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config         *node.Config
-	node           *node.Node
-	ratelimiter    common.RateLimiter
-	logger         logging.Logger
-	metrics        *MetricsV2
-	authenticator  auth.RequestAuthenticator
-	replayGuardian replay.ReplayGuardian
+	config             *node.Config
+	node               *node.Node
+	ratelimiter        common.RateLimiter
+	logger             logging.Logger
+	metrics            *MetricsV2
+	chunkAuthenticator auth.RequestAuthenticator
+	blobAuthenticator  corev2.BlobRequestAuthenticator
+	replayGuardian     replay.ReplayGuardian
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -51,35 +55,34 @@ func NewServerV2(
 		return nil, err
 	}
 
-	var authenticator auth.RequestAuthenticator
+	var chunkAuthenticator auth.RequestAuthenticator
+	var blobAuthenticator corev2.BlobRequestAuthenticator
 	if !config.DisableDispersalAuthentication {
-		authenticator, err = auth.NewRequestAuthenticator(
+		chunkAuthenticator, err = auth.NewRequestAuthenticator(
 			ctx,
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
 		}
+		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
 	}
-
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
 	return &ServerV2{
-		config:         config,
-		node:           node,
-		ratelimiter:    ratelimiter,
-		logger:         logger,
-		metrics:        metrics,
-		authenticator:  authenticator,
-		replayGuardian: replayGuardian,
+		config:             config,
+		node:               node,
+		ratelimiter:        ratelimiter,
+		logger:             logger,
+		metrics:            metrics,
+		chunkAuthenticator: chunkAuthenticator,
+		blobAuthenticator:  blobAuthenticator,
+		replayGuardian:     replayGuardian,
 	}, nil
 }
 
@@ -104,19 +107,18 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-	start := time.Now()
-
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
-
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
 	if s.node.BLSSigner == nil {
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
+
+	probe := s.metrics.GetStoreChunksProbe()
+	defer probe.End()
+
+	probe.SetStage("validate")
 
 	// Validate the request parameters (which is cheap) before starting any further
 	// processing of the request.
@@ -130,8 +132,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.authenticator != nil {
-		hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	// If the disperser is blacklisted and the blob authenticator is not nil, return an error
+	// we don't want to blacklist the disperser if the blob authenticator is nil since that indicated v1
+	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) && s.config.EnableV2 {
+		s.logger.Info("disperser is blacklisted", "disperserID", in.DisperserID, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
+	}
+
+	if s.chunkAuthenticator != nil {
+		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
@@ -141,73 +150,147 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 		}
+		// TODO: move to blob authenticator later
+		for _, blob := range batch.BlobCertificates {
+			if meterer.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
+				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
+				if in.DisperserID != api.EigenLabsDisperserID {
+					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
+				}
+			}
+		}
+	}
+	if s.blobAuthenticator != nil {
+		// TODO: check the latency of request validation later; could be parallelized to avoid significant
+		// impact to the request latency
+		for _, blobCert := range batch.BlobCertificates {
+			_, err = s.validateDispersalRequest(blobCert)
+			if err != nil {
+				// Blacklist the disperser if there's an invalid dispersal request
+				blacklistErr := s.node.BlacklistStore.BlacklistDisperserFromBlobCert(in, blobCert)
+				if blacklistErr != nil {
+					s.logger.Error("failed to blacklist disperser", "disperserID", in.DisperserID, "error", blacklistErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+					return nil, api.NewErrorInvalidArg("failed to blacklist disperser due to blobCert validation failure")
+				}
+				s.logger.Info("disperser blacklisted due to blobCert validation failure", "disperserID", in.DisperserID)
+				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
+			}
+		}
+	}
+	probe.SetStage("get_operator_state")
+	s.logger.Info("new StoreChunks request",
+		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
+		"numBlobs", len(batch.BlobCertificates),
+		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
+
+	quorums := make(map[core.QuorumID]struct{}, len(batch.BlobCertificates))
+	for _, blobCert := range batch.BlobCertificates {
+		for _, quorum := range blobCert.BlobHeader.QuorumNumbers {
+			quorums[quorum] = struct{}{}
+		}
 	}
 
-	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
+	quorumList := make([]core.QuorumID, 0, len(quorums))
+	for quorum := range quorums {
+		quorumList = append(quorumList, quorum)
+	}
+
+	operatorState, err := s.node.ChainState.GetOperatorState(
+		ctx,
+		uint(batch.BatchHeader.ReferenceBlockNumber),
+		quorumList)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	stageTimer := time.Now()
-	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState)
+	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
-	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
 
-	type storeResult struct {
-		keys []kvstore.Key
-		err  error
-	}
-	storeChan := make(chan storeResult)
-	go func() {
-		storageStart := time.Now()
-		keys, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
-		if err != nil {
-			storeChan <- storeResult{
-				keys: nil,
-				err:  err,
-			}
-			return
-		}
-
-		s.metrics.ReportStoreChunksRequestSize(size)
-		s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
-		storeChan <- storeResult{
-			keys: keys,
-			err:  nil,
-		}
-	}()
-
-	stageTimer = time.Now()
-	err = s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
+	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
 	if err != nil {
-		res := <-storeChan
-		if len(res.keys) > 0 {
-			if deleteErr := s.node.StoreV2.DeleteKeys(res.keys); deleteErr != nil {
-				s.logger.Error("failed to delete keys", "err", deleteErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
-			}
-		}
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
-	}
-	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
-
-	res := <-storeChan
-	if res.err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
+		return nil, err
 	}
 
+	probe.SetStage("sign")
 	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
 	}
 
-	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
-
 	return &pb.StoreChunksReply{
 		Signature: sig,
 	}, nil
+}
+
+func (s *ServerV2) validateAndStoreChunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundle,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte,
+	probe *common.SequenceProbe,
+) error {
+
+	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
+	for _, bundle := range rawBundles {
+		blobKey, err := bundle.BlobCertificate.BlobHeader.BlobKey()
+		if err != nil {
+			return api.NewErrorInternal("failed to get blob key")
+		}
+
+		// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
+		quorum := core.QuorumID(0)
+
+		bundleKey, err := node.BundleKey(blobKey, quorum)
+		if err != nil {
+			return api.NewErrorInternal("failed to get bundle key")
+		}
+
+		batchData = append(batchData, &node.BundleToStore{
+			BundleKey:   bundleKey,
+			BundleBytes: bundle.Bundle,
+		})
+	}
+
+	return s.validateAndStoreChunksLittDB(
+		ctx,
+		batch,
+		blobShards,
+		batchData,
+		operatorState,
+		batchHeaderHash,
+		probe)
+}
+
+func (s *ServerV2) validateAndStoreChunksLittDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	batchData []*node.BundleToStore,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte,
+	probe *common.SequenceProbe,
+) error {
+	probe.SetStage("validate")
+	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
+	if err != nil {
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to validate batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
+	}
+
+	probe.SetStage("store")
+	size, err := s.node.ValidatorStore.StoreBatch(batchData)
+	if err != nil {
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to store batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
+	}
+
+	s.metrics.ReportStoreChunksRequestSize(size)
+
+	return nil
 }
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
@@ -238,10 +321,6 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
 
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
-	}
-
 	blobKey, err := corev2.BytesToBlobKey(in.GetBlobKey())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
@@ -250,10 +329,23 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	if corev2.MaxQuorumID < in.GetQuorumId() {
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
-	quorumID := core.QuorumID(in.GetQuorumId())
-	chunks, err := s.node.StoreV2.GetChunks(blobKey, quorumID)
+
+	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
+	quorumID := core.QuorumID(0)
+
+	bundleKey, err := node.BundleKey(blobKey, quorumID)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get bundle key: %v", err))
+	}
+
+	bundleData, err := s.node.ValidatorStore.GetBundleData(bundleKey)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
+	}
+
+	chunks, _, err := node.DecodeChunks(bundleData)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to decode chunks: %v", err))
 	}
 
 	size := 0
@@ -268,4 +360,64 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		Chunks:              chunks,
 		ChunkEncodingFormat: pb.ChunkEncodingFormat_GNARK,
 	}, nil
+}
+
+// validateDispersalRequest validates the DisperseBlobRequest and returns the blob header
+// Differences between this and the DispersalServerV2 are:
+// - Takes *corev2.BlobCertificate instead of DisperseBlobRequest
+// - no encoding prover GetCommitmentsForPaddedLength check
+// - directly take blob lengths (no blob data yet)
+// - doesn't check every 32 bytes is a valid field element
+// Node cannot make these checks because the checks require the blob data
+func (s *ServerV2) validateDispersalRequest(
+	blobCert *corev2.BlobCertificate,
+) (*corev2.BlobHeader, error) {
+	if len(blobCert.Signature) != 65 {
+		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature))
+	}
+	err := s.blobAuthenticator.AuthenticateBlobRequest(blobCert.BlobHeader, blobCert.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate blob request: %v", err)
+	}
+
+	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
+	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
+	if commitedBlobLength == 0 {
+		return nil, errors.New("blob size must be greater than 0")
+	}
+	if commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+		return nil, errors.New("invalid commitment length, must be a power of 2")
+	}
+
+	blobHeader := blobCert.BlobHeader
+	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+		return nil, errors.New("payment metadata is required")
+	}
+
+	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
+	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
+	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
+	if timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
+		return nil, errors.New("invalid payment metadata")
+	}
+
+	if len(blobHeader.QuorumNumbers) == 0 {
+		return nil, errors.New("blob header must contain at least one quorum number")
+	}
+
+	if len(blobHeader.QuorumNumbers) > int(s.node.QuorumCount.Load()) {
+		return nil, fmt.Errorf("too many quorum numbers specified: maximum is %d", s.node.QuorumCount.Load())
+	}
+
+	for _, quorum := range blobHeader.QuorumNumbers {
+		if quorum > corev2.MaxQuorumID || quorum >= uint8(s.node.QuorumCount.Load()) {
+			return nil, fmt.Errorf("invalid quorum number %d; maximum is %d", quorum, s.node.QuorumCount.Load())
+		}
+	}
+
+	if _, ok := s.node.BlobVersionParams.Load().Get(corev2.BlobVersion(blobHeader.BlobVersion)); !ok {
+		return nil, fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeader.BlobVersion, s.node.BlobVersionParams.Load().Keys())
+	}
+
+	return blobHeader, nil
 }

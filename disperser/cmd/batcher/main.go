@@ -79,7 +79,7 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
 	}
@@ -97,6 +97,9 @@ func RunBatcher(ctx *cli.Context) error {
 	}
 
 	metrics := batcher.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+
+	logger.Debugf("Configured attestation timeout: %v, batch attestation timeout: %v",
+		config.TimeoutConfig.AttestationTimeout, config.TimeoutConfig.BatchAttestationTimeout)
 
 	dispatcher := dispatcher.NewDispatcher(&dispatcher.Config{
 		Timeout:                   config.TimeoutConfig.AttestationTimeout,

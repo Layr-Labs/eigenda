@@ -46,8 +46,8 @@ var _ disperser.Dispatcher = (*dispatcher)(nil)
 
 func (c *dispatcher) DisperseBatch(
 	ctx context.Context,
-	state *core.IndexedOperatorState, 
-	blobs []core.EncodedBlob, 
+	state *core.IndexedOperatorState,
+	blobs []core.EncodedBlob,
 	batchHeader *core.BatchHeader,
 ) chan core.SigningMessage {
 	update := make(chan core.SigningMessage, len(state.IndexedOperators))
@@ -147,11 +147,11 @@ func (c *dispatcher) sendChunks(
 	)
 	if err != nil {
 		c.logger.Warn("Disperser cannot connect to operator dispersal socket",
-				"dispersal_socket", core.OperatorSocket(op.Socket).GetV1DispersalSocket(),
-				"err", err)
+			"dispersal_socket", core.OperatorSocket(op.Socket).GetV1DispersalSocket(),
+			"err", err)
 		return nil, err
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "operator connection", c.logger)
 
 	gc := node.NewDispersalClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)

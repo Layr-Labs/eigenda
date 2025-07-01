@@ -20,9 +20,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	encmock "github.com/Layr-Labs/eigenda/encoding/mock"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -144,8 +144,9 @@ func TestEncodeBlob(t *testing.T) {
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, len(reply.Chunks))
+	for i := range indices {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(testBlobData.Data)) + 10
@@ -285,9 +286,9 @@ func TestEncoderPointsLoading(t *testing.T) {
 	}
 	assert.NotNil(t, chunksData)
 
-	// Indices obtained from Encoder_Test
-	indices := []encoding.ChunkNumber{
-		0, 1, 2, 3, 4, 5, 6, 7,
+	indices := make([]encoding.ChunkNumber, len(reply1.Chunks))
+	for i := range indices {
+		indices[i] = encoding.ChunkNumber(i)
 	}
 
 	maxInputSize := uint64(len(testBlobData.Data)) + 10

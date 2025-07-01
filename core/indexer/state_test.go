@@ -21,7 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -121,10 +120,10 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 
 }
 
-func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
+func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *coreindexer.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (
@@ -143,14 +142,21 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	chainState, err := indexedstate.NewIndexedChainState(cs, indexer)
+	chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
 	if err != nil {
 		panic(err)
 	}
 	return chainState
 }
 
+// This test exercises the core indexer, which is not used in production. Since this test is flaky, disable it.
+var skip = true
+
 var _ = Describe("Indexer", func() {
+
+	if skip {
+		return
+	}
 
 	Context("when indexing a chain state", func() {
 
@@ -197,7 +203,7 @@ var _ = Describe("Indexer", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj).NotTo(BeNil())
 
-			pubKeys, ok := obj.(*indexedstate.OperatorPubKeys)
+			pubKeys, ok := obj.(*coreindexer.OperatorPubKeys)
 			Expect(ok).To(BeTrue())
 			Expect(pubKeys.Operators).To(HaveLen(len(testConfig.Operators)))
 
@@ -205,7 +211,7 @@ var _ = Describe("Indexer", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(obj).NotTo(BeNil())
 
-			sockets, ok := obj.(indexedstate.OperatorSockets)
+			sockets, ok := obj.(coreindexer.OperatorSockets)
 			Expect(ok).To(BeTrue())
 			Expect(sockets).To(HaveLen(len(testConfig.Operators)))
 

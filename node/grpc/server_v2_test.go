@@ -7,10 +7,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/gammazero/workerpool"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -39,7 +41,7 @@ var (
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
-		MaxNumOperators: 3537,
+		MaxNumOperators: 2048,
 	}
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
@@ -58,11 +60,12 @@ var (
 )
 
 type testComponents struct {
-	server      *grpc.ServerV2
-	node        *node.Node
-	store       *nodemock.MockStoreV2
-	validator   *coremockv2.MockShardValidator
-	relayClient *clientsmock.MockRelayClient
+	server         *grpc.ServerV2
+	node           *node.Node
+	store          *nodemock.MockStoreV2
+	validator      *coremockv2.MockShardValidator
+	relayClient    *clientsmock.MockRelayClient
+	blacklistStore *nodemock.MockBlacklistStore
 }
 
 func newTestComponents(t *testing.T, config *node.Config) *testComponents {
@@ -90,19 +93,22 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
 
 	s := nodemock.NewMockStoreV2()
+	blacklistStore := nodemock.NewMockBlacklistStore(nil)
 	relay := clientsmock.NewRelayClient()
 	var atomicRelayClient atomic.Value
 	atomicRelayClient.Store(relay)
 	node := &node.Node{
-		Config:      config,
-		Logger:      logger,
-		KeyPair:     keyPair,
-		BLSSigner:   signer,
-		Metrics:     metrics,
-		StoreV2:     s,
-		ChainState:  chainState,
-		ValidatorV2: val,
-		RelayClient: atomicRelayClient,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		ValidatorStore: s,
+		BlacklistStore: blacklistStore,
+		ChainState:     chainState,
+		ValidatorV2:    val,
+		RelayClient:    atomicRelayClient,
+		DownloadPool:   workerpool.New(1),
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
@@ -120,18 +126,19 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 	require.NoError(t, err)
 	return &testComponents{
-		server:      server,
-		node:        node,
-		store:       s,
-		validator:   val,
-		relayClient: relay,
+		server:         server,
+		node:           node,
+		store:          s,
+		blacklistStore: blacklistStore,
+		validator:      val,
+		relayClient:    relay,
 	}
 }
 
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
 	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
-	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, resp.Semver == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
@@ -202,34 +209,26 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
 	bundles00Bytes, err := bundles[0][0].Serialize()
-	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
 	require.NoError(t, err)
 	bundles10Bytes, err := bundles[1][0].Serialize()
 	require.NoError(t, err)
-	bundles11Bytes, err := bundles[1][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
-	require.NoError(t, err)
-	bundles22Bytes, err := bundles[2][2].Serialize()
-	require.NoError(t, err)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
-		require.Len(t, requests, 4)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-		require.Equal(t, blobKeys[2], requests[3].BlobKey)
-	})
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
-		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, nil)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+	})
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -246,6 +245,122 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 	require.True(t, sig.Verify(c.node.KeyPair.GetPubKeyG2(), bhh))
 }
 
+// blacklist tests
+func TestV2StoreChunksIsBlacklistedCheck(t *testing.T) {
+	config := makeConfig(t)
+	config.EnableV2 = true
+	c := newTestComponents(t, config)
+
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+	batchProto, err := batch.ToProtobuf()
+	require.NoError(t, err)
+
+	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bundles00Bytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+	bundles01Bytes, err := bundles[0][1].Serialize()
+	require.NoError(t, err)
+	bundles10Bytes, err := bundles[1][0].Serialize()
+	require.NoError(t, err)
+	bundles11Bytes, err := bundles[1][1].Serialize()
+	require.NoError(t, err)
+	bundles21Bytes, err := bundles[2][1].Serialize()
+	require.NoError(t, err)
+	bundles22Bytes, err := bundles[2][2].Serialize()
+	require.NoError(t, err)
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+		require.Len(t, requests, 4)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[0], requests[1].BlobKey)
+		require.Equal(t, blobKeys[2], requests[2].BlobKey)
+		require.Equal(t, blobKeys[2], requests[3].BlobKey)
+	})
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+		require.Equal(t, blobKeys[1], requests[1].BlobKey)
+	})
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(true)
+	newBlacklist := &node.Blacklist{
+		Entries: []node.BlacklistEntry{
+			{
+				DisperserID: 0,
+				Metadata: node.BlacklistMetadata{
+					ContextId: "test",
+					Reason:    "test",
+				},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		},
+		LastUpdated: uint64(time.Now().Unix()),
+	}
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(newBlacklist, nil)
+
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
+	_, err = c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
+	})
+
+	require.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "disperser is blacklisted"))
+}
+
+// blacklist tests
+func TestV2StoreChunksIsBlacklistedTimeoutReachedCheck(t *testing.T) {
+	config := makeConfig(t)
+	config.EnableV2 = true
+	c := newTestComponents(t, config)
+
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+	batchProto, err := batch.ToProtobuf()
+	require.NoError(t, err)
+
+	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bundles00Bytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+	bundles01Bytes, err := bundles[0][1].Serialize()
+	require.NoError(t, err)
+	bundles10Bytes, err := bundles[1][0].Serialize()
+	require.NoError(t, err)
+	bundles11Bytes, err := bundles[1][1].Serialize()
+	require.NoError(t, err)
+	bundles21Bytes, err := bundles[2][1].Serialize()
+	require.NoError(t, err)
+	bundles22Bytes, err := bundles[2][2].Serialize()
+	require.NoError(t, err)
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+		require.Len(t, requests, 4)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[0], requests[1].BlobKey)
+		require.Equal(t, blobKeys[2], requests[2].BlobKey)
+		require.Equal(t, blobKeys[2], requests[3].BlobKey)
+	})
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+		require.Equal(t, blobKeys[1], requests[1].BlobKey)
+	})
+
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(true)
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
+	_, err = c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
+	})
+
+	assert.True(t, strings.Contains(err.Error(), "disperser is blacklisted"))
+
+}
+
 func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
@@ -254,12 +369,13 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	_, batch, _ := nodemock.MockBatch(t)
 	batchProto, err := batch.ToProtobuf()
 	require.NoError(t, err)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	relayErr := errors.New("error")
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -280,34 +396,26 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	bundles00Bytes, err := bundles[0][0].Serialize()
-	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
 	require.NoError(t, err)
 	bundles10Bytes, err := bundles[1][0].Serialize()
 	require.NoError(t, err)
-	bundles11Bytes, err := bundles[1][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
-	require.NoError(t, err)
-	bundles22Bytes, err := bundles[2][2].Serialize()
-	require.NoError(t, err)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
-		require.Len(t, requests, 4)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-		require.Equal(t, blobKeys[2], requests[3].BlobKey)
-	})
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
-		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
-	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, errors.New("error"))
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+	})
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, errors.New("error"))
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -317,7 +425,7 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 	requireErrorStatusAndMsg(t, err, codes.Internal, "failed to store batch")
 }
 
-func TestV2StoreChunksValidationFailure(t *testing.T) {
+func TestV2StoreChunksLittDBValidationFailure(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
 	c := newTestComponents(t, config)
@@ -326,34 +434,30 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	batchProto, err := batch.ToProtobuf()
 	require.NoError(t, err)
 
-	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("error"))
-	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(
+		errors.New("error"))
+	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(
+		nil)
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	bundles00Bytes, err := bundles[0][0].Serialize()
-	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
 	require.NoError(t, err)
 	bundles10Bytes, err := bundles[1][0].Serialize()
 	require.NoError(t, err)
-	bundles11Bytes, err := bundles[1][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
-	require.NoError(t, err)
-	bundles22Bytes, err := bundles[2][2].Serialize()
-	require.NoError(t, err)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
-		require.Len(t, requests, 4)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-		require.Equal(t, blobKeys[2], requests[3].BlobKey)
-	})
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByRange)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
+		[][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
+	})
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
+		[][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return([]kvstore.Key{mockKey{}}, nil)
 	c.store.On("DeleteKeys", mock.Anything, mock.Anything).Return(nil)
@@ -364,8 +468,51 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	})
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
+}
 
-	c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
+func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
+	config := makeConfig(t)
+	config.EnableV2 = true
+	c := newTestComponents(t, config)
+
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+	batchProto, err := batch.ToProtobuf()
+	require.NoError(t, err)
+
+	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(
+		errors.New("error"))
+	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(
+		nil)
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
+	bundles00Bytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+	bundles10Bytes, err := bundles[1][0].Serialize()
+	require.NoError(t, err)
+	bundles20Bytes, err := bundles[2][0].Serialize()
+	require.NoError(t, err)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
+		[][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
+	})
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
+		[][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+	})
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return([]kvstore.Key{mockKey{}}, nil)
+	c.store.On("DeleteKeys", mock.Anything, mock.Anything).Return(nil)
+	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
+	})
+	require.Nil(t, reply.GetSignature())
+	requireErrorStatus(t, err, codes.Internal)
 }
 
 func TestV2GetChunksInputValidation(t *testing.T) {

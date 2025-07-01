@@ -46,6 +46,8 @@ type TestClientConfig struct {
 	//
 	// If this value is not set, that tests utilizing it will be skipped
 	EigenDACertVerifierAddressQuorums2 string
+	// The contract address of the registry coordinator
+	EigenDARegistryCoordinatorAddress string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test
@@ -58,13 +60,17 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
+	// The size of the thread pool for read operations on the relay.
+	ValidatorReadConnectionPoolSize int
+	// The size of the thread pool for CPU heavy operations.
+	ValidatorReadComputePoolSize int
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
 	root, err := ResolveTildeInPath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return "", fmt.Errorf("resolve tilde in path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }

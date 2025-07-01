@@ -21,14 +21,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -55,11 +53,11 @@ import (
 )
 
 var (
-	//go:embed testdata/prometheus-response-sample.json
-	mockPrometheusResponse string
-
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
+
+	//go:embed testdata/prometheus-response-network-signing-rate.json
+	mockPrometheusResponseNetworkSigningRate string
 
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -103,45 +101,11 @@ var (
 		1: 10,
 		2: 10,
 	})
-
-	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:32005;32006",
-			},
-		},
-	}
-
-	operatorInfoV2 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:31005;31006;32005;32006",
-			},
-		},
-	}
 )
+
+// TODO: we need to make sure that this is always aligned with the timeFormat that
+// the dataapi server uses to parse timestamps from the request.
+const timeFormat = time.RFC3339Nano
 
 type MockSubgraphClient struct {
 	mock.Mock
@@ -189,7 +153,7 @@ func teardown() {
 
 func setup(m *testing.M) {
 	// Start localstack
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -222,10 +186,15 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
+	metrics := dataapi.NewMetrics(serverVersion, nil, blobMetadataStore, "9001", mockLogger)
+	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, metrics)
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb client: " + err.Error())
+		panic("failed to create v2 server: " + err.Error())
 	}
 }
 
@@ -297,7 +266,7 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	body := w.Result().Body
-	defer body.Close()
+	defer core.CloseLogOnError(body, "response body", mockLogger)
 	data, err := io.ReadAll(body)
 	require.NoError(t, err)
 
@@ -328,7 +297,7 @@ func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
-func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+func deleteItems(t *testing.T, keys []dynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)
@@ -377,7 +346,8 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 	dispersedAt := make([]uint64, numRequests)
 	batchHeaders := make([]*corev2.BatchHeader, numRequests)
-	dynamoKeys := make([]commondynamodb.Key, numRequests)
+	signatures := make([][32]byte, numRequests)
+	dynamoKeys := make([]dynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
 		batchHeaders[i] = &corev2.BatchHeader{
@@ -391,15 +361,25 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			DispersedAt:     dispersedAt[i],
 			BatchHeader:     *batchHeaders[i],
 		}
+		signatures[i] = [32]byte{}
+		if i%2 == 0 {
+			signatures[i] = [32]byte{1, 1, uint8(i)}
+		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      dispersedAt[i],
+			Signature:        signatures[i],
+			Error:            "",
+		}
 
-		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
-		bhh, err := dispersalRequest.BatchHeader.Hash()
+		bhh, err := dispersalRequest.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
@@ -453,8 +433,8 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  serverv2.FormatQueryParamTime(now.Add(-time.Minute)),
+					"before": serverv2.FormatQueryParamTime(now.Add(-time.Hour)),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -512,7 +492,12 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 20; i++ {
 			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			if (1+i)%2 == 0 {
+				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+			} else {
+				assert.Equal(t, "", response.Dispersals[i].Signature)
+			}
 		}
 	})
 
@@ -525,11 +510,11 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -537,14 +522,12 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 60; i++ {
 			assert.Equal(t, dispersedAt[i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
-		after := time.Unix(0, int64(dispersedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
-		before := time.Unix(0, int64(dispersedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = time.Unix(0, int64(dispersedAt[20])).UTC().Format(time.RFC3339Nano)
+		beforeTime := time.Unix(0, int64(dispersedAt[50])).UTC().Format(time.RFC3339Nano)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -552,7 +535,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 29; i++ {
 			assert.Equal(t, dispersedAt[21+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[21+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[21+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -565,11 +548,11 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -577,14 +560,12 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 60; i++ {
 			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
-		after := time.Unix(0, int64(dispersedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
-		before := time.Unix(0, int64(dispersedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[20])))
+		beforeTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[50])))
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -592,7 +573,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		for i := 0; i < 29; i++ {
 			assert.Equal(t, dispersedAt[49-i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[49-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[49-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -646,7 +627,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobKey, err := blobHeader.BlobKey()
@@ -660,10 +641,10 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 
 		now := time.Now()
-		metadata := &v2.BlobMetadata{
+		metadata := &commonv2.BlobMetadata{
 			BlobHeader:  blobHeader,
 			Signature:   []byte{0, 1, 2, 3, 4},
-			BlobStatus:  v2.Encoded,
+			BlobStatus:  commonv2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
 			UpdatedAt:   uint64(now.UnixNano()),
@@ -671,7 +652,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -730,8 +711,8 @@ func TestFetchBlobFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -808,7 +789,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -827,7 +808,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -855,7 +836,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -874,7 +855,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[100] through keys[41]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -894,8 +875,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling
-		tm := time.Unix(0, time.Now().UnixNano()).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, time.Now().UnixNano()))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -927,8 +907,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling (cursor is exclusive)
-		tm := time.Unix(0, int64(requestedAt[80])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[80])))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -958,8 +937,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
 		// - These are followed by sequential blobs: keys[3,4] with different timestamps
 		// - End time is set to requestedAt[5]
-		tm := time.Unix(0, int64(requestedAt[5])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[5])))
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
@@ -1142,7 +1120,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 		assert.Equal(t, blobKey.Hex(), response.BlobKey)
 		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
-		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, hex.EncodeToString(inclusionInfo.InclusionProof[:]), response.InclusionInfo.InclusionProof)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
 		signers := map[uint8][]serverv2.OperatorIdentity{
@@ -1195,7 +1173,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 	mockTx.ExpectedCalls = nil
 	mockTx.Calls = nil
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1245,6 +1223,22 @@ func TestFetchBatch(t *testing.T) {
 	batchHeaderHashBytes, err := batchHeader.Hash()
 	require.NoError(t, err)
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
+
+	// Set up batch in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte{0, 1, 2, 3, 4},
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	require.NoError(t, err)
 
 	// Set up attestation in metadata store
 	keyPair, err := core.GenRandomBlsKeys()
@@ -1334,10 +1328,14 @@ func TestFetchBatch(t *testing.T) {
 	response := decodeResponseBody[serverv2.BatchResponse](t, w)
 
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
-	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
+	assert.Equal(t, hex.EncodeToString(batchHeader.BatchRoot[:]), response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
 	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+	assert.Equal(t, 1, len(response.BlobKeys))
+	assert.Equal(t, blobKey.Hex(), response.BlobKeys[0])
+	assert.Equal(t, 1, len(response.BlobCertificates))
+	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
 
 	signers := map[uint8][]serverv2.OperatorIdentity{
 		0: []serverv2.OperatorIdentity{
@@ -1388,7 +1386,7 @@ func TestFetchBatch(t *testing.T) {
 
 	mockTx.ExpectedCalls = nil
 	mockTx.Calls = nil
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1396,6 +1394,10 @@ func TestFetchBatch(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchInfo"},
 		},
 	})
 }
@@ -1411,7 +1413,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1446,17 +1448,20 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
 
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger))
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1507,8 +1512,8 @@ func TestFetchBatchFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -1559,7 +1564,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 20; i++ {
 			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1572,11 +1577,11 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/batches/feed?limit=-1&after=%s", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1584,13 +1589,13 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 72; i++ {
 			assert.Equal(t, attestedAt[i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 3: Custom end time with 1-hour window
 		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/batches/feed?before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1598,7 +1603,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[7+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1611,11 +1616,11 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[71-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/batches/feed?direction=backward&limit=-1&after=%s", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1623,14 +1628,14 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 72; i++ {
 			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[71-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 3: Custom end time with 1-hour window
 		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches,
 		// as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/batches/feed?direction=backward&before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1638,7 +1643,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[65-i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[65-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[65-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[65-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1887,14 +1892,14 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		bhh, err := attestation.BatchHeader.Hash()
+		bhh, err := attestation.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1933,7 +1938,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2127,7 +2132,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		// +------------------+-------------------+------------------+--------------+
 
 		tm := time.Unix(0, int64(now)+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl := fmt.Sprintf("/v2/operators/signing-info?end=%s&interval=1000", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
@@ -2185,21 +2190,22 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
+	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
+	operatorId := core.OperatorID{1}.Hex()
 	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port closed or unreachable", response.DispersalStatus)
-	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port closed or unreachable", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -2211,21 +2217,39 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
+	operatorId := core.OperatorID{1}
+	ios := &core.IndexedOperatorState{
+		IndexedOperators: map[core.OperatorID]*core.IndexedOperatorInfo{
+			operatorId: &core.IndexedOperatorInfo{
+				Socket: "1.2.3.4:3004:3005",
+			},
+		},
+	}
+
+	mockIcs := &coremock.MockIndexedChainState{}
+
+	mockIcs.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockIcs.On("GetIndexedOperatorState").Return(ios, nil)
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger))
+	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId.Hex())
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port is not registered", response.DispersalStatus)
-	assert.Equal(t, "", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port is not registered", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -2244,7 +2268,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 	// Create blobs for testing
 	requestedAt := make([]uint64, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobHeader.PaymentMetadata.AccountID = accountId
@@ -2252,10 +2276,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		require.NoError(t, err)
 		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
 		now := time.Now()
-		metadata := &v2.BlobMetadata{
+		metadata := &commonv2.BlobMetadata{
 			BlobHeader:  blobHeader,
 			Signature:   []byte{1, 2, 3},
-			BlobStatus:  v2.Encoded,
+			BlobStatus:  commonv2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
 			UpdatedAt:   uint64(now.UnixNano()),
@@ -2263,7 +2287,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -2375,7 +2399,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2387,9 +2411,9 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 		// Teste 3: custom end time
 		after := time.Unix(0, int64(requestedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = after.Format(timeFormat)
 		before := time.Unix(0, int64(requestedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := before.Format(timeFormat)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2411,7 +2435,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2423,9 +2447,9 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 		// Teste 3: custom end time
 		after := time.Unix(0, int64(requestedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = after.Format(timeFormat)
 		before := time.Unix(0, int64(requestedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := before.Format(timeFormat)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2504,11 +2528,12 @@ func TestFetchOperatorsStake(t *testing.T) {
 		func(ids []core.OperatorID) []gethcommon.Address {
 			result := make([]gethcommon.Address, len(ids))
 			for i, id := range ids {
-				if id == opId0 {
+				switch id {
+				case opId0:
 					result[i] = addr0
-				} else if id == opId1 {
+				case opId1:
 					result[i] = addr1
-				} else {
+				default:
 					result[i] = gethcommon.Address{}
 				}
 			}
@@ -2555,7 +2580,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
-	err := s.UnmarshalJSON([]byte(mockPrometheusResponse))
+	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
 	assert.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
@@ -2567,7 +2592,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AverageBytesPerSecond)
+	assert.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
@@ -2595,6 +2620,31 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
+	r := setUpRouter()
+
+	s := new(model.SampleStream)
+	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
+	assert.NoError(t, err)
+
+	matrix := make(model.Matrix, 0)
+	matrix = append(matrix, s)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+
+	r.GET("/v2/metrics/timeseries/network-signing-rate", testDataApiServerV2.FetchNetworkSigningRate)
+
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/network-signing-rate")
+	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
+
+	require.Equal(t, 2, len(response.QuorumSigningRates))
+	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(

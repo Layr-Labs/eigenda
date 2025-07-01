@@ -3,11 +3,13 @@ package relay
 import (
 	"context"
 	"fmt"
+	"time"
+
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"time"
 )
 
 // blobProvider encapsulates logic for fetching blobs. Utilized by the relay Server.
@@ -44,7 +46,7 @@ func newBlobProvider(
 	}
 
 	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](
-		cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight),
+		cache2.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight, nil),
 		maxIOConcurrency,
 		server.fetchBlob,
 		metrics)

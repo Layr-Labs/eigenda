@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"math/big"
-	"runtime"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -91,8 +90,6 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SRS: %v", err)
 	}
-
-	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
@@ -242,7 +239,7 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig.SRSOrder, v.KzgConfig.G2Path)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.SRSOrder, v.G2Path)
 	if err != nil {
 		return err
 	}
