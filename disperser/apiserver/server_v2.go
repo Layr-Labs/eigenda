@@ -353,6 +353,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		MinNumSymbols:          minNumSymbols,
 		PricePerSymbol:         pricePerSymbol,
 		ReservationWindow:      reservationWindow,
+		OnDemandQuorumNumbers:  []uint32{0, 1},
 	}
 
 	// build reply
