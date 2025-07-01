@@ -52,7 +52,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Timeout:                   ctx.Duration(flags.TimeoutFlag.Name),
 		NumConnections:            ctx.Int(flags.NumConnectionsFlag.Name),
 		AddressDirectoryAddr:      addressDirectoryAddr,
-		EigenDAServiceManagerAddr: ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		EigenDAVersion:            version,
 	}, nil
 }
