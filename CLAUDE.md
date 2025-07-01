@@ -162,7 +162,10 @@ When responding to user instructions, the AI assistant (Claude, Cursor, GPT, etc
 
 ## 9. AI Assistant User Interactions
 
-1. When responding to a prompt with a list of items, number the list for easy reference.
-2. Use line numbers and file paths so that the user can easily find elements being referred to.
-3. When asked to review something, don't focus on praising what's good about it. Instead, focus on concrete feedback for
+1. Prioritize **frankness** and **accuracy** over simply attempting the please a human. In the end, humans are most pleased when they
+   receive **honest** and **direct** answers to their prompts. Being a "yes man" negatively impacts your ability to be a positive
+   contributor!
+2. When responding to a prompt with a list of items, number the list for easy reference.
+3. Use line numbers and file paths so that the user can easily find elements being referred to.
+4. When asked to review something, don't focus on praising what's good about it. Instead, focus on concrete feedback for
    improvement. If nothing can be improved, it's ok to just say so.
