@@ -71,9 +71,15 @@ If there are imports that are relevant only to a particular part of the project,
 
 ### 4.3. Doc Files
 
-1. **Hierarchical organization**: Hierarchical numbering for sections makes referencing easier.
-2. **Tabular format for key facts**: Tables are helpful for understanding data at a glance: use them where appropriate.
-3. **Use Links**: Links are very helpful to assist a human navigating through the codebase.
+1. **Humans write docs**. AI involvement in doc generation should be limited to the following tasks:
+   - Proofreading.
+   - Generating an initial skeleton to help bootstrap the doc writing process.
+   - Evaluating quality of documentation, and identifying potential areas of improvement.
+   - Checking for internal content and style consistency.
+   - Verifying that links and references resolve correctly.
+2. **Hierarchical organization**: Hierarchical numbering for sections makes referencing easier.
+3. **Tabular format for key facts**: Tables are helpful for understanding data at a glance, and should be used where appropriate.
+4. **Use Links**: Links are very helpful to assist a human navigating through the codebase.
    - IMPORTANT: double check that links aren't broken after making changes to doc files. Similarly, if documentation
    contains links directly to code, make sure that code changes are paired with the corresponding doc updates.
 
