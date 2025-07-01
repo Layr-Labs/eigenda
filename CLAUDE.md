@@ -11,7 +11,7 @@
 |-----|----------------------------------------------------------------------------------------------------------------------------------------------------|
 | G-0 | Write changes or use tools when you are not sure about something project-specific, or if you don't have context for a particular feature/decision. |
 | G-1 | Touch test files, specs, or generated files without EXPLICIT permission. **Humans own tests and specs.**                                           |
-| G-2 | Refactor large modules without human guidance. For changes >300 LOC or >3 files, **ask for confirmation**.                                         |
+| G-2 | Refactor large modules without human guidance. For changes >50 LOC or >3 files, **ask for confirmation**.                                          |
 
 ---
 
