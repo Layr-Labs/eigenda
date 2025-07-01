@@ -25,6 +25,7 @@ NOTE: Be aware that whatever you add to this list is automatically loaded into c
 3. @mise.toml describes external tool dependencies
 4. @.golangci.yml contains linting configuration
 5. @docs/CLAUDE.md causes doc files to be automatically imported
+6. @.claude/commands/CLAUDE.md defines what project slash commands are available to use
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a CLAUDE.md
    file *in the relevant subdirectory*. Then the imports will only be processed when files within that directory are read.
