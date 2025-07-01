@@ -24,6 +24,7 @@ NOTE: Be aware that whatever you add to this list is automatically loaded into c
 |----------------------------------|--------------------------------------|
 | @Makefile                        | Build, test, and formatting commands |
 | @mise.toml                       | Dependency management                |
+| @.golangci.yml                   | Golang linting YAML                  |
 | @README.md                       | Main project README file             |
 | @docs/spec/src/**/*.md           | All project spec markdown files      |
 | @.claude/commands/*              | Project claude commands              |
