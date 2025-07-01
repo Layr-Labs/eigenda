@@ -138,7 +138,7 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
+		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.Directory, logger)
 		assert.NoError(t, err)
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
@@ -204,7 +204,7 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Writer, error) {
+func createTransactorFromScratch(privateKey, addressDirectory string, logger logging.Logger) (*eth.Writer, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -217,7 +217,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	return eth.NewWriter(logger, gethClient, addressDirectory)
 }
 
 func newTestServer(t *testing.T) *churner.Server {
@@ -228,16 +228,14 @@ func newTestServer(t *testing.T) *churner.Server {
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,
 		},
-		LoggerConfig:                  *common.DefaultLoggerConfig(),
-		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
-		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
-		ChurnApprovalInterval:         15 * time.Minute,
+		LoggerConfig:          *common.DefaultLoggerConfig(),
+		AddressDirectoryAddr:  testConfig.EigenDA.Directory,
+		ChurnApprovalInterval: 15 * time.Minute,
 	}
 
 	operatorTransactorChurner, err := createTransactorFromScratch(
 		churnerPrivateKeyHex,
-		testConfig.EigenDA.OperatorStateRetriever,
-		testConfig.EigenDA.ServiceManager,
+		testConfig.EigenDA.Directory,
 		logger,
 	)
 	assert.NoError(t, err)
