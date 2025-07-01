@@ -18,4 +18,20 @@ library AddressDirectoryLib {
         AddressDirectoryStorage.layout().addresses[key] = value;
         emit AddressSet(key, value);
     }
+
+    function registerKey(string memory name) internal {
+        AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
+        bytes32 key = getKey(name);
+        require(bytes(s.names[key]).length == 0, "Key already exists");
+        s.names[key] = name;
+        s.nameList.push(name);
+    }
+
+    function getName(bytes32 key) internal view returns (string memory) {
+        return AddressDirectoryStorage.layout().names[key];
+    }
+
+    function getNameList() internal view returns (string[] memory) {
+        return AddressDirectoryStorage.layout().nameList;
+    }
 }
