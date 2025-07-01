@@ -19,6 +19,15 @@ func GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow
 
 // GetBinLimit returns the bin limit given the bin interval and the symbols per second
 func GetBinLimit(symbolsPerSecond uint64, binInterval uint64) uint64 {
+	if symbolsPerSecond == 0 || binInterval == 0 {
+		return 0
+	}
+
+	// Check for overflow before multiplication by comparing against the maximum safe value
+	if symbolsPerSecond > math.MaxUint64/binInterval {
+		return math.MaxUint64
+	}
+
 	return symbolsPerSecond * binInterval
 }
 
@@ -150,6 +159,8 @@ func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReserva
 	return true
 }
 
+// IsOnDemandPayment explicitly determines if the payment is an on-demand payment by checking if the cumulative payment is greater than 0
+// If the cumulative payment is 0, it is not an on-demand payment, but a reservation payment.
 func IsOnDemandPayment(paymentMetadata *core.PaymentMetadata) bool {
 	return paymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) > 0
 }
