@@ -73,7 +73,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	symbolUsage := paymentlogic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	binLimit := paymentlogic.GetReservationBinLimit(reservation, protocolConfig.ReservationRateLimitWindow)
+	binLimit := paymentlogic.GetBinLimit(reservation.SymbolsPerSecond, protocolConfig.ReservationRateLimitWindow)
 
 	if symbolUsage > binLimit {
 		return errors.New("symbol usage exceeds bin limit")

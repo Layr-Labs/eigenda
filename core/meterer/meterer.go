@@ -169,7 +169,7 @@ func (m *Meterer) incrementBinUsage(
 	for quorumID, reservation := range reservations {
 		reservationWindow := reservationWindows[quorumID]
 		requestReservationPeriod := requestReservationPeriods[quorumID]
-		usageLimit := paymentlogic.GetReservationBinLimit(reservation, reservationWindow)
+		usageLimit := paymentlogic.GetBinLimit(reservation.SymbolsPerSecond, reservationWindow)
 		newUsage, ok := updatedUsages[quorumID]
 		if !ok {
 			return fmt.Errorf("failed to get updated usage for quorum %d", quorumID)

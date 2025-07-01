@@ -75,53 +75,6 @@ func TestGetBinLimit(t *testing.T) {
 	}
 }
 
-func TestGetReservationBinLimit(t *testing.T) {
-	tests := []struct {
-		name              string
-		reservation       *core.ReservedPayment
-		reservationWindow uint64
-		expected          uint64
-	}{
-		{
-			name: "normal reservation",
-			reservation: &core.ReservedPayment{
-				SymbolsPerSecond: 100,
-				StartTimestamp:   1000,
-				EndTimestamp:     2000,
-			},
-			reservationWindow: 60,
-			expected:          6000,
-		},
-		{
-			name: "zero symbols per second",
-			reservation: &core.ReservedPayment{
-				SymbolsPerSecond: 0,
-				StartTimestamp:   1000,
-				EndTimestamp:     2000,
-			},
-			reservationWindow: 60,
-			expected:          0,
-		},
-		{
-			name: "high capacity reservation",
-			reservation: &core.ReservedPayment{
-				SymbolsPerSecond: 10000,
-				StartTimestamp:   1000,
-				EndTimestamp:     2000,
-			},
-			reservationWindow: 3600, // 1 hour
-			expected:          36000000,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := GetReservationBinLimit(tt.reservation, tt.reservationWindow)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestGetReservationPeriod(t *testing.T) {
 	tests := []struct {
 		name        string
