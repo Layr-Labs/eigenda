@@ -93,7 +93,11 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 	if err != nil {
 		panic("failed to create a new levelDB store")
 	}
-	defer os.Remove(dbPath)
+	t.Cleanup(func() {
+		if err := os.Remove(dbPath); err != nil {
+			t.Log("failed to remove dbPath:", dbPath, "error:", err)
+		}
+	})
 	n := &node.Node{
 		Config:       config,
 		Logger:       logger,

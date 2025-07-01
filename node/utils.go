@@ -39,7 +39,8 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 			bundles := make(map[core.QuorumID]core.Bundle, len(blob.GetBundles()))
 			for j, bundle := range blob.GetBundles() {
 				quorumID := blob.GetHeader().GetQuorumHeaders()[j].GetQuorumId()
-				if format == core.GnarkBundleEncodingFormat {
+				switch format {
+				case core.GnarkBundleEncodingFormat:
 					if len(bundle.GetBundle()) > 0 {
 						bundleMsg, err := new(core.Bundle).Deserialize(bundle.GetBundle())
 						if err != nil {
@@ -50,7 +51,7 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 					} else {
 						bundles[uint8(quorumID)] = make([]*encoding.Frame, 0)
 					}
-				} else if format == core.GobBundleEncodingFormat {
+				case core.GobBundleEncodingFormat:
 					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundle.GetChunks()))
 					for k, data := range bundle.GetChunks() {
 						chunk, err := new(encoding.Frame).Deserialize(data)
@@ -60,7 +61,7 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 						}
 						bundles[uint8(quorumID)][k] = chunk
 					}
-				} else {
+				default:
 					resultChan <- fmt.Errorf("invalid bundle encoding format: %d", format)
 					return
 				}

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -302,7 +301,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey1.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
@@ -319,7 +318,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 	now := uint64(time.Now().UnixNano())
 	firstBlobTime := now - uint64(time.Hour.Nanoseconds())
 	numBlobs := 5
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 
 	// Create blobs: first 3 blobs have the same requestedAt, and last 2 blobs have the same requestedAt
 	for i := 0; i < numBlobs; i++ {
@@ -340,7 +339,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -448,7 +447,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithDynamoPaginatio
 	// size of DyanamoDB) so it will have to use DynamoDB's pagination to get all desired
 	// results.
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -464,7 +463,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithDynamoPaginatio
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -496,7 +495,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 
 	// Create blobs for testing
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -513,7 +512,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -675,7 +674,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 
 	// Create blobs for testing
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -692,7 +691,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -869,7 +868,7 @@ func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
 	// Create blobs for testing
 	keys := make([]corev2.BlobKey, numBlobs)
 	requestedAt := make([]uint64, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		_, blobHeader := newBlob(t)
 		blobHeader.PaymentMetadata.AccountID = accountId
@@ -889,7 +888,7 @@ func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -1029,7 +1028,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1064,7 +1063,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1158,7 +1157,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1193,7 +1192,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1311,7 +1310,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1348,7 +1347,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1385,7 +1384,7 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 	keys := make([]corev2.BlobKey, numBlobs)
 	headers := make([]*corev2.BlobHeader, numBlobs)
 	metadataList := make([]*v2.BlobMetadata, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	expectedCursors := make([]*blobstore.StatusIndexCursor, 0)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
@@ -1402,7 +1401,7 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 		require.NoError(t, err)
 		keys[i] = blobKey
 		headers[i] = blobHeader
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -1527,7 +1526,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		assert.Contains(t, timestamps, int64(i))
 	}
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobCertificate"},
@@ -1576,7 +1575,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedMetadata.BlobStatus, v2.Failed)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
@@ -1660,7 +1659,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	assert.Equal(t, dispersalResponse, responses[0])
 	assert.Equal(t, dispersalResponse2, responses[1])
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
@@ -1690,7 +1689,7 @@ func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
 	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
 
 	respondedAt := make([]uint64, numRequests)
-	dynamoKeys := make([]commondynamodb.Key, numRequests)
+	dynamoKeys := make([]dynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		respondedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
 		dispersalRequest := &corev2.DispersalRequest{
@@ -1715,7 +1714,7 @@ func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
 
 		bhh, err := dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
@@ -1932,7 +1931,7 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	assert.Equal(t, inclusionInfo, blobAttestationInfo.InclusionInfo)
 	assert.Equal(t, attestation, blobAttestationInfo.Attestation)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -2112,7 +2111,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	assert.Equal(t, h, fetchedHeader)
 	assert.Equal(t, updatedAttestation, fetchedAttestation)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -2124,7 +2123,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	})
 }
 
-func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+func deleteItems(t *testing.T, keys []dynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)

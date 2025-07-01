@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -546,8 +545,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 
 	now := uint64(time.Now().Unix())
 	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-		1: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+		0: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+		1: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
 	}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 
@@ -589,7 +588,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 	chainReader.On("GetBlockStaleMeasure", tmock.Anything).Return(uint32(10), nil)
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
-	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,

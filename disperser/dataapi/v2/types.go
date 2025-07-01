@@ -82,6 +82,7 @@ type (
 		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
+		StakeAmount     float64 `json:"stake_amount"`
 	}
 	OperatorsStakeResponse struct {
 		CurrentBlock         uint32                      `json:"current_block"`
@@ -218,7 +219,7 @@ func createBatchHeader(bh *corev2.BatchHeader) *BatchHeader {
 func createBlobInclusionInfo(bi *corev2.BlobInclusionInfo) *BlobInclusionInfo {
 	return &BlobInclusionInfo{
 		BatchHeader:    createBatchHeader(bi.BatchHeader),
-		BlobKey:        bi.BlobKey.Hex(),
+		BlobKey:        bi.BlobKey.Hex(), // go:nolint QF1008
 		BlobIndex:      bi.BlobIndex,
 		InclusionProof: hex.EncodeToString(bi.InclusionProof),
 	}

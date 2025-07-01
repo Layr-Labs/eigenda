@@ -151,7 +151,7 @@ func ReadAllowlistFromFile(f string) (Allowlist, error) {
 		log.Printf("failed to read allowlist file: %s", err)
 		return allowlist, err
 	}
-	defer allowlistFile.Close()
+	defer core.CloseLogOnError(allowlistFile, f, nil)
 	var allowlistEntries []AllowlistEntry
 	content, err := io.ReadAll(allowlistFile)
 	if err != nil {

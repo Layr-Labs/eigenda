@@ -19,7 +19,7 @@ const KeyFileExtension = ".keys"
 
 // KeyFileSwapExtension is the file extension for the keys swap file. This file is used to atomically
 // update key files.
-const KeyFileSwapExtension = ".keys.swap"
+const KeyFileSwapExtension = KeyFileExtension + util.SwapFileExtension
 
 // keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
 //
@@ -67,7 +67,7 @@ func createKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := util.VerifyFileProperties(filePath)
+	exists, _, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
@@ -116,7 +116,7 @@ func loadKeyFile(
 
 	filePath := keys.path()
 
-	exists, size, err := util.VerifyFileProperties(filePath)
+	exists, size, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
@@ -153,7 +153,7 @@ func (k *keyFile) path() string {
 }
 
 // atomicSwap atomically replaces the key file, replacing the old one.
-func (k *keyFile) atomicSwap() error {
+func (k *keyFile) atomicSwap(sync bool) error {
 	if !k.swap {
 		return fmt.Errorf("key file is not a swap file")
 	}
@@ -162,9 +162,9 @@ func (k *keyFile) atomicSwap() error {
 	k.swap = false
 	newPath := k.path()
 
-	err := os.Rename(swapPath, newPath)
+	err := util.AtomicRename(swapPath, newPath, sync)
 	if err != nil {
-		return fmt.Errorf("failed to rename key file: %v", err)
+		return fmt.Errorf("failed to atomically swap key file %s with %s: %w", swapPath, newPath, err)
 	}
 
 	return nil
@@ -276,7 +276,7 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	index := 0
 	for {
 		// We need at least 4 bytes to read the length of the key.
-		if index+4 > len(keyBytes) {
+		if index+4 > len(keyBytes) { //nolint:staticcheck // QF1006
 			// There are fewer than 4 bytes left in the file.
 			break
 		}

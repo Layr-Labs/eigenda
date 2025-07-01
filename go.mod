@@ -1,6 +1,13 @@
 module github.com/Layr-Labs/eigenda
 
-go 1.21.13
+// We currently do not make use of any go1.24 features, but want to
+// use weak pointers for littdb, which is why we have this minimum version.
+go 1.24
+
+// We pin the compiler version to ensure determinism across local machines and CI.
+// This should be updated periodically when new minor releases are made.
+// See https://tip.golang.org/doc/devel/release#go1.24.0
+toolchain go1.24.4
 
 require (
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
@@ -20,6 +27,7 @@ require (
 	github.com/gin-contrib/logger v0.2.6
 	github.com/gin-gonic/gin v1.9.1
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ingonyama-zk/icicle/v3 v3.4.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
@@ -107,7 +115,6 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
