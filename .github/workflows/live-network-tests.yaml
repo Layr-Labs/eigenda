@@ -35,14 +35,35 @@ jobs:
       - name: Notify Slack
         if: always()
         run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR="good"
+            STATUS_EMOJI="✅"
+            MENTION=""
+          else
+            COLOR="danger"
+            STATUS_EMOJI="❌"
+            MENTION="<@here> "
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg channel "#da-live-tests" \
+            --arg text "${MENTION}Live Network Tests completed with status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg title "View Run" \
+            --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg color "$COLOR" \
+            '{
+              channel: $channel,
+              text: $text,
+              attachments: [
+                {
+                  color: $color,
+                  title: $title,
+                  title_link: $title_link
+                }
+              ]
+            }')
+
           curl -X POST -H "Authorization: Bearer ${{ secrets.DA_TEST_REPORTER_SLACK_OATH_TOKEN }}" \
-               -H 'Content-type: application/json' \
-               --data "{
-                 \"channel\":\"#da-live-tests\",
-                 \"text\":\"Live Network Tests completed with status: ${{ job.status }}\",
-                 \"attachments\": [{
-                   \"title\": \"View Run\",
-                   \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
-                 }]
-               }" \
+               -H 'Content-type: application/json; charset=utf-8' \
+               --data "$PAYLOAD" \
                https://slack.com/api/chat.postMessage
