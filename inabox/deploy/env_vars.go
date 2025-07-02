@@ -764,7 +764,7 @@ type RelayVars struct {
 
 	RELAY_RELAY_KEYS string
 
-	RELAY_EIGENDA_DIRECTORY_ADDR string
+	RELAY_EIGENDA_DIRECTORY string
 
 	RELAY_ENABLE_METRICS string
 
