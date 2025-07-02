@@ -152,7 +152,7 @@ func setup(_ *testing.M) {
 		panic("failed to create metering store")
 	}
 
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
@@ -586,6 +586,9 @@ func TestMetererDifferentQuorumConfigurations(t *testing.T) {
 
 	// Clear existing mocks to avoid conflicts
 	paymentChainState.ExpectedCalls = nil
+
+	// Re-setup the required mock for RefreshOnchainPaymentState
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 
 	// Create mock payment vault params with different MinNumSymbols for each quorum
 	mockParams := &meterer.PaymentVaultParams{
