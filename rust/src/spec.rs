@@ -1,12 +1,15 @@
-use std::str::FromStr;
+use std::{hash::Hash, num::TryFromIntError, str::FromStr};
 
-use alloy::primitives::{FixedBytes, wrap_fixed_bytes};
+use alloy::{
+    primitives::{Bytes, FixedBytes, wrap_fixed_bytes},
+    rpc::types::Header,
+};
 use borsh::{BorshDeserialize, BorshSerialize};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
     BasicAddress,
-    da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, DaSpec, Time},
+    da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
     sov_universal_wallet::UniversalWallet,
 };
 
@@ -51,25 +54,45 @@ pub struct RollupParams;
 
 /// An Ethereum block header containing only relevant information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EthereumBlockHeader;
+pub struct EthereumBlockHeader {
+    parent_hash: EthereumHash,
+    hash: EthereumHash,
+    timestamp: Time,
+    height: u64,
+}
+
+impl TryFrom<Header> for EthereumBlockHeader {
+    type Error = TryFromIntError;
+
+    fn try_from(header: Header) -> Result<Self, Self::Error> {
+        let timestamp = header.timestamp.try_into()?;
+
+        Ok(Self {
+            timestamp: Time::from_secs(timestamp),
+            parent_hash: EthereumHash::from(header.parent_hash),
+            hash: EthereumHash::from(header.hash_slow()),
+            height: header.number,
+        })
+    }
+}
 
 impl BlockHeaderTrait for EthereumBlockHeader {
     type Hash = EthereumHash;
 
     fn prev_hash(&self) -> Self::Hash {
-        todo!()
+        self.parent_hash
     }
 
     fn hash(&self) -> Self::Hash {
-        todo!()
+        self.hash
     }
 
     fn height(&self) -> u64 {
-        todo!()
+        self.height
     }
 
     fn time(&self) -> Time {
-        todo!()
+        self.timestamp.clone()
     }
 }
 
@@ -165,7 +188,14 @@ impl BorshDeserialize for EthereumHash {
 
 /// A blob containing the sender address.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct BlobWithSender;
+pub struct BlobWithSender {
+    /// The address that submitted blob to the chain.
+    address: EthereumAddress,
+    /// The ethereum transaction in which the blob was included.
+    transaction: EthereumHash,
+    /// The actual blob of bytes
+    blob: CountedBufReader<Bytes>,
+}
 
 impl BlobReaderTrait for BlobWithSender {
     type Address = EthereumAddress;
@@ -173,24 +203,25 @@ impl BlobReaderTrait for BlobWithSender {
     type BlobHash = EthereumHash;
 
     fn sender(&self) -> Self::Address {
-        todo!()
+        self.address.clone()
     }
 
     fn hash(&self) -> Self::BlobHash {
-        todo!()
+        self.transaction
     }
 
     fn verified_data(&self) -> &[u8] {
-        todo!()
+        self.blob.accumulator()
     }
 
     fn total_len(&self) -> usize {
-        todo!()
+        self.blob.total_len()
     }
 
     #[cfg(feature = "native")]
     fn advance(&mut self, num_bytes: usize) -> &[u8] {
-        todo!()
+        self.blob.advance(num_bytes);
+        self.verified_data()
     }
 }
 
