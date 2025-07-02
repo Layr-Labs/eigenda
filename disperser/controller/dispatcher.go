@@ -150,7 +150,7 @@ func NewDispatcher(
 		config.BatchMetadataMaxAge = 5 * config.OnchainStateRefreshInterval
 	}
 
-	d := &Dispatcher{
+	return &Dispatcher{
 		DispatcherConfig: config,
 
 		blobMetadataStore: blobMetadataStore,
@@ -166,18 +166,7 @@ func NewDispatcher(
 		beforeDispatch:         beforeDispatch,
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
-	}
-
-	// Initialize with a blank cache
-	d.cachedOnchainState.Store(&CachedOnchainState{
-		ReferenceBlockNumber: 0,
-		OperatorState: &core.IndexedOperatorState{
-			IndexedOperators: make(map[core.OperatorID]*core.IndexedOperatorInfo),
-		},
-		LastRefreshed: time.Time{},
-	})
-
-	return d, nil
+	}, nil
 }
 
 // refreshOnchainState refreshes the cached onchain state in the background
@@ -946,7 +935,20 @@ func (d *Dispatcher) startOnchainStateRefresher(ctx context.Context) {
 func (d *Dispatcher) getLatestOnchainState(ctx context.Context) (*CachedOnchainState, error) {
 	// Get the cached onchain state. If it is outdated, we need to manually fetch it. If we fail to fetch it
 	// we will not be able to make a new batch.
-	cachedOnChainState := d.cachedOnchainState.Load().(*CachedOnchainState)
+	state := d.cachedOnchainState.Load()
+	var cachedOnChainState *CachedOnchainState
+	if state == nil {
+		// Lazy initialization: force a refresh
+		if err := d.refreshOnchainState(ctx); err != nil {
+			return nil, fmt.Errorf("failed to refresh onchain state: %w", err)
+		}
+		state = d.cachedOnchainState.Load()
+		if state == nil {
+			// Defensive: should never happen unless refresh failed to set cache
+			return nil, errors.New("failed to initialize cached onchain state")
+		}
+	}
+	cachedOnChainState = state.(*CachedOnchainState)
 
 	// If BatchMetadataMaxAge is 0, always fetch fresh
 	// Otherwise, only fetch if cache is too old
@@ -965,11 +967,11 @@ func (d *Dispatcher) getLatestOnchainState(ctx context.Context) (*CachedOnchainS
 
 // GetCachedOnchainState returns the currently cached onchain state, or nil if it has not been set.
 func (d *Dispatcher) GetCachedOnchainState() *CachedOnchainState {
-	raw := d.cachedOnchainState.Load()
-	if raw == nil {
+	state := d.cachedOnchainState.Load()
+	if state == nil {
 		return nil
 	}
-	return raw.(*CachedOnchainState)
+	return state.(*CachedOnchainState)
 }
 
 // SetCachedOnchainState updates the cached onchain state to the provided value.
