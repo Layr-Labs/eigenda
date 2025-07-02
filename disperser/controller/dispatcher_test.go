@@ -344,6 +344,128 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	}
 }
 
+func TestDispatcherInsufficientSignatures2(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		batchMetadataMaxAge time.Duration
+		cachedBlock         uint64
+	}{
+		{"with-cache", 5 * time.Second, 100}, // Use cache; pass the current block number
+		{"legacy", 0, 90},                    // No cache (force fresh); use blockNumber - finalizationBlockDelay
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			components := newDispatcherComponents(t)
+			components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+			components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+			components.BlobSet.On("Contains", mock.Anything).Return(false)
+			components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+			objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
+			objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
+			ctx := context.Background()
+
+			// Get batch header hash to mock signatures
+			certs := make([]*corev2.BlobCertificate, 0, len(objsInBothQuorum.blobCerts)+len(objsInQuorum1.blobCerts))
+			certs = append(certs, objsInBothQuorum.blobCerts...)
+			certs = append(certs, objsInQuorum1.blobCerts...)
+			merkleTree, err := corev2.BuildMerkleTree(certs)
+			require.NoError(t, err)
+			require.NotNil(t, merkleTree)
+			require.NotNil(t, merkleTree.Root())
+
+			// Mock all StoreChunks calls to always fail ("no operators sign")
+			mockClient0 := clientsmock.NewNodeClient()
+			mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+			mockClient1 := clientsmock.NewNodeClient()
+			mockClient1.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+			mockClient2 := clientsmock.NewNodeClient()
+			mockClient2.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+
+			op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+			op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+			op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
+			require.NotEqual(t, op0Port, op1Port)
+			require.NotEqual(t, op0Port, op2Port)
+			components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
+			components.NodeClientManager.On("GetClient", mock.Anything, op1Port).Return(mockClient1, nil)
+			components.NodeClientManager.On("GetClient", mock.Anything, op2Port).Return(mockClient2, nil)
+			components.Dispatcher.BatchMetadataMaxAge = tc.batchMetadataMaxAge
+
+			// Always return a valid operator state for any call
+			cachedState := createCachedState(t, ctx, tc.cachedBlock)
+			mockChainState.On("GetIndexedOperatorState", mock.Anything, mock.Anything, mock.Anything).
+				Return(cachedState.OperatorState, nil)
+			components.Dispatcher.SetCachedOnchainState(cachedState)
+			require.NotNil(t, components.Dispatcher.GetCachedOnchainState())
+
+			// Heartbeat goroutine
+			var seen []healthcheck.HeartbeatMessage
+			done := make(chan struct{})
+			go func() {
+				for hb := range components.LivenessChan {
+					seen = append(seen, hb)
+				}
+				close(done)
+			}()
+
+			// Mock GetRequiredQuorumNumbers in legacy mode
+			components.ChainReader.On("GetRequiredQuorumNumbers", mock.Anything, mock.Anything).
+				Return([]core.QuorumID{0, 1}, nil)
+
+			sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
+			require.NoError(t, err)
+			err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
+			require.NoError(t, err)
+
+			// Test that the blob metadata status are updated
+			for _, blobKey := range objsInBothQuorum.blobKeys {
+				bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
+				require.NoError(t, err)
+				require.Equal(t, commonv2.Failed, bm.BlobStatus)
+			}
+			for _, blobKey := range objsInQuorum1.blobKeys {
+				bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
+				require.NoError(t, err)
+				require.Equal(t, commonv2.Failed, bm.BlobStatus)
+			}
+
+			// Get batch header
+			vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objsInBothQuorum.blobKeys[0])
+			require.NoError(t, err)
+			require.Len(t, vis, 1)
+			bhh, err := vis[0].BatchHeader.Hash()
+			require.NoError(t, err)
+
+			// Test that empty attestation is written
+			att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
+			require.NoError(t, err)
+			require.Nil(t, att.APKG2)
+			require.Len(t, att.QuorumAPKs, 0)
+			require.Nil(t, att.Sigma)
+			require.Len(t, att.QuorumNumbers, 0)
+			require.Len(t, att.QuorumResults, 0)
+			require.Len(t, att.NonSignerPubKeys, 0)
+
+			// Wait for heartbeats
+			time.Sleep(10 * time.Millisecond)
+			close(components.LivenessChan)
+			<-done
+
+			require.NotEmpty(t, seen, "expected at least one heartbeat")
+			for _, hb := range seen {
+				require.Equal(t, "dispatcher", hb.Component)
+			}
+			for i := 1; i < len(seen); i++ {
+				prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+				require.True(t, !curr.Before(prev), "timestamps should not decrease")
+			}
+
+			// Cleanup
+			deleteBlobs(t, components.BlobMetadataStore, objsInBothQuorum.blobKeys, [][32]byte{bhh})
+			deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
+		})
+	}
+}
+
 func TestDispatcherMaxBatchSize(t *testing.T) {
 	for _, tc := range []struct {
 		name                string
