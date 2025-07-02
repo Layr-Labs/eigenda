@@ -136,10 +136,10 @@ func FromProtoRecords(protoRecords map[uint32]*disperser_rpc.PeriodRecords) Quor
 		}
 		// Populate with values from server
 		for _, record := range protoRecord.GetRecords() {
-			idx := record.Index % uint32(MinNumBins)
+			idx := record.GetIndex() % uint32(MinNumBins)
 			records[core.QuorumID(quorumNumber)][idx] = &PeriodRecord{
-				Index: record.Index,
-				Usage: record.Usage,
+				Index: record.GetIndex(),
+				Usage: record.GetUsage(),
 			}
 		}
 	}

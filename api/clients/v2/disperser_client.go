@@ -439,7 +439,7 @@ func (c *disperserClient) getPaymentStateFromLegacyAPI(
 // convertLegacyPaymentStateToNew converts the old GetPaymentStateReply to the new GetPaymentStateForAllQuorumsReply format
 func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateReply) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
 
-	if legacyReply.PaymentGlobalParams == nil {
+	if legacyReply.GetPaymentGlobalParams() == nil {
 		return nil, fmt.Errorf("legacy payment state received from disperser does not contain global params")
 	}
 	// Convert PaymentGlobalParams to PaymentVaultParams
@@ -448,33 +448,33 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		paymentVaultParams = &disperser_rpc.PaymentVaultParams{
 			QuorumPaymentConfigs:  make(map[uint32]*disperser_rpc.PaymentQuorumConfig),
 			QuorumProtocolConfigs: make(map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig),
-			OnDemandQuorumNumbers: legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers,
+			OnDemandQuorumNumbers: legacyReply.GetPaymentGlobalParams().GetOnDemandQuorumNumbers(),
 		}
 
 		// Apply the global params to all quorums, both on-demand and reservation.
-		onDemandQuorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
+		onDemandQuorums := legacyReply.GetPaymentGlobalParams().GetOnDemandQuorumNumbers()
 		if len(onDemandQuorums) == 0 {
 			// Disperser v0.9.0 has a bug where it does not return on-demand quorums: https://github.com/Layr-Labs/eigenda/pull/1699
 			// Until we upgrade all dispersers, we will assume that on-demand quorums are 0 and 1.
 			// TODO: this should instead return an error once we have upgraded all dispersers.
 			onDemandQuorums = []uint32{0, 1}
 		}
-		reservationQuorums := legacyReply.Reservation.QuorumNumbers
+		reservationQuorums := legacyReply.GetReservation().GetQuorumNumbers()
 		// There may be overlapping quorums but it doesn't matter since we will apply the same global params to all of them.
 		allQuorums := append(reservationQuorums, onDemandQuorums...)
 
 		for _, quorumID := range allQuorums {
 			paymentVaultParams.QuorumPaymentConfigs[quorumID] = &disperser_rpc.PaymentQuorumConfig{
 				ReservationSymbolsPerSecond: 0, // Not available in legacy format
-				OnDemandSymbolsPerSecond:    legacyReply.PaymentGlobalParams.GlobalSymbolsPerSecond,
-				OnDemandPricePerSymbol:      legacyReply.PaymentGlobalParams.PricePerSymbol,
+				OnDemandSymbolsPerSecond:    legacyReply.GetPaymentGlobalParams().GetGlobalSymbolsPerSecond(),
+				OnDemandPricePerSymbol:      legacyReply.GetPaymentGlobalParams().GetPricePerSymbol(),
 			}
 
 			paymentVaultParams.QuorumProtocolConfigs[quorumID] = &disperser_rpc.PaymentQuorumProtocolConfig{
-				MinNumSymbols: legacyReply.PaymentGlobalParams.MinNumSymbols,
+				MinNumSymbols: legacyReply.GetPaymentGlobalParams().GetMinNumSymbols(),
 				// ReservationAdvanceWindow is not used offchain at the moment so it's okay to set to any value.
 				ReservationAdvanceWindow:   0,
-				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
+				ReservationRateLimitWindow: legacyReply.GetPaymentGlobalParams().GetReservationWindow(),
 				OnDemandRateLimitWindow:    0, // Not available in legacy format
 			}
 		}
@@ -485,21 +485,21 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 	}
 
 	// If no reservation is available, return early with only payment vault params and cumulative payment info.
-	if legacyReply.Reservation == nil {
+	if legacyReply.GetReservation() == nil {
 		return &disperser_rpc.GetPaymentStateForAllQuorumsReply{
 			PaymentVaultParams:       paymentVaultParams,
-			CumulativePayment:        legacyReply.CumulativePayment,
-			OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
+			CumulativePayment:        legacyReply.GetCumulativePayment(),
+			OnchainCumulativePayment: legacyReply.GetOnchainCumulativePayment(),
 		}, nil
 	}
 
 	// Otherwise there is a reservation available, so we need to convert it to the per-quorum format.
 
 	// We first make sure that the disperser returned valid data.
-	if len(legacyReply.PeriodRecords) == 0 {
+	if len(legacyReply.GetPeriodRecords()) == 0 {
 		return nil, fmt.Errorf("legacy payment state received from disperser does not contain period records")
 	}
-	if len(legacyReply.Reservation.QuorumNumbers) == 0 {
+	if len(legacyReply.GetReservation().GetQuorumNumbers()) == 0 {
 		return nil, fmt.Errorf("legacy payment state received from disperser does not contain reservation quorums")
 	}
 
@@ -507,14 +507,14 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
 
 	// Apply the reservation to all reservationQuorums mentioned in the reservation
-	for _, quorumID := range legacyReply.Reservation.QuorumNumbers {
+	for _, quorumID := range legacyReply.GetReservation().GetQuorumNumbers() {
 		reservations[quorumID] = &disperser_rpc.QuorumReservation{
-			SymbolsPerSecond: legacyReply.Reservation.SymbolsPerSecond,
-			StartTimestamp:   legacyReply.Reservation.StartTimestamp,
-			EndTimestamp:     legacyReply.Reservation.EndTimestamp,
+			SymbolsPerSecond: legacyReply.GetReservation().GetSymbolsPerSecond(),
+			StartTimestamp:   legacyReply.GetReservation().GetStartTimestamp(),
+			EndTimestamp:     legacyReply.GetReservation().GetEndTimestamp(),
 		}
 		periodRecords[quorumID] = &disperser_rpc.PeriodRecords{
-			Records: legacyReply.PeriodRecords,
+			Records: legacyReply.GetPeriodRecords(),
 		}
 	}
 
@@ -522,8 +522,8 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		PaymentVaultParams:       paymentVaultParams,
 		PeriodRecords:            periodRecords,
 		Reservations:             reservations,
-		CumulativePayment:        legacyReply.CumulativePayment,
-		OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
+		CumulativePayment:        legacyReply.GetCumulativePayment(),
+		OnchainCumulativePayment: legacyReply.GetOnchainCumulativePayment(),
 	}, nil
 }
 

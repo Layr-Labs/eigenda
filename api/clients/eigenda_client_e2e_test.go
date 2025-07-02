@@ -47,8 +47,8 @@ func TestClientUsingTestnet(t *testing.T) {
 		assert.NoError(t, err)
 		blobInfo, err := client.PutBlob(context.Background(), []byte(data))
 		assert.NoError(t, err)
-		batchHeaderHash := blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash
-		blobIndex := blobInfo.BlobVerificationProof.BlobIndex
+		batchHeaderHash := blobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()
+		blobIndex := blobInfo.GetBlobVerificationProof().GetBlobIndex()
 		blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
 		assert.NoError(t, err)
 		assert.Equal(t, data, string(blob))
@@ -76,8 +76,8 @@ func TestClientUsingTestnet(t *testing.T) {
 		assert.NoError(t, err)
 		blobInfo, err := client.PutBlob(context.Background(), []byte(data))
 		assert.NoError(t, err)
-		batchHeaderHash := blobInfo.BlobVerificationProof.BatchMetadata.BatchHeaderHash
-		blobIndex := blobInfo.BlobVerificationProof.BlobIndex
+		batchHeaderHash := blobInfo.GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()
+		blobIndex := blobInfo.GetBlobVerificationProof().GetBlobIndex()
 		blob, err := client.GetBlob(context.Background(), batchHeaderHash, blobIndex)
 		assert.NoError(t, err)
 		assert.Equal(t, data, string(blob))
@@ -87,7 +87,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		blockNumCur, err := client.ethClient.BlockNumber(context.Background())
 		assert.NoError(t, err)
 		blockNumAtDepth := new(big.Int).SetUint64(blockNumCur - confDepth)
-		batchId := blobInfo.BlobVerificationProof.GetBatchId()
+		batchId := blobInfo.GetBlobVerificationProof().GetBatchId()
 		onchainBatchMetadataHash, err := client.edasmCaller.BatchIdToBatchMetadataHash(&bind.CallOpts{BlockNumber: blockNumAtDepth}, batchId)
 		assert.NoError(t, err)
 		assert.NotEqual(t, onchainBatchMetadataHash, make([]byte, 32))

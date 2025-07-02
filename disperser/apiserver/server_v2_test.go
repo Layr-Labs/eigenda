@@ -91,8 +91,8 @@ func TestV2DisperseBlob(t *testing.T) {
 
 	blobKey, err := blobHeader.BlobKey()
 	assert.NoError(t, err)
-	assert.Equal(t, pbv2.BlobStatus_QUEUED, reply.Result)
-	assert.Equal(t, blobKey[:], reply.BlobKey)
+	assert.Equal(t, pbv2.BlobStatus_QUEUED, reply.GetResult())
+	assert.Equal(t, blobKey[:], reply.GetBlobKey())
 
 	// Check if the blob is stored
 	storedData, err := c.BlobStore.GetBlob(ctx, blobKey)
@@ -304,7 +304,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 
 	// request with invalid commitment
 	invalidCommitment := commitmentProto
-	invalidCommitment.Length = commitmentProto.Length - 1
+	invalidCommitment.Length = commitmentProto.GetLength() - 1
 	invalidReqProto = &pbcommonv2.BlobHeader{
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
@@ -396,14 +396,14 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_QUEUED, status.Status)
+	require.Equal(t, pbv2.BlobStatus_QUEUED, status.GetStatus())
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Encoded)
 	require.NoError(t, err)
 	status, err = c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
+	require.Equal(t, pbv2.BlobStatus_ENCODED, status.GetStatus())
 
 	// First transition to GatheringSignatures state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
@@ -456,11 +456,11 @@ func TestV2GetBlobStatus(t *testing.T) {
 	blobCertProto, err := blobCert.ToProtobuf()
 	require.NoError(t, err)
 	require.Equal(t, blobHeaderProto, reply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader())
-	require.Equal(t, blobCertProto.RelayKeys, reply.GetBlobInclusionInfo().GetBlobCertificate().GetRelayKeys())
+	require.Equal(t, blobCertProto.GetRelayKeys(), reply.GetBlobInclusionInfo().GetBlobCertificate().GetRelayKeys())
 	require.Equal(t, inclusionInfo0.BlobIndex, reply.GetBlobInclusionInfo().GetBlobIndex())
 	require.Equal(t, inclusionInfo0.InclusionProof, reply.GetBlobInclusionInfo().GetInclusionProof())
-	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().BatchRoot)
-	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().ReferenceBlockNumber)
+	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().GetBatchRoot())
+	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	attestationProto, err := attestation.ToProtobuf()
 	require.NoError(t, err)
 	require.Equal(t, attestationProto, reply.GetSignedBatch().GetAttestation())
@@ -479,16 +479,16 @@ func TestV2GetBlobCommitment(t *testing.T) {
 		Blob: data,
 	})
 	require.NoError(t, err)
-	commitment, err := new(encoding.G1Commitment).Deserialize(reply.BlobCommitment.Commitment)
+	commitment, err := new(encoding.G1Commitment).Deserialize(reply.GetBlobCommitment().GetCommitment())
 	require.NoError(t, err)
 	assert.Equal(t, commit.Commitment, commitment)
-	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthCommitment)
+	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.GetBlobCommitment().GetLengthCommitment())
 	require.NoError(t, err)
 	assert.Equal(t, commit.LengthCommitment, lengthCommitment)
-	lengthProof, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthProof)
+	lengthProof, err := new(encoding.G2Commitment).Deserialize(reply.GetBlobCommitment().GetLengthProof())
 	require.NoError(t, err)
 	assert.Equal(t, commit.LengthProof, lengthProof)
-	assert.Equal(t, uint32(commit.Length), reply.BlobCommitment.Length)
+	assert.Equal(t, uint32(commit.Length), reply.GetBlobCommitment().GetLength())
 }
 
 func newTestServerV2(t *testing.T) *testComponents {

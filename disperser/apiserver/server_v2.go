@@ -288,9 +288,9 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 // Deprecated: Use GetPaymentStateForAllQuorums instead.
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	allQuorumsReq := &pb.GetPaymentStateForAllQuorumsRequest{
-		AccountId: req.AccountId,
-		Signature: req.Signature,
-		Timestamp: req.Timestamp,
+		AccountId: req.GetAccountId(),
+		Signature: req.GetSignature(),
+		Timestamp: req.GetTimestamp(),
 	}
 
 	allQuorumsReply, err := s.GetPaymentStateForAllQuorums(ctx, allQuorumsReq)
@@ -316,31 +316,31 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuorumsReply) *pb.GetPaymentStateReply {
 	// For PaymentVaultParams, use quorum 0 for protocol level parameters and on-demand quorum numbers
 	var paymentGlobalParams *pb.PaymentGlobalParams
-	if allQuorumsReply.PaymentVaultParams != nil &&
-		allQuorumsReply.PaymentVaultParams.QuorumPaymentConfigs != nil &&
-		allQuorumsReply.PaymentVaultParams.QuorumProtocolConfigs != nil {
-		quorum0Config, ok := allQuorumsReply.PaymentVaultParams.QuorumPaymentConfigs[0]
-		quorum0ProtocolConfig, ok2 := allQuorumsReply.PaymentVaultParams.QuorumProtocolConfigs[0]
+	if allQuorumsReply.GetPaymentVaultParams() != nil &&
+		allQuorumsReply.GetPaymentVaultParams().GetQuorumPaymentConfigs() != nil &&
+		allQuorumsReply.GetPaymentVaultParams().GetQuorumProtocolConfigs() != nil {
+		quorum0Config, ok := allQuorumsReply.GetPaymentVaultParams().GetQuorumPaymentConfigs()[0]
+		quorum0ProtocolConfig, ok2 := allQuorumsReply.GetPaymentVaultParams().GetQuorumProtocolConfigs()[0]
 		if ok && ok2 {
 			paymentGlobalParams = &pb.PaymentGlobalParams{
-				GlobalSymbolsPerSecond: quorum0Config.OnDemandSymbolsPerSecond,
-				MinNumSymbols:          quorum0ProtocolConfig.MinNumSymbols,
-				PricePerSymbol:         quorum0Config.OnDemandPricePerSymbol,
-				ReservationWindow:      quorum0ProtocolConfig.ReservationRateLimitWindow,
-				OnDemandQuorumNumbers:  allQuorumsReply.PaymentVaultParams.OnDemandQuorumNumbers,
+				GlobalSymbolsPerSecond: quorum0Config.GetOnDemandSymbolsPerSecond(),
+				MinNumSymbols:          quorum0ProtocolConfig.GetMinNumSymbols(),
+				PricePerSymbol:         quorum0Config.GetOnDemandPricePerSymbol(),
+				ReservationWindow:      quorum0ProtocolConfig.GetReservationRateLimitWindow(),
+				OnDemandQuorumNumbers:  allQuorumsReply.GetPaymentVaultParams().GetOnDemandQuorumNumbers(),
 			}
 		}
 	}
 
 	// Find most restrictive reservation parameters across all quorums
 	var reservation *pb.Reservation
-	if len(allQuorumsReply.Reservations) > 0 {
+	if len(allQuorumsReply.GetReservations()) > 0 {
 		var minSymbolsPerSecond = ^uint64(0) // max uint64
 		var latestStartTimestamp uint32
 		var earliestEndTimestamp = ^uint32(0) // max uint32
 		var reservedQuorums []uint32
 
-		for quorumId, quorumReservation := range allQuorumsReply.Reservations {
+		for quorumId, quorumReservation := range allQuorumsReply.GetReservations() {
 			if quorumReservation == nil {
 				continue
 			}
@@ -348,14 +348,14 @@ func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuo
 			reservedQuorums = append(reservedQuorums, quorumId)
 
 			// Find most restrictive parameters
-			if quorumReservation.SymbolsPerSecond < minSymbolsPerSecond {
-				minSymbolsPerSecond = quorumReservation.SymbolsPerSecond
+			if quorumReservation.GetSymbolsPerSecond() < minSymbolsPerSecond {
+				minSymbolsPerSecond = quorumReservation.GetSymbolsPerSecond()
 			}
-			if quorumReservation.StartTimestamp > latestStartTimestamp {
-				latestStartTimestamp = quorumReservation.StartTimestamp
+			if quorumReservation.GetStartTimestamp() > latestStartTimestamp {
+				latestStartTimestamp = quorumReservation.GetStartTimestamp()
 			}
-			if quorumReservation.EndTimestamp < earliestEndTimestamp {
-				earliestEndTimestamp = quorumReservation.EndTimestamp
+			if quorumReservation.GetEndTimestamp() < earliestEndTimestamp {
+				earliestEndTimestamp = quorumReservation.GetEndTimestamp()
 			}
 		}
 
@@ -372,34 +372,34 @@ func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuo
 
 	// Build period records by selecting highest usage for each period index across all quorums
 	var periodRecords []*pb.PeriodRecord
-	if len(allQuorumsReply.PeriodRecords) > 0 {
+	if len(allQuorumsReply.GetPeriodRecords()) > 0 {
 		highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
-		for _, quorumRecords := range allQuorumsReply.PeriodRecords {
+		for _, quorumRecords := range allQuorumsReply.GetPeriodRecords() {
 			if quorumRecords == nil {
 				continue
 			}
-			for _, record := range quorumRecords.Records {
+			for _, record := range quorumRecords.GetRecords() {
 				if record == nil {
 					continue
 				}
-				idx := record.Index % uint32(meterer.MinNumBins)
-				if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
+				idx := record.GetIndex() % uint32(meterer.MinNumBins)
+				if highestPeriodRecords[idx] == nil || record.GetUsage() > highestPeriodRecords[idx].GetUsage() {
 					highestPeriodRecords[idx] = record
 				}
 			}
 		}
 		periodRecords = highestPeriodRecords
-	} else if quorum0Records, ok := allQuorumsReply.PeriodRecords[0]; ok && quorum0Records != nil {
+	} else if quorum0Records, ok := allQuorumsReply.GetPeriodRecords()[0]; ok && quorum0Records != nil {
 		// Fallback to quorum 0 if no records found
-		periodRecords = quorum0Records.Records
+		periodRecords = quorum0Records.GetRecords()
 	}
 
 	return &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      paymentGlobalParams,
 		PeriodRecords:            periodRecords,
 		Reservation:              reservation,
-		CumulativePayment:        allQuorumsReply.CumulativePayment,
-		OnchainCumulativePayment: allQuorumsReply.OnchainCumulativePayment,
+		CumulativePayment:        allQuorumsReply.GetCumulativePayment(),
+		OnchainCumulativePayment: allQuorumsReply.GetOnchainCumulativePayment(),
 	}
 }
 
@@ -414,11 +414,11 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
-	if !gethcommon.IsHexAddress(req.AccountId) {
+	if !gethcommon.IsHexAddress(req.GetAccountId()) {
 		return nil, api.NewErrorInvalidArg("invalid account ID")
 	}
 
-	accountID := gethcommon.HexToAddress(req.AccountId)
+	accountID := gethcommon.HexToAddress(req.GetAccountId())
 
 	// validate the signature
 	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(accountID, req); err != nil {
@@ -480,7 +480,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 				return nil, api.NewErrorInternal("failed to get quorum protocol config")
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
-			reservationCurrentPeriods = append(reservationCurrentPeriods, meterer.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
+			reservationCurrentPeriods = append(reservationCurrentPeriods, meterer.GetReservationPeriodByNanosecond(int64(req.GetTimestamp()), quorumProtocolConfig.ReservationRateLimitWindow))
 		}
 	}
 
@@ -492,7 +492,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	}
 	for quorumId, record := range records {
 		periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
-			Records: record.Records,
+			Records: record.GetRecords(),
 		}
 	}
 
