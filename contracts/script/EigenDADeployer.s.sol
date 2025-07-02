@@ -439,8 +439,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             UsageAuthorizationTypes.QuorumProtocolConfig({
                 minNumSymbols: _minNumSymbols,
                 reservationAdvanceWindow: 30 days,
-                reservationRateLimitWindow: _globalRatePeriodInterval,
-                onDemandRateLimitWindow: 1 hours,
+                reservationRateLimitWindow: 300,
+                onDemandRateLimitWindow: 30,
                 onDemandEnabled: true
             })
         );
@@ -450,9 +450,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             UsageAuthorizationTypes.QuorumProtocolConfig({
                 minNumSymbols: _minNumSymbols,
                 reservationAdvanceWindow: 30 days,
-                reservationRateLimitWindow: _globalRatePeriodInterval,
-                onDemandRateLimitWindow: 1 hours,
-                onDemandEnabled: true
+                reservationRateLimitWindow: 300,
+                onDemandRateLimitWindow: 30,
+                onDemandEnabled: false
             })
         );
         usageAuthorizationRegistry.setQuorumConfig(
