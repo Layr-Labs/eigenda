@@ -15,9 +15,8 @@ export function createGlobalRatePeriodIntervalUpdatedEvent(
   previousValue: BigInt,
   newValue: BigInt
 ): GlobalRatePeriodIntervalUpdated {
-  let globalRatePeriodIntervalUpdatedEvent = changetype<
-    GlobalRatePeriodIntervalUpdated
-  >(newMockEvent())
+  let globalRatePeriodIntervalUpdatedEvent =
+    changetype<GlobalRatePeriodIntervalUpdated>(newMockEvent())
 
   globalRatePeriodIntervalUpdatedEvent.parameters = new Array()
 
@@ -41,9 +40,8 @@ export function createGlobalSymbolsPerPeriodUpdatedEvent(
   previousValue: BigInt,
   newValue: BigInt
 ): GlobalSymbolsPerPeriodUpdated {
-  let globalSymbolsPerPeriodUpdatedEvent = changetype<
-    GlobalSymbolsPerPeriodUpdated
-  >(newMockEvent())
+  let globalSymbolsPerPeriodUpdatedEvent =
+    changetype<GlobalSymbolsPerPeriodUpdated>(newMockEvent())
 
   globalSymbolsPerPeriodUpdatedEvent.parameters = new Array()
 
@@ -83,9 +81,8 @@ export function createOnDemandPaymentUpdatedEvent(
   onDemandPayment: BigInt,
   totalDeposit: BigInt
 ): OnDemandPaymentUpdated {
-  let onDemandPaymentUpdatedEvent = changetype<OnDemandPaymentUpdated>(
-    newMockEvent()
-  )
+  let onDemandPaymentUpdatedEvent =
+    changetype<OnDemandPaymentUpdated>(newMockEvent())
 
   onDemandPaymentUpdatedEvent.parameters = new Array()
 
@@ -112,9 +109,8 @@ export function createOwnershipTransferredEvent(
   previousOwner: Address,
   newOwner: Address
 ): OwnershipTransferred {
-  let ownershipTransferredEvent = changetype<OwnershipTransferred>(
-    newMockEvent()
-  )
+  let ownershipTransferredEvent =
+    changetype<OwnershipTransferred>(newMockEvent())
 
   ownershipTransferredEvent.parameters = new Array()
 
@@ -187,9 +183,8 @@ export function createReservationPeriodIntervalUpdatedEvent(
   previousValue: BigInt,
   newValue: BigInt
 ): ReservationPeriodIntervalUpdated {
-  let reservationPeriodIntervalUpdatedEvent = changetype<
-    ReservationPeriodIntervalUpdated
-  >(newMockEvent())
+  let reservationPeriodIntervalUpdatedEvent =
+    changetype<ReservationPeriodIntervalUpdated>(newMockEvent())
 
   reservationPeriodIntervalUpdatedEvent.parameters = new Array()
 

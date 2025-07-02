@@ -16,6 +16,7 @@ golangci-lint = "2.1.6"
 # TODO: document exactly why these are needed.
 node = "20.18.1"
 yarn = "1.22.22"
+"npm:@graphprotocol/graph-cli" = "0.97.1"
 
 # Used by the /preprocess-logs claude code slash command
 ripgrep = "latest"
