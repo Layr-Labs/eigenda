@@ -32,7 +32,7 @@ const (
 	disperserHostname = "disperser-testnet-holesky.eigenda.xyz"
 
 	// Eth client
-	addressDirectoryAddress = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
+	eigendaDirectoryAddress = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 
 	// Router address provider
 	certVerifierRouterAddress = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
@@ -338,7 +338,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		addressDirectoryAddress,
+		eigendaDirectoryAddress,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)

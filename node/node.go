@@ -209,7 +209,7 @@ func NewNode(
 	}
 
 	// Get service manager address from address directory
-	addressReader, err := eth.NewAddressDirectoryReader(config.EigenDADirectory, client)
+	addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 	}

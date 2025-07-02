@@ -37,9 +37,9 @@ var _ core.Writer = (*Writer)(nil)
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
-	addressDirectoryHexAddr string) (*Writer, error) {
+	eigendaDirectoryHexAddr string) (*Writer, error) {
 
-	r, err := NewReader(logger, client, addressDirectoryHexAddr)
+	r, err := NewReader(logger, client, eigendaDirectoryHexAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
 	}

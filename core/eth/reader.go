@@ -68,14 +68,14 @@ var _ core.Reader = (*Reader)(nil)
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
-	addressDirectoryHexAddr string) (*Reader, error) {
+	eigendaDirectoryHexAddr string) (*Reader, error) {
 
 	e := &Reader{
 		ethClient: client,
 		logger:    logger.With("component", "Reader"),
 	}
 
-	addressReader, err := NewAddressDirectoryReader(addressDirectoryHexAddr, client)
+	addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 	}

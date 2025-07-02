@@ -10,32 +10,32 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// AddressDirectoryReader wraps the address directory contract and provides
+// EigenDADirectoryReader wraps the address directory contract and provides
 // safe getters for contract addresses with zero address validation
-type AddressDirectoryReader struct {
+type EigenDADirectoryReader struct {
 	contract *eigendadirectory.ContractIEigenDADirectory
 }
 
-// NewAddressDirectoryReader creates a new AddressDirectoryReader
-func NewAddressDirectoryReader(addressDirectoryHexAddr string, client common.EthClient) (*AddressDirectoryReader, error) {
-	if addressDirectoryHexAddr == "" || !gethcommon.IsHexAddress(addressDirectoryHexAddr) {
-		return nil, fmt.Errorf("address directory must be a valid hex address: %s", addressDirectoryHexAddr)
+// NewEigenDADirectoryReader creates a new EigenDADirectoryReader
+func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client common.EthClient) (*EigenDADirectoryReader, error) {
+	if eigendaDirectoryHexAddr == "" || !gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
+		return nil, fmt.Errorf("address directory must be a valid hex address: %s", eigendaDirectoryHexAddr)
 	}
 
-	addressDirectoryAddr := gethcommon.HexToAddress(addressDirectoryHexAddr)
-	contract, err := eigendadirectory.NewContractIEigenDADirectory(addressDirectoryAddr, client)
+	eigendaDirectoryAddr := gethcommon.HexToAddress(eigendaDirectoryHexAddr)
+	contract, err := eigendadirectory.NewContractIEigenDADirectory(eigendaDirectoryAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EigenDADirectory contract: %w", err)
 	}
 
-	return &AddressDirectoryReader{
+	return &EigenDADirectoryReader{
 		contract: contract,
 	}, nil
 }
 
 // getAddressWithValidation reads the directory to get an address by the contract name
 // and validates it's not zero
-func (r *AddressDirectoryReader) getAddressWithValidation(contractName string) (gethcommon.Address, error) {
+func (r *EigenDADirectoryReader) getAddressWithValidation(contractName string) (gethcommon.Address, error) {
 	names, err := r.contract.GetAllNames(&bind.CallOpts{})
 	if err != nil {
 		return gethcommon.Address{}, fmt.Errorf("failed to get all contract names: %w", err)
@@ -55,12 +55,12 @@ func (r *AddressDirectoryReader) getAddressWithValidation(contractName string) (
 }
 
 // GetOperatorStateRetrieverAddress returns the operator state retriever address with validation
-func (r *AddressDirectoryReader) GetOperatorStateRetrieverAddress() (gethcommon.Address, error) {
+func (r *EigenDADirectoryReader) GetOperatorStateRetrieverAddress() (gethcommon.Address, error) {
 	return r.getAddressWithValidation(ContractNames.OperatorStateRetriever)
 }
 
 // GetServiceManagerAddress returns the service manager address with validation
-func (r *AddressDirectoryReader) GetServiceManagerAddress() (gethcommon.Address, error) {
+func (r *EigenDADirectoryReader) GetServiceManagerAddress() (gethcommon.Address, error) {
 	return r.getAddressWithValidation(ContractNames.ServiceManager)
 }
 
