@@ -22,7 +22,7 @@ library UsageAuthorizationTypes {
 
     /// @param token The address of the token used for on-demand payments.
     /// @param recipient The address of the recipient of the on-demand payments.
-    /// @param reservationSymbolsPerSecond The number of symbols reserved per second.
+    /// @param reservationSymbolsPerSecond The number of symbols available to be reserved per second.
     /// @param onDemandSymbolsPerSecond The number of symbols available for on-demand payments per second.
     /// @param onDemandPricePerSymbol The price per symbol for on-demand payments.
     struct QuorumConfig {

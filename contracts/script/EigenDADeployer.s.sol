@@ -42,9 +42,20 @@ import {
     IPauserRegistry
 } from "./DeployOpenEigenLayer.s.sol";
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+
+contract ERC20Mintable is ERC20 {
+    constructor() ERC20("TEST", "TEST") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 // NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
@@ -72,6 +83,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
     UsageAuthorizationRegistry public usageAuthorizationRegistry;
+    ERC20Mintable public testToken;
 
     EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
@@ -114,6 +126,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        testToken = new ERC20Mintable();
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -418,6 +431,49 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(
                 UsageAuthorizationRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig
             )
+        );
+
+        usageAuthorizationRegistry.initializeQuorum(
+            0,
+            addressConfig.eigenLayerCommunityMultisig,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: _minNumSymbols,
+                reservationAdvanceWindow: 30 days,
+                reservationRateLimitWindow: _globalRatePeriodInterval,
+                onDemandRateLimitWindow: 1 hours,
+                onDemandEnabled: true
+            })
+        );
+        usageAuthorizationRegistry.initializeQuorum(
+            1,
+            addressConfig.eigenLayerCommunityMultisig,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: _minNumSymbols,
+                reservationAdvanceWindow: 1 hours,
+                reservationRateLimitWindow: _globalRatePeriodInterval,
+                onDemandRateLimitWindow: 1 hours,
+                onDemandEnabled: true
+            })
+        );
+        usageAuthorizationRegistry.setQuorumConfig(
+            0,
+            UsageAuthorizationTypes.QuorumConfig({
+                token: address(testToken),
+                recipient: addressConfig.eigenLayerCommunityMultisig,
+                reservationSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandPricePerSymbol: _pricePerSymbol
+            })
+        );
+        usageAuthorizationRegistry.setQuorumConfig(
+            1,
+            UsageAuthorizationTypes.QuorumConfig({
+                token: address(testToken),
+                recipient: addressConfig.eigenLayerCommunityMultisig,
+                reservationSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandPricePerSymbol: _pricePerSymbol
+            })
         );
         eigenDADirectory.transferOwnership(addressConfig.eigenLayerCommunityMultisig);
     }
