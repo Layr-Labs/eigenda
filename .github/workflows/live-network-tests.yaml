@@ -4,9 +4,9 @@ on:
   schedule:
     - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
   workflow_dispatch: {}         # Allow manual triggering
-#  push: # temporary
-#    branches:
-#      - auto-test
+  push: # temporary
+    branches:
+      - auto-test
 
 jobs:
   test:
@@ -32,11 +32,17 @@ jobs:
       - name: Run Live Network Tests
         run: go test ./test/v2/live -v
 
-#      - name: Notify Slack on failure
-#        if: failure()
-#        uses: 8398a7/action-slack@v3
-#        with:
-#          status: ${{ job.status }}
-#          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-#        env:
-#          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Notify Slack
+        if: always()
+        run: |
+          curl -X POST -H "Authorization: Bearer ${{ secrets.DA_TEST_REPORTER_SLACK_OATH_TOKEN }}" \
+               -H 'Content-type: application/json' \
+               --data "{
+                 \"channel\":\"#da-live-tests\",
+                 \"text\":\"Live Network Tests completed with status: ${{ job.status }}\",
+                 \"attachments\": [{
+                   \"title\": \"View Run\",
+                   \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+                 }]
+               }" \
+               https://slack.com/api/chat.postMessage
