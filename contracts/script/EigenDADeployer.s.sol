@@ -449,7 +449,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             addressConfig.eigenLayerCommunityMultisig,
             UsageAuthorizationTypes.QuorumProtocolConfig({
                 minNumSymbols: _minNumSymbols,
-                reservationAdvanceWindow: 1 hours,
+                reservationAdvanceWindow: 30 days,
                 reservationRateLimitWindow: _globalRatePeriodInterval,
                 onDemandRateLimitWindow: 1 hours,
                 onDemandEnabled: true
