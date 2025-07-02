@@ -132,7 +132,7 @@ func GetClient(configPath string) (*TestClient, error) {
 }
 
 func skipInCI(t *testing.T) {
-	if os.Getenv("CI") != "" {
+	if os.Getenv("CI") != "" && os.Getenv("LIVE_TESTS") == "" {
 		t.Skip("Skipping test in CI environment")
 	}
 }

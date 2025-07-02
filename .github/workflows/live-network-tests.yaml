@@ -11,12 +11,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-#    env:
-#      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-#      OTHER_SECRET: ${{ secrets.OTHER_SECRET }}
-#      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+    env:
+      LIVE_TESTS: "true"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
