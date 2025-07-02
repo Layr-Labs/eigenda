@@ -1,0 +1,4 @@
+
+proxyAdmin = "0xB043055dd967A382577c2f5261fA6428f2905c15"
+
+schedulePeriod = 3600 # 1 hour in seconds
