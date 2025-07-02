@@ -13,15 +13,31 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// LocalAccountLedger implements AccountLedger for client-side in-memory payment tracking.
-// It manages complete account state including on-chain settings and local usage tracking.
+// LocalAccountLedger implements AccountLedger for client-side dispersal usage tracking.
 //
-// This implementation is designed for client applications that need to track their own
-// payment usage locally without requiring persistent storage. It provides:
-//   - Thread-safe concurrent access using RWMutex
-//   - Atomic multi-quorum operations with rollback on failure
-//   - Deep copying to prevent accidental state mutations
-//   - Efficient read operations with read locks
+// Architecture and Threading:
+//   - Uses sync.RWMutex: multiple concurrent readers, exclusive writers
+//   - All state mutations are atomic via deep-copy-and-commit pattern
+//   - Read operations (GetAccountStateProtobuf) use read locks for efficiency
+//   - Write operations (Debit, RevertDebit) acquire exclusive write locks
+//
+// Reservation Rate Limiting:
+//   - Tracks symbol usage in time-based period bins
+//   - Implements overflow bin logic: when current period exceeds limit for the first time, uses overflow period
+//   - Overflow period calculated as: current_period + 2 * reservation_window
+//   - MinNumBins bins per quorum with modulo-based circular indexing
+//   - Rate limits enforce: symbols_per_second * window_size as maximum per period
+//
+// Multi-Quorum Transaction Semantics:
+//   - All-or-nothing: either ALL quorums succeed with reservations or ALL fall back to on-demand
+//   - Atomic rollback: partial failures revert all state changes via deep copy restoration
+//   - Validation hierarchy: config errors prevent fallback, usage errors allow fallback
+//
+// Payment State Synchronization:
+//   - onDemand.CumulativePayment: on-chain balance from PaymentVault contract
+//   - cumulativePayment: local consumed amount, must not exceed on-chain balance
+//   - Protobuf serialization matches disperser GetPaymentStateForAllQuorums RPC format
+//   - Compatible with Accountant behavior for seamless client-server state transitions
 type LocalAccountLedger struct {
 	// reservations stores the per-quorum reserved payment settings from on-chain state.
 	// Protected by mutex for concurrent access.
@@ -44,17 +60,7 @@ type LocalAccountLedger struct {
 	mutex sync.RWMutex
 }
 
-// NewLocalAccountLedger creates a new LocalAccountLedger with empty state.
-//
-// The returned ledger is initialized with:
-//   - Empty reservations map
-//   - Zero on-demand payment balance
-//   - Empty period records
-//   - Zero cumulative payment
-//
-// Returns:
-//
-//	A new LocalAccountLedger instance with empty state
+// NewLocalAccountLedger creates a new LocalAccountLedger with zero-initialized state.
 func NewLocalAccountLedger() *LocalAccountLedger {
 	return &LocalAccountLedger{
 		reservations:      make(map[core.QuorumID]*core.ReservedPayment),
@@ -64,21 +70,10 @@ func NewLocalAccountLedger() *LocalAccountLedger {
 	}
 }
 
-// NewLocalAccountLedgerFromProtobuf creates a new LocalAccountLedger from protobuf components.
-// This factory method enables efficient deserialization directly from wire format without
-// creating intermediate Go objects.
-//
-// Parameters:
-//
-//	reservations: Per-quorum reservation settings (on-chain)
-//	periodRecords: Usage history for rate limiting (off-chain)
-//	onchainCumulativePayment: Available on-demand balance (on-chain) as bytes
-//	cumulativePayment: Consumed on-demand payment (off-chain) as bytes
-//
-// Returns:
-//
-//	*LocalAccountLedger: A new ledger instance populated with the provided state
-//	error: If the protobuf components contain invalid data (e.g., malformed big.Int values)
+// NewLocalAccountLedgerFromProtobuf creates a LocalAccountLedger from protobuf state components.
+// Deserializes account state received from disperser GetPaymentStateForAllQuorums RPC responses.
+// Converts wire-format protobuf data directly to in-memory structures without intermediate objects.
+// Returns error if big.Int byte arrays are malformed or if required protobuf fields are invalid.
 func NewLocalAccountLedgerFromProtobuf(
 	reservations map[uint32]*disperser_v2.QuorumReservation,
 	periodRecords map[uint32]*disperser_v2.PeriodRecords,
@@ -136,7 +131,9 @@ func NewLocalAccountLedgerFromProtobuf(
 	}, nil
 }
 
-// Debit implements the AccountLedger interface for unified usage tracking
+// Debit implements AccountLedger.Debit with atomic multi-quorum transaction semantics.
+// Acquires exclusive write lock, validates all quorums, applies deep-copy-commit pattern.
+// Uses all-or-nothing logic: either ALL quorums use reservations or ALL use on-demand.
 func (lal *LocalAccountLedger) Debit(
 	ctx context.Context,
 	accountID gethcommon.Address,
@@ -191,7 +188,7 @@ func (lal *LocalAccountLedger) Debit(
 		// Store the reservation validation error for potential combined error message
 		reservationError = reservationValidationErr
 	}
-	
+
 	// Try on-demand for ALL quorums (either reservation validation failed or usage failed)
 	onDemandErr := ValidateQuorum(quorumNumbers, params.OnDemandQuorumNumbers)
 	if onDemandErr != nil {
@@ -219,7 +216,9 @@ func (lal *LocalAccountLedger) Debit(
 	return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Account: %s, Reservation Error: %w, On-demand Error: %w", accountID.Hex(), reservationError, fmt.Errorf("insufficient ondemand payment"))
 }
 
-// RevertDebit implements the AccountLedger interface for reverting debit transactions
+// RevertDebit implements AccountLedger.RevertDebit for undoing failed or cancelled operations.
+// Distinguishes between reservation reverts (subtracts from period usage) and on-demand reverts
+// (subtracts from cumulative payment). Validates revert amounts to prevent negative balances.
 func (lal *LocalAccountLedger) RevertDebit(
 	ctx context.Context,
 	accountID gethcommon.Address,
@@ -254,14 +253,14 @@ func (lal *LocalAccountLedger) RevertDebit(
 
 			// Calculate the period for this timestamp
 			reservationPeriod := GetReservationPeriodByNanosecond(timestampNs, protocolConfig.ReservationRateLimitWindow)
-			
+
 			// Get period records for this quorum
 			if periodRecordsCopy[quorumNumber] == nil {
 				return fmt.Errorf("cannot revert: no period records found for quorum %d", quorumNumber)
 			}
 
 			records := periodRecordsCopy[quorumNumber]
-			
+
 			// Find the record with matching period index
 			found := false
 			for _, record := range records {
@@ -274,7 +273,7 @@ func (lal *LocalAccountLedger) RevertDebit(
 					break
 				}
 			}
-			
+
 			if !found {
 				return fmt.Errorf("cannot revert: no usage record found for period %d, quorum %d", reservationPeriod, quorumNumber)
 			}
@@ -300,7 +299,9 @@ func (lal *LocalAccountLedger) RevertDebit(
 	return nil
 }
 
-// GetAccountStateProtobuf implements the AccountLedger interface for protobuf serialization
+// GetAccountStateProtobuf implements AccountLedger.GetAccountStateProtobuf for state extraction.
+// Uses read lock for concurrent access. Converts internal types to wire-format protobuf structures.
+// Filters out nil period records and converts big.Int values to byte arrays for transmission.
 func (lal *LocalAccountLedger) GetAccountStateProtobuf() (
 	reservations map[uint32]*disperser_v2.QuorumReservation,
 	periodRecords map[uint32]*disperser_v2.PeriodRecords,
@@ -359,7 +360,7 @@ func isConfigError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	errMsg := err.Error()
 	configErrorIndicators := []string{
 		"config not found",
@@ -367,12 +368,12 @@ func isConfigError(err error) bool {
 		"payment config not found",
 		"protocol config not found",
 	}
-	
+
 	for _, indicator := range configErrorIndicators {
 		if strings.Contains(errMsg, indicator) {
 			return true
 		}
 	}
-	
+
 	return false
 }
