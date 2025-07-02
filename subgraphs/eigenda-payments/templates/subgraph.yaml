@@ -24,6 +24,7 @@ dataSources:
         - PriceParamsUpdated
         - ReservationPeriodIntervalUpdated
         - ReservationUpdated
+        - ActiveReservation
       abis:
         - name: PaymentVault
           file: ./abis/PaymentVault.json

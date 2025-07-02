@@ -1,5 +1,5 @@
 import { newMockEvent } from "matchstick-as"
-import { ethereum, BigInt, Address } from "@graphprotocol/graph-ts"
+import { ethereum, BigInt, Address, Bytes } from "@graphprotocol/graph-ts"
 import {
   GlobalRatePeriodIntervalUpdated,
   GlobalSymbolsPerPeriodUpdated,
@@ -206,11 +206,23 @@ export function createReservationPeriodIntervalUpdatedEvent(
 
 export function createReservationUpdatedEvent(
   account: Address,
-  reservation: ethereum.Tuple
+  symbolsPerSecond: BigInt,
+  startTimestamp: BigInt,
+  endTimestamp: BigInt,
+  quorumNumbers: Bytes,
+  quorumSplits: Bytes
 ): ReservationUpdated {
   let reservationUpdatedEvent = changetype<ReservationUpdated>(newMockEvent())
 
   reservationUpdatedEvent.parameters = new Array()
+
+  // Create the reservation tuple
+  let reservationTuple = new ethereum.Tuple()
+  reservationTuple.push(ethereum.Value.fromUnsignedBigInt(symbolsPerSecond))
+  reservationTuple.push(ethereum.Value.fromUnsignedBigInt(startTimestamp))
+  reservationTuple.push(ethereum.Value.fromUnsignedBigInt(endTimestamp))
+  reservationTuple.push(ethereum.Value.fromBytes(quorumNumbers))
+  reservationTuple.push(ethereum.Value.fromBytes(quorumSplits))
 
   reservationUpdatedEvent.parameters.push(
     new ethereum.EventParam("account", ethereum.Value.fromAddress(account))
@@ -218,7 +230,7 @@ export function createReservationUpdatedEvent(
   reservationUpdatedEvent.parameters.push(
     new ethereum.EventParam(
       "reservation",
-      ethereum.Value.fromTuple(reservation)
+      ethereum.Value.fromTuple(reservationTuple)
     )
   )
 

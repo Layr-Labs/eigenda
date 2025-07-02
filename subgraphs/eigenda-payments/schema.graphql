@@ -77,3 +77,16 @@ type ReservationUpdated @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type ActiveReservation @entity(immutable: false) {
+  id: Bytes! # account address
+  account: Bytes! # address
+  symbolsPerSecond: BigInt! # uint64
+  startTimestamp: BigInt! # uint64
+  endTimestamp: BigInt! # uint64
+  quorumNumbers: Bytes! # bytes
+  quorumSplits: Bytes! # bytes
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+  lastUpdatedTransactionHash: Bytes!
+}

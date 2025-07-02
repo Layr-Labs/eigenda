@@ -16,7 +16,8 @@ import {
   OwnershipTransferred,
   PriceParamsUpdated,
   ReservationPeriodIntervalUpdated,
-  ReservationUpdated
+  ReservationUpdated,
+  ActiveReservation
 } from "../generated/schema"
 
 export function handleGlobalRatePeriodIntervalUpdated(
@@ -148,4 +149,22 @@ export function handleReservationUpdated(event: ReservationUpdatedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Create or update the ActiveReservation entity for this account
+  let activeReservation = ActiveReservation.load(event.params.account)
+  if (activeReservation == null) {
+    activeReservation = new ActiveReservation(event.params.account)
+  }
+  
+  activeReservation.account = event.params.account
+  activeReservation.symbolsPerSecond = event.params.reservation.symbolsPerSecond
+  activeReservation.startTimestamp = event.params.reservation.startTimestamp
+  activeReservation.endTimestamp = event.params.reservation.endTimestamp
+  activeReservation.quorumNumbers = event.params.reservation.quorumNumbers
+  activeReservation.quorumSplits = event.params.reservation.quorumSplits
+  activeReservation.lastUpdatedBlock = event.block.number
+  activeReservation.lastUpdatedTimestamp = event.block.timestamp
+  activeReservation.lastUpdatedTransactionHash = event.transaction.hash
+  
+  activeReservation.save()
 }
