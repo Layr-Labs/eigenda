@@ -174,7 +174,7 @@ func NewDispatcher(
 		OperatorState: &core.IndexedOperatorState{
 			IndexedOperators: make(map[core.OperatorID]*core.IndexedOperatorInfo),
 		},
-		LastRefreshed: time.Now(),
+		LastRefreshed: time.Time{},
 	})
 
 	return d, nil
