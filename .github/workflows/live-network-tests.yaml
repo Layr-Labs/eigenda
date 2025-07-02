@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Run unit tests
+      - name: Run Live Network Tests
         run: go test ./test/v2/live -v
 
 #      - name: Notify Slack on failure
