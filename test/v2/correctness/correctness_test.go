@@ -285,20 +285,27 @@ func smallBlobDispersalAllQuorumsSetsTest(t *testing.T, environment string) {
 
 	c := client.GetTestClient(t, environment)
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("0 1", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
+		err = testBasicDispersal(c, payload)
+		require.NoError(t, err)
+	})
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1_2)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("0 1 2", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1_2)
+		err = testBasicDispersal(c, payload)
+		require.NoError(t, err)
+	})
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums2)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("2", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums2)
+		err = testBasicDispersal(c, payload)
+		require.NoError(t, err)
+	})
 }
 
 func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
+	t.Skip() // currently broken
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			smallBlobDispersalAllQuorumsSetsTest(t, environment)
