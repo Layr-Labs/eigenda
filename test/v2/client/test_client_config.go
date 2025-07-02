@@ -3,6 +3,8 @@ package client
 import (
 	"fmt"
 	"path"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 // TestClientConfig is the configuration for the test client.
@@ -68,7 +70,7 @@ type TestClientConfig struct {
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
-	root, err := ResolveTildeInPath(c.SRSPath)
+	root, err := util.SanitizePath(c.SRSPath)
 	if err != nil {
 		return "", fmt.Errorf("resolve tilde in path: %w", err)
 	}

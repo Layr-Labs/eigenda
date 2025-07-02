@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +23,30 @@ var (
 	metrics    *testClientMetrics
 )
 
-const (
-	PreprodEnv = "../config/environment/preprod.json"
-	TestnetEnv = "../config/environment/testnet.json"
-)
+// GetEnvironmentConfigPaths returns a list of paths to the environment config files.
+func GetEnvironmentConfigPaths() ([]string, error) {
+	configDir, err := util.SanitizePath("../config/environment")
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+	}
+
+	files, err := os.ReadDir(configDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read environment config directory: %w", err)
+	}
+	var configPaths []string
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		configPath := fmt.Sprintf("../config/environment/%s", file.Name())
+		configPaths = append(configPaths, configPath)
+	}
+	if len(configPaths) == 0 {
+		return nil, fmt.Errorf("no environment config files found in ../config/environment")
+	}
+	return configPaths, nil
+}
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
 func GetConfig(configPath string) (*TestClientConfig, error) {
@@ -35,7 +57,7 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 		return config, nil
 	}
 
-	configFile, err := ResolveTildeInPath(configPath)
+	configFile, err := util.SanitizePath(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
 	}

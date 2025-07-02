@@ -1,0 +1,39 @@
+name: Live Network Tests
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
+  workflow_dispatch:          # Allow manual triggering
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+#    env:
+#      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+#      OTHER_SECRET: ${{ secrets.OTHER_SECRET }}
+#      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: go test ./test/v2/live -v
+
+#      - name: Notify Slack on failure
+#        if: failure()
+#        uses: 8398a7/action-slack@v3
+#        with:
+#          status: ${{ job.status }}
+#          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+#        env:
+#          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
