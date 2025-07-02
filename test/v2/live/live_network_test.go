@@ -476,9 +476,6 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			unauthorizedGetChunksTest(t, environment)
-
-			// intentionally fail, TODO don't merge
-			require.Equal(t, 1, 2, "This test is intentionally failing to demonstrate the error handling. Please fix it before merging.")
 		})
 	}
 }

@@ -28,7 +28,7 @@ jobs:
         run: go mod download
 
       - name: Run Live Network Tests
-        run: go test ./test/v2/live -v
+        run: go test ./test/v2/live -v -timeout 60m
 
       - name: Notify Slack
         if: always()
