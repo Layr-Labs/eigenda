@@ -1,0 +1,45 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PaymentVault
+    network: mainnet
+    source:
+      address: "0xb2e7ef419a2A399472ae22ef5cFcCb8bE97A4B05"
+      abi: PaymentVault
+      startBlock: 22276885
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GlobalRatePeriodIntervalUpdated
+        - GlobalSymbolsPerPeriodUpdated
+        - Initialized
+        - OnDemandPaymentUpdated
+        - OwnershipTransferred
+        - PriceParamsUpdated
+        - ReservationPeriodIntervalUpdated
+        - ReservationUpdated
+      abis:
+        - name: PaymentVault
+          file: ./abis/PaymentVault.json
+      eventHandlers:
+        - event: GlobalRatePeriodIntervalUpdated(uint64,uint64)
+          handler: handleGlobalRatePeriodIntervalUpdated
+        - event: GlobalSymbolsPerPeriodUpdated(uint64,uint64)
+          handler: handleGlobalSymbolsPerPeriodUpdated
+        - event: Initialized(uint8)
+          handler: handleInitialized
+        - event: OnDemandPaymentUpdated(indexed address,uint80,uint80)
+          handler: handleOnDemandPaymentUpdated
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PriceParamsUpdated(uint64,uint64,uint64,uint64,uint64,uint64)
+          handler: handlePriceParamsUpdated
+        - event: ReservationPeriodIntervalUpdated(uint64,uint64)
+          handler: handleReservationPeriodIntervalUpdated
+        - event: ReservationUpdated(indexed address,(uint64,uint64,uint64,bytes,bytes))
+          handler: handleReservationUpdated
+      file: ./src/payment-vault.ts

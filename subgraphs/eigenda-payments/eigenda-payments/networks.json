@@ -1,0 +1,8 @@
+{
+  "mainnet": {
+    "PaymentVault": {
+      "address": "0xb2e7ef419a2A399472ae22ef5cFcCb8bE97A4B05",
+      "startBlock": 22276885
+    }
+  }
+}
