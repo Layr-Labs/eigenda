@@ -1,11 +1,16 @@
 mod proxy;
 
+use alloy::{
+    eips::{BlockId, BlockNumberOrTag},
+    providers::{Provider, RootProvider},
+    transports::{RpcError, TransportErrorKind},
+};
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::{
     common::HexHash,
-    da::{DaSpec, RelevantBlobs, RelevantProofs},
+    da::{BlockHeaderTrait, DaSpec, RelevantBlobs, RelevantProofs, Time},
     node::da::{DaService, SlotData, SubmitBlobReceipt},
 };
 use thiserror::Error;
@@ -21,6 +26,9 @@ use crate::{
 /// Configuration for the [`EigenDaService`].
 #[derive(Debug, JsonSchema, PartialEq)]
 pub struct EigenDaConfig {
+    /// URL of the Ethereum RPC node
+    pub ethereum_rpc_url: String,
+    /// URL of the EigenDA proxy node
     pub proxy_url: String,
 }
 
@@ -29,22 +37,37 @@ pub struct EigenDaConfig {
 pub enum EigenDaServiceError {
     #[error("ProxyError: {0}")]
     ProxyError(#[from] ProxyError),
+
+    #[error("EthereumRpcError: {0}")]
+    EthereumRpcError(#[from] RpcError<TransportErrorKind>),
 }
 
+/// EigenDaService is responsible for interacting with the EigenDA data availability layer.
+/// It provides functionality to submit blobs (data) to EigenDA and interfaces with Ethereum
+/// for block information and finality status.
 #[derive(Clone)]
 pub struct EigenDaService {
-    client: ProxyClient,
+    /// Client for interacting with the EigenDA proxy node
+    proxy: ProxyClient,
+    /// Provider for interacting with an Ethereum node
+    ethereum: RootProvider,
 }
 
 impl EigenDaService {
-    pub fn new(config: EigenDaConfig) -> Result<Self, EigenDaServiceError> {
+    /// Initialize new [`EigenDaService`] with provided [`EigenDaConfig`].
+    pub async fn new(config: EigenDaConfig) -> Result<Self, EigenDaServiceError> {
         let client = ProxyClient::new(config.proxy_url)?;
+        let ethereum = RootProvider::connect(&config.ethereum_rpc_url).await?;
 
-        Ok(Self { client })
+        Ok(Self {
+            proxy: client,
+            ethereum,
+        })
     }
 }
 
 impl EigenDaService {
+    /// Submit a blob to the EigenDA.
     #[instrument(skip_all)]
     async fn submit_blob(
         &self,
@@ -52,7 +75,7 @@ impl EigenDaService {
         // TODO: Namespace the blob being submitted
     ) -> Result<SubmitBlobReceipt<EthereumHash>, anyhow::Error> {
         // Submit blob to the EigenDA
-        let certificate = self.client.store_blob(blob).await?;
+        let certificate = self.proxy.store_blob(blob).await?;
         debug!(?certificate, "Certificate was received");
 
         // TODO: What should be used as a blob_hash?
@@ -94,7 +117,16 @@ impl DaService for EigenDaService {
     /// Calls to this method for the same height are allowed to return different results.
     /// Should always returns the block at that height on the best fork.
     async fn get_block_at(&self, height: u64) -> Result<Self::FilteredBlock, Self::Error> {
-        todo!()
+        let number = BlockNumberOrTag::Number(height);
+        let block = self.ethereum.get_block_by_number(number).await?;
+
+        // TODO: If we receive an Option::None. We should wait for the block to
+        // be mined.
+        let block = block.unwrap();
+
+        Ok(EthereumBlock {
+            header: EthereumBlockHeader::try_from(block.header)?,
+        })
     }
 
     /// Fetch the [`DaSpec::BlockHeader`] of the last finalized block.
@@ -102,7 +134,14 @@ impl DaService for EigenDaService {
     async fn get_last_finalized_block_header(
         &self,
     ) -> Result<<Self::Spec as DaSpec>::BlockHeader, Self::Error> {
-        todo!()
+        let block = BlockId::finalized();
+        let block = self
+            .ethereum
+            .get_block(block)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
+
+        Ok(EthereumBlockHeader::try_from(block.header)?)
     }
 
     /// Fetch the head block of the most popular fork.
@@ -111,7 +150,14 @@ impl DaService for EigenDaService {
     async fn get_head_block_header(
         &self,
     ) -> Result<<Self::Spec as DaSpec>::BlockHeader, Self::Error> {
-        todo!()
+        let block = BlockId::latest();
+        let block = self
+            .ethereum
+            .get_block(block)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
+
+        Ok(EthereumBlockHeader::try_from(block.header)?)
     }
 
     /// Extract the relevant transactions from a block. For example, this method might return
@@ -174,20 +220,22 @@ impl DaService for EigenDaService {
 
 /// An Ethereum block containing only relevant information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EthereumBlock {}
+pub struct EthereumBlock {
+    header: EthereumBlockHeader,
+}
 
 impl SlotData for EthereumBlock {
     type BlockHeader = EthereumBlockHeader;
 
     fn hash(&self) -> [u8; 32] {
-        todo!()
+        self.header.hash().into()
     }
 
     fn header(&self) -> &Self::BlockHeader {
-        todo!()
+        &self.header
     }
 
-    fn timestamp(&self) -> sov_rollup_interface::da::Time {
-        todo!()
+    fn timestamp(&self) -> Time {
+        self.header.time()
     }
 }
