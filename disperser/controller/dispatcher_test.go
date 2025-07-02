@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -560,7 +561,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobVersion:     0,
 				QuorumNumbers:   []core.QuorumID{0},
 				BlobCommitments: mockCommitment,
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: payment.PaymentMetadata{
 					AccountID:         gethcommon.Address{1},
 					Timestamp:         0,
 					CumulativePayment: big.NewInt(532),
@@ -574,7 +575,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobVersion:     0,
 				QuorumNumbers:   []core.QuorumID{0, 1},
 				BlobCommitments: mockCommitment,
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: payment.PaymentMetadata{
 					AccountID:         gethcommon.Address{2},
 					Timestamp:         0,
 					CumulativePayment: big.NewInt(532),

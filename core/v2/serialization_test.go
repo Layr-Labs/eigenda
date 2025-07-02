@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,7 +23,7 @@ func TestBlobKey(t *testing.T) {
 }
 
 func TestPaymentHash(t *testing.T) {
-	pm := core.PaymentMetadata{
+	pm := payment.PaymentMetadata{
 		AccountID:         gethcommon.HexToAddress("0x0000000000000000000000000000000000000123"),
 		Timestamp:         5,
 		CumulativePayment: big.NewInt(100),
@@ -44,7 +45,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.HexToAddress("0x0000000000000000000000000000000000000123"),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
@@ -60,7 +61,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{1, 0},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.HexToAddress("0x0000000000000000000000000000000000000123"),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
@@ -113,7 +114,7 @@ func TestBlobCertHash(t *testing.T) {
 			BlobVersion:     0,
 			BlobCommitments: commitments,
 			QuorumNumbers:   []core.QuorumID{0, 1},
-			PaymentMetadata: core.PaymentMetadata{
+			PaymentMetadata: payment.PaymentMetadata{
 				AccountID:         gethcommon.HexToAddress("0x0000000000000000000000000000000000000123"),
 				Timestamp:         5,
 				CumulativePayment: big.NewInt(100),
@@ -142,7 +143,7 @@ func TestBlobCertSerialization(t *testing.T) {
 			BlobVersion:     0,
 			BlobCommitments: commitments,
 			QuorumNumbers:   []core.QuorumID{0, 1},
-			PaymentMetadata: core.PaymentMetadata{
+			PaymentMetadata: payment.PaymentMetadata{
 				AccountID:         gethcommon.HexToAddress("0x0000000000000000000000000000000000000123"),
 				Timestamp:         5,
 				CumulativePayment: big.NewInt(100),

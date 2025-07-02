@@ -13,13 +13,14 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// DynamoDBMeteringStore implements the MeteringStore interface using DynamoDB
-type DynamoDBMeteringStore struct {
+// DynamoDBPaymentOffchainState implements the PaymentOffchainState interface using DynamoDB
+type DynamoDBPaymentOffchainState struct {
 	dynamoClient         commondynamodb.Client
 	reservationTableName string
 	onDemandTableName    string
@@ -28,14 +29,14 @@ type DynamoDBMeteringStore struct {
 	// TODO: add maximum storage for both tables
 }
 
-// NewDynamoDBMeteringStore creates a new DynamoDB-backed metering store
-func NewDynamoDBMeteringStore(
+// NewDynamoDBPaymentOffchainState creates a new DynamoDB-backed metering store
+func NewDynamoDBPaymentOffchainState(
 	cfg commonaws.ClientConfig,
 	reservationTableName string,
 	onDemandTableName string,
 	globalBinTableName string,
 	logger logging.Logger,
-) (*DynamoDBMeteringStore, error) {
+) (*DynamoDBPaymentOffchainState, error) {
 	dynamoClient, err := commondynamodb.NewClient(cfg, logger)
 	if err != nil {
 		return nil, err
@@ -55,7 +56,7 @@ func NewDynamoDBMeteringStore(
 	}
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
-	return &DynamoDBMeteringStore{
+	return &DynamoDBPaymentOffchainState{
 		dynamoClient:         dynamoClient,
 		reservationTableName: reservationTableName,
 		onDemandTableName:    onDemandTableName,
@@ -66,7 +67,7 @@ func NewDynamoDBMeteringStore(
 
 // IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
 // The key AccountID is formatted as {AccountID}:{quorumNumber}.
-func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
+func (s *DynamoDBPaymentOffchainState) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
 	binUsages := make(map[core.QuorumID]uint64)
 
 	// Build ops for atomic batch increment
@@ -118,7 +119,7 @@ func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountI
 	return binUsages, nil
 }
 
-func (s *DynamoDBMeteringStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *DynamoDBPaymentOffchainState) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
@@ -146,7 +147,7 @@ func (s *DynamoDBMeteringStore) UpdateGlobalBin(ctx context.Context, reservation
 	return binUsageValue, nil
 }
 
-func (s *DynamoDBMeteringStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
+func (s *DynamoDBPaymentOffchainState) AddOnDemandPayment(ctx context.Context, paymentMetadata payment.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
 	// Create new item with only AccountID and CumulativePayment
 	item := commondynamodb.Item{
 		"AccountID":         &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
@@ -204,7 +205,7 @@ func (s *DynamoDBMeteringStore) AddOnDemandPayment(ctx context.Context, paymentM
 // RollbackOnDemandPayment rolls back a payment to the previous value
 // If oldPayment is 0, it writes a zero value instead of deleting the record
 // This method uses a conditional expression to ensure we only roll back if the current value matches newPayment
-func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
+func (s *DynamoDBPaymentOffchainState) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
 	// Initialize oldPayment to zero if it's nil
 	if oldPayment == nil {
 		oldPayment = big.NewInt(0)
@@ -261,7 +262,7 @@ func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, acc
 // The records start from the first reservation period for each quorum to at most numBins in length into the future.
 // quorumNumbers and reservationPeriods must have the same length and the same ordering.
 // Returns an array of PeriodRecords up to numBins in length, with records for each requested quorum.
-func (s *DynamoDBMeteringStore) GetPeriodRecords(
+func (s *DynamoDBPaymentOffchainState) GetPeriodRecords(
 	ctx context.Context,
 	accountID gethcommon.Address,
 	quorumNumbers []core.QuorumID,
@@ -308,7 +309,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(
 	return records, nil
 }
 
-func (s *DynamoDBMeteringStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+func (s *DynamoDBPaymentOffchainState) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	// Get the single record for this account
 	key := commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
@@ -405,7 +406,7 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (core.QuorumID, *pb.
 
 // DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
 // The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *DynamoDBMeteringStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
+func (s *DynamoDBPaymentOffchainState) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
 	// Build ops for atomic batch decrement
 	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
 	for i, quorumNumber := range quorumNumbers {

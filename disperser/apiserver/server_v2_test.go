@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/core/payment"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -366,7 +367,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: mockCommitment,
 		QuorumNumbers:   []core.QuorumID{0},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.HexToAddress("0x1234"),
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
@@ -516,8 +517,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
 	// Setup mock payment vault params for server v2 test
-	serverV2MockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+	serverV2MockParams := &payment.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*payment.PaymentQuorumConfig{
 			0: {
 				OnDemandSymbolsPerSecond: 1009,
 				OnDemandPricePerSymbol:   2,
@@ -527,7 +528,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 				OnDemandPricePerSymbol:   2,
 			},
 		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+		QuorumProtocolConfigs: map[core.QuorumID]*payment.PaymentQuorumProtocolConfig{
 			0: {
 				MinNumSymbols:              3,
 				ReservationRateLimitWindow: 1,
@@ -544,11 +545,11 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetPaymentGlobalParams").Return(serverV2MockParams, nil)
 
 	now := uint64(time.Now().Unix())
-	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
-		1: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*payment.ReservedPayment{
+		0: &payment.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+		1: &payment.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
 	}, nil)
-	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&payment.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
@@ -570,7 +571,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewDynamoDBMeteringStore(
+	store, err := meterer.NewDynamoDBPaymentOffchainState(
 		awsConfig,
 		table_names[0],
 		table_names[1],

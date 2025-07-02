@@ -97,7 +97,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
-		meteringStore, err := mt.NewDynamoDBMeteringStore(
+		PaymentOffchainState, err := mt.NewDynamoDBPaymentOffchainState(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
 			config.OnDemandTableName,
@@ -111,7 +111,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		meterer = mt.NewMeterer(
 			mtConfig,
 			paymentChainState,
-			meteringStore,
+			PaymentOffchainState,
 			logger,
 			// metrics.NewNoopMetrics(),
 		)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -119,7 +119,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid account ID: %s", accountID))
 	}
 
-	paymentHeader := core.PaymentMetadata{
+	paymentHeader := payment.PaymentMetadata{
 		AccountID:         gethcommon.HexToAddress(accountID),
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
@@ -174,7 +174,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("invalid blob header: %w", err)
 	}
 
-	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+	if blobHeader.PaymentMetadata == (payment.PaymentMetadata{}) {
 		return nil, errors.New("payment metadata is required")
 	}
 

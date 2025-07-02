@@ -8,6 +8,7 @@ import (
 
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -25,7 +26,7 @@ func TestVerifyReceivedBlobKey(t *testing.T) {
 	quorumNumbers := make([]core.QuorumID, 1)
 	quorumNumbers[0] = 8
 
-	paymentMetadata := core.PaymentMetadata{
+	paymentMetadata := payment.PaymentMetadata{
 		AccountID:         gethcommon.Address{1},
 		Timestamp:         5,
 		CumulativePayment: big.NewInt(6),

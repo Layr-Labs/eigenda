@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/pingcap/errors"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
@@ -147,14 +148,14 @@ func CheckOnDemandPayment(payment *big.Int) error {
 
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
 // Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
-func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
+func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*payment.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
 		return nil, ErrPaymentDoesNotExist
 	}
 
-	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
+	reservedPayments := make(map[core.QuorumID]*payment.ReservedPayment)
 	for _, quorumId := range reservation.QuorumNumbers {
-		reservedPayments[core.QuorumID(quorumId)] = &core.ReservedPayment{
+		reservedPayments[core.QuorumID(quorumId)] = &payment.ReservedPayment{
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   reservation.StartTimestamp,
 			EndTimestamp:     reservation.EndTimestamp,

@@ -10,6 +10,7 @@ import (
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -79,7 +80,7 @@ type BlobHeader struct {
 	QuorumNumbers []core.QuorumID
 
 	// PaymentMetadata contains the payment information for the blob
-	PaymentMetadata core.PaymentMetadata
+	PaymentMetadata payment.PaymentMetadata
 }
 
 type BlobHeaderWithHashedPayment struct {
@@ -128,7 +129,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	}
 	slices.Sort(quorumNumbers)
 
-	paymentMetadata, err := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	paymentMetadata, err := payment.ConvertToPaymentMetadata(proto.GetPaymentHeader())
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert payment metadata: %v", err)
 	}

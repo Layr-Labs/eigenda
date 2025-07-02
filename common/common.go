@@ -9,6 +9,9 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+// QuorumID is a unique identifier for a quorum; initially EigenDA will support up to 256 quorums
+type QuorumID = uint8
+
 // PrefixEnvVar returns the environment variable name with the given prefix and suffix
 func PrefixEnvVar(prefix, suffix string) string {
 	if prefix == "" {

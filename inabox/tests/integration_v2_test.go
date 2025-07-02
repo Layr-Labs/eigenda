@@ -21,6 +21,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -103,7 +104,7 @@ var _ = Describe("Inabox v2 blacklisting Integration test", func() {
 					Length:           100,
 				},
 				QuorumNumbers: []core.QuorumID{0, 1},
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: payment.PaymentMetadata{
 					AccountID:         gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
 					Timestamp:         time.Now().UnixNano(),
 					CumulativePayment: big.NewInt(100),

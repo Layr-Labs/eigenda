@@ -10,7 +10,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -143,7 +143,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	}
 
 	// Convert protobuf types to native Go types using meterer conversion function
-	paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, err := meterer.ConvertPaymentStateFromProtobuf(paymentStateProto)
+	paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, err := payment.ConvertPaymentStateFromProtobuf(paymentStateProto)
 	if err != nil {
 		return fmt.Errorf("error converting payment state from protobuf: %w", err)
 	}

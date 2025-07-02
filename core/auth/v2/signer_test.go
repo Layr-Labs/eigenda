@@ -2,12 +2,14 @@ package v2
 
 import (
 	"crypto/sha256"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/hashing"
+
 	corev1 "github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -77,7 +79,7 @@ func TestSignBlobRequest(t *testing.T) {
 		},
 		BlobVersion:   1,
 		QuorumNumbers: []corev1.QuorumID{1, 2},
-		PaymentMetadata: corev1.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         accountID,
 			CumulativePayment: big.NewInt(100),
 			Timestamp:         100,

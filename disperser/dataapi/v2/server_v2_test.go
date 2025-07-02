@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -244,7 +245,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		BlobCommitments: makeCommitment(t),
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,

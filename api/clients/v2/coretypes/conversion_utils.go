@@ -11,6 +11,7 @@ import (
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -206,7 +207,7 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		return nil, fmt.Errorf("convert blob commitment: %s", err)
 	}
 
-	paymentHeader, err := core.ConvertToPaymentMetadata(inputHeader.GetPaymentHeader())
+	paymentHeader, err := payment.ConvertToPaymentMetadata(inputHeader.GetPaymentHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert payment header: %s", err)
 	}

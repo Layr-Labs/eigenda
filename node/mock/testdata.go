@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -20,7 +21,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.Address{0},
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
@@ -30,7 +31,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.Address{1},
 			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
@@ -40,7 +41,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{1, 2},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         gethcommon.Address{2},
 			Timestamp:         7,
 			CumulativePayment: big.NewInt(300),

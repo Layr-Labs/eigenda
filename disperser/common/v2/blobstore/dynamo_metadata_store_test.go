@@ -14,6 +14,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -1496,7 +1497,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobVersion:     0,
 				QuorumNumbers:   []core.QuorumID{0},
 				BlobCommitments: mockCommitment,
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: payment.PaymentMetadata{
 					AccountID:         gethcommon.HexToAddress("0x123"),
 					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
@@ -2144,7 +2145,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: payment.PaymentMetadata{
 			AccountID:         accountID,
 			Timestamp:         timestamp,
 			CumulativePayment: cumulativePayment,
