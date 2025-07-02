@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	"github.com/urfave/cli"
@@ -17,7 +16,7 @@ type Config struct {
 	MetricsConfig    MetricsConfig
 	ChainStateConfig thegraph.Config
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -29,17 +28,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return nil, err
-	}
-
 	return &Config{
 		EthClientConfig:       geth.ReadEthClientConfig(ctx),
 		LoggerConfig:          *loggerConfig,
 		ChainStateConfig:      thegraph.ReadCLIConfig(ctx),
-		AddressDirectoryAddr:  addressDirectoryAddr,
+		EigenDADirectory:      ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		PerPublicKeyRateLimit: ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval: ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{

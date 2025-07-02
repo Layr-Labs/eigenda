@@ -23,11 +23,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMODB_TABLE_NAME"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
@@ -229,7 +229,7 @@ var (
 
 var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,

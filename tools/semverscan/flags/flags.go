@@ -16,11 +16,11 @@ const (
 
 var (
 	/* Required Flags*/
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
 	}
 	/* Optional Flags*/
 	TimeoutFlag = cli.DurationFlag{
@@ -53,7 +53,7 @@ var (
 )
 
 var requiredFlags = []cli.Flag{
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{

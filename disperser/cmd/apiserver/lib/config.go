@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
@@ -48,7 +47,7 @@ type Config struct {
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
 
-	AddressDirectoryAddr            string
+	EigenDADirectory                string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
 
@@ -96,13 +95,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		}
 	}
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	err = eth.ValidateAddressConfig(addressDirectoryAddr)
-	if err != nil {
-		return Config{}, err
-	}
-
 	config := Config{
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
@@ -138,7 +130,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
-		AddressDirectoryAddr:            addressDirectoryAddr,
+		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),

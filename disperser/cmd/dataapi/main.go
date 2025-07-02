@@ -87,7 +87,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := coreeth.NewReader(logger, client, config.AddressDirectoryAddr)
+	tx, err := coreeth.NewReader(logger, client, config.EigenDADirectory)
 	if err != nil {
 		return err
 	}

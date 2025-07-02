@@ -19,6 +19,10 @@ type AddressDirectoryReader struct {
 
 // NewAddressDirectoryReader creates a new AddressDirectoryReader
 func NewAddressDirectoryReader(addressDirectoryHexAddr string, client common.EthClient) (*AddressDirectoryReader, error) {
+	if addressDirectoryHexAddr == "" || !gethcommon.IsHexAddress(addressDirectoryHexAddr) {
+		return nil, fmt.Errorf("address directory must be a valid hex address: %s", addressDirectoryHexAddr)
+	}
+
 	addressDirectoryAddr := gethcommon.HexToAddress(addressDirectoryHexAddr)
 	contract, err := eigendadirectory.NewContractIEigenDADirectory(addressDirectoryAddr, client)
 	if err != nil {

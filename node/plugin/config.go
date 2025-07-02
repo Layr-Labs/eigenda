@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	"github.com/urfave/cli"
 )
@@ -113,11 +112,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHAIN_RPC"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     "address-directory",
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     "eigenda-directory",
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     "churner-url",
@@ -135,22 +134,22 @@ var (
 )
 
 type Config struct {
-	PubIPProvider        string
-	Operation            string
-	EcdsaKeyFile         string
-	BlsKeyFile           string
-	EcdsaKeyPassword     string
-	BlsKeyPassword       string
-	BLSRemoteSignerUrl   string
-	BLSPublicKeyHex      string
-	BLSSignerCertFile    string
-	Socket               string
-	QuorumIDList         []core.QuorumID
-	ChainRpcUrl          string
-	AddressDirectoryAddr string
-	ChurnerUrl           string
-	NumConfirmations     int
-	BLSSignerAPIKey      string
+	PubIPProvider      string
+	Operation          string
+	EcdsaKeyFile       string
+	BlsKeyFile         string
+	EcdsaKeyPassword   string
+	BlsKeyPassword     string
+	BLSRemoteSignerUrl string
+	BLSPublicKeyHex    string
+	BLSSignerCertFile  string
+	Socket             string
+	QuorumIDList       []core.QuorumID
+	ChainRpcUrl        string
+	EigenDADirectory   string
+	ChurnerUrl         string
+	NumConfirmations   int
+	BLSSignerAPIKey    string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -175,30 +174,22 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, errors.New("unsupported operation type")
 	}
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(AddressDirectoryFlag.Name)
-
-	err := eth.ValidateAddressConfig(addressDirectoryAddr)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Config{
-		PubIPProvider:        ctx.GlobalString(PubIPProviderFlag.Name),
-		Operation:            op,
-		EcdsaKeyPassword:     ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
-		BlsKeyPassword:       ctx.GlobalString(BlsKeyPasswordFlag.Name),
-		EcdsaKeyFile:         ctx.GlobalString(EcdsaKeyFileFlag.Name),
-		BlsKeyFile:           ctx.GlobalString(BlsKeyFileFlag.Name),
-		BLSRemoteSignerUrl:   ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:      ctx.GlobalString(BLSPublicKeyHexFlag.Name),
-		BLSSignerCertFile:    ctx.GlobalString(BLSSignerCertFileFlag.Name),
-		Socket:               ctx.GlobalString(SocketFlag.Name),
-		QuorumIDList:         ids,
-		ChainRpcUrl:          ctx.GlobalString(ChainRpcUrlFlag.Name),
-		AddressDirectoryAddr: addressDirectoryAddr,
-		ChurnerUrl:           ctx.GlobalString(ChurnerUrlFlag.Name),
-		NumConfirmations:     ctx.GlobalInt(NumConfirmationsFlag.Name),
-		BLSSignerAPIKey:      ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
+		PubIPProvider:      ctx.GlobalString(PubIPProviderFlag.Name),
+		Operation:          op,
+		EcdsaKeyPassword:   ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
+		BlsKeyPassword:     ctx.GlobalString(BlsKeyPasswordFlag.Name),
+		EcdsaKeyFile:       ctx.GlobalString(EcdsaKeyFileFlag.Name),
+		BlsKeyFile:         ctx.GlobalString(BlsKeyFileFlag.Name),
+		BLSRemoteSignerUrl: ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:    ctx.GlobalString(BLSPublicKeyHexFlag.Name),
+		BLSSignerCertFile:  ctx.GlobalString(BLSSignerCertFileFlag.Name),
+		Socket:             ctx.GlobalString(SocketFlag.Name),
+		QuorumIDList:       ids,
+		ChainRpcUrl:        ctx.GlobalString(ChainRpcUrlFlag.Name),
+		EigenDADirectory:   ctx.GlobalString(EigenDADirectoryFlag.Name),
+		ChurnerUrl:         ctx.GlobalString(ChurnerUrlFlag.Name),
+		NumConfirmations:   ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:    ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }

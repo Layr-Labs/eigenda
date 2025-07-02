@@ -6,7 +6,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -34,9 +33,9 @@ type Config struct {
 	RelayConfig relay.Config
 
 	// Configuration for the graph indexer.
-	EthClientConfig      geth.EthClientConfig
-	AddressDirectoryAddr string
-	ChainStateConfig     thegraph.Config
+	EthClientConfig  geth.EthClientConfig
+	EigenDADirectory string
+	ChainStateConfig thegraph.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -48,12 +47,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	relayKeys := ctx.IntSlice(flags.RelayKeysFlag.Name)
 	if len(relayKeys) == 0 {
 		return Config{}, fmt.Errorf("no relay keys specified")
-	}
-
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.String(flags.AddressDirectoryAddrFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return Config{}, err
 	}
 
 	config := Config{
@@ -107,9 +100,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnablePprof:   ctx.Bool(flags.EnablePprofFlag.Name),
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
-		EthClientConfig:      geth.ReadEthClientConfigRPCOnly(ctx),
-		AddressDirectoryAddr: addressDirectoryAddr,
-		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:  geth.ReadEthClientConfigRPCOnly(ctx),
+		EigenDADirectory: ctx.String(flags.AddressDirectoryFlag.Name),
+		ChainStateConfig: thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {
 		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)

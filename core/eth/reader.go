@@ -54,7 +54,7 @@ type ContractBindings struct {
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
-	AddressDirectory      *eigendadirectory.ContractIEigenDADirectory
+	EigenDADirectory      *eigendadirectory.ContractIEigenDADirectory
 }
 
 type Reader struct {

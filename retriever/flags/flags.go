@@ -32,13 +32,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
 	}
-	// This flag is kept for retriever's fetchBatchHeader; can later be removed by utilizing AddressDirectoryFlag
+	// This flag is kept for retriever's fetchBatchHeader; can later be removed by utilizing EigenDADirectoryFlag
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
 		Usage:    "Address of the EigenDA Service Manager",
@@ -75,7 +75,7 @@ func RetrieverFlags(envPrefix string) []cli.Flag {
 		HostnameFlag,
 		GrpcPortFlag,
 		TimeoutFlag,
-		AddressDirectoryFlag,
+		EigenDADirectoryFlag,
 		NumConnectionsFlag,
 		MetricsHTTPPortFlag,
 		EigenDAVersionFlag,

@@ -6,7 +6,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -35,7 +34,7 @@ type Config struct {
 	ChainStateConfig                    thegraph.Config
 	UseGraph                            bool
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
@@ -99,17 +98,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChainStateConfig:               thegraph.ReadCLIConfig(ctx),
 		UseGraph:                       ctx.GlobalBool(flags.UseGraphFlag.Name),
 
-		AddressDirectoryAddr:         ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		EigenDADirectory:             ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		MetricsPort:                  ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath: ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:    ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
-	}
-
-	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr); err != nil {
-		return Config{}, err
 	}
 
 	return config, nil

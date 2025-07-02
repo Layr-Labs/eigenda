@@ -156,11 +156,11 @@ var (
 		Usage:    "Password to decrypt ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
@@ -549,7 +549,7 @@ var requiredFlags = []cli.Flag{
 	DbPathFlag,
 	BlsKeyFileFlag,
 	BlsKeyPasswordFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
 	ChurnerUrlFlag,

@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 
@@ -67,7 +66,7 @@ type Config struct {
 	DbPath                          string
 	LogPath                         string
 	ID                              core.OperatorID
-	AddressDirectoryAddr            string
+	EigenDADirectory                string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string
@@ -293,12 +292,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	v1Enabled := runtimeMode == flags.ModeV1Only || runtimeMode == flags.ModeV1AndV2
 	v2Enabled := runtimeMode == flags.ModeV2Only || runtimeMode == flags.ModeV1AndV2
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return nil, err
-	}
-
 	// v1 ports must be defined and valid even if v1 is disabled
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
 	err = core.ValidatePort(dispersalPort)
@@ -364,7 +357,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EthClientConfig:                     ethClientConfig,
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
-		AddressDirectoryAddr:                addressDirectoryAddr,
+		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),

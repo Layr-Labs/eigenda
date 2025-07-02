@@ -71,11 +71,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_OPERATOR_STATE_API_SOCKET_ADDR"),
 		Required: true,
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	ServerModeFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "server-mode"),
@@ -141,7 +141,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,

@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/tools/semverscan/flags"
 	"github.com/urfave/cli"
@@ -21,18 +20,18 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Timeout:              ctx.Duration(flags.TimeoutFlag.Name),
-		Workers:              ctx.Int(flags.WorkersFlag.Name),
-		OperatorId:           ctx.String(flags.OperatorIdFlag.Name),
-		UseRetrievalClient:   ctx.Bool(flags.UseRetrievalClientFlag.Name),
-		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:      geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		Timeout:            ctx.Duration(flags.TimeoutFlag.Name),
+		Workers:            ctx.Int(flags.WorkersFlag.Name),
+		OperatorId:         ctx.String(flags.OperatorIdFlag.Name),
+		UseRetrievalClient: ctx.Bool(flags.UseRetrievalClientFlag.Name),
+		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:    geth.ReadEthClientConfig(ctx),
+		EigenDADirectory:   ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 	}
 }
 
@@ -44,11 +43,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
-
-	// Validate address directory configuration
-	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr); err != nil {
-		return nil, err
-	}
 
 	return config, nil
 }

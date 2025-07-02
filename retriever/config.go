@@ -6,7 +6,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	"github.com/urfave/cli"
@@ -20,7 +19,7 @@ type Config struct {
 
 	Timeout                   time.Duration
 	NumConnections            int
-	AddressDirectoryAddr      string
+	EigenDADirectory          string
 	EigenDAServiceManagerAddr string
 
 	EigenDAVersion int
@@ -36,12 +35,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return nil, err
-	}
-
 	return &Config{
 		LoggerConfig:    *loggerConfig,
 		EncoderConfig:   kzg.ReadCLIConfig(ctx),
@@ -49,9 +42,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
 		},
-		Timeout:              ctx.Duration(flags.TimeoutFlag.Name),
-		NumConnections:       ctx.Int(flags.NumConnectionsFlag.Name),
-		AddressDirectoryAddr: addressDirectoryAddr,
-		EigenDAVersion:       version,
+		Timeout:          ctx.Duration(flags.TimeoutFlag.Name),
+		NumConnections:   ctx.Int(flags.NumConnectionsFlag.Name),
+		EigenDADirectory: ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		EigenDAVersion:   version,
 	}, nil
 }

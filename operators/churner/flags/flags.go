@@ -32,11 +32,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "GRPC_PORT"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
 	}
 	PerPublicKeyRateLimit = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "per-public-key-rate-limit"),
@@ -71,7 +71,7 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	EnableMetrics,
 }
 

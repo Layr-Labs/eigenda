@@ -274,7 +274,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	writer, err := eth.NewWriter(
 		logger,
 		ethClient,
-		env.EigenDA.Directory,
+		env.EigenDA.EigenDADirectory,
 	)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %v", err)
@@ -417,7 +417,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_SOCKET=" + socket,
 		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
 		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
-		"NODE_ADDRESS_DIRECTORY=" + operator.NODE_ADDRESS_DIRECTORY,
+		"NODE_EIGENDA_DIRECTORY=" + operator.NODE_EIGENDA_DIRECTORY,
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
 		"NODE_NUM_CONFIRMATIONS=0",
 	}

@@ -46,11 +46,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_STREAM_TIMEOUT"),
 		Value:    time.Second * 10,
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
 		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
@@ -264,7 +264,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{

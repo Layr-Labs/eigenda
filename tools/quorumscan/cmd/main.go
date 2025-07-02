@@ -59,7 +59,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
+	tx, err := eth.NewReader(logger, gethClient, config.EigenDADirectory)
 	if err != nil {
 		log.Fatalln("could not start eth.NewReader", err)
 	}

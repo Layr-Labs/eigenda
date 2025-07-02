@@ -82,7 +82,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
-	chainReader, err := eth.NewReader(logger, gethClient, config.AddressDirectoryAddr)
+	chainReader, err := eth.NewReader(logger, gethClient, config.EigenDADirectory)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func RunController(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			gethClient,
 			rpcClient,
-			config.AddressDirectoryAddr,
+			config.EigenDADirectory,
 			logger,
 		)
 		if err != nil {

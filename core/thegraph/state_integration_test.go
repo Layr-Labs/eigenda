@@ -98,7 +98,7 @@ func TestIndexerIntegration(t *testing.T) {
 
 	logger := testutils.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
-	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.Directory)
+	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.EigenDADirectory)
 	assert.NoError(t, err)
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)

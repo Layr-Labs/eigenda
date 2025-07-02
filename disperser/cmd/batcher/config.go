@@ -4,7 +4,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
@@ -30,7 +29,7 @@ type Config struct {
 
 	IndexerDataDir string
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 
 	EnableGnarkBundleEncoding bool
 }
@@ -44,12 +43,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	kmsConfig := common.ReadKMSKeyConfig(ctx, flags.FlagPrefix)
 	if !kmsConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
-	}
-
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return Config{}, err
 	}
 
 	config := Config{
@@ -90,7 +83,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		ChainStateConfig:          thegraph.ReadCLIConfig(ctx),
 		UseGraph:                  ctx.Bool(flags.UseGraphFlag.Name),
-		AddressDirectoryAddr:      addressDirectoryAddr,
+		EigenDADirectory:          ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		IndexerDataDir:            ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:             indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:              kmsConfig,

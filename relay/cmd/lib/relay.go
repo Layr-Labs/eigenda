@@ -55,7 +55,7 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create eth client: %w", err)
 	}
 
-	tx, err := eth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory)
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}

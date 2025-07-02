@@ -34,7 +34,7 @@ type TestClientConfig struct {
 	//
 	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
 	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
-	AddressDirectoryAddr string
+	EigenDADirectory string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager

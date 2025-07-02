@@ -1,7 +1,6 @@
 package eth
 
 import (
-	"fmt"
 	"math/big"
 	"slices"
 
@@ -11,7 +10,6 @@ import (
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -208,13 +206,4 @@ var ContractNames = struct {
 	RelayRegistry:          "RELAY_REGISTRY",
 	ThresholdRegistry:      "THRESHOLD_REGISTRY",
 	DisperserRegistry:      "DISPERSER_REGISTRY",
-}
-
-// ValidateAddressConfig validates that an valid address directory is provided
-func ValidateAddressConfig(address string) error {
-	if address != "" && !gethcommon.IsHexAddress(address) {
-		return fmt.Errorf("address must be a valid hex address: %s", address)
-	}
-
-	return nil
 }

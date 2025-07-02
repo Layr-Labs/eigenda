@@ -3,7 +3,6 @@ package ejections
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/tools/ejections/flags"
 	"github.com/urfave/cli"
 )
@@ -16,19 +15,19 @@ type Config struct {
 	First            uint
 	Skip             uint
 
-	EthClientConfig      geth.EthClientConfig
-	AddressDirectoryAddr string
+	EthClientConfig  geth.EthClientConfig
+	EigenDADirectory string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Days:                 ctx.Int(flags.DaysFlag.Name),
-		OperatorId:           ctx.String(flags.OperatorIdFlag.Name),
-		SubgraphEndpoint:     ctx.String(flags.SubgraphEndpointFlag.Name),
-		First:                ctx.Uint(flags.FirstFlag.Name),
-		Skip:                 ctx.Uint(flags.SkipFlag.Name),
-		EthClientConfig:      geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
+		Days:             ctx.Int(flags.DaysFlag.Name),
+		OperatorId:       ctx.String(flags.OperatorIdFlag.Name),
+		SubgraphEndpoint: ctx.String(flags.SubgraphEndpointFlag.Name),
+		First:            ctx.Uint(flags.FirstFlag.Name),
+		Skip:             ctx.Uint(flags.SkipFlag.Name),
+		EthClientConfig:  geth.ReadEthClientConfig(ctx),
+		EigenDADirectory: ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 	}
 }
 
@@ -40,9 +39,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
-	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr); err != nil {
-		return nil, err
-	}
 
 	return config, nil
 }

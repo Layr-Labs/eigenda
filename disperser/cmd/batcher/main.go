@@ -179,7 +179,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	tx, err := coreeth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := coreeth.NewWriter(logger, client, config.EigenDADirectory)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func RunBatcher(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			client,
 			rpcClient,
-			config.AddressDirectoryAddr,
+			config.EigenDADirectory,
 			logger,
 		)
 		if err != nil {

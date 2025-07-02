@@ -123,7 +123,7 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func NewNode(
 	}
 
 	// Get service manager address from address directory
-	addressReader, err := eth.NewAddressDirectoryReader(config.AddressDirectoryAddr, client)
+	addressReader, err := eth.NewAddressDirectoryReader(config.EigenDADirectory, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 	}

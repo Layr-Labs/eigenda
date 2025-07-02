@@ -6,7 +6,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -32,7 +31,7 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -51,12 +50,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
 
-	// Validate address directory configuration
-	addressDirectoryAddr := ctx.GlobalString(flags.AddressDirectoryFlag.Name)
-
-	if err := eth.ValidateAddressConfig(addressDirectoryAddr); err != nil {
-		return Config{}, err
-	}
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -68,7 +61,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SocketAddr:                   ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr: ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr: ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
-		AddressDirectoryAddr:         addressDirectoryAddr,
+		EigenDADirectory:             ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		ServerMode:                   ctx.GlobalString(flags.ServerModeFlag.Name),
 		ServerVersion:                version,
 		PrometheusConfig: prometheus.Config{

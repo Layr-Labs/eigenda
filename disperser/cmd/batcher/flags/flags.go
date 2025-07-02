@@ -36,11 +36,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PULL_INTERVAL"),
 	}
-	AddressDirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory"),
-		Usage:    "Address of the EigenDA Address Directory (preferred over individual contract addresses)",
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	EncoderSocket = cli.StringFlag{
 		Name:     "encoder-socket",
@@ -220,7 +220,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
 	PullIntervalFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,

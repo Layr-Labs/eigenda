@@ -202,11 +202,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
 		Value:    1,
 	}
-	AddressDirectoryAddrFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "address-directory-addr"),
-		Usage:    "Address of the EigenDA Directory contract (preferred over individual contract addresses)",
+	AddressDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ADDRESS_DIRECTORY_ADDR"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
@@ -324,7 +324,7 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayKeysFlag,
-	AddressDirectoryAddrFlag,
+	AddressDirectoryFlag,
 	EnableMetricsFlag,
 }
 

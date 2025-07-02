@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/tools/quorumscan/flags"
 	"github.com/urfave/cli"
@@ -28,7 +27,7 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	AddressDirectoryAddr string
+	EigenDADirectory string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -45,14 +44,14 @@ func ReadConfig(ctx *cli.Context) *Config {
 	}
 
 	return &Config{
-		ChainStateConfig:     thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:      geth.ReadEthClientConfig(ctx),
-		AddressDirectoryAddr: ctx.GlobalString(flags.AddressDirectoryFlag.Name),
-		QuorumIDs:            quorumIDs,
-		BlockNumber:          ctx.Uint64(flags.BlockNumberFlag.Name),
-		TopN:                 ctx.Uint(flags.TopNFlag.Name),
-		OutputFormat:         ctx.String(flags.OutputFormatFlag.Name),
-		OutputFile:           ctx.String(flags.OutputFileFlag.Name),
+		ChainStateConfig: thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:  geth.ReadEthClientConfig(ctx),
+		EigenDADirectory: ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		QuorumIDs:        quorumIDs,
+		BlockNumber:      ctx.Uint64(flags.BlockNumberFlag.Name),
+		TopN:             ctx.Uint(flags.TopNFlag.Name),
+		OutputFormat:     ctx.String(flags.OutputFormatFlag.Name),
+		OutputFile:       ctx.String(flags.OutputFileFlag.Name),
 	}
 }
 
@@ -64,11 +63,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
-
-	// Validate address directory configuration
-	if err := eth.ValidateAddressConfig(config.AddressDirectoryAddr); err != nil {
-		return nil, err
-	}
 
 	return config, nil
 }
