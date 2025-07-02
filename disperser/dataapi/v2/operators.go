@@ -326,7 +326,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	handlerStart := time.Now()
 
-	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
+	report, err := s.operatorHandler.ScanOperatorsHostInfoV2(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNodeInfo")

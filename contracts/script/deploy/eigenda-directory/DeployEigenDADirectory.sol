@@ -13,6 +13,7 @@ contract DeployEigenDADirectory is Script {
     using stdToml for string;
 
     EigenDADirectory directory;
+    EigenDADirectory directoryImpl;
 
     struct AddressEntry {
         string name;
@@ -29,6 +30,7 @@ contract DeployEigenDADirectory is Script {
         vm.startBroadcast();
         _deployDirectory();
         _populateDirectory();
+        directory.transferOwnership(cfg.readAddress(".owner"));
         vm.stopBroadcast();
     }
 
@@ -38,8 +40,16 @@ contract DeployEigenDADirectory is Script {
     }
 
     function _deployDirectory() internal virtual {
-        directory = new EigenDADirectory();
-        directory.initialize(msg.sender);
+        directoryImpl = new EigenDADirectory();
+        directory = EigenDADirectory(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(directoryImpl),
+                    cfg.readAddress(".proxyAdmin"),
+                    abi.encodeCall(EigenDADirectory.initialize, msg.sender)
+                )
+            )
+        );
     }
 
     function _populateDirectory() internal virtual {
