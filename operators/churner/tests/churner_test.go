@@ -204,7 +204,7 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, addressDirectory string, logger logging.Logger) (*eth.Writer, error) {
+func createTransactorFromScratch(privateKey, eigenDADirectory string, logger logging.Logger) (*eth.Writer, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -217,7 +217,7 @@ func createTransactorFromScratch(privateKey, addressDirectory string, logger log
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewWriter(logger, gethClient, addressDirectory)
+	return eth.NewWriter(logger, gethClient, eigenDADirectory)
 }
 
 func newTestServer(t *testing.T) *churner.Server {

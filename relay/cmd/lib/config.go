@@ -101,7 +101,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
 		EthClientConfig:  geth.ReadEthClientConfigRPCOnly(ctx),
-		EigenDADirectory: ctx.String(flags.AddressDirectoryFlag.Name),
+		EigenDADirectory: ctx.String(flags.EigenDADirectoryFlag.Name),
 		ChainStateConfig: thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {

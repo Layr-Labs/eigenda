@@ -29,7 +29,7 @@ var (
 	)
 	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
 	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
-	EigenDADirectoryFlagName          = withFlagPrefix("eigen-da-directory")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
 	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
 	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
 	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")

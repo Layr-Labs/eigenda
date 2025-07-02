@@ -202,7 +202,7 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
 		Value:    1,
 	}
-	AddressDirectoryFlag = cli.StringFlag{
+	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
 		Usage:    "Address of the EigenDA Directory contract",
 		Required: false,
@@ -324,7 +324,7 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayKeysFlag,
-	AddressDirectoryFlag,
+	EigenDADirectoryFlag,
 	EnableMetricsFlag,
 }
 
