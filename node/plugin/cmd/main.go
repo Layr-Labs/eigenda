@@ -128,8 +128,7 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	var tx *eth.Writer
-	tx, err = eth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := eth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		log.Printf("Error: failed to create EigenDA transactor: %v", err)
 		return

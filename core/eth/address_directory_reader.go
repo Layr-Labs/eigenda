@@ -27,7 +27,7 @@ func NewAddressDirectoryReader(addressDirectoryHexAddr string, client common.Eth
 
 	contractNames, err := contract.GetAllNames(&bind.CallOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all contract names: %w", err)
+		return nil, fmt.Errorf("failed to get all contract names: %w, addressDirectoryHexAddr: %s", err, addressDirectoryHexAddr)
 	}
 
 	return &AddressDirectoryReader{

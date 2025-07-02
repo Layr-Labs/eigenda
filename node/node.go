@@ -123,8 +123,7 @@ func NewNode(
 	}
 
 	// Create Transactor
-	var tx *eth.Writer
-	tx, err = eth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := eth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return nil, err
 	}
