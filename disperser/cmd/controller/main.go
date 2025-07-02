@@ -214,6 +214,29 @@ func RunController(ctx *cli.Context) error {
 
 	c := context.Background()
 
+	//blockNumber, err := ics.GetCurrentBlockNumber(c)
+	//if err != nil {
+	//	return fmt.Errorf("failed to get current block number: %w", err)
+	//}
+	//
+	//quorumIDs, err := chainReader.GetRequiredQuorumNumbers(c, uint32(blockNumber))
+	//if err != nil {
+	//	return fmt.Errorf("failed to get required quorum numbers: %w", err)
+	//}
+	//
+	//operatorState, err := ics.GetIndexedOperatorState(c, blockNumber, quorumIDs)
+	//if err != nil {
+	//	return fmt.Errorf("failed to get operator state: %w", err)
+	//}
+	//
+	//initialCache := &controller.CachedOnchainState{
+	//	ReferenceBlockNumber: uint64(blockNumber),
+	//	OperatorState:        operatorState,
+	//	LastRefreshed:        time.Now(),
+	//}
+	//
+	//dispatcher.SetCachedOnchainState(initialCache)
+
 	err = controller.RecoverState(c, blobMetadataStore, logger)
 	if err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
