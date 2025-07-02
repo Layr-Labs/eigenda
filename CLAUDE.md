@@ -21,7 +21,9 @@ this list.
 
 ---
 
-## 2. File imports
+## 2. Project Structure
+
+### 2.1 File Imports
 
 NOTE: Be aware that whatever you add to this list is automatically loaded into context (due to `@` annotation). It's
 helpful to provide project context, but only within reasonable limits.
@@ -30,12 +32,27 @@ helpful to provide project context, but only within reasonable limits.
 2. @go.mod describes golang dependencies
 3. @mise.toml describes external tool dependencies
 4. @.golangci.yml contains linting configuration
-5. @docs/CLAUDE.md causes doc files to be automatically imported
-6. @.claude/commands/CLAUDE.md defines what project slash commands are available to use
+5. @.claude/commands/CLAUDE.md defines what project slash commands are available to use
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a
-CLAUDE.md file *in the relevant subdirectory*. Then the imports will only be processed when files within that
-directory are read.
+CLAUDE.md file *in the relevant subdirectory*.
+
+### 2.2 Project Subdirectories
+
+1. **Always check for `CLAUDE.md` files in specific directories** before working on code within them. These files
+   contain targeted context.
+2. If a directory's `CLAUDE.md` is outdated or incorrect, **update it**.
+3. If you make significant changes to a directory's structure, patterns, or critical implementation details,
+   **document these in its `CLAUDE.md`**.
+4. If a directory lacks a `CLAUDE.md` but contains complex logic or patterns worth documenting for AI/humans,
+   **suggest creating one**.
+5. Use `@` annotation within CLAUDE.md files to automatically load in helpful context, e.g. `@docs/submoduleDocs`.
+   These imports will be automatically processed whenever the `CLAUDE.md` file is read.
+6. If there is domain-specific terminology relevant to a directory, consider adding a small glossary of terms.
+
+| Subdirectory | Description                                         |
+|--------------|-----------------------------------------------------|
+| ./docs       | Documentation files describing the EigenDA system.  |
 
 ---
 
@@ -102,22 +119,7 @@ directory are read.
 
 ---
 
-## 5. Directory-Specific CLAUDE.md Files
-
-1. **Always check for `CLAUDE.md` files in specific directories** before working on code within them. These files
-   contain targeted context.
-2. If a directory's `CLAUDE.md` is outdated or incorrect, **update it**.
-3. If you make significant changes to a directory's structure, patterns, or critical implementation details,
-   **document these in its `CLAUDE.md`**.
-4. If a directory lacks a `CLAUDE.md` but contains complex logic or patterns worth documenting for AI/humans,
-   **suggest creating one**.
-5. Use `@` annotation within CLAUDE.md files to automatically load in helpful context, e.g. `@docs/submoduleDocs`.
-   These imports will be automatically processed whenever the `CLAUDE.md` file is read.
-6. If there is domain-specific terminology relevant to a directory, consider adding a small glossary of terms.
-
----
-
-## 6. Common pitfalls
+## 5. Common pitfalls
 
 1. Forgetting to run `go mod tidy` after adding new dependencies.
 2. Not linting before committing code.
@@ -127,7 +129,7 @@ directory are read.
 
 ---
 
-## 7. Files to NOT modify
+## 6. Files to NOT modify
 
 These files and directories should generally not be modified without explicit permission:
 
@@ -144,40 +146,38 @@ These files and directories should generally not be modified without explicit pe
 
 ---
 
-## 8. AI Assistant Workflow: Step-by-Step Methodology
+## 7. AI Assistant Workflow: Step-by-Step Methodology
 
-When responding to user instructions, the AI assistant (Claude, Cursor, GPT, etc.) should follow this process to
-ensure clarity, correctness, and maintainability:
+When responding to user instructions, the AI assistant should follow this process to ensure clarity, correctness, and
+maintainability:
 
 1. **Only take action with sufficient context**: Do not make changes or use tools if unsure about something
-   project-specific, or without having context for a particular feature/decision. 
-2. **Consult Relevant Guidance**: When the user gives an instruction, consult the relevant instructions from
-   `CLAUDE.md` files (both root and directory-specific) for the request.
-3. **Clarify Ambiguities**: Based on what you could gather, see if there's any need for clarifications. If so, ask
-   the user targeted questions before proceeding.
-4. **Break Down & Plan**: Break down the task at hand and chalk out a rough plan for carrying it out, referencing
+   project-specific, or without having context for a particular feature/decision.
+2. **Clarify Ambiguities**: If there's any need for clarifications. If so, ask the user targeted questions before
+   proceeding.
+3. **Break Down & Plan**: Break down the task at hand and chalk out a rough plan for carrying it out, referencing
    project conventions and best practices.
-5. **Trivial Tasks**: If the plan/request is trivial, go ahead and get started immediately.
-6. **Non-Trivial Tasks**: Otherwise, present the plan to the user for review and iterate based on their feedback.
-7. **Track Progress**: Use a to-do list (internally, or optionally in a `TODOS.md` file) to keep track of your
+4. **Trivial Tasks**: If the plan/request is trivial, go ahead and get started immediately.
+5. **Non-Trivial Tasks**: Otherwise, present the plan to the user for review and iterate based on their feedback.
+6. **Track Progress**: Use a to-do list (internally, or optionally in a `TODOS.md` file) to keep track of your
    progress on multi-step or complex tasks.
-8. **If Stuck, Re-plan**: If you get stuck or blocked, return to step 3 to re-evaluate and adjust your plan.
-9. **Check for related updates**: Once the user's request is fulfilled, look for any complementary changes that
+7. **If Stuck, Re-plan**: If you get stuck or blocked, return to step 3 to re-evaluate and adjust your plan.
+8. **Check for related updates**: Once the user's request is fulfilled, look for any complementary changes that
    need to be made:
    - Code documentation / doc files that reference details that have been modified
    - Variable names that need to be updated
    - Error messages that use old terminology
    - Related functions / structures that should be renamed to match new changes
    - Links contained in documentation that were broken by the changes
-10. **Lint**: Make sure changes pass linting, and that they adhere to style and coding standards
-11. **Test**: Run tests related to the changes that have been made. Short tests should always be run, but ask
+9. **Lint**: Make sure changes pass linting, and that they adhere to style and coding standards
+10. **Test**: Run tests related to the changes that have been made. Short tests should always be run, but ask
    permission before trying to run long tests.
-12. **User Review**: After completing the task, ask the user to review what you've done, and repeat the process as
+11. **User Review**: After completing the task, ask the user to review what you've done, and repeat the process as
    needed.
-13. **Session Boundaries**: If the user's request isn't directly related to the current context and can be safely
+12. **Session Boundaries**: If the user's request isn't directly related to the current context and can be safely
    started in a fresh session, suggest starting from scratch to avoid context confusion.
 
-## 9. AI Assistant User Interactions
+## 8. AI Assistant User Interactions
 
 1. Prioritize **frankness** and **accuracy** over simply attempting the please a human. In the end, humans are most
    pleased when they receive **honest** and **direct** answers to their prompts. Being a "yes man" negatively impacts
