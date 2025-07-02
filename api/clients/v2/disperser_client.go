@@ -459,7 +459,7 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 			// TODO: this should instead return an error once we have upgraded all dispersers.
 			onDemandQuorums = []uint32{0, 1}
 		}
-		reservationQuorums := legacyReply.Reservation.QuorumNumbers
+		reservationQuorums := legacyReply.GetReservation().QuorumNumbers
 		// There may be overlapping quorums but it doesn't matter since we will apply the same global params to all of them.
 		allQuorums := append(reservationQuorums, onDemandQuorums...)
 
