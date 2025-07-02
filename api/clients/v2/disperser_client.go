@@ -330,9 +330,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-	// the blob header which was constructed locally and sent to the disperser
+// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-	// the reply received back from the disperser
+// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 
@@ -452,7 +452,7 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		}
 
 		// Apply the global params to all quorums, both on-demand and reservation.
-		onDemandQuorums := legacyReply.GetPaymentGlobalParams().OnDemandQuorumNumbers
+		onDemandQuorums := legacyReply.GetPaymentGlobalParams().GetOnDemandQuorumNumbers()
 		if len(onDemandQuorums) == 0 {
 			// Disperser v0.9.0 has a bug where it does not return on-demand quorums: https://github.com/Layr-Labs/eigenda/pull/1699
 			// Until we upgrade all dispersers, we will assume that on-demand quorums are 0 and 1.
