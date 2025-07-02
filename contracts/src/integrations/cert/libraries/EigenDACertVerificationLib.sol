@@ -14,7 +14,7 @@ import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkR
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-import {EigenDACertTypes as CT} from "src/periphery/cert/EigenDACertTypes.sol";
+import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
 /// @title EigenDACertVerificationLib
 /// @notice Library for verifying EigenDA certificates
