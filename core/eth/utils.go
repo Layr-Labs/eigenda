@@ -1,11 +1,11 @@
 package eth
 
 import (
-	"fmt"
 	"math/big"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/pingcap/errors"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -15,6 +15,9 @@ import (
 
 var (
 	maxNumberOfQuorums = 192
+
+	// ErrPaymentDoesNotExist is returned when a reservation/deposit does not exist (is zero)
+	ErrPaymentDoesNotExist = errors.New("payment does not exist")
 )
 
 type BN254G1Point struct {
@@ -135,11 +138,18 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 		reservation.EndTimestamp == 0
 }
 
+func CheckOnDemandPayment(payment *big.Int) error {
+	if payment.Cmp(big.NewInt(0)) == 0 {
+		return ErrPaymentDoesNotExist
+	}
+	return nil
+}
+
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
-// Returns an error if the input reservation is zero-valued.
+// Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
 func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
-		return nil, fmt.Errorf("reservation is not a valid active reservation")
+		return nil, ErrPaymentDoesNotExist
 	}
 
 	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
