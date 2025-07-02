@@ -50,10 +50,7 @@ func checkAndSetCertVerifierAddress(t *testing.T, c *client.TestClient, certVeri
 // - read the blob from the relays
 // - read the blob from the validators
 func testBasicDispersal(c *client.TestClient, payload []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	err := c.DisperseAndVerify(ctx, payload)
+	err := c.DisperseAndVerify(context.Background(), payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -76,6 +73,7 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// This should fail with "data is empty" error
 	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
 	require.Error(t, err)
+	require.ErrorContains(t, err, "zero symbols requested")
 }
 
 func TestEmptyBlobDispersal(t *testing.T) {
