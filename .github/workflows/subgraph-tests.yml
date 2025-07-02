@@ -14,7 +14,7 @@ on:
 jobs:
   test-subgraphs:
     name: Test ${{ matrix.subgraph }}
-    runs-on: ubuntu-22.04 # https://github.com/graphprotocol/graph-tooling/issues/1546#issuecomment-2589680195
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         subgraph: [eigenda-operator-state, eigenda-batch-metadata, eigenda-payments]
