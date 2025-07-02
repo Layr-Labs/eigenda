@@ -30,11 +30,10 @@ type TestClientConfig struct {
 	//
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
-	// The contract address for the EigenDA address directory (optional)
+	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	//
-	// In the future, this will be used to look up contract addresses instead of individual contract addresses.
 	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
-	// All the new future contract addresses will be added to the address directory.
+	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
 	AddressDirectoryAddr string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string

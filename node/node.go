@@ -213,11 +213,10 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 	}
-	serviceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service manager address: %w", err)
 	}
-	eigenDAServiceManagerAddr := serviceManagerAddr
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)

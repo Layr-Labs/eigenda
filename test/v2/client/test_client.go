@@ -217,13 +217,10 @@ func NewTestClient(
 
 	// Construct the relay client
 
-	// Validate address configuration
 	err = eth.ValidateAddressConfig(config.AddressDirectoryAddr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address configuration: %w", err)
 	}
-
-	// Create eth reader using address directory if provided, otherwise use legacy addresses
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,

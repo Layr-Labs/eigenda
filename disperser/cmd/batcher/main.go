@@ -179,8 +179,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	var tx *coreeth.Writer
-	tx, err = coreeth.NewWriter(logger, client, config.AddressDirectoryAddr)
+	tx, err := coreeth.NewWriter(logger, client, config.AddressDirectoryAddr)
 	if err != nil {
 		return err
 	}

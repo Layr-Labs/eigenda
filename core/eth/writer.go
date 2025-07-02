@@ -34,7 +34,6 @@ type Writer struct {
 
 var _ core.Writer = (*Writer)(nil)
 
-// NewWriter creates a new Writer using an address directory contract address
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,

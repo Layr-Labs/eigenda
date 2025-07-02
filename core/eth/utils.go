@@ -210,11 +210,10 @@ var ContractNames = struct {
 	DisperserRegistry:      "DISPERSER_REGISTRY",
 }
 
-// ValidateAddressConfig validates that either address directory is provided OR both individual addresses are provided
-// and that all provided addresses are valid hex addresses.
-func ValidateAddressConfig(addressDirectory string) error {
-	if addressDirectory != "" && !gethcommon.IsHexAddress(addressDirectory) {
-		return fmt.Errorf("address-directory must be a valid hex address")
+// ValidateAddressConfig validates that an valid address directory is provided
+func ValidateAddressConfig(address string) error {
+	if address != "" && !gethcommon.IsHexAddress(address) {
+		return fmt.Errorf("address must be a valid hex address: %s", address)
 	}
 
 	return nil
