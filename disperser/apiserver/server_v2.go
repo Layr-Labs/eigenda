@@ -12,16 +12,19 @@ import (
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -146,8 +149,14 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-
-	gs := grpc.NewServer(opt, s.metrics.grpcServerOption)
+	loggingOpts := []grpclogging.Option{
+		grpclogging.WithLogOnEvents(grpclogging.StartCall, grpclogging.FinishCall),
+	}
+	gs := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpclogging.UnaryServerInterceptor(common.InterceptorLogger(s.logger), loggingOpts...),
+			s.metrics.grpcMetrics.UnaryServerInterceptor(),
+		), opt)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 
@@ -290,6 +299,22 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, err
 	}
 
+	return convertAllQuorumsReplyToLegacy(allQuorumsReply), nil
+}
+
+// convertAllQuorumsReplyToLegacy converts the new per-quorum payment state format to the legacy aggregated format.
+// This enables backwards compatibility by flattening multi-quorum data into a single legacy response,
+// allowing old clients to continue working properly.
+//
+// Conversion logic:
+// - PaymentVaultParams: Uses quorum 0 configuration as the global parameters (arbitrary choice)
+// - Reservations: Finds the most restrictive reservation across all quorums (minimum symbols/sec, latest start, earliest end)
+// - PeriodRecords: Selects the highest usage for each period index across all quorums
+// - OnDemand cumulative payment amounts: Passed through unchanged as they represent account-level totals
+//
+// This conversion may result in information loss for clients that need per-quorum details,
+// but preserves the most restrictive constraints to ensure client behavior remains within reservation or ondemand.
+func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuorumsReply) *pb.GetPaymentStateReply {
 	// For PaymentVaultParams, use quorum 0 for protocol level parameters and on-demand quorum numbers
 	var paymentGlobalParams *pb.PaymentGlobalParams
 	if allQuorumsReply.PaymentVaultParams != nil &&
@@ -376,7 +401,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		Reservation:              reservation,
 		CumulativePayment:        allQuorumsReply.CumulativePayment,
 		OnchainCumulativePayment: allQuorumsReply.OnchainCumulativePayment,
-	}, nil
+	}
 }
 
 // GetPaymentStateForAllQuorums returns payment state for all quorums including vault parameters,
@@ -456,7 +481,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 				return nil, api.NewErrorInternal("failed to get quorum protocol config")
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
-			reservationCurrentPeriods = append(reservationCurrentPeriods, meterer.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
+			reservationCurrentPeriods = append(reservationCurrentPeriods, payment_logic.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
 		}
 	}
 
