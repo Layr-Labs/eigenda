@@ -51,7 +51,7 @@ func TestTrackerDeterminism(t *testing.T) {
 	}
 
 	dataTracker.Close()
-	
+
 	// Rebuild the tracker at genesis. We should get the same sequence of keys and values.
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
