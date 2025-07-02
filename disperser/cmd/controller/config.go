@@ -92,6 +92,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
 			OnchainStateRefreshInterval:           ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+			BatchMetadataMaxAge:                   ctx.GlobalDuration(flags.BatchMetadataMaxAgeFlag.Name),
 		},
 		NumConcurrentEncodingRequests:  ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		NumConcurrentDispersalRequests: ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),

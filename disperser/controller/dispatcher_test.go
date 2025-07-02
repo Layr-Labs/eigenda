@@ -748,8 +748,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		SignatureTickInterval:       1 * time.Second,
 		NumRequestRetries:           3,
 		MaxBatchSize:                maxBatchSize,
-		OnchainStateRefreshInterval: 1 * time.Second,
-		BatchMetadataMaxAge:         5 * time.Second,
+		OnchainStateRefreshInterval: 1 * time.Minute,
+		BatchMetadataMaxAge:         5 * time.Minute,
 	}, blobMetadataStore, pool, chainReader, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet, livenessChan)
 	require.NoError(t, err)
 	return &dispatcherComponents{

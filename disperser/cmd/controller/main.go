@@ -213,7 +213,7 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	c := context.Background()
-	
+
 	err = controller.RecoverState(c, blobMetadataStore, logger)
 	if err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
