@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LIVE_TESTS: "true"
+      LIVE_TEST_PREPROD_HOLESKY_KEY: ${{ secrets.LIVE_TEST_PREPROD_HOLESKY_KEY }}
+      LIVE_TEST_TESTNET_HOLESKY_KEY: ${{ secrets.LIVE_TEST_TESTNET_HOLESKY_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,13 +40,13 @@ jobs:
           else
             COLOR="danger"
             STATUS_EMOJI="❌"
-            MENTION="<@here> "
+            MENTION="@here"
           fi
 
           PAYLOAD=$(jq -n \
             --arg channel "#da-live-tests" \
-            --arg text "${MENTION}Live Network Tests completed with status: ${STATUS_EMOJI} ${{ job.status }}" \
-            --arg title "View Run" \
+            --arg text "${MENTION}Live Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg title "logs" \
             --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg color "$COLOR" \
             '{
