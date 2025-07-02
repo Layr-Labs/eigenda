@@ -78,3 +78,87 @@ impl From<reqwest::Error> for ProxyError {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::{borrow::Cow, collections::HashMap};
+
+    use testcontainers::{
+        ContainerAsync, Image,
+        core::{ContainerPort, WaitFor},
+        runners::AsyncRunner,
+    };
+
+    use crate::service::proxy::ProxyClient;
+
+    pub async fn create_test_eigenda_proxy()
+    -> Result<(ProxyClient, ContainerAsync<EigenDaProxy>), anyhow::Error> {
+        let container = EigenDaProxy::default().start().await?;
+        let host_port = container.get_host_port_ipv4(PORT).await?;
+        let proxy = ProxyClient::new(format!("http://127.0.0.1:{host_port}"))?;
+
+        Ok((proxy, container))
+    }
+
+    #[tokio::test]
+    async fn blob_roundtrip() {
+        let (proxy, _container) = create_test_eigenda_proxy().await.unwrap();
+        let blob = vec![0; 1000];
+
+        // Store the blob
+        let certificate = proxy.store_blob(&blob).await.unwrap();
+
+        // Retrieve the blob
+        let retrieved_blob = proxy.get_blob(&certificate).await.unwrap();
+
+        assert_eq!(blob, retrieved_blob);
+    }
+
+    const NAME: &str = "ghcr.io/layr-labs/eigenda-proxy";
+    const TAG: &str = "latest";
+    const READY_MSG: &str = "Started EigenDA proxy server";
+    const PORT: ContainerPort = ContainerPort::Tcp(3100);
+
+    /// EigenDAProxy image for testcontainers
+    #[derive(Debug)]
+    pub struct EigenDaProxy {
+        env_vars: HashMap<String, String>,
+    }
+
+    impl Default for EigenDaProxy {
+        fn default() -> Self {
+            let mut env_vars = HashMap::new();
+            env_vars.insert("EIGENDA_PROXY_PORT".to_owned(), PORT.as_u16().to_string());
+            env_vars.insert(
+                "EIGENDA_PROXY_MEMSTORE_ENABLED".to_owned(),
+                "true".to_string(),
+            );
+
+            Self { env_vars }
+        }
+    }
+
+    impl Image for EigenDaProxy {
+        fn name(&self) -> &str {
+            NAME
+        }
+
+        fn tag(&self) -> &str {
+            TAG
+        }
+
+        fn ready_conditions(&self) -> Vec<WaitFor> {
+            vec![WaitFor::message_on_stdout(READY_MSG)]
+        }
+
+        fn env_vars(
+            &self,
+        ) -> impl IntoIterator<Item = (impl Into<Cow<'_, str>>, impl Into<Cow<'_, str>>)> {
+            &self.env_vars
+        }
+
+        fn expose_ports(&self) -> &[ContainerPort] {
+            &[PORT]
+        }
+    }
+}
