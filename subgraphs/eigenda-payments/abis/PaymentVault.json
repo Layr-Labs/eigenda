@@ -1,26 +1,12 @@
 [
-  {
-    "type": "constructor",
-    "inputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "fallback",
-    "stateMutability": "payable"
-  },
-  {
-    "type": "receive",
-    "stateMutability": "payable"
-  },
+  { "type": "constructor", "inputs": [], "stateMutability": "nonpayable" },
+  { "type": "fallback", "stateMutability": "payable" },
+  { "type": "receive", "stateMutability": "payable" },
   {
     "type": "function",
     "name": "depositOnDemand",
     "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      }
+      { "name": "_account", "type": "address", "internalType": "address" }
     ],
     "outputs": [],
     "stateMutability": "payable"
@@ -29,37 +15,19 @@
     "type": "function",
     "name": "getOnDemandTotalDeposit",
     "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      }
+      { "name": "_account", "type": "address", "internalType": "address" }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint80",
-        "internalType": "uint80"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint80", "internalType": "uint80" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "getOnDemandTotalDeposits",
     "inputs": [
-      {
-        "name": "_accounts",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+      { "name": "_accounts", "type": "address[]", "internalType": "address[]" }
     ],
     "outputs": [
-      {
-        "name": "_payments",
-        "type": "uint80[]",
-        "internalType": "uint80[]"
-      }
+      { "name": "_payments", "type": "uint80[]", "internalType": "uint80[]" }
     ],
     "stateMutability": "view"
   },
@@ -67,11 +35,7 @@
     "type": "function",
     "name": "getReservation",
     "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      }
+      { "name": "_account", "type": "address", "internalType": "address" }
     ],
     "outputs": [
       {
@@ -94,16 +58,8 @@
             "type": "uint64",
             "internalType": "uint64"
           },
-          {
-            "name": "quorumNumbers",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "quorumSplits",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
+          { "name": "quorumNumbers", "type": "bytes", "internalType": "bytes" },
+          { "name": "quorumSplits", "type": "bytes", "internalType": "bytes" }
         ]
       }
     ],
@@ -113,11 +69,7 @@
     "type": "function",
     "name": "getReservations",
     "inputs": [
-      {
-        "name": "_accounts",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
+      { "name": "_accounts", "type": "address[]", "internalType": "address[]" }
     ],
     "outputs": [
       {
@@ -140,16 +92,8 @@
             "type": "uint64",
             "internalType": "uint64"
           },
-          {
-            "name": "quorumNumbers",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "quorumSplits",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
+          { "name": "quorumNumbers", "type": "bytes", "internalType": "bytes" },
+          { "name": "quorumSplits", "type": "bytes", "internalType": "bytes" }
         ]
       }
     ],
@@ -159,47 +103,23 @@
     "type": "function",
     "name": "globalRatePeriodInterval",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "globalSymbolsPerPeriod",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "initialize",
     "inputs": [
-      {
-        "name": "_initialOwner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_minNumSymbols",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "_pricePerSymbol",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
+      { "name": "_initialOwner", "type": "address", "internalType": "address" },
+      { "name": "_minNumSymbols", "type": "uint64", "internalType": "uint64" },
+      { "name": "_pricePerSymbol", "type": "uint64", "internalType": "uint64" },
       {
         "name": "_priceUpdateCooldown",
         "type": "uint64",
@@ -228,44 +148,22 @@
     "type": "function",
     "name": "lastPriceUpdateTime",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "minNumSymbols",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "onDemandPayments",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "inputs": [{ "name": "", "type": "address", "internalType": "address" }],
     "outputs": [
-      {
-        "name": "totalDeposit",
-        "type": "uint80",
-        "internalType": "uint80"
-      }
+      { "name": "totalDeposit", "type": "uint80", "internalType": "uint80" }
     ],
     "stateMutability": "view"
   },
@@ -273,39 +171,21 @@
     "type": "function",
     "name": "owner",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "pricePerSymbol",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "priceUpdateCooldown",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
@@ -319,51 +199,23 @@
     "type": "function",
     "name": "reservationPeriodInterval",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
+    "outputs": [{ "name": "", "type": "uint64", "internalType": "uint64" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "reservations",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "inputs": [{ "name": "", "type": "address", "internalType": "address" }],
     "outputs": [
       {
         "name": "symbolsPerSecond",
         "type": "uint64",
         "internalType": "uint64"
       },
-      {
-        "name": "startTimestamp",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "endTimestamp",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "quorumNumbers",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "quorumSplits",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
+      { "name": "startTimestamp", "type": "uint64", "internalType": "uint64" },
+      { "name": "endTimestamp", "type": "uint64", "internalType": "uint64" },
+      { "name": "quorumNumbers", "type": "bytes", "internalType": "bytes" },
+      { "name": "quorumSplits", "type": "bytes", "internalType": "bytes" }
     ],
     "stateMutability": "view"
   },
@@ -397,16 +249,8 @@
     "type": "function",
     "name": "setPriceParams",
     "inputs": [
-      {
-        "name": "_minNumSymbols",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "_pricePerSymbol",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
+      { "name": "_minNumSymbols", "type": "uint64", "internalType": "uint64" },
+      { "name": "_pricePerSymbol", "type": "uint64", "internalType": "uint64" },
       {
         "name": "_priceUpdateCooldown",
         "type": "uint64",
@@ -420,11 +264,7 @@
     "type": "function",
     "name": "setReservation",
     "inputs": [
-      {
-        "name": "_account",
-        "type": "address",
-        "internalType": "address"
-      },
+      { "name": "_account", "type": "address", "internalType": "address" },
       {
         "name": "_reservation",
         "type": "tuple",
@@ -445,16 +285,8 @@
             "type": "uint64",
             "internalType": "uint64"
           },
-          {
-            "name": "quorumNumbers",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "quorumSplits",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
+          { "name": "quorumNumbers", "type": "bytes", "internalType": "bytes" },
+          { "name": "quorumSplits", "type": "bytes", "internalType": "bytes" }
         ]
       }
     ],
@@ -478,11 +310,7 @@
     "type": "function",
     "name": "transferOwnership",
     "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
+      { "name": "newOwner", "type": "address", "internalType": "address" }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -491,11 +319,7 @@
     "type": "function",
     "name": "withdraw",
     "inputs": [
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+      { "name": "_amount", "type": "uint256", "internalType": "uint256" }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -509,11 +333,7 @@
         "type": "address",
         "internalType": "contract IERC20"
       },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+      { "name": "_amount", "type": "uint256", "internalType": "uint256" }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -706,16 +526,8 @@
             "type": "uint64",
             "internalType": "uint64"
           },
-          {
-            "name": "quorumNumbers",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "quorumSplits",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
+          { "name": "quorumNumbers", "type": "bytes", "internalType": "bytes" },
+          { "name": "quorumSplits", "type": "bytes", "internalType": "bytes" }
         ]
       }
     ],
