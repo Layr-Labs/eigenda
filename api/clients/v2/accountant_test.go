@@ -11,6 +11,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -22,14 +23,14 @@ func createTestPaymentVaultParams(reservationWindow, pricePerSymbol, minNumSymbo
 	quorums := []core.QuorumID{0, 1}
 	quorumPaymentConfigs := make(map[core.QuorumID]*core.PaymentQuorumConfig)
 	quorumProtocolConfigs := make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig)
-	
+
 	for _, quorumID := range quorums {
 		quorumPaymentConfigs[quorumID] = &core.PaymentQuorumConfig{
 			ReservationSymbolsPerSecond: 2000,
 			OnDemandSymbolsPerSecond:    1000,
 			OnDemandPricePerSymbol:      pricePerSymbol,
 		}
-		
+
 		quorumProtocolConfigs[quorumID] = &core.PaymentQuorumProtocolConfig{
 			MinNumSymbols:              minNumSymbols,
 			ReservationAdvanceWindow:   10,
@@ -38,7 +39,7 @@ func createTestPaymentVaultParams(reservationWindow, pricePerSymbol, minNumSymbo
 			OnDemandEnabled:            true,
 		}
 	}
-	
+
 	return &meterer.PaymentVaultParams{
 		QuorumPaymentConfigs:  quorumPaymentConfigs,
 		QuorumProtocolConfigs: quorumProtocolConfigs,
@@ -51,7 +52,7 @@ func createAccountantWithReservations(symbolsPerSecond uint64) *Accountant {
 	privateKey, _ := crypto.GenerateKey()
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey.D.Bytes()))
 	accountant := NewAccountant(accountId)
-	
+
 	now := time.Now()
 	reservations := map[core.QuorumID]*core.ReservedPayment{
 		0: {
@@ -65,7 +66,7 @@ func createAccountantWithReservations(symbolsPerSecond uint64) *Accountant {
 			EndTimestamp:     uint64(now.Add(time.Hour).Unix()),
 		},
 	}
-	
+
 	err := accountant.SetPaymentState(
 		createTestPaymentVaultParams(2, 1, 1),
 		reservations,
@@ -84,7 +85,7 @@ func createAccountantOnDemandOnly(balance int64) *Accountant {
 	privateKey, _ := crypto.GenerateKey()
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey.D.Bytes()))
 	accountant := NewAccountant(accountId)
-	
+
 	err := accountant.SetPaymentState(
 		createTestPaymentVaultParams(5, 1, 100),
 		map[core.QuorumID]*core.ReservedPayment{},
@@ -165,7 +166,6 @@ func TestAccountBlob_InsufficientBalance(t *testing.T) {
 
 // This test is now covered by TestAccountBlob_Scenarios
 
-
 // This test is now covered by TestAccountBlob_Scenarios
 
 func TestAccountBlob_BinRotation(t *testing.T) {
@@ -205,7 +205,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	baseTime := now.UnixNano()
 
 	// First call - use current period
-	currentPeriod := meterer.GetReservationPeriodByNanosecond(baseTime, reservationWindow)
+	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(baseTime, reservationWindow)
 	_, err = accountant.AccountBlob(baseTime, 800, quorums)
 	assert.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Second call - use previous period (which should be allowed by validation)
 	prevTime := baseTime - int64(reservationWindow)*time.Second.Nanoseconds()
-	prevPeriod := meterer.GetReservationPeriodByNanosecond(prevTime, reservationWindow)
+	prevPeriod := payment_logic.GetReservationPeriodByNanosecond(prevTime, reservationWindow)
 	_, err = accountant.AccountBlob(prevTime, 300, quorums)
 	assert.NoError(t, err)
 
@@ -291,7 +291,7 @@ func TestAccountant_Concurrent(t *testing.T) {
 
 	// Check final state
 	for _, quorumNumber := range quorums {
-		currentPeriod := meterer.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
+		currentPeriod := payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
 		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(1000), record.Usage)
 	}
@@ -432,7 +432,6 @@ func TestAccountant_OnDemandUsage(t *testing.T) {
 	assert.Nil(t, payment)
 }
 
-
 func TestAccountant_MixedReservationStates(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
@@ -532,7 +531,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 
 	// Test rollback when a later quorum fails
 	nowNano := time.Now().UnixNano()
-	currentPeriod := meterer.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
+	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(nowNano, reservationWindow)
 
 	// First update should succeed
 	moreUsedQuorum := uint8(1)
@@ -551,7 +550,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Equal(t, uint64(100), record.Usage)
 	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(payment_logic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Use both quorums, more used quorum cannot overflow again
@@ -564,7 +563,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Equal(t, uint64(100), record.Usage)
 	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(payment_logic.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Test rollback when a quorum doesn't exist
