@@ -29,6 +29,7 @@ var (
 	)
 	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
 	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigen-da-directory")
 	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
 	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
 	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
@@ -234,6 +235,15 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		}
 	}
 
+	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
+	if eigenDADirectory == "" {
+		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		}
+	}
+
 	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
 	if serviceManagerAddress == "" {
 		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
@@ -271,6 +281,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDAServiceManagerAddr:          serviceManagerAddress,
+		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 	}, nil
