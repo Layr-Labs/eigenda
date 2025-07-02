@@ -1,4 +1,6 @@
-specVersion: 0.0.5
+specVersion: 1.3.0
+indexerHints:
+  prune: auto
 schema:
   file: ./schema.graphql
 dataSources:
@@ -11,7 +13,7 @@ dataSources:
       startBlock: 22276885
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - GlobalRatePeriodIntervalUpdated
