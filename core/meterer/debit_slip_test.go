@@ -23,8 +23,8 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		{
 			name: "valid request",
 			paymentMetadata: core.PaymentMetadata{
-				AccountID: gethcommon.HexToAddress("0x123"),
-				Timestamp: time.Now().UnixNano(),
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         time.Now().UnixNano(),
 				CumulativePayment: big.NewInt(100),
 			},
 			numSymbols:    1000,
@@ -35,8 +35,8 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		{
 			name: "no quorums",
 			paymentMetadata: core.PaymentMetadata{
-				AccountID: gethcommon.HexToAddress("0x123"),
-				Timestamp: time.Now().UnixNano(),
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         time.Now().UnixNano(),
 				CumulativePayment: big.NewInt(100),
 			},
 			numSymbols:    100,
@@ -46,8 +46,8 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		{
 			name: "zero symbols",
 			paymentMetadata: core.PaymentMetadata{
-				AccountID: gethcommon.HexToAddress("0x123"),
-				Timestamp: time.Now().UnixNano(),
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         time.Now().UnixNano(),
 				CumulativePayment: big.NewInt(100),
 			},
 			numSymbols:    0,
@@ -57,8 +57,8 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		{
 			name: "invalid account ID",
 			paymentMetadata: core.PaymentMetadata{
-				AccountID: gethcommon.Address{},
-				Timestamp: time.Now().UnixNano(),
+				AccountID:         gethcommon.Address{},
+				Timestamp:         time.Now().UnixNano(),
 				CumulativePayment: big.NewInt(100),
 			},
 			numSymbols:    100,
@@ -68,8 +68,8 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		{
 			name: "invalid timestamp",
 			paymentMetadata: core.PaymentMetadata{
-				AccountID: gethcommon.HexToAddress("0x123"),
-				Timestamp: 0,
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         0,
 				CumulativePayment: big.NewInt(100),
 			},
 			numSymbols:    100,
@@ -84,7 +84,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
 				assert.NotNil(t, request)
-				
+
 				if tt.checkFields {
 					assert.Equal(t, tt.paymentMetadata, request.PaymentMetadata)
 					assert.Equal(t, tt.numSymbols, request.NumSymbols)

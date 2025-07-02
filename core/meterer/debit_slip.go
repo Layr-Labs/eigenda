@@ -45,7 +45,7 @@ func NewDebitSlip(
 	if paymentMetadata.Timestamp <= 0 {
 		return nil, fmt.Errorf("invalid timestamp")
 	}
-	
+
 	return &DebitSlip{
 		PaymentMetadata: paymentMetadata,
 		NumSymbols:      numSymbols,
