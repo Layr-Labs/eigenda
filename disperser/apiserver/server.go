@@ -294,8 +294,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	// Note that we have no plans to enable payments for v1 disperser
 	if paymentHeader != nil {
 		blobLength := encoding.GetBlobLength(uint(blobSize))
-		debitSlip := meterer.NewDebitSlip(*paymentHeader, uint64(blobLength), blob.GetQuorumNumbers()).WithReceivedAt(dispersalStart)
-		_, err := s.meterer.MeterRequest(ctx, debitSlip)
+		_, err := s.meterer.MeterRequest(ctx, *paymentHeader, uint64(blobLength), blob.GetQuorumNumbers(), dispersalStart)
 		if err != nil {
 			return nil, api.NewErrorResourceExhausted(err.Error())
 		}

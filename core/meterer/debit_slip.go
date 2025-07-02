@@ -26,35 +26,32 @@ type DebitSlip struct {
 	RequestID string // Optional, for tracing and debugging
 }
 
-// NewDebitSlip creates a new DebitSlip with the essential parameters
+// NewDebitSlip creates a new DebitSlip with the essential parameters and validates them
 func NewDebitSlip(
 	paymentMetadata core.PaymentMetadata,
 	numSymbols uint64,
 	quorumNumbers []core.QuorumID,
-) *DebitSlip {
+) (*DebitSlip, error) {
+	// Validate the parameters during construction
+	if len(quorumNumbers) == 0 {
+		return nil, fmt.Errorf("no quorums provided")
+	}
+	if numSymbols == 0 {
+		return nil, fmt.Errorf("zero symbols requested")
+	}
+	if paymentMetadata.AccountID == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("invalid account ID")
+	}
+	if paymentMetadata.Timestamp <= 0 {
+		return nil, fmt.Errorf("invalid timestamp")
+	}
+	
 	return &DebitSlip{
 		PaymentMetadata: paymentMetadata,
 		NumSymbols:      numSymbols,
 		QuorumNumbers:   quorumNumbers,
 		ReceivedAt:      time.Now(),
-	}
-}
-
-// Validate performs basic validation on the request parameters
-func (ds *DebitSlip) Validate() error {
-	if len(ds.QuorumNumbers) == 0 {
-		return fmt.Errorf("no quorums provided")
-	}
-	if ds.NumSymbols == 0 {
-		return fmt.Errorf("zero symbols requested")
-	}
-	if ds.PaymentMetadata.AccountID == (gethcommon.Address{}) {
-		return fmt.Errorf("invalid account ID")
-	}
-	if ds.PaymentMetadata.Timestamp <= 0 {
-		return fmt.Errorf("invalid timestamp")
-	}
-	return nil
+	}, nil
 }
 
 // GetAccountID returns the account ID from the payment metadata
@@ -67,7 +64,7 @@ func (ds *DebitSlip) GetTimestamp() int64 {
 	return ds.PaymentMetadata.Timestamp
 }
 
-// GetQuorumNumbersAsUint8 returns quorum numbers as uint8 slice for backward compatibility
+// GetQuorumNumbersAsUint8 returns quorum numbers as uint8 slice
 func (ds *DebitSlip) GetQuorumNumbersAsUint8() []uint8 {
 	result := make([]uint8, len(ds.QuorumNumbers))
 	for i, qid := range ds.QuorumNumbers {

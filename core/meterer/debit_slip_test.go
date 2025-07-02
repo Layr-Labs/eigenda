@@ -12,103 +12,90 @@ import (
 )
 
 func TestDebitSlip_NewDebitSlip(t *testing.T) {
-	accountID := gethcommon.HexToAddress("0x123")
-	timestamp := time.Now().UnixNano()
-
-	paymentMetadata := core.PaymentMetadata{
-		AccountID:         accountID,
-		Timestamp:         timestamp,
-		CumulativePayment: big.NewInt(100),
-	}
-
-	numSymbols := uint64(1000)
-	quorumNumbers := []core.QuorumID{0, 1, 2}
-
-	request := NewDebitSlip(paymentMetadata, numSymbols, quorumNumbers)
-
-	assert.Equal(t, paymentMetadata, request.PaymentMetadata)
-	assert.Equal(t, numSymbols, request.NumSymbols)
-	assert.Equal(t, quorumNumbers, request.QuorumNumbers)
-	assert.Equal(t, accountID, request.GetAccountID())
-	assert.Equal(t, timestamp, request.GetTimestamp())
-	assert.NotZero(t, request.ReceivedAt)
-}
-
-func TestDebitSlip_Validate(t *testing.T) {
 	tests := []struct {
-		name          string
-		request       *DebitSlip
-		expectedError string
+		name            string
+		paymentMetadata core.PaymentMetadata
+		numSymbols      uint64
+		quorumNumbers   []core.QuorumID
+		expectedError   string
+		checkFields     bool
 	}{
 		{
 			name: "valid request",
-			request: &DebitSlip{
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID: gethcommon.HexToAddress("0x123"),
-					Timestamp: time.Now().UnixNano(),
-				},
-				NumSymbols:    100,
-				QuorumNumbers: []core.QuorumID{0, 1},
+			paymentMetadata: core.PaymentMetadata{
+				AccountID: gethcommon.HexToAddress("0x123"),
+				Timestamp: time.Now().UnixNano(),
+				CumulativePayment: big.NewInt(100),
 			},
+			numSymbols:    1000,
+			quorumNumbers: []core.QuorumID{0, 1, 2},
 			expectedError: "",
+			checkFields:   true,
 		},
 		{
 			name: "no quorums",
-			request: &DebitSlip{
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID: gethcommon.HexToAddress("0x123"),
-					Timestamp: time.Now().UnixNano(),
-				},
-				NumSymbols:    100,
-				QuorumNumbers: []core.QuorumID{},
+			paymentMetadata: core.PaymentMetadata{
+				AccountID: gethcommon.HexToAddress("0x123"),
+				Timestamp: time.Now().UnixNano(),
+				CumulativePayment: big.NewInt(100),
 			},
+			numSymbols:    100,
+			quorumNumbers: []core.QuorumID{},
 			expectedError: "no quorums provided",
 		},
 		{
 			name: "zero symbols",
-			request: &DebitSlip{
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID: gethcommon.HexToAddress("0x123"),
-					Timestamp: time.Now().UnixNano(),
-				},
-				NumSymbols:    0,
-				QuorumNumbers: []core.QuorumID{0},
+			paymentMetadata: core.PaymentMetadata{
+				AccountID: gethcommon.HexToAddress("0x123"),
+				Timestamp: time.Now().UnixNano(),
+				CumulativePayment: big.NewInt(100),
 			},
+			numSymbols:    0,
+			quorumNumbers: []core.QuorumID{0},
 			expectedError: "zero symbols requested",
 		},
 		{
 			name: "invalid account ID",
-			request: &DebitSlip{
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID: gethcommon.Address{},
-					Timestamp: time.Now().UnixNano(),
-				},
-				NumSymbols:    100,
-				QuorumNumbers: []core.QuorumID{0},
+			paymentMetadata: core.PaymentMetadata{
+				AccountID: gethcommon.Address{},
+				Timestamp: time.Now().UnixNano(),
+				CumulativePayment: big.NewInt(100),
 			},
+			numSymbols:    100,
+			quorumNumbers: []core.QuorumID{0},
 			expectedError: "invalid account ID",
 		},
 		{
 			name: "invalid timestamp",
-			request: &DebitSlip{
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID: gethcommon.HexToAddress("0x123"),
-					Timestamp: 0,
-				},
-				NumSymbols:    100,
-				QuorumNumbers: []core.QuorumID{0},
+			paymentMetadata: core.PaymentMetadata{
+				AccountID: gethcommon.HexToAddress("0x123"),
+				Timestamp: 0,
+				CumulativePayment: big.NewInt(100),
 			},
+			numSymbols:    100,
+			quorumNumbers: []core.QuorumID{0},
 			expectedError: "invalid timestamp",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.request.Validate()
+			request, err := NewDebitSlip(tt.paymentMetadata, tt.numSymbols, tt.quorumNumbers)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
+				assert.NotNil(t, request)
+				
+				if tt.checkFields {
+					assert.Equal(t, tt.paymentMetadata, request.PaymentMetadata)
+					assert.Equal(t, tt.numSymbols, request.NumSymbols)
+					assert.Equal(t, tt.quorumNumbers, request.QuorumNumbers)
+					assert.Equal(t, tt.paymentMetadata.AccountID, request.GetAccountID())
+					assert.Equal(t, tt.paymentMetadata.Timestamp, request.GetTimestamp())
+					assert.NotZero(t, request.ReceivedAt)
+				}
 			} else {
 				require.Error(t, err)
+				assert.Nil(t, request)
 				assert.Contains(t, err.Error(), tt.expectedError)
 			}
 		})

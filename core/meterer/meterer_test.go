@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -205,7 +206,7 @@ func TestMetererReservations(t *testing.T) {
 	quoromNumbers := []uint8{0, 1}
 	reservationPeriods := make([]uint64, len(quoromNumbers))
 	for i, quorumNumber := range quoromNumbers {
-		reservationPeriods[i] = meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mockParams.QuorumProtocolConfigs[core.QuorumID(quorumNumber)].ReservationRateLimitWindow)
+		reservationPeriods[i] = payment_logic.GetReservationPeriodByNanosecond(now.UnixNano(), mockParams.QuorumProtocolConfigs[core.QuorumID(quorumNumber)].ReservationRateLimitWindow)
 	}
 
 	// Update mocks for GetReservedPaymentByAccountAndQuorums
@@ -226,27 +227,24 @@ func TestMetererReservations(t *testing.T) {
 	)
 
 	// test not active reservation
-	request := createDebitSlip(1, big.NewInt(0), accountID1, 1000, []uint8{0, 1})
-	request.ReceivedAt = now
-	_, err := mt.MeterRequest(ctx, request)
+	header := createPaymentHeader(1, big.NewInt(0), accountID1)
+	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1}, now)
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid quorom ID
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID1, 1000, []uint8{0, 1, 2})
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
+	assert.ErrorContains(t, err, "quorum number mismatch")
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
 	// small bin overflow for empty bin (using one quorum for protocol parameters for now)
 	reservationWindow := mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow
-	request = createDebitSlip(now.UnixNano()-int64(reservationWindow)*1e9, big.NewInt(0), accountID2, 10, quoromNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano()-int64(reservationWindow)*1e9, big.NewInt(0), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers, now)
 	assert.NoError(t, err)
 	// overwhelming bin overflow for empty bins
-	request = createDebitSlip(now.UnixNano()-int64(reservationWindow)*1e9, big.NewInt(0), accountID2, 1000, quoromNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano()-int64(reservationWindow)*1e9, big.NewInt(0), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers, now)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
 	// test non-existent account
@@ -254,22 +252,19 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	request = createDebitSlip(1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey), 1000, []uint8{0, 1, 2})
-	request.ReceivedAt = time.Now()
+	header = createPaymentHeader(1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	assert.NoError(t, err)
-	_, err = mt.MeterRequest(ctx, request)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, time.Now())
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
 	// test inactive reservation
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID3, 1000, []uint8{0})
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID3)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0}, now)
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid reservation period
-	request = createDebitSlip(now.UnixNano()-2*int64(reservationWindow)*1e9, big.NewInt(0), accountID1, 2000, quoromNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano()-2*int64(reservationWindow)*1e9, big.NewInt(0), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers, now)
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 	// test bin usage metering
 	symbolLength := uint64(20)
@@ -279,10 +274,9 @@ func TestMetererReservations(t *testing.T) {
 		accountAndQuorums = append(accountAndQuorums, fmt.Sprintf("%s:%d", accountID2.Hex(), quorum))
 	}
 	for i := 0; i < 9; i++ {
-		reservationPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), reservationWindow)
-		request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID2, symbolLength, quoromNumbers)
-		request.ReceivedAt = now
-		symbolsCharged, err := mt.MeterRequest(ctx, request)
+		reservationPeriod := payment_logic.GetReservationPeriodByNanosecond(now.UnixNano(), reservationWindow)
+		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
 		for _, accountAndQuorum := range accountAndQuorums {
 			item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -298,15 +292,14 @@ func TestMetererReservations(t *testing.T) {
 		}
 	}
 	// first over flow is allowed
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID2, 25, quoromNumbers)
-	request.ReceivedAt = now
-	symbolsCharged, err := mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	symbolsCharged, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(27), symbolsCharged)
 
 	for _, accountAndQuorum := range accountAndQuorums {
-		reservationPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow)
-		overflowedReservationPeriod := meterer.GetOverflowPeriod(reservationPeriod, mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow)
+		reservationPeriod := payment_logic.GetReservationPeriodByNanosecond(now.UnixNano(), mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow)
+		overflowedReservationPeriod := payment_logic.GetOverflowPeriod(reservationPeriod, mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum},
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(overflowedReservationPeriod, 10)},
@@ -319,9 +312,9 @@ func TestMetererReservations(t *testing.T) {
 	}
 
 	// second over flow
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID2, 1, quoromNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	assert.NoError(t, err)
+	_, err = mt.MeterRequest(ctx, *header, 1, quoromNumbers, now)
 	assert.ErrorContains(t, err, "bin has already been filled")
 
 	// Test quorum-specific behavior - one quorum succeeds, one fails
@@ -334,9 +327,8 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Now try a request that should succeed for quorum 1 but fail for quorum 0
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0), accountID2, 50, quoromNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 50, quoromNumbers, now)
 	assert.ErrorContains(t, err, "bin has already been filled")
 
 	// Verify quorum 1 was not updated (because the operation should be atomic)
@@ -393,21 +385,19 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	request := createDebitSlip(now.UnixNano(), big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey), 1000, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header := createPaymentHeader(now.UnixNano(), big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
+	assert.NoError(t, err)
+	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	request = createDebitSlip(now.UnixNano(), big.NewInt(2), accountID1, 1000, []uint8{0, 1, 2})
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(2), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	request = createDebitSlip(now.UnixNano(), big.NewInt(1), accountID1, 1000, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
 	// No record for invalid payment
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -421,51 +411,46 @@ func TestMetererOnDemand(t *testing.T) {
 	symbolLength := uint64(100)
 	minSymbols := mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].MinNumSymbols
 	pricePerSymbol := mockParams.QuorumPaymentConfigs[meterer.OnDemandQuorumID].OnDemandPricePerSymbol
-	symbolsCharged := meterer.SymbolsCharged(symbolLength, minSymbols)
-	priceCharged := meterer.PaymentCharged(symbolsCharged, pricePerSymbol)
+	symbolsCharged := payment_logic.SymbolsCharged(symbolLength, minSymbols)
+	priceCharged := payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol)
 	assert.Equal(t, big.NewInt(int64(102*pricePerSymbol)), priceCharged)
-	request = createDebitSlip(now.UnixNano(), priceCharged, accountID2, symbolLength, quorumNumbers)
-	request.ReceivedAt = now
-	symbolsCharged, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
+	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(102), symbolsCharged)
-	request = createDebitSlip(now.UnixNano(), priceCharged, accountID2, symbolLength, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
+	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	// Doesn't check for exact payment, checks for increment
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
-		request = createDebitSlip(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2, symbolLength, quorumNumbers)
-		request.ReceivedAt = now
-		symbolsCharged, err = mt.MeterRequest(ctx, request)
+		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
+		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(102), symbolsCharged)
 	}
 
 	// test cumulative payment on-chain constraint
-	request = createDebitSlip(now.UnixNano(), big.NewInt(2023), accountID2, 1, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
+	assert.ErrorContains(t, err, "request claims a cumulative payment greater than the on-chain deposit")
 	assert.ErrorContains(t, err, "request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
 	symbolLength = uint64(2)
-	symbolsCharged = meterer.SymbolsCharged(symbolLength, minSymbols)
-	priceCharged = meterer.PaymentCharged(symbolsCharged, pricePerSymbol)
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2, symbolLength, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	symbolsCharged = payment_logic.SymbolsCharged(symbolLength, minSymbols)
+	priceCharged = payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
-	symbolsCharged = meterer.SymbolsCharged(uint64(50), minSymbols)
-	request = createDebitSlip(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, pricePerSymbol), accountID2, 50, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	symbolsCharged = payment_logic.SymbolsCharged(uint64(50), minSymbols)
+	header = createPaymentHeader(now.UnixNano(), payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -476,16 +461,14 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
-	symbolsCharged = meterer.SymbolsCharged(uint64(30), minSymbols)
-	request = createDebitSlip(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, pricePerSymbol), accountID2, 30, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	symbolsCharged = payment_logic.SymbolsCharged(uint64(30), minSymbols)
+	header = createPaymentHeader(now.UnixNano(), payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	request = createDebitSlip(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, pricePerSymbol)), accountID1, 1010, quorumNumbers)
-	request.ReceivedAt = now
-	_, err = mt.MeterRequest(ctx, request)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, payment_logic.PaymentCharged(1010, pricePerSymbol)), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -537,7 +520,7 @@ func TestPaymentCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := meterer.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
+			result := payment_logic.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -584,17 +567,16 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := meterer.SymbolsCharged(tt.symbolLength, tt.minNumSymbols)
+			result := payment_logic.SymbolsCharged(tt.symbolLength, tt.minNumSymbols)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func createDebitSlip(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address, numSymbols uint64, quorumNumbers []uint8) *meterer.DebitSlip {
-	paymentMetadata := core.PaymentMetadata{
+func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
+	return &core.PaymentMetadata{
 		AccountID:         accountID,
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
-	return meterer.NewDebitSlip(paymentMetadata, numSymbols, quorumNumbers)
 }
