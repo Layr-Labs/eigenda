@@ -8,9 +8,9 @@ dataSources:
     name: PaymentVault
     network: mainnet
     source:
-      address: "0xb2e7ef419a2A399472ae22ef5cFcCb8bE97A4B05"
+      address: "0x0000000000000000000000000000000000000000"
       abi: PaymentVault
-      startBlock: 22276885
+      startBlock: 0
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -24,7 +24,7 @@ dataSources:
         - PriceParamsUpdated
         - ReservationPeriodIntervalUpdated
         - ReservationUpdated
-        - ActiveReservation
+        - CurrentReservation
       abis:
         - name: PaymentVault
           file: ./abis/PaymentVault.json

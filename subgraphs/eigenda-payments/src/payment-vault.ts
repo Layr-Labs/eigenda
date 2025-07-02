@@ -17,7 +17,7 @@ import {
   PriceParamsUpdated,
   ReservationPeriodIntervalUpdated,
   ReservationUpdated,
-  ActiveReservation
+  CurrentReservation
 } from "../generated/schema"
 
 export function handleGlobalRatePeriodIntervalUpdated(
@@ -151,9 +151,9 @@ export function handleReservationUpdated(event: ReservationUpdatedEvent): void {
   entity.save()
 
   // Create or update the ActiveReservation entity for this account
-  let activeReservation = ActiveReservation.load(event.params.account)
+  let activeReservation = CurrentReservation.load(event.params.account)
   if (activeReservation == null) {
-    activeReservation = new ActiveReservation(event.params.account)
+    activeReservation = new CurrentReservation(event.params.account)
   }
   
   activeReservation.account = event.params.account

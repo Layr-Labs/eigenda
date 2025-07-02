@@ -7,7 +7,6 @@ import {
   afterAll
 } from "matchstick-as/assembly/index"
 import { BigInt, Address, Bytes } from "@graphprotocol/graph-ts"
-import { GlobalRatePeriodIntervalUpdated, ActiveReservation } from "../generated/schema"
 import { handleGlobalRatePeriodIntervalUpdated, handleReservationUpdated } from "../src/payment-vault"
 import { createGlobalRatePeriodIntervalUpdatedEvent, createReservationUpdatedEvent } from "./payment-vault-utils"
 
@@ -58,12 +57,12 @@ describe("Describe entity assertions", () => {
   })
 })
 
-describe("ActiveReservation entity", () => {
+describe("CurrentReservation entity", () => {
   afterAll(() => {
     clearStore()
   })
 
-  test("ActiveReservation created and updated on ReservationUpdated event", () => {
+  test("CurrentReservation created and updated on ReservationUpdated event", () => {
     // Create test data
     let account = Address.fromString("0x1234567890123456789012345678901234567890")
     let symbolsPerSecond = BigInt.fromI32(1000)
@@ -83,17 +82,17 @@ describe("ActiveReservation entity", () => {
     )
     handleReservationUpdated(event1)
 
-    // Check that ActiveReservation was created
-    assert.entityCount("ActiveReservation", 1)
+    // Check that CurrentReservation was created
+    assert.entityCount("CurrentReservation", 1)
     
-    // Verify the ActiveReservation fields
+    // Verify the CurrentReservation fields
     let accountId = account.toHexString()
-    assert.fieldEquals("ActiveReservation", accountId, "account", accountId)
-    assert.fieldEquals("ActiveReservation", accountId, "symbolsPerSecond", "1000")
-    assert.fieldEquals("ActiveReservation", accountId, "startTimestamp", "1000000")
-    assert.fieldEquals("ActiveReservation", accountId, "endTimestamp", "2000000")
-    assert.fieldEquals("ActiveReservation", accountId, "quorumNumbers", "0x01")
-    assert.fieldEquals("ActiveReservation", accountId, "quorumSplits", "0x64")
+    assert.fieldEquals("CurrentReservation", accountId, "account", accountId)
+    assert.fieldEquals("CurrentReservation", accountId, "symbolsPerSecond", "1000")
+    assert.fieldEquals("CurrentReservation", accountId, "startTimestamp", "1000000")
+    assert.fieldEquals("CurrentReservation", accountId, "endTimestamp", "2000000")
+    assert.fieldEquals("CurrentReservation", accountId, "quorumNumbers", "0x01")
+    assert.fieldEquals("CurrentReservation", accountId, "quorumSplits", "0x64")
 
     // Create and handle updated reservation event
     let newSymbolsPerSecond = BigInt.fromI32(2000)
@@ -109,15 +108,15 @@ describe("ActiveReservation entity", () => {
     )
     handleReservationUpdated(event2)
 
-    // Check that we still have only one ActiveReservation (it was updated, not created new)
-    assert.entityCount("ActiveReservation", 1)
+    // Check that we still have only one CurrentReservation (it was updated, not created new)
+    assert.entityCount("CurrentReservation", 1)
     
     // Verify the updated fields
-    assert.fieldEquals("ActiveReservation", accountId, "symbolsPerSecond", "2000")
-    assert.fieldEquals("ActiveReservation", accountId, "endTimestamp", "3000000")
+    assert.fieldEquals("CurrentReservation", accountId, "symbolsPerSecond", "2000")
+    assert.fieldEquals("CurrentReservation", accountId, "endTimestamp", "3000000")
   })
 
-  test("Multiple accounts have separate ActiveReservations", () => {
+  test("Multiple accounts have separate CurrentReservations", () => {
     clearStore()
     
     let account1 = Address.fromString("0x1111111111111111111111111111111111111111")
@@ -145,11 +144,11 @@ describe("ActiveReservation entity", () => {
     )
     handleReservationUpdated(event2)
     
-    // Check that we have two ActiveReservations
-    assert.entityCount("ActiveReservation", 2)
+    // Check that we have two CurrentReservations
+    assert.entityCount("CurrentReservation", 2)
     
     // Verify each account has its own reservation
-    assert.fieldEquals("ActiveReservation", account1.toHexString(), "symbolsPerSecond", "1000")
-    assert.fieldEquals("ActiveReservation", account2.toHexString(), "symbolsPerSecond", "2000")
+    assert.fieldEquals("CurrentReservation", account1.toHexString(), "symbolsPerSecond", "1000")
+    assert.fieldEquals("CurrentReservation", account2.toHexString(), "symbolsPerSecond", "2000")
   })
 })

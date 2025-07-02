@@ -78,7 +78,7 @@ type ReservationUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type ActiveReservation @entity(immutable: false) {
+type CurrentReservation @entity(immutable: false) {
   id: Bytes! # account address
   account: Bytes! # address
   symbolsPerSecond: BigInt! # uint64
