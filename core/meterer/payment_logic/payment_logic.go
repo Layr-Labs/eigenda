@@ -122,12 +122,18 @@ func ValidateReservations(
 	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
 
 	// Gather quorums the user had an reservations on and relevant quorum configurations
-	for quorumID := range reservations {
-		reservationQuorums = append(reservationQuorums, uint8(quorumID))
-		_, ok := quorumConfigs[quorumID]
+	for quorumID, reservation := range reservations {
+		quorumConfig, ok := quorumConfigs[quorumID]
 		if !ok {
 			return fmt.Errorf("quorum config not found for quorum %d", quorumID)
 		}
+		if quorumConfig == nil {
+			return fmt.Errorf("quorum config is nil for quorum %d", quorumID)
+		}
+		if reservation == nil {
+			return fmt.Errorf("reservation not found for quorum %d", quorumID)
+		}
+		reservationQuorums = append(reservationQuorums, uint8(quorumID))
 		reservationWindows[quorumID] = quorumConfigs[quorumID].ReservationRateLimitWindow
 		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(paymentHeaderTimestampNs, quorumConfigs[quorumID].ReservationRateLimitWindow)
 	}
@@ -151,6 +157,9 @@ func ValidateReservations(
 // ValidateReservationPeriod checks if the provided reservation period is valid
 // Note: This is called per-quorum since reservation is for a single quorum.
 func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedTimestampNs int64) bool {
+	if reservation == nil {
+		return false
+	}
 	currentReservationPeriod := GetReservationPeriodByNanosecond(receivedTimestampNs, reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
