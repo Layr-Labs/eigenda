@@ -204,7 +204,7 @@ var (
 	}
 	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "[Deprecating soon in favor of EigenDADirectory] Address of the BLS operator state retriever",
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
 	}
@@ -216,7 +216,7 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Directory contract",
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
