@@ -52,14 +52,18 @@ contract DeployEigenDADirectory is Script {
         );
     }
 
+    struct AddressConfig {
+        string name;
+        address value;
+    }
     function _populateDirectory() internal virtual {
-        string[] memory names = cfg.readStringArray(".contractNames");
-        address[] memory values = cfg.readAddressArray(".contractAddresses");
-
-        require(names.length == values.length, "Names and addresses length mismatch");
-
-        for (uint256 i; i < names.length; i++) {
-            directory.addAddress(names[i], values[i]);
+        // Dynamically read all contract names from the [contracts] table
+        string[] memory contractNames = vm.parseTomlKeys(cfg, ".contracts");
+        
+        for (uint256 i; i < contractNames.length; i++) {
+            string memory name = contractNames[i];
+            address contractAddress = cfg.readAddress(string.concat(".contracts.", name));
+            directory.addAddress(name, contractAddress);
         }
     }
 }
