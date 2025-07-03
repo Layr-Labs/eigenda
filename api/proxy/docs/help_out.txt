@@ -1,0 +1,142 @@
+NAME:
+   eigenda-proxy - EigenDA Proxy Sidecar Service
+
+USAGE:
+   eigenda-proxy [global options] command [command options]
+
+
+DESCRIPTION:
+   Service for more trustless and secure interactions with EigenDA
+
+COMMANDS:
+   doc      
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --help, -h     show help
+   --version, -v  print the version
+
+   Cert Verifier (V1 only)
+
+   --eigenda.cert-verification-disabled  Whether to verify certificates received from EigenDA disperser. (default: false) [$EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED]
+   --eigenda.cert-verifier-v1 value      Address of EigenDACertVerifierV1 contract. Only necessary if using custom quorums/thresholds 
+                                                 for certificate verification. If no address is provided then the default 
+                                                 EigenDAServiceManager parameters will be uesd. [$EIGENDA_PROXY_EIGENDA_CERT_VERIFIER_V1]
+
+   EigenDA V1 Client
+
+   --eigenda.confirmation-depth value                                       Number of Ethereum blocks to wait after the blob's batch has been included on-chain, before returning from PutBlob calls. Can either be a number or 'finalized'. (default: "8") [$EIGENDA_PROXY_EIGENDA_CONFIRMATION_DEPTH]
+   --eigenda.confirmation-timeout value                                     The total amount of time that the client will spend waiting for EigenDA
+                                                                                to "confirm" (include onchain) a blob after it has been dispersed. Note that
+                                                                                we stick to "confirm" here but this really means InclusionTimeout,
+                                                                                not confirmation in the sense of confirmation depth.
+                                                                                
+                                                                                If ConfirmationTimeout time passes and the blob is not yet confirmed,
+                                                                                the client will return an api.ErrorFailover to let the caller failover to EthDA. (default: 15m0s) [$EIGENDA_PROXY_EIGENDA_CONFIRMATION_TIMEOUT]
+   --eigenda.custom-quorum-ids value [ --eigenda.custom-quorum-ids value ]  Custom quorum IDs for writing blobs. Should not include default quorums 0 or 1. [$EIGENDA_PROXY_EIGENDA_CUSTOM_QUORUM_IDS]
+   --eigenda.disable-point-verification-mode                                Disable point verification mode. This mode performs IFFT on data before writing and FFT on data after reading. Disabling requires supplying the entire blob for verification against the KZG commitment. (default: false) [$EIGENDA_PROXY_EIGENDA_DISABLE_POINT_VERIFICATION_MODE]
+   --eigenda.disable-tls                                                    Disable TLS for gRPC communication with the EigenDA disperser. Default is false. (default: false) [$EIGENDA_PROXY_EIGENDA_GRPC_DISABLE_TLS]
+   --eigenda.disperser-rpc value                                            RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC]
+   --eigenda.eth-rpc value                                                  URL of the Ethereum RPC endpoint. Needed to confirm blobs landed onchain. [$EIGENDA_PROXY_EIGENDA_ETH_RPC]
+   --eigenda.max-blob-length value                                          Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
+                                                                                      loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
+                                                                                      slightly exceeds 1GB. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH]
+   --eigenda.put-blob-encoding-version value                                Blob encoding version to use when writing blobs from the high-level interface. (default: 0) [$EIGENDA_PROXY_EIGENDA_PUT_BLOB_ENCODING_VERSION]
+   --eigenda.put-retries value                                              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_PUT_RETRIES]
+   --eigenda.response-timeout value                                         Flag used to configure the underlying disperser-client. Total time to wait for the disperseBlob call to return or disperseAuthenticatedBlob stream to finish and close. (default: 1m0s) [$EIGENDA_PROXY_EIGENDA_RESPONSE_TIMEOUT]
+   --eigenda.signer-private-key-hex value                                   Hex-encoded signer private key. Used for authn/authz and rate limits on EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX]
+   --eigenda.status-query-retry-interval value                              Interval between retries when awaiting network blob finalization. Default is 5 seconds. (default: 5s) [$EIGENDA_PROXY_EIGENDA_STATUS_QUERY_INTERVAL]
+   --eigenda.status-query-timeout value                                     Duration to wait for a blob to finalize after being sent for dispersal. Default is 30 minutes. (default: 30m0s) [$EIGENDA_PROXY_EIGENDA_STATUS_QUERY_TIMEOUT]
+   --eigenda.svc-manager-addr value                                         Address of the EigenDAServiceManager contract. Required to confirm blobs landed onchain. See https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment [$EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR]
+
+   EigenDA V2 Client
+
+   --eigenda.v2.blob-certified-timeout value     Maximum amount of time to wait for blob certification against the on-chain EigenDACertVerifier. (default: 30s) [$EIGENDA_PROXY_EIGENDA_V2_CERTIFY_BLOB_TIMEOUT]
+   --eigenda.v2.blob-status-poll-interval value  Duration to query for blob status updates during dispersal. (default: 1s) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_STATUS_POLL_INTERVAL]
+   --eigenda.v2.blob-version value               Blob params version used when dispersing. This refers to a global version maintained by EigenDA
+governance and is injected in the BlobHeader before dispersing. Currently only supports (0). (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION]
+   --eigenda.v2.bls-operator-state-retriever-addr value                Address of the BLS operator state retriever contract. [$EIGENDA_PROXY_EIGENDA_V2_BLS_OPERATOR_STATE_RETRIEVER_ADDR]
+   --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value  Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. Required for performing eth_calls to verify EigenDA certificates. [$EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR]
+   --eigenda.v2.contract-call-timeout value                            Timeout used when performing smart contract call operation (i.e, eth_call). (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_CONTRACT_CALL_TIMEOUT]
+   --eigenda.v2.disable-point-evaluation                               Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISABLE_POINT_EVALUATION]
+   --eigenda.v2.disable-tls                                            Disable TLS for gRPC communication with the EigenDA disperser and retrieval subnet. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS]
+   --eigenda.v2.disperse-blob-timeout value                            Maximum amount of time to wait for a blob to disperse against v2 protocol. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_DISPERSE_BLOB_TIMEOUT]
+   --eigenda.v2.disperser-rpc value                                    RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC]
+   --eigenda.v2.eth-rpc value                                          URL of the Ethereum RPC endpoint. [$EIGENDA_PROXY_EIGENDA_V2_ETH_RPC]
+   --eigenda.v2.max-blob-length value                                  Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
+loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
+slightly exceeds 1GB. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH]
+   --eigenda.v2.network value  The EigenDA network that is being used. This is an optional flag, to configure
+default values for eigenda.v2.disperser-rpc, eigenda.v2.service-manager-addr, and eigenda.v2.bls-operator-state-retriever-addr. If all of these fields are explicitly configured, the
+network flag may be omitted. If some or all of these fields are configured, and the network
+is also configured, then the explicitly defined field values will take precedence. Permitted
+EigenDANetwork values include holesky_testnet, holesky_preprod, & sepolia_testnet. [$EIGENDA_PROXY_EIGENDA_V2_NETWORK]
+   --eigenda.v2.put-retries value              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
+   --eigenda.v2.rbn-recency-window-size value  Allowed distance (in L1 blocks) between the eigenDA cert's reference 
+block number (RBN) and the L1 block number at which the cert was included 
+in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
+and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
+This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE]
+   --eigenda.v2.relay-timeout value           Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
+   --eigenda.v2.service-manager-addr value    Address of the EigenDA service manager contract. [$EIGENDA_PROXY_EIGENDA_V2_SERVICE_MANAGER_ADDR]
+   --eigenda.v2.signer-payment-key-hex value  Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
+   --eigenda.v2.validator-timeout value       Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
+
+   KZG
+
+   --eigenda.cache-path value        path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
+   --eigenda.g1-path value           path to g1.point file. (default: "resources/g1.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH]
+   --eigenda.g2-path value           path to g2.point file. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
+   --eigenda.g2-path-trailing value  path to g2.trailing.point file. (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
+
+   Logging
+
+   --log.format value  The format of the log file. Accepted options are 'json' and 'text' (default: "text") [$EIGENDA_PROXY_LOG_FORMAT]
+   --log.level value   The lowest log level that will be output. Accepted options are "debug", "info", "warn", "error" (default: "info") [$EIGENDA_PROXY_LOG_LEVEL]
+   --log.path value    Path to file where logs will be written [$EIGENDA_PROXY_LOG_PATH]
+
+   Memstore (for testing purposes - replaces EigenDA backend)
+
+   --memstore.enabled                     Whether to use memstore for DA logic. (default: false) [$EIGENDA_PROXY_MEMSTORE_ENABLED, $MEMSTORE_ENABLED]
+   --memstore.expiration value            Duration that a memstore blob/commitment pair is allowed to live. Setting to (0) results in no expiration. (default: 25m0s) [$EIGENDA_PROXY_MEMSTORE_EXPIRATION, $MEMSTORE_EXPIRATION]
+   --memstore.get-latency value           Artificial latency added for memstore backend to mimic EigenDA's retrieval latency. (default: 0s) [$EIGENDA_PROXY_MEMSTORE_GET_LATENCY]
+   --memstore.put-latency value           Artificial latency added for memstore backend to mimic EigenDA's dispersal latency. (default: 0s) [$EIGENDA_PROXY_MEMSTORE_PUT_LATENCY]
+   --memstore.put-returns-failover-error  When true, Put requests will return a failover error, after sleeping for --memstore.put-latency duration. (default: false) [$EIGENDA_PROXY_MEMSTORE_PUT_RETURNS_FAILOVER_ERROR]
+
+   Metrics
+
+   --metrics.addr value  Metrics listening address (default: "0.0.0.0") [$EIGENDA_PROXY_METRICS_ADDR]
+   --metrics.enabled     Enable the metrics server (default: false) [$EIGENDA_PROXY_METRICS_ENABLED]
+   --metrics.port value  Metrics listening port (default: 7300) [$EIGENDA_PROXY_METRICS_PORT]
+
+   Proxy Server
+
+   --addr value                                 Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
+   --api-enabled value [ --api-enabled value ]  List of API types to enable (e.g. admin) [$EIGENDA_PROXY_API_ENABLED]
+   --port value                                 Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
+
+   Redis Cache/Fallback
+
+   --redis.db value        Redis database (default: 0) [$EIGENDA_PROXY_REDIS_DB]
+   --redis.endpoint value  Redis endpoint [$EIGENDA_PROXY_REDIS_ENDPOINT]
+   --redis.eviction value  Redis eviction time (default: 24h0m0s) [$EIGENDA_PROXY_REDIS_EVICTION]
+   --redis.password value  Redis password [$EIGENDA_PROXY_REDIS_PASSWORD]
+
+   S3 Cache/Fallback
+
+   --s3.access-key-id value      access key id for S3 storage [$EIGENDA_PROXY_S3_ACCESS_KEY_ID]
+   --s3.access-key-secret value  access key secret for S3 storage [$EIGENDA_PROXY_S3_ACCESS_KEY_SECRET]
+   --s3.bucket value             bucket name for S3 storage [$EIGENDA_PROXY_S3_BUCKET]
+   --s3.credential-type value    the way to authenticate to S3, options are [iam, static, public] [$EIGENDA_PROXY_S3_CREDENTIAL_TYPE]
+   --s3.enable-tls               enable TLS connection to S3 endpoint (default: false) [$EIGENDA_PROXY_S3_ENABLE_TLS]
+   --s3.endpoint value           endpoint for S3 storage [$EIGENDA_PROXY_S3_ENDPOINT]
+   --s3.path value               path for S3 storage [$EIGENDA_PROXY_S3_PATH]
+
+   Storage
+
+   --storage.backends-to-enable value [ --storage.backends-to-enable value ]  Comma separated list of eigenDA backends to enable (e.g. V1,V2) (default: "V1") [$EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE]
+   --storage.cache-targets value [ --storage.cache-targets value ]            List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
+   --storage.concurrent-write-routines value                                  Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
+   --storage.dispersal-backend value                                          Target EigenDA backend version for blob dispersal (e.g. V1 or V2). (default: "V1") [$EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND]
+   --storage.fallback-targets value [ --storage.fallback-targets value ]      List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
+

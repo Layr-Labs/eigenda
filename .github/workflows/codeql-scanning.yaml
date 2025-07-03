@@ -4,36 +4,35 @@ on:
   push:
     branches:
       - master
-      - 'release/*'
+      - "release/*"
   pull_request:
     branches:
       - master
-      - 'release/*'
+      - "release/*"
     paths:
-      - 'node/**'
-      - 'operators/**'
-      - 'retriever/**'
-      - 'disperser/**'
-      - 'core/**'
-      - 'contracts/src'
-      - 'common/**'
-      - 'api/**'
-      - 'subgraphs/**'
-      - 'indexer/**'
-      - 'encoding/**'
-      - 'crypto/**'
-      - 'relay/**'
-      - '.github/codeql/**'
-      - '.github/workflows/codeql-scanning.yaml'
+      - "node/**"
+      - "operators/**"
+      - "retriever/**"
+      - "disperser/**"
+      - "core/**"
+      - "contracts/src"
+      - "common/**"
+      - "api/**"
+      - "subgraphs/**"
+      - "indexer/**"
+      - "encoding/**"
+      - "crypto/**"
+      - "relay/**"
+      - ".github/codeql/**"
+      - ".github/workflows/codeql-scanning.yaml"
   schedule:
-    - cron: '0 9 * * *'
+    - cron: "0 9 * * *"
 
 env:
   MISE_VERSION: 2024.12.14
 
 jobs:
   CodeQL-Build:
-
     runs-on: ubuntu-latest
 
     permissions:
@@ -42,42 +41,45 @@ jobs:
       pull-requests: read
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
-      with:
-        submodules: recursive
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+        with:
+          submodules: recursive
 
-    - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1
-      with:
-          version: nightly
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: go version
 
-    - uses: jdx/mise-action@v2
-      with:
-        version: ${{ env.MISE_VERSION }}
-        experimental: true
-    - run: go version
+      - name: Build contract dependencies
+        run: |
+          cd contracts && yarn
 
-    - name: Build contract dependencies
-      run: |
-        cd contracts && yarn
+      - name: Compile contracts
+        run: |
+          cd contracts && forge build
 
-    - name: Compile contracts
-      run: |
-        cd contracts && forge build
+      # Ref: https://github.com/Layr-Labs/eigenda/blob/master/.github/workflows/integration-tests.yml#L71C7-L71C67
+      # - name: Custom build using make
+      #   run: |
+      #     go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+      #     make compile-contracts
 
-    # Ref: https://github.com/Layr-Labs/eigenda/blob/master/.github/workflows/integration-tests.yml#L71C7-L71C67
-    # - name: Custom build using make
-    #   run: |
-    #     go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-    #     make compile-contracts
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL including Trail of Bits Go Queries
+        uses: github/codeql-action/init@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.16
+        with:
+          languages: go
+          packs: trailofbits/go-queries
 
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL including Trail of Bits Go Queries
-      uses: github/codeql-action/init@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.16
-      with:
-        languages: go
-        packs: trailofbits/go-queries
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.8
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.8
+
+    # TODO(anup): you were using this in the proxy repo, shall we use it here too?
+    # Also the go version in the root mise.toml currently doesn't work for proxy... not sure if it will work here
+    # - name: Run shared CodeQL scan
+    #   uses: Layr-Labs/security-shared-workflows/actions/codeql-scans@418d735c1c4e5cc650c8addaeb8909b36b9dca27
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
