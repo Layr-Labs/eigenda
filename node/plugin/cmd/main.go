@@ -135,16 +135,17 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	hostname, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
 	}
 
 	socket := config.Socket
-	if isLocalhost(socket) {
+	// Use public IP provider if hostname is empty or contains localhost
+	if hostname == "" || node.isLocalhost(hostname) {
 		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, "", dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to get socket address from ip provider: %v", err)
 			return
@@ -197,8 +198,4 @@ func pluginOps(ctx *cli.Context) {
 	default:
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
-}
-
-func isLocalhost(socket string) bool {
-	return strings.Contains(socket, "localhost") || strings.Contains(socket, "127.0.0.1") || strings.Contains(socket, "0.0.0.0")
 }

@@ -735,9 +735,14 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			hostname := n.Config.Hostname
+			if hostname == "" || isLocalhost(hostname) {
+				hostname = ""
+			}
 			newSocketAddr, err := SocketAddress(
 				ctx,
 				n.PubIPProvider,
+				hostname,
 				n.Config.DispersalPort,
 				n.Config.RetrievalPort,
 				n.Config.V2DispersalPort,
