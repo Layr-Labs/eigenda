@@ -55,13 +55,14 @@ GLOBAL OPTIONS:
    --eigenda.v2.blob-status-poll-interval value  Duration to query for blob status updates during dispersal. (default: 1s) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_STATUS_POLL_INTERVAL]
    --eigenda.v2.blob-version value               Blob params version used when dispersing. This refers to a global version maintained by EigenDA
 governance and is injected in the BlobHeader before dispersing. Currently only supports (0). (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION]
-   --eigenda.v2.bls-operator-state-retriever-addr value                Address of the BLS operator state retriever contract. [$EIGENDA_PROXY_EIGENDA_V2_BLS_OPERATOR_STATE_RETRIEVER_ADDR]
+   --eigenda.v2.bls-operator-state-retriever-addr value                [Deprecating soon in favor of EigenDADirectory] Address of the BLS operator state retriever contract. [$EIGENDA_PROXY_EIGENDA_V2_BLS_OPERATOR_STATE_RETRIEVER_ADDR]
    --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value  Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. Required for performing eth_calls to verify EigenDA certificates. [$EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR]
    --eigenda.v2.contract-call-timeout value                            Timeout used when performing smart contract call operation (i.e, eth_call). (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_CONTRACT_CALL_TIMEOUT]
    --eigenda.v2.disable-point-evaluation                               Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISABLE_POINT_EVALUATION]
    --eigenda.v2.disable-tls                                            Disable TLS for gRPC communication with the EigenDA disperser and retrieval subnet. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS]
    --eigenda.v2.disperse-blob-timeout value                            Maximum amount of time to wait for a blob to disperse against v2 protocol. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_DISPERSE_BLOB_TIMEOUT]
    --eigenda.v2.disperser-rpc value                                    RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC]
+   --eigenda.v2.eigenda-directory value                                Address of the EigenDA directory contract. [$EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY]
    --eigenda.v2.eth-rpc value                                          URL of the Ethereum RPC endpoint. [$EIGENDA_PROXY_EIGENDA_V2_ETH_RPC]
    --eigenda.v2.max-blob-length value                                  Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
 loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
@@ -78,7 +79,7 @@ in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBloc
 and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
 This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE]
    --eigenda.v2.relay-timeout value           Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
-   --eigenda.v2.service-manager-addr value    Address of the EigenDA service manager contract. [$EIGENDA_PROXY_EIGENDA_V2_SERVICE_MANAGER_ADDR]
+   --eigenda.v2.service-manager-addr value    [Deprecating soon in favor of EigenDADirectory] Address of the EigenDA Service Manager contract. [$EIGENDA_PROXY_EIGENDA_V2_SERVICE_MANAGER_ADDR]
    --eigenda.v2.signer-payment-key-hex value  Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
    --eigenda.v2.validator-timeout value       Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
 
