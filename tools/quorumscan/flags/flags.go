@@ -20,6 +20,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
 	}
+	BlsOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Address of the BLS Operator State Retriever",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 	/* Optional Flags*/
 	BlockNumberFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "block-number"),
@@ -57,6 +69,8 @@ var (
 
 var requiredFlags = []cli.Flag{
 	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 var optionalFlags = []cli.Flag{

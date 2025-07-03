@@ -36,6 +36,18 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PULL_INTERVAL"),
 	}
+	BlsOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Address of the BLS Operator State Retriever",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
 		Usage:    "Address of the EigenDA Address Directory",
@@ -226,6 +238,9 @@ var requiredFlags = []cli.Flag{
 	BatchSizeLimitFlag,
 	UseGraphFlag,
 	SRSOrderFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
+	EigenDADirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{

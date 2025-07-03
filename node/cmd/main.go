@@ -92,8 +92,7 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
-	var reader *coreeth.Reader
-	reader, err = coreeth.NewReader(logger, client, config.EigenDADirectory)
+	reader, err := coreeth.NewReader(logger, client, config.EigenDADirectory)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}

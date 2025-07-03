@@ -27,7 +27,9 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	EigenDADirectory string
+	EigenDADirectory              string
+	BLSOperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr     string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -44,14 +46,16 @@ func ReadConfig(ctx *cli.Context) *Config {
 	}
 
 	return &Config{
-		ChainStateConfig: thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:  geth.ReadEthClientConfig(ctx),
-		EigenDADirectory: ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		QuorumIDs:        quorumIDs,
-		BlockNumber:      ctx.Uint64(flags.BlockNumberFlag.Name),
-		TopN:             ctx.Uint(flags.TopNFlag.Name),
-		OutputFormat:     ctx.String(flags.OutputFormatFlag.Name),
-		OutputFile:       ctx.String(flags.OutputFileFlag.Name),
+		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		QuorumIDs:                     quorumIDs,
+		BlockNumber:                   ctx.Uint64(flags.BlockNumberFlag.Name),
+		TopN:                          ctx.Uint(flags.TopNFlag.Name),
+		OutputFormat:                  ctx.String(flags.OutputFormatFlag.Name),
+		OutputFile:                    ctx.String(flags.OutputFileFlag.Name),
 	}
 }
 

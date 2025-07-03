@@ -46,6 +46,18 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_STREAM_TIMEOUT"),
 		Value:    time.Second * 10,
 	}
+	BlsOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Address of the BLS Operator State Retriever",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
 		Usage:    "Address of the EigenDA Directory contract",
@@ -264,6 +276,8 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
 }
 

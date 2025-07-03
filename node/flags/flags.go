@@ -162,6 +162,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
+	BlsOperatorStateRetrieverFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage:    "Address of the BLS Operator State Retriever",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+	}
+	EigenDAServiceManagerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
+		Usage:    "Address of the EigenDA Service Manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
 		Usage:    "URL of the Churner",
@@ -550,6 +562,8 @@ var requiredFlags = []cli.Flag{
 	BlsKeyFileFlag,
 	BlsKeyPasswordFlag,
 	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
 	ChurnerUrlFlag,

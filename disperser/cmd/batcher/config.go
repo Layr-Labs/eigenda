@@ -29,7 +29,9 @@ type Config struct {
 
 	IndexerDataDir string
 
-	EigenDADirectory string
+	BLSOperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 
 	EnableGnarkBundleEncoding bool
 }
@@ -81,13 +83,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		ChainStateConfig:          thegraph.ReadCLIConfig(ctx),
-		UseGraph:                  ctx.Bool(flags.UseGraphFlag.Name),
-		EigenDADirectory:          ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		IndexerDataDir:            ctx.GlobalString(flags.IndexerDataDirFlag.Name),
-		IndexerConfig:             indexer.ReadIndexerConfig(ctx),
-		KMSKeyConfig:              kmsConfig,
-		EnableGnarkBundleEncoding: ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
+		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
+		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
+		KMSKeyConfig:                  kmsConfig,
+		EnableGnarkBundleEncoding:     ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 	}
 	return config, nil
 }

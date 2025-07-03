@@ -15,19 +15,23 @@ type Config struct {
 	First            uint
 	Skip             uint
 
-	EthClientConfig  geth.EthClientConfig
-	EigenDADirectory string
+	EthClientConfig               geth.EthClientConfig
+	BLSOperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Days:             ctx.Int(flags.DaysFlag.Name),
-		OperatorId:       ctx.String(flags.OperatorIdFlag.Name),
-		SubgraphEndpoint: ctx.String(flags.SubgraphEndpointFlag.Name),
-		First:            ctx.Uint(flags.FirstFlag.Name),
-		Skip:             ctx.Uint(flags.SkipFlag.Name),
-		EthClientConfig:  geth.ReadEthClientConfig(ctx),
-		EigenDADirectory: ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		Days:                          ctx.Int(flags.DaysFlag.Name),
+		OperatorId:                    ctx.String(flags.OperatorIdFlag.Name),
+		SubgraphEndpoint:              ctx.String(flags.SubgraphEndpointFlag.Name),
+		First:                         ctx.Uint(flags.FirstFlag.Name),
+		Skip:                          ctx.Uint(flags.SkipFlag.Name),
+		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 	}
 }
 
