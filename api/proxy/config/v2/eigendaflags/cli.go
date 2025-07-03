@@ -29,6 +29,7 @@ var (
 	)
 	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
 	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
 	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
 	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
 	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
@@ -118,15 +119,22 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:     ServiceManagerAddrFlagName,
-			Usage:    "Address of the EigenDA service manager contract.",
+			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
 			Category: category,
 			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     BLSOperatorStateRetrieverFlagName,
-			Usage:    "Address of the BLS operator state retriever contract.",
+			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
+			Category: category,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     EigenDADirectoryFlagName,
+			Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain..",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "EIGENDA_DIRECTORY")},
 			Category: category,
 			Required: false,
 		},
@@ -234,6 +242,15 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		}
 	}
 
+	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
+	if eigenDADirectory == "" {
+		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		}
+	}
+
 	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
 	if serviceManagerAddress == "" {
 		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
@@ -271,6 +288,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDAServiceManagerAddr:          serviceManagerAddress,
+		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 	}, nil

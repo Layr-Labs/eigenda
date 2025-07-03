@@ -10,6 +10,20 @@ const (
 	SepoliaTestnetEigenDANetwork EigenDANetwork = "sepolia_testnet"
 )
 
+// GetEigenDADirectory returns, as a string, the address of the EigenDADirectory contract for the network.
+func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
+	switch n {
+	case HoleskyTestnetEigenDANetwork:
+		return "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE", nil
+	case HoleskyPreprodEigenDANetwork:
+		return "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502", nil
+	case SepoliaTestnetEigenDANetwork:
+		return "0x9620dC4B3564198554e4D2b06dEFB7A369D90257", nil
+	default:
+		return "", fmt.Errorf("unknown network type: %s", n)
+	}
+}
+
 // GetServiceManagerAddress returns, as a string, the address of the EigenDAServiceManager contract for the network.
 func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
 	switch n {
