@@ -213,19 +213,14 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	// TODO(hopeyen): with payment vault update, this function will take quorum numbers;
-	// Currently we just build the same reservation for each quorum
-	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
-	if err != nil {
-		return err
-	}
-
-	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
-	for accountID, payments := range reservedPayments {
-		reservedPaymentsByQuorum[accountID] = make(map[uint8]*core.ReservedPayment)
-		for quorumNumber, reservation := range payments {
-			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = reservation
+	// Updated to use Usage Authorization Registry - read reservations for all quorums
+	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
+	for _, accountID := range accountIDs {
+		newRes, err := pcs.getReservedPayments(ctx, accountID, quorumNumbers)
+		if err != nil {
+			return fmt.Errorf("failed to get reserved payments: %w", err)
 		}
+		reservedPaymentsByQuorum[accountID] = newRes
 	}
 	pcs.ReservedPayments = reservedPaymentsByQuorum
 	return nil
@@ -245,9 +240,19 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := pcs.tx.GetOnDemandPayments(ctx, accountIDs)
-	if err != nil {
-		return err
+	// Updated to use Usage Authorization Registry - read on-demand deposits for all quorums
+	onDemandPayments := make(map[gethcommon.Address]*core.OnDemandPayment)
+	for _, accountID := range accountIDs {
+		deposit, err := pcs.tx.GetUsageAuthOnDemandDeposit(ctx, core.QuorumID(OnDemandQuorumID), accountID)
+		if err != nil {
+			// Log but continue for other accounts
+			pcs.logger.Debug("Failed to get usage auth on-demand deposit", "account", accountID, "err", err)
+			continue
+		}
+
+		onDemandPayments[accountID] = &core.OnDemandPayment{
+			CumulativePayment: deposit,
+		}
 	}
 	pcs.OnDemandPayments = onDemandPayments
 	return nil
@@ -256,46 +261,77 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 // GetReservedPaymentByAccountAndQuorums retrieves reserved payments for an account across specified quorums
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
-	if quorumReservations, ok := pcs.ReservedPayments[accountID]; ok {
-		// Check if all quorums are present
-		allFound := true
-		for _, quorumNumber := range quorumNumbers {
-			if _, ok := quorumReservations[quorumNumber]; !ok {
-				allFound = false
-				break
-			}
-		}
-		if allFound {
-			pcs.ReservationsLock.RUnlock()
-			return quorumReservations, nil
-		}
-	}
-	pcs.ReservationsLock.RUnlock()
-
-	// pulls the chain state
-	allRes, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get reserved payment: %w", err)
-	}
-
-	pcs.ReservationsLock.Lock()
-	defer pcs.ReservationsLock.Unlock()
-
 	// Initialize map if needed
 	if _, ok := pcs.ReservedPayments[accountID]; !ok {
 		pcs.ReservedPayments[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
 	}
 
-	// Update cache with new data and filter for requested quorums
-	res := make(map[core.QuorumID]*core.ReservedPayment)
+	// first read from the periodically refreshed cache
+	notCachedQuorums := make([]core.QuorumID, 0)
+	accountReservations := make(map[core.QuorumID]*core.ReservedPayment)
+	if quorumReservations, ok := pcs.ReservedPayments[accountID]; ok {
+		for _, quorumNumber := range quorumNumbers {
+			if reservation, cached := quorumReservations[quorumNumber]; cached {
+				accountReservations[quorumNumber] = reservation
+			} else {
+				notCachedQuorums = append(notCachedQuorums, quorumNumber)
+			}
+		}
+
+		// If notCachedQuorums are empty, return the existing cache
+		if len(notCachedQuorums) == 0 {
+			pcs.ReservationsLock.RUnlock()
+			return accountReservations, nil
+		}
+	} else {
+		// No cached data for this account, need to fetch all quorums
+		notCachedQuorums = quorumNumbers
+	}
+	pcs.ReservationsLock.RUnlock()
+
+	// pulls the chain state using Usage Authorization Registry - only for notCachedQuorums
+	newRes, err := pcs.getReservedPayments(ctx, accountID, notCachedQuorums)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reserved payments: %w", err)
+	}
+
+	pcs.ReservationsLock.Lock()
+	defer pcs.ReservationsLock.Unlock()
+
+	// Combine cached and newly fetched results; update cache as well
+	for quorumNumber, reservation := range newRes {
+		pcs.ReservedPayments[accountID][quorumNumber] = reservation
+		accountReservations[quorumNumber] = reservation
+	}
+
+	return accountReservations, nil
+}
+
+// getReservedPayments retrieves reserved payments for an account across specified quorums directly from the chain
+// Zero-valued reservations are not included in the returned map.
+func (pcs *OnchainPaymentState) getReservedPayments(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
+	allRes := make(map[core.QuorumID]*core.ReservedPayment)
 	for _, quorumNumber := range quorumNumbers {
-		if reservation, ok := allRes[quorumNumber]; ok {
-			pcs.ReservedPayments[accountID][quorumNumber] = reservation
-			res[quorumNumber] = reservation
+		reservation, err := pcs.tx.GetUsageAuthReservation(ctx, quorumNumber, accountID)
+		if err != nil {
+			// Log but continue for other quorums
+			pcs.logger.Debug("Failed to get usage auth reservation", "account", accountID, "quorum", quorumNumber, "err", err)
+			continue
+		}
+
+		// Convert to ReservedPayment and check if zero-valued
+		reservedPayment := &core.ReservedPayment{
+			SymbolsPerSecond: reservation.SymbolsPerSecond,
+			StartTimestamp:   reservation.StartTimestamp,
+			EndTimestamp:     reservation.EndTimestamp,
+		}
+
+		if !eth.IsZeroValuedReservation(reservedPayment) {
+			allRes[quorumNumber] = reservedPayment
 		}
 	}
 
-	return res, nil
+	return allRes, nil
 }
 
 // GetOnDemandPaymentByAccount retrieves on-demand payment information for an account
@@ -306,11 +342,13 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 		return payment, nil
 	}
 	pcs.OnDemandLocks.RUnlock()
-
-	// pulls the chain state
-	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
+	deposit, err := pcs.tx.GetUsageAuthOnDemandDeposit(ctx, OnDemandQuorumID, accountID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get on-demand payment: %w", err)
+		return nil, err
+	}
+
+	res := &core.OnDemandPayment{
+		CumulativePayment: deposit,
 	}
 
 	pcs.OnDemandLocks.Lock()
