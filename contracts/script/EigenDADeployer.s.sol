@@ -31,6 +31,7 @@ import {PaymentVault} from "src/core/PaymentVault.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
+import {UsageAuthorizationRegistry} from "src/core/UsageAuthorizationRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {
@@ -41,9 +42,20 @@ import {
     IPauserRegistry
 } from "./DeployOpenEigenLayer.s.sol";
 import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+
+contract ERC20Mintable is ERC20 {
+    constructor() ERC20("TEST", "TEST") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 // NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
@@ -70,6 +82,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IPaymentVault public paymentVault;
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
+    UsageAuthorizationRegistry public usageAuthorizationRegistry;
+    ERC20Mintable public testToken;
 
     EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
@@ -83,6 +97,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
     IEigenDADisperserRegistry public eigenDADisperserRegistryImplementation;
+    UsageAuthorizationRegistry public usageAuthorizationRegistryImplementation;
 
     uint64 _minNumSymbols = 4096;
     uint64 _pricePerSymbol = 0.447 gwei;
@@ -90,6 +105,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     uint64 _globalSymbolsPerPeriod = 131072;
     uint64 _reservationPeriodInterval = 300;
     uint64 _globalRatePeriodInterval = 30;
+
+    uint64 _schedulePeriod = 1 hours;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -109,6 +126,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        testToken = new ERC20Mintable();
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -213,6 +231,13 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             );
             eigenDADirectory.addAddress(
                 AddressDirectoryConstants.DISPERSER_REGISTRY_NAME, address(eigenDADisperserRegistry)
+            );
+
+            usageAuthorizationRegistry = UsageAuthorizationRegistry(
+                address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+            );
+            eigenDADirectory.addAddress(
+                AddressDirectoryConstants.USAGE_AUTHORIZATION_REGISTRY_NAME, address(usageAuthorizationRegistry)
             );
 
             paymentVaultImplementation = new PaymentVault();
@@ -399,6 +424,57 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
 
+        usageAuthorizationRegistryImplementation = new UsageAuthorizationRegistry(_schedulePeriod);
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(usageAuthorizationRegistry))),
+            address(usageAuthorizationRegistryImplementation),
+            abi.encodeWithSelector(
+                UsageAuthorizationRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig
+            )
+        );
+
+        usageAuthorizationRegistry.initializeQuorum(
+            0,
+            addressConfig.eigenLayerCommunityMultisig,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: _minNumSymbols,
+                reservationAdvanceWindow: 30 days,
+                reservationRateLimitWindow: 300,
+                onDemandRateLimitWindow: 30,
+                onDemandEnabled: true
+            })
+        );
+        usageAuthorizationRegistry.initializeQuorum(
+            1,
+            addressConfig.eigenLayerCommunityMultisig,
+            UsageAuthorizationTypes.QuorumProtocolConfig({
+                minNumSymbols: _minNumSymbols,
+                reservationAdvanceWindow: 30 days,
+                reservationRateLimitWindow: 300,
+                onDemandRateLimitWindow: 30,
+                onDemandEnabled: false
+            })
+        );
+        usageAuthorizationRegistry.setQuorumConfig(
+            0,
+            UsageAuthorizationTypes.QuorumConfig({
+                token: address(testToken),
+                recipient: addressConfig.eigenLayerCommunityMultisig,
+                reservationSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandPricePerSymbol: _pricePerSymbol
+            })
+        );
+        usageAuthorizationRegistry.setQuorumConfig(
+            1,
+            UsageAuthorizationTypes.QuorumConfig({
+                token: address(testToken),
+                recipient: addressConfig.eigenLayerCommunityMultisig,
+                reservationSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandSymbolsPerSecond: 32768 * 1000, // 1 GB/s
+                onDemandPricePerSymbol: _pricePerSymbol
+            })
+        );
         eigenDADirectory.transferOwnership(addressConfig.eigenLayerCommunityMultisig);
     }
 }
