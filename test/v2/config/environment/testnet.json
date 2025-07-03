@@ -1,5 +1,5 @@
 {
-  "SRSPath": "../../../resources/srs",
+  "SRSPath": "../../resources/srs",
   "KeyPath": "~/.test-v2/testnet-private-key.txt",
   "DisperserHostname": "disperser-testnet-holesky.eigenda.xyz",
   "DisperserPort": 443,

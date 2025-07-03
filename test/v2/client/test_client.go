@@ -165,6 +165,15 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
+	ethReader, err := eth.NewReader(
+		logger,
+		ethClient,
+		config.BLSOperatorStateRetrieverAddr,
+		config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
+	}
+
 	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
 
 	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
@@ -189,7 +198,7 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), ethClient)
+	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}
@@ -216,15 +225,6 @@ func NewTestClient(
 	}
 
 	// Construct the relay client
-
-	ethReader, err := eth.NewReader(
-		logger,
-		ethClient,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
-	}
 
 	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
 	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
