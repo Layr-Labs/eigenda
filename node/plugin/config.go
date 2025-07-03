@@ -114,14 +114,14 @@ var (
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     "bls-operator-state-retriever",
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecating soon in favor of EigenDADirectory] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     "eigenda-service-manager",
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecating soon in favor of EigenDADirectory] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	EigenDADirectoryFlag = cli.StringFlag{

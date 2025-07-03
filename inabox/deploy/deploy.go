@@ -275,6 +275,8 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 		logger,
 		ethClient,
 		env.EigenDA.EigenDADirectory,
+		env.EigenDA.OperatorStateRetriever,
+		env.EigenDA.ServiceManager,
 	)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %v", err)

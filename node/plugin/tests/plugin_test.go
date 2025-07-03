@@ -195,7 +195,7 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
-	transactor, err := eth.NewWriter(logger, client, operator.NODE_EIGENDA_DIRECTORY)
+	transactor, err := eth.NewWriter(logger, client, operator.NODE_EIGENDA_DIRECTORY, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
 	assert.NoError(t, err)
 	assert.NotNil(t, transactor)
 
@@ -230,7 +230,7 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
-	transactor, err := eth.NewWriter(logger, client, operator.NODE_EIGENDA_DIRECTORY)
+	transactor, err := eth.NewWriter(logger, client, operator.NODE_EIGENDA_DIRECTORY, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
 	assert.NoError(t, err)
 	assert.NotNil(t, transactor)
 

@@ -164,14 +164,14 @@ var (
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecating soon in favor of EigenDADirectory] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecating soon in favor of EigenDADirectory] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
@@ -561,9 +561,6 @@ var requiredFlags = []cli.Flag{
 	DbPathFlag,
 	BlsKeyFileFlag,
 	BlsKeyPasswordFlag,
-	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
 	ChurnerUrlFlag,
@@ -623,6 +620,9 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdCacheReadLimitMBFlag,
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 func init() {

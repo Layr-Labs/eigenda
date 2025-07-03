@@ -522,6 +522,8 @@ func buildEthReader(log logging.Logger,
 		log,
 		ethClient,
 		clientConfigV2.EigenDADirectory,
+		clientConfigV2.BLSOperatorStateRetrieverAddr,
+		clientConfigV2.EigenDAServiceManagerAddr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
