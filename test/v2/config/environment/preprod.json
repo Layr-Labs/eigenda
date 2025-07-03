@@ -1,5 +1,5 @@
 {
-  "SRSPath": "../../../resources/srs",
+  "SRSPath": "../../resources/srs",
   "KeyPath": "~/.test-v2/preprod-private-key.txt",
   "DisperserHostname": "disperser-preprod-holesky.eigenda.xyz",
   "DisperserPort": 443,
@@ -11,7 +11,6 @@
   "EigenDACertVerifierAddressQuorums0_1":   "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C",
   "EigenDACertVerifierAddressQuorums0_1_2": "0x2ccB62f3349DD04FEeff189C7f0568193eFd4430",
   "EigenDACertVerifierAddressQuorums2":     "0xBC23d765540b77803910E65F62BF01a9F8CaB30A",
-  "EigenDARegistryCoordinatorAddress": "0x2c61EA360D6500b58E7f481541A36B443Bc858c6",
   "SubgraphURL": "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
   "SRSOrder": 268435456,
   "MaxBlobSize": 16777216,

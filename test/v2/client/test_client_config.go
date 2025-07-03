@@ -30,6 +30,7 @@ type TestClientConfig struct {
 	//
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
+	// TODO: we should eventually get rid of all of these hardcoded addresses and use the EigenDADirectory instead.
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
@@ -46,8 +47,6 @@ type TestClientConfig struct {
 	//
 	// If this value is not set, that tests utilizing it will be skipped
 	EigenDACertVerifierAddressQuorums2 string
-	// The contract address of the registry coordinator
-	EigenDARegistryCoordinatorAddress string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test
