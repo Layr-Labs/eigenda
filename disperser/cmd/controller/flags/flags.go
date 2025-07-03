@@ -115,7 +115,14 @@ var (
 		Usage:    "Interval at which to refresh the onchain state",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
-		Value:    1 * time.Hour,
+		Value:    1 * time.Minute,
+	}
+	BatchMetadataMaxAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "batch-metadata-max-age"),
+		Usage:    "How old the cached onchain state can be before a new batch will force a refresh",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_METADATA_MAX_AGE"),
+		Value:    5 * time.Minute,
 	}
 
 	// Dispatcher Flags
@@ -256,6 +263,7 @@ var optionalFlags = []cli.Flag{
 	NumConcurrentEncodingRequestsFlag,
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
+	BatchMetadataMaxAgeFlag,
 
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,

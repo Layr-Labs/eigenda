@@ -198,6 +198,7 @@ func RunController(ctx *cli.Context) error {
 		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,
+		chainReader,
 		ics,
 		sigAgg,
 		nodeClientManager,
