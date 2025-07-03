@@ -242,6 +242,8 @@ var (
 var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,

@@ -232,15 +232,14 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
 	PullIntervalFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,
 	UseGraphFlag,
 	SRSOrderFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
-	EigenDADirectoryFlag,
 }
 
 var optionalFlags = []cli.Flag{

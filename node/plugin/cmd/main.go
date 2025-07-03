@@ -33,6 +33,8 @@ func main() {
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
 		plugin.EigenDADirectoryFlag,
+		plugin.BlsOperatorStateRetrieverFlag,
+		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
 		plugin.PubIPProviderFlag,

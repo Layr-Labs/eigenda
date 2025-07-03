@@ -83,6 +83,7 @@ func RetrieverFlags(envPrefix string) []cli.Flag {
 		TimeoutFlag,
 		EigenDADirectoryFlag,
 		BlsOperatorStateRetrieverFlag,
+		EigenDAServiceManagerFlag,
 		NumConnectionsFlag,
 		MetricsHTTPPortFlag,
 		EigenDAVersionFlag,

@@ -48,6 +48,8 @@ type Config struct {
 	OnchainStateRefreshInterval time.Duration
 
 	EigenDADirectory                string
+	BLSOperatorStateRetrieverAddr   string
+	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
 
@@ -131,6 +133,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),
