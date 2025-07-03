@@ -324,8 +324,6 @@ func (pcs *OnchainPaymentState) getReservedPayments(ctx context.Context, account
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   reservation.StartTimestamp,
 			EndTimestamp:     reservation.EndTimestamp,
-			QuorumNumbers:    []uint8{uint8(quorumNumber)},
-			QuorumSplits:     []uint8{100},
 		}
 
 		if !eth.IsZeroValuedReservation(reservedPayment) {
