@@ -1,5 +1,5 @@
 # This Dockerfile has been tested on Ubuntu 24.04
-# Note: Will fail on macOS with "gcc: error: unrecognized command-line option '-m64'" during cgo compilation
+# Note: Will fail on macOS with "gcc: error: unrecognized command-line option '-m64'" during cgo compilation, which is expected because cuda is not available.
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
 # Install Go 1.24.4 to match go.mod requirements
