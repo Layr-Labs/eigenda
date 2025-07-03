@@ -35,6 +35,16 @@ func NewCertBuilder(
 	if logger == nil {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
+	if ethClient == nil {
+		return nil, fmt.Errorf("ethClient cannot be nil")
+	}
+	if opsrAddr == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("opsrAddr cannot be empty")
+	}
+	if registryCoordinatorAddr == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("registryCoordinatorAddr cannot be empty")
+	}
+
 	// Create the Operator State Retriever caller
 	opsrCaller, err := opsrbinding.NewContractOperatorStateRetrieverCaller(opsrAddr, ethClient)
 	if err != nil {
