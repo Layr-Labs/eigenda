@@ -56,13 +56,14 @@ contract DeployEigenDADirectory is Script {
         string name;
         address value;
     }
-
     function _populateDirectory() internal virtual {
-        bytes memory addressConfigsRaw = stdToml.parseRaw(cfg, ".addressConfigs");
-        AddressConfig[] memory addressConfigs = abi.decode(addressConfigsRaw, (AddressConfig[]));
-
-        for (uint256 i; i < addressConfigs.length; i++) {
-            directory.addAddress(addressConfigs[i].name, addressConfigs[i].value);
+        // Dynamically read all contract names from the [contracts] table
+        string[] memory contractNames = vm.parseTomlKeys(cfg, ".contracts");
+        
+        for (uint256 i; i < contractNames.length; i++) {
+            string memory name = contractNames[i];
+            address contractAddress = cfg.readAddress(string.concat(".contracts.", name));
+            directory.addAddress(name, contractAddress);
         }
     }
 }
