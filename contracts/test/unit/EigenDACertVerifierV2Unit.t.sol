@@ -2,10 +2,10 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
+import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
-import {EigenDACertTypes} from "src/periphery/cert/EigenDACertTypes.sol";
+import {EigenDACertTypes} from "src/integrations/cert/EigenDACertTypes.sol";
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;

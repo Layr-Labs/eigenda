@@ -50,8 +50,8 @@ contracts="PaymentVault \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
-  IEigenDADirectory \
-  EigenDADisperserRegistry"
+  EigenDADisperserRegistry \
+  IEigenDADirectory"
 
 for contract in $contracts; do
   create_binding_abi_only ./ $contract ./bindings
