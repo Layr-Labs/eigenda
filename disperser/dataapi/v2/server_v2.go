@@ -132,7 +132,7 @@ func NewServerV2(
 			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())-1, limit,
 		)
 	}
-	batchFeedCache := NewFeedCache[corev2.Attestation](
+	batchFeedCache := NewFeedCache(
 		maxNumBatchesToCache,
 		fetchBatchFn,
 		getBatchTimestampFn,
@@ -165,6 +165,10 @@ func NewServerV2(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
 	}
+
+	// Register reservation metrics collector
+	reservationCollector := NewReservationExpirationCollector(subgraphClient, metrics, l)
+	metrics.RegisterCollector(reservationCollector)
 
 	return &ServerV2{
 		logger:                           l,

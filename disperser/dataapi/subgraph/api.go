@@ -29,23 +29,27 @@ type (
 		QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*OperatorQuorum, error)
 		QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx context.Context, blockTimestamp uint64, operatorId string, first uint, skip uint) ([]*OperatorEjection, error)
 		QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64, first uint, skip uint) ([]*OperatorEjection, error)
+		QueryReservations(ctx context.Context, currentTimestamp uint64, first, skip int) ([]*Reservation, error)
 	}
 
 	api struct {
 		uiMonitoringGql  *graphql.Client
 		operatorStateGql *graphql.Client
+		paymentsGql      *graphql.Client
 	}
 )
 
 var _ Api = (*api)(nil)
 
-func NewApi(uiMonitoringSocketAddr string, operatorStateSocketAddr string) *api {
+func NewApi(uiMonitoringSocketAddr string, operatorStateSocketAddr string, paymentsSocketAddr string) *api {
 	once.Do(func() {
 		uiMonitoringGql := graphql.NewClient(uiMonitoringSocketAddr, nil)
 		operatorStateGql := graphql.NewClient(operatorStateSocketAddr, nil)
+		paymentsGql := graphql.NewClient(paymentsSocketAddr, nil)
 		instance = &api{
 			uiMonitoringGql:  uiMonitoringGql,
 			operatorStateGql: operatorStateGql,
+			paymentsGql:      paymentsGql,
 		}
 	})
 	return instance
@@ -300,4 +304,18 @@ func (a *api) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, en
 		skip += maxEntriesPerQuery
 	}
 	return removedFromQuorums, nil
+}
+
+func (a *api) QueryReservations(ctx context.Context, currentTimestamp uint64, first, skip int) ([]*Reservation, error) {
+	variables := map[string]any{
+		"currentTimestamp": graphql.Int(currentTimestamp),
+		"first":            graphql.Int(first),
+		"skip":             graphql.Int(skip),
+	}
+	result := new(queryReservations)
+	err := a.paymentsGql.Query(ctx, result, variables)
+	if err != nil {
+		return nil, err
+	}
+	return result.Reservations, nil
 }

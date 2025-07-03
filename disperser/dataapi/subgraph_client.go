@@ -37,6 +37,7 @@ type (
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
 		QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error)
+		QueryReservations(ctx context.Context, currentTimestamp uint64, limit, skip int) ([]*Reservation, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -96,6 +97,10 @@ type (
 		ReferenceBlockNumber uint32
 		// The operatorIds of nonsigners for the batch.
 		NonSigners []string
+	}
+	Reservation struct {
+		Account      string
+		EndTimestamp uint64
 	}
 	subgraphClient struct {
 		api    subgraph.Api
@@ -356,6 +361,26 @@ func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx conte
 		Operators: operators,
 	}, nil
 
+}
+
+func (sc *subgraphClient) QueryReservations(ctx context.Context, currentTimestamp uint64, limit, skip int) ([]*Reservation, error) {
+	reservationsGql, err := sc.api.QueryReservations(ctx, currentTimestamp, limit, skip)
+	if err != nil {
+		return nil, err
+	}
+
+	reservations := make([]*Reservation, len(reservationsGql))
+	for i, resGql := range reservationsGql {
+		endTimestamp, err := strconv.ParseUint(string(resGql.EndTimestamp), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		reservations[i] = &Reservation{
+			Account:      string(resGql.Account),
+			EndTimestamp: endTimestamp,
+		}
+	}
+	return reservations, nil
 }
 
 func getOperatorInfoForQueriedOperators(sc *subgraphClient, ctx context.Context, operators map[core.OperatorID]*QueriedOperatorInfo, queriedOperators []*subgraph.Operator) {

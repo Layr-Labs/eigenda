@@ -206,6 +206,11 @@ func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics
 	}
 }
 
+// RegisterCollector registers a prometheus collector with the metrics registry
+func (g *Metrics) RegisterCollector(collector prometheus.Collector) {
+	g.registry.MustRegister(collector)
+}
+
 func (g *Metrics) updateStakeMetrics(rankedOperators []*operators.OperatorStakeShare, label string) {
 	indices := []int{0, 1, 2, 4, 7, 9}
 	accuStake := float64(0)

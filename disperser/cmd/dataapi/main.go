@@ -95,7 +95,7 @@ func RunDataApi(ctx *cli.Context) error {
 	var (
 		reg               = prometheus.NewRegistry()
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
+		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr, config.SubgraphApiPaymentsAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
