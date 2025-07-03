@@ -132,7 +132,7 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 	return bytesArray
 }
 
-func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+func IsZeroValuedReservation(reservation *core.ReservedPayment) bool {
 	return reservation.SymbolsPerSecond == 0 &&
 		reservation.StartTimestamp == 0 &&
 		reservation.EndTimestamp == 0
@@ -148,13 +148,10 @@ func CheckOnDemandPayment(payment *big.Int) error {
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
 // Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
 func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
-	if isZeroValuedReservation(reservation) {
-		return nil, ErrPaymentDoesNotExist
-	}
 
 	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
 	for _, quorumId := range reservation.QuorumNumbers {
-		reservedPayments[core.QuorumID(quorumId)] = &core.ReservedPayment{
+		res := &core.ReservedPayment{
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   reservation.StartTimestamp,
 			EndTimestamp:     reservation.EndTimestamp,
@@ -163,6 +160,10 @@ func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation
 			QuorumNumbers: []byte{},
 			QuorumSplits:  []uint8{},
 		}
+		if IsZeroValuedReservation(res) {
+			return nil, ErrPaymentDoesNotExist
+		}
+		reservedPayments[core.QuorumID(quorumId)] = res
 	}
 
 	return reservedPayments, nil
