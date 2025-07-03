@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -141,15 +140,11 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	socket := config.Socket
-	// Use public IP provider if hostname is empty or contains localhost
-	if hostname == "" || node.isLocalhost(hostname) {
-		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, "", dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
-		if err != nil {
-			log.Printf("Error: failed to get socket address from ip provider: %v", err)
-			return
-		}
+	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
+	socket, err := node.SocketAddress(context.Background(), pubIPProvider, hostname, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
+	if err != nil {
+		log.Printf("Error: failed to get socket address from ip provider: %v", err)
+		return
 	}
 
 	operator := &node.Operator{
