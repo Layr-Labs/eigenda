@@ -60,6 +60,7 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
         }
 
         key.setAddress(address(0));
+        AddressDirectoryLib.deregisterKey(name);
 
         emit AddressRemoved(name, key);
     }
