@@ -370,7 +370,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier));
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
+        );
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
