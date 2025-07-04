@@ -10,6 +10,7 @@ import (
 
 	disperser_v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -150,7 +151,7 @@ func (lal *LocalAccountLedger) Debit(
 
 	// First, try reservation usage for ALL quorums (matches Accountant behavior)
 	// Validate all reservations exist and are valid for this timestamp
-	reservationValidationErr := ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now().UnixNano())
+	reservationValidationErr := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now().UnixNano())
 	if reservationValidationErr == nil {
 		// Create a deep copy for atomic updates
 		periodRecordsCopy := lal.periodRecords.DeepCopy()
@@ -190,7 +191,7 @@ func (lal *LocalAccountLedger) Debit(
 	}
 
 	// Try on-demand for ALL quorums (either reservation validation failed or usage failed)
-	onDemandErr := ValidateQuorum(quorumNumbers, params.OnDemandQuorumNumbers)
+	onDemandErr := payment_logic.ValidateQuorum(quorumNumbers, params.OnDemandQuorumNumbers)
 	if onDemandErr != nil {
 		// Both reservation and on-demand failed, return combined error (matches Accountant)
 		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Account: %s, Reservation Error: %w, On-demand Error: %w", accountID.Hex(), reservationError, onDemandErr)
@@ -202,8 +203,8 @@ func (lal *LocalAccountLedger) Debit(
 		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Account: %s, Reservation Error: %w, On-demand Error: %w", accountID.Hex(), reservationError, err)
 	}
 
-	symbolsCharged := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	paymentCharged := PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
+	symbolsCharged := payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	paymentCharged := payment_logic.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
 
 	// Calculate the increment required to add to the cumulative payment
 	resultingPayment := new(big.Int).Add(lal.cumulativePayment, paymentCharged)
@@ -234,7 +235,7 @@ func (lal *LocalAccountLedger) RevertDebit(
 	// If payment is nil, this was a reservation usage - revert period records
 	if payment == nil {
 		// Validate reservations exist for reversal
-		if err := ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now().UnixNano()); err != nil {
+		if err := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now().UnixNano()); err != nil {
 			return fmt.Errorf("cannot revert reservation usage: %v", err)
 		}
 
@@ -252,7 +253,7 @@ func (lal *LocalAccountLedger) RevertDebit(
 			}
 
 			// Calculate the period for this timestamp
-			reservationPeriod := GetReservationPeriodByNanosecond(timestampNs, protocolConfig.ReservationRateLimitWindow)
+			reservationPeriod := payment_logic.GetReservationPeriodByNanosecond(timestampNs, protocolConfig.ReservationRateLimitWindow)
 
 			// Get period records for this quorum
 			if periodRecordsCopy[quorumNumber] == nil {

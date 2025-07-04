@@ -80,6 +80,9 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment global params: %w", err)
 	}
+	if params == nil {
+		return nil, fmt.Errorf("payment global params are nil")
+	}
 	// Validate against the payment method
 	if !payment_logic.IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)

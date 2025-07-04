@@ -10,6 +10,7 @@ import (
 	disperser_v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -327,7 +328,7 @@ func TestLocalAccountLedger_RevertDebit(t *testing.T) {
 		}
 
 		// Calculate the correct period for the current timestamp
-		currentPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), 10)
+		currentPeriod := payment_logic.GetReservationPeriodByNanosecond(now.UnixNano(), 10)
 
 		// Create ledger with existing usage
 		periodRecords := map[uint32]*disperser_v2.PeriodRecords{
