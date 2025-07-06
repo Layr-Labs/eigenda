@@ -139,7 +139,7 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 		"registryCoordinatorAddr", cb.registryCoordinatorAddr.Hex(),
 		"referenceBlockNumber", rbn,
 		"quorumNumbers", "0x"+hex.EncodeToString(quorumNumbers),
-		"nonSignerOperatorIDs", "[" + strings.Join(nonSignerOperatorIDsHex, ",") + "]",
+		"nonSignerOperatorIDs", "["+strings.Join(nonSignerOperatorIDsHex, ",")+"]",
 	)
 	checkSigIndices, err := cb.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(rbn))},
 		cb.registryCoordinatorAddr, uint32(rbn), quorumNumbers, nonSignerOperatorIDs)
