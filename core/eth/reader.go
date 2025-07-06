@@ -79,30 +79,7 @@ func NewReader(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
-	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
-	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
-	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
-		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-		}
-
-		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress()
-		if err != nil {
-			return nil, err
-		}
-
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	}
-
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	err := e.updateContractBindings(eigendaDirectoryHexAddr, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
 	}
@@ -111,7 +88,40 @@ func NewReader(
 
 // updateContractBindings updates the contract bindings for the reader
 // TODO: update to use address directory contract once all contracts are written into the directory
-func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
+func (t *Reader) updateContractBindings(eigendaDirectoryHexAddr, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr string) error {
+
+	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
+	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
+	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
+	var usageAuthorizationRegistry *usageauth.ContractIUsageAuthorizationRegistry
+	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
+		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, t.ethClient)
+		if err != nil {
+			return fmt.Errorf("failed to create address directory reader: %w", err)
+		}
+
+		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress()
+		if err != nil {
+			return err
+		}
+
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		if err != nil {
+			return err
+		}
+
+		usageAuthorizationRegistryAddr, err := addressReader.GetUsageAuthorizationRegistryAddress()
+		if err != nil {
+			return err
+		}
+		usageAuthorizationRegistry, err = usageauth.NewContractIUsageAuthorizationRegistry(usageAuthorizationRegistryAddr, t.ethClient)
+		if err != nil {
+			return err
+		}
+	} else {
+		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
+		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
+	}
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
@@ -271,13 +281,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
-	// Usage Authorization Registry initialization
-	// TODO(hopeyen): Replace with proper service manager method when available
-	var contractUsageAuthorizationRegistry *usageauth.ContractIUsageAuthorizationRegistry
-	// For now, set to nil until the service manager has the method
-	// or until we implement address directory lookup
-	contractUsageAuthorizationRegistry = nil
-
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:         eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:         registryCoordinatorAddr,
@@ -293,9 +296,9 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		EigenDAServiceManager:      contractEigenDAServiceManager,
 		DelegationManager:          contractDelegationManager,
 		PaymentVault:               contractPaymentVault,
-		UsageAuthorizationRegistry: contractUsageAuthorizationRegistry,
 		ThresholdRegistry:          contractThresholdRegistry,
 		DisperserRegistry:          contractEigenDADisperserRegistry,
+		UsageAuthorizationRegistry: usageAuthorizationRegistry,
 	}
 	return nil
 }
@@ -647,7 +650,7 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 	}
 
 	quorumNumbers := make([]byte, quorumCount)
-	for i := 0; i < len(quorumNumbers); i++ {
+	for i := range len(quorumNumbers) {
 		quorumNumbers[i] = byte(uint8(i))
 	}
 	operatorsByQuorum, err := t.bindings.OpStateRetriever.GetOperatorState(&bind.CallOpts{

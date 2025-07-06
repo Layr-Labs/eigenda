@@ -584,11 +584,9 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 func TestMetererDifferentQuorumConfigurations(t *testing.T) {
 	ctx := context.Background()
 
-	// Clear existing mocks to avoid conflicts
-	paymentChainState.ExpectedCalls = nil
-
-	// Re-setup the required mock for RefreshOnchainPaymentState
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
+	// Reset mocks while preserving RefreshOnchainPaymentState for background goroutine
+	refreshMock := paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
+	paymentChainState.ExpectedCalls = []*testifymock.Call{refreshMock}
 
 	// Create mock payment vault params with different MinNumSymbols for each quorum
 	mockParams := &meterer.PaymentVaultParams{
@@ -724,9 +722,10 @@ func TestMetererDifferentQuorumConfigurations(t *testing.T) {
 		})
 	}
 
-	// Restore original mock state by clearing all expected calls
+	// Restore minimal mock state (keep RefreshOnchainPaymentState for background goroutine)
 	// Note: Other tests may need to re-setup their mocks if they run after this test
-	paymentChainState.ExpectedCalls = nil
+	refreshMock = paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
+	paymentChainState.ExpectedCalls = []*testifymock.Call{refreshMock}
 }
 
 func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
