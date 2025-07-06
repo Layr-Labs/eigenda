@@ -22,6 +22,7 @@ import (
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
 	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
+	usageauth "github.com/Layr-Labs/eigenda/contracts/bindings/IUsageAuthorizationRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
@@ -37,24 +38,25 @@ import (
 )
 
 type ContractBindings struct {
-	RegCoordinatorAddr    gethcommon.Address
-	ServiceManagerAddr    gethcommon.Address
-	RelayRegistryAddress  gethcommon.Address
-	DelegationManager     *delegationmgr.ContractDelegationManager
-	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
-	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
-	IndexRegistry         *indexreg.ContractIIndexRegistry
-	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
-	StakeRegistry         *stakereg.ContractStakeRegistry
-	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
-	EjectionManager       *ejectionmg.ContractEjectionManager
-	AVSDirectory          *avsdir.ContractAVSDirectory
-	SocketRegistry        *socketreg.ContractSocketRegistry
-	PaymentVault          *paymentvault.ContractPaymentVault
-	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
-	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
-	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
-	EigenDADirectory      *eigendadirectory.ContractIEigenDADirectory
+	RegCoordinatorAddr         gethcommon.Address
+	ServiceManagerAddr         gethcommon.Address
+	RelayRegistryAddress       gethcommon.Address
+	DelegationManager          *delegationmgr.ContractDelegationManager
+	OpStateRetriever           *opstateretriever.ContractOperatorStateRetriever
+	BLSApkRegistry             *blsapkreg.ContractBLSApkRegistry
+	IndexRegistry              *indexreg.ContractIIndexRegistry
+	RegistryCoordinator        *regcoordinator.ContractRegistryCoordinator
+	StakeRegistry              *stakereg.ContractStakeRegistry
+	EigenDAServiceManager      *eigendasrvmg.ContractEigenDAServiceManager
+	EjectionManager            *ejectionmg.ContractEjectionManager
+	AVSDirectory               *avsdir.ContractAVSDirectory
+	SocketRegistry             *socketreg.ContractSocketRegistry
+	PaymentVault               *paymentvault.ContractPaymentVault
+	RelayRegistry              *relayreg.ContractEigenDARelayRegistry
+	ThresholdRegistry          *thresholdreg.ContractEigenDAThresholdRegistry
+	DisperserRegistry          *disperserreg.ContractEigenDADisperserRegistry
+	EigenDADirectory           *eigendadirectory.ContractIEigenDADirectory
+	UsageAuthorizationRegistry *usageauth.ContractIUsageAuthorizationRegistry
 }
 
 type Reader struct {
@@ -269,23 +271,31 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
+	// Usage Authorization Registry initialization
+	// TODO(hopeyen): Replace with proper service manager method when available
+	var contractUsageAuthorizationRegistry *usageauth.ContractIUsageAuthorizationRegistry
+	// For now, set to nil until the service manager has the method
+	// or until we implement address directory lookup
+	contractUsageAuthorizationRegistry = nil
+
 	t.bindings = &ContractBindings{
-		ServiceManagerAddr:    eigenDAServiceManagerAddr,
-		RegCoordinatorAddr:    registryCoordinatorAddr,
-		RelayRegistryAddress:  relayRegistryAddress,
-		AVSDirectory:          contractAVSDirectory,
-		SocketRegistry:        contractSocketRegistry,
-		OpStateRetriever:      contractBLSOpStateRetr,
-		BLSApkRegistry:        contractBLSPubkeyReg,
-		IndexRegistry:         contractIIndexReg,
-		RegistryCoordinator:   contractIRegistryCoordinator,
-		EjectionManager:       contractEjectionManager,
-		StakeRegistry:         contractStakeRegistry,
-		EigenDAServiceManager: contractEigenDAServiceManager,
-		DelegationManager:     contractDelegationManager,
-		PaymentVault:          contractPaymentVault,
-		ThresholdRegistry:     contractThresholdRegistry,
-		DisperserRegistry:     contractEigenDADisperserRegistry,
+		ServiceManagerAddr:         eigenDAServiceManagerAddr,
+		RegCoordinatorAddr:         registryCoordinatorAddr,
+		RelayRegistryAddress:       relayRegistryAddress,
+		AVSDirectory:               contractAVSDirectory,
+		SocketRegistry:             contractSocketRegistry,
+		OpStateRetriever:           contractBLSOpStateRetr,
+		BLSApkRegistry:             contractBLSPubkeyReg,
+		IndexRegistry:              contractIIndexReg,
+		RegistryCoordinator:        contractIRegistryCoordinator,
+		EjectionManager:            contractEjectionManager,
+		StakeRegistry:              contractStakeRegistry,
+		EigenDAServiceManager:      contractEigenDAServiceManager,
+		DelegationManager:          contractDelegationManager,
+		PaymentVault:               contractPaymentVault,
+		UsageAuthorizationRegistry: contractUsageAuthorizationRegistry,
+		ThresholdRegistry:          contractThresholdRegistry,
+		DisperserRegistry:          contractEigenDADisperserRegistry,
 	}
 	return nil
 }
@@ -833,112 +843,6 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-// TODO: later add quorumIds specifications
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-
-	reservationsMap := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
-
-	// In the new API, we need to query reservations per quorum and account
-	// For now, there's only one reservation per account, applied to multiple quorums
-	// TODO: update this to handle multiple quorums
-	for _, accountID := range accountIDs {
-		//TODO: add quorumId to the call
-		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
-			Context: ctx,
-		}, accountID)
-
-		if err != nil {
-			t.logger.Warn("failed to get reservation", "account", accountID, "err", err)
-			continue
-		}
-
-		res, err := ConvertToReservedPayments(reservation)
-		if err != nil {
-			t.logger.Warn("failed to convert reservation", "account", accountID, "err", err)
-			continue
-		}
-
-		reservationsMap[accountID] = res
-	}
-
-	return reservationsMap, nil
-}
-
-// TODO: this function should take in a list of quorumIds
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-
-	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
-		Context: ctx,
-	}, accountID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return ConvertToReservedPayments(reservation)
-}
-
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-
-	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
-
-	// TODO: update to use default of quorum 0 for deposits
-	// quorumId := uint64(0)
-	for _, accountID := range accountIDs {
-		onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
-			Context: ctx,
-		}, accountID)
-
-		if err != nil {
-			t.logger.Warn("failed to get on-demand deposit", "account", accountID, "err", err)
-			continue
-		}
-
-		if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
-			t.logger.Debug("on-demand deposit is zero for account", "account", accountID)
-			continue
-		}
-
-		paymentsMap[accountID] = &core.OnDemandPayment{
-			CumulativePayment: onDemandDeposit,
-		}
-	}
-
-	return paymentsMap, nil
-}
-
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-
-	// In the new API, we need to specify a quorumId (only 0 enabled for deposits)
-	onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
-		Context: ctx,
-	}, accountID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err := CheckOnDemandPayment(onDemandDeposit); err != nil {
-		return nil, err
-	}
-
-	return &core.OnDemandPayment{
-		CumulativePayment: onDemandDeposit,
-	}, nil
-}
-
 func (t *Reader) GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
@@ -1053,4 +957,86 @@ func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 
 func (t *Reader) GetRegistryCoordinatorAddress() gethcommon.Address {
 	return t.bindings.RegCoordinatorAddr
+}
+
+func (t *Reader) GetUsageAuthReservation(ctx context.Context, quorumId core.QuorumID, account gethcommon.Address) (*core.ReservedPayment, error) {
+	if t.bindings.UsageAuthorizationRegistry == nil {
+		return nil, errors.New("usage authorization registry not deployed")
+	}
+
+	reservation, err := t.bindings.UsageAuthorizationRegistry.GetReservation(&bind.CallOpts{
+		Context: ctx,
+	}, uint64(quorumId), account)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get usage auth reservation: %w", err)
+	}
+
+	res := &core.ReservedPayment{
+		SymbolsPerSecond: reservation.SymbolsPerSecond,
+		StartTimestamp:   reservation.StartTimestamp,
+		EndTimestamp:     reservation.EndTimestamp,
+	}
+
+	return res, nil
+}
+
+func (t *Reader) GetUsageAuthOnDemandDeposit(ctx context.Context, quorumId core.QuorumID, account gethcommon.Address) (*big.Int, error) {
+	if t.bindings.UsageAuthorizationRegistry == nil {
+		return nil, errors.New("usage authorization registry not deployed")
+	}
+
+	deposit, err := t.bindings.UsageAuthorizationRegistry.GetOnDemandDeposit(&bind.CallOpts{
+		Context: ctx,
+	}, uint64(quorumId), account)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get usage auth on demand deposit: %w", err)
+	}
+
+	if err := CheckOnDemandPayment(deposit); err != nil {
+		return nil, err
+	}
+
+	return deposit, nil
+}
+
+func (t *Reader) GetUsageAuthQuorumProtocolConfig(ctx context.Context, quorumId core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
+	if t.bindings.UsageAuthorizationRegistry == nil {
+		return nil, errors.New("usage authorization registry not deployed")
+	}
+
+	config, err := t.bindings.UsageAuthorizationRegistry.GetQuorumProtocolConfig(&bind.CallOpts{
+		Context: ctx,
+	}, uint64(quorumId))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get usage auth quorum protocol config: %w", err)
+	}
+
+	return &core.PaymentQuorumProtocolConfig{
+		MinNumSymbols:              config.MinNumSymbols,
+		ReservationAdvanceWindow:   config.ReservationAdvanceWindow,
+		ReservationRateLimitWindow: config.ReservationRateLimitWindow,
+		OnDemandRateLimitWindow:    config.OnDemandRateLimitWindow,
+		OnDemandEnabled:            config.OnDemandEnabled,
+	}, nil
+}
+
+func (t *Reader) GetUsageAuthQuorumConfig(ctx context.Context, quorumId core.QuorumID) (*core.PaymentQuorumConfig, error) {
+	if t.bindings.UsageAuthorizationRegistry == nil {
+		return nil, errors.New("usage authorization registry not deployed")
+	}
+
+	config, err := t.bindings.UsageAuthorizationRegistry.GetQuorumPaymentConfig(&bind.CallOpts{
+		Context: ctx,
+	}, uint64(quorumId))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get usage auth quorum config: %w", err)
+	}
+
+	return &core.PaymentQuorumConfig{
+		Token:                       config.Token,
+		Recipient:                   config.Recipient,
+		ReservationSymbolsPerSecond: config.ReservationSymbolsPerSecond,
+		OnDemandSymbolsPerSecond:    config.OnDemandSymbolsPerSecond,
+		OnDemandPricePerSymbol:      config.OnDemandPricePerSymbol,
+	}, nil
 }

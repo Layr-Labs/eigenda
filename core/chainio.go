@@ -127,17 +127,19 @@ type Reader interface {
 	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 
-	// GetReservedPayments returns active reservations (end timestamp > current timestamp)
-	GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[QuorumID]*ReservedPayment, error)
+	// Usage Authorization Registry getter methods
 
-	// GetReservedPaymentByAccount returns active reservation by account ID
-	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[QuorumID]*ReservedPayment, error)
+	// GetUsageAuthReservation gets the reservation for a given account and quorum from the Usage Authorization Registry
+	GetUsageAuthReservation(ctx context.Context, quorumId QuorumID, account gethcommon.Address) (*ReservedPayment, error)
 
-	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
+	// GetUsageAuthOnDemandDeposit gets the on-demand deposit for a given account and quorum from the Usage Authorization Registry
+	GetUsageAuthOnDemandDeposit(ctx context.Context, quorumId QuorumID, account gethcommon.Address) (*big.Int, error)
 
-	// GetOnDemandPaymentByAccount returns on-demand payment of an account
-	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+	// GetUsageAuthQuorumProtocolConfig gets the protocol configuration for a given quorum from the Usage Authorization Registry
+	GetUsageAuthQuorumProtocolConfig(ctx context.Context, quorumId QuorumID) (*PaymentQuorumProtocolConfig, error)
+
+	// GetUsageAuthQuorumConfig gets the payment configuration for a given quorum from the Usage Authorization Registry
+	GetUsageAuthQuorumConfig(ctx context.Context, quorumId QuorumID) (*PaymentQuorumConfig, error)
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)

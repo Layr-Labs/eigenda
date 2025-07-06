@@ -13,6 +13,7 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -155,7 +156,39 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             );
         }
 
-        // Register Reservations for client as the eigenDACommunityMultisig
+        // Register Reservations for client using UsageAuthorizationRegistry
+        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+        vm.startBroadcast(msg.sender);
+
+        // Create reservation for quorum 0
+        usageAuthorizationRegistry.addReservation(
+            0,
+            clientAddress,
+            UsageAuthorizationTypes.Reservation({
+                symbolsPerSecond: 452198,
+                startTimestamp: uint64(block.timestamp),
+                endTimestamp: uint64(block.timestamp + 1000000000)
+            })
+        );
+
+        // Create reservation for quorum 1
+        usageAuthorizationRegistry.addReservation(
+            1,
+            clientAddress,
+            UsageAuthorizationTypes.Reservation({
+                symbolsPerSecond: 452198,
+                startTimestamp: uint64(block.timestamp),
+                endTimestamp: uint64(block.timestamp + 1000000000)
+            })
+        );
+
+        // Mint tokens and deposit on-demand for quorum 0
+        uint256 onDemandDepositAmount = 1 * 10 ** 18; // 1 TEST tokens
+        testToken.mint(msg.sender, onDemandDepositAmount);
+        testToken.approve(address(usageAuthorizationRegistry), onDemandDepositAmount);
+        usageAuthorizationRegistry.depositOnDemand(0, clientAddress, onDemandDepositAmount);
+
+        // Keep the old PaymentVault reservation logic for backward compatibility
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
             symbolsPerSecond: 452198,
             startTimestamp: uint64(block.timestamp),
@@ -163,8 +196,6 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
-        vm.startBroadcast(msg.sender);
         paymentVault.setReservation(clientAddress, reservation);
         // Deposit OnDemand
         paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);

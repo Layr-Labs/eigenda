@@ -636,11 +636,6 @@ type ReservedPayment struct {
 	StartTimestamp uint64
 	// reservation expiration timestamp
 	EndTimestamp uint64
-
-	// allowed quorums
-	QuorumNumbers []uint8
-	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-	QuorumSplits []byte
 }
 
 type OnDemandPayment struct {
@@ -649,8 +644,14 @@ type OnDemandPayment struct {
 }
 
 // PaymentQuorumConfig contains the configuration for a quorum's payment configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+// Token is the token that is used for payment in the quorum. (Currently not used by the offchain components)
+// Recipient is the address that receives the payment in the quorum. (Currently not used by the offchain components)
+// ReservationSymbolsPerSecond is the number of symbols that can be reserved per second in the quorum. (Currently not used by the offchain components)
+// OnDemandSymbolsPerSecond is the number of symbols that can be stored per second in the quorum.
+// OnDemandPricePerSymbol is the price per symbol for on-demand storage in the quorum.
 type PaymentQuorumConfig struct {
+	Token                       gethcommon.Address
+	Recipient                   gethcommon.Address
 	ReservationSymbolsPerSecond uint64
 
 	// OnDemand is initially only enabled on Quorum 0
@@ -659,7 +660,11 @@ type PaymentQuorumConfig struct {
 }
 
 // PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+// MinNumSymbols is the minimum number of symbols that must be metered for a blob dispersal in the quorum.
+// ReservationAdvanceWindow limits how far reservation's end time can be scheduled in-advance from the current block number. (Currently not used by the offchain components)
+// ReservationRateLimitWindow specifies the duration of each rate limit window in the quorum for each reservation.
+// OnDemandRateLimitWindow specifies the duration of each rate limit window in the quorum for all on-demand usage.
+// OnDemandEnabled is a boolean that indicates if on-demand payments are enabled in the quorum; this is only enabled for Quorum 0 initially
 type PaymentQuorumProtocolConfig struct {
 	MinNumSymbols              uint64
 	ReservationAdvanceWindow   uint64
