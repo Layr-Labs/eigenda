@@ -726,9 +726,8 @@ func TestMetererDifferentQuorumConfigurations(t *testing.T) {
 		})
 	}
 
-	// Restore original mock state by clearing all expected calls
-	// Note: Other tests may need to re-setup their mocks if they run after this test
 	paymentChainState.ExpectedCalls = nil
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 }
 
 func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {

@@ -53,7 +53,7 @@ func (s *SimpleOnchainPaymentState) GetPaymentGlobalParams() (*meterer.PaymentVa
 // ServerAccountLedgerTest mirrors the meterer tests but for ServerAccountLedger
 func TestServerAccountLedgerReservations(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Setup equivalent to meterer test
 	logger := testutils.GetLogger()
 	config := meterer.Config{
@@ -97,7 +97,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 		},
 		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
 	}
-	
+
 	// Setup chain payment state mock identical to meterer test
 	chainPaymentState := &mock.MockOnchainPaymentState{}
 	chainPaymentState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
@@ -132,7 +132,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	// Test 1: Not active reservation - should match meterer behavior
 	sal1, err := meterer.NewServerAccountLedger(ctx, accountID1, chainPaymentState, store, config, logger)
 	assert.NoError(t, err)
-	
+
 	header := createPaymentHeader(1, big.NewInt(0), accountID1)
 	_, err = sal1.Debit(ctx, *header, 1000, []uint8{0, 1}, mockParams, now)
 	assert.ErrorContains(t, err, "reservation not active")
@@ -145,9 +145,9 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	// Test 3: Small bin overflow for empty bin - should match meterer behavior
 	// Clear any existing data first to ensure clean state
 	reservationWindow := mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow
-	testTimestamp := now.UnixNano()-int64(reservationWindow)*1e9
+	testTimestamp := now.UnixNano() - int64(reservationWindow)*1e9
 	reservationPeriod := payment_logic.GetReservationPeriodByNanosecond(testTimestamp, reservationWindow)
-	
+
 	// Clear previous test data for account2 in this reservation period
 	for _, quorum := range quorumNumbers {
 		accountAndQuorum := fmt.Sprintf("%s:%d", accountID2.Hex(), quorum)
@@ -156,10 +156,10 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		})
 	}
-	
+
 	sal2, err := meterer.NewServerAccountLedger(ctx, accountID2, chainPaymentState, store, config, logger)
 	assert.NoError(t, err)
-	
+
 	header = createPaymentHeader(testTimestamp, big.NewInt(0), accountID2)
 	_, err = sal2.Debit(ctx, *header, 10, quorumNumbers, mockParams, now)
 	assert.NoError(t, err)
@@ -174,7 +174,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	unregisteredUser, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	unregisteredAccountID := crypto.PubkeyToAddress(unregisteredUser.PublicKey)
-	
+
 	// This should fail during construction like meterer fails during request
 	_, err = meterer.NewServerAccountLedger(ctx, unregisteredAccountID, chainPaymentState, store, config, logger)
 	assert.ErrorContains(t, err, "failed to get reservations: reservation not found")
@@ -182,7 +182,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	// Test 6: Inactive reservation - should match meterer behavior
 	sal3, err := meterer.NewServerAccountLedger(ctx, accountID3, chainPaymentState, store, config, logger)
 	assert.NoError(t, err)
-	
+
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID3)
 	_, err = sal3.Debit(ctx, *header, 1000, []uint8{0}, mockParams, now)
 	assert.ErrorContains(t, err, "reservation not active")
@@ -199,16 +199,16 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	for _, quorum := range quorumNumbers {
 		accountAndQuorums = append(accountAndQuorums, fmt.Sprintf("%s:%d", accountID2.Hex(), quorum))
 	}
-	
+
 	// Clear any previous data for clean test (using current time not past time)
 	currentReservationPeriod := payment_logic.GetReservationPeriodByNanosecond(now.UnixNano(), reservationWindow)
 	overflowReservationPeriod := payment_logic.GetOverflowPeriod(currentReservationPeriod, reservationWindow)
-	
+
 	// Also clear periods from earlier tests that used different timestamps
-	testTimestampFromEarlierTest := now.UnixNano()-int64(reservationWindow)*1e9
+	testTimestampFromEarlierTest := now.UnixNano() - int64(reservationWindow)*1e9
 	pastReservationPeriod := payment_logic.GetReservationPeriodByNanosecond(testTimestampFromEarlierTest, reservationWindow)
 	pastOverflowPeriod := payment_logic.GetOverflowPeriod(pastReservationPeriod, reservationWindow)
-	
+
 	for _, accountAndQuorum := range accountAndQuorums {
 		// Clear current period data
 		_ = dynamoClient.DeleteItem(ctx, reservationTableName, commondynamodb.Key{
@@ -242,7 +242,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 		payment, err := sal2_fresh.Debit(ctx, *header, symbolLength, quorumNumbers, mockParams, now)
 		assert.NoError(t, err)
 		assert.Nil(t, payment) // Should be nil for reservation requests
-		
+
 		// Verify database state matches meterer behavior exactly
 		for _, accountAndQuorum := range accountAndQuorums {
 			item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -266,14 +266,14 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 	payment, err := sal2_fresh.Debit(ctx, *header, 25, quorumNumbers, mockParams, now)
 	assert.NoError(t, err)
 	assert.Nil(t, payment) // Should be nil for reservation requests
-	
+
 	// Verify symbols charged matches meterer: 25 symbols -> 27 charged (rounded up to multiple of 3)
 	overflowSymbolsCharged := payment_logic.SymbolsCharged(25, mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].MinNumSymbols)
 	assert.Equal(t, uint64(27), overflowSymbolsCharged) // 25 -> 27 with minSymbols=3
 
 	// Verify overflow period usage matches meterer behavior
 	overflowedReservationPeriod := payment_logic.GetOverflowPeriod(currentReservationPeriod, mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow)
-	
+
 	// Check each quorum separately with detailed debugging
 	for i, accountAndQuorum := range accountAndQuorums {
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -284,7 +284,7 @@ func TestServerAccountLedgerReservations(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, accountAndQuorum, item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		
+
 		binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
 		assert.Equal(t, strconv.Itoa(int(16)), binUsageStr, "Quorum %d should have 16 overflow symbols, got %s", i, binUsageStr) // 216-200=16
 	}
@@ -342,11 +342,11 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 	// Create local variables to ensure consistent test values
 	testAccount1OnDemandPayments := &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	testAccount2OnDemandPayments := &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
-	
+
 	chainPaymentState.On("GetOnDemandPaymentByAccount", testifymock.Anything, accountID1).Return(testAccount1OnDemandPayments, nil)
 	chainPaymentState.On("GetOnDemandPaymentByAccount", testifymock.Anything, accountID2).Return(testAccount2OnDemandPayments, nil)
 	chainPaymentState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.OnDemandPayment{}, fmt.Errorf("payment not found"))
-	
+
 	// Setup reservation responses for constructor calls
 	chainPaymentState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID1, testifymock.Anything).Return(
 		map[core.QuorumID]*core.ReservedPayment{}, nil,
@@ -371,7 +371,7 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 			"AccountID": item["AccountID"],
 		})
 	}
-	
+
 	result2, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
@@ -388,7 +388,7 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 	unregisteredUser, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	unregisteredAccountID := crypto.PubkeyToAddress(unregisteredUser.PublicKey)
-	
+
 	// This should fail during construction - ServerAccountLedger tries reservations first
 	_, err = meterer.NewServerAccountLedger(ctx, unregisteredAccountID, chainPaymentState, store, config, logger)
 	assert.ErrorContains(t, err, "failed to get reservations: reservation not found")
@@ -396,17 +396,17 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 	// Test 2: Invalid quorum ID - should match meterer behavior
 	sal1, err := meterer.NewServerAccountLedger(ctx, accountID1, chainPaymentState, store, config, logger)
 	assert.NoError(t, err)
-	
+
 	header := createPaymentHeader(now.UnixNano(), big.NewInt(2), accountID1)
 	_, err = sal1.Debit(ctx, *header, 1000, []uint8{0, 1, 2}, mockParams, now)
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
-	// Test 3: Insufficient cumulative payment - should match meterer behavior  
+	// Test 3: Insufficient cumulative payment - should match meterer behavior
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = sal1.Debit(ctx, *header, 1000, quorumNumbers, mockParams, now)
 	// Should fail with payment validation from DB store
 	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
-	
+
 	// Verify no record for invalid payment - should match meterer behavior
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
@@ -418,20 +418,19 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 	// Test 4: Valid payments sequence - should match meterer behavior exactly
 	sal2, err := meterer.NewServerAccountLedger(ctx, accountID2, chainPaymentState, store, config, logger)
 	assert.NoError(t, err)
-	
+
 	symbolLength := uint64(100)
 	minSymbols := mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].MinNumSymbols
 	pricePerSymbol := mockParams.QuorumPaymentConfigs[meterer.OnDemandQuorumID].OnDemandPricePerSymbol
 	symbolsCharged := payment_logic.SymbolsCharged(symbolLength, minSymbols)
 	priceCharged := payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol)
 	assert.Equal(t, big.NewInt(int64(102*pricePerSymbol)), priceCharged)
-	
-	
+
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	payment, err := sal2.Debit(ctx, *header, symbolLength, quorumNumbers, mockParams, now)
 	assert.NoError(t, err)
 	assert.Equal(t, priceCharged, payment) // Should return payment charged for on-demand
-	
+
 	// Verify symbols charged calculation matches meterer: 100 symbols -> 102 charged (rounded up to multiple of 3)
 	assert.Equal(t, uint64(102), symbolsCharged)
 
@@ -487,7 +486,7 @@ func TestServerAccountLedgerOnDemand(t *testing.T) {
 
 func TestServerAccountLedgerRevertDebit(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Setup equivalent to meterer test
 	logger := testutils.GetLogger()
 	config := meterer.Config{
@@ -534,7 +533,7 @@ func TestServerAccountLedgerRevertDebit(t *testing.T) {
 	chainPaymentState := &mock.MockOnchainPaymentState{}
 	chainPaymentState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
 	chainPaymentState.On("GetPaymentGlobalParams").Return(mockParams, nil)
-	
+
 	// Use local test values to ensure clean state
 	testAccount2OnDemandPayments := &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 	chainPaymentState.On("GetOnDemandPaymentByAccount", testifymock.Anything, accountID2).Return(testAccount2OnDemandPayments, nil)
@@ -553,13 +552,13 @@ func TestServerAccountLedgerRevertDebit(t *testing.T) {
 	assert.NoError(t, err)
 	for _, item := range result {
 		deleteErr := dynamoClient.DeleteItem(ctx, ondemandTableName, commondynamodb.Key{
-			"AccountID": item["AccountID"],  // Only AccountID - no CumulativePayment needed!
+			"AccountID": item["AccountID"], // Only AccountID - no CumulativePayment needed!
 		})
 		if deleteErr != nil {
 			t.Logf("Failed to delete item: %v", deleteErr)
 		}
 	}
-	
+
 	// Double-check cleanup worked
 	verifyResult, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
@@ -571,22 +570,22 @@ func TestServerAccountLedgerRevertDebit(t *testing.T) {
 	// Test RevertDebit with on-demand payment
 	sal2, err2 := meterer.NewServerAccountLedger(ctx, accountID2, chainPaymentState, store, config, logger)
 	assert.NoError(t, err2)
-	
+
 	symbolLength := uint64(100)
 	pricePerSymbol := mockParams.QuorumPaymentConfigs[meterer.OnDemandQuorumID].OnDemandPricePerSymbol
 	symbolsCharged := payment_logic.SymbolsCharged(symbolLength, mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].MinNumSymbols)
 	priceCharged := payment_logic.PaymentCharged(symbolsCharged, pricePerSymbol)
-	
+
 	// Make a successful payment
 	header := createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	payment, err := sal2.Debit(ctx, *header, symbolLength, quorumNumbers, mockParams, now)
 	assert.NoError(t, err)
 	assert.Equal(t, priceCharged, payment)
-	
+
 	// Test RevertDebit functionality
 	err = sal2.RevertDebit(ctx, *header, symbolLength, quorumNumbers, mockParams, now, payment)
 	assert.NoError(t, err)
-	
+
 	// Verify payment was rolled back by checking database state
 	result2, err3 := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
@@ -644,7 +643,7 @@ func TestErrorMessageComparison(t *testing.T) {
 
 	// Test that both Meterer and ServerAccountLedger fail consistently for unregistered accounts
 	metererInstance := meterer.NewMeterer(config, chainPaymentState, store, logger)
-	
+
 	now := time.Now()
 	header := &core.PaymentMetadata{
 		AccountID:         accountID,
@@ -654,7 +653,7 @@ func TestErrorMessageComparison(t *testing.T) {
 
 	// Both should fail with reservation-related errors for unregistered accounts
 	_, err1 := metererInstance.MeterRequest(ctx, *header, 1000, []uint8{0}, now)
-	
+
 	// For ServerAccountLedger, test the same operation (Debit) rather than just construction
 	sal, err2 := meterer.NewServerAccountLedger(ctx, accountID, chainPaymentState, store, config, logger)
 	if err2 == nil {
@@ -665,6 +664,6 @@ func TestErrorMessageComparison(t *testing.T) {
 	// Both should have similar error patterns (though exact messages may differ due to different execution flows)
 	assert.Error(t, err1)
 	assert.Error(t, err2)
-	
+
 	// The key is that both fail when trying to handle unregistered accounts, maintaining the same security model
 }

@@ -336,32 +336,32 @@ func TestServerLedgerGlobalUsageCalculation(t *testing.T) {
 
 	// Test different rate limit configurations
 	testCases := []struct {
-		name            string
-		symbolsPerSec   uint64
-		requestSymbols  uint64
-		expectedLimit   uint64
-		shouldSucceed   bool
+		name           string
+		symbolsPerSec  uint64
+		requestSymbols uint64
+		expectedLimit  uint64
+		shouldSucceed  bool
 	}{
 		{
-			name:            "Low rate limit",
-			symbolsPerSec:   10,     // 10 symbols/sec = 36,000 per hour
-			requestSymbols:  20000,  // Request 20K symbols
-			expectedLimit:   36000,  // Limit is 36K
-			shouldSucceed:   true,   // 20K < 36K
+			name:           "Low rate limit",
+			symbolsPerSec:  10,    // 10 symbols/sec = 36,000 per hour
+			requestSymbols: 20000, // Request 20K symbols
+			expectedLimit:  36000, // Limit is 36K
+			shouldSucceed:  true,  // 20K < 36K
 		},
 		{
-			name:            "High rate limit",
-			symbolsPerSec:   1000,    // 1000 symbols/sec = 3,600,000 per hour
-			requestSymbols:  2000000, // Request 2M symbols
-			expectedLimit:   3600000, // Limit is 3.6M
-			shouldSucceed:   true,    // 2M < 3.6M
+			name:           "High rate limit",
+			symbolsPerSec:  1000,    // 1000 symbols/sec = 3,600,000 per hour
+			requestSymbols: 2000000, // Request 2M symbols
+			expectedLimit:  3600000, // Limit is 3.6M
+			shouldSucceed:  true,    // 2M < 3.6M
 		},
 		{
-			name:            "Exceeded rate limit",
-			symbolsPerSec:   100,      // 100 symbols/sec = 360,000 per hour
-			requestSymbols:  500000,   // Request 500K symbols  
-			expectedLimit:   360000,   // Limit is 360K
-			shouldSucceed:   false,    // 500K > 360K
+			name:           "Exceeded rate limit",
+			symbolsPerSec:  100,    // 100 symbols/sec = 360,000 per hour
+			requestSymbols: 500000, // Request 500K symbols
+			expectedLimit:  360000, // Limit is 360K
+			shouldSucceed:  false,  // 500K > 360K
 		},
 	}
 
