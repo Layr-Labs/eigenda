@@ -20,6 +20,7 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 }
@@ -32,6 +33,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 		UseRetrievalClient:            ctx.Bool(flags.UseRetrievalClientFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 	}
@@ -45,5 +47,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	config := ReadConfig(ctx)
 	config.LoggerConfig = *loggerConfig
+
 	return config, nil
 }

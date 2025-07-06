@@ -168,6 +168,7 @@ func NewTestClient(
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
+		config.EigenDADirectory,
 		config.BLSOperatorStateRetrieverAddr,
 		config.EigenDAServiceManagerAddr)
 	if err != nil {
