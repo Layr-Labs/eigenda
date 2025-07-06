@@ -26,7 +26,7 @@ type ServerAccountLedger struct {
 	// Account-specific state from metering store
 	periodRecords     QuorumPeriodRecords
 	cumulativePayment *big.Int
-	
+
 	// Payment rollback state - stores the previous payment amount for potential rollback
 	lastOldPayment *big.Int
 
@@ -93,7 +93,7 @@ func (sal *ServerAccountLedger) loadPeriodRecords(ctx context.Context, params *P
 
 	for quorumID := range sal.reservations {
 		quorumIDs = append(quorumIDs, quorumID)
-		
+
 		// Get the proper reservation window for this quorum
 		_, protocolConfig, err := params.GetQuorumConfigs(quorumID)
 		if err != nil {
@@ -102,7 +102,7 @@ func (sal *ServerAccountLedger) loadPeriodRecords(ctx context.Context, params *P
 			periods = append(periods, payment_logic.GetReservationPeriodByNanosecond(currentTime, 3600))
 			continue
 		}
-		
+
 		// Calculate current period using the proper reservation window
 		currentPeriod := payment_logic.GetReservationPeriodByNanosecond(currentTime, protocolConfig.ReservationRateLimitWindow)
 		periods = append(periods, currentPeriod)
@@ -373,7 +373,7 @@ func (sal *ServerAccountLedger) RevertDebit(
 
 	// If this was a payment, rollback the payment
 	if payment != nil && payment.Cmp(big.NewInt(0)) > 0 && sal.lastOldPayment != nil {
-		newPayment := header.CumulativePayment  // The payment that was written to database during Debit
+		newPayment := header.CumulativePayment // The payment that was written to database during Debit
 		oldPayment := sal.lastOldPayment
 
 		err = sal.meteringStore.RollbackOnDemandPayment(ctx, sal.accountID, newPayment, oldPayment)
@@ -384,7 +384,7 @@ func (sal *ServerAccountLedger) RevertDebit(
 		// Update local cached state - only update our internal cumulative payment tracking
 		// NOTE: sal.onDemandPayment.CumulativePayment represents the on-chain deposit and should not be modified
 		sal.cumulativePayment = oldPayment
-		
+
 		// Clear the stored old payment since we've used it
 		sal.lastOldPayment = nil
 	}
