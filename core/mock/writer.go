@@ -313,3 +313,41 @@ func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
 	result := args.Get(0)
 	return result.(gethcommon.Address)
 }
+
+// Usage Authorization Registry methods for MockWriter
+
+func (t *MockWriter) GetUsageAuthReservation(ctx context.Context, quorumId core.QuorumID, account gethcommon.Address) (*core.ReservedPayment, error) {
+	args := t.Called(ctx, quorumId, account)
+	result := args.Get(0)
+	if result == nil {
+		return nil, args.Error(1)
+	}
+	return result.(*core.ReservedPayment), args.Error(1)
+}
+
+func (t *MockWriter) GetUsageAuthOnDemandDeposit(ctx context.Context, quorumId core.QuorumID, account gethcommon.Address) (*big.Int, error) {
+	args := t.Called(ctx, quorumId, account)
+	result := args.Get(0)
+	if result == nil {
+		return nil, args.Error(1)
+	}
+	return result.(*big.Int), args.Error(1)
+}
+
+func (t *MockWriter) GetUsageAuthQuorumProtocolConfig(ctx context.Context, quorumId core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
+	args := t.Called(ctx, quorumId)
+	result := args.Get(0)
+	if result == nil {
+		return nil, args.Error(1)
+	}
+	return result.(*core.PaymentQuorumProtocolConfig), args.Error(1)
+}
+
+func (t *MockWriter) GetUsageAuthQuorumConfig(ctx context.Context, quorumId core.QuorumID) (*core.PaymentQuorumConfig, error) {
+	args := t.Called(ctx, quorumId)
+	result := args.Get(0)
+	if result == nil {
+		return nil, args.Error(1)
+	}
+	return result.(*core.PaymentQuorumConfig), args.Error(1)
+}

@@ -13,6 +13,7 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -155,20 +156,58 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             );
         }
 
-        // Register Reservations for client as the eigenDACommunityMultisig
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
-            startTimestamp: uint64(block.timestamp),
-            endTimestamp: uint64(block.timestamp + 1000000000),
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"3232"
-        });
-        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
-        vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
-        vm.stopBroadcast();
+        // Register Reservations for client using UsageAuthorizationRegistry
+        {
+            address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+            vm.startBroadcast(msg.sender);
+
+            uint64 startTime = uint64(block.timestamp / _schedulePeriod) * _schedulePeriod;
+            uint64 endTime = startTime + _schedulePeriod;
+
+            // Create reservation for quorum 0
+            usageAuthorizationRegistry.addReservation(
+                0,
+                clientAddress,
+                UsageAuthorizationTypes.Reservation({
+                    symbolsPerSecond: 452198,
+                    startTimestamp: startTime,
+                    endTimestamp: endTime
+                })
+            );
+
+            // Create reservation for quorum 1
+            usageAuthorizationRegistry.addReservation(
+                1,
+                clientAddress,
+                UsageAuthorizationTypes.Reservation({
+                    symbolsPerSecond: 452198,
+                    startTimestamp: startTime,
+                    endTimestamp: endTime
+                })
+            );
+
+            // Mint tokens and deposit on-demand for quorum 0
+            uint256 depositAmount = 1 * 10 ** 18;
+            testToken.mint(msg.sender, depositAmount);
+            testToken.approve(address(usageAuthorizationRegistry), depositAmount);
+            usageAuthorizationRegistry.depositOnDemand(0, clientAddress, depositAmount);
+
+            // Keep the old PaymentVault reservation logic for backward compatibility
+            paymentVault.setReservation(
+                clientAddress,
+                IPaymentVault.Reservation({
+                    symbolsPerSecond: 452198,
+                    startTimestamp: startTime,
+                    endTimestamp: endTime,
+                    quorumNumbers: hex"0001",
+                    quorumSplits: hex"3232"
+                })
+            );
+
+            // Deposit OnDemand
+            paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
+            vm.stopBroadcast();
+        }
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
@@ -197,6 +236,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "eigenDALegacyCertVerifier", address(legacyEigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
+        vm.serializeAddress(output, "usageAuthorizationRegistry", address(usageAuthorizationRegistry));
+        vm.serializeAddress(output, "testToken", address(testToken));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

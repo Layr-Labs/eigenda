@@ -64,4 +64,9 @@ func (r *EigenDADirectoryReader) GetServiceManagerAddress() (gethcommon.Address,
 	return r.getAddressWithValidation(ContractNames.ServiceManager)
 }
 
+// GetUsageAuthorizationRegistryAddress returns the usage authorization registry address with validation
+func (r *EigenDADirectoryReader) GetUsageAuthorizationRegistryAddress() (gethcommon.Address, error) {
+	return r.getAddressWithValidation(ContractNames.UsageAuthorizationRegistry)
+}
+
 // TODO: add other getters for other contracts; they are not needed for the current usage

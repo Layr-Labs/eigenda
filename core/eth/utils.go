@@ -132,7 +132,7 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 	return bytesArray
 }
 
-func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+func IsZeroValuedReservation(reservation *core.ReservedPayment) bool {
 	return reservation.SymbolsPerSecond == 0 &&
 		reservation.StartTimestamp == 0 &&
 		reservation.EndTimestamp == 0
@@ -148,21 +148,18 @@ func CheckOnDemandPayment(payment *big.Int) error {
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
 // Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
 func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
-	if isZeroValuedReservation(reservation) {
-		return nil, ErrPaymentDoesNotExist
-	}
 
 	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
 	for _, quorumId := range reservation.QuorumNumbers {
-		reservedPayments[core.QuorumID(quorumId)] = &core.ReservedPayment{
+		res := &core.ReservedPayment{
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   reservation.StartTimestamp,
 			EndTimestamp:     reservation.EndTimestamp,
-			// They are now handled at the quorum level in the new contract design; right now we are keeping for minimal changes
-			// TODO: the core type will be updated to be specific to a single quorum
-			QuorumNumbers: []byte{},
-			QuorumSplits:  []uint8{},
 		}
+		if IsZeroValuedReservation(res) {
+			return nil, ErrPaymentDoesNotExist
+		}
+		reservedPayments[core.QuorumID(quorumId)] = res
 	}
 
 	return reservedPayments, nil
@@ -181,29 +178,31 @@ func GetAllQuorumIDs(quorumCount uint8) []core.QuorumID {
 // TODO: consider auto-generating this from the address directory contract
 // These values must match exactly the constants defined in AddressDirectoryConstants.sol.
 var ContractNames = struct {
-	ServiceManager         string
-	OperatorStateRetriever string
-	RegistryCoordinator    string
-	BLSApkRegistry         string
-	IndexRegistry          string
-	StakeRegistry          string
-	SocketRegistry         string
-	PaymentVault           string
-	EjectionManager        string
-	RelayRegistry          string
-	ThresholdRegistry      string
-	DisperserRegistry      string
+	ServiceManager             string
+	OperatorStateRetriever     string
+	RegistryCoordinator        string
+	UsageAuthorizationRegistry string
+	BLSApkRegistry             string
+	IndexRegistry              string
+	StakeRegistry              string
+	SocketRegistry             string
+	PaymentVault               string
+	EjectionManager            string
+	RelayRegistry              string
+	ThresholdRegistry          string
+	DisperserRegistry          string
 }{
-	ServiceManager:         "SERVICE_MANAGER",
-	OperatorStateRetriever: "OPERATOR_STATE_RETRIEVER",
-	RegistryCoordinator:    "REGISTRY_COORDINATOR",
-	BLSApkRegistry:         "BLS_APK_REGISTRY",
-	IndexRegistry:          "INDEX_REGISTRY",
-	StakeRegistry:          "STAKE_REGISTRY",
-	SocketRegistry:         "SOCKET_REGISTRY",
-	PaymentVault:           "PAYMENT_VAULT",
-	EjectionManager:        "EJECTION_MANAGER",
-	RelayRegistry:          "RELAY_REGISTRY",
-	ThresholdRegistry:      "THRESHOLD_REGISTRY",
-	DisperserRegistry:      "DISPERSER_REGISTRY",
+	ServiceManager:             "SERVICE_MANAGER",
+	OperatorStateRetriever:     "OPERATOR_STATE_RETRIEVER",
+	RegistryCoordinator:        "REGISTRY_COORDINATOR",
+	UsageAuthorizationRegistry: "USAGE_AUTHORIZATION_REGISTRY",
+	BLSApkRegistry:             "BLS_APK_REGISTRY",
+	IndexRegistry:              "INDEX_REGISTRY",
+	StakeRegistry:              "STAKE_REGISTRY",
+	SocketRegistry:             "SOCKET_REGISTRY",
+	PaymentVault:               "PAYMENT_VAULT",
+	EjectionManager:            "EJECTION_MANAGER",
+	RelayRegistry:              "RELAY_REGISTRY",
+	ThresholdRegistry:          "THRESHOLD_REGISTRY",
+	DisperserRegistry:          "DISPERSER_REGISTRY",
 }
