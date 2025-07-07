@@ -20,13 +20,6 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-// updateRecord tracks a successful update for rollback purposes
-type UpdateRecord struct {
-	QuorumNumber core.QuorumID
-	Period       uint64
-	Usage        uint64
-}
-
 // GetRelativePeriodRecord returns the period record for the given index and quorum number; if the record does not exist, it is initialized to 0
 func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber core.QuorumID) *PeriodRecord {
 	if _, exists := pr[quorumNumber]; !exists {
