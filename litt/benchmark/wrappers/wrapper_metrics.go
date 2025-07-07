@@ -96,36 +96,36 @@ func newBasicWrapperMetrics(registry *prometheus.Registry, tableName string) *ba
 }
 
 func (m *basicWrapperMetrics) RecordBytesWritten(bytes uint64) {
-	if m == nil {
-		return
-	}
+	//if m == nil {
+	//	return
+	//}
 	m.bytesWrittenCounter.WithLabelValues(m.tableName).Add(float64(bytes))
 }
 
 func (m *basicWrapperMetrics) RecordBytesRead(bytes uint64) {
-	if m == nil {
-		return
-	}
+	//if m == nil {
+	//	return
+	//}
 	m.bytesReadCounter.WithLabelValues(m.tableName).Add(float64(bytes))
 }
 
 func (m *basicWrapperMetrics) RecordWriteLatency(latency time.Duration) {
-	if m == nil {
-		return
-	}
+	//if m == nil {
+	//	return
+	//}
 	m.writeLatency.WithLabelValues(m.tableName).Observe(common.ToMilliseconds(latency))
 }
 
 func (m *basicWrapperMetrics) RecordFlushLatency(latency time.Duration) {
-	if m == nil {
-		return
-	}
+	//if m == nil {
+	//	return
+	//}
 	m.flushLatency.WithLabelValues(m.tableName).Observe(common.ToMilliseconds(latency))
 }
 
 func (m *basicWrapperMetrics) RecordReadLatency(latency time.Duration) {
-	if m == nil {
-		return
-	}
+	//if m == nil {
+	//	return
+	//}
 	m.readLatency.WithLabelValues(m.tableName).Observe(common.ToMilliseconds(latency))
 }
