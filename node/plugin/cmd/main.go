@@ -32,6 +32,7 @@ func main() {
 		plugin.SocketFlag,
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
+		plugin.EigenDADirectoryFlag,
 		plugin.BlsOperatorStateRetrieverFlag,
 		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
@@ -129,7 +130,7 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Printf("Error: failed to create EigenDA transactor: %v", err)
 		return

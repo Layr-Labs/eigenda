@@ -32,6 +32,39 @@ updates:
           - "patch"
           - "major"
 
+  # TODO: not sure if this works, just copy-pasted from the proxy repo
+  # and changed the directory
+  - package-ecosystem: "gomod"
+    directory: "/api/proxy"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    target-branch: "main"
+    commit-message:
+      prefix: "[golang-version]"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "-"
+    open-pull-requests-limit: 8
+    reviewers:
+      - "Layr-Labs/eigenda-intg" # https://github.com/orgs/Layr-Labs/teams/eigenda-intg
+    labels:
+      - "version"
+      - "golang"
+    allow:
+      - dependency-type: "direct"
+    groups:
+      # Creates one consolidated PR for all minor/patch updates to reduce PR noise
+      # Major version updates (e.g., 1.x.x -> 2.x.x) are excluded since they might contain breaking changes and should be reviewed separately.
+      golang-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

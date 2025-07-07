@@ -17,9 +17,9 @@ import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServ
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
-import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol";
-import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
-import {EigenDACertVerifierRouter} from "src/periphery/cert/router/EigenDACertVerifierRouter.sol";
+import {EigenDACertVerifierV2} from "src/integrations/cert/legacy/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
@@ -370,7 +370,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_V2_NAME, address(legacyEigenDACertVerifier));
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
+        );
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),

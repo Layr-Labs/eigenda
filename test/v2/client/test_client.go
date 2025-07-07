@@ -217,12 +217,13 @@ func NewTestClient(
 	}
 
 	// Construct the relay client
-
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
+		config.EigenDADirectory,
 		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		config.EigenDAServiceManagerAddr,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
