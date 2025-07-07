@@ -1,4 +1,4 @@
-package meterer
+package payment
 
 import (
 	"errors"

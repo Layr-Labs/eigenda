@@ -1,4 +1,4 @@
-package meterer
+package payment_test
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payment"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{},
-			expectedError: ErrNoQuorums,
+			expectedError: payment.ErrNoQuorums,
 		},
 		{
 			name: "zero symbols",
@@ -53,7 +54,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    0,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: ErrZeroSymbols,
+			expectedError: payment.ErrZeroSymbols,
 		},
 		{
 			name: "invalid account ID",
@@ -64,7 +65,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: ErrInvalidAccount,
+			expectedError: payment.ErrInvalidAccount,
 		},
 		{
 			name: "invalid timestamp",
@@ -75,13 +76,13 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: ErrInvalidTimestamp,
+			expectedError: payment.ErrInvalidTimestamp,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request, err := NewDebitSlip(tt.paymentMetadata, tt.numSymbols, tt.quorumNumbers)
+			request, err := payment.NewDebitSlip(tt.paymentMetadata, tt.numSymbols, tt.quorumNumbers)
 			if tt.expectedError == nil {
 				assert.NoError(t, err)
 				assert.NotNil(t, request)
@@ -103,7 +104,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 }
 
 func TestDebitSlip_WithMethods(t *testing.T) {
-	request := &DebitSlip{
+	request := &payment.DebitSlip{
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID: gethcommon.HexToAddress("0x123"),
 			Timestamp: time.Now().UnixNano(),
@@ -125,7 +126,7 @@ func TestDebitSlip_String(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	timestamp := int64(1234567890)
 
-	request := &DebitSlip{
+	request := &payment.DebitSlip{
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID: accountID,
 			Timestamp: timestamp,
