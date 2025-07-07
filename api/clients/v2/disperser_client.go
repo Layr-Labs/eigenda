@@ -452,11 +452,14 @@ func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateRe
 		}
 
 		// Apply the global params to all quorums, both on-demand and reservation.
-		onDemandQuorums := legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers
+		onDemandQuorums := legacyReply.GetPaymentGlobalParams().GetOnDemandQuorumNumbers()
 		if len(onDemandQuorums) == 0 {
-			return nil, fmt.Errorf("no on-demand quorums specified in legacy PaymentGlobalParams received from disperser")
+			// Disperser v0.9.0 has a bug where it does not return on-demand quorums: https://github.com/Layr-Labs/eigenda/pull/1699
+			// Until we upgrade all dispersers, we will assume that on-demand quorums are 0 and 1.
+			// TODO: this should instead return an error once we have upgraded all dispersers.
+			onDemandQuorums = []uint32{0, 1}
 		}
-		reservationQuorums := legacyReply.Reservation.QuorumNumbers
+		reservationQuorums := legacyReply.GetReservation().GetQuorumNumbers()
 		// There may be overlapping quorums but it doesn't matter since we will apply the same global params to all of them.
 		allQuorums := append(reservationQuorums, onDemandQuorums...)
 

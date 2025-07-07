@@ -352,6 +352,52 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	return semverReport, nil
 }
 
+func (s *OperatorHandler) ScanOperatorsHostInfoV2(ctx context.Context) (*SemverReportResponse, error) {
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
+	}
+	operators, err := s.indexedChainState.GetIndexedOperators(context.Background(), currentBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch indexed operator info: %w", err)
+	}
+
+	// check operator socket registration against the indexed state
+	for operatorID, operatorInfo := range operators {
+		socket, err := s.chainState.GetOperatorSocket(context.Background(), currentBlock, operatorID)
+		if err != nil {
+			s.logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
+			continue
+		}
+		if socket != operatorInfo.Socket {
+			s.logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
+		}
+	}
+
+	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
+
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, s.quorumIds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
+	}
+
+	nodeInfoWorkers := 20
+	nodeInfoTimeout := time.Duration(1 * time.Second)
+	useRetrievalClient := false
+	semvers := semver.ScanOperatorsV2(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
+
+	// Create HostInfoReportResponse instance
+	semverReport := &SemverReportResponse{
+		Semver: semvers,
+	}
+
+	// Publish semver report metrics
+	s.metrics.UpdateSemverCounts(semvers)
+
+	s.logger.Info("Semver scan completed", "semverReport", semverReport)
+	return semverReport, nil
+}
+
 // CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the
 // the block interval [startBlock, endBlock] for operators specified in OperatorList.
 //

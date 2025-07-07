@@ -16,16 +16,22 @@ const (
 
 var (
 	/* Required Flags*/
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	/* Optional Flags*/
@@ -58,16 +64,16 @@ var (
 	}
 )
 
-var requiredFlags = []cli.Flag{
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
-}
+var requiredFlags = []cli.Flag{}
 
 var optionalFlags = []cli.Flag{
 	TimeoutFlag,
 	WorkersFlag,
 	OperatorIdFlag,
 	UseRetrievalClientFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

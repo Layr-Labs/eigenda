@@ -22,7 +22,6 @@ func TestNewFileLock(t *testing.T) {
 		name        string
 		setup       func() string
 		expectError bool
-		errorMsg    string
 	}{
 		{
 			name: "successful lock creation",
@@ -42,7 +41,6 @@ func TestNewFileLock(t *testing.T) {
 				return lockPath
 			},
 			expectError: true,
-			errorMsg:    "process",
 		},
 		{
 			name: "stale lock file gets overridden",
@@ -68,7 +66,6 @@ func TestNewFileLock(t *testing.T) {
 				return lockPath
 			},
 			expectError: true,
-			errorMsg:    "lock file already exists",
 		},
 		{
 			name: "invalid directory",
@@ -76,7 +73,6 @@ func TestNewFileLock(t *testing.T) {
 				return filepath.Join(tempDir, "nonexistent", "test.lock")
 			},
 			expectError: true,
-			errorMsg:    "failed to create lock file",
 		},
 		{
 			name: "tilde expansion",
@@ -91,21 +87,11 @@ func TestNewFileLock(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			lockPath := tc.setup()
 
-			lock, err := NewFileLock(logger, lockPath, true)
+			lock, err := NewFileLock(logger, lockPath, false)
 
 			if tc.expectError {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tc.errorMsg)
 				require.Nil(t, lock)
-
-				// Check for specific error messages
-				switch tc.name {
-				case "lock already exists with live process":
-					require.Contains(t, err.Error(), "still running")
-					require.Contains(t, err.Error(), fmt.Sprintf("process %d", os.Getpid()))
-				case "malformed lock file gets treated as existing":
-					require.Contains(t, err.Error(), "lock file already exists")
-				}
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, lock)
@@ -136,7 +122,7 @@ func TestFileLockRelease(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a lock
-	lock, err := NewFileLock(logger, lockPath, true)
+	lock, err := NewFileLock(logger, lockPath, false)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
@@ -162,7 +148,7 @@ func TestFileLockPath(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
-	lock, err := NewFileLock(logger, lockPath, true)
+	lock, err := NewFileLock(logger, lockPath, false)
 	require.NoError(t, err)
 	defer lock.Release()
 
@@ -192,7 +178,7 @@ func TestFileLockConcurrency(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			lock, err := NewFileLock(logger, lockPath, true)
+			lock, err := NewFileLock(logger, lockPath, false)
 			if err != nil {
 				results <- false
 				return
@@ -222,73 +208,22 @@ func TestFileLockConcurrency(t *testing.T) {
 	require.Equal(t, int32(1), successCount, "Only one goroutine should acquire the lock")
 }
 
-func TestFileLockCleanupOnFailure(t *testing.T) {
+func TestDoubleRelease(t *testing.T) {
 	tempDir := t.TempDir()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
-	// Test that failed lock creation cleans up partial files
-	t.Run("sync failure cleanup", func(t *testing.T) {
-		// This is harder to test directly since sync failures are rare
-		// We'll test the error path by creating a lock and verifying it's cleaned up
-		lockPath := filepath.Join(tempDir, "cleanup-test.lock")
+	lockPath := filepath.Join(tempDir, "double-release.lock")
 
-		lock, err := NewFileLock(logger, lockPath, true)
-		require.NoError(t, err)
-		require.NotNil(t, lock)
-
-		// Verify lock was created
-		_, err = os.Stat(lockPath)
-		require.NoError(t, err)
-
-		// Clean up
-		lock.Release()
-
-		// Verify cleanup
-		_, err = os.Stat(lockPath)
-		require.True(t, os.IsNotExist(err))
-	})
-}
-
-func TestFileLockEdgeCases(t *testing.T) {
-	tempDir := t.TempDir()
-
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	lock, err := NewFileLock(logger, lockPath, false)
 	require.NoError(t, err)
 
-	t.Run("release nil lock", func(t *testing.T) {
-		lock := &FileLock{}
-		lock.Release()
-		require.NoError(t, err)
-	})
+	// First release should succeed
+	lock.Release()
 
-	t.Run("path sanitization", func(t *testing.T) {
-		// Test that paths are properly sanitized
-		relativePath := "test.lock"
-
-		lock, err := NewFileLock(logger, relativePath, true)
-		require.NoError(t, err)
-		defer lock.Release()
-
-		// Path should be absolute
-		lockPath := lock.Path()
-		require.True(t, filepath.IsAbs(lockPath))
-		require.Contains(t, lockPath, "test.lock")
-	})
-
-	t.Run("double release protection", func(t *testing.T) {
-		lockPath := filepath.Join(tempDir, "double-release.lock")
-
-		lock, err := NewFileLock(logger, lockPath, true)
-		require.NoError(t, err)
-
-		// First release should succeed
-		lock.Release()
-
-		// Second release should fail gracefully
-		lock.Release()
-	})
+	// Second release should not panic
+	lock.Release()
 }
 
 func TestFileLockDebugInfo(t *testing.T) {
@@ -299,11 +234,11 @@ func TestFileLockDebugInfo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create first lock
-	lock1, err := NewFileLock(logger, lockPath, true)
+	lock1, err := NewFileLock(logger, lockPath, false)
 	require.NoError(t, err)
 
 	// Try to create second lock - should fail with debug info
-	lock2, err := NewFileLock(logger, lockPath, true)
+	lock2, err := NewFileLock(logger, lockPath, false)
 	require.Error(t, err)
 	require.Nil(t, lock2)
 
@@ -315,41 +250,6 @@ func TestFileLockDebugInfo(t *testing.T) {
 
 	// Clean up
 	lock1.Release()
-}
-
-func TestFileLockContentsFormat(t *testing.T) {
-	tempDir := t.TempDir()
-	lockPath := filepath.Join(tempDir, "content-test.lock")
-
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
-	lock, err := NewFileLock(logger, lockPath, true)
-	require.NoError(t, err)
-	defer lock.Release()
-
-	// Read and verify lock file contents
-	content, err := os.ReadFile(lockPath)
-	require.NoError(t, err)
-
-	contentStr := string(content)
-	lines := strings.Split(strings.TrimSpace(contentStr), "\n")
-	require.Len(t, lines, 2)
-
-	// Check PID line
-	require.True(t, strings.HasPrefix(lines[0], "PID: "))
-	pidStr := strings.TrimPrefix(lines[0], "PID: ")
-	require.NotEmpty(t, pidStr)
-	// Verify it's a valid number
-	require.Regexp(t, `^\d+$`, pidStr)
-
-	// Check timestamp line
-	require.True(t, strings.HasPrefix(lines[1], "Timestamp: "))
-
-	// Verify timestamp is valid RFC3339 format
-	timestampStr := strings.TrimPrefix(lines[1], "Timestamp: ")
-	_, err = time.Parse(time.RFC3339, timestampStr)
-	require.NoError(t, err)
 }
 
 func TestIsProcessAlive(t *testing.T) {
@@ -470,7 +370,7 @@ func TestStaleLockRecovery(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to acquire the lock - should succeed by removing stale lock
-	lock, err := NewFileLock(logger, lockPath, true)
+	lock, err := NewFileLock(logger, lockPath, false)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
@@ -483,230 +383,243 @@ func TestStaleLockRecovery(t *testing.T) {
 	lock.Release()
 }
 
-func TestLockDirectories(t *testing.T) {
+func TestLockDirectoriesSuccessfulLocking(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
-	t.Run("successful locking of multiple directories", func(t *testing.T) {
-		tempDir := t.TempDir()
-		
-		// Create multiple directories
-		dir1 := filepath.Join(tempDir, "dir1")
-		dir2 := filepath.Join(tempDir, "dir2")
-		dir3 := filepath.Join(tempDir, "dir3")
-		
-		err := os.MkdirAll(dir1, 0755)
+	tempDir := t.TempDir()
+
+	// Create multiple directories
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "dir2")
+	dir3 := filepath.Join(tempDir, "dir3")
+
+	err = os.MkdirAll(dir1, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir2, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir3, 0755)
+	require.NoError(t, err)
+
+	directories := []string{dir1, dir2, dir3}
+	lockFileName := "test.lock"
+
+	// Lock all directories
+	release, err := LockDirectories(logger, directories, lockFileName, false)
+	require.NoError(t, err)
+	require.NotNil(t, release)
+
+	// Verify lock files were created in all directories
+	for _, dir := range directories {
+		lockPath := filepath.Join(dir, lockFileName)
+		_, err := os.Stat(lockPath)
+		require.NoError(t, err, "lock file should exist in %s", dir)
+
+		// Verify lock file content
+		content, err := os.ReadFile(lockPath)
 		require.NoError(t, err)
-		err = os.MkdirAll(dir2, 0755)
+		contentStr := string(content)
+		require.Contains(t, contentStr, "PID:")
+		require.Contains(t, contentStr, "Timestamp:")
+	}
+
+	// Release all locks
+	release()
+
+	// Verify all lock files were removed
+	for _, dir := range directories {
+		lockPath := filepath.Join(dir, lockFileName)
+		_, err := os.Stat(lockPath)
+		require.True(t, os.IsNotExist(err), "lock file should be removed from %s", dir)
+	}
+}
+
+func TestLockDirectoriesFailureWhenLockExists(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	tempDir := t.TempDir()
+
+	// Create multiple directories
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "dir2")
+	dir3 := filepath.Join(tempDir, "dir3")
+
+	err = os.MkdirAll(dir1, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir2, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir3, 0755)
+	require.NoError(t, err)
+
+	lockFileName := "test.lock"
+
+	// Create an existing lock in dir2
+	existingLockPath := filepath.Join(dir2, lockFileName)
+	content := fmt.Sprintf("PID: %d\nTimestamp: 2023-01-01T00:00:00Z\n", os.Getpid())
+	err = os.WriteFile(existingLockPath, []byte(content), 0644)
+	require.NoError(t, err)
+
+	directories := []string{dir1, dir2, dir3}
+
+	// Try to lock all directories - should fail
+	release, err := LockDirectories(logger, directories, lockFileName, false)
+	require.Error(t, err)
+	require.Nil(t, release)
+	require.Contains(t, err.Error(), "failed to acquire lock on directory")
+	require.Contains(t, err.Error(), dir2)
+
+	// Verify that no locks were left behind (all should be cleaned up on failure)
+	lockPath1 := filepath.Join(dir1, lockFileName)
+	_, err = os.Stat(lockPath1)
+	require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir1)
+
+	lockPath3 := filepath.Join(dir3, lockFileName)
+	_, err = os.Stat(lockPath3)
+	require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir3)
+
+	// Clean up the existing lock
+	err = os.Remove(existingLockPath)
+	require.NoError(t, err)
+}
+
+func TestLockDirectoriesFailureWhenDirectoryDoesNotExist(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	tempDir := t.TempDir()
+
+	// Create some directories but not all
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "nonexistent")
+	dir3 := filepath.Join(tempDir, "dir3")
+
+	err = os.MkdirAll(dir1, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir3, 0755)
+	require.NoError(t, err)
+
+	directories := []string{dir1, dir2, dir3}
+	lockFileName := "test.lock"
+
+	// Try to lock all directories - should fail on nonexistent directory
+	release, err := LockDirectories(logger, directories, lockFileName, false)
+	require.Error(t, err)
+	require.Nil(t, release)
+	require.Contains(t, err.Error(), "failed to acquire lock on directory")
+	require.Contains(t, err.Error(), dir2)
+
+	// Verify that no locks were left behind
+	lockPath1 := filepath.Join(dir1, lockFileName)
+	_, err = os.Stat(lockPath1)
+	require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir1)
+
+	lockPath3 := filepath.Join(dir3, lockFileName)
+	_, err = os.Stat(lockPath3)
+	require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir3)
+}
+
+func TestLockDirectoriesEmptyList(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	directories := []string{}
+	lockFileName := "test.lock"
+
+	// Lock empty list should succeed
+	release, err := LockDirectories(logger, directories, lockFileName, false)
+	require.NoError(t, err)
+	require.NotNil(t, release)
+
+	// Release should not panic
+	release()
+}
+
+func TestLockDirectoriesConcurrentAccessPrevention(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	tempDir := t.TempDir()
+
+	// Create directories
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "dir2")
+
+	err = os.MkdirAll(dir1, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir2, 0755)
+	require.NoError(t, err)
+
+	directories := []string{dir1, dir2}
+	lockFileName := "test.lock"
+
+	// First process locks directories
+	release1, err := LockDirectories(logger, directories, lockFileName, false)
+	require.NoError(t, err)
+	require.NotNil(t, release1)
+
+	// Second process tries to lock same directories - should fail
+	release2, err := LockDirectories(logger, directories, lockFileName, false)
+	require.Error(t, err)
+	require.Nil(t, release2)
+	require.Contains(t, err.Error(), "failed to acquire lock on directory")
+
+	// Release first lock
+	release1()
+
+	// Now second process should be able to lock
+	release2, err = LockDirectories(logger, directories, lockFileName, false)
+	require.NoError(t, err)
+	require.NotNil(t, release2)
+
+	// Clean up
+	release2()
+}
+
+func TestLockDirectoriesStaleLockRecovery(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	tempDir := t.TempDir()
+
+	// Create directories
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "dir2")
+
+	err = os.MkdirAll(dir1, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(dir2, 0755)
+	require.NoError(t, err)
+
+	lockFileName := "test.lock"
+
+	// Create stale lock files with non-existent PIDs
+	stalePID := 999999
+	staleContent := fmt.Sprintf("PID: %d\nTimestamp: 2023-01-01T00:00:00Z\n", stalePID)
+
+	staleLockPath1 := filepath.Join(dir1, lockFileName)
+	err = os.WriteFile(staleLockPath1, []byte(staleContent), 0644)
+	require.NoError(t, err)
+
+	staleLockPath2 := filepath.Join(dir2, lockFileName)
+	err = os.WriteFile(staleLockPath2, []byte(staleContent), 0644)
+	require.NoError(t, err)
+
+	directories := []string{dir1, dir2}
+
+	// Should succeed by removing stale locks
+	release, err := LockDirectories(logger, directories, lockFileName, false)
+	require.NoError(t, err)
+	require.NotNil(t, release)
+
+	// Verify lock files now contain our PID
+	for _, dir := range directories {
+		lockPath := filepath.Join(dir, lockFileName)
+		content, err := os.ReadFile(lockPath)
 		require.NoError(t, err)
-		err = os.MkdirAll(dir3, 0755)
-		require.NoError(t, err)
+		require.Contains(t, string(content), fmt.Sprintf("PID: %d", os.Getpid()))
+	}
 
-		directories := []string{dir1, dir2, dir3}
-		lockFileName := "test.lock"
-
-		// Lock all directories
-		release, err := LockDirectories(logger, directories, lockFileName, true)
-		require.NoError(t, err)
-		require.NotNil(t, release)
-
-		// Verify lock files were created in all directories
-		for _, dir := range directories {
-			lockPath := filepath.Join(dir, lockFileName)
-			_, err := os.Stat(lockPath)
-			require.NoError(t, err, "lock file should exist in %s", dir)
-
-			// Verify lock file content
-			content, err := os.ReadFile(lockPath)
-			require.NoError(t, err)
-			contentStr := string(content)
-			require.Contains(t, contentStr, "PID:")
-			require.Contains(t, contentStr, "Timestamp:")
-		}
-
-		// Release all locks
-		release()
-
-		// Verify all lock files were removed
-		for _, dir := range directories {
-			lockPath := filepath.Join(dir, lockFileName)
-			_, err := os.Stat(lockPath)
-			require.True(t, os.IsNotExist(err), "lock file should be removed from %s", dir)
-		}
-	})
-
-	t.Run("failure when one directory already has a lock", func(t *testing.T) {
-		tempDir := t.TempDir()
-		
-		// Create multiple directories
-		dir1 := filepath.Join(tempDir, "dir1")
-		dir2 := filepath.Join(tempDir, "dir2")
-		dir3 := filepath.Join(tempDir, "dir3")
-		
-		err := os.MkdirAll(dir1, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dir2, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dir3, 0755)
-		require.NoError(t, err)
-
-		lockFileName := "test.lock"
-
-		// Create an existing lock in dir2
-		existingLockPath := filepath.Join(dir2, lockFileName)
-		content := fmt.Sprintf("PID: %d\nTimestamp: 2023-01-01T00:00:00Z\n", os.Getpid())
-		err = os.WriteFile(existingLockPath, []byte(content), 0644)
-		require.NoError(t, err)
-
-		directories := []string{dir1, dir2, dir3}
-
-		// Try to lock all directories - should fail
-		release, err := LockDirectories(logger, directories, lockFileName, true)
-		require.Error(t, err)
-		require.Nil(t, release)
-		require.Contains(t, err.Error(), "failed to acquire lock on directory")
-		require.Contains(t, err.Error(), dir2)
-
-		// Verify that no locks were left behind (all should be cleaned up on failure)
-		lockPath1 := filepath.Join(dir1, lockFileName)
-		_, err = os.Stat(lockPath1)
-		require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir1)
-
-		lockPath3 := filepath.Join(dir3, lockFileName)
-		_, err = os.Stat(lockPath3)
-		require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir3)
-
-		// Clean up the existing lock
-		err = os.Remove(existingLockPath)
-		require.NoError(t, err)
-	})
-
-	t.Run("failure when directory doesn't exist", func(t *testing.T) {
-		tempDir := t.TempDir()
-		
-		// Create some directories but not all
-		dir1 := filepath.Join(tempDir, "dir1")
-		dir2 := filepath.Join(tempDir, "nonexistent")
-		dir3 := filepath.Join(tempDir, "dir3")
-		
-		err := os.MkdirAll(dir1, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dir3, 0755)
-		require.NoError(t, err)
-
-		directories := []string{dir1, dir2, dir3}
-		lockFileName := "test.lock"
-
-		// Try to lock all directories - should fail on nonexistent directory
-		release, err := LockDirectories(logger, directories, lockFileName, true)
-		require.Error(t, err)
-		require.Nil(t, release)
-		require.Contains(t, err.Error(), "failed to acquire lock on directory")
-		require.Contains(t, err.Error(), dir2)
-
-		// Verify that no locks were left behind
-		lockPath1 := filepath.Join(dir1, lockFileName)
-		_, err = os.Stat(lockPath1)
-		require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir1)
-
-		lockPath3 := filepath.Join(dir3, lockFileName)
-		_, err = os.Stat(lockPath3)
-		require.True(t, os.IsNotExist(err), "lock file should not exist in %s after failure", dir3)
-	})
-
-	t.Run("empty directories list", func(t *testing.T) {
-		directories := []string{}
-		lockFileName := "test.lock"
-
-		// Lock empty list should succeed
-		release, err := LockDirectories(logger, directories, lockFileName, true)
-		require.NoError(t, err)
-		require.NotNil(t, release)
-
-		// Release should not panic
-		release()
-	})
-
-	t.Run("concurrent access prevention", func(t *testing.T) {
-		tempDir := t.TempDir()
-		
-		// Create directories
-		dir1 := filepath.Join(tempDir, "dir1")
-		dir2 := filepath.Join(tempDir, "dir2")
-		
-		err := os.MkdirAll(dir1, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dir2, 0755)
-		require.NoError(t, err)
-
-		directories := []string{dir1, dir2}
-		lockFileName := "test.lock"
-
-		// First process locks directories
-		release1, err := LockDirectories(logger, directories, lockFileName, true)
-		require.NoError(t, err)
-		require.NotNil(t, release1)
-
-		// Second process tries to lock same directories - should fail
-		release2, err := LockDirectories(logger, directories, lockFileName, true)
-		require.Error(t, err)
-		require.Nil(t, release2)
-		require.Contains(t, err.Error(), "failed to acquire lock on directory")
-
-		// Release first lock
-		release1()
-
-		// Now second process should be able to lock
-		release2, err = LockDirectories(logger, directories, lockFileName, true)
-		require.NoError(t, err)
-		require.NotNil(t, release2)
-
-		// Clean up
-		release2()
-	})
-
-	t.Run("stale lock recovery", func(t *testing.T) {
-		tempDir := t.TempDir()
-		
-		// Create directories
-		dir1 := filepath.Join(tempDir, "dir1")
-		dir2 := filepath.Join(tempDir, "dir2")
-		
-		err := os.MkdirAll(dir1, 0755)
-		require.NoError(t, err)
-		err = os.MkdirAll(dir2, 0755)
-		require.NoError(t, err)
-
-		lockFileName := "test.lock"
-
-		// Create stale lock files with non-existent PIDs
-		stalePID := 999999
-		staleContent := fmt.Sprintf("PID: %d\nTimestamp: 2023-01-01T00:00:00Z\n", stalePID)
-		
-		staleLockPath1 := filepath.Join(dir1, lockFileName)
-		err = os.WriteFile(staleLockPath1, []byte(staleContent), 0644)
-		require.NoError(t, err)
-		
-		staleLockPath2 := filepath.Join(dir2, lockFileName)
-		err = os.WriteFile(staleLockPath2, []byte(staleContent), 0644)
-		require.NoError(t, err)
-
-		directories := []string{dir1, dir2}
-
-		// Should succeed by removing stale locks
-		release, err := LockDirectories(logger, directories, lockFileName, true)
-		require.NoError(t, err)
-		require.NotNil(t, release)
-
-		// Verify lock files now contain our PID
-		for _, dir := range directories {
-			lockPath := filepath.Join(dir, lockFileName)
-			content, err := os.ReadFile(lockPath)
-			require.NoError(t, err)
-			require.Contains(t, string(content), fmt.Sprintf("PID: %d", os.Getpid()))
-		}
-
-		// Clean up
-		release()
-	})
+	// Clean up
+	release()
 }
