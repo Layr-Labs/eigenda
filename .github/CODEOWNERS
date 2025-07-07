@@ -1,6 +1,7 @@
 # Clients
 # See https://github.com/orgs/Layr-Labs/teams/eigenda-intg
 /api/clients @Layr-Labs/eigenda-intg
+/api/proxy @Layr-Labs/eigenda-intg
 
 # Contracts
 /contracts @pakim249CAL
