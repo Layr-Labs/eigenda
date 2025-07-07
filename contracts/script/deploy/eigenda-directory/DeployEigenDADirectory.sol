@@ -56,10 +56,11 @@ contract DeployEigenDADirectory is Script {
         string name;
         address value;
     }
+
     function _populateDirectory() internal virtual {
         // Dynamically read all contract names from the [contracts] table
         string[] memory contractNames = vm.parseTomlKeys(cfg, ".contracts");
-        
+
         for (uint256 i; i < contractNames.length; i++) {
             string memory name = contractNames[i];
             address contractAddress = cfg.readAddress(string.concat(".contracts.", name));
