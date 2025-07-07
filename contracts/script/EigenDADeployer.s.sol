@@ -15,6 +15,8 @@ import {StakeRegistry, IStrategy} from "../lib/eigenlayer-middleware/src/StakeRe
 import {IStakeRegistry, IDelegationManager} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
+import {IRelayRegistry} from "src/core/interfaces/IRelayRegistry.sol";
+import {RelayRegistry} from "src/core/RelayRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {EigenDACertVerifierV2} from "src/integrations/cert/legacy/v2/EigenDACertVerifierV2.sol";
@@ -70,6 +72,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IPaymentVault public paymentVault;
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
+    IRelayRegistry public relayRegistry;
 
     EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
@@ -83,6 +86,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
     IEigenDADisperserRegistry public eigenDADisperserRegistryImplementation;
+    IRelayRegistry public relayRegistryImplementation;
 
     uint64 _minNumSymbols = 4096;
     uint64 _pricePerSymbol = 0.447 gwei;
@@ -201,6 +205,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
         eigenDADirectory.addAddress(AddressDirectoryConstants.SOCKET_REGISTRY_NAME, address(socketRegistry));
+        relayRegistry = IRelayRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        eigenDADirectory.addAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME, address(relayRegistry));
 
         {
             paymentVault = IPaymentVault(
@@ -263,6 +271,11 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDAProxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(socketRegistry))), address(socketRegistryImplementation)
+        );
+
+        relayRegistryImplementation = new RelayRegistry();
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(relayRegistry))), address(relayRegistryImplementation)
         );
 
         registryCoordinatorImplementation = new RegistryCoordinator(
