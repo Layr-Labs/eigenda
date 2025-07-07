@@ -1,6 +1,7 @@
 package meterer
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 		paymentMetadata core.PaymentMetadata
 		numSymbols      uint64
 		quorumNumbers   []core.QuorumID
-		expectedError   string
+		expectedError   error
 		checkFields     bool
 	}{
 		{
@@ -29,7 +30,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    1000,
 			quorumNumbers: []core.QuorumID{0, 1, 2},
-			expectedError: "",
+			expectedError: nil,
 			checkFields:   true,
 		},
 		{
@@ -41,7 +42,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{},
-			expectedError: "no quorums provided",
+			expectedError: ErrNoQuorums,
 		},
 		{
 			name: "zero symbols",
@@ -52,7 +53,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    0,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: "zero symbols requested",
+			expectedError: ErrZeroSymbols,
 		},
 		{
 			name: "invalid account ID",
@@ -63,7 +64,7 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: "invalid account ID",
+			expectedError: ErrInvalidAccount,
 		},
 		{
 			name: "invalid timestamp",
@@ -74,14 +75,14 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 			},
 			numSymbols:    100,
 			quorumNumbers: []core.QuorumID{0},
-			expectedError: "invalid timestamp",
+			expectedError: ErrInvalidTimestamp,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := NewDebitSlip(tt.paymentMetadata, tt.numSymbols, tt.quorumNumbers)
-			if tt.expectedError == "" {
+			if tt.expectedError == nil {
 				assert.NoError(t, err)
 				assert.NotNil(t, request)
 
@@ -91,12 +92,11 @@ func TestDebitSlip_NewDebitSlip(t *testing.T) {
 					assert.Equal(t, tt.quorumNumbers, request.QuorumNumbers)
 					assert.Equal(t, tt.paymentMetadata.AccountID, request.GetAccountID())
 					assert.Equal(t, tt.paymentMetadata.Timestamp, request.GetTimestamp())
-					assert.NotZero(t, request.ReceivedAt)
 				}
 			} else {
 				require.Error(t, err)
 				assert.Nil(t, request)
-				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.True(t, errors.Is(err, tt.expectedError), "expected error %v, got %v", tt.expectedError, err)
 			}
 		})
 	}
@@ -113,13 +113,11 @@ func TestDebitSlip_WithMethods(t *testing.T) {
 	}
 
 	requestID := "test-request-123"
-	receivedAt := time.Now().Add(-time.Hour)
 
 	// Test method chaining
-	result := request.WithRequestID(requestID).WithReceivedAt(receivedAt)
+	result := request.WithRequestID(requestID)
 
 	assert.Equal(t, requestID, result.RequestID)
-	assert.Equal(t, receivedAt, result.ReceivedAt)
 	assert.Same(t, request, result) // Should return same instance for chaining
 }
 

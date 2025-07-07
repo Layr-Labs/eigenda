@@ -1,11 +1,18 @@
 package meterer
 
 import (
+	"errors"
 	"fmt"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+)
+
+var (
+	ErrNoQuorums       = errors.New("no quorums provided")
+	ErrZeroSymbols     = errors.New("zero symbols requested")
+	ErrInvalidAccount  = errors.New("invalid account ID")
+	ErrInvalidTimestamp = errors.New("invalid timestamp")
 )
 
 // DebitSlip encapsulates all parameters needed for blob processing requests.
@@ -19,8 +26,6 @@ type DebitSlip struct {
 	// Target quorums for blob dispersal
 	QuorumNumbers []core.QuorumID
 
-	// Timing information (for server-side processing)
-	ReceivedAt time.Time // Optional, set by server when request is received
 
 	// Request identification (for tracking/logging)
 	RequestID string // Optional, for tracing and debugging
@@ -34,23 +39,22 @@ func NewDebitSlip(
 ) (*DebitSlip, error) {
 	// Validate the parameters during construction
 	if len(quorumNumbers) == 0 {
-		return nil, fmt.Errorf("no quorums provided")
+		return nil, ErrNoQuorums
 	}
 	if numSymbols == 0 {
-		return nil, fmt.Errorf("zero symbols requested")
+		return nil, ErrZeroSymbols
 	}
 	if paymentMetadata.AccountID == (gethcommon.Address{}) {
-		return nil, fmt.Errorf("invalid account ID")
+		return nil, ErrInvalidAccount
 	}
 	if paymentMetadata.Timestamp <= 0 {
-		return nil, fmt.Errorf("invalid timestamp")
+		return nil, ErrInvalidTimestamp
 	}
 
 	return &DebitSlip{
 		PaymentMetadata: paymentMetadata,
 		NumSymbols:      numSymbols,
 		QuorumNumbers:   quorumNumbers,
-		ReceivedAt:      time.Now(),
 	}, nil
 }
 
@@ -79,11 +83,6 @@ func (ds *DebitSlip) WithRequestID(requestID string) *DebitSlip {
 	return ds
 }
 
-// WithReceivedAt sets the received timestamp
-func (ds *DebitSlip) WithReceivedAt(receivedAt time.Time) *DebitSlip {
-	ds.ReceivedAt = receivedAt
-	return ds
-}
 
 // String returns a string representation for logging and debugging
 func (ds *DebitSlip) String() string {
