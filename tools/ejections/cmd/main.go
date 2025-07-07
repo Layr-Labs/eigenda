@@ -77,7 +77,7 @@ func RunScan(ctx *cli.Context) error {
 	if chainState == nil {
 		return errors.New("failed to create chain state")
 	}
-	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
+	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint, config.SubgraphEndpoint)
 	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
 
 	ejections, err := subgraphClient.QueryOperatorEjectionsForTimeWindow(context.Background(), int32(config.Days), config.OperatorId, config.First, config.Skip)
