@@ -24,12 +24,11 @@ library AddressDirectoryConstants {
     /// PERIPHERY
 
     string internal constant OPERATOR_STATE_RETRIEVER_NAME = "OPERATOR_STATE_RETRIEVER";
-
     string internal constant CERT_VERIFIER_NAME = "CERT_VERIFIER";
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
 
     /// LEGACY
 
-    string internal constant CERT_VERIFIER_V1_NAME = "CERT_VERIFIER_V1";
-    string internal constant CERT_VERIFIER_V2_NAME = "CERT_VERIFIER_V2";
+    string internal constant CERT_VERIFIER_LEGACY_V1_NAME = "CERT_VERIFIER_LEGACY_V1";
+    string internal constant CERT_VERIFIER_LEGACY_V2_NAME = "CERT_VERIFIER_LEGACY_V2";
 }
