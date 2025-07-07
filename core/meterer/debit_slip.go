@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	ErrNoQuorums       = errors.New("no quorums provided")
-	ErrZeroSymbols     = errors.New("zero symbols requested")
-	ErrInvalidAccount  = errors.New("invalid account ID")
+	ErrNoQuorums        = errors.New("no quorums provided")
+	ErrZeroSymbols      = errors.New("zero symbols requested")
+	ErrInvalidAccount   = errors.New("invalid account ID")
 	ErrInvalidTimestamp = errors.New("invalid timestamp")
 )
 
@@ -25,7 +25,6 @@ type DebitSlip struct {
 
 	// Target quorums for blob dispersal
 	QuorumNumbers []core.QuorumID
-
 
 	// Request identification (for tracking/logging)
 	RequestID string // Optional, for tracing and debugging
@@ -82,7 +81,6 @@ func (ds *DebitSlip) WithRequestID(requestID string) *DebitSlip {
 	ds.RequestID = requestID
 	return ds
 }
-
 
 // String returns a string representation for logging and debugging
 func (ds *DebitSlip) String() string {
