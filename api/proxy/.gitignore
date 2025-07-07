@@ -5,7 +5,7 @@
 *.exe
 *.exe~
 *.dll
-*.socl
+*.so
 *.dylib
 
 # Test binary, built with `go test -c`
