@@ -2,17 +2,18 @@ package benchmark
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/benchmark/config"
-	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/litt/benchmark/wrappers"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -29,10 +30,7 @@ type BenchmarkEngine struct {
 	config *config.BenchmarkConfig
 
 	// The database to be benchmarked.
-	db litt.DB
-
-	// The table in the database where data is stored.
-	table litt.Table
+	db wrappers.DatabaseWrapper
 
 	// Keeps track of data to read and write.
 	dataTracker *DataTracker
@@ -70,20 +68,23 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 
 	cfg.LittConfig.ShardingFactor = uint32(len(cfg.LittConfig.Paths))
 
-	db, err := littbuilder.NewDB(cfg.LittConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create db: %w", err)
+	dbFactory, ok := wrappers.WrapperFactories[cfg.DBType]
+	if !ok {
+		sb := strings.Builder{}
+		sb.WriteString("unknown database type: ")
+		sb.WriteString(cfg.DBType)
+		sb.WriteString("\nAvailable database types: ")
+		for dbType := range wrappers.WrapperFactories {
+			sb.WriteString("- ")
+			sb.WriteString(dbType)
+			sb.WriteString("\n")
+		}
+		return nil, errors.New(sb.String())
 	}
 
-	table, err := db.GetTable("benchmark")
+	db, err := dbFactory(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create table: %w", err)
-	}
-
-	ttl := time.Duration(cfg.TTLHours * float64(time.Hour))
-	err = table.SetTTL(ttl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set TTL for table: %w", err)
+		return nil, fmt.Errorf("failed to create database wrapper: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +119,6 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		logger:                       cfg.LittConfig.Logger,
 		config:                       cfg,
 		db:                           db,
-		table:                        table,
 		dataTracker:                  dataTracker,
 		writeBytesPerSecondPerThread: writeBytesPerSecondPerThread,
 		readBytesPerSecondPerThread:  readBytesPerSecondPerThread,
@@ -195,6 +195,12 @@ func (b *BenchmarkEngine) writer() {
 	maxBatchSize := uint64(b.config.BatchSizeMB * float64(units.MiB))
 	throttle := rate.NewLimiter(rate.Limit(b.writeBytesPerSecondPerThread), int(b.writeBurstSize))
 
+	localDB, err := b.db.BuildThreadLocalWrapper()
+	if err != nil {
+		b.errorMonitor.Panic(fmt.Errorf("failed to build thread-local database wrapper: %v", err))
+		return
+	}
+
 	for {
 		select {
 		case <-b.errorMonitor.ImmediateShutdownRequired():
@@ -219,7 +225,7 @@ func (b *BenchmarkEngine) writer() {
 
 				start := time.Now()
 
-				err := b.table.Put(writeInfo.Key, writeInfo.Value)
+				err = localDB.Put(writeInfo.Key, writeInfo.Value)
 				if err != nil {
 					b.errorMonitor.Panic(fmt.Errorf("failed to write data: %v", err))
 					return
@@ -231,7 +237,7 @@ func (b *BenchmarkEngine) writer() {
 
 			start := time.Now()
 
-			err := b.table.Flush()
+			err := localDB.Flush()
 			if err != nil {
 				b.errorMonitor.Panic(fmt.Errorf("failed to flush data: %v", err))
 				return
@@ -264,6 +270,12 @@ func (b *BenchmarkEngine) verifyValue(expected *ReadInfo, actual []byte) error {
 func (b *BenchmarkEngine) reader() {
 	throttle := rate.NewLimiter(rate.Limit(b.readBytesPerSecondPerThread), int(b.readBurstSize))
 
+	localDB, err := b.db.BuildThreadLocalWrapper()
+	if err != nil {
+		b.errorMonitor.Panic(fmt.Errorf("failed to build thread-local database wrapper: %v", err))
+		return
+	}
+
 	for {
 		select {
 		case <-b.errorMonitor.ImmediateShutdownRequired():
@@ -286,7 +298,7 @@ func (b *BenchmarkEngine) reader() {
 
 			start := time.Now()
 
-			value, exists, err := b.table.Get(readInfo.Key)
+			value, exists, err := localDB.Get(readInfo.Key)
 			if err != nil {
 				b.errorMonitor.Panic(fmt.Errorf("failed to read data: %v", err))
 				return

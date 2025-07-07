@@ -15,6 +15,11 @@ import (
 // BenchmarkConfig is a struct that holds the configuration for the benchmark.
 type BenchmarkConfig struct {
 
+	// The database to use for the test. If not provided, the default is "littdb". If a DB other than LittDB is used,
+	// then some LittDB specific configurations may be ignored. This benchmark suite is primarily designed for LittDB,
+	// but supports other databases for the sake of comparison.
+	DBType string
+
 	// Configuration for the LittDB instance.
 	LittConfig *litt.Config
 
@@ -95,6 +100,7 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 	littConfig.MetricsEnabled = true
 
 	return &BenchmarkConfig{
+		DBType:                      "littdb",
 		LittConfig:                  littConfig,
 		MetadataDirectory:           "~/benchmark",
 		MaximumWriteThroughputMB:    10,
