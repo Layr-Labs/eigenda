@@ -107,6 +107,8 @@ func NewLevelDBWrapper(cfg *config.BenchmarkConfig) (DatabaseWrapper, error) {
 		}()
 
 		metrics = newBasicWrapperMetrics(registry, tableName)
+	} else {
+		logger.Infof("Metrics are disabled, not starting metrics server, metrics enabled flag = %v", cfg.LittConfig.MetricsEnabled)
 	}
 
 	return &LevelDBWrapper{
