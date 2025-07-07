@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/require"
 )
@@ -158,7 +159,7 @@ func createUncompressedFile[T bn254.G1Affine | bn254.G2Affine](points []T, filen
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer core.CloseLogOnError(file, filename, nil)
 
 	for _, point := range points {
 		// Uncompressed format using RawBytes
