@@ -234,11 +234,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 	// Start background refresh of chain state
 	if d.OnchainStateRefreshInterval > 0 {
-		// Refresh immediately on start
-		if err := d.refreshOnchainState(ctx); err != nil {
-			return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
-		}
-
 		go d.startOnchainStateRefresher(ctx)
 	}
 
@@ -278,7 +273,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 	}()
 
 	return nil
-
 }
 
 func (d *Dispatcher) HandleBatch(
