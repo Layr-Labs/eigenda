@@ -31,8 +31,8 @@ type valueFile struct {
 	// The shard number of this value file.
 	shard uint32
 
-	// The parent directory containing this file.
-	parentDirectory string
+	// Path data for the segment file.
+	segmentPath *SegmentPath
 
 	// The file wrapped by the writer. If the file is sealed, this value is nil.
 	file *os.File
@@ -59,15 +59,16 @@ func createValueFile(
 	logger logging.Logger,
 	index uint32,
 	shard uint32,
-	parentDirectory string,
-	fsync bool) (*valueFile, error) {
+	segmentPath *SegmentPath,
+	fsync bool,
+) (*valueFile, error) {
 
 	values := &valueFile{
-		logger:          logger,
-		index:           index,
-		shard:           shard,
-		parentDirectory: parentDirectory,
-		fsync:           fsync,
+		logger:      logger,
+		index:       index,
+		shard:       shard,
+		segmentPath: segmentPath,
+		fsync:       fsync,
 	}
 
 	filePath := values.path()
@@ -98,25 +99,23 @@ func loadValueFile(
 	logger logging.Logger,
 	index uint32,
 	shard uint32,
-	parentDirectories []string) (*valueFile, error) {
+	segmentPaths []*SegmentPath) (*valueFile, error) {
 
 	valuesFileName := fmt.Sprintf("%d-%d%s", index, shard, ValuesFileExtension)
-	valuesPath, err := lookForFile(parentDirectories, valuesFileName)
-	var parentDirectory string
+	valuesPath, err := lookForFile(segmentPaths, valuesFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find value file: %v", err)
 	}
-	if valuesPath == "" {
+	if valuesPath == nil {
 		return nil, fmt.Errorf("value file %s not found", valuesFileName)
 	}
-	parentDirectory = path.Dir(valuesPath)
 
 	values := &valueFile{
-		logger:          logger,
-		index:           index,
-		shard:           shard,
-		parentDirectory: parentDirectory,
-		fsync:           false,
+		logger:      logger,
+		index:       index,
+		shard:       shard,
+		segmentPath: valuesPath,
+		fsync:       false,
 	}
 
 	filePath := values.path()
@@ -187,7 +186,7 @@ func (v *valueFile) name() string {
 
 // path returns the path to the value file.
 func (v *valueFile) path() string {
-	return path.Join(v.parentDirectory, v.name())
+	return path.Join(v.segmentPath.SegmentDirectory(), v.name())
 }
 
 // read reads a value from the value file.
@@ -309,6 +308,21 @@ func (v *valueFile) seal() error {
 	return nil
 }
 
+// snapshot creates a hard link to the file in the snapshot directory, and a soft link to the hard linked file in the
+// soft link directory. Requires that the file is sealed and that snapshotting is enabled.
+func (v *valueFile) snapshot() error {
+	if v.writer != nil {
+		return fmt.Errorf("file %s is not sealed, cannot take Snapshot", v.path())
+	}
+
+	err := v.segmentPath.Snapshot(v.name())
+	if err != nil {
+		return fmt.Errorf("failed to create Snapshot: %v", err)
+	}
+
+	return nil
+}
+
 // delete deletes the value file.
 func (v *valueFile) delete() error {
 	if v.writer != nil {
@@ -318,14 +332,28 @@ func (v *valueFile) delete() error {
 	// As an extra safety check, make it so that all future reads fail before they do I/O.
 	v.flushedSize.Store(0)
 
-	err := os.Remove(v.path())
-	if err != nil {
-		if os.IsNotExist(err) {
-			// file does not exist, no work to be done
-			return nil
-		}
+	filePath := v.path()
 
-		return fmt.Errorf("failed to delete value file: %v", err)
+	fileInfo, err := os.Lstat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to call lstat for %s: %v", filePath, err)
+	}
+	isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
+
+	if isSymlink {
+		// remove the file where the symlink points
+		actualFile, err := os.Readlink(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %v", filePath, err)
+		}
+		if err := os.Remove(actualFile); err != nil {
+			return fmt.Errorf("failed to remove actual file %s: %v", actualFile, err)
+		}
+	}
+
+	err = os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to remove file %s: %v", filePath, err)
 	}
 
 	return nil
