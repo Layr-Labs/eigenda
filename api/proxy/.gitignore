@@ -5,7 +5,7 @@
 *.exe
 *.exe~
 *.dll
-*.so
+*.socl
 *.dylib
 
 # Test binary, built with `go test -c`
@@ -29,3 +29,6 @@ e2e/resources/**
 
 ## Idea
 .idea
+
+# Claude
+.claude
