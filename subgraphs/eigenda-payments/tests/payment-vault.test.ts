@@ -127,9 +127,20 @@ describe("Reservation entity", () => {
     ]
     
     // Past reservation (expired) - ended at timestamp 200000
+    // Create three accounts with different reservation time ranges
+    let accounts = [
+      Address.fromString("0x1111111111111111111111111111111111111111"), // Past (expired)
+      Address.fromString("0x2222222222222222222222222222222222222222"), // Current (would be active)
+      Address.fromString("0x3333333333333333333333333333333333333333")  // Future (would be pending)
+    ]
+    
+    // Past reservation (expired) - ended at timestamp 200000
     let event1 = createReservationUpdatedEvent(
       accounts[0],
+      accounts[0],
       BigInt.fromI32(1000),
+      BigInt.fromI32(100000),
+      BigInt.fromI32(200000),
       BigInt.fromI32(100000),
       BigInt.fromI32(200000),
       Bytes.fromHexString("0x01"),
@@ -138,9 +149,13 @@ describe("Reservation entity", () => {
     handleReservationUpdated(event1)
     
     // Current reservation (active) - from 150000 to 250000
+    // Current reservation (active) - from 150000 to 250000
     let event2 = createReservationUpdatedEvent(
       accounts[1],
+      accounts[1],
       BigInt.fromI32(2000),
+      BigInt.fromI32(150000),
+      BigInt.fromI32(250000),
       BigInt.fromI32(150000),
       BigInt.fromI32(250000),
       Bytes.fromHexString("0x02"),
