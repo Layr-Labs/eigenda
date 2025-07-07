@@ -185,7 +185,7 @@ func (env *Config) DeployExperiment() {
 	if err != nil {
 		log.Panicf("error opening file: %v", err)
 	}
-	defer f.Close()
+	defer core.CloseLogOnError(f, f.Name(), nil)
 	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
 	// Create a new experiment and deploy the contracts
@@ -274,8 +274,10 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	writer, err := eth.NewWriter(
 		logger,
 		ethClient,
-		env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER,
-		env.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+		env.EigenDA.EigenDADirectory,
+		env.EigenDA.OperatorStateRetriever,
+		env.EigenDA.ServiceManager,
+	)
 	if err != nil {
 		return fmt.Errorf("could not create writer: %v", err)
 	}
@@ -417,6 +419,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_SOCKET=" + socket,
 		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
 		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
+		"NODE_EIGENDA_DIRECTORY=" + operator.NODE_EIGENDA_DIRECTORY,
 		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
 		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,

@@ -62,7 +62,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := coreeth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := coreeth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}

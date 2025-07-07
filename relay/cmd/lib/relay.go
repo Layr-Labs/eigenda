@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -25,7 +25,7 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create relay config: %w", err)
 	}
 
-	logger, err := common.NewLogger(config.Log)
+	logger, err := common.NewLogger(&config.Log)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -55,12 +55,12 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create eth client: %w", err)
 	}
 
-	tx, err := coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	cs := coreeth.NewChainState(tx, client)
+	cs := eth.NewChainState(tx, client)
 	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
 	server, err := relay.NewServer(

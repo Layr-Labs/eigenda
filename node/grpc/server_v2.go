@@ -15,7 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -132,6 +132,13 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
+	// If the disperser is blacklisted and the blob authenticator is not nil, return an error
+	// we don't want to blacklist the disperser if the blob authenticator is nil since that indicated v1
+	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) && s.config.EnableV2 {
+		s.logger.Info("disperser is blacklisted", "disperserID", in.DisperserID, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
+	}
+
 	if s.chunkAuthenticator != nil {
 		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
@@ -145,7 +152,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 		// TODO: move to blob authenticator later
 		for _, blob := range batch.BlobCertificates {
-			if meterer.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
+			if payment_logic.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
 				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
 				if in.DisperserID != api.EigenLabsDisperserID {
 					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
@@ -156,10 +163,16 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if s.blobAuthenticator != nil {
 		// TODO: check the latency of request validation later; could be parallelized to avoid significant
 		// impact to the request latency
-		for _, blob := range batch.BlobCertificates {
-			_, err = s.validateDispersalRequest(blob)
+		for _, blobCert := range batch.BlobCertificates {
+			_, err = s.validateDispersalRequest(blobCert)
 			if err != nil {
-				// TODO: Blacklist the disperser if there's an invalid dispersal request
+				// Blacklist the disperser if there's an invalid dispersal request
+				blacklistErr := s.node.BlacklistStore.BlacklistDisperserFromBlobCert(in, blobCert)
+				if blacklistErr != nil {
+					s.logger.Error("failed to blacklist disperser", "disperserID", in.DisperserID, "error", blacklistErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+					return nil, api.NewErrorInvalidArg("failed to blacklist disperser due to blobCert validation failure")
+				}
+				s.logger.Info("disperser blacklisted due to blobCert validation failure", "disperserID", in.DisperserID)
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 			}
 		}

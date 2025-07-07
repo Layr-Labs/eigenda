@@ -1,0 +1,8 @@
+# The address of the proxy admin contract that manages the upgradeability of the contracts.
+proxyAdmin = "0xF36fDAf681E3D88Ee412879aa4907B60D6ff0707"
+
+# The privileged account that can manage the contract directory.
+owner = "0xF36fDAf681E3D88Ee412879aa4907B60D6ff0707"
+
+[contracts]
+EXAMPLE = "0xF36fDAf681E3D88Ee412879aa4907B60D6ff0707"

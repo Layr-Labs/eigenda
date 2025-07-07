@@ -7,7 +7,7 @@ ARG SEMVER=""
 ARG GITCOMMIT=""
 ARG GITDATE=""
 
-FROM golang:1.21.13-alpine3.20 AS base-builder
+FROM golang:1.24.4-alpine3.22 AS base-builder
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
 # Common build stage
@@ -111,7 +111,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -ldflags="-X main.version=${SEMVER} \
                        -X main.gitCommit=${GITCOMMIT} \
                        -X main.gitDate=${GITDATE}" \
-      -o ./bin/blobapi ./cmd/blobapi
+        -o ./bin/blobapi ./cmd/blobapi
+
+# Proxy build stage
+FROM common-builder AS proxy-builder
+WORKDIR /app/api/proxy
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+        go build -ldflags="-X main.version=${SEMVER} \
+                       -X main.gitCommit=${GITCOMMIT} \
+                       -X main.gitDate=${GITDATE}" \
+        -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
 FROM alpine:3.22 AS churner
@@ -162,6 +172,16 @@ FROM alpine:3.22 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load", "-", "-"]
 
-FROM alpine:3.18 AS blobapi
+FROM alpine:3.22 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin
 ENTRYPOINT ["blobapi"]
+
+# proxy doesn't follow the same pattern as the others, because we keep it in the same
+# format as when it was a separate repo: https://github.com/Layr-Labs/eigenda-proxy/blob/main/Dockerfile
+FROM alpine:3.22 AS proxy
+WORKDIR /app
+COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy .
+COPY --from=proxy-builder /app/api/proxy/resources/ /app/resources/
+# default ports for data and metrics
+EXPOSE 3100 7300
+ENTRYPOINT ["./eigenda-proxy"]

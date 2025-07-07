@@ -34,6 +34,7 @@ type Config struct {
 	ChainStateConfig                    thegraph.Config
 	UseGraph                            bool
 
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
@@ -101,6 +102,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
@@ -108,5 +110,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
 	}
+
 	return config, nil
 }

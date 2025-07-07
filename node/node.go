@@ -64,6 +64,7 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
+	BlacklistStore          BlacklistStore
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
@@ -122,7 +123,7 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func NewNode(
 		}
 		storeDurationBlocks = storeDuration
 	}
-	// Create new store
+	// Create new chunk store
 	store, err := NewLevelDBStore(
 		config.DbPath+"/chunk",
 		logger,
@@ -193,7 +194,29 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	// Create new blacklist store
+	// We disable seeks compaction and enable sync writes to ensure that the blacklist is always up to date.
+	// This is because the blacklist is used to check if a disperser is blacklisted, and if it is, we need to
+	// stop accepting requests from that disperser.
+	blacklistStore, err := NewLevelDBBlacklistStore(
+		config.DbPath+"/blacklist",
+		logger,
+		true, // disable seeks compaction
+		true, // enable sync writes
+		DefaultTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
+	}
+
+	// Get service manager address from address directory
+	addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+	}
+	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address: %w", err)
+	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -211,10 +234,10 @@ func NewNode(
 		"v2RetrievalPort", config.V2RetrievalPort,
 		"internalV2RetrievalPort", config.InternalV2RetrievalPort,
 		"churnerUrl", config.ChurnerUrl,
-		"quorumIDs", fmt.Sprint(config.QuorumIDList),
+		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr,
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -231,6 +254,7 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
+		BlacklistStore:          blacklistStore,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
@@ -342,7 +366,7 @@ func (n *Node) Start(ctx context.Context) error {
 			"retrievalPort", n.Config.RetrievalPort,
 			"v2RetrievalPort", n.Config.V2RetrievalPort,
 			"churnerUrl", n.Config.ChurnerUrl,
-			"quorumIds", fmt.Sprint(n.Config.QuorumIDList))
+			"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)

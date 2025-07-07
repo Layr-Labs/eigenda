@@ -68,6 +68,7 @@ build:
 	cd tools/traffic && make build
 	cd tools/kzgpad && make build
 	cd relay && make build
+	cd litt && make build
 
 dataapi-build:
 	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
@@ -106,6 +107,8 @@ integration-tests-dataapi:
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake node-group-release ${PUSH_FLAG}
+	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
+	docker buildx bake proxy ${PUSH_FLAG}
 
 semver:
 	echo "${SEMVER}"

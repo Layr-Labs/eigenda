@@ -150,7 +150,7 @@ func TestKzgRs() {
 	//log.Fatalf("%v", err)
 	//}
 
-	fmt.Println(dataFr)
+	fmt.Printf("%x\n", dataFr)
 	// printFr(dataFr)
 	//deData := kzg.ToByteArray(dataFr, inputByteSize)
 	//fmt.Println("dataFr")

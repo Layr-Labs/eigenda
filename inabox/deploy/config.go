@@ -139,6 +139,7 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_LOG_FORMAT:                  "text",
 		CHURNER_HOSTNAME:                    "",
 		CHURNER_GRPC_PORT:                   grpcPort,
+		CHURNER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		CHURNER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 
@@ -187,6 +188,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
+		DISPERSER_SERVER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 	}
@@ -225,6 +227,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
+		DISPERSER_SERVER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
@@ -250,6 +253,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
+		BATCHER_EIGENDA_DIRECTORY:             env.EigenDA.EigenDADirectory,
 		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
 		BATCHER_SRS_ORDER:                     "300000",
@@ -337,6 +341,7 @@ func (env *Config) generateControllerVars(
 	v := ControllerVars{
 		CONTROLLER_LOG_FORMAT:                  "text",
 		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
+		CONTROLLER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		CONTROLLER_USE_GRAPH:                   "true",
@@ -372,6 +377,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
 		RELAY_RELAY_KEYS:                            fmt.Sprint(ind),
+		RELAY_EIGENDA_DIRECTORY:                     env.EigenDA.EigenDADirectory,
 		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetriever,
 		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
 		RELAY_PRIVATE_KEY:                           "123",
@@ -430,6 +436,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_ECDSA_KEY_FILE:                   ecdsaKeyFile,
 		NODE_BLS_KEY_PASSWORD:                 blsPassword,
 		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
+		NODE_EIGENDA_DIRECTORY:                env.EigenDA.EigenDADirectory,
 		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetriever,
 		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
 		NODE_REGISTER_AT_NODE_START:           "true",
@@ -468,6 +475,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_HOSTNAME:                     "",
 		RETRIEVER_GRPC_PORT:                    grpcPort,
 		RETRIEVER_TIMEOUT:                      "10s",
+		RETRIEVER_EIGENDA_DIRECTORY:            env.EigenDA.EigenDADirectory,
 		RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER: env.EigenDA.OperatorStateRetriever,
 		RETRIEVER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
 		RETRIEVER_NUM_CONNECTIONS:              "10",
@@ -769,6 +777,7 @@ func (env *Config) GenerateAllVariables() {
 		if err != nil {
 			log.Panicf("Error: %s", err.Error())
 		}
+
 		writeFile(composeFile, composeYaml)
 	}
 }

@@ -16,6 +16,9 @@ export function createNewOperatorAddedToQuorumsEvent(
     new ethereum.EventParam("operator", ethereum.Value.fromAddress(operator))
   )
   newOperatorAddedToQuorumsEvent.parameters.push(
+    new ethereum.EventParam("operatorId", ethereum.Value.fromBytes(Bytes.fromHexString("0x" + "00".repeat(32))))
+  )
+  newOperatorAddedToQuorumsEvent.parameters.push(
     new ethereum.EventParam("quorumNumbers", ethereum.Value.fromBytes(quorumNumbers))
   )
 
@@ -36,11 +39,11 @@ export function createNewOperatorRemovedFromQuorumsEvent(
     new ethereum.EventParam("operator", ethereum.Value.fromAddress(operator))
   )
   newOperatorRemovedFromQuorumsEvent.parameters.push(
+    new ethereum.EventParam("operatorId", ethereum.Value.fromBytes(Bytes.fromHexString("0x" + "00".repeat(32))))
+  )
+  newOperatorRemovedFromQuorumsEvent.parameters.push(
     new ethereum.EventParam("quorumNumbers", ethereum.Value.fromBytes(quorumNumbers))
   )
 
   return newOperatorRemovedFromQuorumsEvent
 }
-
-
-
