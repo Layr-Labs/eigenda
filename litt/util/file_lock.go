@@ -106,8 +106,11 @@ func NewFileLock(logger logging.Logger, path string, fsync bool) (*FileLock, err
 				} else {
 					// Process is still alive, cannot acquire lock
 					debugInfo := ""
-					if content, readErr := os.ReadFile(path); readErr == nil {
+					content, readErr := os.ReadFile(path)
+					if readErr == nil {
 						debugInfo = fmt.Sprintf(" (existing lock info: %s)", strings.TrimSpace(string(content)))
+					} else {
+						debugInfo = fmt.Sprintf(" (failed to read existing lock file: %v)", readErr)
 					}
 					return nil, fmt.Errorf("lock file already exists and process %d is still running: %s%s",
 						pid, path, debugInfo)
@@ -130,8 +133,14 @@ func NewFileLock(logger logging.Logger, path string, fsync bool) (*FileLock, err
 	_, err = file.WriteString(lockInfo)
 	if err != nil {
 		// Close and remove the file if we can't write to it
-		_ = file.Close()
-		_ = os.Remove(path)
+		secondaryErr := file.Close()
+		if secondaryErr != nil {
+			logger.Errorf("failed to close lock file %s after write error: %v", path, secondaryErr)
+		}
+		secondaryErr = os.Remove(path)
+		if secondaryErr != nil {
+			logger.Errorf("failed to remove lock file %s after write error: %v", path, secondaryErr)
+		}
 		return nil, fmt.Errorf("failed to write to lock file %s: %w", path, err)
 	}
 
@@ -139,8 +148,14 @@ func NewFileLock(logger logging.Logger, path string, fsync bool) (*FileLock, err
 		err = file.Sync()
 		if err != nil {
 			// Close and remove the file if we can't sync it
-			_ = file.Close()
-			_ = os.Remove(path)
+			secondaryErr := file.Close()
+			if secondaryErr != nil {
+				logger.Errorf("failed to close lock file %s after sync error: %v", path, secondaryErr)
+			}
+			secondaryErr = os.Remove(path)
+			if secondaryErr != nil {
+				logger.Errorf("failed to remove lock file %s after sync error: %v", path, secondaryErr)
+			}
 			return nil, fmt.Errorf("failed to sync lock file %s: %w", path, err)
 		}
 	}
