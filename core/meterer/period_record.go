@@ -90,7 +90,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	if oldUsage >= binLimit {
-		return fmt.Errorf("reservation limit exceeded for quorum %d", quorumNumber)
+		return fmt.Errorf("reservation limit exceeded for quorum %d; binLimit: %d, currentPeriod: %d, oldUsage: %d, relativePeriodRecord: %d", quorumNumber, binLimit, currentPeriod, oldUsage, relativePeriodRecord.Usage)
 	}
 
 	// overflow bin if we're over the limit
@@ -102,7 +102,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 		return nil
 	}
 
-	return fmt.Errorf("reservation limit exceeded for quorum %d", quorumNumber)
+	return fmt.Errorf("reservation limit exceeded for quorum %d; binLimit: %d, currentPeriod: %d, oldUsage: %d, relativePeriodRecord: %d, overflowPeriod: %d, overflowPeriodRecord: %d", quorumNumber, binLimit, currentPeriod, oldUsage, relativePeriodRecord.Usage, overflowPeriod, overflowPeriodRecord.Usage)
 }
 
 // Make a deep copy of the period records
