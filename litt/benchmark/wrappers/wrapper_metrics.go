@@ -96,7 +96,7 @@ func newBasicWrapperMetrics(registry *prometheus.Registry, tableName string) *ba
 }
 
 func (m *basicWrapperMetrics) RecordBytesWritten(bytes uint64) {
-	//if m == nil {
+	//if m == nil { // TODO
 	//	return
 	//}
 	m.bytesWrittenCounter.WithLabelValues(m.tableName).Add(float64(bytes))
