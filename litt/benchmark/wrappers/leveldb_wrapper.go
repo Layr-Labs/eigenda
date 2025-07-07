@@ -105,15 +105,7 @@ func NewLevelDBWrapper(cfg *config.BenchmarkConfig) (DatabaseWrapper, error) {
 				logger.Errorf("metrics server error: %v", err)
 			}
 		}()
-
-		fmt.Printf("Registry: %v\n", registry) // TODO
-
-		metrics = newBasicWrapperMetrics(registry, tableName)
-	} else {
-		logger.Infof("Metrics are disabled, not starting metrics server, metrics enabled flag = %v", cfg.LittConfig.MetricsEnabled) // TODO
 	}
-
-	fmt.Printf("metrics: %v\n", metrics) // TODO
 
 	return &LevelDBWrapper{
 		store:      store,
@@ -131,6 +123,7 @@ func (w *LevelDBWrapper) BuildThreadLocalWrapper() (ThreadLocalDatabaseWrapper, 
 		keyBuilder: w.keyBuilder,
 		batch:      batch,
 		ttl:        w.ttl,
+		metrics:    w.metrics,
 	}, nil
 }
 
