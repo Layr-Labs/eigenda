@@ -116,39 +116,63 @@ describe("CurrentReservation entity", () => {
     assert.fieldEquals("CurrentReservation", accountId, "endTimestamp", "3000000")
   })
 
-  test("Multiple accounts have separate CurrentReservations", () => {
+  test("Multiple accounts have separate CurrentReservations with different time ranges", () => {
     clearStore()
     
-    let account1 = Address.fromString("0x1111111111111111111111111111111111111111")
-    let account2 = Address.fromString("0x2222222222222222222222222222222222222222")
+    // Create three accounts with different reservation time ranges
+    let accounts = [
+      Address.fromString("0x1111111111111111111111111111111111111111"), // Past (expired)
+      Address.fromString("0x2222222222222222222222222222222222222222"), // Current (would be active)
+      Address.fromString("0x3333333333333333333333333333333333333333")  // Future (would be pending)
+    ]
     
-    // Create reservation for account1
+    // Past reservation (expired) - ended at timestamp 200000
     let event1 = createReservationUpdatedEvent(
-      account1,
+      accounts[0],
       BigInt.fromI32(1000),
-      BigInt.fromI32(1000000),
-      BigInt.fromI32(2000000),
+      BigInt.fromI32(100000),
+      BigInt.fromI32(200000),
       Bytes.fromHexString("0x01"),
       Bytes.fromHexString("0x64")
     )
     handleReservationUpdated(event1)
     
-    // Create reservation for account2
+    // Current reservation (active) - from 150000 to 250000
     let event2 = createReservationUpdatedEvent(
-      account2,
+      accounts[1],
       BigInt.fromI32(2000),
-      BigInt.fromI32(1500000),
-      BigInt.fromI32(2500000),
+      BigInt.fromI32(150000),
+      BigInt.fromI32(250000),
       Bytes.fromHexString("0x02"),
       Bytes.fromHexString("0x32")
     )
     handleReservationUpdated(event2)
     
-    // Check that we have two CurrentReservations
-    assert.entityCount("CurrentReservation", 2)
+    // Future reservation (pending) - starts at 300000
+    let event3 = createReservationUpdatedEvent(
+      accounts[2],
+      BigInt.fromI32(3000),
+      BigInt.fromI32(300000),
+      BigInt.fromI32(400000),
+      Bytes.fromHexString("0x03"),
+      Bytes.fromHexString("0x50")
+    )
+    handleReservationUpdated(event3)
     
-    // Verify each account has its own reservation
-    assert.fieldEquals("CurrentReservation", account1.toHexString(), "symbolsPerSecond", "1000")
-    assert.fieldEquals("CurrentReservation", account2.toHexString(), "symbolsPerSecond", "2000")
+    // Verify we have three CurrentReservations
+    assert.entityCount("CurrentReservation", 3)
+    
+    // Verify each account has its own reservation with correct data
+    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "symbolsPerSecond", "1000")
+    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "startTimestamp", "100000")
+    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "endTimestamp", "200000")
+    
+    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "symbolsPerSecond", "2000")
+    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "startTimestamp", "150000")
+    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "endTimestamp", "250000")
+    
+    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "symbolsPerSecond", "3000")
+    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "startTimestamp", "300000")
+    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "endTimestamp", "400000")
   })
 })
