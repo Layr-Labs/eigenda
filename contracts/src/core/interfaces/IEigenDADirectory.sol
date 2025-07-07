@@ -35,4 +35,10 @@ interface IEigenDADirectory {
 
     /// @notice Gets the address by name.
     function getAddress(string memory name) external view returns (address);
+
+    /// @notice Gets the name by keccak256 hash of the name.
+    function getName(bytes32 key) external view returns (string memory);
+
+    /// @notice Gets all names in the directory.
+    function getAllNames() external view returns (string[] memory);
 }

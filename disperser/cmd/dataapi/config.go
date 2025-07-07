@@ -31,6 +31,7 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
@@ -50,6 +51,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	ethClientConfig := geth.ReadEthClientConfig(ctx)
+
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -63,6 +65,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
 		ServerVersion:                 version,
 		PrometheusConfig: prometheus.Config{

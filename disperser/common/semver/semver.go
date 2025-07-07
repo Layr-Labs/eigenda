@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
@@ -36,6 +37,72 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, oper
 				socket = operatorSocket.GetV1DispersalSocket()
 			}
 			semver := GetSemverInfo(context.Background(), socket, useRetrievalSocket, operatorId, logger, nodeInfoTimeout)
+
+			mu.Lock()
+			if _, exists := semvers[semver]; !exists {
+				semvers[semver] = &SemverMetrics{
+					Semver:                semver,
+					Operators:             1,
+					OperatorIds:           []string{operatorId.Hex()},
+					QuorumStakePercentage: make(map[uint8]float64),
+				}
+			} else {
+				semvers[semver].Operators += 1
+				semvers[semver].OperatorIds = append(semvers[semver].OperatorIds, operatorId.Hex())
+			}
+
+			// Calculate stake percentage for each quorum
+			for quorum, totalOperatorInfo := range operatorState.Totals {
+				stakePercentage := float64(0)
+				if stake, ok := operatorState.Operators[quorum][operatorId]; ok {
+					totalStake := new(big.Float).SetInt(totalOperatorInfo.Stake)
+					operatorStake := new(big.Float).SetInt(stake.Stake)
+					stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
+				}
+
+				if _, exists := semvers[semver].QuorumStakePercentage[quorum]; !exists {
+					semvers[semver].QuorumStakePercentage[quorum] = stakePercentage
+				} else {
+					semvers[semver].QuorumStakePercentage[quorum] += stakePercentage
+				}
+			}
+			mu.Unlock()
+		}
+		wg.Done()
+	}
+
+	// Launch worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker()
+	}
+
+	// Send operator IDs to the channel
+	for operatorId := range operators {
+		operatorChan <- operatorId
+	}
+	close(operatorChan)
+
+	// Wait for all workers to finish
+	wg.Wait()
+	return semvers
+}
+
+func ScanOperatorsV2(operators map[core.OperatorID]*core.IndexedOperatorInfo, operatorState *core.OperatorState, useRetrievalSocket bool, numWorkers int, nodeInfoTimeout time.Duration, logger logging.Logger) map[string]*SemverMetrics {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	semvers := make(map[string]*SemverMetrics)
+	operatorChan := make(chan core.OperatorID, len(operators))
+	worker := func() {
+		for operatorId := range operatorChan {
+			operatorSocket := core.OperatorSocket(operators[operatorId].Socket)
+			var socket string
+			if useRetrievalSocket {
+				socket = operatorSocket.GetV2RetrievalSocket()
+			} else {
+				socket = operatorSocket.GetV2DispersalSocket()
+			}
+			semver := GetSemverInfoV2(context.Background(), socket, useRetrievalSocket, operatorId, logger, nodeInfoTimeout)
 
 			mu.Lock()
 			if _, exists := semvers[semver]; !exists {
@@ -125,6 +192,49 @@ func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool,
 	// local node source compiles without semver
 	if reply.Semver == "" {
 		reply.Semver = "0.8.4"
+	}
+
+	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	return reply.Semver
+}
+
+func GetSemverInfoV2(ctx context.Context, socket string, userRetrievalClient bool, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
+	conn, err := grpc.NewClient(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return "unreachable"
+	}
+	defer core.CloseLogOnError(conn, "connection to node", logger)
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	var reply *validator.GetNodeInfoReply
+	if userRetrievalClient {
+		client := validator.NewRetrievalClient(conn)
+		reply, err = client.GetNodeInfo(ctxWithTimeout, &validator.GetNodeInfoRequest{})
+	} else {
+		client := validator.NewDispersalClient(conn)
+		reply, err = client.GetNodeInfo(ctxWithTimeout, &validator.GetNodeInfoRequest{})
+	}
+	if err != nil {
+		var semver string
+		if strings.Contains(err.Error(), "unknown method NodeInfo") {
+			semver = "unsupported"
+		} else if strings.Contains(err.Error(), "unknown service") {
+			semver = "filtered"
+		} else if strings.Contains(err.Error(), "DeadlineExceeded") {
+			semver = "timeout"
+		} else if strings.Contains(err.Error(), "Unavailable") {
+			semver = "refused"
+		} else {
+			semver = "error"
+		}
+
+		logger.Warn("GetNodeInfo", "operatorId", operatorId.Hex(), "semver", semver, "error", err)
+		return semver
+	}
+
+	// local node source compiles without semver
+	if reply.Semver == "" {
+		reply.Semver = "0.9.0"
 	}
 
 	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)

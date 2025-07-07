@@ -1,0 +1,209 @@
+name: test-proxy # this name appears in the badge on the README
+
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - "api/proxy/**"
+      - ".github/workflows/per-pr-proxy.yml"
+  pull_request:
+    paths:
+      - "api/proxy/**"
+      - ".github/workflows/per-pr-proxy.yml"
+
+env:
+  MISE_VERSION: 2024.12.14
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api/proxy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: make lint
+        working-directory: api/proxy
+
+  # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
+  # valid, and allow the proxy to start.
+  flags:
+    strategy:
+      matrix:
+        env-file:
+          [
+            .env.exampleV1.holesky,
+            .env.exampleV2.holesky,
+            .env.exampleV1AndV2.holesky,
+            .env.exampleV1.sepolia,
+            .env.exampleV2.sepolia,
+            .env.exampleV1AndV2.sepolia,
+          ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - name: Run flag test
+        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
+        working-directory: api/proxy
+
+  # This ensures that std output generated when running binary with `--help` is reflected in docs/help_out.txt
+  help-output-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: make gen-static-help-output && git diff --exit-code
+        working-directory: api/proxy
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-unit
+        working-directory: api/proxy
+
+  e2e-tests-local:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-e2e-local
+        working-directory: api/proxy
+
+  e2e-tests-testnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-e2e-testnet
+        working-directory: api/proxy
+        env:
+          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
+          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+
+  e2e-tests-preprod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-e2e-preprod
+        working-directory: api/proxy
+        env:
+          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
+          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+
+  e2e-tests-sepolia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-e2e-sepolia
+        working-directory: api/proxy
+        env:
+          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_SEPOLIA_PRIVATE_KEY }}
+          ETHEREUM_RPC: ${{ secrets.ETHEREUM_SEPOLIA_RPC }}
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: go mod download
+        working-directory: api/proxy
+      - run: make test-fuzz
+        working-directory: api/proxy
+
+  build-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          working_directory: api/proxy
+      - run: make build
+        working-directory: api/proxy
+
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make docker-build
+        working-directory: api/proxy
+      # We also test that the docker container starts up correctly.
+      - name: Run container as background process
+        shell: bash
+        run: |
+          docker run -d \
+          -p 6666:6666 \
+          -e EIGENDA_PROXY_ADDR=0.0.0.0 \
+          -e EIGENDA_PROXY_PORT=6666 \
+          -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
+          ghcr.io/layr-labs/eigenda-proxy:dev
+        working-directory: api/proxy
+      - name: Wait for rpc to come up
+        shell: bash
+        run: |
+          ${{ github.workspace }}/api/proxy/scripts/wait-for.sh

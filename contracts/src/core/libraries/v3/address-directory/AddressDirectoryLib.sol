@@ -18,4 +18,36 @@ library AddressDirectoryLib {
         AddressDirectoryStorage.layout().addresses[key] = value;
         emit AddressSet(key, value);
     }
+
+    function registerKey(string memory name) internal {
+        AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
+        bytes32 key = getKey(name);
+        require(bytes(s.names[key]).length == 0, "Key already exists");
+        s.names[key] = name;
+        s.nameList.push(name);
+    }
+
+    function deregisterKey(string memory name) internal {
+        AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
+        bytes32 key = getKey(name);
+        require(bytes(s.names[key]).length > 0, "Key does not exist");
+        delete s.names[key];
+        // Here we utilize a simple swap and pop to remove the name from the list.
+        // There is no guarantee of preservation of ordering.
+        for (uint256 i; i < s.nameList.length; i++) {
+            if (getKey(s.nameList[i]) == key) {
+                s.nameList[i] = s.nameList[s.nameList.length - 1];
+                s.nameList.pop();
+                break;
+            }
+        }
+    }
+
+    function getName(bytes32 key) internal view returns (string memory) {
+        return AddressDirectoryStorage.layout().names[key];
+    }
+
+    function getNameList() internal view returns (string[] memory) {
+        return AddressDirectoryStorage.layout().nameList;
+    }
 }

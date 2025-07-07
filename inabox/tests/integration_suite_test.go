@@ -307,7 +307,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 			log.Fatalln("could not start tcp listener", err)
 		}
 	}
-	tx, err := eth.NewWriter(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, ethClient, testConfig.EigenDA.EigenDADirectory, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return err
 	}
@@ -343,8 +343,10 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	chainReader, err = eth.NewReader(
 		logger,
 		ethClient,
-		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER,
-		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+		testConfig.EigenDA.EigenDADirectory,
+		testConfig.EigenDA.OperatorStateRetriever,
+		testConfig.EigenDA.ServiceManager,
+	)
 	if err != nil {
 		return err
 	}
