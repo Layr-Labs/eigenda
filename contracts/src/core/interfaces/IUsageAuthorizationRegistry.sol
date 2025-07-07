@@ -12,8 +12,6 @@ interface IUsageAuthorizationRegistry {
 
     error ReservationStillActive(uint64 endTimestamp);
 
-    error InvalidStartTimestamp(uint64 startTimestamp);
-
     error StartTimestampMustMatch(uint64 startTimestamp);
 
     error ReservationMustIncrease(uint64 endTimestamp, uint64 symbolsPerSecond);
