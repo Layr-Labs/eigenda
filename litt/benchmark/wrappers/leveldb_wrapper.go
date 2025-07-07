@@ -105,6 +105,8 @@ func NewLevelDBWrapper(cfg *config.BenchmarkConfig) (DatabaseWrapper, error) {
 				logger.Errorf("metrics server error: %v", err)
 			}
 		}()
+
+		metrics = newBasicWrapperMetrics(registry, tableName)
 	}
 
 	return &LevelDBWrapper{
