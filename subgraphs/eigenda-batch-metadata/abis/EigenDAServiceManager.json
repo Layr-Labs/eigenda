@@ -1,994 +1,1509 @@
 [
-    {
-        "type": "constructor",
-        "inputs": [
-            {
-                "name": "__avsDirectory",
-                "type": "address",
-                "internalType": "contract IAVSDirectory"
-            },
-            {
-                "name": "__registryCoordinator",
-                "type": "address",
-                "internalType": "contract IRegistryCoordinator"
-            },
-            {
-                "name": "__stakeRegistry",
-                "type": "address",
-                "internalType": "contract IStakeRegistry"
-            }
-        ],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "BLOCK_STALE_MEASURE",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "STORE_DURATION_BLOCKS",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "THRESHOLD_DENOMINATOR",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "__avsDirectory",
+        "type": "address",
+        "internalType": "contract IAVSDirectory"
+      },
+      {
+        "name": "__rewardsCoordinator",
+        "type": "address",
+        "internalType": "contract IRewardsCoordinator"
+      },
+      {
+        "name": "__registryCoordinator",
+        "type": "address",
+        "internalType": "contract IRegistryCoordinator"
+      },
+      {
+        "name": "__stakeRegistry",
+        "type": "address",
+        "internalType": "contract IStakeRegistry"
+      },
+      {
+        "name": "__eigenDAThresholdRegistry",
+        "type": "address",
+        "internalType": "contract IEigenDAThresholdRegistry"
+      },
+      {
+        "name": "__eigenDARelayRegistry",
+        "type": "address",
+        "internalType": "contract IEigenDARelayRegistry"
+      },
+      {
+        "name": "__paymentVault",
+        "type": "address",
+        "internalType": "contract IPaymentVault"
+      },
+      {
+        "name": "__eigenDADisperserRegistry",
+        "type": "address",
+        "internalType": "contract IEigenDADisperserRegistry"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "BLOCK_STALE_MEASURE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "STORE_DURATION_BLOCKS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "THRESHOLD_DENOMINATOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "avsDirectory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "batchId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "batchIdToBatchMetadataHash",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "blsApkRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IBLSApkRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "checkSignatures",
+    "inputs": [
+      {
+        "name": "msgHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "quorumNumbers",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "referenceBlockNumber",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct IBLSSignatureChecker.NonSignerStakesAndSignature",
+        "components": [
+          {
+            "name": "nonSignerQuorumBitmapIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "nonSignerPubkeys",
+            "type": "tuple[]",
+            "internalType": "struct BN254.G1Point[]",
+            "components": [
+              {
+                "name": "X",
                 "type": "uint256",
                 "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "avsDirectory",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "quorumApks",
+            "type": "tuple[]",
+            "internalType": "struct BN254.G1Point[]",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "apkG2",
+            "type": "tuple",
+            "internalType": "struct BN254.G2Point",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256[2]",
+                "internalType": "uint256[2]"
+              },
+              {
+                "name": "Y",
+                "type": "uint256[2]",
+                "internalType": "uint256[2]"
+              }
+            ]
+          },
+          {
+            "name": "sigma",
+            "type": "tuple",
+            "internalType": "struct BN254.G1Point",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "quorumApkIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "totalStakeIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "nonSignerStakeIndices",
+            "type": "uint32[][]",
+            "internalType": "uint32[][]"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct IBLSSignatureChecker.QuorumStakeTotals",
+        "components": [
+          {
+            "name": "signedStakeForQuorum",
+            "type": "uint96[]",
+            "internalType": "uint96[]"
+          },
+          {
+            "name": "totalStakeForQuorum",
+            "type": "uint96[]",
+            "internalType": "uint96[]"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "confirmBatch",
+    "inputs": [
+      {
+        "name": "batchHeader",
+        "type": "tuple",
+        "internalType": "struct EigenDATypesV1.BatchHeader",
+        "components": [
+          {
+            "name": "blobHeadersRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "quorumNumbers",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "signedStakeForQuorums",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "referenceBlockNumber",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
+      },
+      {
+        "name": "nonSignerStakesAndSignature",
+        "type": "tuple",
+        "internalType": "struct IBLSSignatureChecker.NonSignerStakesAndSignature",
+        "components": [
+          {
+            "name": "nonSignerQuorumBitmapIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "nonSignerPubkeys",
+            "type": "tuple[]",
+            "internalType": "struct BN254.G1Point[]",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "quorumApks",
+            "type": "tuple[]",
+            "internalType": "struct BN254.G1Point[]",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "apkG2",
+            "type": "tuple",
+            "internalType": "struct BN254.G2Point",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256[2]",
+                "internalType": "uint256[2]"
+              },
+              {
+                "name": "Y",
+                "type": "uint256[2]",
+                "internalType": "uint256[2]"
+              }
+            ]
+          },
+          {
+            "name": "sigma",
+            "type": "tuple",
+            "internalType": "struct BN254.G1Point",
+            "components": [
+              {
+                "name": "X",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "Y",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "quorumApkIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "totalStakeIndices",
+            "type": "uint32[]",
+            "internalType": "uint32[]"
+          },
+          {
+            "name": "nonSignerStakeIndices",
+            "type": "uint32[][]",
+            "internalType": "uint32[][]"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createAVSRewardsSubmission",
+    "inputs": [
+      {
+        "name": "rewardsSubmissions",
+        "type": "tuple[]",
+        "internalType": "struct IRewardsCoordinator.RewardsSubmission[]",
+        "components": [
+          {
+            "name": "strategiesAndMultipliers",
+            "type": "tuple[]",
+            "internalType": "struct IRewardsCoordinator.StrategyAndMultiplier[]",
+            "components": [
+              {
+                "name": "strategy",
+                "type": "address",
+                "internalType": "contract IStrategy"
+              },
+              {
+                "name": "multiplier",
+                "type": "uint96",
+                "internalType": "uint96"
+              }
+            ]
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "startTimestamp",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "duration",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createOperatorDirectedAVSRewardsSubmission",
+    "inputs": [
+      {
+        "name": "operatorDirectedRewardsSubmissions",
+        "type": "tuple[]",
+        "internalType": "struct IRewardsCoordinator.OperatorDirectedRewardsSubmission[]",
+        "components": [
+          {
+            "name": "strategiesAndMultipliers",
+            "type": "tuple[]",
+            "internalType": "struct IRewardsCoordinator.StrategyAndMultiplier[]",
+            "components": [
+              {
+                "name": "strategy",
+                "type": "address",
+                "internalType": "contract IStrategy"
+              },
+              {
+                "name": "multiplier",
+                "type": "uint96",
+                "internalType": "uint96"
+              }
+            ]
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "operatorRewards",
+            "type": "tuple[]",
+            "internalType": "struct IRewardsCoordinator.OperatorReward[]",
+            "components": [
+              {
+                "name": "operator",
                 "type": "address",
                 "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "batchConfirmer",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "startTimestamp",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "duration",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "delegation",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IDelegationManager"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "deregisterOperatorFromAVS",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "eigenDADisperserRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IEigenDADisperserRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eigenDARelayRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IEigenDARelayRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eigenDAThresholdRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IEigenDAThresholdRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getBlobParams",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct EigenDATypesV1.VersionedBlobParams",
+        "components": [
+          {
+            "name": "maxNumOperators",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "numChunks",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "codingRate",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getIsQuorumRequired",
+    "inputs": [
+      {
+        "name": "quorumNumber",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOperatorRestakedStrategies",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getQuorumAdversaryThresholdPercentage",
+    "inputs": [
+      {
+        "name": "quorumNumber",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getQuorumConfirmationThresholdPercentage",
+    "inputs": [
+      {
+        "name": "quorumNumber",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRestakeableStrategies",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [
+      {
+        "name": "_pauserRegistry",
+        "type": "address",
+        "internalType": "contract IPauserRegistry"
+      },
+      {
+        "name": "_initialPausedStatus",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_initialOwner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_batchConfirmers",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_rewardsInitiator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isBatchConfirmer",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "latestServeUntilBlock",
+    "inputs": [
+      {
+        "name": "referenceBlockNumber",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "newPausedStatus",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "pauseAll",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pauserRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPauserRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "paymentVault",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPaymentVault"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quorumAdversaryThresholdPercentages",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quorumConfirmationThresholdPercentages",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quorumNumbersRequired",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registerOperatorToAVS",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "operatorSignature",
+        "type": "tuple",
+        "internalType": "struct ISignatureUtils.SignatureWithSaltAndExpiry",
+        "components": [
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "salt",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "expiry",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registryCoordinator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IRegistryCoordinator"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "rewardsInitiator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setBatchConfirmer",
+    "inputs": [
+      {
+        "name": "_batchConfirmer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setClaimerFor",
+    "inputs": [
+      {
+        "name": "claimer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPauserRegistry",
+    "inputs": [
+      {
+        "name": "newPauserRegistry",
+        "type": "address",
+        "internalType": "contract IPauserRegistry"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setRewardsInitiator",
+    "inputs": [
+      {
+        "name": "newRewardsInitiator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setStaleStakesForbidden",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stakeRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IStakeRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "staleStakesForbidden",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "taskNumber",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "inputs": [
+      {
+        "name": "newOwner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "trySignatureAndApkVerification",
+    "inputs": [
+      {
+        "name": "msgHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "apk",
+        "type": "tuple",
+        "internalType": "struct BN254.G1Point",
+        "components": [
+          {
+            "name": "X",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "Y",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "apkG2",
+        "type": "tuple",
+        "internalType": "struct BN254.G2Point",
+        "components": [
+          {
+            "name": "X",
+            "type": "uint256[2]",
+            "internalType": "uint256[2]"
+          },
+          {
+            "name": "Y",
+            "type": "uint256[2]",
+            "internalType": "uint256[2]"
+          }
+        ]
+      },
+      {
+        "name": "sigma",
+        "type": "tuple",
+        "internalType": "struct BN254.G1Point",
+        "components": [
+          {
+            "name": "X",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "Y",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pairingSuccessful",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "siganatureIsValid",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [
+      {
+        "name": "newPausedStatus",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateAVSMetadataURI",
+    "inputs": [
+      {
+        "name": "_metadataURI",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BatchConfirmed",
+    "inputs": [
+      {
+        "name": "batchHeaderHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
         "name": "batchId",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "batchIdToBatchMetadataHash",
-        "inputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "blsApkRegistry",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "contract IBLSApkRegistry"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "checkSignatures",
-        "inputs": [
-            {
-                "name": "msgHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "quorumNumbers",
-                "type": "bytes",
-                "internalType": "bytes"
-            },
-            {
-                "name": "referenceBlockNumber",
-                "type": "uint32",
-                "internalType": "uint32"
-            },
-            {
-                "name": "params",
-                "type": "tuple",
-                "internalType": "struct IBLSSignatureChecker.NonSignerStakesAndSignature",
-                "components": [
-                    {
-                        "name": "nonSignerQuorumBitmapIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "nonSignerPubkeys",
-                        "type": "tuple[]",
-                        "internalType": "struct BN254.G1Point[]",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "quorumApks",
-                        "type": "tuple[]",
-                        "internalType": "struct BN254.G1Point[]",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "apkG2",
-                        "type": "tuple",
-                        "internalType": "struct BN254.G2Point",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256[2]",
-                                "internalType": "uint256[2]"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256[2]",
-                                "internalType": "uint256[2]"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "sigma",
-                        "type": "tuple",
-                        "internalType": "struct BN254.G1Point",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "quorumApkIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "totalStakeIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "nonSignerStakeIndices",
-                        "type": "uint32[][]",
-                        "internalType": "uint32[][]"
-                    }
-                ]
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "tuple",
-                "internalType": "struct IBLSSignatureChecker.QuorumStakeTotals",
-                "components": [
-                    {
-                        "name": "signedStakeForQuorum",
-                        "type": "uint96[]",
-                        "internalType": "uint96[]"
-                    },
-                    {
-                        "name": "totalStakeForQuorum",
-                        "type": "uint96[]",
-                        "internalType": "uint96[]"
-                    }
-                ]
-            },
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "confirmBatch",
-        "inputs": [
-            {
-                "name": "batchHeader",
-                "type": "tuple",
-                "internalType": "struct IEigenDAServiceManager.BatchHeader",
-                "components": [
-                    {
-                        "name": "blobHeadersRoot",
-                        "type": "bytes32",
-                        "internalType": "bytes32"
-                    },
-                    {
-                        "name": "quorumNumbers",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "signedStakeForQuorums",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "referenceBlockNumber",
-                        "type": "uint32",
-                        "internalType": "uint32"
-                    }
-                ]
-            },
-            {
-                "name": "nonSignerStakesAndSignature",
-                "type": "tuple",
-                "internalType": "struct IBLSSignatureChecker.NonSignerStakesAndSignature",
-                "components": [
-                    {
-                        "name": "nonSignerQuorumBitmapIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "nonSignerPubkeys",
-                        "type": "tuple[]",
-                        "internalType": "struct BN254.G1Point[]",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "quorumApks",
-                        "type": "tuple[]",
-                        "internalType": "struct BN254.G1Point[]",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "apkG2",
-                        "type": "tuple",
-                        "internalType": "struct BN254.G2Point",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256[2]",
-                                "internalType": "uint256[2]"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256[2]",
-                                "internalType": "uint256[2]"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "sigma",
-                        "type": "tuple",
-                        "internalType": "struct BN254.G1Point",
-                        "components": [
-                            {
-                                "name": "X",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "Y",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "quorumApkIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "totalStakeIndices",
-                        "type": "uint32[]",
-                        "internalType": "uint32[]"
-                    },
-                    {
-                        "name": "nonSignerStakeIndices",
-                        "type": "uint32[][]",
-                        "internalType": "uint32[][]"
-                    }
-                ]
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "delegation",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "contract IDelegationManager"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "deregisterOperatorFromAVS",
-        "inputs": [
-            {
-                "name": "operator",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "getOperatorRestakedStrategies",
-        "inputs": [
-            {
-                "name": "operator",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address[]",
-                "internalType": "address[]"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getRestakeableStrategies",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address[]",
-                "internalType": "address[]"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "initialize",
-        "inputs": [
-            {
-                "name": "_pauserRegistry",
-                "type": "address",
-                "internalType": "contract IPauserRegistry"
-            },
-            {
-                "name": "_initialPausedStatus",
-                "type": "uint256",
-                "internalType": "uint256"
-            },
-            {
-                "name": "_initialOwner",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "_batchConfirmer",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "latestServeUntilBlock",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "owner",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "pause",
-        "inputs": [
-            {
-                "name": "newPausedStatus",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "pauseAll",
-        "inputs": [],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "paused",
-        "inputs": [
-            {
-                "name": "index",
-                "type": "uint8",
-                "internalType": "uint8"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "paused",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BatchConfirmerStatusChanged",
+    "inputs": [
+      {
+        "name": "batchConfirmer",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "status",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DefaultSecurityThresholdsV2Updated",
+    "inputs": [
+      {
+        "name": "previousDefaultSecurityThresholdsV2",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct EigenDATypesV1.SecurityThresholds",
+        "components": [
+          {
+            "name": "confirmationThreshold",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adversaryThreshold",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      },
+      {
+        "name": "newDefaultSecurityThresholdsV2",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct EigenDATypesV1.SecurityThresholds",
+        "components": [
+          {
+            "name": "confirmationThreshold",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "adversaryThreshold",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Initialized",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferred",
+    "inputs": [
+      {
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Paused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newPausedStatus",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PauserRegistrySet",
+    "inputs": [
+      {
         "name": "pauserRegistry",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "contract IPauserRegistry"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "quorumAdversaryThresholdPercentages",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "quorumConfirmationThresholdPercentages",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "registerOperatorToAVS",
-        "inputs": [
-            {
-                "name": "operator",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "operatorSignature",
-                "type": "tuple",
-                "internalType": "struct ISignatureUtils.SignatureWithSaltAndExpiry",
-                "components": [
-                    {
-                        "name": "signature",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "salt",
-                        "type": "bytes32",
-                        "internalType": "bytes32"
-                    },
-                    {
-                        "name": "expiry",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    }
-                ]
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "registryCoordinator",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "contract IRegistryCoordinator"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "renounceOwnership",
-        "inputs": [],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "setBatchConfirmer",
-        "inputs": [
-            {
-                "name": "_batchConfirmer",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "setMetadataURI",
-        "inputs": [
-            {
-                "name": "_metadataURI",
-                "type": "string",
-                "internalType": "string"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "setPauserRegistry",
-        "inputs": [
-            {
-                "name": "newPauserRegistry",
-                "type": "address",
-                "internalType": "contract IPauserRegistry"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "setStaleStakesForbidden",
-        "inputs": [
-            {
-                "name": "value",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "stakeRegistry",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "contract IStakeRegistry"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "staleStakesForbidden",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "taskNumber",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint32",
-                "internalType": "uint32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "transferOwnership",
-        "inputs": [
-            {
-                "name": "newOwner",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "trySignatureAndApkVerification",
-        "inputs": [
-            {
-                "name": "msgHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "apk",
-                "type": "tuple",
-                "internalType": "struct BN254.G1Point",
-                "components": [
-                    {
-                        "name": "X",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "Y",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    }
-                ]
-            },
-            {
-                "name": "apkG2",
-                "type": "tuple",
-                "internalType": "struct BN254.G2Point",
-                "components": [
-                    {
-                        "name": "X",
-                        "type": "uint256[2]",
-                        "internalType": "uint256[2]"
-                    },
-                    {
-                        "name": "Y",
-                        "type": "uint256[2]",
-                        "internalType": "uint256[2]"
-                    }
-                ]
-            },
-            {
-                "name": "sigma",
-                "type": "tuple",
-                "internalType": "struct BN254.G1Point",
-                "components": [
-                    {
-                        "name": "X",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "Y",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    }
-                ]
-            }
-        ],
-        "outputs": [
-            {
-                "name": "pairingSuccessful",
-                "type": "bool",
-                "internalType": "bool"
-            },
-            {
-                "name": "siganatureIsValid",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "unpause",
-        "inputs": [
-            {
-                "name": "newPausedStatus",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "event",
-        "name": "BatchConfirmed",
-        "inputs": [
-            {
-                "name": "batchHeaderHash",
-                "type": "bytes32",
-                "indexed": true,
-                "internalType": "bytes32"
-            },
-            {
-                "name": "batchId",
-                "type": "uint32",
-                "indexed": false,
-                "internalType": "uint32"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "BatchConfirmerChanged",
-        "inputs": [
-            {
-                "name": "previousAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            },
-            {
-                "name": "newAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "Initialized",
-        "inputs": [
-            {
-                "name": "version",
-                "type": "uint8",
-                "indexed": false,
-                "internalType": "uint8"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "OwnershipTransferred",
-        "inputs": [
-            {
-                "name": "previousOwner",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            },
-            {
-                "name": "newOwner",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "Paused",
-        "inputs": [
-            {
-                "name": "account",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            },
-            {
-                "name": "newPausedStatus",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "PauserRegistrySet",
-        "inputs": [
-            {
-                "name": "pauserRegistry",
-                "type": "address",
-                "indexed": false,
-                "internalType": "contract IPauserRegistry"
-            },
-            {
-                "name": "newPauserRegistry",
-                "type": "address",
-                "indexed": false,
-                "internalType": "contract IPauserRegistry"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "StaleStakesForbiddenUpdate",
-        "inputs": [
-            {
-                "name": "value",
-                "type": "bool",
-                "indexed": false,
-                "internalType": "bool"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "Unpaused",
-        "inputs": [
-            {
-                "name": "account",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            },
-            {
-                "name": "newPausedStatus",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256"
-            }
-        ],
-        "anonymous": false
-    }
+        "type": "address",
+        "indexed": false,
+        "internalType": "contract IPauserRegistry"
+      },
+      {
+        "name": "newPauserRegistry",
+        "type": "address",
+        "indexed": false,
+        "internalType": "contract IPauserRegistry"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "QuorumAdversaryThresholdPercentagesUpdated",
+    "inputs": [
+      {
+        "name": "previousQuorumAdversaryThresholdPercentages",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "newQuorumAdversaryThresholdPercentages",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "QuorumConfirmationThresholdPercentagesUpdated",
+    "inputs": [
+      {
+        "name": "previousQuorumConfirmationThresholdPercentages",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "newQuorumConfirmationThresholdPercentages",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "QuorumNumbersRequiredUpdated",
+    "inputs": [
+      {
+        "name": "previousQuorumNumbersRequired",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "newQuorumNumbersRequired",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RewardsInitiatorUpdated",
+    "inputs": [
+      {
+        "name": "prevRewardsInitiator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "newRewardsInitiator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StaleStakesForbiddenUpdate",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Unpaused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newPausedStatus",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VersionedBlobParamsAdded",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint16",
+        "indexed": true,
+        "internalType": "uint16"
+      },
+      {
+        "name": "versionedBlobParams",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct EigenDATypesV1.VersionedBlobParams",
+        "components": [
+          {
+            "name": "maxNumOperators",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "numChunks",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "codingRate",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  }
 ]
