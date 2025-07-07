@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -14,14 +16,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"google.golang.org/grpc"
 )
 
 const namespace = "eigenda_disperser_api"
 
 // metricsV2 encapsulates the metrics for the v2 API server.
 type metricsV2 struct {
-	grpcServerOption grpc.ServerOption
+	grpcMetrics *grpcprom.ServerMetrics
 
 	getBlobCommitmentLatency        *prometheus.SummaryVec
 	getPaymentStateLatency          *prometheus.SummaryVec
@@ -43,10 +44,6 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 	registry.MustRegister(grpcMetrics)
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
-
-	grpcServerOption := grpc.UnaryInterceptor(
-		grpcMetrics.UnaryServerInterceptor(),
-	)
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
@@ -95,7 +92,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 			Name:      "disperse_blob_metered_bytes",
 			Help:      "The number of bytes charged for the blob.",
 		},
-		[]string{},
+		[]string{"quorum_number"},
 	)
 
 	validateDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
@@ -129,7 +126,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 	)
 
 	return &metricsV2{
-		grpcServerOption:                grpcServerOption,
+		grpcMetrics:                     grpcMetrics,
 		getBlobCommitmentLatency:        getBlobCommitmentLatency,
 		getPaymentStateLatency:          getPaymentStateLatency,
 		disperseBlobLatency:             disperseBlobLatency,
@@ -176,8 +173,12 @@ func (m *metricsV2) reportDisperseBlobSize(size int) {
 	m.disperseBlobSize.WithLabelValues().Add(float64(size))
 }
 
-func (m *metricsV2) reportDisperseMeteredBytes(usageInBytes int) {
-	m.disperseBlobMeteredBytes.WithLabelValues().Add(float64(usageInBytes))
+func (m *metricsV2) reportDisperseMeteredBytes(quorumNumbers []uint8, symbolsCharges map[core.QuorumID]uint64) {
+	for _, quorumNumber := range quorumNumbers {
+		if charge, ok := symbolsCharges[core.QuorumID(quorumNumber)]; ok {
+			m.disperseBlobMeteredBytes.WithLabelValues(strconv.FormatUint(uint64(quorumNumber), 10)).Add(float64(charge))
+		}
+	}
 }
 
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {

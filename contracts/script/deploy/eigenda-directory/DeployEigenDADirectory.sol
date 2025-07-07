@@ -13,6 +13,7 @@ contract DeployEigenDADirectory is Script {
     using stdToml for string;
 
     EigenDADirectory directory;
+    EigenDADirectory directoryImpl;
 
     struct AddressEntry {
         string name;
@@ -29,6 +30,7 @@ contract DeployEigenDADirectory is Script {
         vm.startBroadcast();
         _deployDirectory();
         _populateDirectory();
+        directory.transferOwnership(cfg.readAddress(".owner"));
         vm.stopBroadcast();
     }
 
@@ -38,18 +40,31 @@ contract DeployEigenDADirectory is Script {
     }
 
     function _deployDirectory() internal virtual {
-        directory = new EigenDADirectory();
-        directory.initialize(msg.sender);
+        directoryImpl = new EigenDADirectory();
+        directory = EigenDADirectory(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(directoryImpl),
+                    cfg.readAddress(".proxyAdmin"),
+                    abi.encodeCall(EigenDADirectory.initialize, msg.sender)
+                )
+            )
+        );
+    }
+
+    struct AddressConfig {
+        string name;
+        address value;
     }
 
     function _populateDirectory() internal virtual {
-        string[] memory names = cfg.readStringArray(".contractNames");
-        address[] memory values = cfg.readAddressArray(".contractAddresses");
+        // Dynamically read all contract names from the [contracts] table
+        string[] memory contractNames = vm.parseTomlKeys(cfg, ".contracts");
 
-        require(names.length == values.length, "Names and addresses length mismatch");
-
-        for (uint256 i; i < names.length; i++) {
-            directory.addAddress(names[i], values[i]);
+        for (uint256 i; i < contractNames.length; i++) {
+            string memory name = contractNames[i];
+            address contractAddress = cfg.readAddress(string.concat(".contracts.", name));
+            directory.addAddress(name, contractAddress);
         }
     }
 }

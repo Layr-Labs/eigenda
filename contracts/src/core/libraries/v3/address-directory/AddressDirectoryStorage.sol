@@ -7,6 +7,8 @@ library AddressDirectoryStorage {
     /// @custom: storage-location erc7201:address.directory.storage
     struct Layout {
         mapping(bytes32 => address) addresses;
+        mapping(bytes32 => string) names;
+        string[] nameList;
     }
 
     string internal constant STORAGE_ID = "address.directory.storage";
