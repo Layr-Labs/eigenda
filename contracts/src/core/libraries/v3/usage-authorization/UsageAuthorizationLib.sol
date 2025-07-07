@@ -41,9 +41,6 @@ library UsageAuthorizationLib {
                 s().quorum[quorumId].user[account].reservation.endTimestamp
             );
         }
-        if (reservation.startTimestamp < block.timestamp) {
-            revert IUsageAuthorizationRegistry.InvalidStartTimestamp(uint64(block.timestamp));
-        }
 
         increaseReservedSymbols(
             quorumId, reservation.startTimestamp, reservation.endTimestamp, reservation.symbolsPerSecond, schedulePeriod

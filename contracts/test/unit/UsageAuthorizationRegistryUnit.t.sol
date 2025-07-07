@@ -171,25 +171,6 @@ contract UsageAuthorizationRegistryUnit is Test {
         usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
     }
 
-    /// @notice Tests that adding a reservation reverts if the start timestamp is in the past.
-    function test_AddReservationRevertsIfInvalidStartTimestamp(address account, uint64 symbolsPerSecond) public {
-        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
-        uint64 quorumId = 0;
-        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
-        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
-            startTimestamp: (START_PERIOD - 1) * SCHEDULE_PERIOD,
-            endTimestamp: SCHEDULE_PERIOD * START_PERIOD,
-            symbolsPerSecond: symbolsPerSecond
-        });
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IUsageAuthorizationRegistry.InvalidStartTimestamp.selector, START_PERIOD * SCHEDULE_PERIOD
-            )
-        );
-        vm.prank(QUORUM_OWNER_0);
-        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
-    }
-
     /// @notice Tests that we can successfully pass a reservation check.
     function test_CheckReservation(uint256 timestampSeed, uint64 symbolsPerSecond) public view {
         uint64 quorumId = 0;
