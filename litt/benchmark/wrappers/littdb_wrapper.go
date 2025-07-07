@@ -23,8 +23,10 @@ type LittDBWrapper struct {
 	table litt.Table
 }
 
+var _ WrapperFactory = NewLittDBWrapper
+
 // Instantiate a new LittDBWrapper with the given configuration.
-func NewLittDBWrapper(cfg *config.BenchmarkConfig) (*LittDBWrapper, error) {
+func NewLittDBWrapper(cfg *config.BenchmarkConfig) (DatabaseWrapper, error) {
 	db, err := littbuilder.NewDB(cfg.LittConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create db: %w", err)
@@ -51,11 +53,7 @@ func (w *LittDBWrapper) BuildThreadLocalWrapper() (ThreadLocalDatabaseWrapper, e
 	return w, nil
 }
 
-func (w *LittDBWrapper) Close() error {
-	return w.db.Close()
-}
-
-func (w *LittDBWrapper) Put(key, value []byte) error {
+func (w *LittDBWrapper) Put(key []byte, value []byte) error {
 	return w.table.Put(key, value)
 }
 
