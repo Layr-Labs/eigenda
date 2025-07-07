@@ -1,0 +1,6 @@
+# For github action yaml file formatting.
+# Useful when used with vscode yamlfmt extension.
+# TODO: Currently not enforced by CI.
+formatter:
+  type: basic
+  retain_line_breaks_single: true
