@@ -185,9 +185,27 @@ func (d *Dispatcher) refreshOnchainState(ctx context.Context) error {
 		return fmt.Errorf("failed to get required quorum IDs: %w", err)
 	}
 
-	state, err := d.chainState.GetIndexedOperatorState(ctx, uint(referenceBlockNumber), quorumIDs)
+	maxRetries := 3
+	retryDelay := 500 * time.Millisecond
+
+	var state *core.IndexedOperatorState
+
+	for i := 0; i < maxRetries; i++ {
+		state, err = d.chainState.GetIndexedOperatorState(ctx, uint(referenceBlockNumber), quorumIDs)
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "quorum did not exist at given block number") {
+			d.logger.Warn("quorum missing at block, will retry", "block", referenceBlockNumber, "retry", i+1)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		break // for all other errors, don't retry
+	}
+
 	if err != nil {
-		return fmt.Errorf("failed to get operator state: %w", err)
+		return fmt.Errorf("failed to get operator state after %d attempts: %w", maxRetries, err)
 	}
 
 	// Create new cached state
