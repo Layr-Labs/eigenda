@@ -96,9 +96,6 @@ func (c *ReservationExpirationCollector) updateCounts(ctx context.Context) {
 			expiringCounts["7d"]++
 		} else if timeUntilExpiration <= 3*30*24*time.Hour {
 			expiringCounts["3m"]++
-		} else {
-			// Ignore reservations that are not expiring in the next 3 months
-			continue
 		}
 
 		// Record gauge value
