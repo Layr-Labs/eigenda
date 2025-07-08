@@ -64,4 +64,6 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          max_turns: "10"
+          timeout_minutes: "5"
 
