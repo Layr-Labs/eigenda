@@ -361,7 +361,7 @@ func loadPrivateKey(keyPath string, keyVar string) (string, error) {
 	if keyPath != "" {
 		privateKeyFile, err := util.SanitizePath(keyPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+			return "", fmt.Errorf("failed to sanitize path: %w", err)
 		}
 
 		exists, err := util.Exists(privateKeyFile)

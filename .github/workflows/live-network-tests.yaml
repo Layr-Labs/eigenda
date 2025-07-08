@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
   workflow_dispatch: {}         # Allow manual triggering
+  push: # TODO: temporary for testing, do not merge
+    branches:
+      - auto-test
+
+env:
+  MISE_VERSION: 2024.12.14
 
 jobs:
   test:
@@ -16,16 +22,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: jdx/mise-action@v2
         with:
-          go-version: '1.24'
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: go version
 
       - name: Install dependencies
         run: go mod download
 
       - name: Run Live Network Tests
-        run: go test ./test/v2/live -v -timeout 60m
+        run: make live-tests
 
       - name: Notify Slack
         if: always()

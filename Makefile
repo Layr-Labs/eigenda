@@ -76,6 +76,9 @@ dataapi-build:
 unit-tests:
 	./test.sh
 
+live-tests:
+	go test -v ./test/v2/live -v -timeout 60m
+
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
 

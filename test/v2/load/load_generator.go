@@ -54,7 +54,7 @@ type LoadGenerator struct {
 func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 	configFile, err := util.SanitizePath(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {

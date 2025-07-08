@@ -27,7 +27,7 @@ var (
 func GetEnvironmentConfigPaths() ([]string, error) {
 	configDir, err := util.SanitizePath("../config/environment")
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
 	}
 
 	files, err := os.ReadDir(configDir)
@@ -59,7 +59,7 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 
 	configFile, err := util.SanitizePath(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed sanitize path: %w", err)
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {
@@ -132,6 +132,18 @@ func GetClient(configPath string) (*TestClient, error) {
 }
 
 func skipInCI(t *testing.T) {
+
+	// The environment variable "CI" will be set when running inside a github action.
+	// The environment variable "LIVE_TESTS" will be set when running live tests, which is a specific github action.
+	//
+	// There are three situations we want to consider:
+	//
+	// 1. When running a tests locally, we want to run live tests if requested. "CI" will not be set, and so
+	//    we will not skip the test.
+	// 2. When we are running general unit tests as a github action, we specifically don't want to run live tests.
+	//    "CI" will be set, and "LIVE_TESTS" will not be set, so we skip the test.
+	// 3. When we are running live tests as a github action, we want to run the test. Both "CI" and "LIVE_TESTS" will
+	//    be set, so we do not skip the test.
 	if os.Getenv("CI") != "" && os.Getenv("LIVE_TESTS") == "" {
 		t.Skip("Skipping test in CI environment")
 	}

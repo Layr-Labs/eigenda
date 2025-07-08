@@ -77,7 +77,7 @@ type TestClientConfig struct {
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
 	root, err := util.SanitizePath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("resolve tilde in path: %w", err)
+		return "", fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }
