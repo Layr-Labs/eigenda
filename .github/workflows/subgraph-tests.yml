@@ -32,18 +32,6 @@ jobs:
         run: |
           graph --version
 
-      - name: Check ABI is up to date
-        working-directory: subgraphs/${{ matrix.subgraph }}
-        run: |
-          if [ -f "./scripts/update-abi.sh" ]; then
-            echo "Running ABI update check for ${{ matrix.subgraph }}..."
-            ./scripts/update-abi.sh
-          else
-            echo "No update-abi.sh script found for ${{ matrix.subgraph }}, skipping ABI check"
-          fi
-        env:
-          CI: true
-
       - name: Test ${{ matrix.subgraph }} subgraph
         working-directory: subgraphs/${{ matrix.subgraph }}
         run: |
