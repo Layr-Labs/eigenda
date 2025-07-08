@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -19,11 +20,6 @@ var (
 	clientMap  = make(map[string]*TestClient)
 	logger     logging.Logger
 	metrics    *testClientMetrics
-)
-
-const (
-	PreprodEnv = "../config/environment/preprod.json"
-	TestnetEnv = "../config/environment/testnet.json"
 )
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
@@ -48,6 +44,14 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	// Resolve relative SRS path based on config file location
+	if config.SRSPath != "" && !filepath.IsAbs(config.SRSPath) {
+		configDir := filepath.Dir(configFile)
+		absPath := filepath.Join(configDir, config.SRSPath)
+		config.SRSPath = filepath.Clean(absPath)
+		// to debug this, you can print filepath.Abs(config.SRSPath)
 	}
 
 	configMap[configPath] = config

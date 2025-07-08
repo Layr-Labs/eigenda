@@ -23,10 +23,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Golang tests are always run with CWD set to the dir in which the test file is located.
+// These relative paths should thus only be used for tests in the `test/v2/correctness` directory.
+const (
+	PreprodEnv = "../config/environment/preprod.json"
+	TestnetEnv = "../config/environment/testnet.json"
+)
+
 // A list of config files that this test runs against
 var environments = []string{
-	client.PreprodEnv,
-	client.TestnetEnv,
+	PreprodEnv,
+	TestnetEnv,
 }
 
 // getEnvironmentName takes an environment string as listed in environments (aka a path to a config file describing
