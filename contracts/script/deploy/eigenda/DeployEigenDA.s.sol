@@ -38,12 +38,14 @@ import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
 
-import {InitParamsLib} from "script/deploy/mainnet/DeployMainnetConfig.sol";
+import {InitParamsLib} from "script/deploy/eigenda/DeployEigenDAConfig.sol";
 
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 
-contract DeployMainnet is Script {
+/// @notice This script deploys EigenDA contracts and should eventually replace the other deployment scripts, 
+///         which cannot currently be removed due to CI depending on them.
+contract DeployEigenDA is Script {
     using InitParamsLib for string;
 
     string constant PROXY_ADMIN = "PROXY_ADMIN";
