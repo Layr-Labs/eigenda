@@ -45,6 +45,15 @@ import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+
+contract ERC20Mintable is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 // NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
@@ -72,6 +81,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
     IDisperserRegistry public disperserRegistry;
+    ERC20Mintable public testToken;
 
     EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
@@ -112,6 +122,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        testToken = new ERC20Mintable("Test Token", "TEST");
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -261,7 +272,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                     DisperserRegistryTypes.LockedDisperserDeposit({
                         deposit: 100,
                         refund: 100,
-                        token: address(0),
+                        token: address(testToken),
                         lockPeriod: 1 days
                     }),
                     100
