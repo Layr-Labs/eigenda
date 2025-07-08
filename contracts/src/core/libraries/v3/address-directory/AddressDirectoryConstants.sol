@@ -27,6 +27,8 @@ library AddressDirectoryConstants {
     string internal constant CERT_VERIFIER_NAME = "CERT_VERIFIER";
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
 
+    /// LEGACY
+
     string internal constant CERT_VERIFIER_LEGACY_V1_NAME = "CERT_VERIFIER_LEGACY_V1";
     string internal constant CERT_VERIFIER_LEGACY_V2_NAME = "CERT_VERIFIER_LEGACY_V2";
     string internal constant RELAY_REGISTRY_LEGACY_NAME = "RELAY_REGISTRY_LEGACY";
