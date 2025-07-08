@@ -280,3 +280,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+require github.com/dgraph-io/badger/v4 v4.7.0
+
+require (
+	github.com/dgraph-io/ristretto/v2 v2.2.0 // indirect
+	github.com/google/flatbuffers v25.2.10+incompatible // indirect
+)
