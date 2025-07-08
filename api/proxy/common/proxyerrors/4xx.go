@@ -36,7 +36,7 @@ func Is400(err error) bool {
 // See https://github.com/Layr-Labs/optimism/pull/45 for how this is
 // used in optimism's derivation pipeline.
 func Is418(err error) bool {
-	var invalidCertErr *verification.CertVerificationFailedError
+	var invalidCertErr *verification.CertVerifierInvalidCertError
 	return errors.As(err, &invalidCertErr)
 }
 

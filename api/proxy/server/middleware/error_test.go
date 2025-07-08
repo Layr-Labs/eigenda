@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
@@ -38,7 +37,7 @@ func TestWithErrorHandling_HTTPStatusCodes(t *testing.T) {
 		{
 			name: "418 CertVerificationFailedError",
 			handleFn: func(w http.ResponseWriter, r *http.Request) error {
-				return &verification.CertVerificationFailedError{
+				return &verification.CertVerifierInvalidCertError{
 					StatusCode: 99,
 					Msg:        "cert failed",
 				}
@@ -100,11 +99,11 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 		name                         string
 		err                          error
 		expectHTTPStatus             int
-		expectVerificationStatusCode coretypes.VerificationStatusCode
+		expectVerificationStatusCode eigendav2store.DerivationErrorStatusCode
 	}{
 		{
 			name: "CertVerificationFailedError",
-			err: &verification.CertVerificationFailedError{
+			err: &verification.CertVerifierInvalidCertError{
 				StatusCode: 42, Msg: "cert verification failed"},
 			expectHTTPStatus:             http.StatusTeapot,
 			expectVerificationStatusCode: 42, // 42 is arbitrarily chosen for this test
@@ -113,7 +112,7 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 			name:                         "RBNRecencyCheckFailedError",
 			err:                          eigendav2store.NewRBNRecencyCheckFailedError(1, 2, 3),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: eigendav2store.StatusRBNRecencyCheckFailed,
+			expectVerificationStatusCode: eigendav2store.RecencyCheckFailedDerivationErrorStatusCode,
 		},
 	}
 
@@ -132,8 +131,8 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tc.expectHTTPStatus, rr.Code)
 			}
 			var resp struct {
-				StatusCode coretypes.VerificationStatusCode `json:"StatusCode"`
-				Msg        string                           `json:"Msg"`
+				StatusCode eigendav2store.DerivationErrorStatusCode `json:"StatusCode"`
+				Msg        string                                   `json:"Msg"`
 			}
 			dec := json.NewDecoder(strings.NewReader(rr.Body.String()))
 			if err := dec.Decode(&resp); err != nil {

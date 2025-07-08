@@ -108,9 +108,9 @@ func (cv *CertVerifier) CheckDACert(
 	if verifyResultCode == coretypes.StatusNullError {
 		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
 	} else if verifyResultCode != coretypes.StatusSuccess {
-		return &CertVerificationFailedError{
+		return &CertVerifierInvalidCertError{
 			StatusCode: verifyResultCode,
-			Msg:        fmt.Sprintf("cert verification failed: status code (%d) %s", verifyResultCode, verifyResultCode.String()),
+			Msg:        verifyResultCode.String(),
 		}
 	}
 	return nil

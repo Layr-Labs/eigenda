@@ -40,7 +40,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// expect proxy to return a 418 error which the client converts to this structured error
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(eigendav2store.StatusRBNRecencyCheckFailed), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(eigendav2store.RecencyCheckFailedDerivationErrorStatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
