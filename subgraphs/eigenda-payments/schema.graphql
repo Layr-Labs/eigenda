@@ -78,7 +78,10 @@ type ReservationUpdated @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-type CurrentReservation @entity(immutable: false) {
+# Everything above here maps 1:1 to onchain events
+# ============== EVENT-DERIVED STATE BELOW ==============
+
+type Reservation @entity(immutable: false) {
   id: Bytes! # account address
   account: Bytes! # address
   symbolsPerSecond: BigInt! # uint64

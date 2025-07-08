@@ -17,7 +17,7 @@ import {
   PriceParamsUpdated,
   ReservationPeriodIntervalUpdated,
   ReservationUpdated,
-  CurrentReservation
+  Reservation
 } from "../generated/schema"
 
 export function handleGlobalRatePeriodIntervalUpdated(
@@ -150,21 +150,21 @@ export function handleReservationUpdated(event: ReservationUpdatedEvent): void {
 
   entity.save()
 
-  // Create or update the ActiveReservation entity for this account
-  let activeReservation = CurrentReservation.load(event.params.account)
-  if (activeReservation == null) {
-    activeReservation = new CurrentReservation(event.params.account)
+  // Create or update the Reservation entity for this account
+  let reservation = Reservation.load(event.params.account)
+  if (reservation == null) {
+    reservation = new Reservation(event.params.account)
   }
   
-  activeReservation.account = event.params.account
-  activeReservation.symbolsPerSecond = event.params.reservation.symbolsPerSecond
-  activeReservation.startTimestamp = event.params.reservation.startTimestamp
-  activeReservation.endTimestamp = event.params.reservation.endTimestamp
-  activeReservation.quorumNumbers = event.params.reservation.quorumNumbers
-  activeReservation.quorumSplits = event.params.reservation.quorumSplits
-  activeReservation.lastUpdatedBlock = event.block.number
-  activeReservation.lastUpdatedTimestamp = event.block.timestamp
-  activeReservation.lastUpdatedTransactionHash = event.transaction.hash
+  reservation.account = event.params.account
+  reservation.symbolsPerSecond = event.params.reservation.symbolsPerSecond
+  reservation.startTimestamp = event.params.reservation.startTimestamp
+  reservation.endTimestamp = event.params.reservation.endTimestamp
+  reservation.quorumNumbers = event.params.reservation.quorumNumbers
+  reservation.quorumSplits = event.params.reservation.quorumSplits
+  reservation.lastUpdatedBlock = event.block.number
+  reservation.lastUpdatedTimestamp = event.block.timestamp
+  reservation.lastUpdatedTransactionHash = event.transaction.hash
   
-  activeReservation.save()
+  reservation.save()
 }

@@ -28,8 +28,8 @@ query ReservationUpdatesForAccount($account: Bytes!) {
 
 ## Timestamp-based Reservation Filtering
 
-Since reservations never get deleted on-chain we use timestamp-based filtering in queries to determine reservation status. Note: the `currentReservations` entity
-is used to represent the current state of reservations, which is updated based on the latest reservation update events.
+Since reservations never get deleted on-chain we use timestamp-based filtering in queries to determine reservation status. Note: the `reservations` entity
+is used to represent the latest state of reservations, which is updated based on the latest reservation update events.
 
 ### Query Active Reservations
 
@@ -37,7 +37,7 @@ To find all currently active reservations, filter by comparing the current times
 
 ```graphql
 query ActiveReservations($currentTime: BigInt!) {
-  currentReservations(
+  reservations(
     where: { 
       startTimestamp_lte: $currentTime,
       endTimestamp_gt: $currentTime 
@@ -66,7 +66,7 @@ To find reservations that haven't started yet:
 
 ```graphql
 query PendingReservations($currentTime: BigInt!) {
-  currentReservations(
+  reservations(
     where: { 
       startTimestamp_gt: $currentTime 
     }
@@ -85,7 +85,7 @@ To find reservations that have already ended:
 
 ```graphql
 query ExpiredReservations($currentTime: BigInt!) {
-  currentReservations(
+  reservations(
     where: { 
       endTimestamp_lte: $currentTime 
     }
@@ -104,7 +104,7 @@ To get a specific account's reservation:
 
 ```graphql
 query AccountReservation($account: Bytes!) {
-  currentReservation(id: $account) {
+  reservation(id: $account) {
     symbolsPerSecond
     startTimestamp
     endTimestamp

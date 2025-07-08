@@ -57,12 +57,12 @@ describe("Describe entity assertions", () => {
   })
 })
 
-describe("CurrentReservation entity", () => {
+describe("Reservation entity", () => {
   afterAll(() => {
     clearStore()
   })
 
-  test("CurrentReservation created and updated on ReservationUpdated event", () => {
+  test("Reservation created and updated on ReservationUpdated event", () => {
     // Create test data
     let account = Address.fromString("0x1234567890123456789012345678901234567890")
     let symbolsPerSecond = BigInt.fromI32(1000)
@@ -82,17 +82,17 @@ describe("CurrentReservation entity", () => {
     )
     handleReservationUpdated(event1)
 
-    // Check that CurrentReservation was created
-    assert.entityCount("CurrentReservation", 1)
+    // Check that Reservation was created
+    assert.entityCount("Reservation", 1)
     
-    // Verify the CurrentReservation fields
+    // Verify the Reservation fields
     let accountId = account.toHexString()
-    assert.fieldEquals("CurrentReservation", accountId, "account", accountId)
-    assert.fieldEquals("CurrentReservation", accountId, "symbolsPerSecond", "1000")
-    assert.fieldEquals("CurrentReservation", accountId, "startTimestamp", "1000000")
-    assert.fieldEquals("CurrentReservation", accountId, "endTimestamp", "2000000")
-    assert.fieldEquals("CurrentReservation", accountId, "quorumNumbers", "0x01")
-    assert.fieldEquals("CurrentReservation", accountId, "quorumSplits", "0x64")
+    assert.fieldEquals("Reservation", accountId, "account", accountId)
+    assert.fieldEquals("Reservation", accountId, "symbolsPerSecond", "1000")
+    assert.fieldEquals("Reservation", accountId, "startTimestamp", "1000000")
+    assert.fieldEquals("Reservation", accountId, "endTimestamp", "2000000")
+    assert.fieldEquals("Reservation", accountId, "quorumNumbers", "0x01")
+    assert.fieldEquals("Reservation", accountId, "quorumSplits", "0x64")
 
     // Create and handle updated reservation event
     let newSymbolsPerSecond = BigInt.fromI32(2000)
@@ -108,15 +108,15 @@ describe("CurrentReservation entity", () => {
     )
     handleReservationUpdated(event2)
 
-    // Check that we still have only one CurrentReservation (it was updated, not created new)
-    assert.entityCount("CurrentReservation", 1)
+    // Check that we still have only one Reservation (it was updated, not created new)
+    assert.entityCount("Reservation", 1)
     
     // Verify the updated fields
-    assert.fieldEquals("CurrentReservation", accountId, "symbolsPerSecond", "2000")
-    assert.fieldEquals("CurrentReservation", accountId, "endTimestamp", "3000000")
+    assert.fieldEquals("Reservation", accountId, "symbolsPerSecond", "2000")
+    assert.fieldEquals("Reservation", accountId, "endTimestamp", "3000000")
   })
 
-  test("Multiple accounts have separate CurrentReservations with different time ranges", () => {
+  test("Multiple accounts have separate Reservations with different time ranges", () => {
     clearStore()
     
     // Create three accounts with different reservation time ranges
@@ -159,20 +159,20 @@ describe("CurrentReservation entity", () => {
     )
     handleReservationUpdated(event3)
     
-    // Verify we have three CurrentReservations
-    assert.entityCount("CurrentReservation", 3)
+    // Verify we have three Reservations
+    assert.entityCount("Reservation", 3)
     
     // Verify each account has its own reservation with correct data
-    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "symbolsPerSecond", "1000")
-    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "startTimestamp", "100000")
-    assert.fieldEquals("CurrentReservation", accounts[0].toHexString(), "endTimestamp", "200000")
+    assert.fieldEquals("Reservation", accounts[0].toHexString(), "symbolsPerSecond", "1000")
+    assert.fieldEquals("Reservation", accounts[0].toHexString(), "startTimestamp", "100000")
+    assert.fieldEquals("Reservation", accounts[0].toHexString(), "endTimestamp", "200000")
     
-    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "symbolsPerSecond", "2000")
-    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "startTimestamp", "150000")
-    assert.fieldEquals("CurrentReservation", accounts[1].toHexString(), "endTimestamp", "250000")
+    assert.fieldEquals("Reservation", accounts[1].toHexString(), "symbolsPerSecond", "2000")
+    assert.fieldEquals("Reservation", accounts[1].toHexString(), "startTimestamp", "150000")
+    assert.fieldEquals("Reservation", accounts[1].toHexString(), "endTimestamp", "250000")
     
-    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "symbolsPerSecond", "3000")
-    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "startTimestamp", "300000")
-    assert.fieldEquals("CurrentReservation", accounts[2].toHexString(), "endTimestamp", "400000")
+    assert.fieldEquals("Reservation", accounts[2].toHexString(), "symbolsPerSecond", "3000")
+    assert.fieldEquals("Reservation", accounts[2].toHexString(), "startTimestamp", "300000")
+    assert.fieldEquals("Reservation", accounts[2].toHexString(), "endTimestamp", "400000")
   })
 })
