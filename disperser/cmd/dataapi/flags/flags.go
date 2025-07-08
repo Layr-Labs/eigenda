@@ -71,16 +71,22 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_OPERATOR_STATE_API_SOCKET_ADDR"),
 		Required: true,
 	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ServerModeFlag = cli.StringFlag{
@@ -147,8 +153,6 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,
@@ -164,6 +168,9 @@ var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

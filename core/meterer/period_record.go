@@ -6,6 +6,7 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 )
 
 // QuorumPeriodRecords is a map of quorum number to a slice of period records
@@ -19,20 +20,14 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-// updateRecord tracks a successful update for rollback purposes
-type UpdateRecord struct {
-	QuorumNumber core.QuorumID
-	Period       uint64
-	Usage        uint64
-}
-
 // GetRelativePeriodRecord returns the period record for the given index and quorum number; if the record does not exist, it is initialized to 0
+// If the index is greater than the corresponding relative index's absolute index, refresh the record
 func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber core.QuorumID) *PeriodRecord {
 	if _, exists := pr[quorumNumber]; !exists {
 		pr[quorumNumber] = make([]*PeriodRecord, MinNumBins)
 	}
 	relativeIndex := uint32(index % uint64(MinNumBins))
-	if pr[quorumNumber][relativeIndex] == nil {
+	if pr[quorumNumber][relativeIndex] == nil || uint64(pr[quorumNumber][relativeIndex].Index) < index {
 		pr[quorumNumber][relativeIndex] = &PeriodRecord{
 			Index: uint32(index),
 			Usage: 0,
@@ -71,14 +66,14 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 		return errors.New("protocolConfig cannot be nil")
 	}
 
-	symbolUsage := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	binLimit := GetReservationBinLimit(reservation, protocolConfig.ReservationRateLimitWindow)
+	symbolUsage := payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	binLimit := payment_logic.GetBinLimit(reservation.SymbolsPerSecond, protocolConfig.ReservationRateLimitWindow)
 
 	if symbolUsage > binLimit {
 		return errors.New("symbol usage exceeds bin limit")
 	}
 
-	currentPeriod := GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
+	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
 	relativePeriodRecord := pr.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 	oldUsage := relativePeriodRecord.Usage
 	relativePeriodRecord.Usage += symbolUsage
@@ -93,7 +88,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	// overflow bin if we're over the limit
-	overflowPeriod := GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
+	overflowPeriod := payment_logic.GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
 	overflowPeriodRecord := pr.GetRelativePeriodRecord(overflowPeriod, quorumNumber)
 	if overflowPeriodRecord.Usage == 0 {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit

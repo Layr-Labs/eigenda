@@ -176,3 +176,34 @@ func GetAllQuorumIDs(quorumCount uint8) []core.QuorumID {
 	}
 	return quorumIDs
 }
+
+// ContractNames defines the standard contract names used in the address directory
+// TODO: consider auto-generating this from the address directory contract
+// These values must match exactly the constants defined in AddressDirectoryConstants.sol.
+var ContractNames = struct {
+	ServiceManager         string
+	OperatorStateRetriever string
+	RegistryCoordinator    string
+	BLSApkRegistry         string
+	IndexRegistry          string
+	StakeRegistry          string
+	SocketRegistry         string
+	PaymentVault           string
+	EjectionManager        string
+	RelayRegistry          string
+	ThresholdRegistry      string
+	DisperserRegistry      string
+}{
+	ServiceManager:         "SERVICE_MANAGER",
+	OperatorStateRetriever: "OPERATOR_STATE_RETRIEVER",
+	RegistryCoordinator:    "REGISTRY_COORDINATOR",
+	BLSApkRegistry:         "BLS_APK_REGISTRY",
+	IndexRegistry:          "INDEX_REGISTRY",
+	StakeRegistry:          "STAKE_REGISTRY",
+	SocketRegistry:         "SOCKET_REGISTRY",
+	PaymentVault:           "PAYMENT_VAULT",
+	EjectionManager:        "EJECTION_MANAGER",
+	RelayRegistry:          "RELAY_REGISTRY",
+	ThresholdRegistry:      "THRESHOLD_REGISTRY",
+	DisperserRegistry:      "DISPERSER_REGISTRY",
+}

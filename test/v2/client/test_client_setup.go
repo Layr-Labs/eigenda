@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +23,30 @@ var (
 	metrics    *testClientMetrics
 )
 
-const (
-	PreprodEnv = "../config/environment/preprod.json"
-	TestnetEnv = "../config/environment/testnet.json"
-)
+// GetEnvironmentConfigPaths returns a list of paths to the environment config files.
+func GetEnvironmentConfigPaths() ([]string, error) {
+	configDir, err := util.SanitizePath("../config/environment")
+	if err != nil {
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
+	}
+
+	files, err := os.ReadDir(configDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read environment config directory: %w", err)
+	}
+	var configPaths []string
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		configPath := fmt.Sprintf("../config/environment/%s", file.Name())
+		configPaths = append(configPaths, configPath)
+	}
+	if len(configPaths) == 0 {
+		return nil, fmt.Errorf("no environment config files found in ../config/environment")
+	}
+	return configPaths, nil
+}
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
 func GetConfig(configPath string) (*TestClientConfig, error) {
@@ -35,9 +57,9 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 		return config, nil
 	}
 
-	configFile, err := ResolveTildeInPath(configPath)
+	configFile, err := util.SanitizePath(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed sanitize path: %w", err)
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {
@@ -110,7 +132,19 @@ func GetClient(configPath string) (*TestClient, error) {
 }
 
 func skipInCI(t *testing.T) {
-	if os.Getenv("CI") != "" {
+
+	// The environment variable "CI" will be set when running inside a github action.
+	// The environment variable "LIVE_TESTS" will be set when running live tests, which is a specific github action.
+	//
+	// There are three situations we want to consider:
+	//
+	// 1. When running a tests locally, we want to run live tests if requested. "CI" will not be set, and so
+	//    we will not skip the test.
+	// 2. When we are running general unit tests as a github action, we specifically don't want to run live tests.
+	//    "CI" will be set, and "LIVE_TESTS" will not be set, so we skip the test.
+	// 3. When we are running live tests as a github action, we want to run the test. Both "CI" and "LIVE_TESTS" will
+	//    be set, so we do not skip the test.
+	if os.Getenv("CI") != "" && os.Getenv("LIVE_TESTS") == "" {
 		t.Skip("Skipping test in CI environment")
 	}
 }

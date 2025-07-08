@@ -76,6 +76,9 @@ dataapi-build:
 unit-tests:
 	./test.sh
 
+live-tests:
+	go test -v ./test/v2/live -v -timeout 60m
+
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
 
@@ -107,6 +110,8 @@ integration-tests-dataapi:
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake node-group-release ${PUSH_FLAG}
+	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
+	docker buildx bake proxy ${PUSH_FLAG}
 
 semver:
 	echo "${SEMVER}"

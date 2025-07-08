@@ -3,6 +3,8 @@ package client
 import (
 	"fmt"
 	"path"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 // TestClientConfig is the configuration for the test client.
@@ -30,6 +32,11 @@ type TestClientConfig struct {
 	//
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
+	// The contract address for the EigenDA address directory, where all contract addresses are stored
+	//
+	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
+	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
+	EigenDADirectory string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
@@ -68,9 +75,9 @@ type TestClientConfig struct {
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
-	root, err := ResolveTildeInPath(c.SRSPath)
+	root, err := util.SanitizePath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("resolve tilde in path: %w", err)
+		return "", fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }

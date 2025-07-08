@@ -47,6 +47,7 @@ type Config struct {
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
 
+	EigenDADirectory                string
 	BLSOperatorStateRetrieverAddr   string
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
@@ -131,6 +132,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
+		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
