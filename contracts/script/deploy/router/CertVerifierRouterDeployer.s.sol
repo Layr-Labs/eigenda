@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifierRouter} from "src/periphery/cert/router/EigenDACertVerifierRouter.sol";
+import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
