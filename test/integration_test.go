@@ -227,8 +227,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
 	}), mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-		1: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
+		0: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
+		1: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
 	}, nil)
 	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.Anything, mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{}, errors.New("reservation not found"))
 

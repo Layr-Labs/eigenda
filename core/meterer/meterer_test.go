@@ -635,8 +635,6 @@ func TestMetererDifferentQuorumConfigurations(t *testing.T) {
 		SymbolsPerSecond: 100,
 		StartTimestamp:   uint64(now.Add(-2 * time.Minute).Unix()),
 		EndTimestamp:     uint64(now.Add(3 * time.Minute).Unix()),
-		QuorumSplits:     []byte{33, 33, 34},
-		QuorumNumbers:    quorumNumbers,
 	}
 
 	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID1, testifymock.Anything).Return(
