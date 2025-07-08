@@ -46,16 +46,16 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    # Minimal permissions required for Claude to access repository context
+    # Permissions for Claude to read repository context and comment on PRs/issues
     permissions:
       contents: read        # Read repository files
-      pull-requests: read   # Read PR information
-      issues: read          # Read issue information
+      pull-requests: write  # Comment on PRs
+      issues: write         # Comment on issues
       id-token: write       # Generate OIDC token for secure authentication
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1
 
