@@ -1,7 +1,9 @@
 package clients
 
 import (
+	"context"
 	"math/big"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -10,8 +12,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
 
 func TestVerifyReceivedBlobKey(t *testing.T) {
@@ -115,4 +119,132 @@ func TestMutexPreventsSimultaneousRequests(t *testing.T) {
 	expectedMinTime := time.Duration(numRequests) * 200 * time.Millisecond
 	require.GreaterOrEqual(t, totalTime.Milliseconds(), expectedMinTime.Milliseconds()-10, // allow small timing variations
 		"Total execution time was less than expected, suggesting concurrent execution")
+}
+
+// mockDisperserServer implements the gRPC DisperserServer interface for testing
+// Currently only implements the GetBlobStatus method, to be able to test Cert Retrievals.
+type mockDisperserServer struct {
+	v2.UnimplementedDisperserServer
+
+	getBlobStatusResponse  *v2.BlobStatusReply
+	getBlobStatusError     error
+	getBlobStatusCallCount int
+	getBlobStatusRequests  []*v2.BlobStatusRequest
+
+	// Mutex for thread-safe access
+	mu sync.Mutex
+}
+
+func (m *mockDisperserServer) GetBlobStatus(ctx context.Context, req *v2.BlobStatusRequest) (*v2.BlobStatusReply, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.getBlobStatusCallCount++
+	m.getBlobStatusRequests = append(m.getBlobStatusRequests, req)
+
+	if m.getBlobStatusError != nil {
+		return nil, m.getBlobStatusError
+	}
+	return m.getBlobStatusResponse, nil
+}
+
+// testHarness encapsulates all the test dependencies
+type testHarness struct {
+	server     *mockDisperserServer
+	grpcServer *grpc.Server
+	client     DisperserClient
+	signer     *mockBlobRequestSigner
+	prover     *mockProver
+	accountant *Accountant
+	logger     logging.Logger
+	listener   net.Listener
+}
+
+// setupTestHarness creates a complete test environment with mocked dependencies
+func setupTestHarness(t *testing.T) (*testHarness, func()) {
+	// Create mock server
+	mockServer := &mockDisperserServer{}
+
+	// Create gRPC server
+	grpcServer := grpc.NewServer()
+	v2.RegisterDisperserServer(grpcServer, mockServer)
+
+	// Create listener on random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	// Start gRPC server
+	go func() {
+		_ = grpcServer.Serve(listener)
+	}()
+
+	// Extract port from listener
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+
+	// Create mock dependencies
+	logger := logging.NewNoopLogger()
+	signer := &mockBlobRequestSigner{}
+	prover := &mockProver{}
+	accountant := NewAccountant(gethcommon.Address{})
+
+	// Create client config
+	config := &DisperserClientConfig{
+		Hostname:          "127.0.0.1",
+		Port:              port,
+		UseSecureGrpcFlag: false,
+	}
+
+	// Create disperser client
+	client, err := NewDisperserClient(logger, config, signer, prover, accountant)
+	require.NoError(t, err)
+
+	// Cleanup function
+	cleanup := func() {
+		client.Close()
+		grpcServer.Stop()
+		listener.Close()
+	}
+
+	return &testHarness{
+		server:     mockServer,
+		grpcServer: grpcServer,
+		client:     client,
+		signer:     signer,
+		prover:     prover,
+		accountant: accountant,
+		logger:     logger,
+		listener:   listener,
+	}, cleanup
+}
+
+func TestDisperserClient(t *testing.T) {
+
+	t.Run("GetBlobStatus", func(t *testing.T) {
+		harness, cleanup := setupTestHarness(t)
+		defer cleanup()
+
+		// Configure mock response
+		harness.server.getBlobStatusResponse = &v2.BlobStatusReply{
+			Status: v2.BlobStatus_FINALIZED,
+		}
+
+		// Test blob key
+		var blobKey corev2.BlobKey
+		copy(blobKey[:], []byte("test-blob-key"))
+
+		// Make the call
+		ctx := context.Background()
+		reply, err := harness.client.GetBlobStatus(ctx, blobKey)
+
+		// Verify results
+		require.NoError(t, err)
+		require.NotNil(t, reply)
+		require.Equal(t, v2.BlobStatus_FINALIZED, reply.Status)
+
+		// Verify mock was called correctly
+		require.Equal(t, 1, harness.server.getBlobStatusCallCount)
+		require.Len(t, harness.server.getBlobStatusRequests, 1)
+		require.Equal(t, blobKey[:], harness.server.getBlobStatusRequests[0].BlobKey)
+	})
 }

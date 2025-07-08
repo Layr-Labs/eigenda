@@ -31,6 +31,13 @@ type DisperserClientConfig struct {
 	NtpSyncInterval   time.Duration
 }
 
+type BlobCommitter interface {
+	// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254
+	// field elements (32 bytes each, except potentially the last element),
+	// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
+	GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error)
+}
+
 // DisperserClient manages communication with the disperser server.
 type DisperserClient interface {
 	// Close closes the grpc connection to the disperser server.
@@ -61,7 +68,7 @@ type disperserClient struct {
 	initOnceAccountant sync.Once
 	conn               *grpc.ClientConn
 	client             disperser_rpc.DisperserClient
-	prover             encoding.Prover
+	committer          BlobCommitter
 	accountant         *Accountant
 	accountantLock     sync.Mutex
 	ntpClock           *core.NTPSyncedClock
@@ -89,7 +96,7 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, signer corev2.BlobRequestSigner, committer BlobCommitter, accountant *Accountant) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -120,7 +127,7 @@ func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, si
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
-		prover:     prover,
+		committer:  committer,
 		accountant: accountant,
 		ntpClock:   ntpClock,
 		// conn and client are initialized lazily
@@ -244,8 +251,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe.SetStage("get_commitments")
 
 	var blobCommitments encoding.BlobCommitments
-	if c.prover == nil {
-		// if prover is not configured, get blob commitments from disperser
+	if c.committer == nil {
+		// if committer is not configured, get blob commitments from disperser
 		commitments, err := c.GetBlobCommitment(ctx, data)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
@@ -268,9 +275,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 				lengthFromCommitment, symbolLength, err)
 		}
 	} else {
-		// if prover is configured, get commitments from prover
+		// if committer is configured, get commitments from committer
 
-		blobCommitments, err = c.prover.GetCommitmentsForPaddedLength(data)
+		blobCommitments, err = c.committer.GetCommitmentsForPaddedLength(data)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
 		}
