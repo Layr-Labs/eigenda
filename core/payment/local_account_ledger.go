@@ -2,10 +2,10 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
@@ -60,10 +60,11 @@ func NewLocalAccountLedger(
 // Logic: try reservations first (CumulativePayment=0), fallback to on-demand (CumulativePayment=new total).
 func (lal *LocalAccountLedger) CreatePaymentHeader(
 	accountID gethcommon.Address,
-	timestamp int64,
+	timestampNs int64,
 	numSymbols uint64,
 	quorumNumbers []core.QuorumID,
 	params *meterer.PaymentVaultParams,
+	receivedAtNs int64,
 ) (core.PaymentMetadata, error) {
 	if len(quorumNumbers) == 0 {
 		return core.PaymentMetadata{}, fmt.Errorf("no quorums provided")
@@ -76,7 +77,7 @@ func (lal *LocalAccountLedger) CreatePaymentHeader(
 	defer lal.mutex.RUnlock()
 
 	// Try reservation first
-	reservationValidationErr := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestamp, time.Now().UnixNano())
+	reservationValidationErr := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, receivedAtNs)
 	if reservationValidationErr == nil {
 		// Check usage limits with deep copy
 		periodRecordsCopy := lal.periodRecords.DeepCopy()
@@ -88,7 +89,7 @@ func (lal *LocalAccountLedger) CreatePaymentHeader(
 				reservationUsageErr = err
 				break
 			}
-			if err := periodRecordsCopy.UpdateUsage(quorumNumber, timestamp, numSymbols, reservation, protocolConfig); err != nil {
+			if err := periodRecordsCopy.UpdateUsage(quorumNumber, timestampNs, numSymbols, reservation, protocolConfig); err != nil {
 				reservationUsageErr = err
 				break
 			}
@@ -97,7 +98,7 @@ func (lal *LocalAccountLedger) CreatePaymentHeader(
 		if reservationUsageErr == nil {
 			return core.PaymentMetadata{
 				AccountID:         accountID,
-				Timestamp:         timestamp,
+				Timestamp:         timestampNs,
 				CumulativePayment: big.NewInt(0),
 			}, nil
 		}
@@ -121,7 +122,7 @@ func (lal *LocalAccountLedger) CreatePaymentHeader(
 	if resultingPayment.Cmp(lal.onDemand.CumulativePayment) <= 0 {
 		return core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         timestamp,
+			Timestamp:         timestampNs,
 			CumulativePayment: resultingPayment,
 		}, nil
 	}
@@ -219,60 +220,30 @@ func (lal *LocalAccountLedger) RevertDebit(
 	params *meterer.PaymentVaultParams,
 	previousCumulativePayment *big.Int,
 ) error {
-	if slip == nil {
-		return fmt.Errorf("debit slip cannot be nil")
-	}
-	if len(slip.QuorumNumbers) == 0 {
-		return fmt.Errorf("no quorums provided")
-	}
-	if slip.NumSymbols == 0 {
-		return fmt.Errorf("zero symbols requested")
-	}
-
-	payment := previousCumulativePayment
 	lal.mutex.Lock()
 	defer lal.mutex.Unlock()
 
-	if payment == nil {
+	if previousCumulativePayment == nil {
 		// Revert reservation usage
-		if err := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, slip.QuorumNumbers, slip.GetTimestamp(), time.Now().UnixNano()); err != nil {
-			return fmt.Errorf("cannot revert reservation usage: %v", err)
+		if params == nil {
+			return errors.New("payment vault params cannot be nil")
 		}
 
 		periodRecordsCopy := lal.periodRecords.DeepCopy()
 
 		for _, quorumNumber := range slip.QuorumNumbers {
-			_, exists := lal.reservations[quorumNumber]
-			if !exists {
-				return fmt.Errorf("cannot revert: reservation not found for quorum %d", quorumNumber)
-			}
 			_, protocolConfig, err := params.GetQuorumConfigs(quorumNumber)
 			if err != nil {
-				return fmt.Errorf("cannot revert: %v", err)
+				return fmt.Errorf("failed to get config for quorum %d: %w", quorumNumber, err)
 			}
-
 			reservationPeriod := payment_logic.GetReservationPeriodByNanosecond(slip.GetTimestamp(), protocolConfig.ReservationRateLimitWindow)
 
-			if periodRecordsCopy[quorumNumber] == nil {
-				return fmt.Errorf("cannot revert: no period records found for quorum %d", quorumNumber)
-			}
-
 			records := periodRecordsCopy[quorumNumber]
-
-			found := false
 			for _, record := range records {
-				if record.Index == uint32(reservationPeriod) {
-					if record.Usage < slip.NumSymbols {
-						return fmt.Errorf("cannot revert: insufficient usage to subtract (%d < %d) for quorum %d", record.Usage, slip.NumSymbols, quorumNumber)
-					}
+				if record != nil && record.Index == uint32(reservationPeriod) {
 					record.Usage -= slip.NumSymbols
-					found = true
 					break
 				}
-			}
-
-			if !found {
-				return fmt.Errorf("cannot revert: no usage record found for period %d, quorum %d", reservationPeriod, quorumNumber)
 			}
 		}
 
@@ -281,15 +252,7 @@ func (lal *LocalAccountLedger) RevertDebit(
 	}
 
 	// Revert on-demand payment
-	if payment.Cmp(big.NewInt(0)) <= 0 {
-		return fmt.Errorf("cannot revert: invalid payment amount %v", payment)
-	}
-
-	if lal.cumulativePayment.Cmp(payment) < 0 {
-		return fmt.Errorf("cannot revert: insufficient cumulative payment (%v < %v)", lal.cumulativePayment, payment)
-	}
-
-	lal.cumulativePayment.Sub(lal.cumulativePayment, payment)
+	lal.cumulativePayment = new(big.Int).Set(previousCumulativePayment)
 	return nil
 }
 
