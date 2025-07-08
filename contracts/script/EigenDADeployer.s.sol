@@ -177,7 +177,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDARelayRegistry = EigenDARelayRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME, address(eigenDARelayRegistry));
+        eigenDADirectory.addAddress(AddressDirectoryConstants.RELAY_REGISTRY_LEGACY_NAME, address(eigenDARelayRegistry));
         eigenDACertVerifierRouter = EigenDACertVerifierRouter(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );

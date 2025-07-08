@@ -8,25 +8,27 @@ import {RelayRegistryLib} from "src/core/libraries/v3/relay-registry/RelayRegist
 contract RelayRegistry is IRelayRegistry {
     using RelayRegistryLib for uint32;
 
-    function addRelay(address relay, string memory url, uint32[] memory dispersers)
-        external
-        override
-        returns (uint32)
-    {
+    function addRelayInfo(address relay, string memory url, uint32[] memory dispersers) external returns (uint32) {
         uint32 relayId = RelayRegistryLib.addRelay(relay, url, dispersers);
         emit RelayAdded(relayId, relay, url, dispersers);
         return relayId;
     }
 
-    function getRelayAddress(uint32 relayId) external view override returns (address) {
-        return relayId.getRelayAddress();
+    function addRelayInfo(address relay, string memory url) external returns (uint32) {
+        uint32 relayId = RelayRegistryLib.addRelay(relay, url, new uint32[](0));
+        emit RelayAdded(relayId, relay, url, new uint32[](0));
+        return relayId;
     }
 
-    function getRelayUrl(uint32 relayId) external view override returns (string memory) {
-        return relayId.getRelayUrl();
+    function relayKeyToAddress(uint32 key) external view returns (address) {
+        return key.getRelayAddress();
     }
 
-    function getRelayDispersers(uint32 relayId) external view override returns (uint32[] memory) {
-        return relayId.getRelayDispersers();
+    function relayKeyToUrl(uint32 key) external view returns (string memory) {
+        return key.getRelayUrl();
+    }
+
+    function relayKeyToDispersers(uint32 key) external view override returns (uint32[] memory) {
+        return key.getRelayDispersers();
     }
 }
