@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
   workflow_dispatch: {}         # Allow manual triggering
-  push: # TODO: temporary for testing, do not merge
-    branches:
-      - auto-test
 
 env:
   MISE_VERSION: 2024.12.14
