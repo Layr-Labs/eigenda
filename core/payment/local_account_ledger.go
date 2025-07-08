@@ -14,12 +14,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// Verify that LocalAccountLedger implements AccountLedger interface at compile time
 var _ AccountLedger = (*LocalAccountLedger)(nil)
 
 // LocalAccountLedger implements AccountLedger for client-side payment tracking.
-// Supports reservation-based and on-demand payment methods with atomic multi-quorum transactions.
-// Thread-safe with RWMutex; uses deep-copy-commit pattern for atomic state updates.
 type LocalAccountLedger struct {
 	// on-chain per-quorum reservation configs
 	reservations map[core.QuorumID]*core.ReservedPayment
@@ -58,6 +55,7 @@ func NewLocalAccountLedger(
 
 // CreatePaymentHeader determines payment method and creates PaymentMetadata.
 // Logic: try reservations first (CumulativePayment=0), fallback to on-demand (CumulativePayment=new total).
+// No changes made to the AccountLedger state.
 func (lal *LocalAccountLedger) CreatePaymentHeader(
 	accountID gethcommon.Address,
 	timestampNs int64,
@@ -79,7 +77,7 @@ func (lal *LocalAccountLedger) CreatePaymentHeader(
 	// Try reservation first
 	reservationValidationErr := payment_logic.ValidateReservations(lal.reservations, params.QuorumProtocolConfigs, quorumNumbers, timestampNs, receivedAtNs)
 	if reservationValidationErr == nil {
-		// Check usage limits with deep copy
+		// Check usage limits with deep copy; no changes made to the original periodRecords
 		periodRecordsCopy := lal.periodRecords.DeepCopy()
 		var reservationUsageErr error
 		for _, quorumNumber := range quorumNumbers {
