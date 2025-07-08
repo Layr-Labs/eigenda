@@ -162,12 +162,6 @@ func TestAccountBlob_InsufficientBalance(t *testing.T) {
 	assert.Nil(t, header)
 }
 
-// This test is now covered by TestAccountBlob_Scenarios
-
-// This test is now covered by TestAccountBlob_Scenarios
-
-// This test is now covered by TestAccountBlob_Scenarios
-
 func TestAccountBlob_BinRotation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -233,12 +227,15 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	_, err = accountant.AccountBlob(prevTime, 500, quorums)
 	assert.NoError(t, err)
 
-	// Check previous period now has usage 800
+	// Check previous period now has usage 800; overflow period is 0
+	overflowPeriod := payment_logic.GetOverflowPeriod(currentPeriod, reservationWindow)
 	for _, quorumNumber := range quorums {
 		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
 		record = accountant.periodRecords.GetRelativePeriodRecord(prevPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
+		record = accountant.periodRecords.GetRelativePeriodRecord(overflowPeriod, quorumNumber)
+		assert.Equal(t, uint64(0), record.Usage)
 	}
 }
 
