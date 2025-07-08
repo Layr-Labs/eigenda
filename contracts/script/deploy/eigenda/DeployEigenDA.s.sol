@@ -43,7 +43,7 @@ import {InitParamsLib} from "script/deploy/eigenda/DeployEigenDAConfig.sol";
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 
-/// @notice This script deploys EigenDA contracts and should eventually replace the other deployment scripts, 
+/// @notice This script deploys EigenDA contracts and should eventually replace the other deployment scripts,
 ///         which cannot currently be removed due to CI depending on them.
 contract DeployEigenDA is Script {
     using InitParamsLib for string;
@@ -74,7 +74,7 @@ contract DeployEigenDA is Script {
     string cfg;
 
     function initConfig() internal virtual {
-        cfg = vm.readFile(vm.envString("DEPLOY_MAINNET_CONFIG"));
+        cfg = vm.readFile(vm.envString("DEPLOY_CONFIG_PATH"));
     }
 
     function run() public virtual {
