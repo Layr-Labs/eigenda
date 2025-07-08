@@ -685,6 +685,9 @@ func TestLocalAccountLedger_RevertDebit(t *testing.T) {
 			QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
 				0: {MinNumSymbols: 1, ReservationRateLimitWindow: 10},
 			},
+			QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+				0: {OnDemandPricePerSymbol: 1},
+			},
 		}
 
 		revertSlip, err = payment.NewDebitSlip(
