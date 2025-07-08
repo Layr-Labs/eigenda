@@ -33,7 +33,7 @@ import {EjectionManager} from "lib/eigenlayer-middleware/src/EjectionManager.sol
 import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
