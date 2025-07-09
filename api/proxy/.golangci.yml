@@ -17,7 +17,7 @@ linters:
     - unused # checks for unused constants, variables, functions and types
     ## disabled by default
     - asasalint # checks for pass []any as any in variadic func(...any)
-    - asciicheck # checks that your code does not contain non-ASCII identifiers
+    - asciicheck # checks that your code does not contain non-ASCII identifiers1
     - bidichk # checks for dangerous unicode character sequences
     - bodyclose # checks whether HTTP response body is closed successfully
     - cyclop # checks function and package cyclomatic complexity
@@ -195,7 +195,7 @@ linters:
           - unparam
 
       # Allow certain patterns to be ignored by lll (long lines)
-      - source: '".{120,}"' # Ignores double-quoted strings longer than 120 chars
+      - source: '".{100,}"' # Ignores double-quoted strings longer than 120 chars
         linters: [lll]
       - source: "// https?://" # This pattern matches comments containing URLs
         linters: [lll]

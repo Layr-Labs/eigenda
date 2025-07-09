@@ -122,7 +122,7 @@ func BuildStoreManager(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks)
+	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
