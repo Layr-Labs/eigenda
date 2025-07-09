@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -191,7 +190,7 @@ func (l *LoadGenerator) run() {
 	defer ticker.Stop()
 
 	for l.alive.Load() {
-		<-ticker.Tick()
+		<-ticker.C
 
 		l.lifecycleLimiter <- struct{}{}
 		go func() {
