@@ -237,21 +237,21 @@ impl BorshDeserialize for EthereumHash {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlobWithSender {
     /// The address that submitted blob to the chain.
-    address: EthereumAddress,
+    pub sender: EthereumAddress,
     /// The ethereum transaction hash in which the blob was included.
-    tx_hash: EthereumHash,
+    pub tx_hash: EthereumHash,
     /// The actual blob of bytes
-    blob: CountedBufReader<Bytes>,
+    pub blob: CountedBufReader<Bytes>,
 }
 
 impl BlobWithSender {
-    pub fn new<Address, Hash>(address: Address, tx_hash: Hash, blob: Vec<u8>) -> Self
+    pub fn new<Address, Hash>(sender: Address, tx_hash: Hash, blob: Vec<u8>) -> Self
     where
         Address: Into<EthereumAddress>,
         Hash: Into<EthereumHash>,
     {
         Self {
-            address: address.into(),
+            sender: sender.into(),
             tx_hash: tx_hash.into(),
             blob: CountedBufReader::new(blob.into()),
         }
@@ -264,7 +264,7 @@ impl BlobReaderTrait for BlobWithSender {
     type BlobHash = EthereumHash;
 
     fn sender(&self) -> Self::Address {
-        self.address
+        self.sender
     }
 
     fn hash(&self) -> Self::BlobHash {
@@ -284,6 +284,15 @@ impl BlobReaderTrait for BlobWithSender {
         self.blob.advance(num_bytes);
         self.verified_data()
     }
+}
+
+/// Struct that holds an Ethereum transaction with certificate and an actual blob
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransactionWithBlob {
+    /// The transaction that holds a certificate
+    pub transaction: Transaction,
+    /// The actual blob persisted to the EigenDa
+    pub blob: Option<Vec<u8>>,
 }
 
 #[cfg(test)]

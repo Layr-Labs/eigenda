@@ -1,3 +1,32 @@
+use alloy::{
+    consensus::{SidecarCoder, SimpleCoder, TxEip4844Variant},
+    rpc::types::Transaction,
+};
+use tracing::debug;
+
+/// Extract certificate blob from the ethereum transaction.
+pub fn extract_certificate(transaction: &Transaction) -> Option<Vec<u8>> {
+    // Check if this is an EIP-4844 transaction
+    let eip4844_tx = transaction.inner.as_eip4844()?;
+
+    // Check if the transaction has a sidecar
+    let TxEip4844Variant::TxEip4844WithSidecar(tx_with_sidecar) = &eip4844_tx.tx() else {
+        debug!(
+            tx_hash = %eip4844_tx.hash(),
+            "Transaction is missing the sidecar"
+        );
+        return None;
+    };
+
+    // Decode the certificate from the sidecar
+    let sidecar = &tx_with_sidecar.sidecar;
+    let decoded = SimpleCoder::default().decode_all(&sidecar.blobs)?;
+    // The certificate is small enough that only one ethereum blob is used
+    let decoded = decoded.into_iter().next()?;
+
+    Some(decoded)
+}
+
 #[cfg(test)]
 pub mod tests {
     use std::borrow::Cow;

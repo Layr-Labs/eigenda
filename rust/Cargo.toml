@@ -4,38 +4,39 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "a25b7634c3a0eaa40acf57503508956a74291cdd" }
+sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git", rev = "dce0cc06959fc754e06ce00ac2c2ada943a8d621" }
 
 # rust-eigenda-v2-common = { version = "0.1.3" }
 # rust-eigenda-v2-client = { version = "0.1.4" }
 
-anyhow = { version = "1.0.98", default-features = false }
-alloy = { version = "1.0.17", features = [
+alloy = { version = "1.0.20", features = [
     "full",    # TODO: Use only needed features
     "network",
 ] }
+anyhow = { version = "1.0.98", default-features = false }
 async-trait = "0.1.88"
 borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
 derive_more = { version = "2.0.1" }
+futures = { version = "0.3.31" }
+hex = { version = "0.4.3" }
+reqwest = { version = "0.12.22", features = ["json"], optional = true }
 schemars = { version = "0.8.22", default-features = false, features = [
     "derive",
 ] }
-hex = { version = "0.4.3" }
-thiserror = "2.0.12"
-tracing = { version = "0.1.41" }
-reqwest = { version = "0.12.20", features = ["json"], optional = true }
 serde = { version = "1.0.219", default-features = false, features = [
     "alloc",
     "derive",
 ] }
 serde_json = { version = "1.0.140" }
-tokio = { version = "1.45.1", features = ["sync"], optional = true }
+thiserror = "2.0.12"
+tokio = { version = "1.46.1", features = ["sync"], optional = true }
+tracing = { version = "0.1.41" }
 url = { version = "2.5.4" }
 
 [dev-dependencies]
-alloy = { version = "1.0.17", features = ["providers"] }
-testcontainers = "0.24.0"
+alloy = { version = "1.0.20", features = ["providers"] }
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
+testcontainers = "0.24.0"
 
 [features]
 default = []

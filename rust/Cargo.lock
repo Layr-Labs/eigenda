@@ -46,9 +46,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alloy"
-version = "1.0.17"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e0d1aecf3cab3d0e7383064ce488616434b4ade10d8904dff422e74203c712f"
+checksum = "ae58d888221eecf621595e2096836ce7cfc37be06bfa39d7f64aa6a3ea4c9e5b"
 dependencies = [
  "alloy-consensus",
  "alloy-contract",
@@ -2817,6 +2817,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "io-uring"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b86e202f00093dcba4275d4636b93ef9dd75d025ae560d2521b45ea28ab49013"
+dependencies = [
+ "bitflags 2.9.1",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3776,9 +3787,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reqwest"
-version = "0.12.20"
+version = "0.12.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eabf4c97d9130e2bf606614eb937e86edac8292eaa6f422f995d7e8de1eb1813"
+checksum = "cbc931937e6ca3a06e3b6c0aa7841849b160a90351d6ab467a8b9b9959767531"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4029,13 +4040,13 @@ dependencies = [
 [[package]]
 name = "rockbound"
 version = "1.0.0"
-source = "git+https://github.com/sovereign-labs/rockbound?rev=8a9ca9e2859e168117f230c0a51c517319c74284#8a9ca9e2859e168117f230c0a51c517319c74284"
+source = "git+https://github.com/sovereign-labs/rockbound?rev=dfd0624c32f5fb363c2190e9d911605663f7d693#dfd0624c32f5fb363c2190e9d911605663f7d693"
 dependencies = [
  "anyhow",
  "once_cell",
  "prometheus",
  "rocksdb",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tracing",
 ]
@@ -4582,6 +4593,7 @@ dependencies = [
  "async-trait",
  "borsh",
  "derive_more 2.0.1",
+ "futures",
  "hex",
  "reqwest",
  "risc0-zkvm",
@@ -4599,7 +4611,7 @@ dependencies = [
 [[package]]
 name = "sov-rollup-interface"
 version = "0.3.0"
-source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=a25b7634c3a0eaa40acf57503508956a74291cdd#a25b7634c3a0eaa40acf57503508956a74291cdd"
+source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=dce0cc06959fc754e06ce00ac2c2ada943a8d621#dce0cc06959fc754e06ce00ac2c2ada943a8d621"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4623,7 +4635,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=a25b7634c3a0eaa40acf57503508956a74291cdd#a25b7634c3a0eaa40acf57503508956a74291cdd"
+source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=dce0cc06959fc754e06ce00ac2c2ada943a8d621#dce0cc06959fc754e06ce00ac2c2ada943a8d621"
 dependencies = [
  "bech32",
  "borsh",
@@ -4638,7 +4650,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macro-helpers"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=a25b7634c3a0eaa40acf57503508956a74291cdd#a25b7634c3a0eaa40acf57503508956a74291cdd"
+source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=dce0cc06959fc754e06ce00ac2c2ada943a8d621#dce0cc06959fc754e06ce00ac2c2ada943a8d621"
 dependencies = [
  "bech32",
  "borsh",
@@ -4655,7 +4667,7 @@ dependencies = [
 [[package]]
 name = "sov-universal-wallet-macros"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=a25b7634c3a0eaa40acf57503508956a74291cdd#a25b7634c3a0eaa40acf57503508956a74291cdd"
+source = "git+ssh://git@github.com/Sovereign-Labs/sovereign-sdk-wip.git?rev=dce0cc06959fc754e06ce00ac2c2ada943a8d621#dce0cc06959fc754e06ce00ac2c2ada943a8d621"
 dependencies = [
  "proc-macro2",
  "sov-universal-wallet-macro-helpers",
@@ -5008,15 +5020,17 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.45.1"
+version = "1.46.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ef51a33ef1da925cea3e4eb122833cb377c61439ca401b770f54902b806779"
+checksum = "0cc3a2344dafbe23a245241fe8b09735b521110d30fcefbbd5feb1797ca35d17"
 dependencies = [
  "backtrace",
  "bytes",
+ "io-uring",
  "libc",
  "mio",
  "pin-project-lite",
+ "slab",
  "socket2",
  "tokio-macros",
  "windows-sys 0.52.0",

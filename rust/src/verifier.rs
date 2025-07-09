@@ -1,4 +1,4 @@
-use crate::spec::EigenDaSpec;
+use crate::spec::{EigenDaSpec, NamespaceId, TransactionWithBlob};
 use serde::{Deserialize, Serialize};
 use sov_rollup_interface::da::{DaSpec, DaVerifier, RelevantBlobs, RelevantProofs};
 use thiserror::Error;
@@ -35,5 +35,21 @@ impl DaVerifier for EigenDaVerifier {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EigenDaCompletenessProof;
 
+impl EigenDaCompletenessProof {
+    /// Create a new completeness proof from a complete and ordered list of
+    /// transactions that can be relevant for the rollup.
+    pub fn new(maybe_relevant_txs: Vec<TransactionWithBlob>) -> Self {
+        todo!()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EigenDaInclusionProof;
+
+impl EigenDaInclusionProof {
+    /// Create a new inclusion proof from a namespace and complete and ordered
+    /// set of transactions in the block.
+    pub fn new(namespace: NamespaceId, transactions: &[TransactionWithBlob]) -> Self {
+        todo!()
+    }
+}

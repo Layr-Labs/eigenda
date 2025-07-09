@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use alloy::network::TransactionBuilder4844;
 use alloy::providers::{DynProvider, ProviderBuilder};
-use alloy::rpc::types::Transaction;
 use alloy::signers::local::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy::{
     consensus::{SidecarBuilder, SimpleCoder},
@@ -17,8 +16,10 @@ use alloy::{
     transports::{RpcError, TransportErrorKind},
 };
 use async_trait::async_trait;
+use futures::future::join_all;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use sov_rollup_interface::da::{BlobReaderTrait, DaProof};
 use sov_rollup_interface::{
     common::HexHash,
     da::{BlockHeaderTrait, DaSpec, RelevantBlobs, RelevantProofs, Time},
@@ -29,7 +30,9 @@ use tokio::sync::oneshot;
 use tokio::time::sleep;
 use tracing::{debug, instrument, warn};
 
-use crate::spec::{BlobWithSender, NamespaceId, RollupParams};
+use crate::service::ethereum::extract_certificate;
+use crate::spec::{BlobWithSender, NamespaceId, RollupParams, TransactionWithBlob};
+use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 use crate::{
     service::proxy::{ProxyClient, ProxyError},
     spec::{EigenDaSpec, EthereumBlockHeader, EthereumHash},
@@ -103,9 +106,7 @@ impl EigenDaService {
             sequencer_signer,
         })
     }
-}
 
-impl EigenDaService {
     /// Submit a blob to the EigenDA.
     #[instrument(skip_all)]
     async fn submit_blob_to_namespace(
@@ -115,10 +116,15 @@ impl EigenDaService {
     ) -> Result<SubmitBlobReceipt<EthereumHash>, anyhow::Error> {
         // Submit blob to the EigenDA
         let certificate = self.proxy.store_blob(blob).await?;
-        debug!(?certificate, "Certificate was received");
+        debug!(?certificate, "Certificate was received by EigenDa");
 
         // Persist certificate to the ethereum
         let da_transaction_id = self.submit_certificate(&certificate, namespace).await?;
+        debug!(
+            th_hash = %da_transaction_id,
+            "Certificate was submitted to Ethereum"
+        );
+
         // TODO: Check how should the blob_hash be actually computed. Is it ok
         // to use the transaction id?
         let blob_hash = HexHash::new(da_transaction_id.into());
@@ -136,7 +142,9 @@ impl EigenDaService {
         namespace: NamespaceId,
     ) -> Result<EthereumHash, EigenDaServiceError> {
         let sidecar = SidecarBuilder::<SimpleCoder>::from_slice(certificate);
-        let sidecar = sidecar.build().unwrap();
+        let sidecar = sidecar
+            .build()
+            .expect("the sidecar builder is configured correctly");
 
         let tx = TransactionRequest::default()
             // This is technically not needed. Because the `from` field is
@@ -193,16 +201,30 @@ impl DaService for EigenDaService {
             }
         };
 
-        // TODO: Retrieve blobs from the beacon chain and append them to
-        // transactions.
-        let transactions = block
+        let transactions_fut = block
             .transactions
             .into_transactions()
-            .map(|transaction| EthereumTransactionWithBlob {
-                transaction,
-                blob: todo!(),
+            .map(|tx| {
+                let proxy = &self.proxy;
+                async move {
+                    let blob = if let Some(cert) = extract_certificate(&tx) {
+                        Some(proxy.get_blob(&cert).await?)
+                    } else {
+                        None
+                    };
+
+                    Ok::<_, anyhow::Error>(TransactionWithBlob {
+                        transaction: tx,
+                        blob,
+                    })
+                }
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        let transactions = join_all(transactions_fut)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(EthereumBlock {
             header: EthereumBlockHeader::try_from(block.header)?,
@@ -266,7 +288,10 @@ impl DaService for EigenDaService {
         <Self::Spec as DaSpec>::InclusionMultiProof,
         <Self::Spec as DaSpec>::CompletenessProof,
     > {
-        todo!()
+        let proof = block.get_extraction_proof(self.rollup_proof_namespace);
+        let batch = block.get_extraction_proof(self.rollup_batch_namespace);
+
+        RelevantProofs { proof, batch }
     }
 
     /// Send a transaction directly to the DA layer.
@@ -305,7 +330,14 @@ impl DaService for EigenDaService {
 
     /// Fetches all proofs at a specified block height.
     async fn get_proofs_at(&self, height: u64) -> Result<Vec<Vec<u8>>, Self::Error> {
-        todo!()
+        let block = self.get_block_at(height).await?;
+        let blobs = block.extract_relevant_blobs(self.rollup_proof_namespace);
+        let proofs = blobs
+            .into_iter()
+            .map(|mut b| b.full_data().to_vec())
+            .collect::<Vec<Vec<u8>>>();
+
+        Ok(proofs)
     }
 }
 
@@ -313,7 +345,7 @@ impl DaService for EigenDaService {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthereumBlock {
     header: EthereumBlockHeader,
-    transactions: Vec<EthereumTransactionWithBlob>,
+    transactions: Vec<TransactionWithBlob>,
 }
 
 impl EthereumBlock {
@@ -321,17 +353,36 @@ impl EthereumBlock {
     pub fn extract_relevant_blobs(&self, namespace: NamespaceId) -> Vec<BlobWithSender> {
         self.transactions
             .iter()
-            .filter_map(|tx: &EthereumTransactionWithBlob| {
+            .filter_map(|tx| {
                 let recovered = tx.transaction.as_recovered();
-                let address = recovered.signer();
+                let sender = recovered.signer();
                 let tx_hash = recovered.hash().to_owned();
-                let blob = tx.blob.clone();
 
                 namespace
                     .contains(&tx.transaction)
-                    .then_some(BlobWithSender::new(address, tx_hash, blob))
+                    .then(|| tx.blob.clone())
+                    .and_then(|blob| blob.map(|blob| BlobWithSender::new(sender, tx_hash, blob)))
             })
             .collect::<Vec<_>>()
+    }
+
+    /// Get the inclusion and completeness proofs pair for rollup's blobs (indicated by namespace)
+    /// contained in this block.
+    pub fn get_extraction_proof(
+        &self,
+        namespace: NamespaceId,
+    ) -> DaProof<EigenDaInclusionProof, EigenDaCompletenessProof> {
+        let maybe_relevant_txs = self
+            .transactions
+            .iter()
+            .filter(|tx| namespace.contains(&tx.transaction))
+            .cloned()
+            .collect();
+
+        DaProof {
+            inclusion_proof: EigenDaInclusionProof::new(namespace, &self.transactions),
+            completeness_proof: EigenDaCompletenessProof::new(maybe_relevant_txs),
+        }
     }
 }
 
@@ -349,12 +400,6 @@ impl SlotData for EthereumBlock {
     fn timestamp(&self) -> Time {
         self.header.time()
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct EthereumTransactionWithBlob {
-    pub transaction: Transaction,
-    pub blob: Vec<u8>,
 }
 
 #[cfg(test)]
