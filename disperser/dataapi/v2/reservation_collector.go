@@ -21,7 +21,7 @@ type ReservationExpirationCollector struct {
 }
 
 // NewReservationExpirationCollector creates a new collector
-func NewReservationExpirationCollector(subgraphClient dataapi.SubgraphClient, metrics *dataapi.Metrics, logger logging.Logger) *ReservationExpirationCollector {
+func NewReservationExpirationCollector(subgraphClient dataapi.SubgraphClient, logger logging.Logger) *ReservationExpirationCollector {
 	return &ReservationExpirationCollector{
 		subgraphClient: subgraphClient,
 		logger:         logger,

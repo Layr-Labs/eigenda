@@ -166,10 +166,6 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
 	}
 
-	// Register reservation metrics collector
-	reservationCollector := NewReservationExpirationCollector(subgraphClient, metrics, l)
-	metrics.RegisterCollector(reservationCollector)
-
 	return &ServerV2{
 		logger:                           l,
 		serverMode:                       config.ServerMode,

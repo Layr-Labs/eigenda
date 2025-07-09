@@ -108,6 +108,11 @@ func RunDataApi(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
+
+		// Register reservation collector
+		reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger)
+		reg.MustRegister(reservationCollector)
+
 		metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
