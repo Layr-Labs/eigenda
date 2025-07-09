@@ -3,11 +3,13 @@ package meterer
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -34,6 +36,11 @@ type Meterer struct {
 	// MeteringStore tracks usage and payments in a storage backend
 	MeteringStore MeteringStore
 
+	// accountLocks provides per-account locking to serialize bin updates
+	// This prevents DynamoDB transaction conflicts when multiple requests
+	// from the same account arrive concurrently
+	accountLocks *accountLockManager
+
 	logger logging.Logger
 }
 
@@ -47,6 +54,7 @@ func NewMeterer(
 		Config:            config,
 		ChainPaymentState: paymentChainState,
 		MeteringStore:     meteringStore,
+		accountLocks:      newAccountLockManager(),
 		logger:            logger.With("component", "Meterer"),
 	}
 }
@@ -80,6 +88,27 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	if err != nil {
 		return 0, fmt.Errorf("failed to get payment global params: %w", err)
 	}
+
+	// Acquire per-account lock to serialize bin updates for this account
+	// This prevents DynamoDB transaction conflicts when multiple requests
+	// from the same account are processed concurrently
+	accountLock := m.accountLocks.getLock(header.AccountID)
+	lockStart := time.Now()
+	accountLock.Lock()
+	lockWaitTime := time.Since(lockStart)
+	if lockWaitTime > 100*time.Millisecond {
+		m.logger.Warn("Account lock wait time exceeded threshold",
+			"accountID", header.AccountID.Hex(),
+			"waitTime", lockWaitTime,
+			"threshold", 100*time.Millisecond)
+	}
+	defer func() {
+		accountLock.Unlock()
+		m.logger.Debug("Released account lock",
+			"accountID", header.AccountID.Hex(),
+			"lockHeldTime", time.Since(lockStart))
+	}()
+
 	// Validate against the payment method
 	if !payment_logic.IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
@@ -273,4 +302,21 @@ func (m *Meterer) incrementGlobalBinUsage(ctx context.Context, params *PaymentVa
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil
+}
+
+// accountLockManager manages per-account locks to serialize bin updates
+// and prevent DynamoDB transaction conflicts
+type accountLockManager struct {
+	locks sync.Map // map[gethcommon.Address]*sync.Mutex
+}
+
+func newAccountLockManager() *accountLockManager {
+	return &accountLockManager{}
+}
+
+// getLock returns a lock for the given account, creating one if it doesn't exist
+func (alm *accountLockManager) getLock(accountID gethcommon.Address) *sync.Mutex {
+	// Load or store a new mutex for this account
+	lock, _ := alm.locks.LoadOrStore(accountID, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
