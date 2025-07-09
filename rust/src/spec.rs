@@ -1,8 +1,10 @@
 use std::{hash::Hash, num::TryFromIntError, str::FromStr};
 
 use alloy::{
-    primitives::{Bytes, FixedBytes, wrap_fixed_bytes},
-    rpc::types::Header,
+    consensus::Transaction as TTransaction,
+    eips::Typed2718,
+    primitives::{Address, Bytes, FixedBytes, wrap_fixed_bytes},
+    rpc::types::{Header, Transaction},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use schemars::JsonSchema;
@@ -50,7 +52,39 @@ impl DaSpec for EigenDaSpec {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct RollupParams;
+pub struct RollupParams {
+    /// The account to which we are storing the certificates of the batch blobs
+    pub rollup_batch_account: NamespaceId,
+    /// The account to which we are storing the certificates of the proof blobs
+    pub rollup_proof_account: NamespaceId,
+}
+
+/// A namespace id used to identify transactions of the sequencer.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[serde(transparent)]
+pub struct NamespaceId(EthereumAddress);
+
+impl NamespaceId {
+    /// Check if namespace contains this transaction. The namespace contains
+    /// transaction if the receiver of transaction is the address used as a namespace.
+    pub fn contains(&self, tx: &Transaction) -> bool {
+        tx.is_eip4844() && tx.to().is_some_and(|to| to == self.0.0)
+    }
+}
+
+impl From<NamespaceId> for Address {
+    fn from(value: NamespaceId) -> Self {
+        value.0.0
+    }
+}
+
+impl FromStr for NamespaceId {
+    type Err = alloy::primitives::AddressError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(EthereumAddress::from_str(s)?))
+    }
+}
 
 /// An Ethereum block header containing only relevant information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,6 +134,7 @@ impl BlockHeaderTrait for EthereumBlockHeader {
     Debug,
     derive_more::Display,
     Clone,
+    Copy,
     Serialize,
     Deserialize,
     Hash,
@@ -169,6 +204,18 @@ impl TryFrom<&[u8]> for EthereumAddress {
     }
 }
 
+impl From<alloy::primitives::Address> for EthereumAddress {
+    fn from(value: alloy::primitives::Address) -> Self {
+        Self(value)
+    }
+}
+
+impl From<EthereumAddress> for alloy::primitives::Address {
+    fn from(value: EthereumAddress) -> Self {
+        value.0
+    }
+}
+
 wrap_fixed_bytes!(pub struct EthereumHash<32>;);
 
 impl BlockHashTrait for EthereumHash {}
@@ -191,10 +238,24 @@ impl BorshDeserialize for EthereumHash {
 pub struct BlobWithSender {
     /// The address that submitted blob to the chain.
     address: EthereumAddress,
-    /// The ethereum transaction in which the blob was included.
-    transaction: EthereumHash,
+    /// The ethereum transaction hash in which the blob was included.
+    tx_hash: EthereumHash,
     /// The actual blob of bytes
     blob: CountedBufReader<Bytes>,
+}
+
+impl BlobWithSender {
+    pub fn new<Address, Hash>(address: Address, tx_hash: Hash, blob: Vec<u8>) -> Self
+    where
+        Address: Into<EthereumAddress>,
+        Hash: Into<EthereumHash>,
+    {
+        Self {
+            address: address.into(),
+            tx_hash: tx_hash.into(),
+            blob: CountedBufReader::new(blob.into()),
+        }
+    }
 }
 
 impl BlobReaderTrait for BlobWithSender {
@@ -203,11 +264,11 @@ impl BlobReaderTrait for BlobWithSender {
     type BlobHash = EthereumHash;
 
     fn sender(&self) -> Self::Address {
-        self.address.clone()
+        self.address
     }
 
     fn hash(&self) -> Self::BlobHash {
-        self.transaction
+        self.tx_hash
     }
 
     fn verified_data(&self) -> &[u8] {
@@ -271,7 +332,7 @@ mod tests {
     #[test]
     fn test_ethereum_address_as_ref() {
         let address = EthereumAddress::from_str(ADDRESS).unwrap();
-        let bytes = address.as_ref();
+        let bytes: &[u8] = address.as_ref();
         assert_eq!(bytes.len(), 20); // Ethereum addresses are 20 bytes
         assert_eq!(hex::encode(bytes), ADDRESS[2..].to_lowercase());
     }

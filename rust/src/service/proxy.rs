@@ -91,25 +91,26 @@ pub mod tests {
 
     use crate::service::proxy::ProxyClient;
 
-    pub async fn create_test_eigenda_proxy()
-    -> Result<(ProxyClient, ContainerAsync<EigenDaProxy>), anyhow::Error> {
+    /// Start the proxy server.
+    pub async fn start_proxy() -> Result<(String, ContainerAsync<EigenDaProxy>), anyhow::Error> {
         let container = EigenDaProxy::default().start().await?;
         let host_port = container.get_host_port_ipv4(PORT).await?;
-        let proxy = ProxyClient::new(format!("http://127.0.0.1:{host_port}"))?;
+        let url = format!("http://127.0.0.1:{host_port}");
 
-        Ok((proxy, container))
+        Ok((url, container))
     }
 
     #[tokio::test]
     async fn blob_roundtrip() {
-        let (proxy, _container) = create_test_eigenda_proxy().await.unwrap();
+        let (proxy_url, _container) = start_proxy().await.unwrap();
+        let proxy_client = ProxyClient::new(proxy_url).unwrap();
         let blob = vec![0; 1000];
 
         // Store the blob
-        let certificate = proxy.store_blob(&blob).await.unwrap();
+        let certificate = proxy_client.store_blob(&blob).await.unwrap();
 
         // Retrieve the blob
-        let retrieved_blob = proxy.get_blob(&certificate).await.unwrap();
+        let retrieved_blob = proxy_client.get_blob(&certificate).await.unwrap();
 
         assert_eq!(blob, retrieved_blob);
     }

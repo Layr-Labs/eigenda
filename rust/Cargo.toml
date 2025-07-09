@@ -10,8 +10,9 @@ sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sd
 # rust-eigenda-v2-client = { version = "0.1.4" }
 
 anyhow = { version = "1.0.98", default-features = false }
-alloy = { version = "1.0.16", features = [
-    "full", # TODO: Use only needed features
+alloy = { version = "1.0.17", features = [
+    "full",    # TODO: Use only needed features
+    "network",
 ] }
 async-trait = "0.1.88"
 borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
@@ -32,7 +33,9 @@ tokio = { version = "1.45.1", features = ["sync"], optional = true }
 url = { version = "2.5.4" }
 
 [dev-dependencies]
+alloy = { version = "1.0.17", features = ["providers"] }
 testcontainers = "0.24.0"
+risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 
 [features]
 default = []
