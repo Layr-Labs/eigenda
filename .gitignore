@@ -19,6 +19,10 @@ lightnode/docker/args.sh
 .vscode
 .cursor
 .serena
+# Ignore local claude code files, but commit commands (which are meant to be shared by whole team)
+.claude
+!.claude/commands
+!.claude/commands/**
 
 icicle/*
 
