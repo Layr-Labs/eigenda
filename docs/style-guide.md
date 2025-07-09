@@ -1,0 +1,118 @@
+## Style Guide
+
+This style guide contains coding style guidelines for the EigenDA project. This guide is not exhaustive, but rather
+builds on top of the guidelines expressed in [Effective Go](https://go.dev/doc/effective_go). It is intended as a guide
+for human engineers, and to provide AI agents with a checklist for code review.
+
+### 1. Error handling
+
+1. Return errors explicitly; don't panic except for unrecoverable errors.
+   - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
+2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
+   - Ensure that `%w` is used for error wrapping, *not* `%v`.
+
+### 2. Code Documentation
+
+1. Document all exported functions/types in production code.
+2. Document unexported functions/types that contain non-trivial logic.
+   - A good rule of thumb: if you can't understand everything there is to know about a function/type by its *name*,
+   you should write a doc.
+3. Function/type docs should NOT simply be a rephrasing of the function/type name.
+   - E.g. the doc for `computeData` should NOT be "Computes the data".
+4. Function docs should consider the following helpful information, if relevant:
+   - What are the inputs?
+   - Are there any restrictions on what the input values are permitted to be?
+   - What is returned in the standard case?
+   - What is returned in the error case(s)?
+   - What side effects does calling the function have?
+   - Are there any performance implications that users should be aware of?
+   - Are there any performance optimizations that should/could be undertaken in the future?
+5. TODO comments should be added to denote future work.
+   - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
+   can understand.
+   - TODO comments that must be addressed prior to merging a PR should clearly be marked, e.g.
+   `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
+
+### 3. Spelling and Grammar
+
+Proper spelling and grammar are important, because they help keep code and documentation unambiguous, easy to read, 
+and professional. They should be checked and carefully maintained.
+
+1. Overly strict adherence to arbitrary grammar "rules" that don't impact readability is not beneficial. Some 
+   examples of "rules" that shouldn't be enforced or commented on are:
+   - "Don't end a sentence with a preposition"
+   - "Never split the infinitive"
+   - "Don't use passive voice"
+   - "Always spell out numbers"
+   - "Don't begin a sentence with 'And', 'But', or 'Because'"
+   - Perfect canonical comma usage
+2. Some things are technically correct grammatically, yet hinder readability. Despite being "grammatically correct",
+   the following things should not be tolerated:
+   - Sentences with ambiguous interpretations
+   - Run-on sentences
+3. Spelling should be checked, with some caveats:
+   - If there are multiple correct spellings for a word, no one "correct" spelling should be asserted over another
+   - Neologisms are permitted
+
+### 4. Naming
+
+Good code has good names. Bad names yield bad code.
+
+1. Using names that are too succinct hinders readability:
+   - `i` -> `nodeIndex`
+   - `req` -> `dispersalRequest`
+   - `status` -> `operatorStatus`
+2. Consistency is key. A single concept should have a single term, ideally across the entire codebase.
+   - The exception here is with local scoping. E.g. if you have an `OperatorId` throughout the codebase, it would be
+   reasonable to refer to it as an `id` inside the `Operator` struct.
+3. Do not overload terms.
+4. Avoid attributing special technical meaning to common generic terms.
+   - E.g., you shouldn't try to usurp the word `Component` to mean a specific part of the system, since it's already
+   used in many generic contexts.
+
+### 5. Code Structure
+
+1. Keep functions short and readable. If a function gets too long or complicated, split out helper functions. Some
+   good candidates for logic to split out of complex functions are:
+   - The logic inside a `for` loop or `if` block
+   - Input validation
+   - Complex calculations
+2. Keep nesting as shallow as possible. Ideally, you'd never have > 1 block deep of nesting. Practically, some amount of
+   multi-level nesting is unavoidable, but efforts should be made to keep it to a minimum:
+   - Split out helper functions
+   - Consider using "early-out" logic, to decrease nesting by 1 level:
+
+        Before:
+        ```go
+        if success {
+            for _, item := range items {
+                processItem(item)           // <-- nesting here is 2 blocks deep
+            }
+            return nil
+        }
+        return error
+        ```
+
+        After:
+        ```go
+        if !success {
+            // early-out
+            return error
+        }
+        for _, item := range items {
+            processItem(item)               // <-- now it's only 1 block deep
+        }
+        return nil
+        ```
+
+### 6. Defensive Coding
+
+1. Prefer using constructors over raw struct instantiation.
+   - Raw struct instantiation is bug prone: fields can be removed by mistake, or newly added fields may not be
+   universally added to all usages.
+   - Constructors are a convenient place to validate new struct instantiations.
+2. If it is even remotely possible that something could be `nil`, *check it*.
+   - Even if it doesn't seem likely that something could be `nil`, it's easy to miss edge cases, and future changes can
+   invalidate original assumptions.
+   - At minimum, any situation where a `nil` check is skipped must be explicitly commented, stating the reason that
+   it's safe.
