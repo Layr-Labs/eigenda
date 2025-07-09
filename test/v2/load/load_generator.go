@@ -165,25 +165,30 @@ func (l *LoadGenerator) Stop() {
 // run runs the load generator.
 func (l *LoadGenerator) run() {
 
+	// TODO
 	// Start with frequency 0.
-	ticker, err := common.NewVariableTickerWithFrequency(l.ctx, 0)
-	if err != nil {
-		// Not possible, error is only returned with invalid arguments, and 0hz is a valid frequency.
-		panic(fmt.Errorf("failed to create variable ticker: %w", err))
-	}
+	//ticker, err := common.NewVariableTickerWithFrequency(l.ctx, 0)
+	//if err != nil {
+	//	// Not possible, error is only returned with invalid arguments, and 0hz is a valid frequency.
+	//	panic(fmt.Errorf("failed to create variable ticker: %w", err))
+	//}
+	//
+	//defer ticker.Close()
+	//// Set acceleration prior to setting target frequency, since acceleration 0 allows "infinite" acceleration.
+	//err = ticker.SetAcceleration(l.config.FrequencyAcceleration)
+	//if err != nil {
+	//	// load generator configuration error, no way to recover
+	//	panic(fmt.Errorf("failed to set acceleration: %w", err))
+	//}
+	//err = ticker.SetTargetFrequency(l.submissionFrequency)
+	//if err != nil {
+	//	// load generator configuration error, no way to recover
+	//	panic(fmt.Errorf("failed to set target frequency: %w", err))
+	//}
 
-	defer ticker.Close()
-	// Set acceleration prior to setting target frequency, since acceleration 0 allows "infinite" acceleration.
-	err = ticker.SetAcceleration(l.config.FrequencyAcceleration)
-	if err != nil {
-		// load generator configuration error, no way to recover
-		panic(fmt.Errorf("failed to set acceleration: %w", err))
-	}
-	err = ticker.SetTargetFrequency(l.submissionFrequency)
-	if err != nil {
-		// load generator configuration error, no way to recover
-		panic(fmt.Errorf("failed to set target frequency: %w", err))
-	}
+	period := time.Duration(1.0/l.submissionFrequency) * time.Second
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
 
 	for l.alive.Load() {
 		<-ticker.Tick()
