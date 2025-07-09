@@ -1,378 +1,300 @@
 [
   {
-    "type": "constructor",
     "inputs": [
       {
+        "internalType": "contract IRegistryCoordinator",
         "name": "_registryCoordinator",
-        "type": "address",
-        "internalType": "contract IRegistryCoordinator"
+        "type": "address"
       },
       {
+        "internalType": "contract IStakeRegistry",
         "name": "_stakeRegistry",
-        "type": "address",
-        "internalType": "contract IStakeRegistry"
+        "type": "address"
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    "type": "function",
-    "name": "amountEjectableForQuorum",
+    "anonymous": false,
     "inputs": [
       {
-        "name": "_quorumNumber",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ejectOperators",
-    "inputs": [
-      {
-        "name": "_operatorIds",
-        "type": "bytes32[][]",
-        "internalType": "bytes32[][]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "initialize",
-    "inputs": [
-      {
-        "name": "_owner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_ejectors",
-        "type": "address[]",
-        "internalType": "address[]"
-      },
-      {
-        "name": "_quorumEjectionParams",
-        "type": "tuple[]",
-        "internalType": "struct IEjectionManager.QuorumEjectionParams[]",
-        "components": [
-          {
-            "name": "rateLimitWindow",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "ejectableStakePercent",
-            "type": "uint16",
-            "internalType": "uint16"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "isEjector",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "owner",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "quorumEjectionParams",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "rateLimitWindow",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "ejectableStakePercent",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registryCoordinator",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IRegistryCoordinator"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "renounceOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setEjector",
-    "inputs": [
-      {
-        "name": "_ejector",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_status",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setQuorumEjectionParams",
-    "inputs": [
-      {
-        "name": "_quorumNumber",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "_quorumEjectionParams",
-        "type": "tuple",
-        "internalType": "struct IEjectionManager.QuorumEjectionParams",
-        "components": [
-          {
-            "name": "rateLimitWindow",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "ejectableStakePercent",
-            "type": "uint16",
-            "internalType": "uint16"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "stakeEjectedForQuorum",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "timestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "stakeEjected",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "stakeRegistry",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IStakeRegistry"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "transferOwnership",
-    "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "EjectorUpdated",
-    "inputs": [
-      {
+        "indexed": false,
+        "internalType": "address",
         "name": "ejector",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "bool",
         "name": "status",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
+        "type": "bool"
       }
     ],
-    "anonymous": false
+    "name": "EjectorUpdated",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "Initialized",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "version",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
+        "type": "uint8"
       }
     ],
-    "anonymous": false
+    "name": "Initialized",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "OperatorEjected",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "bytes32",
         "name": "operatorId",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
+        "type": "bytes32"
       },
       {
-        "name": "quorumNumber",
-        "type": "uint8",
         "indexed": false,
-        "internalType": "uint8"
+        "internalType": "uint8",
+        "name": "quorumNumber",
+        "type": "uint8"
       }
     ],
-    "anonymous": false
+    "name": "OperatorEjected",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "OwnershipTransferred",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "previousOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
         "name": "newOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "anonymous": false
+    "name": "OwnershipTransferred",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "QuorumEjection",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "uint32",
         "name": "ejectedOperators",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
+        "type": "uint32"
       },
       {
-        "name": "ratelimitHit",
-        "type": "bool",
         "indexed": false,
-        "internalType": "bool"
+        "internalType": "bool",
+        "name": "ratelimitHit",
+        "type": "bool"
       }
     ],
-    "anonymous": false
+    "name": "QuorumEjection",
+    "type": "event"
   },
   {
-    "type": "event",
-    "name": "QuorumEjectionParamsSet",
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "uint8",
         "name": "quorumNumber",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
+        "type": "uint8"
       },
       {
+        "indexed": false,
+        "internalType": "uint32",
         "name": "rateLimitWindow",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
+        "type": "uint32"
       },
       {
-        "name": "ejectableStakePercent",
-        "type": "uint16",
         "indexed": false,
-        "internalType": "uint16"
+        "internalType": "uint16",
+        "name": "ejectableStakePercent",
+        "type": "uint16"
       }
     ],
-    "anonymous": false
+    "name": "QuorumEjectionParamsSet",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "_quorumNumber", "type": "uint8" }
+    ],
+    "name": "amountEjectableForQuorum",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32[][]",
+        "name": "_operatorIds",
+        "type": "bytes32[][]"
+      }
+    ],
+    "name": "ejectOperators",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_owner", "type": "address" },
+      { "internalType": "address[]", "name": "_ejectors", "type": "address[]" },
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "rateLimitWindow",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ejectableStakePercent",
+            "type": "uint16"
+          }
+        ],
+        "internalType": "struct IEjectionManager.QuorumEjectionParams[]",
+        "name": "_quorumEjectionParams",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "isEjector",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }],
+    "name": "quorumEjectionParams",
+    "outputs": [
+      { "internalType": "uint32", "name": "rateLimitWindow", "type": "uint32" },
+      {
+        "internalType": "uint16",
+        "name": "ejectableStakePercent",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "registryCoordinator",
+    "outputs": [
+      {
+        "internalType": "contract IRegistryCoordinator",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_ejector", "type": "address" },
+      { "internalType": "bool", "name": "_status", "type": "bool" }
+    ],
+    "name": "setEjector",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "_quorumNumber", "type": "uint8" },
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "rateLimitWindow",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ejectableStakePercent",
+            "type": "uint16"
+          }
+        ],
+        "internalType": "struct IEjectionManager.QuorumEjectionParams",
+        "name": "_quorumEjectionParams",
+        "type": "tuple"
+      }
+    ],
+    "name": "setQuorumEjectionParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint8", "name": "", "type": "uint8" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "stakeEjectedForQuorum",
+    "outputs": [
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+      { "internalType": "uint256", "name": "stakeEjected", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stakeRegistry",
+    "outputs": [
+      {
+        "internalType": "contract IStakeRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ]
