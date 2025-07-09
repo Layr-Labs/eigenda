@@ -13,15 +13,20 @@ contract TestChurnGasCost is Test {
     IIndexRegistry constant INDEX_REGISTRY = IIndexRegistry(0xBd35a7a1CDeF403a6a99e4E8BA0974D198455030);
     IStakeRegistry constant STAKE_REGISTRY = IStakeRegistry(0x006124Ae7976137266feeBFb3F4D2BE4C073139D);
 
-    function test_churnGasCost() public view {
+    function test_churnGasCost() public {
         // get a list of all operators
+        vm.startSnapshotGas("OPERATOR_LIST");
         bytes32[] memory operators = INDEX_REGISTRY.getOperatorListAtBlockNumber(0, uint32(block.number));
         console2.log("Number of operators: ", operators.length);
+        vm.stopSnapshotGas("OPERATOR_LIST");
+
 
         // fetch the stakes of each operator
+        vm.startSnapshotGas("OPERATOR_STAKES");
         uint96[] memory stakes = new uint96[](operators.length);
         for (uint256 i; i < operators.length; i++) {
             stakes[i] = STAKE_REGISTRY.getStakeAtBlockNumber(operators[i], 0, uint32(block.number));
         }
+        vm.stopSnapshotGas("OPERATOR_STAKES");
     }
 }
