@@ -23,14 +23,14 @@ func withErrorHandling(
 		// Or maybe we should just add a requestID to the error, and log the request-specific information
 		// in the logging middleware, so that we can correlate the error with the request?
 
-		var teapotErr eigenda.TeapotError
+		var derivationErr eigenda.DerivationError
 		switch {
 		case proxyerrors.Is400(err):
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		// 418 TEAPOT errors don't follow the pattern proxyerrors.Is418(err),
 		// because we need to marshal the correct json body.
-		case errors.As(err, &teapotErr):
-			http.Error(w, teapotErr.MarshalBody(), http.StatusTeapot)
+		case errors.As(err, &derivationErr):
+			http.Error(w, derivationErr.MarshalToTeapotBody(), http.StatusTeapot)
 		case proxyerrors.Is429(err):
 			http.Error(w, err.Error(), http.StatusTooManyRequests)
 		case proxyerrors.Is503(err):

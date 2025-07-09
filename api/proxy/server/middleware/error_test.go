@@ -37,10 +37,7 @@ func TestWithErrorHandling_HTTPStatusCodes(t *testing.T) {
 		{
 			name: "418 CertVerificationFailedError",
 			handleFn: func(w http.ResponseWriter, r *http.Request) error {
-				return &verification.CertVerifierInvalidCertError{
-					StatusCode: 99,
-					Msg:        "cert failed",
-				}
+				return eigendav2store.ErrInvalidCertDerivationError
 			},
 			expectStatus: http.StatusTeapot,
 		},
@@ -99,7 +96,7 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 		name                         string
 		err                          error
 		expectHTTPStatus             int
-		expectVerificationStatusCode eigendav2store.DerivationErrorStatusCode
+		expectVerificationStatusCode uint8
 	}{
 		{
 			name: "CertVerificationFailedError",
@@ -112,7 +109,7 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 			name:                         "RBNRecencyCheckFailedError",
 			err:                          eigendav2store.NewRBNRecencyCheckFailedError(1, 2, 3),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: eigendav2store.RecencyCheckFailedDerivationErrorStatusCode,
+			expectVerificationStatusCode: eigendav2store.ErrRecencyCheckFailedDerivationError.StatusCode,
 		},
 	}
 
@@ -131,8 +128,8 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tc.expectHTTPStatus, rr.Code)
 			}
 			var resp struct {
-				StatusCode eigendav2store.DerivationErrorStatusCode `json:"StatusCode"`
-				Msg        string                                   `json:"Msg"`
+				StatusCode uint8  `json:"StatusCode"`
+				Msg        string `json:"Msg"`
 			}
 			dec := json.NewDecoder(strings.NewReader(rr.Body.String()))
 			if err := dec.Decode(&resp); err != nil {

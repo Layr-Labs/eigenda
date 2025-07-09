@@ -47,7 +47,8 @@ func NewCertVerifier(
 }
 
 // CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
-// This method returns nil if the certificate is successfully verified; otherwise, it returns an error.
+// This method returns nil if the certificate is successfully verified; otherwise, it returns one of
+// [CertVerifierInputError], [CertVerifierInvalidCertError], or [CertVerifierInternalError] errors.
 func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
@@ -58,25 +59,16 @@ func (cv *CertVerifier) CheckDACert(
 	// EigenDACertV3 is the only version that is supported by the CheckDACert function
 	var certV3 *coretypes.EigenDACertV3
 	var err error
-	switch cert.Version() {
-	case coretypes.VersionThreeCert:
-		var ok bool
-		certV3, ok = cert.(*coretypes.EigenDACertV3)
-		if !ok {
-			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV3, got %T", cert)}
-		}
-	case coretypes.VersionTwoCert:
-		certV2, ok := cert.(*coretypes.EigenDACertV2)
-		if !ok {
-			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
-		}
-
-		certV3, err = certV2.ToV3()
+	switch c := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		certV3 = c
+	case *coretypes.EigenDACertV2:
+		certV3, err = c.ToV3()
 		if err != nil {
 			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
 		}
 	default:
-		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %d", cert.Version())}
+		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %T", cert)}
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate

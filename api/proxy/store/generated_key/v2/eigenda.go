@@ -162,20 +162,13 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	switch cert.Version() {
-	case coretypes.VersionTwoCert:
+	switch c := cert.(type) {
+	case *coretypes.EigenDACertV2:
 		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
-
-	case coretypes.VersionThreeCert:
-		eigenDACertV3, ok := cert.(*coretypes.EigenDACertV3)
-		if !ok {
-			return nil, fmt.Errorf("expected EigenDACertV3, got %T", cert)
-		}
-
-		return eigenDACertV3.Serialize(coretypes.CertSerializationRLP)
-
+	case *coretypes.EigenDACertV3:
+		return c.Serialize(coretypes.CertSerializationRLP)
 	default:
-		return nil, fmt.Errorf("unsupported EigenDA cert version: %d", cert.Version())
+		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}
 }
 
@@ -242,8 +235,13 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 	// verify cert via simulation call to verifier contract
 	err = e.certVerifier.CheckDACert(ctx, sumDACert)
 	if err != nil {
-		// CheckDACert already returns a structured error that is converted to a 418 HTTP error by the error middleware.
-		// We still wrap it to provide more context.
+		var certVerifierInvalidCertErr *verification.CertVerifierInvalidCertError
+		if errors.As(err, &certVerifierInvalidCertErr) {
+			// We convert the cert verifier failure error, which contains the low-level detailed status code,
+			// into the higher-level CertDerivationError which will get converted to a 418 HTTP error by the error middleware.
+			return ErrInvalidCertDerivationError.WithMessage(certVerifierInvalidCertErr.Error())
+		}
+		// Other errors are internal proxy errors, so we just wrap it and let it be converted to a 500 HTTP error by the error middleware.
 		return fmt.Errorf("eth-call to CertVerifier.checkDACert: %w", err)
 	}
 
