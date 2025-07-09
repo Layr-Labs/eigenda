@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
@@ -48,6 +50,8 @@ type LoadGenerator struct {
 	randPool *sync.Pool
 	// The time when the load generator started.
 	startTime time.Time
+	// The size of the payload that will result in an encoded blob of the target size.
+	payloadSize uint32
 }
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
@@ -73,12 +77,25 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 // NewLoadGenerator creates a new LoadGenerator.
 func NewLoadGenerator(
 	config *LoadGeneratorConfig,
-	client *client.TestClient) *LoadGenerator {
+	client *client.TestClient) (*LoadGenerator, error) {
 
 	bytesPerSecond := config.MBPerSecond * units.MiB
-	averageBlobSize := config.AverageBlobSizeMB * units.MiB
 
-	submissionFrequency := bytesPerSecond / averageBlobSize
+	// The size of the blob we want to send.
+	targetBlobSize := uint64(config.BlobSizeMB * units.MiB)
+	// The target blob size must be a power of 2.
+	targetBlobSize = encoding.NextPowerOf2(targetBlobSize)
+
+	// The size of the payload necessary to create a blob of the target size.
+	payloadSize, err := codec.BlobSizeToMaxPayloadSize(uint32(targetBlobSize))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute payload size for target blob size %d: %w", targetBlobSize, err)
+	}
+
+	submissionFrequency := bytesPerSecond / float64(targetBlobSize)
+
+	client.GetLogger().Infof("Target blob size: %s bytes, submission frequency: %f hz",
+		util.PrettyPrintBytes(targetBlobSize), submissionFrequency)
 
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
 	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
@@ -123,7 +140,8 @@ func NewLoadGenerator(
 		randPool:             randPool,
 		metrics:              metrics,
 		startTime:            time.Now(),
-	}
+		payloadSize:          payloadSize,
+	}, nil
 }
 
 // Start starts the load generator. If block is true, this function will block until Stop() or
@@ -214,12 +232,7 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	eigenDACert coretypes.EigenDACert,
 	err error) {
 
-	payloadSize := int(rand.BoundedGaussian(
-		l.config.AverageBlobSizeMB*units.MiB,
-		l.config.BlobSizeStdDev*units.MiB,
-		1.0,
-		float64(l.client.GetConfig().MaxBlobSize+1)))
-	payload = rand.Bytes(payloadSize)
+	payload = rand.Bytes(int(l.payloadSize))
 
 	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
 	ctx, cancel := context.WithTimeout(l.ctx, timeout)
@@ -283,7 +296,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 		l.metrics.endOperation("relay_read")
 	}()
 
-	blobLengthSymbols := uint32(eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length)
+	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
 	relayKeys := eigenDACert.RelayKeys()
 	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
 
