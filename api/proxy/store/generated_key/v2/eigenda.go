@@ -241,7 +241,8 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 			// into the higher-level CertDerivationError which will get converted to a 418 HTTP error by the error middleware.
 			return ErrInvalidCertDerivationError.WithMessage(certVerifierInvalidCertErr.Error())
 		}
-		// Other errors are internal proxy errors, so we just wrap it and let it be converted to a 500 HTTP error by the error middleware.
+		// Other errors are internal proxy errors, so we just wrap them for extra context.
+		// They will be converted to 500 HTTP errors by the error middleware.
 		return fmt.Errorf("eth-call to CertVerifier.checkDACert: %w", err)
 	}
 
