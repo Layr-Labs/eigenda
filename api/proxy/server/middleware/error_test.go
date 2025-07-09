@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"google.golang.org/grpc/codes"
@@ -99,11 +98,10 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 		expectVerificationStatusCode uint8
 	}{
 		{
-			name: "CertVerificationFailedError",
-			err: &verification.CertVerifierInvalidCertError{
-				StatusCode: 42, Msg: "cert verification failed"},
+			name:                         "CertVerificationFailedError",
+			err:                          eigendav2store.ErrInvalidCertDerivationError.WithMessage("some arbitrary msg"),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: 42, // 42 is arbitrarily chosen for this test
+			expectVerificationStatusCode: eigendav2store.ErrInvalidCertDerivationError.StatusCode,
 		},
 		{
 			name:                         "RBNRecencyCheckFailedError",
