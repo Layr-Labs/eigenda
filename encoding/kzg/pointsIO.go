@@ -26,7 +26,7 @@ const (
 
 // Read the n-th G1 point from SRS.
 func ReadG1Point(n uint64, srsOrder uint64, g1Path string) (bn254.G1Affine, error) {
-	// Do we really need to check srsOrder here? Or can we just read the file and let the error propagate if n is out of bounds?
+	// TODO: Do we really need to check srsOrder here? Or can we just read the file and let the error propagate if n is out of bounds?
 	if n >= srsOrder {
 		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, srsOrder)
 	}
