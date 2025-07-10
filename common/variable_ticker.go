@@ -5,19 +5,25 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // Any frequency at or below this value will be interpreted as a frequency of 0 Hz. Needed to avoid overflow.
 // The factor of 2 is to take care of floating point precision issues.
-const MinimumFrequency = float64(time.Nanosecond/math.MaxInt64) * 2.0
+const MinimumFrequency = float64(time.Second/math.MaxInt64) * 2.0
 
 // Any frequency above this value will be interpreted as a frequency of MaximumFrequency Hz. Needed to avoid overflow.
-const MaximumFrequency = float64(time.Nanosecond)
+const MaximumFrequency = float64(time.Second)
+
+// the period between debug logs about the ticker's frequency and acceleration.
+const logPeriod = time.Minute
 
 // VariableTicker behaves like a ticker with a frequency that can be changed at runtime.
 type VariableTicker struct {
-	ctx   context.Context
-	close context.CancelFunc
+	ctx    context.Context
+	close  context.CancelFunc
+	logger logging.Logger
 
 	// The target frequency for the ticker, in HZ.
 	targetFrequency float64
@@ -44,6 +50,9 @@ type VariableTicker struct {
 
 	// The channel used to send control messages to main ticker loop.
 	controlChan chan any
+
+	// The time when logFrequencyInfo was last called.
+	lastLogTime time.Time
 }
 
 // frequencyUpdate is a control message to update the target frequency of the ticker.
@@ -59,16 +68,26 @@ type accelerationUpdate struct {
 }
 
 // NewVariableTickerWithPeriod creates a new VariableTicker given a target period.
-func NewVariableTickerWithPeriod(ctx context.Context, period time.Duration) (*VariableTicker, error) {
+func NewVariableTickerWithPeriod(
+	ctx context.Context,
+	logger logging.Logger,
+	period time.Duration,
+) (*VariableTicker, error) {
+
 	if period <= 0 {
 		return nil, fmt.Errorf("period must be positive, got %v", period)
 	}
 	frequency := float64(time.Second) / float64(period)
-	return NewVariableTickerWithFrequency(ctx, frequency)
+	return NewVariableTickerWithFrequency(ctx, logger, frequency)
 }
 
 // NewVariableTickerWithFrequency creates a new VariableTicker given a target frequency.
-func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) (*VariableTicker, error) {
+func NewVariableTickerWithFrequency(
+	ctx context.Context,
+	logger logging.Logger,
+	frequency float64,
+) (*VariableTicker, error) {
+
 	if frequency < 0 {
 		return nil, fmt.Errorf("frequency must be non-negative, got %v", frequency)
 	}
@@ -83,6 +102,7 @@ func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) (*Va
 	ticker := &VariableTicker{
 		ctx:              ctx,
 		close:            cancel,
+		logger:           logger,
 		acceleration:     0.0,
 		currentFrequency: frequency,
 		currentPeriod:    currentPeriod,
@@ -107,6 +127,9 @@ func (t *VariableTicker) SetTargetPeriod(period time.Duration) error {
 	return t.SetTargetFrequency(frequency)
 }
 
+// SetTargetFrequency sets the target frequency for the ticker. If acceleration is non-zero, the ticker will
+// move towards the target frequency at the rate of acceleration per second. If acceleration is zero,
+// the ticker will immediately adopt the target frequency.
 func (t *VariableTicker) SetTargetFrequency(frequency float64) error {
 	if frequency < 0 {
 		return fmt.Errorf("invalid frequency %v, frequency must be non-negative", frequency)
@@ -137,6 +160,26 @@ func (t *VariableTicker) SetAcceleration(acceleration float64) error {
 	}
 
 	return nil
+}
+
+// logFrequencyInfo logs information about the current frequency and acceleration of the ticker.
+func (t *VariableTicker) logFrequencyInfo() {
+	t.lastLogTime = time.Now()
+
+	var accelerationString string
+	if t.acceleration == 0 {
+		accelerationString = "Acceleration is infinite, target frequency will be adopted immediately."
+	} else {
+		distanceToTarget := math.Abs(t.currentFrequency - t.targetFrequency)
+		timeToReachTarget := time.Duration(distanceToTarget / t.acceleration * float64(time.Second))
+
+		accelerationString = fmt.Sprintf(
+			"Acceleration is %v Hz/s, it will take %s to reach the target frequency.",
+			t.acceleration, PrettyPrintTime(uint64(timeToReachTarget)))
+	}
+
+	t.logger.Debugf("Current ticker frequency: %0.3f Hz, target frequency: %v Hz. %s",
+		t.currentFrequency, t.targetFrequency, accelerationString)
 }
 
 // Tick returns a channel that produces an output every time the ticker ticks.
@@ -206,14 +249,11 @@ func (t *VariableTicker) run() {
 
 // handleControlMessage processes control messages that update the ticker's configuration.
 func (t *VariableTicker) handleControlMessage(msg any) {
-	targetFrequency := t.targetFrequency
-	acceleration := t.acceleration
-
 	switch m := msg.(type) {
 	case *frequencyUpdate:
-		targetFrequency = m.targetFrequency
+		t.targetFrequency = m.targetFrequency
 	case *accelerationUpdate:
-		acceleration = m.acceleration
+		t.acceleration = m.acceleration
 	default:
 		// This should not be possible.
 		panic(fmt.Sprintf("invalid control message type: %T", msg))
@@ -221,8 +261,10 @@ func (t *VariableTicker) handleControlMessage(msg any) {
 
 	t.anchorTime = time.Now()
 	t.anchorFrequency = t.currentFrequency
-	t.targetFrequency = targetFrequency
-	t.acceleration = acceleration
+
+	if t.targetFrequency != t.currentFrequency {
+		t.logFrequencyInfo()
+	}
 }
 
 // computePeriod updates the current period based on configured frequency and acceleration
@@ -255,6 +297,12 @@ func (t *VariableTicker) computePeriod() {
 			// If we over shoot, adopt the target frequency.
 			t.currentFrequency = t.targetFrequency
 		}
+	}
+
+	if t.currentFrequency == t.targetFrequency {
+		t.logger.Infof("Ticker reached target frequency of %00.3f Hz.", t.targetFrequency)
+	} else if time.Since(t.lastLogTime) >= logPeriod {
+		t.logFrequencyInfo()
 	}
 
 	if t.currentFrequency == 0 {
