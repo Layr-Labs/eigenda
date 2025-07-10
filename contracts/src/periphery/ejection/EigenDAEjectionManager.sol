@@ -4,6 +4,8 @@ pragma solidity ^0.8.9;
 import {EigenDAEjectionLib, EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IIndexRegistry} from "lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
@@ -19,9 +21,6 @@ contract EigenDAEjectionManager {
 
     bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
         "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
-    );
-    bytes32 internal constant CANCEL_CHURN_TYPEHASH = keccak256(
-        "CancelChurn(address operator, address lowerStakeOperator, bytes quorums, uint64 proceedingTime, uint64 lastProceedingInitiated, address recipient)"
     );
 
     constructor(
@@ -62,25 +61,6 @@ contract EigenDAEjectionManager {
         _returnDeposit(msg.sender);
     }
 
-    /// @notice Starts the churn process for an operator. Takes a deposit from the watcher.
-    function startChurn(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
-        _takeDeposit(msg.sender);
-        operator.startChurn(quorums);
-    }
-
-    /// @notice Cancels the churn process initiated by a watcher.
-    function cancelChurnByWatcher(address operator) external onlyWatcher(msg.sender) {
-        operator.cancelChurn();
-        _returnDeposit(msg.sender);
-    }
-
-    /// @notice Completes the churn process for an operator. Transfers the deposit back to the watcher.
-    function completeChurn(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
-        operator.completeChurn(quorums);
-        _tryEjectOperator(operator, quorums);
-        _returnDeposit(msg.sender);
-    }
-
     /// OPERATOR FUNCTIONS
 
     /// @notice Cancels the ejection process for a given operator with their signature.
@@ -108,40 +88,29 @@ contract EigenDAEjectionManager {
         _returnDeposit(msg.sender);
     }
 
-    /// @notice Cancels the churn process for a given operator with their signature.
-    /// @param operator The address of the operator whose churn is being cancelled.
-    /// @param lowerStakeOperator The address of the operator with lower stake.
-    /// @param quorums The quorums for which the churn is being cancelled.
-    /// @param apkG2 The G2 point of the operator's public key.
-    /// @param sigma The BLS signature of the operator.
-    /// @param recipient The address to which the deposit will be returned.
-    function cancelChurnWithSig(
-        address operator,
-        address lowerStakeOperator,
-        bytes memory quorums,
-        BN254.G2Point memory apkG2,
-        BN254.G1Point memory sigma,
-        address recipient
-    ) external {
-        (BN254.G1Point memory apk,) =
-            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
-        _verifySig(_cancelChurnMessageHash(operator, lowerStakeOperator, quorums, recipient), apk, apkG2, sigma);
-        require(
-            _isOperatorWeightsGreater(operator, lowerStakeOperator, quorums),
-            "EigenDAEjectionManager: Operator does not have greater weights"
-        );
-        operator.cancelChurn();
-        _returnDeposit(recipient);
-    }
+    /// @notice Finds the lowest stake operator via an exhaustive search and eject them.
+    function churn(uint8 quorumId) external {
+        bytes32[] memory operators = IRegistryCoordinator(_registryCoordinator).indexRegistry()
+            .getOperatorListAtBlockNumber(quorumId, uint32(block.number));
 
-    /// @notice Completes the ejection process for the operator. Transfers the deposit to the operator.
-    function cancelChurn(address lowerStakeOperator, bytes memory quorums) external {
-        require(
-            _isOperatorWeightsGreater(msg.sender, lowerStakeOperator, quorums),
-            "EigenDAEjectionManager: Operator does not have greater weights"
+        uint96[] memory stakes = new uint96[](operators.length);
+        for (uint256 i; i < operators.length; i++) {
+            stakes[i] = IRegistryCoordinator(_registryCoordinator).stakeRegistry().getStakeAtBlockNumber(
+                operators[i], 0, uint32(block.number)
+            );
+        }
+        bytes32 lowestStakeOperator = operators[0];
+        uint96 lowestStake = stakes[0];
+        for (uint256 i = 1; i < operators.length; i++) {
+            if (stakes[i] < lowestStake) {
+                lowestStake = stakes[i];
+                lowestStakeOperator = operators[i];
+            }
+        }
+        _tryEjectOperator(
+            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().pubkeyHashToOperator(lowestStakeOperator),
+            bytes(abi.encodePacked(quorumId))
         );
-        msg.sender.cancelChurn();
-        _returnDeposit(msg.sender);
     }
 
     /// GETTERS
@@ -158,36 +127,16 @@ contract EigenDAEjectionManager {
         return _depositAmount;
     }
 
-    function churnInitiated(address operator) external view returns (bool) {
-        return operator.churnInitiated();
-    }
-
-    function churnTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator].proceedingTime;
-    }
-
-    function lastChurnInitiated(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator].lastProceedingInitiated;
-    }
-
-    function churnDelay() external view returns (uint64) {
-        return EigenDAEjectionLib.churnStorage().delay;
-    }
-
-    function churnCooldown() external view returns (uint64) {
-        return EigenDAEjectionLib.churnStorage().cooldown;
-    }
-
     function ejectionInitiated(address operator) external view returns (bool) {
         return operator.ejectionInitiated();
     }
 
     function ejectionTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator].proceedingTime;
+        return EigenDAEjectionLib.ejectionStorage().proceedingParams[operator].proceedingTime;
     }
 
     function lastEjectionInitiated(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator].lastProceedingInitiated;
+        return EigenDAEjectionLib.ejectionStorage().proceedingParams[operator].lastProceedingInitiated;
     }
 
     function ejectionDelay() external view returns (uint64) {
@@ -250,26 +199,7 @@ contract EigenDAEjectionManager {
     function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
-                CANCEL_EJECTION_TYPEHASH,
-                EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator],
-                recipient
-            )
-        );
-    }
-
-    function _cancelChurnMessageHash(
-        address operator,
-        address lowerStakeOperator,
-        bytes memory quorums,
-        address recipient
-    ) internal view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                CANCEL_CHURN_TYPEHASH,
-                EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator],
-                lowerStakeOperator,
-                quorums,
-                recipient
+                CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionStorage().proceedingParams[operator], recipient
             )
         );
     }
