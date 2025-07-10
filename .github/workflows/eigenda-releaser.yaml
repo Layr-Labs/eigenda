@@ -12,9 +12,12 @@ permissions:
   contents: write  # Required to push to the repo
 
 jobs:
-  create-release:
+  wait-for-approval:
     runs-on: ubuntu-latest
-
+    environment:
+      name: eigenda-release-environment
+      # This triggers the manual approval request to the assigned reviewers
+      
     steps:
       - name: Checkout default branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
