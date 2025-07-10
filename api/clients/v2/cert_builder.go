@@ -131,20 +131,20 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	for i, id := range nonSignerOperatorIDs {
 		nonSignerOperatorIDsHex[i] = "0x" + hex.EncodeToString(id[:])
 	}
-	// We log the call parameters for debugging purposes. If execution reverts, we can debug using tenderly.
-	cb.logger.Info("eth-call",
-		"contract", "OperatorStateRetriever",
-		"contractAddr", cb.opsrAddr.Hex(),
-		"method", "GetCheckSignaturesIndices",
-		"registryCoordinatorAddr", cb.registryCoordinatorAddr.Hex(),
-		"referenceBlockNumber", rbn,
-		"quorumNumbers", "0x"+hex.EncodeToString(quorumNumbers),
-		"nonSignerOperatorIDs", "["+strings.Join(nonSignerOperatorIDsHex, ",")+"]",
-	)
 	checkSigIndices, err := cb.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(rbn))},
 		cb.registryCoordinatorAddr, uint32(rbn), quorumNumbers, nonSignerOperatorIDs)
 
 	if err != nil {
+		// We log the call parameters for debugging purposes: input them into tenderly to simulate the call and get more context.
+		cb.logger.Error("eth-call failed",
+			"contract", "OperatorStateRetriever",
+			"contractAddr", cb.opsrAddr.Hex(),
+			"method", "GetCheckSignaturesIndices",
+			"registryCoordinatorAddr", cb.registryCoordinatorAddr.Hex(),
+			"referenceBlockNumber", rbn,
+			"quorumNumbers", "0x"+hex.EncodeToString(quorumNumbers),
+			"nonSignerOperatorIDs", "["+strings.Join(nonSignerOperatorIDsHex, ",")+"]",
+		)
 		return nil, fmt.Errorf("check sig indices call: %w", err)
 	}
 
