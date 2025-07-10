@@ -173,7 +173,7 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 	n := to - from
 	reader := bufio.NewReaderSize(file, int(n*pointSizeBytes))
 
-	_, err = file.Seek(int64(from)*int64(pointSizeBytes), 0)
+	_, err = file.Seek(int64(from)*int64(pointSizeBytes), io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
