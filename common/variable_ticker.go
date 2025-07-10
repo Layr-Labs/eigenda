@@ -14,6 +14,8 @@ import (
 const MinimumFrequency = float64(time.Second/math.MaxInt64) * 2.0
 
 // Any frequency above this value will be interpreted as a frequency of MaximumFrequency Hz. Needed to avoid overflow.
+// The time.Second constant holds the number of nanoseconds in a second, which means that the ticker can never tick
+// more than once per nanosecond.
 const MaximumFrequency = float64(time.Second)
 
 // the period between debug logs about the ticker's frequency and acceleration.
