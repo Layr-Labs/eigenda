@@ -42,7 +42,10 @@ func main() {
 		panic(fmt.Errorf("failed to read config file %s: %w", loadFile, err))
 	}
 
-	generator := load.NewLoadGenerator(config, c)
+	generator, err := load.NewLoadGenerator(config, c)
+	if err != nil {
+		panic(fmt.Errorf("failed to create load generator: %w", err))
+	}
 
 	signals := make(chan os.Signal)
 	go func() {
