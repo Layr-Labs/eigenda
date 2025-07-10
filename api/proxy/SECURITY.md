@@ -16,4 +16,4 @@ Audit reports are published in the [docs/audits](https://github.com/Layr-Labs/ei
 
 **Please do not file a public ticket** mentioning a vulnerability.
 
-Please report security vulnerabilities to security@eigenlabs.org with all the relavent details included in the email.
+Please report security vulnerabilities to security@eigenlabs.org with all the relevant details included in the email.
