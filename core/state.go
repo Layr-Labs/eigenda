@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
 	"slices"
 	"strings"
 )
@@ -30,6 +31,33 @@ func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v
 
 type StakeAmount = *big.Int
 
+// isTrustedInternalHostname checks if a hostname is a trusted internal hostname
+// that should bypass DNS lookup validation in test environments.
+func isTrustedInternalHostname(host string) bool {
+	// Check if we're in a test environment
+	if os.Getenv("EIGENDA_SKIP_DNS_LOOKUP") != "true" {
+		return false
+	}
+	
+	// List of trusted internal hostname patterns
+	trustedPatterns := []string{
+		".svc.cluster.local",     // Kubernetes service hostnames
+		".internal",              // Internal domain
+		"localhost",              // Localhost
+		"127.0.0.1",             // Loopback IP
+		"::1",                   // IPv6 loopback
+	}
+	
+	// Check if hostname matches any trusted pattern
+	for _, pattern := range trustedPatterns {
+		if strings.Contains(host, pattern) || host == pattern {
+			return true
+		}
+	}
+	
+	return false
+}
+
 func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort string, err error) {
 
 	s := strings.Split(socket, ";")
@@ -40,12 +68,15 @@ func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort,
 
 		return
 	}
-	if _, err = net.LookupHost(host); err != nil {
-		//Invalid host
-		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-			"", "", "", "", "",
-			fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
-		return
+	// Skip DNS lookup for trusted internal hostnames in test environments
+	if !isTrustedInternalHostname(host) {
+		if _, err = net.LookupHost(host); err != nil {
+			//Invalid host
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+			return
+		}
 	}
 	if err = ValidatePort(v1DispersalPort); err != nil {
 		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
