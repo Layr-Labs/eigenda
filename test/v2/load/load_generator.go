@@ -185,8 +185,7 @@ func (l *LoadGenerator) run() {
 	//	panic(fmt.Errorf("failed to set target frequency: %w", err))
 	//}
 
-	period := time.Duration(1.0/l.submissionFrequency) * time.Second
-	l.client.GetLogger().Infof("period between blob submissions: %s", period) // TODO
+	period := time.Duration(1.0 / l.submissionFrequency * float64(time.Second))
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
