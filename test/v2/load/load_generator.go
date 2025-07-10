@@ -186,6 +186,7 @@ func (l *LoadGenerator) run() {
 	//}
 
 	period := time.Duration(1.0/l.submissionFrequency) * time.Second
+	l.client.GetLogger().Infof("period between blob submissions: %s", period) // TODO
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
