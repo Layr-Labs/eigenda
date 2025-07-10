@@ -1,0 +1,31 @@
+name: eigenda releaser
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the release'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # Required to push to the repo
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push release branch
+        run: |
+          version="${{ github.event.inputs.version }}"
+          git checkout -b "release/$version"
+          git push origin "release/$version"
