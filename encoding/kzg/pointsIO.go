@@ -45,14 +45,14 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 }
 
 // Convenience wrapper for reading all G1 points from the start of the file.
-// See [readPointSection] for details on the parameters.
+// n is the number of points to read, numWorker is the number of goroutines to use for parallel parsing.
 func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	// ReadG1Points is just ReadG1PointSection starting from 0
 	return ReadG1PointSection(filepath, 0, n, numWorker)
 }
 
 // Convenience wrapper for reading all G1 points in uncompressed format.
-// This is just a wrapper around [readPointSection] with the uncompressed size.
+// n is the number of points to read, numWorker is the number of goroutines to use for parallel parsing.
 // We don't currently use uncompressed file formats; see [BenchmarkReadG2PointsCompressedVsUncompressed] for performance comparison.
 func ReadG1PointsUncompressed(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	// ReadG1PointsUncompressed is just ReadG1PointSection starting from 0
@@ -77,7 +77,8 @@ func ReadG2Point(n uint64, srsOrder uint64, g2Path string) (bn254.G2Affine, erro
 	return g2point[0], nil
 }
 
-// Convenience wrapper around [readPointSection] for reading a section of G2 points.
+// Convenience wrapper around [readPointSection] for reading G2 points from the start of the file.
+// n is the number of points to read, numWorker is the number of goroutines to use for parallel parsing.
 func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	result, err := ReadG2PointSection(filepath, 0, n, numWorker)
 	if err != nil {
@@ -88,7 +89,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 }
 
 // Convenience wrapper for reading all G2 points in uncompressed format.
-// This is just a wrapper around [readPointSection] with the uncompressed size.
+// n is the number of points to read, numWorker is the number of goroutines to use for parallel parsing.
 // We don't currently use uncompressed file formats; see [BenchmarkReadG2PointsCompressedVsUncompressed] for performance comparison.
 func ReadG2PointsUncompressed(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	// ReadG2PointsUncompressed is just ReadG2PointSection starting from 0
@@ -101,7 +102,8 @@ func ReadG2PointsUncompressed(filepath string, n uint64, numWorker uint64) ([]bn
 }
 
 // Convenience wrapper for reading a section of G2 points.
-// See [readPointSection] for details on the parameters.
+// from and to specify the range of point indices to read (inclusive from, exclusive to).
+// numWorker specifies the number of goroutines to use for parallel parsing.
 func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	return readPointSection[bn254.G2Affine](filepath, from, to, G2PointBytes, numWorker)
 }
