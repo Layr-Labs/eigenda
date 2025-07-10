@@ -182,9 +182,9 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 		numWorker = n
 	}
 
-	buf, err := readDesiredBytes(reader, n*pointSizeBytes)
+	buf, err := readBytes(reader, n*pointSizeBytes)
 	if err != nil {
-		return nil, fmt.Errorf("readDesiredBytes: %w", err)
+		return nil, fmt.Errorf("readBytes: %w", err)
 	}
 
 	points := make([]T, n)
@@ -231,9 +231,9 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 	return points, nil
 }
 
-// readDesiredBytes reads exactly numBytesToRead bytes from the reader and returns
+// readBytes reads exactly numBytesToRead bytes from the reader and returns
 // the result.
-func readDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
+func readBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 	buf := make([]byte, numBytesToRead)
 	_, err := io.ReadFull(reader, buf)
 	// Note that ReadFull() guarantees the bytes read is len(buf) IFF err is nil.
