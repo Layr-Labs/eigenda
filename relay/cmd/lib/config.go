@@ -34,6 +34,7 @@ type Config struct {
 
 	// Configuration for the graph indexer.
 	EthClientConfig               geth.EthClientConfig
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChainStateConfig              thegraph.Config
@@ -49,6 +50,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if len(relayKeys) == 0 {
 		return Config{}, fmt.Errorf("no relay keys specified")
 	}
+
 	config := Config{
 		Log:               *loggerConfig,
 		AWS:               awsClientConfig,
@@ -101,6 +103,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
+		EigenDADirectory:              ctx.String(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),

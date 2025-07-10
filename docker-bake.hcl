@@ -72,7 +72,8 @@ group "ci-release" {
     "dataapi",
     "controller",
     "relay",
-    "blobapi"
+    "blobapi",
+    "proxy",
   ]
 }
 
@@ -90,7 +91,8 @@ group "internal-release" {
     "traffic-generator-v2-internal",
     "controller-internal",
     "relay-internal",
-    "blobapi-internal"
+    "blobapi-internal",
+    "proxy-internal",
   ]
 }
 
@@ -283,6 +285,24 @@ target "blobapi-internal" {
     "${REGISTRY}/eigenda-blobapi:${BUILD_TAG}",
     "${REGISTRY}/eigenda-blobapi:${GIT_SHA}",
     "${REGISTRY}/eigenda-blobapi:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "proxy" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "proxy"
+  # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
+  # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
+  tags       = ["${REGISTRY}/layr-labs/eigenda-proxy:${BUILD_TAG}"]
+}
+
+target "proxy-internal" {
+  inherits = ["proxy"]
+  tags     = [
+    "${REGISTRY}/eigenda-proxy:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-proxy:${GIT_SHA}",
+    "${REGISTRY}/eigenda-proxy:sha-${GIT_SHORT_SHA}"
   ]
 }
 

@@ -31,7 +31,7 @@ func newTestFetcher(baseTime time.Time) *testFetcher {
 }
 
 func roundUpToNextMinute(t time.Time) time.Time {
-	if t.Truncate(time.Minute) == t {
+	if t.Equal(t.Truncate(time.Minute)) {
 		return t
 	}
 	return t.Truncate(time.Minute).Add(time.Minute)

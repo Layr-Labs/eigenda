@@ -37,12 +37,13 @@ var _ core.Writer = (*Writer)(nil)
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
+	eigendaDirectoryHexAddr string,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Writer, error) {
 
-	r := &Reader{
-		ethClient: client,
-		logger:    logger.With("component", "Reader"),
+	r, err := NewReader(logger, client, eigendaDirectoryHexAddr, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
 	}
 
 	e := &Writer{
@@ -51,11 +52,7 @@ func NewWriter(
 		Reader:    r,
 	}
 
-	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
-
-	return e, err
+	return e, nil
 }
 
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.

@@ -248,7 +248,8 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 	// Query all operators in the last N days.
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	var operators map[core.OperatorID]*QueriedOperatorInfo
-	if state == Deregistered {
+	switch state {
+	case Deregistered:
 		// Get OperatorsInfo for DeRegistered Operators
 		deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
@@ -257,7 +258,7 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
 		getOperatorInfoForQueriedOperators(sc, ctx, operators, deregisteredOperators)
-	} else if state == Registered {
+	case Registered:
 		// Get OperatorsInfo for Registered Operators
 		registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
@@ -267,7 +268,7 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
 		getOperatorInfoForQueriedOperators(sc, ctx, operators, registeredOperators)
 
-	} else {
+	default:
 		return nil, fmt.Errorf("invalid operator state: %d", state)
 	}
 

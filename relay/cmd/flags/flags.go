@@ -204,15 +204,21 @@ var (
 	}
 	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "Address of the BLS operator state retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
 	}
 	EigenDAServiceManagerAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigen-da-service-manager-addr"),
 		Usage:    "Address of the Eigen DA service manager",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
@@ -330,8 +336,6 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayKeysFlag,
-	BlsOperatorStateRetrieverAddrFlag,
-	EigenDAServiceManagerAddrFlag,
 	EnableMetricsFlag,
 }
 
@@ -374,6 +378,9 @@ var optionalFlags = []cli.Flag{
 	PprofHttpPortFlag,
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverAddrFlag,
+	EigenDAServiceManagerAddrFlag,
 }
 
 var Flags []cli.Flag

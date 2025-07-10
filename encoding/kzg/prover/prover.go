@@ -73,7 +73,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			}
 			fileSizeByte := fileStat.Size()
 			if fileSizeByte%64 != 0 {
-				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point.", fileSizeByte)
+				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point", fileSizeByte)
 			}
 			// get the size
 			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)

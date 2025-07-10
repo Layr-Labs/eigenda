@@ -28,7 +28,7 @@ func Example_relayPayloadRetrieval() {
 	if err != nil {
 		panic(fmt.Sprintf("create payload disperser: %v", err))
 	}
-	defer payloadDisperser.Close()
+	defer payloadDisperser.Close() //nolint:errcheck // just an example, so we ignore the error
 
 	payload, err := createRandomPayload(4 * 1024) // (4KB of random data)
 	if err != nil {
@@ -47,7 +47,7 @@ func Example_relayPayloadRetrieval() {
 	if err != nil {
 		panic(fmt.Sprintf("create relay payload retriever: %v", err))
 	}
-	defer payloadRetriever.Close()
+	defer payloadRetriever.Close() //nolint:errcheck // just an example, so we ignore the error
 
 	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {

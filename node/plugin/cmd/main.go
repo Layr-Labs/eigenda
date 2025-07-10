@@ -32,6 +32,7 @@ func main() {
 		plugin.SocketFlag,
 		plugin.QuorumIDListFlag,
 		plugin.ChainRpcUrlFlag,
+		plugin.EigenDADirectoryFlag,
 		plugin.BlsOperatorStateRetrieverFlag,
 		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
@@ -129,7 +130,7 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Printf("Error: failed to create EigenDA transactor: %v", err)
 		return
@@ -162,7 +163,8 @@ func pluginOps(ctx *cli.Context) {
 		RegisterNodeAtStart: false,
 	}
 	churnerClient := node.NewChurnerClient(config.ChurnerUrl, true, operator.Timeout, logger)
-	if config.Operation == plugin.OperationOptIn {
+	switch config.Operation {
+	case plugin.OperationOptIn:
 		log.Printf("Info: Operator with Operator Address: %x is opting in to EigenDA", sk.Address)
 		err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger.With("component", "NodeOperator"))
 		if err != nil {
@@ -170,7 +172,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-in the EigenDA, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
-	} else if config.Operation == plugin.OperationOptOut {
+	case plugin.OperationOptOut:
 		log.Printf("Info: Operator with Operator Address: %x and OperatorID: %x is opting out of EigenDA", sk.Address, operatorID)
 		err = node.DeregisterOperator(context.Background(), operator, pubKeyG1Point, tx)
 		if err != nil {
@@ -178,7 +180,7 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully opt-out the EigenDA, for operator ID: %x, operator address: %x", operatorID, sk.Address)
-	} else if config.Operation == plugin.OperationUpdateSocket {
+	case plugin.OperationUpdateSocket:
 		log.Printf("Info: Operator with Operator Address: %x is updating its socket: %s", sk.Address, config.Socket)
 		err = node.UpdateOperatorSocket(context.Background(), tx, config.Socket)
 		if err != nil {
@@ -186,14 +188,14 @@ func pluginOps(ctx *cli.Context) {
 			return
 		}
 		log.Printf("Info: successfully updated socket, for operator ID: %x, operator address: %x, socket: %s", operatorID, sk.Address, config.Socket)
-	} else if config.Operation == plugin.OperationListQuorums {
+	case plugin.OperationListQuorums:
 		quorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
 		if err != nil {
 			log.Printf("Error: failed to get quorum(s) for operatorID: %x, operator address: %x, error: %v", operatorID, sk.Address, err)
 			return
 		}
 		log.Printf("Info: operator ID: %x, operator address: %x, current quorums: %v", operatorID, sk.Address, quorumIds)
-	} else {
+	default:
 		log.Fatalf("Fatal: unsupported operation: %s", config.Operation)
 	}
 }

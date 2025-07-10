@@ -151,7 +151,7 @@ func (c *dispatcher) sendChunks(
 			"err", err)
 		return nil, err
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "operator connection", c.logger)
 
 	gc := node.NewDispersalClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)

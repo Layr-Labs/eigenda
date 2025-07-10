@@ -28,6 +28,11 @@ func NewErrorInvalidArg(msg string) error {
 	return newErrorGRPC(codes.InvalidArgument, msg)
 }
 
+// HTTP Mapping: 403 Forbidden
+func NewErrorForbidden(msg string) error {
+	return newErrorGRPC(codes.PermissionDenied, msg)
+}
+
 // HTTP Mapping: 404 Not Found
 func NewErrorNotFound(msg string) error {
 	return newErrorGRPC(codes.NotFound, msg)

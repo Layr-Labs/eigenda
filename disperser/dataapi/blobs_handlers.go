@@ -185,7 +185,7 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 
 func (s *server) getBlobMetadataByBatchHeaderHashWithLimit(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *disperser.BatchIndexExclusiveStartKey) ([]*disperser.BlobMetadata, *disperser.BatchIndexExclusiveStartKey, error) {
 	var allMetadata []*disperser.BlobMetadata
-	var nextKey *disperser.BatchIndexExclusiveStartKey = exclusiveStartKey
+	nextKey := exclusiveStartKey
 
 	const maxLimit int32 = 1000
 	remainingLimit := min(limit, maxLimit)

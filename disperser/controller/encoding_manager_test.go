@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -532,7 +531,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	encodingClient := dispmock.NewMockEncoderClientV2()
 	chainReader := &coremock.MockWriter{}
 	chainReader.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	chainReader.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+	chainReader.On("GetAllVersionedBlobParams", mock.Anything).Return(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,

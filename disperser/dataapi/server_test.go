@@ -26,7 +26,6 @@ import (
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/common/model"
@@ -169,7 +168,7 @@ func TestFetchBlobHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -219,7 +218,7 @@ func TestFetchBlobsHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -257,7 +256,7 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -278,7 +277,7 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res = w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err = io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -298,7 +297,7 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res = w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err = io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -316,7 +315,7 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res = w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err = io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -334,7 +333,7 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res = w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err = io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -381,7 +380,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -418,7 +417,7 @@ func TestFetchMetricsThroughputHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -467,7 +466,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -530,7 +529,7 @@ func TestPortCheck(t *testing.T) {
 	assert.Equal(t, w.Code, http.StatusOK)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -560,7 +559,7 @@ func TestCheckBatcherHealthExpectServing(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -593,7 +592,7 @@ func TestCheckBatcherHealthExpectNotServing(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -631,7 +630,7 @@ func TestFetchDisperserServiceAvailabilityHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -669,7 +668,7 @@ func TestChurnerServiceAvailabilityHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -715,7 +714,7 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -767,7 +766,7 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -824,7 +823,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -865,7 +864,7 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -924,7 +923,7 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -978,7 +977,7 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1027,7 +1026,7 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1081,7 +1080,7 @@ func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 	fmt.Printf("Response: %v\n", res)
 
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -1119,7 +1118,7 @@ func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 	fmt.Printf("Response: %v\n", res)
 
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -1161,7 +1160,7 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1222,7 +1221,7 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1275,7 +1274,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1345,7 +1344,7 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1402,7 +1401,7 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1466,7 +1465,7 @@ func TestFetchRegisteredOperatorOnline(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer core.CloseLogOnError(res.Body, "response body", mockLogger)
 
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
@@ -1520,7 +1519,7 @@ func markBlobConfirmed(t *testing.T, blob *core.Blob, key disperser.BlobKey, blo
 			Length:     uint(expectedDataLength),
 		},
 		BatchID:                 expectedBatchId,
-		ConfirmationTxnHash:     common.HexToHash("0x123"),
+		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),
 		ConfirmationBlockNumber: expectedConfirmationBlockNumber,
 		Fee:                     expectedFee,
 	}
@@ -1572,7 +1571,7 @@ func startTestGRPCServer(address string) (stopFunc func(), err error) {
 
 	stopFunc = func() {
 		grpcServer.Stop()
-		lis.Close()
+		core.CloseLogOnError(lis, "listener", nil)
 	}
 
 	go func() {

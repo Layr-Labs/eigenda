@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 const (
@@ -123,7 +125,7 @@ func getRemoteFileSize(url string) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to access %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer core.CloseLogOnError(resp.Body, "downloader: close response body", nil)
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("server returned non-OK status: %s", resp.Status)
@@ -148,7 +150,7 @@ func downloadFile(url string, outputPath string, rangeStart uint64, rangeEnd uin
 	if err != nil {
 		return fmt.Errorf("create file %s: %w", outputPath, err)
 	}
-	defer file.Close()
+	defer core.CloseLogOnError(file, file.Name(), nil)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -162,7 +164,7 @@ func downloadFile(url string, outputPath string, rangeStart uint64, rangeEnd uin
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer core.CloseLogOnError(resp.Body, "downloader: close response body", nil)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("server returned non-OK status: %s", resp.Status)

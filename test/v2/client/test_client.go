@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -216,12 +217,13 @@ func NewTestClient(
 	}
 
 	// Construct the relay client
-
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
+		config.EigenDADirectory,
 		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		config.EigenDAServiceManagerAddr,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
@@ -355,26 +357,36 @@ func NewTestClient(
 
 // loadPrivateKey loads the private key from the file/env var specified in the config.
 func loadPrivateKey(keyPath string, keyVar string) (string, error) {
+	var privateKey string
 	if keyPath != "" {
-		privateKeyFile, err := ResolveTildeInPath(keyPath)
+		privateKeyFile, err := util.SanitizePath(keyPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
-		}
-		privateKey, err := os.ReadFile(privateKeyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to read private key file: %w", err)
+			return "", fmt.Errorf("failed to sanitize path: %w", err)
 		}
 
-		return formatPrivateKey(string(privateKey)), nil
+		exists, err := util.Exists(privateKeyFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to check if private key file exists: %w", err)
+		}
+		if exists {
+			privateKeyBytes, err := os.ReadFile(privateKeyFile)
+			if err != nil {
+				return "", fmt.Errorf("failed to read private key file: %w", err)
+			}
+			privateKey = string(privateKeyBytes)
+		}
 	}
 
-	if keyVar == "" {
-		return "", fmt.Errorf("either KeyPath or KeyVar must be set")
-	}
-	privateKey := os.Getenv(keyVar)
 	if privateKey == "" {
-		return "", fmt.Errorf("key not found in environment variable %s", keyVar)
+		if keyVar == "" {
+			return "", fmt.Errorf("either KeyPath must reference a valid key file or KeyVar must be set")
+		}
+		privateKey = os.Getenv(keyVar)
+		if privateKey == "" {
+			return "", fmt.Errorf("key not found in environment variable %s", keyVar)
+		}
 	}
+
 	return formatPrivateKey(privateKey), nil
 }
 

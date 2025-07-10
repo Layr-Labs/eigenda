@@ -48,15 +48,21 @@ var (
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
@@ -270,8 +276,6 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	GrpcPortFlag,
 	BucketTableName,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -295,6 +299,9 @@ var optionalFlags = []cli.Flag{
 	NtpServerFlag,
 	NtpSyncIntervalFlag,
 	ReservedOnly,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
+	EigenDADirectoryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

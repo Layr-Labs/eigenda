@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/hashing"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -19,7 +18,7 @@ type LocalBlobRequestSigner struct {
 var _ core.BlobRequestSigner = &LocalBlobRequestSigner{}
 
 func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, error) {
-	privateKeyBytes := common.FromHex(privateKeyHex)
+	privateKeyBytes := gethcommon.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("create ECDSA private key: %w", err)

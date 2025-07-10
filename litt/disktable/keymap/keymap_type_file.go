@@ -78,7 +78,7 @@ func (k *KeymapTypeFile) Type() KeymapType {
 func (k *KeymapTypeFile) Write() error {
 	filePath := path.Join(k.keymapPath, KeymapTypeFileName)
 
-	exists, _, err := util.VerifyFileProperties(filePath)
+	exists, _, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
 		return fmt.Errorf("unable to open keymap type file: %v", err)
 	}

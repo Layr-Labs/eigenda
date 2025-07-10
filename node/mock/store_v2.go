@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockStoreV2 is a mock implementation ofStoreV2
+// MockStoreV2 is a mock implementation of StoreV2
 type MockStoreV2 struct {
 	mock.Mock
 }

@@ -71,10 +71,10 @@ func TestIndex(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		assert.Equal(t, 4, len(headerStore.Chain), "header store chain should have 4 headers")
-		assert.Equal(t, uint64(1), headerStore.Chain[0].Header.Number, "header number should have number 1")
-		assert.Equal(t, uint64(2), headerStore.Chain[1].Header.Number, "header number should have number 2")
-		assert.Equal(t, uint64(3), headerStore.Chain[2].Header.Number, "header number should have number 3")
-		assert.Equal(t, uint64(4), headerStore.Chain[3].Header.Number, "header number should have number 4")
+		assert.Equal(t, uint64(1), headerStore.Chain[0].Number, "header number should have number 1")
+		assert.Equal(t, uint64(2), headerStore.Chain[1].Number, "header number should have number 2")
+		assert.Equal(t, uint64(3), headerStore.Chain[2].Number, "header number should have number 3")
+		assert.Equal(t, uint64(4), headerStore.Chain[3].Number, "header number should have number 4")
 
 		ao, h, err := headerStore.GetLatestObject(acc, false)
 		assert.NoError(t, err)

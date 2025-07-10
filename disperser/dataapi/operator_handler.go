@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -226,7 +227,7 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	if err != nil {
 		return false, err.Error()
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, fmt.Sprintf("grpc connection to %s", socket), nil)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -279,11 +280,15 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		stakeRanked[quorum] = make([]*OperatorStake, 0)
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				weiToEth := new(big.Float).SetFloat64(1e18)
+				stakeAmountEth := new(big.Float).Quo(&op.StakeAmount, weiToEth)
+				stakeAmount, _ := stakeAmountEth.Float64()
 				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
 					StakePercentage: op.StakeShare / 100.0,
 					Rank:            i + 1,
+					StakeAmount:     stakeAmount,
 				})
 			}
 		}
@@ -334,6 +339,52 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	nodeInfoTimeout := time.Duration(1 * time.Second)
 	useRetrievalClient := false
 	semvers := semver.ScanOperators(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
+
+	// Create HostInfoReportResponse instance
+	semverReport := &SemverReportResponse{
+		Semver: semvers,
+	}
+
+	// Publish semver report metrics
+	s.metrics.UpdateSemverCounts(semvers)
+
+	s.logger.Info("Semver scan completed", "semverReport", semverReport)
+	return semverReport, nil
+}
+
+func (s *OperatorHandler) ScanOperatorsHostInfoV2(ctx context.Context) (*SemverReportResponse, error) {
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
+	}
+	operators, err := s.indexedChainState.GetIndexedOperators(context.Background(), currentBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch indexed operator info: %w", err)
+	}
+
+	// check operator socket registration against the indexed state
+	for operatorID, operatorInfo := range operators {
+		socket, err := s.chainState.GetOperatorSocket(context.Background(), currentBlock, operatorID)
+		if err != nil {
+			s.logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
+			continue
+		}
+		if socket != operatorInfo.Socket {
+			s.logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
+		}
+	}
+
+	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
+
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, s.quorumIds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
+	}
+
+	nodeInfoWorkers := 20
+	nodeInfoTimeout := time.Duration(1 * time.Second)
+	useRetrievalClient := false
+	semvers := semver.ScanOperatorsV2(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
 
 	// Create HostInfoReportResponse instance
 	semverReport := &SemverReportResponse{

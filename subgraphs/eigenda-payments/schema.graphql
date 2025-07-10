@@ -1,0 +1,95 @@
+type GlobalRatePeriodIntervalUpdated @entity(immutable: true) {
+  id: Bytes!
+  previousValue: BigInt! # uint64
+  newValue: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GlobalSymbolsPerPeriodUpdated @entity(immutable: true) {
+  id: Bytes!
+  previousValue: BigInt! # uint64
+  newValue: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Initialized @entity(immutable: true) {
+  id: Bytes!
+  version: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OnDemandPaymentUpdated @entity(immutable: true) {
+  id: Bytes!
+  account: Bytes! # address
+  onDemandPayment: BigInt! # uint80
+  totalDeposit: BigInt! # uint80
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type PriceParamsUpdated @entity(immutable: true) {
+  id: Bytes!
+  previousMinNumSymbols: BigInt! # uint64
+  newMinNumSymbols: BigInt! # uint64
+  previousPricePerSymbol: BigInt! # uint64
+  newPricePerSymbol: BigInt! # uint64
+  previousPriceUpdateCooldown: BigInt! # uint64
+  newPriceUpdateCooldown: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ReservationPeriodIntervalUpdated @entity(immutable: true) {
+  id: Bytes!
+  previousValue: BigInt! # uint64
+  newValue: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ReservationUpdated @entity(immutable: true) {
+  id: Bytes!
+  account: Bytes! # address
+  reservation_symbolsPerSecond: BigInt! # uint64
+  reservation_startTimestamp: BigInt! # uint64
+  reservation_endTimestamp: BigInt! # uint64
+  reservation_quorumNumbers: Bytes! # bytes
+  reservation_quorumSplits: Bytes! # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Everything above here maps 1:1 to onchain events
+# ============== EVENT-DERIVED STATE BELOW ==============
+
+type Reservation @entity(immutable: false) {
+  id: Bytes! # account address
+  account: Bytes! # address
+  symbolsPerSecond: BigInt! # uint64
+  startTimestamp: BigInt! # uint64
+  endTimestamp: BigInt! # uint64
+  quorumNumbers: Bytes! # bytes
+  quorumSplits: Bytes! # bytes
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+  lastUpdatedTransactionHash: Bytes!
+}

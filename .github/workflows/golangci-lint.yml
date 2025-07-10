@@ -21,7 +21,5 @@ jobs:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-
       - run: make lint
-
       - run: make fmt-check

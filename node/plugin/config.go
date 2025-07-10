@@ -114,15 +114,21 @@ var (
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     "bls-operator-state-retriever",
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     "eigenda-service-manager",
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     "eigenda-directory",
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     "churner-url",
@@ -152,6 +158,7 @@ type Config struct {
 	Socket                        string
 	QuorumIDList                  []core.QuorumID
 	ChainRpcUrl                   string
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChurnerUrl                    string
@@ -194,6 +201,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Socket:                        ctx.GlobalString(SocketFlag.Name),
 		QuorumIDList:                  ids,
 		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
 		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),

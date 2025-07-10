@@ -14,7 +14,7 @@ import { createNewBatchConfirmedEvent, createNewConfimBatchCall } from "./edasm-
 
 let blobHeadersRoot: Bytes = Bytes.fromHexString("0x1111000011110000111100001111000011110000111100001111000011110000")
 let quorumNumbers: Bytes = Bytes.fromHexString("0x000112")
-let quorumThresholdPercentages: Bytes = Bytes.fromHexString("0x646464")
+let signedStakeForQuorums: Bytes = Bytes.fromHexString("0x646464")
 let referenceBlockNumber: BigInt = BigInt.fromI32(123123)
 let nonSignerPubkeysBigInts: Array<Array<BigInt>> = [
   [BigInt.fromI32(123), BigInt.fromI32(456)],
@@ -42,7 +42,7 @@ describe("EigenDASM", () => {
     let confirmBatchCall = createNewConfimBatchCall(
       blobHeadersRoot,
       quorumNumbers,
-      quorumThresholdPercentages,
+      signedStakeForQuorums,
       referenceBlockNumber,
       nonSignerPubkeysBigInts
     )
@@ -79,8 +79,8 @@ describe("EigenDASM", () => {
     assert.fieldEquals(
       "BatchHeader",
       batchHeaderEntityId.toHexString(),
-      "quorumThresholdPercentages",
-      convertArraySringToAssertString(bytesToBigIntArray(quorumThresholdPercentages).toString())
+      "signedStakeForQuorums",
+      convertArraySringToAssertString(bytesToBigIntArray(signedStakeForQuorums).toString())
     )
 
     assert.fieldEquals(

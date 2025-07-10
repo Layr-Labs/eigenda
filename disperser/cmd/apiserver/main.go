@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/lib"
 	"github.com/urfave/cli"
-	"log"
-	"os"
 )
 
 var (

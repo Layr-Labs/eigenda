@@ -63,7 +63,7 @@ func writeEnv(envMap map[string]string, filename string) {
 		if value == "" {
 			continue
 		}
-		_, err = f.WriteString(fmt.Sprintf("%v=%v\n", key, value))
+		_, err = fmt.Fprintf(f, "%v=%v\n", key, value)
 		if err != nil {
 			log.Panicf("Failed to write experiment to env. Error: %s", err)
 		}

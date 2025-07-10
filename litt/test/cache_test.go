@@ -39,7 +39,7 @@ func TestCache(t *testing.T) {
 
 	// Write some values to the table. Stop before any values are evicted from the write cache.
 	bytesWritten := uint64(0)
-	for bytesWritten < config.WriteCacheSize-keySize-maxValueSize {
+	for bytesWritten <= config.WriteCacheSize-keySize-maxValueSize {
 		nextValueSize := rand.Uint64Range(1, maxValueSize)
 		kvSize := keySize + nextValueSize
 

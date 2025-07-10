@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -99,7 +98,7 @@ var clientBuilders = []*clientBuilder{
 }
 
 func setupLocalstack() error {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		var err error
@@ -113,7 +112,7 @@ func setupLocalstack() error {
 }
 
 func teardownLocalstack() {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
@@ -265,7 +264,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
-	logger := testutils.GetLogger()
+	logger := tu.GetLogger()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)

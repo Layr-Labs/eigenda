@@ -1,12 +1,14 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/urfave/cli"
 )
 
@@ -54,8 +56,8 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 
 // DefaultLoggerConfig returns a LoggerConfig with the default settings for a JSON logger.
 // In general, this should be the baseline config for most services running in production.
-func DefaultLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       JSONLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -68,8 +70,8 @@ func DefaultLoggerConfig() LoggerConfig {
 
 // DefaultTextLoggerConfig returns a LoggerConfig with the default settings for a text logger.
 // For use in tests or other scenarios where the logs are consumed by humans.
-func DefaultTextLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultTextLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       TextLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -83,8 +85,8 @@ func DefaultTextLoggerConfig() LoggerConfig {
 // DefaultConsoleLoggerConfig returns a LoggerConfig with the default settings
 // for logging to a console (i.e. with human eyeballs). Adds color, and so should
 // not be used when logs are captured in a file.
-func DefaultConsoleLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultConsoleLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       TextLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -122,10 +124,10 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, er
 	}
 	cfg.HandlerOpts.Level = level
 
-	return &cfg, nil
+	return cfg, nil
 }
 
-func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
+func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 	if cfg.Format == JSONLogFormat {
 		return logging.NewJsonSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
@@ -133,4 +135,24 @@ func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
 		return logging.NewTextSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
+}
+
+// InterceptorLogger returns a grpclogging.Logger that uses the provided logging.Logger.
+// grpclogging.Logger is an interface that allows logging gRPC interceptor messages.
+// Ref: https://github.com/grpc-ecosystem/go-grpc-middleware/blob/main/interceptors/logging/examples/slog/example_test.go
+func InterceptorLogger(logger logging.Logger) grpclogging.Logger {
+	return grpclogging.LoggerFunc(func(ctx context.Context, lvl grpclogging.Level, msg string, fields ...any) {
+		switch lvl {
+		case grpclogging.LevelDebug:
+			logger.Debug(msg, fields...)
+		case grpclogging.LevelInfo:
+			logger.Info(msg, fields...)
+		case grpclogging.LevelWarn:
+			logger.Warn(msg, fields...)
+		case grpclogging.LevelError:
+			logger.Error(msg, fields...)
+		default:
+			logger.Info(msg, fields...)
+		}
+	})
 }

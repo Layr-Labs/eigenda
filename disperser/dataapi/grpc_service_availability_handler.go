@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -137,10 +138,10 @@ func (sac *EigenDAServiceAvailabilityCheck) CheckHealth(ctx context.Context, ser
 // Close Open connections
 func (sac *EigenDAServiceAvailabilityCheck) CloseConnections() error {
 	if sac.disperserConn != nil {
-		sac.disperserConn.Close()
+		core.CloseLogOnError(sac.disperserConn, "disperser connection", nil)
 	}
 	if sac.churnerConn != nil {
-		sac.churnerConn.Close()
+		core.CloseLogOnError(sac.churnerConn, "churner connection", nil)
 	}
 
 	return nil
