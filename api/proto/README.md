@@ -21,7 +21,7 @@ The following APIs are currently experimental:
 
 ## Q: are APIs not marked with "Experimental" stable?
 
-Yes. We are commited to maintaining backwards compatibility for all APIs that are not marked as experimental,
+Yes. We are committed to maintaining backwards compatibility for all APIs that are not marked as experimental,
 and any breaking changes will be made only after a long deprecation period and active communication with
 all stakeholders. Furthermore, breaking API changes are expected to be rare.
 
