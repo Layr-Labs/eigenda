@@ -1,0 +1,16 @@
+[package]
+name = "eigenda-cert-verifier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ark-bn254 = { version = "0.5.0", default-features = false, features = ["curve"] }
+ark-ff = "0.5.0"
+bitvec     = { version = "1.0.1", default-features = false }
+primitive-types = { version = "0.13.1", default-features = false }
+thiserror  = { version = "2.0.12", default-features = false }
+tiny-keccak  = { version = "2.0.2", default-features = false, features = ["keccak"] }
+
+[dev-dependencies]
+ark-ec = "0.5.0"
+hex = "0.4.3"
