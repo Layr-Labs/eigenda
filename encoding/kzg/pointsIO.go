@@ -189,17 +189,17 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 
 	points := make([]T, n)
 	results := make(chan error, numWorker)
-	size := n / numWorker
+	pointsPerWorker := n / numWorker
 
 	for i := uint64(0); i < numWorker; i++ {
-		start := i * size
-		end := start + size
+		startPoint := i * pointsPerWorker
+		endPoint := startPoint + pointsPerWorker
 		if i == numWorker-1 {
-			end = n
+			endPoint = n
 		}
 
-		go func(start, end uint64) {
-			for j := start; j < end; j++ {
+		go func(startPoint, endPoint uint64) {
+			for j := startPoint; j < endPoint; j++ {
 				pointData := buf[j*pointSizeBytes : (j+1)*pointSizeBytes]
 				switch p := any(&points[j]).(type) {
 				case *bn254.G1Affine:
@@ -219,7 +219,7 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 				}
 			}
 			results <- nil
-		}(start, end)
+		}(startPoint, endPoint)
 	}
 
 	for w := uint64(0); w < numWorker; w++ {
