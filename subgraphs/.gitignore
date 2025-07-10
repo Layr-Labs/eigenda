@@ -12,3 +12,7 @@ eigenda-operator-state/Makefile
 eigenda-batch-metadata/networks.json
 eigenda-batch-metadata/subgraph.yaml
 eigenda-batch-metadata/Makefile
+
+eigenda-payments/networks.json
+eigenda-payments/subgraph.yaml
+eigenda-payments/Makefile

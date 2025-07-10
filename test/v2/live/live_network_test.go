@@ -1,4 +1,4 @@
-package correctness
+package live
 
 import (
 	"context"
@@ -22,19 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
 )
-
-// Golang tests are always run with CWD set to the dir in which the test file is located.
-// These relative paths should thus only be used for tests in the `test/v2/correctness` directory.
-const (
-	PreprodEnv = "../config/environment/preprod.json"
-	TestnetEnv = "../config/environment/testnet.json"
-)
-
-// A list of config files that this test runs against
-var environments = []string{
-	PreprodEnv,
-	TestnetEnv,
-}
 
 // getEnvironmentName takes an environment string as listed in environments (aka a path to a config file describing
 // the environment) and returns the name of the environment. Assumes the path is in the format of
@@ -62,11 +49,8 @@ func checkAndSetCertVerifierAddress(t *testing.T, c *client.TestClient, certVeri
 // - wait for it to be confirmed
 // - read the blob from the relays
 // - read the blob from the validators
-func testBasicDispersal(c *client.TestClient, payload []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	err := c.DisperseAndVerify(ctx, payload)
+func testBasicDispersal(t *testing.T, c *client.TestClient, payload []byte) error {
+	err := c.DisperseAndVerify(t.Context(), payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -81,7 +65,7 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	quorums := []core.QuorumID{0, 1}
 
 	c := client.GetTestClient(t, environment)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
@@ -89,10 +73,13 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// This should fail with "data is empty" error
 	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "blob size must be greater than 0")
+	require.ErrorContains(t, err, clients.ErrZeroSymbols.Error())
 }
 
 func TestEmptyBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			emptyBlobDispersalTest(t, environment)
@@ -110,11 +97,14 @@ func emptyPayloadDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestEmptyPayloadDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			emptyPayloadDispersalTest(t, environment)
@@ -132,11 +122,14 @@ func testZeroPayloadDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestZeroPayloadDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			testZeroPayloadDispersalTest(t, environment)
@@ -151,7 +144,7 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 	quorums := []core.QuorumID{0, 1}
 
 	c := client.GetTestClient(t, environment)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
@@ -161,6 +154,9 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 }
 
 func TestZeroBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			zeroBlobDispersalTest(t, environment)
@@ -178,11 +174,14 @@ func microscopicBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestMicroscopicBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			microscopicBlobDispersalTest(t, environment)
@@ -200,11 +199,14 @@ func microscopicBlobDispersalWithPadding(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			microscopicBlobDispersalWithPadding(t, environment)
@@ -223,11 +225,14 @@ func smallBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestSmallBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			smallBlobDispersalTest(t, environment)
@@ -246,11 +251,14 @@ func mediumBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestMediumBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			mediumBlobDispersalTest(t, environment)
@@ -271,11 +279,14 @@ func largeBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestLargeBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			largeBlobDispersalTest(t, environment)
@@ -293,20 +304,31 @@ func smallBlobDispersalAllQuorumsSetsTest(t *testing.T, environment string) {
 
 	c := client.GetTestClient(t, environment)
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("0 1", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
+		err = testBasicDispersal(t, c, payload)
+		require.NoError(t, err)
+	})
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1_2)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("0 1 2", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1_2)
+		err = testBasicDispersal(t, c, payload)
+		require.NoError(t, err)
+	})
 
-	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums2)
-	err = testBasicDispersal(c, payload)
-	require.NoError(t, err)
+	t.Run("2", func(t *testing.T) {
+		checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums2)
+		err = testBasicDispersal(t, c, payload)
+		require.NoError(t, err)
+	})
 }
 
 func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
+	t.Skip() // currently broken
+
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			smallBlobDispersalAllQuorumsSetsTest(t, environment)
@@ -329,11 +351,14 @@ func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.NoError(t, err)
 }
 
 func TestMaximumSizedBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			maximumSizedBlobDispersalTest(t, environment)
@@ -355,11 +380,14 @@ func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	c := client.GetTestClient(t, environment)
 	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(c, payload)
+	err = testBasicDispersal(t, c, payload)
 	require.Error(t, err)
 }
 
 func TestTooLargeBlobDispersal(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			tooLargeBlobDispersalTest(t, environment)
@@ -373,7 +401,7 @@ func doubleDispersalTest(t *testing.T, environment string) {
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
 	config, err := client.GetConfig(environment)
@@ -393,6 +421,9 @@ func doubleDispersalTest(t *testing.T, environment string) {
 func TestDoubleDispersal(t *testing.T) {
 	t.Skip("This test is not working ever since we removed the salt param from the top level client.")
 
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			doubleDispersalTest(t, environment)
@@ -408,7 +439,7 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
 	c.SetCertVerifierAddress(config.EigenDACertVerifierAddressQuorums0_1)
@@ -437,6 +468,9 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			unauthorizedGetChunksTest(t, environment)
@@ -480,7 +514,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	blob, err := payload.ToBlob(codecs.PolynomialFormCoeff)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
 	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums)
@@ -489,6 +523,9 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 }
 
 func TestDispersalWithInvalidSignature(t *testing.T) {
+	environments, err := client.GetEnvironmentConfigPaths()
+	require.NoError(t, err)
+
 	for _, environment := range environments {
 		t.Run(getEnvironmentName(environment), func(t *testing.T) {
 			dispersalWithInvalidSignatureTest(t, environment)

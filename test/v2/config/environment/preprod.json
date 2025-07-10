@@ -1,6 +1,7 @@
 {
   "SRSPath": "../../../../resources/srs",
   "KeyPath": "~/.test-v2/preprod-private-key.txt",
+  "KeyVar": "LIVE_TEST_PREPROD_HOLESKY_KEY",
   "DisperserHostname": "disperser-preprod-holesky.eigenda.xyz",
   "DisperserPort": 443,
   "EthRPCURLs": [

@@ -13,6 +13,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// ErrZeroSymbols is returned when the requested number of symbols is zero.
+var ErrZeroSymbols = errors.New("zero symbols requested")
+
 type Accountant struct {
 	// on-chain states
 	accountID    gethcommon.Address
@@ -125,7 +128,7 @@ func (a *Accountant) AccountBlob(
 		return nil, fmt.Errorf("no quorums provided")
 	}
 	if numSymbols == 0 {
-		return nil, fmt.Errorf("zero symbols requested")
+		return nil, ErrZeroSymbols
 	}
 
 	// Always try to use reservation first

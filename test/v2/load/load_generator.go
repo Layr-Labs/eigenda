@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 )
@@ -51,9 +52,9 @@ type LoadGenerator struct {
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
 func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
-	configFile, err := client.ResolveTildeInPath(filePath)
+	configFile, err := util.SanitizePath(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {
