@@ -14,4 +14,4 @@ clean:
 	rm -rf bin 2>/dev/null || true
 
 test:
-	cd correctness && go test
+	cd live && go test
