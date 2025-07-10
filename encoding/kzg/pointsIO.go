@@ -191,15 +191,15 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 	results := make(chan error, numWorker)
 	pointsPerWorker := n / numWorker
 
-	for i := uint64(0); i < numWorker; i++ {
+	for i := uint64(0); i < numWorker; i++ { // i is the workerIndex
 		startPoint := i * pointsPerWorker
 		endPoint := startPoint + pointsPerWorker
 		if i == numWorker-1 {
-			endPoint = n
+			endPoint = n // The final worker reads the rest of the points
 		}
 
 		go func(startPoint, endPoint uint64) {
-			for j := startPoint; j < endPoint; j++ {
+			for j := startPoint; j < endPoint; j++ { // j is the pointIndex
 				pointData := buf[j*pointSizeBytes : (j+1)*pointSizeBytes]
 				switch p := any(&points[j]).(type) {
 				case *bn254.G1Affine:
