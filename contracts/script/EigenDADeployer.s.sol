@@ -30,6 +30,7 @@ import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {DisperserRegistry, IDisperserRegistry, DisperserRegistryTypes} from "src/core/DisperserRegistry.sol";
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
@@ -44,6 +45,15 @@ import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+
+contract ERC20Mintable is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 // NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
@@ -70,6 +80,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IPaymentVault public paymentVault;
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
+    IDisperserRegistry public disperserRegistry;
+    ERC20Mintable public testToken;
 
     EigenDADirectory public eigenDADirectoryImplementation;
     BLSApkRegistry public apkRegistryImplementation;
@@ -83,6 +95,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
     IEigenDADisperserRegistry public eigenDADisperserRegistryImplementation;
+    DisperserRegistry public disperserRegistryImplementation;
 
     uint64 _minNumSymbols = 4096;
     uint64 _pricePerSymbol = 0.447 gwei;
@@ -109,6 +122,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         address tokenOwner,
         uint256 maxOperatorCount
     ) internal {
+        testToken = new ERC20Mintable("Test Token", "TEST");
         StrategyConfig[] memory strategyConfigs = new StrategyConfig[](numStrategies);
         // deploy a token and create a strategy config for each token
         for (uint8 i = 0; i < numStrategies; i++) {
@@ -212,8 +226,13 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
             eigenDADirectory.addAddress(
-                AddressDirectoryConstants.DISPERSER_REGISTRY_NAME, address(eigenDADisperserRegistry)
+                AddressDirectoryConstants.DISPERSER_REGISTRY_LEGACY_NAME, address(eigenDADisperserRegistry)
             );
+
+            disperserRegistry = IDisperserRegistry(
+                address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+            );
+            eigenDADirectory.addAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME, address(disperserRegistry));
 
             paymentVaultImplementation = new PaymentVault();
 
@@ -239,6 +258,26 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
             address(eigenDADisperserRegistryImplementation),
             abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
+        );
+
+        disperserRegistryImplementation = new DisperserRegistry();
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(disperserRegistry))),
+            address(disperserRegistryImplementation),
+            abi.encodeCall(
+                DisperserRegistry.initialize,
+                (
+                    addressConfig.eigenDACommunityMultisig,
+                    DisperserRegistryTypes.LockedDisperserDeposit({
+                        deposit: 100,
+                        refund: 100,
+                        token: address(testToken),
+                        lockPeriod: 1 days
+                    }),
+                    100
+                )
+            )
         );
 
         indexRegistryImplementation = new IndexRegistry(registryCoordinator);

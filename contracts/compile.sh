@@ -50,6 +50,7 @@ contracts="PaymentVault \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
   EigenDADisperserRegistry \
+  IDisperserRegistry \
   IEigenDADirectory"
 
 for contract in $contracts; do
