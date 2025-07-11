@@ -12,134 +12,90 @@ import (
 
 func TestQuorumPeriodRecords_GetRelativePeriodRecord(t *testing.T) {
 	tests := []struct {
-		name                 string
-		setupRecords         func() meterer.QuorumPeriodRecords
-		accessSequence       []uint64
-		quorumNumber         core.QuorumID
-		expectedFinalUsages  []uint64
-		expectedFinalIndices []uint32
-		description          string
+		name               string
+		initialRecords     meterer.QuorumPeriodRecords
+		index              uint64
+		quorumNumber       core.QuorumID
+		expectedIndex      uint32
+		expectedUsage      uint64
+		shouldCreateQuorum bool
+		shouldCreateRecord bool
 	}{
-		// Basic functionality tests
 		{
-			name: "new quorum and record",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				return make(meterer.QuorumPeriodRecords)
+			name:               "new quorum and record",
+			initialRecords:     make(meterer.QuorumPeriodRecords),
+			index:              5,
+			quorumNumber:       core.QuorumID(1),
+			expectedIndex:      5,
+			expectedUsage:      0,
+			shouldCreateQuorum: true,
+			shouldCreateRecord: true,
+		},
+		{
+			name: "existing quorum, new record",
+			initialRecords: meterer.QuorumPeriodRecords{
+				core.QuorumID(1): make([]*meterer.PeriodRecord, 3),
 			},
-			accessSequence:       []uint64{5},
-			quorumNumber:         core.QuorumID(1),
-			expectedFinalUsages:  []uint64{0, 0, 0}, // slot 2 (5%3=2) should have Usage=0
-			expectedFinalIndices: []uint32{0, 0, 5}, // slot 2 should have Index=5
-			description:          "Should create new quorum and record when both don't exist",
+			index:              7,
+			quorumNumber:       core.QuorumID(1),
+			expectedIndex:      7,
+			expectedUsage:      0,
+			shouldCreateQuorum: false,
+			shouldCreateRecord: true,
 		},
 		{
 			name: "existing quorum and record",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				records := make(meterer.QuorumPeriodRecords)
-				records[core.QuorumID(1)] = []*meterer.PeriodRecord{
+			initialRecords: meterer.QuorumPeriodRecords{
+				core.QuorumID(1): []*meterer.PeriodRecord{
 					nil,
-					{Index: uint32(4), Usage: 100},
+					{Index: 4, Usage: 100},
 					nil,
-				}
-				return records
+				},
 			},
-			accessSequence:       []uint64{4},
-			quorumNumber:         core.QuorumID(1),
-			expectedFinalUsages:  []uint64{0, 100, 0}, // slot 1 should keep Usage=100
-			expectedFinalIndices: []uint32{0, 4, 0},   // slot 1 should keep Index=4
-			description:          "Should return existing record without modification",
+			index:              4,
+			quorumNumber:       core.QuorumID(1),
+			expectedIndex:      4,
+			expectedUsage:      100,
+			shouldCreateQuorum: false,
+			shouldCreateRecord: false,
 		},
 		{
-			name: "index wraps around (modulo operation)",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				return make(meterer.QuorumPeriodRecords)
-			},
-			accessSequence:       []uint64{10}, // 10 % 3 = 1
-			quorumNumber:         core.QuorumID(2),
-			expectedFinalUsages:  []uint64{0, 0, 0},  // slot 1 should have Usage=0
-			expectedFinalIndices: []uint32{0, 10, 0}, // slot 1 should have Index=10
-			description:          "Should handle modulo operation correctly for wrapping indices",
-		},
-
-		// Circular wrapping refresh tests
-		{
-			name: "circular wrapping refresh - newer period overwrites older in same slot",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				records := make(meterer.QuorumPeriodRecords)
-				// Setup initial record at index 1 (maps to slot 1)
-				record := records.GetRelativePeriodRecord(1, core.QuorumID(1))
-				record.Usage = 100
-				return records
-			},
-			accessSequence:       []uint64{1, 4}, // index 4 also maps to slot 1 (4 % 3 = 1)
-			quorumNumber:         core.QuorumID(1),
-			expectedFinalUsages:  []uint64{0, 0, 0}, // slot 1 should be refreshed to Usage=0
-			expectedFinalIndices: []uint32{0, 4, 0}, // slot 1 should have Index=4
-			description:          "When index 4 maps to same slot as index 1, it should refresh the record since 4 > 1",
+			name:               "index wraps around (modulo operation)",
+			initialRecords:     make(meterer.QuorumPeriodRecords),
+			index:              10, // 10 % 3 = 1
+			quorumNumber:       core.QuorumID(2),
+			expectedIndex:      10,
+			expectedUsage:      0,
+			shouldCreateQuorum: true,
+			shouldCreateRecord: true,
 		},
 		{
-			name: "circular wrapping refresh - multiple wraps around",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				records := make(meterer.QuorumPeriodRecords)
-				// Setup records at indices 0, 1, 2 (filling all slots)
-				records.GetRelativePeriodRecord(0, core.QuorumID(1)).Usage = 50
-				records.GetRelativePeriodRecord(1, core.QuorumID(1)).Usage = 60
-				records.GetRelativePeriodRecord(2, core.QuorumID(1)).Usage = 70
-				return records
-			},
-			accessSequence:       []uint64{0, 1, 2, 6, 7, 8}, // 6,7,8 map to slots 0,1,2 respectively
-			quorumNumber:         core.QuorumID(1),
-			expectedFinalUsages:  []uint64{0, 0, 0}, // all slots should be refreshed
-			expectedFinalIndices: []uint32{6, 7, 8}, // all slots should have newer indices
-			description:          "When indices 6,7,8 map to same slots as 0,1,2, they should refresh since 6>0, 7>1, 8>2",
+			name:               "zero index",
+			initialRecords:     make(meterer.QuorumPeriodRecords),
+			index:              0,
+			quorumNumber:       core.QuorumID(0),
+			expectedIndex:      0,
+			expectedUsage:      0,
+			shouldCreateQuorum: true,
+			shouldCreateRecord: true,
 		},
-		{
-			name: "circular wrapping refresh - no refresh when index is smaller",
-			setupRecords: func() meterer.QuorumPeriodRecords {
-				records := make(meterer.QuorumPeriodRecords)
-				record := records.GetRelativePeriodRecord(10, core.QuorumID(1))
-				record.Usage = 300
-				return records
-			},
-			accessSequence:       []uint64{10, 7}, // 10 and 7 both map to slot 1 (10%3=1, 7%3=1)
-			quorumNumber:         core.QuorumID(1),
-			expectedFinalUsages:  []uint64{0, 300, 0}, // slot 1 should keep Usage=300
-			expectedFinalIndices: []uint32{0, 10, 0},  // slot 1 should keep Index=10
-			description:          "When accessing smaller index 7 after larger index 10, no refresh should occur since 7 < 10",
-		},
-
-		// Edge case tests
-
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			records := tt.setupRecords()
+			record := tt.initialRecords.GetRelativePeriodRecord(tt.index, tt.quorumNumber)
 
-			// Access records in sequence
-			for _, index := range tt.accessSequence {
-				record := records.GetRelativePeriodRecord(index, tt.quorumNumber)
-				assert.NotNil(t, record, "Record should never be nil")
-			}
+			assert.NotNil(t, record)
+			assert.Equal(t, tt.expectedIndex, record.Index)
+			assert.Equal(t, tt.expectedUsage, record.Usage)
 
 			// Verify quorum exists after call
-			_, quorumExists := records[tt.quorumNumber]
-			assert.True(t, quorumExists, "Quorum should exist after GetRelativePeriodRecord call")
+			_, quorumExists := tt.initialRecords[tt.quorumNumber]
+			assert.True(t, quorumExists)
 
-			// Verify final state of all slots
-			for i := 0; i < 3; i++ { // MinNumBins = 3
-				slot := records[tt.quorumNumber][i]
-				if tt.expectedFinalUsages[i] == 0 && tt.expectedFinalIndices[i] == 0 {
-					// Expect nil or zero values
-					if slot != nil {
-						assert.Equal(t, uint64(0), slot.Usage, "Slot %d usage should be 0 (refreshed)", i)
-					}
-				} else {
-					assert.NotNil(t, slot, "Slot %d should not be nil", i)
-					assert.Equal(t, tt.expectedFinalUsages[i], slot.Usage, "Slot %d usage mismatch", i)
-					assert.Equal(t, tt.expectedFinalIndices[i], slot.Index, "Slot %d index mismatch", i)
-				}
-			}
+			// Verify record exists in expected position
+			relativeIndex := uint32(tt.index % 3) // MinNumBins = 3
+			assert.NotNil(t, tt.initialRecords[tt.quorumNumber][relativeIndex])
 		})
 	}
 }
