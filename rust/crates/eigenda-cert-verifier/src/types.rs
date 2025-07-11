@@ -1,11 +1,15 @@
+// todo: consider using the existing crate `rust-eigenda-v2-common`
 use alloc::vec::Vec;
+
 use ark_bn254::G1Affine;
-use primitive_types::U256;
+use hashbrown::HashMap;
+
+use crate::{bitmap_utils::Bitmap, hashing::Hash};
 
 #[derive(Default, Debug)]
 pub struct NonSignerStakesAndSignature {
     /// Quorum aggregated pubkeys
-    pub quorum_apks: Vec<u8>,
+    pub quorum_apks: Vec<G1Affine>,
 
     /// Quorum aggregated pubkey indices
     pub quorum_apk_indices: Vec<u8>,
@@ -23,6 +27,11 @@ pub struct QuorumStakeTotals {
 
 #[derive(Default, Debug)]
 pub struct NonSignerInfo {
-    pub _quorum_bitmaps: Vec<U256>,
-    pub _non_signer_pubkey_hashes: Vec<[u8; 32]>,
+    pub _quorum_bitmaps: Vec<Bitmap>,
+    pub _non_signer_pubkey_hashes: Vec<Hash>,
+}
+
+#[derive(Default, Debug)]
+pub struct ReferenceBlock {
+    pub hash_to_bitmap: HashMap<Hash, Bitmap>,
 }

@@ -1,17 +1,19 @@
 // little-endian is more efficient but Ethereum relies on little-endian
 // little-endian is more natural to reason about in the context of bitmaps
+use bitvec::array::BitArray;
+
 use crate::error::SignaturesVerificationError;
-use bitvec::{bitarr, order::Lsb0};
-use primitive_types::U256;
 
 const MAX_BIT_INDICES_LENGTH: usize = 256;
+
+pub type Bitmap = BitArray<[u64; 4]>;
 
 pub fn bit_indices_to_bitmap(
     // implied little-endian
     bit_indices: &[u8],
     // implied little-endian
     upper_bound_bit_index: u8,
-) -> Result<U256, SignaturesVerificationError<'_>> {
+) -> Result<Bitmap, SignaturesVerificationError<'_>> {
     use SignaturesVerificationError::*;
 
     // abort early here even though other checks (sorted + unique) would catch it
@@ -24,11 +26,11 @@ pub fn bit_indices_to_bitmap(
     }
 
     if bit_indices_len == 0 {
-        return Ok(U256::default());
+        return Ok(Bitmap::default());
     }
 
     let mut prev_bit_index = None;
-    let mut bitmap = bitarr![u8, Lsb0; 0; 256];
+    let mut bitmap = Bitmap::default();
     for bit_index in bit_indices {
         if Some(bit_index) < prev_bit_index {
             return Err(BitIndicesNotSorted { bit_indices });
@@ -51,23 +53,22 @@ pub fn bit_indices_to_bitmap(
         });
     }
 
-    let slice = bitmap.as_raw_slice();
-    let bitmap = U256::from_little_endian(slice);
     Ok(bitmap)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use SignaturesVerificationError::*;
     use alloc::vec;
+
+    use crate::bitmap_utils::{Bitmap, MAX_BIT_INDICES_LENGTH, bit_indices_to_bitmap};
+    use crate::error::SignaturesVerificationError::*;
 
     #[test]
     fn test_bit_indices_to_bitmap_succeeds_given_empty_input() {
         let bit_indices = vec![];
         let upper_bound_bit_index = u8::MAX;
         let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
-        assert_eq!(result.unwrap(), U256::default());
+        assert_eq!(result.unwrap(), Bitmap::default());
     }
 
     #[test]
@@ -136,7 +137,9 @@ mod tests {
         let upper_bound_bit_index = u8::MAX;
         let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
         let actual = result.unwrap();
-        let expected = U256::from(3u8);
+        let mut expected = Bitmap::default();
+        expected.set(0, true);
+        expected.set(1, true);
         assert_eq!(actual, expected);
     }
 
@@ -152,7 +155,8 @@ mod tests {
         let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
         let actual = result.unwrap();
 
-        let expected = U256::from(8u8);
+        let mut expected = Bitmap::default();
+        expected.set(3, true);
 
         assert_eq!(actual, expected);
     }

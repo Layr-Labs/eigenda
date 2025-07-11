@@ -69,10 +69,14 @@ pub fn validate_inputs<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{BlsSignaturesVerifier, NonSignerStakesAndSignature, SignatureVerifier};
     use alloc::vec;
+
     use ark_bn254::G1Affine;
+
+    use crate::{
+        BlsSignaturesVerifier, NonSignerStakesAndSignature, SignatureVerifier,
+        error::SignaturesVerificationError, types::ReferenceBlock,
+    };
 
     #[test]
     fn test_verify_signatures_fails_given_empty_quorum_numbers() {
@@ -83,6 +87,7 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature::default();
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -90,6 +95,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -107,13 +113,14 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 42],
+            quorum_apks: vec![G1Affine::default(); 42],
             quorum_apk_indices: vec![0u8; 1],
             total_stake_indices: vec![0u8; 1],
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -121,6 +128,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -141,13 +149,14 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 1],
+            quorum_apks: vec![G1Affine::default(); 1],
             quorum_apk_indices: vec![0u8; 42],
             total_stake_indices: vec![0u8; 1],
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -155,6 +164,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -176,13 +186,14 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 1],
+            quorum_apks: vec![G1Affine::default(); 1],
             quorum_apk_indices: vec![0u8; 1],
             total_stake_indices: vec![0u8; 42],
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -190,6 +201,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -211,13 +223,14 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 1],
+            quorum_apks: vec![G1Affine::default(); 1],
             quorum_apk_indices: vec![0u8; 1],
             total_stake_indices: vec![0u8; 1],
             non_signer_stake_indices: vec![0u8; 42],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -225,6 +238,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -246,13 +260,14 @@ mod tests {
         let reference_block_number = 0u32;
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 1],
+            quorum_apks: vec![G1Affine::default(); 1],
             quorum_apk_indices: vec![0u8; 1],
             total_stake_indices: vec![0u8; 1],
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 42],
             non_signer_quorum_bitmap_indices: vec![0u8; 41],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -260,6 +275,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(
@@ -280,13 +296,14 @@ mod tests {
         let reference_block_number = 42u32;
         let current_block_number = 41u32;
         let params = NonSignerStakesAndSignature {
-            quorum_apks: vec![0u8; 1],
+            quorum_apks: vec![G1Affine::default(); 1],
             quorum_apk_indices: vec![0u8; 1],
             total_stake_indices: vec![0u8; 1],
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
         };
+        let reference_block = ReferenceBlock::default();
 
         let signatures_verification = signatures_verifier.verify_signatures(
             msg_hash,
@@ -294,6 +311,7 @@ mod tests {
             reference_block_number,
             current_block_number,
             &params,
+            &reference_block,
         );
 
         assert_eq!(

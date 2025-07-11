@@ -2,7 +2,9 @@ use ark_bn254::G1Affine;
 use ark_ff::{BigInteger, PrimeField};
 use tiny_keccak::{Hasher, Keccak};
 
-pub fn hash_g1_point(point: &G1Affine) -> [u8; 32] {
+pub type Hash = [u8; 32];
+
+pub fn hash_g1_point(point: &G1Affine) -> Hash {
     let x_bytes = point.x.into_bigint().to_bytes_be();
     let y_bytes = point.y.into_bigint().to_bytes_be();
 
@@ -21,8 +23,10 @@ pub fn hash_g1_point(point: &G1Affine) -> [u8; 32] {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use ark_bn254::G1Affine;
     use ark_ec::AffineRepr;
+
+    use crate::hashing::hash_g1_point;
 
     #[test]
     fn test_hash_g1_point() {

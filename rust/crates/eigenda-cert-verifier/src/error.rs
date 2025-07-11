@@ -74,4 +74,7 @@ pub enum SignaturesVerificationError<'a> {
         bit_indices: &'a [u8],
         upper_bound_bit_index: u8,
     },
+
+    #[error("Expected to find a matching bitmap from the hash of a signer's pubkey")]
+    SignerBitmapNotFound,
 }
