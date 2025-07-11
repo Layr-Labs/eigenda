@@ -212,7 +212,6 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 		return nil, err
 	}
 	pcs.ReservationsLock.Lock()
-	// update specific quorum reservations
 	if (pcs.ReservedPayments)[accountID] == nil {
 		(pcs.ReservedPayments)[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
 	}
