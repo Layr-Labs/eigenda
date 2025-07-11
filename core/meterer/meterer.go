@@ -118,6 +118,8 @@ func (m *Meterer) serveReservationRequest(
 	if err := payment_logic.ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt.UnixNano()); err != nil {
 		return nil, fmt.Errorf("invalid reservation: %w", err)
 	}
+
+	// Make atomic batched updates over all reservations identified by the same account and quorum
 	usage, err := m.incrementBinUsage(ctx, header, reservations, globalParams, numSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("failed to increment bin usages: %w", err)
