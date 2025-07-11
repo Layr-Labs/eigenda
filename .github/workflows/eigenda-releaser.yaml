@@ -50,18 +50,14 @@ jobs:
           fi
           echo "Version format is valid: $version"
 
-      - name: Check if version already exists
+      - name: Check if release branch already exists
         run: |
           version="${{ github.event.inputs.version }}"
-          if git tag -l | grep -q "^v$version$"; then
-            echo "Error: Version v$version already exists as a tag"
-            exit 1
-          fi
           if git branch -r | grep -q "origin/release/$version$"; then
             echo "Error: Release branch release/$version already exists"
             exit 1
           fi
-          echo "Version $version is available for release"
+          echo "Release branch for version $version is available"
 
       - name: Create and push release branch
         run: |
