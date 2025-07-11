@@ -22,8 +22,6 @@ type Config struct {
 	UpdateInterval time.Duration
 }
 
-const OnDemandQuorumID = core.QuorumID(0)
-
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
 // with payments information (CumulativePayments, Timestamp, and Signature). Disperser will pass the blob header to the meterer, which will check if the
 // payments information is valid.
@@ -107,22 +105,21 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	quorumIDs := make([]core.QuorumID, 0, len(reservations))
 	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
 	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
-	// Gather quorums the user had an reservations on and relevant quorum configurations
 	for quorumID := range reservations {
 		quorumIDs = append(quorumIDs, quorumID)
-		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow(quorumID)
-		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow(quorumID))
+		// TODO: update to use actual quorum configs when the payment vault update goes through
+		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow()
+		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow())
 	}
-	// Validate quorumIDs is a subset of the quorumNumbers in the dispersal request; this should be guaranteed by GetReservedPaymentByAccountAndQuorums
 	if err := m.ValidateQuorum(quorumNumbers, quorumIDs); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 
-	// Validate the used reservations are active and is of valid periods
 	for quorumID, reservation := range reservations {
 		if !reservation.IsActiveByNanosecond(header.Timestamp) {
 			return fmt.Errorf("reservation not active")
 		}
+		// TODO: update to use actual quorum configs when the payment vault update goes through
 		if !m.ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
 			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
 		}
@@ -155,14 +152,13 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
-// Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
-	m.logger.Debug("ValidateReservationPeriod", "startPeriod", startPeriod, "endPeriod", endPeriod, "requestReservationPeriod", requestReservationPeriod, "currentReservationPeriod", currentReservationPeriod, "isCurrentOrPreviousPeriod", isCurrentOrPreviousPeriod)
+	fmt.Println("startPeriod", startPeriod, "endPeriod", endPeriod, "requestReservationPeriod", requestReservationPeriod, "currentReservationPeriod", currentReservationPeriod, "isCurrentOrPreviousPeriod", isCurrentOrPreviousPeriod)
 	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
 	if !isCurrentOrPreviousPeriod || !isWithinReservationWindow {
 		return false
@@ -270,7 +266,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol(OnDemandQuorumID))
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
 	oldPayment, err := m.MeteringStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -299,7 +295,7 @@ func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
 func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
-	minSymbols := uint64(m.ChainPaymentState.GetMinNumSymbols(OnDemandQuorumID))
+	minSymbols := uint64(m.ChainPaymentState.GetMinNumSymbols())
 	if numSymbols <= minSymbols {
 		return minSymbols
 	}
@@ -314,20 +310,19 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 
 // IncrementGlobalBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
-	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID))
+	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
 	newUsage, err := m.MeteringStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(OnDemandQuorumID)*uint64(m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID)) {
+	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil
 }
 
 // GetReservationBinLimit returns the bin limit for a given reservation
-// Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
 }

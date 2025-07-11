@@ -648,28 +648,6 @@ type OnDemandPayment struct {
 	CumulativePayment *big.Int
 }
 
-// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
-type PaymentQuorumConfig struct {
-	ReservationSymbolsPerSecond uint64
-
-	// OnDemand is initially only enabled on Quorum 0
-	OnDemandSymbolsPerSecond uint64
-	OnDemandPricePerSymbol   uint64
-}
-
-// PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
-type PaymentQuorumProtocolConfig struct {
-	MinNumSymbols              uint64
-	ReservationAdvanceWindow   uint64
-	ReservationRateLimitWindow uint64
-
-	// OnDemand is initially only enabled on Quorum 0
-	OnDemandRateLimitWindow uint64
-	OnDemandEnabled         bool
-}
-
 type BlobVersionParameters struct {
 	// CodingRate specifies the amount of redundancy that will be added when encoding the blob
 	// (Note that for the purposes of integer representation, this is the inverse of the standard

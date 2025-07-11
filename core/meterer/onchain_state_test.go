@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -79,63 +78,19 @@ func TestGetOnDemandQuorumNumbers(t *testing.T) {
 // properly handles nil map assignments and doesn't panic
 func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	t.Run("PaymentVaultParams_NilProtection", func(t *testing.T) {
-		stateWithNilParams, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+		stateWithNilParams := &meterer.OnchainPaymentState{}
 
-		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), stateWithNilParams.GetReservationWindow(meterer.OnDemandQuorumID))
-	})
-
-	t.Run("PaymentVaultParams_MissingQuorum", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
-		params := &meterer.PaymentVaultParams{
-			QuorumPaymentConfigs:  make(map[core.QuorumID]*core.PaymentQuorumConfig),
-			QuorumProtocolConfigs: make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig),
-		}
-		state.PaymentVaultParams.Store(params)
-
-		assert.Equal(t, uint64(0), state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), state.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), state.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), state.GetReservationWindow(meterer.OnDemandQuorumID))
-	})
-
-	t.Run("PaymentVaultParams_ValidConfig", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
-
-		params := &meterer.PaymentVaultParams{
-			QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-				meterer.OnDemandQuorumID: {
-					OnDemandSymbolsPerSecond: 100,
-					OnDemandPricePerSymbol:   200,
-				},
-			},
-			QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-				meterer.OnDemandQuorumID: {
-					MinNumSymbols:              300,
-					OnDemandRateLimitWindow:    400,
-					ReservationRateLimitWindow: 500,
-				},
-			},
-		}
-		state.PaymentVaultParams.Store(params)
-
-		assert.Equal(t, uint64(100), state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(400), state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(300), state.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(200), state.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(500), state.GetReservationWindow(meterer.OnDemandQuorumID))
+		assert.Equal(t, uint64(0), stateWithNilParams.GetGlobalSymbolsPerSecond())
+		assert.Equal(t, uint64(0), stateWithNilParams.GetGlobalRatePeriodInterval())
+		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetMinNumSymbols())
+		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetPricePerSymbol())
+		assert.Equal(t, uint64(0), stateWithNilParams.GetReservationWindow())
 	})
 
 	t.Run("NilMapAssignment_Protection", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+		state := &meterer.OnchainPaymentState{
+			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
+		}
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
@@ -174,8 +129,9 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 // TestNilAssignmentPanicScenario tests the "assignment to entry in nil map" panic scenario
 func TestNilAssignmentPanicScenario(t *testing.T) {
 	t.Run("OriginalPanicScenario_NowFixed", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+		state := &meterer.OnchainPaymentState{
+			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
+		}
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 		quorumNumbers := []core.QuorumID{0, 1}
@@ -209,8 +165,9 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 	})
 
 	t.Run("MultipleAccounts_ConcurrentSafe", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+		state := &meterer.OnchainPaymentState{
+			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
+		}
 
 		accounts := []gethcommon.Address{
 			gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -246,8 +203,9 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 	})
 
 	t.Run("WithoutProtection_WouldPanic", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+		state := &meterer.OnchainPaymentState{
+			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
+		}
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
