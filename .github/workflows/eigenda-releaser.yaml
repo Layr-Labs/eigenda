@@ -26,9 +26,12 @@ jobs:
           
       - name: Checkout default branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
 
       - name: Create and push release branch
         run: |
           version="${{ github.event.inputs.version }}"
+          git config --global user.name "releaser-bot"
           git checkout -b "release/$version"
           git push origin "release/$version"
