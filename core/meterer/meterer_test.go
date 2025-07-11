@@ -151,7 +151,7 @@ func setup(_ *testing.M) {
 		panic("failed to create metering store")
 	}
 
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
 
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
@@ -275,10 +275,8 @@ func TestMetererReservations(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		reservationPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), reservationWindow)
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
-		symbolsChargedMap, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
+		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
-		// Get symbols charged for quorum 0 (all quorums should have the same charge in this test)
-		symbolsCharged := symbolsChargedMap[core.QuorumID(quoromNumbers[0])]
 		for _, accountAndQuorum := range accountAndQuorums {
 			item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 				"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum},
@@ -294,10 +292,8 @@ func TestMetererReservations(t *testing.T) {
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
-	symbolsChargedMap, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers, now)
+	symbolsCharged, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers, now)
 	assert.NoError(t, err)
-	// Get symbols charged for quorum 0 (all quorums should have the same charge in this test)
-	symbolsCharged := symbolsChargedMap[core.QuorumID(quoromNumbers[0])]
 	assert.Equal(t, uint64(27), symbolsCharged)
 
 	for _, accountAndQuorum := range accountAndQuorums {
@@ -418,11 +414,9 @@ func TestMetererOnDemand(t *testing.T) {
 	priceCharged := meterer.PaymentCharged(symbolsCharged, pricePerSymbol)
 	assert.Equal(t, big.NewInt(int64(102*pricePerSymbol)), priceCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
-	symbolsChargedMap, err := mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
+	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.NoError(t, err)
-	// Get symbols charged for quorum 0 (all quorums should have the same charge in this test)
-	actualSymbolsCharged := symbolsChargedMap[core.QuorumID(quorumNumbers[0])]
-	assert.Equal(t, uint64(102), actualSymbolsCharged)
+	assert.Equal(t, uint64(102), symbolsCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	// Doesn't check for exact payment, checks for increment
@@ -431,11 +425,9 @@ func TestMetererOnDemand(t *testing.T) {
 	// test valid payments
 	for i := 1; i < 9; i++ {
 		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
-		symbolsChargedMap, err := mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
+		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		assert.NoError(t, err)
-		// Get symbols charged for quorum 0 (all quorums should have the same charge in this test)
-		actualSymbolsCharged := symbolsChargedMap[core.QuorumID(quorumNumbers[0])]
-		assert.Equal(t, uint64(102), actualSymbolsCharged)
+		assert.Equal(t, uint64(102), symbolsCharged)
 	}
 
 	// test cumulative payment on-chain constraint
@@ -578,156 +570,6 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestMetererDifferentQuorumConfigurations(t *testing.T) {
-	ctx := context.Background()
-
-	// Clear existing mocks to avoid conflicts
-	paymentChainState.ExpectedCalls = nil
-
-	// Re-setup the required mock for RefreshOnchainPaymentState
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
-
-	// Create mock payment vault params with different MinNumSymbols for each quorum
-	mockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				OnDemandSymbolsPerSecond: 1000,
-				OnDemandPricePerSymbol:   1,
-			},
-			1: {
-				OnDemandSymbolsPerSecond: 1000,
-				OnDemandPricePerSymbol:   1,
-			},
-			2: {
-				OnDemandSymbolsPerSecond: 1000,
-				OnDemandPricePerSymbol:   1,
-			},
-		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              10, // Quorum 0: min 10 symbols
-				ReservationRateLimitWindow: 5,
-				OnDemandRateLimitWindow:    1,
-			},
-			1: {
-				MinNumSymbols:              25, // Quorum 1: min 25 symbols
-				ReservationRateLimitWindow: 5,
-				OnDemandRateLimitWindow:    1,
-			},
-			2: {
-				MinNumSymbols:              50, // Quorum 2: min 50 symbols
-				ReservationRateLimitWindow: 5,
-				OnDemandRateLimitWindow:    1,
-			},
-		},
-		OnDemandQuorumNumbers: []core.QuorumID{0, 1, 2},
-	}
-	paymentChainState.On("GetPaymentGlobalParams").Return(mockParams, nil)
-
-	now := time.Now()
-	quorumNumbers := []uint8{0, 1, 2}
-
-	// Create reservations for all three quorums
-	testReservations := &core.ReservedPayment{
-		SymbolsPerSecond: 100,
-		StartTimestamp:   uint64(now.Add(-2 * time.Minute).Unix()),
-		EndTimestamp:     uint64(now.Add(3 * time.Minute).Unix()),
-		QuorumSplits:     []byte{33, 33, 34},
-		QuorumNumbers:    quorumNumbers,
-	}
-
-	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID1, testifymock.Anything).Return(
-		map[core.QuorumID]*core.ReservedPayment{
-			0: testReservations,
-			1: testReservations,
-			2: testReservations,
-		},
-	)
-
-	tests := []struct {
-		name           string
-		numSymbols     uint64
-		expectedCharge map[core.QuorumID]uint64
-	}{
-		{
-			name:       "Small request - all quorums use their minimum",
-			numSymbols: 5, // Less than all minimums
-			expectedCharge: map[core.QuorumID]uint64{
-				0: 10, // Uses quorum 0's min: 10
-				1: 25, // Uses quorum 1's min: 25
-				2: 50, // Uses quorum 2's min: 50
-			},
-		},
-		{
-			name:       "Medium request - some use minimum, some use actual",
-			numSymbols: 30, // Between quorum 1 and 2 minimums
-			expectedCharge: map[core.QuorumID]uint64{
-				0: 30, // 30 rounded up to multiple of 10 = 30
-				1: 50, // 30 rounded up to multiple of 25 = 50
-				2: 50, // Uses minimum: 30 < 50 (min)
-			},
-		},
-		{
-			name:       "Large request - all use actual size",
-			numSymbols: 100, // Greater than all minimums
-			expectedCharge: map[core.QuorumID]uint64{
-				0: 100, // Uses actual: 100 > 10 (min)
-				1: 100, // Uses actual: 100 > 25 (min)
-				2: 100, // Uses actual: 100 > 50 (min)
-			},
-		},
-		{
-			name:       "Edge case - exactly equals one minimum",
-			numSymbols: 25, // Exactly equals quorum 1's minimum
-			expectedCharge: map[core.QuorumID]uint64{
-				0: 30, // 25 rounded up to multiple of 10 = 30
-				1: 25, // 25 equals minimum, so uses 25
-				2: 50, // Uses minimum: 25 < 50 (min)
-			},
-		},
-		{
-			name:       "Rounding behavior test",
-			numSymbols: 33, // Test rounding to multiples
-			expectedCharge: map[core.QuorumID]uint64{
-				0: 40, // 33 rounded up to multiple of 10 = 40
-				1: 50, // 33 rounded up to multiple of 25 = 50
-				2: 50, // Uses minimum: 33 < 50 (min)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			header := createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
-			symbolsChargedMap, err := mt.MeterRequest(ctx, *header, tt.numSymbols, quorumNumbers, now)
-
-			assert.NoError(t, err)
-			assert.Equal(t, len(tt.expectedCharge), len(symbolsChargedMap), "Should have charges for all quorums")
-
-			for quorumID, expectedCharge := range tt.expectedCharge {
-				actualCharge, exists := symbolsChargedMap[quorumID]
-				assert.True(t, exists, "Should have charge for quorum %d", quorumID)
-				assert.Equal(t, expectedCharge, actualCharge,
-					"Quorum %d should charge %d symbols for %d input symbols (min: %d)",
-					quorumID, expectedCharge, tt.numSymbols, mockParams.QuorumProtocolConfigs[quorumID].MinNumSymbols)
-			}
-
-			// Verify the charging logic matches the SymbolsCharged function for each quorum
-			for quorumID, expectedCharge := range tt.expectedCharge {
-				minSymbols := mockParams.QuorumProtocolConfigs[quorumID].MinNumSymbols
-				computedCharge := payment_logic.SymbolsCharged(tt.numSymbols, minSymbols)
-				assert.Equal(t, expectedCharge, computedCharge,
-					"Expected charge should match SymbolsCharged(%d, %d) for quorum %d",
-					tt.numSymbols, minSymbols, quorumID)
-			}
-		})
-	}
-
-	// Restore original mock state by clearing all expected calls
-	// Note: Other tests may need to re-setup their mocks if they run after this test
-	paymentChainState.ExpectedCalls = nil
 }
 
 func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
