@@ -30,4 +30,5 @@ jobs:
       - name: Create and push release branch
         run: |
           version="${{ github.event.inputs.version }}"
+          git checkout -b "release/$version"
           git push origin "release/$version"
