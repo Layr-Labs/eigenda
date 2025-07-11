@@ -30,6 +30,10 @@ type flushLoop struct {
 
 	// the name of the table
 	name string
+
+	// This file stores the highest segment index that is fully snapshot. Written as segments are sealed
+	// and copied to the snapshot directory, read by the external snapshot consumer.
+	upperBoundSnapshotFile *BoundaryFile
 }
 
 // enqueue sends work to be handled on the flush loop. Will return an error if the DB is panicking.
@@ -85,6 +89,22 @@ func (f *flushLoop) handleSealRequest(req *flushLoopSealRequest) {
 	}
 
 	req.responseChan <- struct{}{}
+
+	// Snapshotting can wait until after we have sent a response. No need for the Flush() caller to wait for
+	// snapshotting. Flush() only cares about the data's crash durability, and is completely independent of
+	// snapshotting.
+	err = req.segmentToSeal.Snapshot()
+	if err != nil {
+		f.errorMonitor.Panic(fmt.Errorf("failed to snapshot segment %s: %w", req.segmentToSeal.String(), err))
+		return
+	}
+
+	// Update the boundary file. The consumer of the snapshot uses this information to determine when segments
+	// are fully copied to the snapshot directory.
+	err = f.upperBoundSnapshotFile.Update(req.segmentToSeal.SegmentIndex())
+	if err != nil {
+		f.errorMonitor.Panic(fmt.Errorf("failed to update upper bound snapshot file: %w", err))
+	}
 }
 
 // handleFlushRequest handles the part of the flush that is performed on the flush loop.
