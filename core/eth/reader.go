@@ -930,8 +930,8 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 		return nil, err
 	}
 
-	if err := CheckOnDemandPayment(onDemandDeposit); err != nil {
-		return nil, err
+	if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
+		return nil, errors.New("on-demand deposit does not exist for given account")
 	}
 
 	return &core.OnDemandPayment{

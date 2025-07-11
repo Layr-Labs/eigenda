@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -440,12 +439,10 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	periodRecords := make(map[uint32]*pb.PeriodRecords)
 	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
-	// Return no reservations if none exists, when user only has ondemand payments
-	if err != nil && !errors.Is(err, eth.ErrPaymentDoesNotExist) {
-		s.logger.Error("failed to get reservation", "err", err, "accountID", accountID)
-		return nil, api.NewErrorInternal("failed to get reservation")
+	if err != nil {
+		s.logger.Error("failed to get onchain reservation", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get onchain reservation")
 	}
-
 	reservationQuorumIds := []core.QuorumID{}
 	reservationCurrentPeriods := []uint64{}
 	if len(reservations) > 0 {
@@ -494,12 +491,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		if !errors.Is(err, eth.ErrPaymentDoesNotExist) {
-			s.logger.Error("failed to get ondemand payment", "err", err, "accountID", accountID)
-			return nil, api.NewErrorInternal("failed to get ondemand payment")
-		}
-		// Return empty bytes if the ondemand payment does not exist, when user only has reserved payments
-		onchainCumulativePaymentBytes = []byte{}
+		s.logger.Error("failed to get ondemand payment", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get ondemand payment")
 	} else {
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}

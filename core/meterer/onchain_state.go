@@ -15,6 +15,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// PaymentAccounts (For reservations and on-demand payments)
+
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
 	// State management
