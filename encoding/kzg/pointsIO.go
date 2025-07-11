@@ -198,28 +198,7 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 			endPoint = n
 		}
 
-		go func(startPoint, endPoint uint64) {
-			for pointIndex := startPoint; pointIndex < endPoint; pointIndex++ {
-				pointData := buf[pointIndex*pointSizeBytes : (pointIndex+1)*pointSizeBytes]
-				switch p := any(&points[pointIndex]).(type) {
-				case *bn254.G1Affine:
-					if _, err := p.SetBytes(pointData); err != nil {
-						results <- fmt.Errorf("error setting G1 point bytes: %w", err)
-						return
-					}
-				case *bn254.G2Affine:
-					// G2 points are stored as uncompressed points, so we can directly set bytes
-					if _, err := p.SetBytes(pointData); err != nil {
-						results <- fmt.Errorf("error setting G2 point bytes: %w", err)
-						return
-					}
-				default:
-					results <- fmt.Errorf("unsupported point type: %T", p)
-					return
-				}
-			}
-			results <- nil
-		}(startPoint, endPoint)
+		go deserializePointsInRange(buf, points, startPoint, endPoint, pointSizeBytes, results)
 	}
 
 	for w := uint64(0); w < numWorker; w++ {
@@ -229,6 +208,36 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 	}
 
 	return points, nil
+}
+
+// deserializePointsInRange deserializes a range of points from byte data for a worker goroutine.
+func deserializePointsInRange[T bn254.G1Affine | bn254.G2Affine](
+	buf []byte,
+	points []T,
+	startPoint, endPoint uint64,
+	pointSizeBytes uint64,
+	results chan<- error,
+) {
+	for pointIndex := startPoint; pointIndex < endPoint; pointIndex++ {
+		pointData := buf[pointIndex*pointSizeBytes : (pointIndex+1)*pointSizeBytes]
+		switch p := any(&points[pointIndex]).(type) {
+		case *bn254.G1Affine:
+			if _, err := p.SetBytes(pointData); err != nil {
+				results <- fmt.Errorf("error setting G1 point bytes: %w", err)
+				return
+			}
+		case *bn254.G2Affine:
+			// G2 points are stored as uncompressed points, so we can directly set bytes
+			if _, err := p.SetBytes(pointData); err != nil {
+				results <- fmt.Errorf("error setting G2 point bytes: %w", err)
+				return
+			}
+		default:
+			results <- fmt.Errorf("unsupported point type: %T", p)
+			return
+		}
+	}
+	results <- nil
 }
 
 // readBytes reads exactly numBytesToRead bytes from the reader and returns
