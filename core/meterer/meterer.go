@@ -78,11 +78,11 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
+		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, reservations, symbolsCharged, quorumNumbers, receivedAt); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, reservation, symbolsCharged, quorumNumbers, receivedAt); err != nil {
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
