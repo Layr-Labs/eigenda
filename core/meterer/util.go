@@ -15,7 +15,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
-				AttributeName: aws.String("AccountID"),
+				AttributeName: aws.String("AccountIDAndQuorum"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
@@ -25,7 +25,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
-				AttributeName: aws.String("AccountID"),
+				AttributeName: aws.String("AccountIDAndQuorum"),
 				KeyType:       types.KeyTypeHash,
 			},
 			{

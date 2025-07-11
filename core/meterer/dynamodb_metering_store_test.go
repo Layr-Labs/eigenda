@@ -98,20 +98,18 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("existing bin (increment)", func(t *testing.T) {
-		withTestContext(t, func(t *testing.T, tc *testContext) {
-			accountID := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
-			reservationPeriod := uint64(42)
-			size := uint64(100)
-			quorum := core.QuorumID(1)
-			periods := map[core.QuorumID]uint64{quorum: reservationPeriod}
-			// First increment
-			_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
-			assert.NoError(t, err)
-			// Second increment
-			binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
-			assert.NoError(t, err)
-			assert.Equal(t, size*2, binUsages[quorum])
-		})
+		tc := setupTest(t)
+		accountID := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+		reservationPeriod := uint64(42)
+		size := uint64(100)
+		quorum := core.QuorumID(1)
+		periods := map[core.QuorumID]uint64{quorum: reservationPeriod}
+		// First increment
+		_, _ = tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		// Second increment
+		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		assert.NoError(t, err)
+		assert.Equal(t, size*2, binUsages[quorum])
 	})
 
 	t.Run("nonexistent bin (first write)", func(t *testing.T) {

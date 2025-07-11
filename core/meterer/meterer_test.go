@@ -258,13 +258,13 @@ func TestMetererReservations(t *testing.T) {
 		assert.NoError(t, err)
 		for _, accountAndQuorum := range accountAndQuorums {
 			item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-				"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum},
-				"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+				"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum},
+				"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 			})
 			assert.NotNil(t, item)
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(requiredLength), symbolsCharged)
-			assert.Equal(t, accountAndQuorum, item["AccountID"].(*types.AttributeValueMemberS).Value)
+			assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
 			assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 			assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 		}
@@ -277,12 +277,12 @@ func TestMetererReservations(t *testing.T) {
 	overflowedReservationPeriod := reservationPeriods[0] + 2
 	accountAndQuorum := fmt.Sprintf("%s:%d", accountID2.Hex(), quoromNumbers[0])
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, accountAndQuorum, item["AccountID"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
@@ -296,8 +296,8 @@ func TestMetererReservations(t *testing.T) {
 	// First, reset the bin data for quorum 1 used in the previous test
 	accountAndQuorum1 := fmt.Sprintf("%s_%d", accountID2.Hex(), uint8(1))
 	err = dynamoClient.DeleteItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum1},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriods[0]))},
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum1},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriods[0]))},
 	})
 	assert.NoError(t, err)
 
@@ -308,8 +308,8 @@ func TestMetererReservations(t *testing.T) {
 
 	// Verify quorum 1 was not updated (because the operation should be atomic)
 	item, err = dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountAndQuorum1},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriods[0]))},
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum1},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriods[0]))},
 	})
 	assert.NoError(t, err)
 	// The item should not exist or have zero usage since the batched update failed
