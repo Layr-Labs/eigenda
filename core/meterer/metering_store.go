@@ -14,9 +14,8 @@ const MinNumBins int32 = 3
 // MeteringStore defines the interface for storage backends
 // used to track reservation and payment usage data
 type MeteringStore interface {
-	// IncrementBinUsages atomically increments the usage for a reservation bin and returns the new value
-	// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-	IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error)
+	// UpdateReservationBin atomically increments the usage for a reservation bin and returns the new value
+	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error)
 
 	// UpdateGlobalBin atomically increments the usage for a global bin and returns the new value
 	UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error)
@@ -32,8 +31,4 @@ type MeteringStore interface {
 
 	// GetLargestCumulativePayment returns the largest cumulative payment for the given account
 	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)
-
-	// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
-	// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-	DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error
 }

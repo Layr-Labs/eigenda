@@ -327,25 +327,23 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// on-Chain account state
 	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	var pbReservation *pb.Reservation
-	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
-		quorumNumbers := make([]uint32, len(reservations))
-		for quorumNumber := range reservations {
-			quorumNumbers[quorumNumber] = uint32(quorumNumber)
+		quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+		for i, v := range reservation.QuorumNumbers {
+			quorumNumbers[i] = uint32(v)
 		}
-		quorumSplits := make([]uint32, len(reservations))
-		for quorumNumber := range reservations {
-			quorumSplits[quorumNumber] = 0
+		quorumSplits := make([]uint32, len(reservation.QuorumSplits))
+		for i, v := range reservation.QuorumSplits {
+			quorumSplits[i] = uint32(v)
 		}
 
-		// TODO: in a subsequent PR, we update PaymentState API types to include multiple quorum reservations;
-		// For this PR, we return the first reservation as they are actually the same reservation
 		pbReservation = &pb.Reservation{
-			SymbolsPerSecond: reservations[0].SymbolsPerSecond,
-			StartTimestamp:   uint32(reservations[0].StartTimestamp),
-			EndTimestamp:     uint32(reservations[0].EndTimestamp),
+			SymbolsPerSecond: reservation.SymbolsPerSecond,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
 			QuorumSplits:     quorumSplits,
 			QuorumNumbers:    quorumNumbers,
 		}

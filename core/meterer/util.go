@@ -15,7 +15,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
-				AttributeName: aws.String("AccountIDAndQuorum"),
+				AttributeName: aws.String("AccountID"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
@@ -25,7 +25,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
-				AttributeName: aws.String("AccountIDAndQuorum"),
+				AttributeName: aws.String("AccountID"),
 				KeyType:       types.KeyTypeHash,
 			},
 			{
@@ -63,14 +63,7 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-
-	if err != nil {
-		if err.Error() == "ResourceInUseException: Table already exists" {
-			return nil
-		}
-		return err
-	}
-	return nil
+	return err
 }
 
 func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) error {

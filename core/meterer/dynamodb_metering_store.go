@@ -64,58 +64,33 @@ func NewDynamoDBMeteringStore(
 	}, nil
 }
 
-// IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
-// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
-	binUsages := make(map[core.QuorumID]uint64)
-
-	// Build ops for atomic batch increment
-	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
-	for i, quorumNumber := range quorumNumbers {
-		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
-		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
-		}
-		ops[i] = commondynamodb.TransactAddOp{
-			Key:   key,
-			Attr:  "BinUsage",
-			Value: float64(sizes[quorumNumber]), // positive for increment
-		}
+func (s *DynamoDBMeteringStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
+	key := map[string]types.AttributeValue{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
 
-	err := s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
+	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
 	if err != nil {
-		return nil, err
+		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
 	}
 
-	// Fetch new values for each key
-	for _, quorumNumber := range quorumNumbers {
-		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
-		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
-		}
-		item, getErr := s.dynamoClient.GetItem(ctx, s.reservationTableName, key)
-		if getErr != nil {
-			return nil, getErr
-		}
-		binUsage, ok := item["BinUsage"]
-		if !ok {
-			return nil, fmt.Errorf("BinUsage is not present in the response")
-		}
-		binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
-		}
-		binUsageValue, parseErr := strconv.ParseUint(binUsageAttr.Value, 10, 64)
-		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse BinUsage: %w", parseErr)
-		}
-		binUsages[quorumNumber] = binUsageValue
+	binUsage, ok := res["BinUsage"]
+	if !ok {
+		return 0, errors.New("BinUsage is not present in the response")
 	}
 
-	return binUsages, nil
+	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	if !ok {
+		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+	}
+
+	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
+	}
+
+	return binUsageValue, nil
 }
 
 func (s *DynamoDBMeteringStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
@@ -356,25 +331,4 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		Index: uint32(reservationPeriodValue),
 		Usage: uint64(binUsageValue),
 	}, nil
-}
-
-// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
-// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *DynamoDBMeteringStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
-	// Build ops for atomic batch decrement
-	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
-	for i, quorumNumber := range quorumNumbers {
-		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
-		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
-		}
-		ops[i] = commondynamodb.TransactAddOp{
-			Key:   key,
-			Attr:  "BinUsage",
-			Value: -float64(sizes[quorumNumber]), // negative for decrement
-		}
-	}
-
-	return s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
 }
