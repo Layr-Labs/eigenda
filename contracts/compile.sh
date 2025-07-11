@@ -27,6 +27,7 @@ forge clean
 forge build
 
 contracts="PaymentVault \
+  IUsageAuthorizationRegistry \
   SocketRegistry \
   AVSDirectory \
   DelegationManager \
