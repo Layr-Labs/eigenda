@@ -301,8 +301,8 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 				m.Log.Warn("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
 			}
-			latestBlobStatus = statusRes.Status
-			switch statusRes.Status {
+			latestBlobStatus = statusRes.GetStatus()
+			switch statusRes.GetStatus() {
 			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
 				// to prevent log clutter, we only log at info level once
 				if alreadyWaitingForDispersal {
@@ -338,14 +338,14 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 						alreadyWaitingForConfirmationOrFinality = true
 					}
 				} else {
-					batchId := statusRes.Info.BlobVerificationProof.GetBatchId()
+					batchId := statusRes.GetInfo().GetBlobVerificationProof().GetBatchId()
 					batchConfirmed, err := m.batchIdConfirmedAtDepth(ctxFinality, batchId, m.Config.WaitForConfirmationDepth)
 					if err != nil {
 						m.Log.Warn("Error checking if batch ID is confirmed at depth. Will retry...", "requestID", base64RequestID, "err", err)
 					}
 					if batchConfirmed {
 						m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID, "confirmationDepth", m.Config.WaitForConfirmationDepth)
-						resultChan <- statusRes.Info
+						resultChan <- statusRes.GetInfo()
 						return
 					}
 					// to prevent log clutter, we only log at info level once
@@ -357,15 +357,15 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 					}
 				}
 			case grpcdisperser.BlobStatus_FINALIZED:
-				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash))
+				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()))
 				m.Log.Info("EigenDA blob finalized", "requestID", base64RequestID, "batchHeaderHash", batchHeaderHashHex)
-				resultChan <- statusRes.Info
+				resultChan <- statusRes.GetInfo()
 				return
 			default:
 				// This should never happen. If it does, the blob is in a heisenberg state... it could either eventually get confirmed or fail.
 				// However, this doesn't mean there's a major outage with EigenDA, so we return a 500 error to let the caller redisperse the blob,
 				// rather than an api.ErrorFailover to failover to EthDA.
-				errChan <- api.NewErrorInternal(fmt.Sprintf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID))
+				errChan <- api.NewErrorInternal(fmt.Sprintf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.GetStatus(), base64RequestID))
 				return
 			}
 		}

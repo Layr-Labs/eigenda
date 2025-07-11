@@ -113,7 +113,7 @@ func (e *MemStore) generateRandomCert(blobValue []byte) (*verify.Certificate, er
 	// this is necessary since EigenDA x Arbitrum reconstructs
 	// the batch header hash before querying proxy since hash field
 	// isn't persisted via the onchain cert posted to the inbox
-	bh := cert.BlobVerificationProof.BatchMetadata.BatchHeader
+	bh := cert.BlobVerificationProof.GetBatchMetadata().GetBatchHeader()
 
 	reducedHeader := core.BatchHeader{
 		BatchRoot:            [32]byte(bh.GetBatchRoot()),

@@ -143,12 +143,12 @@ func (pd *PayloadDisperser) SendPayload(
 	// generic function or helper to enhance DRY
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.blockMonitor.WaitForBlockNumber(timeoutCtx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
+	err = pd.blockMonitor.WaitForBlockNumber(timeoutCtx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	certVersion, err := pd.certVerifier.GetCertVersion(ctx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
+	certVersion, err := pd.certVerifier.GetCertVersion(ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
@@ -251,7 +251,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				continue
 			}
 
-			newStatus := blobStatusReply.Status
+			newStatus := blobStatusReply.GetStatus()
 			if newStatus != previousStatus {
 				pd.logger.Debug(
 					"Blob status changed",

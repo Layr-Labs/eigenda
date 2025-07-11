@@ -74,7 +74,7 @@ func NewLevelDBBlacklistStore(
 
 func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error {
 	ctx := context.Background()
-	s.logger.Info("blacklisting disperser from storeChunks request due to blobCert validation failure", "disperserID", request.DisperserID)
+	s.logger.Info("blacklisting disperser from storeChunks request due to blobCert validation failure", "disperserID", request.GetDisperserID())
 
 	// Get blob key for context
 	blobKey, err := blobCert.BlobHeader.BlobKey()
@@ -82,7 +82,7 @@ func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksR
 		return fmt.Errorf("failed to get blob key: %w", err)
 	}
 
-	err = s.AddEntry(ctx, request.DisperserID, fmt.Sprintf("blobKey: %x", blobKey), "blobCert validation failed")
+	err = s.AddEntry(ctx, request.GetDisperserID(), fmt.Sprintf("blobKey: %x", blobKey), "blobCert validation failed")
 	if err != nil {
 		return fmt.Errorf("failed to add entry to blacklist: %w", err)
 	}

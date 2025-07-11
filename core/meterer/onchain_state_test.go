@@ -429,23 +429,23 @@ func TestConversionPaymentVaultParams(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{1, 2},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				require.Equal(t, 2, len(pbParams.QuorumPaymentConfigs))
-				require.Equal(t, 2, len(pbParams.QuorumProtocolConfigs))
-				require.Equal(t, 2, len(pbParams.OnDemandQuorumNumbers))
+				require.Equal(t, 2, len(pbParams.GetQuorumPaymentConfigs()))
+				require.Equal(t, 2, len(pbParams.GetQuorumProtocolConfigs()))
+				require.Equal(t, 2, len(pbParams.GetOnDemandQuorumNumbers()))
 
 				// Verify quorum 1
-				require.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
-				require.Equal(t, uint64(200), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
-				require.Equal(t, uint64(300), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
-				require.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
-				require.True(t, pbParams.QuorumProtocolConfigs[1].OnDemandEnabled)
+				require.Equal(t, uint64(100), pbParams.GetQuorumPaymentConfigs()[1].GetReservationSymbolsPerSecond())
+				require.Equal(t, uint64(200), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandSymbolsPerSecond())
+				require.Equal(t, uint64(300), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandPricePerSymbol())
+				require.Equal(t, uint64(10), pbParams.GetQuorumProtocolConfigs()[1].GetMinNumSymbols())
+				require.True(t, pbParams.GetQuorumProtocolConfigs()[1].GetOnDemandEnabled())
 
 				// Verify quorum 2
-				require.Equal(t, uint64(400), pbParams.QuorumPaymentConfigs[2].ReservationSymbolsPerSecond)
-				require.Equal(t, uint64(500), pbParams.QuorumPaymentConfigs[2].OnDemandSymbolsPerSecond)
-				require.Equal(t, uint64(600), pbParams.QuorumPaymentConfigs[2].OnDemandPricePerSymbol)
-				require.Equal(t, uint64(50), pbParams.QuorumProtocolConfigs[2].MinNumSymbols)
-				require.False(t, pbParams.QuorumProtocolConfigs[2].OnDemandEnabled)
+				require.Equal(t, uint64(400), pbParams.GetQuorumPaymentConfigs()[2].GetReservationSymbolsPerSecond())
+				require.Equal(t, uint64(500), pbParams.GetQuorumPaymentConfigs()[2].GetOnDemandSymbolsPerSecond())
+				require.Equal(t, uint64(600), pbParams.GetQuorumPaymentConfigs()[2].GetOnDemandPricePerSymbol())
+				require.Equal(t, uint64(50), pbParams.GetQuorumProtocolConfigs()[2].GetMinNumSymbols())
+				require.False(t, pbParams.GetQuorumProtocolConfigs()[2].GetOnDemandEnabled())
 
 				// Verify round-trip conversion
 				convertedCoreParams, err := meterer.PaymentVaultParamsFromProtobuf(pbParams)
@@ -486,9 +486,9 @@ func TestConversionPaymentVaultParams(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				require.Empty(t, pbParams.QuorumPaymentConfigs)
-				require.Empty(t, pbParams.QuorumProtocolConfigs)
-				require.Empty(t, pbParams.OnDemandQuorumNumbers)
+				require.Empty(t, pbParams.GetQuorumPaymentConfigs())
+				require.Empty(t, pbParams.GetQuorumProtocolConfigs())
+				require.Empty(t, pbParams.GetOnDemandQuorumNumbers())
 			},
 		},
 		{
@@ -503,9 +503,9 @@ func TestConversionPaymentVaultParams(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{core.QuorumID(255)},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				require.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[255].ReservationSymbolsPerSecond)
-				require.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[255].MinNumSymbols)
-				require.Equal(t, uint32(255), pbParams.OnDemandQuorumNumbers[0])
+				require.Equal(t, uint64(100), pbParams.GetQuorumPaymentConfigs()[255].GetReservationSymbolsPerSecond())
+				require.Equal(t, uint64(10), pbParams.GetQuorumProtocolConfigs()[255].GetMinNumSymbols())
+				require.Equal(t, uint32(255), pbParams.GetOnDemandQuorumNumbers()[0])
 			},
 		},
 		{
@@ -530,13 +530,13 @@ func TestConversionPaymentVaultParams(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{1},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationAdvanceWindow)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationRateLimitWindow)
-				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].OnDemandRateLimitWindow)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetReservationSymbolsPerSecond())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandSymbolsPerSecond())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandPricePerSymbol())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetMinNumSymbols())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetReservationAdvanceWindow())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetReservationRateLimitWindow())
+				require.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetOnDemandRateLimitWindow())
 			},
 		},
 	}
@@ -670,23 +670,23 @@ func TestConversionPaymentVaultParamsToProtobuf(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{1, 2},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				assert.Equal(t, 2, len(pbParams.QuorumPaymentConfigs))
-				assert.Equal(t, 2, len(pbParams.QuorumProtocolConfigs))
-				assert.Equal(t, 2, len(pbParams.OnDemandQuorumNumbers))
+				assert.Equal(t, 2, len(pbParams.GetQuorumPaymentConfigs()))
+				assert.Equal(t, 2, len(pbParams.GetQuorumProtocolConfigs()))
+				assert.Equal(t, 2, len(pbParams.GetOnDemandQuorumNumbers()))
 
 				// Verify quorum 1
-				assert.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
-				assert.Equal(t, uint64(200), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
-				assert.Equal(t, uint64(300), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
-				assert.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
-				assert.True(t, pbParams.QuorumProtocolConfigs[1].OnDemandEnabled)
+				assert.Equal(t, uint64(100), pbParams.GetQuorumPaymentConfigs()[1].GetReservationSymbolsPerSecond())
+				assert.Equal(t, uint64(200), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandSymbolsPerSecond())
+				assert.Equal(t, uint64(300), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandPricePerSymbol())
+				assert.Equal(t, uint64(10), pbParams.GetQuorumProtocolConfigs()[1].GetMinNumSymbols())
+				assert.True(t, pbParams.GetQuorumProtocolConfigs()[1].GetOnDemandEnabled())
 
 				// Verify quorum 2
-				assert.Equal(t, uint64(400), pbParams.QuorumPaymentConfigs[2].ReservationSymbolsPerSecond)
-				assert.Equal(t, uint64(500), pbParams.QuorumPaymentConfigs[2].OnDemandSymbolsPerSecond)
-				assert.Equal(t, uint64(600), pbParams.QuorumPaymentConfigs[2].OnDemandPricePerSymbol)
-				assert.Equal(t, uint64(50), pbParams.QuorumProtocolConfigs[2].MinNumSymbols)
-				assert.False(t, pbParams.QuorumProtocolConfigs[2].OnDemandEnabled)
+				assert.Equal(t, uint64(400), pbParams.GetQuorumPaymentConfigs()[2].GetReservationSymbolsPerSecond())
+				assert.Equal(t, uint64(500), pbParams.GetQuorumPaymentConfigs()[2].GetOnDemandSymbolsPerSecond())
+				assert.Equal(t, uint64(600), pbParams.GetQuorumPaymentConfigs()[2].GetOnDemandPricePerSymbol())
+				assert.Equal(t, uint64(50), pbParams.GetQuorumProtocolConfigs()[2].GetMinNumSymbols())
+				assert.False(t, pbParams.GetQuorumProtocolConfigs()[2].GetOnDemandEnabled())
 
 				// Verify round-trip conversion
 				convertedCoreParams, err := meterer.PaymentVaultParamsFromProtobuf(pbParams)
@@ -727,9 +727,9 @@ func TestConversionPaymentVaultParamsToProtobuf(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				assert.Empty(t, pbParams.QuorumPaymentConfigs)
-				assert.Empty(t, pbParams.QuorumProtocolConfigs)
-				assert.Empty(t, pbParams.OnDemandQuorumNumbers)
+				assert.Empty(t, pbParams.GetQuorumPaymentConfigs())
+				assert.Empty(t, pbParams.GetQuorumProtocolConfigs())
+				assert.Empty(t, pbParams.GetOnDemandQuorumNumbers())
 			},
 		},
 		{
@@ -744,9 +744,9 @@ func TestConversionPaymentVaultParamsToProtobuf(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{core.QuorumID(255)},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				assert.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[255].ReservationSymbolsPerSecond)
-				assert.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[255].MinNumSymbols)
-				assert.Equal(t, uint32(255), pbParams.OnDemandQuorumNumbers[0])
+				assert.Equal(t, uint64(100), pbParams.GetQuorumPaymentConfigs()[255].GetReservationSymbolsPerSecond())
+				assert.Equal(t, uint64(10), pbParams.GetQuorumProtocolConfigs()[255].GetMinNumSymbols())
+				assert.Equal(t, uint32(255), pbParams.GetOnDemandQuorumNumbers()[0])
 			},
 		},
 		{
@@ -771,13 +771,13 @@ func TestConversionPaymentVaultParamsToProtobuf(t *testing.T) {
 				OnDemandQuorumNumbers: []core.QuorumID{1},
 			},
 			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationAdvanceWindow)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationRateLimitWindow)
-				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].OnDemandRateLimitWindow)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetReservationSymbolsPerSecond())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandSymbolsPerSecond())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumPaymentConfigs()[1].GetOnDemandPricePerSymbol())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetMinNumSymbols())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetReservationAdvanceWindow())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetReservationRateLimitWindow())
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.GetQuorumProtocolConfigs()[1].GetOnDemandRateLimitWindow())
 			},
 		},
 	}

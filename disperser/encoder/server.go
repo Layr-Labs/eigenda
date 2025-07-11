@@ -148,11 +148,11 @@ func (s *EncoderServer) popRequest() {
 func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	begin := time.Now()
 
-	if len(req.Data) == 0 {
+	if len(req.GetData()) == 0 {
 		return nil, errors.New("handleEncoding: missing data")
 	}
 
-	if req.EncodingParams == nil {
+	if req.GetEncodingParams() == nil {
 		return nil, errors.New("handleEncoding: missing encoding parameters")
 	}
 

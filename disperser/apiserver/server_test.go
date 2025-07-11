@@ -271,8 +271,8 @@ func TestGetBlobStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
-	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().X
-	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().Y
+	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().GetX()
+	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().GetY()
 	assert.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
 	assert.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
 	assert.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))

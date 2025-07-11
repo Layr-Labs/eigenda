@@ -175,8 +175,8 @@ func TestBasicWorkflow(t *testing.T) {
 		verificationSet.Store(operatorID, struct{}{})
 
 		// make sure the chunks are the ones we expect for this operator
-		require.Equal(t, len(chunks), len(getChunksReply.Chunks))
-		for i, chunk := range getChunksReply.Chunks {
+		require.Equal(t, len(chunks), len(getChunksReply.GetChunks()))
+		for i, chunk := range getChunksReply.GetChunks() {
 			require.Equal(t, chunks[i], chunk)
 		}
 
@@ -396,8 +396,8 @@ func TestDownloadTimeout(t *testing.T) {
 		verificationSet.Store(operatorID, struct{}{})
 
 		// make sure the chunks are the ones we expect for this operator
-		require.Equal(t, len(chunks), len(getChunksReply.Chunks))
-		for i, chunk := range getChunksReply.Chunks {
+		require.Equal(t, len(chunks), len(getChunksReply.GetChunks()))
+		for i, chunk := range getChunksReply.GetChunks() {
 			require.Equal(t, chunks[i], chunk)
 		}
 
@@ -653,8 +653,8 @@ func TestFailedVerification(t *testing.T) {
 		verificationSet.Store(operatorID, struct{}{})
 
 		// make sure the chunks are the ones we expect for this operator
-		require.Equal(t, len(chunks), len(getChunksReply.Chunks))
-		for i, chunk := range getChunksReply.Chunks {
+		require.Equal(t, len(chunks), len(getChunksReply.GetChunks()))
+		for i, chunk := range getChunksReply.GetChunks() {
 			require.Equal(t, chunks[i], chunk)
 		}
 

@@ -100,5 +100,5 @@ func TestRetrieveBlob(t *testing.T) {
 		QuorumId:             0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, retrievalReply.Data)
+	assert.Equal(t, gettysburgAddressBytes, retrievalReply.GetData())
 }

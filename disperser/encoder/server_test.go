@@ -131,12 +131,12 @@ func TestEncodeBlob(t *testing.T) {
 
 	reply, err := server.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)
-	assert.NotNil(t, reply.Chunks)
+	assert.NotNil(t, reply.GetChunks())
 
 	// Decode Server Data
 	var chunksData []*encoding.Frame
 
-	for i := range reply.Chunks {
+	for i := range reply.GetChunks() {
 		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
@@ -144,7 +144,7 @@ func TestEncodeBlob(t *testing.T) {
 	assert.NotNil(t, chunksData)
 
 	// Indices obtained from Encoder_Test
-	indices := make([]encoding.ChunkNumber, len(reply.Chunks))
+	indices := make([]encoding.ChunkNumber, len(reply.GetChunks()))
 	for i := range indices {
 		indices[i] = encoding.ChunkNumber(i)
 	}
@@ -274,19 +274,19 @@ func TestEncoderPointsLoading(t *testing.T) {
 
 	reply1, err := server1.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)
-	assert.NotNil(t, reply1.Chunks)
+	assert.NotNil(t, reply1.GetChunks())
 
 	// Decode Server Data
 	var chunksData []*encoding.Frame
 
-	for i := range reply1.Chunks {
+	for i := range reply1.GetChunks() {
 		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply1.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
 	assert.NotNil(t, chunksData)
 
-	indices := make([]encoding.ChunkNumber, len(reply1.Chunks))
+	indices := make([]encoding.ChunkNumber, len(reply1.GetChunks()))
 	for i := range indices {
 		indices[i] = encoding.ChunkNumber(i)
 	}
@@ -306,9 +306,9 @@ func TestEncoderPointsLoading(t *testing.T) {
 
 	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)
-	assert.NotNil(t, reply2.Chunks)
+	assert.NotNil(t, reply2.GetChunks())
 
-	for i := range reply2.Chunks {
+	for i := range reply2.GetChunks() {
 		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply2.GetChunks()[i])
 		// perform an operation
 		assert.Equal(t, len(chunkSerialized.Coeffs), len(chunksData[i].Coeffs))

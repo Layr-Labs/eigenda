@@ -494,9 +494,9 @@ func TestGetPeriodRecords(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, records, 1)
 			require.Contains(t, records, quorum1)
-			require.Len(t, records[quorum1].Records, 1)
-			assert.Equal(t, period1, uint64(records[quorum1].Records[0].Index))
-			assert.Equal(t, size1, records[quorum1].Records[0].Usage)
+			require.Len(t, records[quorum1].GetRecords(), 1)
+			assert.Equal(t, period1, uint64(records[quorum1].GetRecords()[0].GetIndex()))
+			assert.Equal(t, size1, records[quorum1].GetRecords()[0].GetUsage())
 		})
 	})
 
@@ -515,15 +515,15 @@ func TestGetPeriodRecords(t *testing.T) {
 
 			// Check quorum1 records
 			require.Contains(t, records, quorum1)
-			require.Len(t, records[quorum1].Records, 1)
-			assert.Equal(t, period1, uint64(records[quorum1].Records[0].Index))
-			assert.Equal(t, size1, records[quorum1].Records[0].Usage)
+			require.Len(t, records[quorum1].GetRecords(), 1)
+			assert.Equal(t, period1, uint64(records[quorum1].GetRecords()[0].GetIndex()))
+			assert.Equal(t, size1, records[quorum1].GetRecords()[0].GetUsage())
 
 			// Check quorum2 records
 			require.Contains(t, records, quorum2)
-			require.Len(t, records[quorum2].Records, 1)
-			assert.Equal(t, period2, uint64(records[quorum2].Records[0].Index))
-			assert.Equal(t, size2, records[quorum2].Records[0].Usage)
+			require.Len(t, records[quorum2].GetRecords(), 1)
+			assert.Equal(t, period2, uint64(records[quorum2].GetRecords()[0].GetIndex()))
+			assert.Equal(t, size2, records[quorum2].GetRecords()[0].GetUsage())
 		})
 	})
 
@@ -545,34 +545,34 @@ func TestGetPeriodRecords(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, records, 1)
 			require.Contains(t, records, quorum1)
-			require.Len(t, records[quorum1].Records, 2)
+			require.Len(t, records[quorum1].GetRecords(), 2)
 
 			// Find and verify period1 record
 			var period1Record *pb.PeriodRecord
-			for _, record := range records[quorum1].Records {
-				if record.Index == uint32(period1) {
+			for _, record := range records[quorum1].GetRecords() {
+				if record.GetIndex() == uint32(period1) {
 					period1Record = record
 					break
 				}
 			}
 			require.NotNil(t, period1Record, "Period1 record not found")
-			assert.Equal(t, size1, period1Record.Usage)
+			assert.Equal(t, size1, period1Record.GetUsage())
 
 			// Find and verify period2 record
 			var period2Record *pb.PeriodRecord
-			for _, record := range records[quorum1].Records {
-				if record.Index == uint32(period2) {
+			for _, record := range records[quorum1].GetRecords() {
+				if record.GetIndex() == uint32(period2) {
 					period2Record = record
 					break
 				}
 			}
 			require.NotNil(t, period2Record, "Period2 record not found")
-			assert.Equal(t, size2, period2Record.Usage)
+			assert.Equal(t, size2, period2Record.GetUsage())
 
 			// Verify no other periods exist
-			for _, record := range records[quorum1].Records {
-				assert.True(t, record.Index == uint32(period1) || record.Index == uint32(period2),
-					"Unexpected period index found: %d", record.Index)
+			for _, record := range records[quorum1].GetRecords() {
+				assert.True(t, record.GetIndex() == uint32(period1) || record.GetIndex() == uint32(period2),
+					"Unexpected period index found: %d", record.GetIndex())
 			}
 		})
 	})
@@ -595,34 +595,34 @@ func TestGetPeriodRecords(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, records, 1)
 			require.Contains(t, records, quorum1)
-			require.Len(t, records[quorum1].Records, 2, "Should only return existing periods")
+			require.Len(t, records[quorum1].GetRecords(), 2, "Should only return existing periods")
 
 			// Verify period 1
 			var period1Record *pb.PeriodRecord
-			for _, record := range records[quorum1].Records {
-				if record.Index == 1 {
+			for _, record := range records[quorum1].GetRecords() {
+				if record.GetIndex() == 1 {
 					period1Record = record
 					break
 				}
 			}
 			require.NotNil(t, period1Record, "Period 1 record not found")
-			assert.Equal(t, size1, period1Record.Usage)
+			assert.Equal(t, size1, period1Record.GetUsage())
 
 			// Verify period 2
 			var period2Record *pb.PeriodRecord
-			for _, record := range records[quorum1].Records {
-				if record.Index == 2 {
+			for _, record := range records[quorum1].GetRecords() {
+				if record.GetIndex() == 2 {
 					period2Record = record
 					break
 				}
 			}
 			require.NotNil(t, period2Record, "Period 2 record not found")
-			assert.Equal(t, size2, period2Record.Usage)
+			assert.Equal(t, size2, period2Record.GetUsage())
 
 			// Verify no other periods exist
-			for _, record := range records[quorum1].Records {
-				assert.True(t, record.Index == 1 || record.Index == 2,
-					"Unexpected period index found: %d", record.Index)
+			for _, record := range records[quorum1].GetRecords() {
+				assert.True(t, record.GetIndex() == 1 || record.GetIndex() == 2,
+					"Unexpected period index found: %d", record.GetIndex())
 			}
 		})
 	})

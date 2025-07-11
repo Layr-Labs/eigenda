@@ -617,14 +617,14 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 		return nil, nil
 	}
 
-	if !gethcommon.IsHexAddress(ph.AccountId) {
-		return nil, fmt.Errorf("invalid account ID: %s", ph.AccountId)
+	if !gethcommon.IsHexAddress(ph.GetAccountId()) {
+		return nil, fmt.Errorf("invalid account ID: %s", ph.GetAccountId())
 	}
 
 	return &PaymentMetadata{
-		AccountID:         gethcommon.HexToAddress(ph.AccountId),
-		Timestamp:         ph.Timestamp,
-		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+		AccountID:         gethcommon.HexToAddress(ph.GetAccountId()),
+		Timestamp:         ph.GetTimestamp(),
+		CumulativePayment: new(big.Int).SetBytes(ph.GetCumulativePayment()),
 	}, nil
 }
 

@@ -77,17 +77,17 @@ func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient,
 func retrieve(t *testing.T, ctx context.Context, client retriever.RetrieverClient, result result) error {
 
 	reply, err := client.RetrieveBlob(ctx, &retriever.BlobRequest{
-		BatchHeaderHash:      result.BlobVerificationProof.BatchMetadata.BatchHeaderHash,
-		BlobIndex:            result.BlobVerificationProof.BlobIndex,
-		ReferenceBlockNumber: result.BlobVerificationProof.BatchMetadata.ConfirmationBlockNumber,
-		QuorumId:             result.BlobHeader.BlobQuorumParams[0].QuorumNumber,
+		BatchHeaderHash:      result.BlobVerificationProof.GetBatchMetadata().GetBatchHeaderHash(),
+		BlobIndex:            result.BlobVerificationProof.GetBlobIndex(),
+		ReferenceBlockNumber: result.BlobVerificationProof.GetBatchMetadata().GetConfirmationBlockNumber(),
+		QuorumId:             result.GetBlobHeader().GetBlobQuorumParams()[0].GetQuorumNumber(),
 	})
 	if err != nil {
 		return err
 	}
 	assert.NotNil(t, reply)
 	if reply != nil {
-		assert.Equal(t, result.data, reply.Data[:len(result.data)])
+		assert.Equal(t, result.data, reply.GetData()[:len(result.data)])
 	}
 	return nil
 }

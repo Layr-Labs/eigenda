@@ -139,10 +139,10 @@ func TestAttestationToProtobuf(t *testing.T) {
 	}
 	attestationProto, err := zeroAttestation.ToProtobuf()
 	assert.NoError(t, err)
-	assert.Empty(t, attestationProto.NonSignerPubkeys)
-	assert.Empty(t, attestationProto.ApkG2)
-	assert.Empty(t, attestationProto.QuorumApks)
-	assert.Empty(t, attestationProto.Sigma)
-	assert.Empty(t, attestationProto.QuorumNumbers)
-	assert.Empty(t, attestationProto.QuorumSignedPercentages)
+	assert.Empty(t, attestationProto.GetNonSignerPubkeys())
+	assert.Empty(t, attestationProto.GetApkG2())
+	assert.Empty(t, attestationProto.GetQuorumApks())
+	assert.Empty(t, attestationProto.GetSigma())
+	assert.Empty(t, attestationProto.GetQuorumNumbers())
+	assert.Empty(t, attestationProto.GetQuorumSignedPercentages())
 }

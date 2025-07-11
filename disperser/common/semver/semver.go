@@ -190,12 +190,12 @@ func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool,
 	}
 
 	// local node source compiles without semver
-	if reply.Semver == "" {
+	if reply.GetSemver() == "" {
 		reply.Semver = "0.8.4"
 	}
 
-	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
-	return reply.Semver
+	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.GetSemver(), "os", reply.GetOs(), "arch", reply.GetArch(), "numCpu", reply.GetNumCpu(), "memBytes", reply.GetMemBytes())
+	return reply.GetSemver()
 }
 
 func GetSemverInfoV2(ctx context.Context, socket string, userRetrievalClient bool, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
@@ -233,10 +233,10 @@ func GetSemverInfoV2(ctx context.Context, socket string, userRetrievalClient boo
 	}
 
 	// local node source compiles without semver
-	if reply.Semver == "" {
+	if reply.GetSemver() == "" {
 		reply.Semver = "0.9.0"
 	}
 
-	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
-	return reply.Semver
+	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.GetSemver(), "os", reply.GetOs(), "arch", reply.GetArch(), "numCpu", reply.GetNumCpu(), "memBytes", reply.GetMemBytes())
+	return reply.GetSemver()
 }
