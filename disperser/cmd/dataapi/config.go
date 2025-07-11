@@ -28,6 +28,7 @@ type Config struct {
 	PrometheusApiAddr            string
 	SubgraphApiBatchMetadataAddr string
 	SubgraphApiOperatorStateAddr string
+	SubgraphApiPaymentsAddr      string
 	ServerMode                   string
 	AllowOrigins                 []string
 
@@ -63,6 +64,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
 		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
+		SubgraphApiPaymentsAddr:       ctx.GlobalString(flags.SubgraphApiPaymentsAddrFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),

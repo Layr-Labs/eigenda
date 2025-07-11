@@ -15,3 +15,7 @@ generate-swagger-v2:
 	swag fmt --dir ./v2
 
 generate-swagger: generate-swagger-v1 generate-swagger-v2
+
+run: build
+	@echo "  >  Running dataapi..."
+	cd .. && ./bin/dataapi

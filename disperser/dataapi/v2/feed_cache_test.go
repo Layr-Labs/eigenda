@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	v2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,7 +96,7 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 		maxItems,
 		fetcher.fetch,
 		timestampFn,
-		dataapi.NewMetrics(uint(2), nil, nil, "9001", testutils.GetLogger()).BatchFeedCacheMetrics,
+		dataapi.NewMetrics(uint(2), prometheus.NewRegistry(), nil, "9001", testutils.GetLogger()).BatchFeedCacheMetrics,
 	)
 
 	return cache, fetcher, baseTime

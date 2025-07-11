@@ -132,7 +132,7 @@ func NewServerV2(
 			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())-1, limit,
 		)
 	}
-	batchFeedCache := NewFeedCache[corev2.Attestation](
+	batchFeedCache := NewFeedCache(
 		maxNumBatchesToCache,
 		fetchBatchFn,
 		getBatchTimestampFn,
