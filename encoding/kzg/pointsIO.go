@@ -227,7 +227,6 @@ func deserializePointsInRange[T bn254.G1Affine | bn254.G2Affine](
 				return
 			}
 		case *bn254.G2Affine:
-			// G2 points are stored as uncompressed points, so we can directly set bytes
 			if _, err := p.SetBytes(pointData); err != nil {
 				results <- fmt.Errorf("error setting G2 point bytes: %w", err)
 				return
