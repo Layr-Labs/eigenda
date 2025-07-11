@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/benchmark/config"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -186,7 +186,7 @@ func (m *metrics) logMetrics() {
 	totalTime := ""
 	if m.config.TimeLimitSeconds > 0 {
 		totalTime = fmt.Sprintf(" / %s",
-			util.PrettyPrintTime(uint64(m.config.TimeLimitSeconds*float64(time.Second))))
+			common.PrettyPrintTime(uint64(m.config.TimeLimitSeconds*float64(time.Second))))
 	}
 
 	m.logger.Infof("Benchmark Metrics (since most recent restart):\n"+
@@ -204,20 +204,19 @@ func (m *metrics) logMetrics() {
 		"    Flush Count:            %s\n"+
 		"    Average Flush Latency:  %s\n"+
 		"    Longest Flush Duration: %s",
-		util.PrettyPrintTime(elapsedTimeNanoseconds),
+		common.PrettyPrintTime(elapsedTimeNanoseconds),
 		totalTime,
-		util.PrettyPrintBytes(writeThroughput),
-		util.PrettyPrintBytes(bytesWritten),
-		util.CommaOMatic(writeCount),
-		util.PrettyPrintTime(averageWriteLatency),
-		util.PrettyPrintTime(m.longestWriteDuration.Load()),
-		util.PrettyPrintBytes(readThroughput),
-		util.PrettyPrintBytes(m.bytesRead.Load()),
-		util.CommaOMatic(readCount),
-		util.PrettyPrintTime(averageReadLatency),
-		util.PrettyPrintTime(m.longestReadDuration.Load()),
-		util.CommaOMatic(flushCount),
-		util.PrettyPrintTime(averageFlushLatency),
-		util.PrettyPrintTime(m.longestFlushDuration.Load()))
-
+		common.PrettyPrintBytes(writeThroughput),
+		common.PrettyPrintBytes(bytesWritten),
+		common.CommaOMatic(writeCount),
+		common.PrettyPrintTime(averageWriteLatency),
+		common.PrettyPrintTime(m.longestWriteDuration.Load()),
+		common.PrettyPrintBytes(readThroughput),
+		common.PrettyPrintBytes(m.bytesRead.Load()),
+		common.CommaOMatic(readCount),
+		common.PrettyPrintTime(averageReadLatency),
+		common.PrettyPrintTime(m.longestReadDuration.Load()),
+		common.CommaOMatic(flushCount),
+		common.PrettyPrintTime(averageFlushLatency),
+		common.PrettyPrintTime(m.longestFlushDuration.Load()))
 }

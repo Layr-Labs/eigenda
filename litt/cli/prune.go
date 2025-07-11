@@ -80,7 +80,7 @@ func prune(logger logging.Logger, sources []string, allowedTables []string, maxA
 			return fmt.Errorf("failed to prune table %s in paths %v: %v", table, sources, err)
 		}
 
-		logger.Infof("Deleted %s from table '%s'.", util.PrettyPrintBytes(bytesDeleted), table)
+		logger.Infof("Deleted %s from table '%s'.", common.PrettyPrintBytes(bytesDeleted), table)
 	}
 
 	return nil
