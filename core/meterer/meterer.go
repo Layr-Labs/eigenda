@@ -124,7 +124,7 @@ func (m *Meterer) serveReservationRequest(
 	receivedAt time.Time,
 ) error {
 	m.logger.Debug("Recording and validating reservation usage", "header", header, "reservation", reservations)
-	if err := ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt.UnixNano()); err != nil {
+	if err := ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt); err != nil {
 		return fmt.Errorf("invalid reservation: %w", err)
 	}
 
@@ -360,6 +360,9 @@ func ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 
 // ValidateReservations ensures that the quorums listed in the blobHeader are present within allowedQuorums.
 //
+// Parameters:
+//   - timestamp: time in nanoseconds
+//
 // Notes:
 //   - Reservations that don't use all allowed quorums are still accepted
 //   - Charges apply to ALL allowed quorums, even if not all are used
@@ -368,8 +371,8 @@ func ValidateReservations(
 	reservations map[core.QuorumID]*core.ReservedPayment,
 	quorumConfigs map[core.QuorumID]*core.PaymentQuorumProtocolConfig,
 	quorumNumbers []uint8,
-	paymentHeaderTimestampNs int64,
-	receivedTimestampNs int64,
+	timestamp int64,
+	receivedAt time.Time,
 ) error {
 	reservationQuorums := make([]uint8, 0, len(reservations))
 	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
@@ -383,7 +386,7 @@ func ValidateReservations(
 			return fmt.Errorf("quorum config not found for quorum %d", quorumID)
 		}
 		reservationWindows[quorumID] = quorumConfigs[quorumID].ReservationRateLimitWindow
-		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(paymentHeaderTimestampNs, quorumConfigs[quorumID].ReservationRateLimitWindow)
+		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(timestamp, quorumConfigs[quorumID].ReservationRateLimitWindow)
 	}
 	if err := ValidateQuorum(quorumNumbers, reservationQuorums); err != nil {
 		return err
@@ -391,10 +394,10 @@ func ValidateReservations(
 	// Validate the used reservations are active and is of valid periods
 	for _, quorumID := range quorumNumbers {
 		reservation := reservations[core.QuorumID(quorumID)]
-		if !reservation.IsActiveByNanosecond(paymentHeaderTimestampNs) {
+		if !reservation.IsActiveByNanosecond(timestamp) {
 			return errors.New("reservation not active")
 		}
-		if !ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedTimestampNs) {
+		if !ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
 			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
 		}
 	}
@@ -404,8 +407,8 @@ func ValidateReservations(
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
 // Note: This is called per-quorum since reservation is for a single quorum.
-func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedTimestampNs int64) bool {
-	currentReservationPeriod := GetReservationPeriodByNanosecond(receivedTimestampNs, reservationWindow)
+func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
+	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)

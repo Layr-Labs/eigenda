@@ -132,9 +132,9 @@ func setup(_ *testing.M) {
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
 	accountID3 = crypto.PubkeyToAddress(privateKey3.PublicKey)
-	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 20, StartTimestamp: uint64(now.Add(-2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix())}
-	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: uint64(now.Add(-2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix())}
-	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: uint64(now.Add(2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix())}
+	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 20, StartTimestamp: uint64(now.Add(-2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix()), QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: uint64(now.Add(-2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix()), QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: uint64(now.Add(2 * time.Minute).Unix()), EndTimestamp: uint64(now.Add(3 * time.Minute).Unix()), QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
@@ -152,6 +152,9 @@ func setup(_ *testing.M) {
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
+	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
 
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
@@ -234,7 +237,6 @@ func TestMetererReservations(t *testing.T) {
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
 	assert.ErrorContains(t, err, "quorum number mismatch")
-	assert.ErrorContains(t, err, "quorum number mismatch")
 
 	// small bin overflow for empty bin (using one quorum for protocol parameters for now)
 	reservationWindow := mockParams.QuorumProtocolConfigs[meterer.OnDemandQuorumID].ReservationRateLimitWindow
@@ -265,6 +267,7 @@ func TestMetererReservations(t *testing.T) {
 	header = createPaymentHeader(now.UnixNano()-2*int64(reservationWindow)*1e9, big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers, now)
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
+
 	// test bin usage metering
 	symbolLength := uint64(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
@@ -433,7 +436,6 @@ func TestMetererOnDemand(t *testing.T) {
 	// test cumulative payment on-chain constraint
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
-	assert.ErrorContains(t, err, "request claims a cumulative payment greater than the on-chain deposit")
 	assert.ErrorContains(t, err, "request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
