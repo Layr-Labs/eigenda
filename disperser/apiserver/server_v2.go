@@ -298,22 +298,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, err
 	}
 
-	return convertAllQuorumsReplyToLegacy(allQuorumsReply), nil
-}
-
-// convertAllQuorumsReplyToLegacy converts the new per-quorum payment state format to the legacy aggregated format.
-// This enables backwards compatibility by flattening multi-quorum data into a single legacy response,
-// allowing old clients to continue working properly.
-//
-// Conversion logic:
-// - PaymentVaultParams: Uses quorum 0 configuration as the global parameters (arbitrary choice)
-// - Reservations: Finds the most restrictive reservation across all quorums (minimum symbols/sec, latest start, earliest end)
-// - PeriodRecords: Selects the highest usage for each period index across all quorums
-// - OnDemand cumulative payment amounts: Passed through unchanged as they represent account-level totals
-//
-// This conversion may result in information loss for clients that need per-quorum details,
-// but preserves the most restrictive constraints to ensure client behavior remains within reservation or ondemand.
-func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuorumsReply) *pb.GetPaymentStateReply {
 	// For PaymentVaultParams, use quorum 0 for protocol level parameters and on-demand quorum numbers
 	var paymentGlobalParams *pb.PaymentGlobalParams
 	if allQuorumsReply.PaymentVaultParams != nil &&
@@ -400,7 +384,7 @@ func convertAllQuorumsReplyToLegacy(allQuorumsReply *pb.GetPaymentStateForAllQuo
 		Reservation:              reservation,
 		CumulativePayment:        allQuorumsReply.CumulativePayment,
 		OnchainCumulativePayment: allQuorumsReply.OnchainCumulativePayment,
-	}
+	}, nil
 }
 
 // GetPaymentStateForAllQuorums returns payment state for all quorums including vault parameters,

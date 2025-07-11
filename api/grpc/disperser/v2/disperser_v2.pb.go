@@ -481,9 +481,6 @@ func (x *BlobCommitmentReply) GetBlobCommitment() *common.BlobCommitment {
 }
 
 // GetPaymentStateRequest contains parameters to query the payment state of an account.
-// GetPaymentStateForAllQuorumsRequest is a separate message type even though it currently contains the same fields,
-// because we follow buf's best practices and linting rules which recommend every RPC having its own request and reply types,
-// to allow for evolution of the API without breaking changes: https://buf.build/docs/lint/rules/#rpc_no_server_streaming
 type GetPaymentStateRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -628,21 +625,12 @@ type GetPaymentStateReply struct {
 	// global payment vault parameters
 	PaymentGlobalParams *PaymentGlobalParams `protobuf:"bytes,1,opt,name=payment_global_params,json=paymentGlobalParams,proto3" json:"payment_global_params,omitempty"`
 	// off-chain account reservation usage records
-	// Should be empty if reservation.quorum_numbers is empty (i.e. no reservation exists for the account).
 	PeriodRecords []*PeriodRecord `protobuf:"bytes,2,rep,name=period_records,json=periodRecords,proto3" json:"period_records,omitempty"`
 	// on-chain account reservation setting
 	Reservation *Reservation `protobuf:"bytes,3,opt,name=reservation,proto3" json:"reservation,omitempty"`
-	// off-chain on-demand payment usage.
-	// The bytes are parsed to a big.Int value.
-	// This value should always be <= onchain_cumulative_payment.
-	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
-	//
-	// This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
-	// Future work will support decentralized on-demand dispersals.
+	// off-chain on-demand payment usage
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 	// on-chain on-demand payment deposited
-	// The bytes are parsed to a big.Int value.
-	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
@@ -726,23 +714,14 @@ type GetPaymentStateForAllQuorumsReply struct {
 	// payment vault parameters with per-quorum configurations
 	PaymentVaultParams *PaymentVaultParams `protobuf:"bytes,1,opt,name=payment_vault_params,json=paymentVaultParams,proto3" json:"payment_vault_params,omitempty"`
 	// period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods
-	// Should contain the same number of entries as the `reservations` field.
 	PeriodRecords map[uint32]*PeriodRecords `protobuf:"bytes,2,rep,name=period_records,json=periodRecords,proto3" json:"period_records,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// reservations maps quorum IDs to the on-chain account reservation record
-	// Should contain the same number of entries as the `period_records` field.
 	Reservations map[uint32]*QuorumReservation `protobuf:"bytes,3,rep,name=reservations,proto3" json:"reservations,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// off-chain on-demand payment usage.
-	// The bytes are parsed to a big.Int value.
-	// This value should always be <= onchain_cumulative_payment.
-	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
-	//
-	// This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
-	// Future work will support decentralized on-demand dispersals.
+	// off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only
+	// supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by
+	// dispersers unlimited to EigenLabs.
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 	// on-chain on-demand payment deposited.
-	// The bytes are parsed to a big.Int value.
-	// This value should always be >= cumulative_payment.
-	// See [common.v2.PaymentHeader.cumulative_payment] for more details.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
@@ -1412,8 +1391,6 @@ type PaymentQuorumProtocolConfig struct {
 	// min_num_symbols is the minimum number of symbols that must be charged for any request
 	MinNumSymbols uint64 `protobuf:"varint,1,opt,name=min_num_symbols,json=minNumSymbols,proto3" json:"min_num_symbols,omitempty"`
 	// reservation_advance_window is the window in seconds before a reservation starts that it can be activated
-	// It is added here for offchain to have access to all onchain data structs, but it isn't currently used,
-	// and might get removed in the future.
 	ReservationAdvanceWindow uint64 `protobuf:"varint,2,opt,name=reservation_advance_window,json=reservationAdvanceWindow,proto3" json:"reservation_advance_window,omitempty"`
 	// reservation_rate_limit_window is the time window in seconds for reservation rate limiting
 	ReservationRateLimitWindow uint64 `protobuf:"varint,3,opt,name=reservation_rate_limit_window,json=reservationRateLimitWindow,proto3" json:"reservation_rate_limit_window,omitempty"`
