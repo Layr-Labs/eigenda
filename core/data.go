@@ -692,15 +692,11 @@ func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
 
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
-	return WithinTime(time.Unix(int64(currentTimestamp), 0), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
+	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
 }
 
-// IsActiveByNanosecond returns true if the reservation is active at the given timestamp
+// IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
-	return WithinTime(time.Unix(0, currentTimestamp), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
-}
-
-// WithinTime returns true if the timestamp is within the time range, inclusive of the start and end timestamps
-func WithinTime(timestamp time.Time, startTimestamp time.Time, endTimestamp time.Time) bool {
-	return !timestamp.Before(startTimestamp) && !timestamp.After(endTimestamp)
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

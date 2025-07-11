@@ -370,7 +370,7 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
-	symbolsCharged := meterer.SymbolsCharged(symbolLength, mt.ChainPaymentState.GetMinNumSymbols(meterer.OnDemandQuorumID))
+	symbolsCharged := mt.SymbolsCharged(symbolLength)
 	priceCharged := meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol(meterer.OnDemandQuorumID))
 	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol(meterer.OnDemandQuorumID))), priceCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
@@ -398,7 +398,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
 	symbolLength = uint64(2)
-	symbolsCharged = meterer.SymbolsCharged(symbolLength, mt.ChainPaymentState.GetMinNumSymbols(meterer.OnDemandQuorumID))
+	symbolsCharged = mt.SymbolsCharged(symbolLength)
 	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol(meterer.OnDemandQuorumID))
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
@@ -406,7 +406,7 @@ func TestMetererOnDemand(t *testing.T) {
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
-	symbolsCharged = meterer.SymbolsCharged(uint64(50), mt.ChainPaymentState.GetMinNumSymbols(meterer.OnDemandQuorumID))
+	symbolsCharged = mt.SymbolsCharged(uint64(50))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol(meterer.OnDemandQuorumID)), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
@@ -419,7 +419,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
-	symbolsCharged = meterer.SymbolsCharged(uint64(30), mt.ChainPaymentState.GetMinNumSymbols(meterer.OnDemandQuorumID))
+	symbolsCharged = mt.SymbolsCharged(uint64(30))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol(meterer.OnDemandQuorumID)), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
@@ -523,9 +523,14 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 		},
 	}
 
+	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
-			result := meterer.SymbolsCharged(tt.symbolLength, tt.minNumSymbols)
+			m := &meterer.Meterer{
+				ChainPaymentState: paymentChainState,
+			}
+			result := m.SymbolsCharged(tt.symbolLength)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
