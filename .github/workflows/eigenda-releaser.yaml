@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Generate a token
-        id: generate-token
+        id: generate_token
         uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e #2.0.6
         with:
           app-id: ${{ secrets.EIGENDA_RELEASER_ID }}
