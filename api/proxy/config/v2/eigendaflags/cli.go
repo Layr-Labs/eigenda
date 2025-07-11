@@ -27,17 +27,15 @@ var (
 	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
 		"cert-verifier-router-or-immutable-verifier-addr",
 	)
-	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
-	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
-	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
-	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
-	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
-	NetworkFlagName                   = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
+	EigenDADirectoryFlagName     = withFlagPrefix("eigenda-directory")
+	RelayTimeoutFlagName         = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName     = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName  = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName    = withFlagPrefix("blob-version")
+	EthRPCURLFlagName            = withFlagPrefix("eth-rpc")
+	MaxBlobLengthFlagName        = withFlagPrefix("max-blob-length")
+	NetworkFlagName              = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName = withFlagPrefix("rbn-recency-window-size")
 )
 
 func withFlagPrefix(s string) string {
@@ -118,25 +116,11 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Required: false,
 		},
 		&cli.StringFlag{
-			Name:     ServiceManagerAddrFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     BLSOperatorStateRetrieverFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
 			Name:     EigenDADirectoryFlagName,
-			Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain..",
+			Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain. Required for all networks.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "EIGENDA_DIRECTORY")},
 			Category: category,
-			Required: false,
+			Required: true,
 		},
 		&cli.DurationFlag{
 			Name:     ContractCallTimeoutFlagName,
@@ -192,13 +176,13 @@ slightly exceeds 1GB.`,
 		&cli.StringFlag{
 			Name: NetworkFlagName,
 			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
-default values for %s, %s, and %s. If all of these fields are explicitly configured, the
+default values for %s and %s. If these fields are explicitly configured, the
 network flag may be omitted. If some or all of these fields are configured, and the network
 is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, & %s.`,
+EigenDANetwork values include %s, %s, %s, & %s.`,
 				DisperserFlagName,
-				ServiceManagerAddrFlagName,
-				BLSOperatorStateRetrieverFlagName,
+				EigenDADirectoryFlagName,
+				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
@@ -244,31 +228,18 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 
 	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
 	if eigenDADirectory == "" {
-		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		if networkString != "" {
+			eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
+			if err != nil {
+				return common.ClientConfigV2{}, fmt.Errorf(
+					"EigenDA directory address wasn't specified, and failed to get it from the specified network: %w", err)
+			}
+		} else {
+			return common.ClientConfigV2{}, fmt.Errorf("EigenDA directory address is required. Either specify --eigenda.v2.eigenda-directory or --eigenda.v2.network")
 		}
 	}
 
-	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
-	if serviceManagerAddress == "" {
-		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
-		}
-	}
 
-	blsOperatorStateRetrieverAddress := ctx.String(BLSOperatorStateRetrieverFlagName)
-	if blsOperatorStateRetrieverAddress == "" {
-		blsOperatorStateRetrieverAddress, err = eigenDANetwork.GetBLSOperatorStateRetrieverAddress()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				`BLS operator state retriever address wasn't specified, and failed to get it from the
-							specified network : %w`, err)
-		}
-	}
 
 	return common.ClientConfigV2{
 		DisperserClientCfg:           disperserConfig,
@@ -285,9 +256,9 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 			common.RelayRetrieverType,
 			common.ValidatorRetrieverType,
 		},
-		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
+		BLSOperatorStateRetrieverAddr:      "", // Will be populated from EigenDADirectory
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
-		EigenDAServiceManagerAddr:          serviceManagerAddress,
+		EigenDAServiceManagerAddr:          "", // Will be populated from EigenDADirectory
 		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,

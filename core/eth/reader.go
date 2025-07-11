@@ -77,30 +77,27 @@ func NewReader(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
-	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
-	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
-	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
-		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-		}
-
-		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress()
-		if err != nil {
-			return nil, err
-		}
-
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
+	// EigenDADirectory is required - all contract addresses are read from it
+	if eigendaDirectoryHexAddr == "" || !gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
+		return nil, fmt.Errorf("EigenDA directory address is required and must be a valid hex address: %s", eigendaDirectoryHexAddr)
 	}
 
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+	}
+
+	blsOperatorStateRetrieverAddr, err := addressReader.GetOperatorStateRetrieverAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	err = e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
 	}
