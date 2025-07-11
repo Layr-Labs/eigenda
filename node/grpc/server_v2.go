@@ -15,7 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -152,7 +152,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 		// TODO: move to blob authenticator later
 		for _, blob := range batch.BlobCertificates {
-			if payment_logic.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
+			if meterer.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
 				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
 				if in.DisperserID != api.EigenLabsDisperserID {
 					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))

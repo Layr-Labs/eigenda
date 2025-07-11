@@ -6,7 +6,6 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer/payment_logic"
 )
 
 // QuorumPeriodRecords is a map of quorum number to a slice of period records
@@ -72,14 +71,14 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 		return errors.New("protocolConfig cannot be nil")
 	}
 
-	symbolUsage := payment_logic.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-	binLimit := payment_logic.GetBinLimit(reservation.SymbolsPerSecond, protocolConfig.ReservationRateLimitWindow)
+	symbolUsage := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	binLimit := GetReservationBinLimit(reservation, protocolConfig.ReservationRateLimitWindow)
 
 	if symbolUsage > binLimit {
 		return errors.New("symbol usage exceeds bin limit")
 	}
 
-	currentPeriod := payment_logic.GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
+	currentPeriod := GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
 	relativePeriodRecord := pr.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 	oldUsage := relativePeriodRecord.Usage
 	relativePeriodRecord.Usage += symbolUsage
@@ -94,7 +93,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	// overflow bin if we're over the limit
-	overflowPeriod := payment_logic.GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
+	overflowPeriod := GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
 	overflowPeriodRecord := pr.GetRelativePeriodRecord(overflowPeriod, quorumNumber)
 	if overflowPeriodRecord.Usage == 0 {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
