@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -200,7 +201,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		}
 		d.logger.Infof(
 			"Table '%s' initialized, table contains %d key-value pairs and has a size of %s.",
-			name, table.KeyCount(), util.PrettyPrintBytes(table.Size()))
+			name, table.KeyCount(), common.PrettyPrintBytes(table.Size()))
 
 		d.tables[name] = table
 	}
