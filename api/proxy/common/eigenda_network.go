@@ -8,11 +8,14 @@ const (
 	HoleskyTestnetEigenDANetwork EigenDANetwork = "holesky_testnet"
 	HoleskyPreprodEigenDANetwork EigenDANetwork = "holesky_preprod"
 	SepoliaTestnetEigenDANetwork EigenDANetwork = "sepolia_testnet"
+	MainnetEigenDANetwork        EigenDANetwork = "mainnet"
 )
 
 // GetEigenDADirectory returns, as a string, the address of the EigenDADirectory contract for the network.
 func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
 	switch n {
+	case MainnetEigenDANetwork:
+		return "0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4", nil
 	case HoleskyTestnetEigenDANetwork:
 		return "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE", nil
 	case HoleskyPreprodEigenDANetwork:
@@ -27,6 +30,8 @@ func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
 // GetServiceManagerAddress returns, as a string, the address of the EigenDAServiceManager contract for the network.
 func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
 	switch n {
+	case MainnetEigenDANetwork:
+		return "0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0", nil
 	case HoleskyTestnetEigenDANetwork:
 		return "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", nil
 	case HoleskyPreprodEigenDANetwork:
@@ -42,6 +47,8 @@ func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
 // The format of the returned address is "<hostname>:<port>"
 func (n EigenDANetwork) GetDisperserAddress() (string, error) {
 	switch n {
+	case MainnetEigenDANetwork:
+		return "disperser.eigenda.xyz:443", nil
 	case HoleskyTestnetEigenDANetwork:
 		return "disperser-testnet-holesky.eigenda.xyz:443", nil
 	case HoleskyPreprodEigenDANetwork:
@@ -57,6 +64,8 @@ func (n EigenDANetwork) GetDisperserAddress() (string, error) {
 // network
 func (n EigenDANetwork) GetBLSOperatorStateRetrieverAddress() (string, error) {
 	switch n {
+	case MainnetEigenDANetwork:
+		return "0xEC35aa6521d23479318104E10B4aA216DBBE63Ce", nil
 	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork:
 		return "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7", nil
 	case SepoliaTestnetEigenDANetwork:
@@ -72,6 +81,7 @@ func (n EigenDANetwork) String() string {
 
 // chainIDToNetworkMap maps chain IDs to EigenDA networks
 var chainIDToNetworkMap = map[string][]EigenDANetwork{
+	"1":        {MainnetEigenDANetwork},
 	"17000":    {HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork},
 	"11155111": {SepoliaTestnetEigenDANetwork},
 }
@@ -89,7 +99,7 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	network := EigenDANetwork(inputString)
 
 	switch network {
-	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork:
+	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork, MainnetEigenDANetwork:
 		return network, nil
 	default:
 		return "", fmt.Errorf("unknown network type: %s", inputString)
