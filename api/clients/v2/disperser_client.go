@@ -15,7 +15,6 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
@@ -27,8 +26,6 @@ type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
-	NtpServer         string
-	NtpSyncInterval   time.Duration
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -64,7 +61,6 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
-	ntpClock           *core.NTPSyncedClock
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -89,7 +85,7 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -103,26 +99,11 @@ func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, si
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
-	// Set default NTP config if not provided
-	if config.NtpServer == "" {
-		config.NtpServer = "pool.ntp.org"
-	}
-	if config.NtpSyncInterval == 0 {
-		config.NtpSyncInterval = 5 * time.Minute
-	}
-
-	// Initialize NTP synced clock
-	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger.With("component", "DisperserClient"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NTP clock: %w", err)
-	}
-
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
 		prover:     prover,
 		accountant: accountant,
-		ntpClock:   ntpClock,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -216,7 +197,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(c.ntpClock.Now().UnixNano(), uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)

@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -485,10 +484,6 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 
 	c := client.GetTestClient(t, environment)
 
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	require.NoError(t, err)
-
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
 	require.NoError(t, err)
@@ -502,7 +497,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
-	disperserClient, err := clients.NewDisperserClient(logger, disperserConfig, signer, nil, nil)
+	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
 	require.NoError(t, err)
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
