@@ -151,7 +151,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "cannot create payment information for reservation or on-demand")
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
@@ -204,7 +204,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "cannot create payment information for reservation or on-demand")
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
