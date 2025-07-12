@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -12,6 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
+
+// ErrZeroSymbols is returned when the requested number of symbols is zero.
+var ErrZeroSymbols = errors.New("zero symbols requested")
 
 var requiredQuorums = []uint8{0, 1}
 
@@ -130,7 +134,7 @@ func (a *Accountant) AccountBlob(
 		return nil, fmt.Errorf("no quorums provided")
 	}
 	if numSymbols == 0 {
-		return nil, fmt.Errorf("zero symbols requested")
+		return nil, ErrZeroSymbols
 	}
 
 	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
