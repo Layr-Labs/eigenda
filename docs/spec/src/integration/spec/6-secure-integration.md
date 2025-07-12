@@ -4,21 +4,17 @@ This page is meant to be read by eigenda and rollup developers who are writing a
 
 
 Unlike a trusted integration, a secure integration must be able to handle any malicious data posted on Ethereum L1:
-- A malicious batcher can post an invalid or malformed DA certificate (DA Cert) to stall the roll-up derivation pipeline. 
+- A malicious batcher can post an invalid or malformed DA certificate (DA Cert)
 - A malicious proposer can publish wrong L2 state roots. 
-To overcome incorrect data posted on L1,
-we rely on the GET path of the rollup to reliably filter out incorrect data posted by malicious batcher(s), and challenge incorrect state roots posted by malicious proposer(s).
-
-We will first introduce the derivation procedures and then discuss two implementations - **eigenda-proxy** and **Hokulea**.
 
 ## EigenDA blob derivation
 
-This section introduces a canonical procedure for deriving a rollup payload from a DA Cert in the GET path. The diagram below illustrates a step-by-step transition from a raw DA Cert byte string to the final roll-up payload:
+This section describes a canonical procedure for deriving a rollup payload from a DA Cert. For any rollup integrated with EigenDA, this derivation is an integral part of the perspective L2 consensus whose logic must be present in both rollup node and secure integration. Currently, the EigenDA blob derivation has been implemented in EigenDA proxy, OP EigenDA secure integration ([Hokulea](https://github.com/Layr-Labs/hokulea/tree/master)) and Nitro EigenDA secure integration([EigenDA Nitro](https://github.com/Layr-Labs/nitro)). The diagram below illustrates **EigenDA blob derivation** highlighting step-by-step transition from an input to the final rollup payload. Each green box represents the data and its attribute.
 
-- Calldata Input: The pipeline starts only containing a serialized DA Cert.
-- Blob derivation: As the input transitions downward to the rollup payload at the bottom, the DA cert can be routed to one of the terminal states depending on if the DA cert is recent enough, if it is valid or if can be decoded correctly.
-- Preimage oracle: Some procedures during the derivation require fetching EigenDA blobs and other cert metadata. Access to each piece of data is abstracted behind a pre-image oracle. More see this [section](#eigenda-blob-derivation-and-preimage-oracle).
-- Host: entity hosting a preimage server which can reply to preimage oracle requests.
+- Input: The pipeline starts only containing a serialized DA Cert (as calldata) and block number of the DA Cert inclusion block.
+- Blob derivation: As the input transitions downward to the rollup payload at the bottom, the DA cert can be routed to one of the terminal states.
+- Preimage oracle: Some procedures during the derivation require fetching additional data beyond the Input provided at the start. A preimage oracle is an object with an interface which the derivation can use for fetching additional data. Depending on the requirement, the oracle and the interface use specific implementation. For example, a secure integration with optimistic fault proof requires the interface as a key value mapping whose relation is verifiable on chain.
+- Host: an entity hosting a preimage oracle which can return the answer to the preimage query.
 
 ![](../../assets/integration/eigenda-blob-derivation.png)
 
@@ -27,18 +23,14 @@ All inputs to EigenDA derivation pipeline end in exactly one of four terminal st
 | State               | Meaning                                                             |
 | ------------------- | ------------------------------------------------------------------- |
 | **dropped**         | The input is rejected and therefore ignored by the rollup execution |
-| **stalled**         | Required data is temporarily unavailable.                           |
-| **panic**           | A fundamental invariant (e.g., field-element validity) is violated. |
-| **roll-up payload** | Success case when the desired payload bytes are produced.           |
+| **stalled**         | Required preimage data is temporarily unavailable.                           |
+| **rollup payload** | Success case when the desired payload bytes are produced.           |
 
 ### Failure cases
 
 If an arrow in the diagram is labelled failed, the supplied data did not satisfy EigenDA’s safeguards. The DA Cert is discarded and nothing is forwarded downstream.
 
-A path marked stall means the host cannot (yet) provide the requested data.
-A path marked panic means the blob’s coefficients are not valid BN254 field elements. Then in theory, a KZG commitment cannot be generated, therefore derivation panic.
-
-- parse failed – The batcher submitted an improperly-serialized DA Cert.
+- parse failed – The batcher submitted an improperly-serialized DA Cert or a unrecognized cert.
 - recency check failed – The DA Cert reached the roll-up inbox too late.
 - cert validity check failed – Either the certificate does not satisfy the [quorum-attestation constraint](#2-cert-validation) or the host lies about its validity via the preimage oracle.
 - decode blob failed – The host supplies an EigenDA blob that cannot be decoded back into a rollup payload as per the [spec](./3-datastructs.md#data-structs). This can occur when
@@ -47,60 +39,40 @@ A path marked panic means the blob’s coefficients are not valid BN254 field el
 
 If none of these error cases arise, the derivation pipeline outputs the expected payload.
 
-## EigenDA Blob derivation and Preimage Oracle
+## Secure Integration Framework
 
-We have defined the canonical derivation process, and now we describe two concrete implementations and their preimage oracle:
+The L2 consensus must cover all parts from the EigenDA blob derivation. There are 2 degree of Freedom in Design a Secure Integration with EigendA.
+- A split of the EigenDA blob derivation. Some can be checked onchain pessimistically and others offchain optimistically
+- Choices of Onchain Proving VM
 
-### EigenDA-proxy (Go)
+For every secure integration design, a  designer can tailor the protocol to fit Its own constraint from the protocol.
 
-Eigenda proxy is the first implementation of the eigenda blob derivation described above, it is also the first implementation  of the  preimage oracle
-server that uses the external RPC to implement the preimage oracle. Below we highlight some parts around derivation pipeline
-- the calldata input in proxy is received from http listening port (typically the requester is a roll-up consensus node).
-- proxy has both ETH RPC and EigenDA network RPC to get the preimage like the diagram below
-- Queries an Ethereum RPC endpoint to validate the cert.
-- the EigenDA blob can be retrieved from the EigenDA network either directly via an EigenDA relay node RPC or via distributed retrieval by communicating directly to the endpoints exposed by EigenDA validators.
-- if everything succeeds, the roll-up payload is returned by the proxy to the requester via the HTTP response.
+### Splitting EigenDA blob derivation
 
-Eigenda-Proxy is the implemention which rollup consensus nodes run in the normal mode for optimistic rollup.  
+Depending on the approach a rollup is taking for its secure integration, some elements of the EIGENDA derivation pipeline can be pessimistically checked 
+in the rollup inbox, leaving the rest of eigenda blob derivation to the proof system. For instance, in Arbitrum secure integration with Eigenda v1, all the component down to cert validity are checked within the rollup inbox. On the other hand, the entire EigenDA blob derivation takes place offchain in OP secure integration. 
 
-![](../../assets/integration/preimage-derivation-layers.png)
+### VM for Optimistic Fault Proof
+At the high level, For parts of the Eigenda block variation that are not checked inside the inbox, they have to take place in the rollup consensus software.
+For the Eigenda blob derivation to be fault proveable, the blob derivation must be imported into the L2 consensus as part of the library. 
+Because the software is compiled into a set of instructions each can be replayed by onchain VM, the offchain part of EigenDA blob derivation is secured by the proof system. Together, the whole EigenDA blob deviation are covered and secured by Ethereum consensus.
 
-### Hokulea (Rust)
+Given Eigen da blob derivation requires parameter oracle, There should be implementations for both of them in both on-chain and off-chain. 
 
-We have developed another implementation of EigenDA blob derivation for OP stack, which supports all of optimistic and ZK fault proof,
-as well as validity ZK proofs. The hokulea client (and crates it uses) implement the eigenda blob derivation logic described in the [eigenda blob derivation section](#eigenda-blob-derivation). The client is intended to be imported as a library into OP consensus rust implementation [Kona](https://github.com/op-rs/kona).
+![](../../assets/integration/secure-integration-model.png)
 
+### ZKVM for ZK Fault Proof
 
-The major difference between the two implementations comes to how the preimage oracle is abstracted and implemented.
-For Hokulea, the interface is abstracted as key-value map to make preimage oracle verifiable on L1 Ethereum.
-In Hokulea, the preimage host for the key-value oracle interface is built on top of the Eigenda proxy. See diagram above. All the heavy lifting parts to get
-the actual preimage data is done by the proxy, and the Hokulea host is a thin layer to translate http status codes into preimage data or error.
+Unlike VMs designed for optimistic far proof, an Integration using zkVM does not require a preimage oracle because all pre-image verification can be Augmented into the EigenDA blob dervation. But in theory, there's nothing stopping a secure integration design that takes advantage of both ZKey VM and VM for open-mesh fault proof.
 
-### Communication betweeen Hokulea host and EigenDA proxy
+## EigenDA Blob derivation in EigenDA-proxy
 
-Proxy Uses HTTP interface, And to allow proxy to be used as a base layer for abstraction. The proxy exposes the following JSON status code In addition to http
-status code to convey Information about the preimage.
+We have defined the canonical derivation process, and clarifies two design freedom allowed for The secure integration. Before diving into a specific secure integration, it's worth looking at one implementation of the eigenda blob derivation, **eigenda proxy** which has been used in rollup consensus nodes in the normal mode since the Start of the Eigenda integration.
 
-| Message             | HTTP Status Code                | JSON Status Code                |     Indication      |
-| ------------------- | ------------------------------- | ------------------------------- | ------------------- |
-| **decoded blob (i.e rollup payload)**    | 200                             | NA                              |  successful request |
-| **cert validity**   | 418                             | 1                               |  cert is invalid    |
-| **cert recency**    | 418                             | 2                               |  cert is too old    |
-| **encoded payload(subject to change)**    | 418                             | 3                               |  blob decoding error|
+EigenDA proxy implements the blob derivation. Like diagram below, At the high level, the proxy contains both the derivation and the retrieval client responsible for retrieving preimage using ETH and EigenDA network RPC. As shown in the diagram, the preimage for validity of the cert is Served by the ETH RPC. The EIGENDA blob is served by the gRPC connection to the EIGENDA network. And currently in proxy, the recency window is supplied as an input parameter when starting the binary. 
 
-For careful readers and developer familiar with EigenDA proxy, proxy by default returns the decoded blob, i.e. the rollup payload, as a byte string in a HTTP 200
-reponse message. However, to enable proxy as a part of the preimage oracle against other implementation of EigenDA derivation pipeline (like Hokulea), the preimage data must be a valid blob polynomial, whose every 32 Bytes must be valid field element on BN254 (i.e [encoded payload](./3-data-structs.md)).
+![](../../assets/integration/proxy-preimage-derivation-impl.png)
 
-Proxy must be able to return the encoded payload alone, though the specific implementation has not been decided yet.
-As described in [data-struct page](./3-data-structs.md). During the creation of a DA cert a rollup payload, the data is first transformed into the encoded paylod
-then undergo IFFT transform into the right polynomial format before sending to EigenDA that created a DA cert.
-
-Normally the DecodeBlob functional interface on the GET path of the proxy does the FFT transformation on the received EigenDA blob to convert into the encoded
-payload which is the original polynomial format.
-To remove redundant work which the upper layer (Hokulea host) has to do (i.e. the FFT step), the proxy when used as a component for providing preimage, it returns
-the encoded payload as opposed to the raw eigenda blob, which has the IFFT transformation, which is needed for optimistic challenge for opening points onchain.
-
-In the following sections, we provide the definition for each check in the diagram above. 
 
 ## Derivation validation In Depth
 
