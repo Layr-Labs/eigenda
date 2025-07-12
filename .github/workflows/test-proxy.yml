@@ -43,6 +43,7 @@ jobs:
             .env.exampleV1.sepolia,
             .env.exampleV2.sepolia,
             .env.exampleV1AndV2.sepolia,
+            .env.exampleV2.mainnet,
           ]
     runs-on: ubuntu-latest
     steps:
