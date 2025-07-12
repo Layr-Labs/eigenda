@@ -119,9 +119,9 @@ func (a *Accountant) BlobPaymentInfo(
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
-	return big.NewInt(0), fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+	return big.NewInt(0), fmt.Errorf("cannot create payment information for reservation or on-demand. "+
+		"Consider depositing more eth to the PaymentVault contract for your account. For more details, "+
+		"see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s", a.accountID.Hex())
 }
 
 // AccountBlob accountant provides and records payment information
