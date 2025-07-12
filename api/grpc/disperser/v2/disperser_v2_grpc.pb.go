@@ -19,11 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Disperser_DisperseBlob_FullMethodName                 = "/disperser.v2.Disperser/DisperseBlob"
-	Disperser_GetBlobStatus_FullMethodName                = "/disperser.v2.Disperser/GetBlobStatus"
-	Disperser_GetBlobCommitment_FullMethodName            = "/disperser.v2.Disperser/GetBlobCommitment"
-	Disperser_GetPaymentState_FullMethodName              = "/disperser.v2.Disperser/GetPaymentState"
-	Disperser_GetPaymentStateForAllQuorums_FullMethodName = "/disperser.v2.Disperser/GetPaymentStateForAllQuorums"
+	Disperser_DisperseBlob_FullMethodName      = "/disperser.v2.Disperser/DisperseBlob"
+	Disperser_GetBlobStatus_FullMethodName     = "/disperser.v2.Disperser/GetBlobStatus"
+	Disperser_GetBlobCommitment_FullMethodName = "/disperser.v2.Disperser/GetBlobCommitment"
+	Disperser_GetPaymentState_FullMethodName   = "/disperser.v2.Disperser/GetPaymentState"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -46,13 +45,6 @@ type DisperserClient interface {
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-	// As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
-	// in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
-	// uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
-	// For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
-	// non-EigenDA dispersers should only request with reserved usages.
-	//
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
@@ -60,15 +52,6 @@ type DisperserClient interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
-	// GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
-	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
-	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
-	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
-	//
-	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
-	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
-	GetPaymentStateForAllQuorums(ctx context.Context, in *GetPaymentStateForAllQuorumsRequest, opts ...grpc.CallOption) (*GetPaymentStateForAllQuorumsReply, error)
 }
 
 type disperserClient struct {
@@ -115,15 +98,6 @@ func (c *disperserClient) GetPaymentState(ctx context.Context, in *GetPaymentSta
 	return out, nil
 }
 
-func (c *disperserClient) GetPaymentStateForAllQuorums(ctx context.Context, in *GetPaymentStateForAllQuorumsRequest, opts ...grpc.CallOption) (*GetPaymentStateForAllQuorumsReply, error) {
-	out := new(GetPaymentStateForAllQuorumsReply)
-	err := c.cc.Invoke(ctx, Disperser_GetPaymentStateForAllQuorums_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // DisperserServer is the server API for Disperser service.
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
@@ -144,13 +118,6 @@ type DisperserServer interface {
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-	// As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
-	// in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
-	// uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
-	// For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
-	// non-EigenDA dispersers should only request with reserved usages.
-	//
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
@@ -158,15 +125,6 @@ type DisperserServer interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
-	// GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
-	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
-	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
-	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
-	//
-	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
-	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
-	GetPaymentStateForAllQuorums(context.Context, *GetPaymentStateForAllQuorumsRequest) (*GetPaymentStateForAllQuorumsReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -185,9 +143,6 @@ func (UnimplementedDisperserServer) GetBlobCommitment(context.Context, *BlobComm
 }
 func (UnimplementedDisperserServer) GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentState not implemented")
-}
-func (UnimplementedDisperserServer) GetPaymentStateForAllQuorums(context.Context, *GetPaymentStateForAllQuorumsRequest) (*GetPaymentStateForAllQuorumsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentStateForAllQuorums not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -274,24 +229,6 @@ func _Disperser_GetPaymentState_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Disperser_GetPaymentStateForAllQuorums_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetPaymentStateForAllQuorumsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DisperserServer).GetPaymentStateForAllQuorums(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Disperser_GetPaymentStateForAllQuorums_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DisperserServer).GetPaymentStateForAllQuorums(ctx, req.(*GetPaymentStateForAllQuorumsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -314,10 +251,6 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPaymentState",
 			Handler:    _Disperser_GetPaymentState_Handler,
-		},
-		{
-			MethodName: "GetPaymentStateForAllQuorums",
-			Handler:    _Disperser_GetPaymentStateForAllQuorums_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

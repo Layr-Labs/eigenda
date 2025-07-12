@@ -27,13 +27,6 @@ service Disperser {
 
   // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-  // As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
-  // in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
-  // uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-  // OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
-  // For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
-  // non-EigenDA dispersers should only request with reserved usages.
-  //
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
   // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
@@ -41,16 +34,6 @@ service Disperser {
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
-
-  // GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
-  // EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
-  // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
-  // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
-  //
-  // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
-  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
-  rpc GetPaymentStateForAllQuorums(GetPaymentStateForAllQuorumsRequest) returns (GetPaymentStateForAllQuorumsReply) {}
 }
 
 // Requests and Replies
@@ -134,28 +117,14 @@ message BlobCommitmentReply {
 }
 
 // GetPaymentStateRequest contains parameters to query the payment state of an account.
-// GetPaymentStateForAllQuorumsRequest is a separate message type even though it currently contains the same fields,
-// because we follow buf's best practices and linting rules which recommend every RPC having its own request and reply types,
-// to allow for evolution of the API without breaking changes: https://buf.build/docs/lint/rules/#rpc_no_server_streaming
 message GetPaymentStateRequest {
   // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
-  // Signature over the account ID and timestamp.
+  // Signature over the account ID
   bytes signature = 2;
   // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
   // request may be rejected.
   uint64 timestamp = 3;
-}
-
-// GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.
-message GetPaymentStateForAllQuorumsRequest {
-  // The ID of the account being queried. This account ID is an eth wallet address of the user.
-  string account_id = 1;
-  // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
-  // request may be rejected.
-  uint64 timestamp = 2;
-  // Signature over the payment account ID and timestamp.
-  bytes signature = 3;
 }
 
 // GetPaymentStateReply contains the payment state of an account.
@@ -163,61 +132,13 @@ message GetPaymentStateReply {
   // global payment vault parameters
   PaymentGlobalParams payment_global_params = 1;
   // off-chain account reservation usage records
-  // Should be empty if reservation.quorum_numbers is empty (i.e. no reservation exists for the account).
   repeated PeriodRecord period_records = 2;
   // on-chain account reservation setting
   Reservation reservation = 3;
-  // off-chain on-demand payment usage.
-  // The bytes are parsed to a big.Int value.
-  // This value should always be <= onchain_cumulative_payment.
-  // See [common.v2.PaymentHeader.cumulative_payment] for more details.
-  //
-  // This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
-  // Future work will support decentralized on-demand dispersals.
+  // off-chain on-demand payment usage
   bytes cumulative_payment = 4;
   // on-chain on-demand payment deposited
-  // The bytes are parsed to a big.Int value.
-  // See [common.v2.PaymentHeader.cumulative_payment] for more details.
   bytes onchain_cumulative_payment = 5;
-}
-
-// GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
-// for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.
-// Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using
-// non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.
-// A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.
-message GetPaymentStateForAllQuorumsReply {
-  // payment vault parameters with per-quorum configurations
-  PaymentVaultParams payment_vault_params = 1;
-  // period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods
-  // Should contain the same number of entries as the `reservations` field.
-  map<uint32, PeriodRecords> period_records = 2;
-  // reservations maps quorum IDs to the on-chain account reservation record
-  // Should contain the same number of entries as the `period_records` field.
-  map<uint32, QuorumReservation> reservations = 3;
-  // off-chain on-demand payment usage.
-  // The bytes are parsed to a big.Int value.
-  // This value should always be <= onchain_cumulative_payment.
-  // See [common.v2.PaymentHeader.cumulative_payment] for more details.
-  //
-  // This value should only be nonzero for the EigenLabs disperser, as it is the only disperser that supports on-demand payments currently.
-  // Future work will support decentralized on-demand dispersals.
-  bytes cumulative_payment = 4;
-  // on-chain on-demand payment deposited.
-  // The bytes are parsed to a big.Int value.
-  // This value should always be >= cumulative_payment.
-  // See [common.v2.PaymentHeader.cumulative_payment] for more details.
-  bytes onchain_cumulative_payment = 5;
-}
-
-// Reservation parameters of an account, used to determine the rate limit for the account.
-message QuorumReservation {
-  // rate limit for the account
-  uint64 symbols_per_second = 1;
-  // start timestamp of the reservation
-  uint32 start_timestamp = 2;
-  // end timestamp of the reservation
-  uint32 end_timestamp = 3;
 }
 
 // Data Types
@@ -303,8 +224,6 @@ message Attestation {
 }
 
 // Global constant parameters defined by the payment vault.
-// This message type will soon be deprecated in replacement of PaymentVaultParams. During endpoint migration, this will be filled
-// with the parameters on quorum 0, quorum configurations will be the same across quorums for the foreseeable future.
 message PaymentGlobalParams {
   // Global ratelimit for on-demand dispersals
   uint64 global_symbols_per_second = 1;
@@ -319,9 +238,6 @@ message PaymentGlobalParams {
 }
 
 // Reservation parameters of an account, used to determine the rate limit for the account.
-// This message type will soon be deprecated. During the migration time, we will maintain the usage by returning the
-// most restrictive reservation parameters across the quroums: symbols_per_second will be the lowest rate of across all quroums
-// with latest start and earliest end timestamp, all the quorum numbers with a reservation, and a dummy quorum_splits which was never used.
 message Reservation {
   // rate limit for the account
   uint64 symbols_per_second = 1;
@@ -342,56 +258,4 @@ message PeriodRecord {
   uint32 index = 1;
   // symbol usage recorded
   uint64 usage = 2;
-}
-
-// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
-message PaymentQuorumConfig {
-  // reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum
-  uint64 reservation_symbols_per_second = 1;
-
-  // on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum
-  uint64 on_demand_symbols_per_second = 2;
-
-  // on_demand_price_per_symbol is the price per symbol for on-demand payments in wei
-  uint64 on_demand_price_per_symbol = 3;
-}
-
-// PaymentQuorumProtocolConfig contains the configuration for a quorum's protocol-level configurations
-message PaymentQuorumProtocolConfig {
-  // min_num_symbols is the minimum number of symbols that must be charged for any request
-  uint64 min_num_symbols = 1;
-
-  // reservation_advance_window is the window in seconds before a reservation starts that it can be activated
-  // It is added here for offchain to have access to all onchain data structs, but it isn't currently used,
-  // and might get removed in the future.
-  uint64 reservation_advance_window = 2;
-
-  // reservation_rate_limit_window is the time window in seconds for reservation rate limiting
-  uint64 reservation_rate_limit_window = 3;
-
-  // on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting
-  uint64 on_demand_rate_limit_window = 4;
-
-  // on_demand_enabled indicates whether on-demand payments are enabled for this quorum
-  bool on_demand_enabled = 5;
-}
-
-// PaymentVaultParams contains the global payment configuration parameters from the payment vault
-// This is the new version of
-message PaymentVaultParams {
-  // quorum_payment_configs maps quorum IDs to their payment configurations
-  map<uint32, PaymentQuorumConfig> quorum_payment_configs = 1;
-
-  // quorum_protocol_configs maps quorum IDs to their protocol configurations
-  map<uint32, PaymentQuorumProtocolConfig> quorum_protocol_configs = 2;
-
-  // on_demand_quorum_numbers lists the quorum numbers that support on-demand payments
-  repeated uint32 on_demand_quorum_numbers = 3;
-}
-
-// An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.
-// The next two period records are included because they may include spillage usages from the previous period or the current period.
-// The client should be aware of the spillage so they account for them as they disperse during those periods.
-message PeriodRecords {
-  repeated PeriodRecord records = 1;
 }
