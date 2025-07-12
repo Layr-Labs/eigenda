@@ -14,21 +14,24 @@ import (
 type NTPSyncedClock struct {
 	offset int64
 	logger logging.Logger
+	cancel context.CancelFunc
 }
 
 // NewNTPSyncedClock creates a new NTP synchronized clock and starts background sync.
-func NewNTPSyncedClock(ctx context.Context, server string, syncInterval time.Duration, logger logging.Logger) (*NTPSyncedClock, error) {
+func NewNTPSyncedClock(parentCtx context.Context, server string, syncInterval time.Duration, logger logging.Logger) (*NTPSyncedClock, error) {
 	if logger == nil {
 		return nil, fmt.Errorf("logger must not be nil")
 	}
+	ctx, cancel := context.WithCancel(parentCtx)
 
 	clock := &NTPSyncedClock{
 		logger: logger.With("component", "NTPSyncedClock"),
+		cancel: cancel,
 	}
 
-	// Try to sync once, but don't fail if it doesn't work
 	if err := clock.syncOnce(server); err != nil {
-		clock.logger.Warn("Initial NTP sync failed, will retry in background and use system clock until sync succeeds", "err", err)
+		cancel()
+		return nil, fmt.Errorf("initial NTP query failed: %w", err)
 	}
 
 	go clock.runSyncLoop(ctx, server, syncInterval)
@@ -64,7 +67,6 @@ func (c *NTPSyncedClock) syncOnce(server string) error {
 }
 
 // Now returns the current time compensated by the latest NTP offset.
-// If the NTP sync has not yet succeeded, it returns the current system time.
 func (c *NTPSyncedClock) Now() time.Time {
 	offset := atomic.LoadInt64(&c.offset)
 	return time.Now().Add(time.Duration(offset))
