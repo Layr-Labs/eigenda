@@ -35,7 +35,7 @@ var (
 func main() {
 	app := cli.NewApp()
 	app.Flags = flags.Flags
-	app.Version = fmt.Sprintf("%s-%s-%s", node.SemVer, node.GitCommit, node.GitDate)
+	app.Version = fmt.Sprintf("%s %s %s", node.SemVer, node.GitCommit, node.GitDate)
 	app.Name = node.AppName
 	app.Usage = "EigenDA Node"
 	app.Description = "Service for receiving and storing encoded blobs from disperser"
