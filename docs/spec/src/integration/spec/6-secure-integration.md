@@ -49,8 +49,8 @@ When validation fails, the DA Cert is discarded and nothing is forwarded downstr
 - Batcher submitted improperly-serialized or unrecognized DA Cert
 
 #### Recency Check Failed
-- DA Cert reached rollup inbox too late
-- Host provides false recency window size
+- DA Cert reached rollup inbox after reference block number + recency window 
+- Host provides false recency window size that leads to failure
 
 #### Cert Validity Check Failed
 - Certificate doesn't satisfy [quorum-attestation constraint](#2-cert-validation)
