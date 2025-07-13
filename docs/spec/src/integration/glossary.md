@@ -8,4 +8,4 @@ DA cert: an `EigenDA Certificate` (or short `DACert`) contains all the informati
 
 EigenDA blob derivation: a sequence of procedures to convert a byte array repreesenting a DA cert to the final rollup payload.
 
-Preimage oracle: Some procedures during the derivation require fetching additional data beyond the Input mentioned above. A preimage oracle is an object which the blob derivation is using for fetching those data.
+Preimage oracle: Interface for fetching additional data during EigenDA blob derivation
