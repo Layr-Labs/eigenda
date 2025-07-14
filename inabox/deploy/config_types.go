@@ -198,6 +198,9 @@ type Config struct {
 	// Dockertest resources for Anvil
 	anvilPool     *dockertest.Pool
 	anvilResource *dockertest.Resource
+
+	// Dockertest resources for Graph Node services
+	graphResources *GraphResources
 }
 
 func (env *Config) IsEigenDADeployed() bool {

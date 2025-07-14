@@ -429,6 +429,7 @@ func (env *Config) StopAnvil() {
 	}
 }
 
+
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 

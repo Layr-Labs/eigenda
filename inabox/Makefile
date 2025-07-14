@@ -20,9 +20,8 @@ deploy-all:
 	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
 
 stop-infra:
-	./bin.sh stop-graph
-	docker stop anvil-inabox || true
-	docker stop localstack-test || true
+# 	We rm forcefully instead of using `docker stop` because it is much faster and we don't care about graceful shutdowns in tests.
+	docker rm -f graph-node graph-postgres graph-ipfs anvil-inabox localstack-test 2>/dev/null || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml

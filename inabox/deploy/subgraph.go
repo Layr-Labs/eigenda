@@ -181,18 +181,17 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 
 func (env *Config) StartGraphNode() {
 	timeStep("Graph node startup", func() {
-		changeDirectory(filepath.Join(env.rootPath, "inabox"))
-		err := execCmd("./bin.sh", []string{"start-graph"}, []string{}, true)
+		resources, err := StartDockertestWithGraphServices()
 		if err != nil {
-			log.Panicf("Failed to start graph node. Err: %s", err)
+			log.Panicf("Failed to start graph services. Err: %s", err)
 		}
+		env.graphResources = resources
 	})
 }
 
 func (env *Config) StopGraphNode() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-graph"}, []string{}, true)
-	if err != nil {
-		log.Panicf("Failed to stop graph node. Err: %s", err)
+	if env.graphResources != nil {
+		PurgeDockertestGraphResources(env.graphResources)
+		env.graphResources = nil
 	}
 }

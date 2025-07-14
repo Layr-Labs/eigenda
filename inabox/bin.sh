@@ -235,28 +235,6 @@ function stop_detached {
 }
 
 
-function start_graph {
-
-    echo "Starting graph node ....."
-    pushd ./thegraph
-        docker compose up -d
-    popd
-     ./wait-for http://0.0.0.0:8000 -- echo "GraphQL up"
-
-     if [ $? -ne 0 ]; then
-        echo "Failed to start graph node"
-        exit 1
-     fi
-
-    echo "Graph node started ....."
-}
-
-function stop_graph {
-
-    pushd ./thegraph
-        docker compose down -v
-    popd
-}
 
 testpath=$(ls -td ./testdata/*/ | head -1)
 
@@ -272,12 +250,8 @@ EOF
         start_detached ${@:2} ;;
     stop)
         stop_detached ${@:2} ;;
-    start-graph)
-        start_graph ${@:2} ;;
-    stop-graph)
-        stop_graph ${@:2} ;;
     *)
-        echo "Usage: $0 {start|start-detached|stop|start-graph|stop-graph}"
+        echo "Usage: $0 {start|start-detached|stop}"
         exit 1
         ;;
 esac
