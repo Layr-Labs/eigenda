@@ -86,7 +86,7 @@ fuzz-tests:
 
 # Integration tests use mocks
 integration-tests:
-	go test -v ./churner/tests
+	go test -v ./operators/churner/tests
 	go test -v ./core/indexer
 	go test -v ./node/plugin/tests
 # TODO: this test is against holesky, should be moved to the live-tests.
