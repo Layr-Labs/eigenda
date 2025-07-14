@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer check-fmt
+.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-churner integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi check-fmt
 
 ifeq ($(wildcard .git/*),)
 $(warning semver disabled - building from release zip)
@@ -70,48 +70,38 @@ build:
 	cd relay && make build
 	cd litt && make build
 
-dataapi-build:
-	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
-
-unit-tests:
-	./test.sh
-
-live-tests:
-	go test -v ./test/v2/live -v -timeout 60m
-
-fuzz-tests:
-	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
-
-integration-tests-churner:
-	go test -v ./churner/tests
-
-integration-tests-indexer:
-	go test -v ./core/indexer
-
-integration-tests-node-plugin:
-	go test -v ./node/plugin/tests
-
-integration-tests-inabox:
-	make build
-	cd inabox && make run-e2e
-
-integration-tests-inabox-nochurner:
-	make build
-	cd inabox && make run-e2e-nochurner
-
-integration-tests-graph-indexer:
-	make build
-	go test -v ./core/thegraph
-
-integration-tests-dataapi:
-	make dataapi-build
-	go test -v ./disperser/dataapi
-
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake node-group-release ${PUSH_FLAG}
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake proxy ${PUSH_FLAG}
+
+# Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
+# TODO: we should break these up into short and long unit-tests.
+unit-tests:
+	./test.sh
+
+fuzz-tests:
+	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
+
+# Integration tests use mocks
+integration-tests:
+	go test -v ./churner/tests
+	go test -v ./core/indexer
+	go test -v ./node/plugin/tests
+# TODO: this test is against holesky, should be moved to the live-tests.
+	go test -v ./api/clients --testnet-integration
+	go test -v ./disperser/dataapi
+
+# Tests that require a build because they start local inabox infra:
+# either chain, subgraph, or localstack.
+integration-tests-inabox: build
+	cd inabox && make run-e2e
+	go test -v ./core/thegraph
+
+# These are e2e tests that run against live environments (preprod and holesky currently).
+live-tests:
+	go test -v ./test/v2/live -v -timeout 60m
 
 semver:
 	echo "${SEMVER}"
