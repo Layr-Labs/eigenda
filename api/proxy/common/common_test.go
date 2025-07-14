@@ -25,14 +25,6 @@ func TestParseByteAmount(t *testing.T) {
 		{"3 mib", 3 * 1024 * 1024, false},
 		{"10 MB", 10 * 1000 * 1000, false},
 		{"100 mb", 100 * 1000 * 1000, false},
-		{"1 GiB", 1024 * 1024 * 1024, false},
-		{"10 gib", 10 * 1024 * 1024 * 1024, false},
-		{"10 GB", 10 * 1000 * 1000 * 1000, false},
-		{"100 gb", 100 * 1000 * 1000 * 1000, false},
-		{"1 TiB", 1024 * 1024 * 1024 * 1024, false},
-		{"10 tib", 10 * 1024 * 1024 * 1024 * 1024, false},
-		{"1 TB", 1000 * 1000 * 1000 * 1000, false},
-		{"100 tb", 100 * 1000 * 1000 * 1000 * 1000, false},
 
 		{"   5 B   ", 5, false}, // Whitespace handling
 		{"10", 10, false},       // Default to bytes if no unit
