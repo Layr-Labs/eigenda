@@ -65,7 +65,7 @@ jobs:
             inabox/testdata/*/logs/
             inabox/testdata/*/deploy.log
 
-      - name: Send GitHub Action trigger data to Slack workflow
+      - name: Send GitHub Action trigger data to Slack eigenda-pr channel
         if: ${{ failure() }}
         id: slack
         uses: slackapi/slack-github-action@v1.24.0
@@ -81,5 +81,4 @@ jobs:
               "commit_sha": "https://github.com/Layr-Labs/eigenda/commit/${{ github.sha }}"
             }
         env:
-          # TODO: which channel is this being sent to?
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
