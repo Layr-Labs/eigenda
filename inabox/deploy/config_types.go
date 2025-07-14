@@ -18,20 +18,6 @@ type Staker struct {
 	Stake      string `json:"stake"`
 }
 
-// Docker compose
-type testbed struct {
-	Services map[string]map[string]interface{} `yaml:"services"`
-}
-
-type Service struct {
-	Image         string   `yaml:"image"`
-	Volumes       []string `yaml:"volumes"`
-	Ports         []string `yaml:"ports"`
-	EnvFile       []string `yaml:"env_file"`
-	Command       []string `yaml:"command"`
-	ContainerName string   `yaml:"container_name"`
-}
-
 type EnvList map[string]string
 
 type ContractDeployer struct {

@@ -30,15 +30,6 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const (
-	churnerImage   = "ghcr.io/layr-labs/eigenda/churner:local"
-	disImage       = "ghcr.io/layr-labs/eigenda/disperser:local"
-	encoderImage   = "ghcr.io/layr-labs/eigenda/encoder:local"
-	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
-	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
-	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
-	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
-)
 
 // getKeyString retrieves a ECDSA private key string for a given Ethereum account
 func (env *Config) getKeyString(name string) string {
@@ -160,10 +151,14 @@ func (env *Config) deployEigenDAContracts() {
 
 	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
 	//       can be deprecated.
-	writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data)
-	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"})
+	// Create inabox subdirectories for deployment artifacts
+	createDirectory("script/deploy/certverifier/config/v1/inabox")
+	createDirectory("script/deploy/certverifier/output/v1/inabox")
+	
+	writeFile("script/deploy/certverifier/config/v1/inabox/deploy_config_v1.json", data)
+	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox/deploy_config_v1.json", "v1/inabox/deploy.json"})
 
-	data = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
+	data = readFile("script/deploy/certverifier/output/v1/inabox/deploy.json")
 	var verifierAddress struct{ EigenDACertVerifier string }
 	err = json.Unmarshal(data, &verifierAddress)
 	if err != nil {

@@ -1,6 +1,6 @@
 # Inabox Tests
 
-Notice: The scripts for setting up a local geth chain are currently broken. The instructions below use anvil instead
+Notice: This local devnet setup uses anvil as the test chain
 
 ## First time setup
 - Go path is in system path. [Instructions for installing go](https://go.dev/doc/install).

@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 )
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
@@ -501,74 +500,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 	return v
 }
 
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genService(compose testbed, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"ports":    ports,
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
-			env.rootPath + "/inabox/resources:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-	}
-}
-
-// Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genNodeService(compose testbed, name, image, envFile string, ports []string) {
-
-	for i, port := range ports {
-		ports[i] = port + ":" + port
-	}
-
-	compose.Services[name] = map[string]interface{}{
-		"image":    image,
-		"env_file": []string{envFile},
-		"volumes": []string{
-			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
-			env.rootPath + "/inabox/resources:/resources",
-		},
-		"extra_hosts": []string{
-			"host.docker.internal:host-gateway",
-		},
-		// "environment": []string{
-		// 	"NODE_HOSTNAME=" + name,
-		// },
-	}
-
-	nginxService := name + "_nginx"
-	compose.Services[nginxService] = map[string]interface{}{
-		"image":    "nginx:latest",
-		"env_file": []string{envFile},
-		"environment": []string{
-			"REQUEST_LIMIT=1r/s",
-			"BURST_LIMIT=2",
-			"NODE_HOST=" + name,
-		},
-		"depends_on": []string{name},
-		"ports":      ports,
-		"volumes": []string{
-			env.rootPath + "/node/cmd/resources/nginx-local.conf:/etc/nginx/templates/default.conf.template:ro",
-		},
-	}
-}
-
-func genTelemetryServices(compose testbed, name, image string, volumes []string) {
-	compose.Services[name] = map[string]interface{}{
-		"image":  image,
-		"volume": volumes,
-	}
-}
 
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
 	if env.Environment.IsLocal() {
@@ -605,12 +536,6 @@ func (env *Config) GenerateAllVariables() {
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
 
-	// Create compose file
-	composeFile := env.Path + "/docker-compose.yml"
-	servicesMap := make(map[string]map[string]interface{})
-	compose := testbed{
-		Services: servicesMap,
-	}
 
 	// Create participants
 	port := env.Services.BasePort
@@ -618,13 +543,10 @@ func (env *Config) GenerateAllVariables() {
 	// Generate churners
 	name := "churner"
 	port += 2
-	logPath, _, filename, envFile := env.getPaths(name)
+	logPath, _, _, envFile := env.getPaths(name)
 	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
 	writeEnv(churnerConfig.getEnvMap(), envFile)
 	env.Churner = churnerConfig
-	env.genService(
-		compose, name, churnerImage,
-		filename, []string{fmt.Sprint(port)})
 
 	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
 
@@ -634,29 +556,22 @@ func (env *Config) GenerateAllVariables() {
 	port += 2
 
 	name = "dis0"
-	logPath, dbPath, filename, envFile := env.getPaths(name)
+	logPath, dbPath, _, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
 	writeEnv(disperserConfig.getEnvMap(), envFile)
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	// v2 disperser
 	grpcPort = fmt.Sprint(port + 1)
 	port += 2
 
 	name = "dis1"
-	logPath, dbPath, filename, envFile = env.getPaths(name)
+	logPath, dbPath, _, envFile = env.getPaths(name)
 
 	// Convert key to address
 	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
 	writeEnv(disperserConfig.getEnvMap(), envFile)
 	env.Dispersers = append(env.Dispersers, disperserConfig)
-
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
 
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 		metricsPort := fmt.Sprint(port + 1) // port
@@ -668,7 +583,7 @@ func (env *Config) GenerateAllVariables() {
 		port += 7
 
 		name := fmt.Sprintf("opr%v", i)
-		logPath, dbPath, filename, envFile := env.getPaths(name)
+		logPath, dbPath, _, envFile := env.getPaths(name)
 		key, _ := env.getKey(name)
 
 		// Convert key to address
@@ -676,43 +591,30 @@ func (env *Config) GenerateAllVariables() {
 		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
 		writeEnv(operatorConfig.getEnvMap(), envFile)
 		env.Operators = append(env.Operators, operatorConfig)
-
-		env.genNodeService(
-			compose, name, nodeImage,
-			filename, []string{dispersalPort, retrievalPort})
 	}
 
 	// Batcher
 	name = "batcher0"
-	logPath, _, filename, envFile = env.getPaths(name)
+	logPath, _, _, envFile = env.getPaths(name)
 	key, _ := env.getKey(name)
 	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
 	writeEnv(batcherConfig.getEnvMap(), envFile)
 	env.Batcher = append(env.Batcher, batcherConfig)
-	env.genService(
-		compose, name, batcherImage,
-		filename, []string{})
 
 	// Encoders
 	// TODO: Add more encoders
 	name = "enc0"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig := env.generateEncoderVars(0, "34000")
 	writeEnv(encoderConfig.getEnvMap(), envFile)
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34000"})
 
 	// v2 encoder
 	name = "enc1"
-	_, _, filename, envFile = env.getPaths(name)
+	_, _, _, envFile = env.getPaths(name)
 	encoderConfig = env.generateEncoderV2Vars(0, "34001")
 	writeEnv(encoderConfig.getEnvMap(), envFile)
 	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34001"})
 
 	// Stakers
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
@@ -733,13 +635,10 @@ func (env *Config) GenerateAllVariables() {
 		name := fmt.Sprintf("relay%v", i)
 		grpcPort := fmt.Sprint(port + 1)
 		port += 2
-		_, _, filename, envFile := env.getPaths(name)
+		_, _, _, envFile := env.getPaths(name)
 		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
 		writeEnv(relayConfig.getEnvMap(), envFile)
 		env.Relays = append(env.Relays, relayConfig)
-		env.genService(
-			compose, name, relayImage,
-			filename, []string{grpcPort})
 	}
 
 	name = "retriever0"
@@ -755,29 +654,4 @@ func (env *Config) GenerateAllVariables() {
 	controllerConfig := env.generateControllerVars(0, graphUrl)
 	writeEnv(controllerConfig.getEnvMap(), envFile)
 	env.Controller = controllerConfig
-
-	if env.Environment.IsLocal() {
-
-		if env.Telemetry.IsNeeded {
-			// sd is required for accessing docker daemon
-			// agent.yaml configures the grafana agent
-			agentVolumes := append(
-				env.Telemetry.DockerSd,
-				env.Telemetry.ConfigPath+":/etc/agent/agent.yaml",
-			)
-
-			// run grafana agent
-			genTelemetryServices(compose, "grafana-agent", "grafana/agent", agentVolumes)
-			// run node exporter
-			genTelemetryServices(compose, "node-exporter", "prom/node-exporter", nil)
-		}
-
-		// Write to compose file
-		composeYaml, err := yaml.Marshal(&compose)
-		if err != nil {
-			log.Panicf("Error: %s", err.Error())
-		}
-
-		writeFile(composeFile, composeYaml)
-	}
 }
