@@ -13,23 +13,16 @@ new-anvil-nochurner:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
 
-
-chain:
-	go run ./deploy/cmd -localstack-port 4570 chain
-
-localstack:
-	go run ./deploy/cmd -localstack-port 4570 localstack
-
-exp: 
-	go run ./deploy/cmd exp
+clean:
+	rm -rf testdata/*
 
 deploy-all:
 	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
 
 stop-infra:
-	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	docker stop localstack-test
+	docker stop anvil-inabox || true
+	docker stop localstack-test || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
@@ -40,5 +33,14 @@ run-e2e-nochurner:
 run-e2e-nograph:
 	go test ./tests -v -config=../templates/testconfig-anvil-nograph.yaml
 
-clean:
-	rm -rf testdata/*
+### Debug indidividual deploy targets
+
+# chain deploys both anvil and thegraph
+deploy-anvil-and-graph:
+	go run ./deploy/cmd -localstack-port 4570 chain
+
+deploy-localstack:
+	go run ./deploy/cmd -localstack-port 4570 localstack
+
+deploy-exp: 
+	go run ./deploy/cmd exp

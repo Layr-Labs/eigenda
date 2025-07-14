@@ -234,26 +234,6 @@ function stop_detached {
     rm -f $pid_file
 }
 
-function start_anvil {
-
-    echo "Starting anvil server ....."
-    anvil --host 0.0.0.0 > /dev/null &
-    anvil_pid=$!
-    echo "Anvil server started ....."
-
-    echo $anvil_pid > ./anvil.pid
-
-}
-
-function stop_anvil {
-
-    pid_file="./anvil.pid"
-    anvil_pid=$(cat $pid_file)
-
-    kill $anvil_pid
-
-    rm -f $pid_file
-}
 
 function start_graph {
 
@@ -292,13 +272,12 @@ EOF
         start_detached ${@:2} ;;
     stop)
         stop_detached ${@:2} ;;
-    start-anvil)
-        start_anvil ${@:2} ;;
-    stop-anvil)
-        stop_anvil ${@:2} ;;
     start-graph)
         start_graph ${@:2} ;;
     stop-graph)
         stop_graph ${@:2} ;;
     *)
+        echo "Usage: $0 {start|start-detached|stop|start-graph|stop-graph}"
+        exit 1
+        ;;
 esac

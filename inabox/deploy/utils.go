@@ -247,7 +247,7 @@ func GetLatestBlockNumber(rpcUrl string) int {
 	err := cmd.Run()
 	if err != nil {
 		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
+		log.Panicf("Failed to execute cast wallet command. Command: %s. Err: %s", cmd.String(), err)
 	}
 
 	log.Print("Cast bn command ran successfully")

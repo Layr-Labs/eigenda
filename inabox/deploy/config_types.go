@@ -2,12 +2,14 @@ package deploy
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ory/dockertest/v3"
 
 	"gopkg.in/yaml.v3"
 )
@@ -192,6 +194,10 @@ type Config struct {
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
+
+	// Dockertest resources for Anvil
+	anvilPool     *dockertest.Pool
+	anvilResource *dockertest.Resource
 }
 
 func (env *Config) IsEigenDADeployed() bool {
@@ -212,7 +218,9 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 		configPath = testPath + "/config.yaml"
 
 	}
+	fmt.Println("Loading test config from:", configPath)
 	data := readFile(configPath)
+	fmt.Println("Test config data:", string(data))
 
 	err = yaml.Unmarshal(data, &testEnv)
 	if err != nil {

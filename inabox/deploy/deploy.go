@@ -30,6 +30,13 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// timeStep executes a function and measures its execution time, printing the result
+func timeStep(stepName string, fn func()) {
+	start := time.Now()
+	fn()
+	duration := time.Since(start)
+	fmt.Printf("[TIMING] %s: %.2fs\n", stepName, duration.Seconds())
+}
 
 // getKeyString retrieves a ECDSA private key string for a given Ethereum account
 func (env *Config) getKeyString(name string) string {
@@ -102,6 +109,12 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 // deployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
 func (env *Config) deployEigenDAContracts() {
+	timeStep("Contract deployment", func() {
+		env.deployEigenDAContractsInternal()
+	})
+}
+
+func (env *Config) deployEigenDAContractsInternal() {
 	log.Print("Deploy the EigenDA and EigenLayer contracts")
 
 	// get deployer
@@ -154,7 +167,7 @@ func (env *Config) deployEigenDAContracts() {
 	// Create inabox subdirectories for deployment artifacts
 	createDirectory("script/deploy/certverifier/config/v1/inabox")
 	createDirectory("script/deploy/certverifier/output/v1/inabox")
-	
+
 	writeFile("script/deploy/certverifier/config/v1/inabox/deploy_config_v1.json", data)
 	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox/deploy_config_v1.json", "v1/inabox/deploy.json"})
 
@@ -170,6 +183,12 @@ func (env *Config) deployEigenDAContracts() {
 // Deploys a EigenDA experiment
 // TODO: Figure out what necessitates experiment nomenclature
 func (env *Config) DeployExperiment() {
+	timeStep("Total experiment deployment", func() {
+		env.deployExperimentInternal()
+	})
+}
+
+func (env *Config) deployExperimentInternal() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 	defer env.SaveTestConfig()
 
@@ -193,6 +212,8 @@ func (env *Config) DeployExperiment() {
 	if env.EigenDA.Deployer != "" && !env.IsEigenDADeployed() {
 		fmt.Println("Deploying EigenDA")
 		env.deployEigenDAContracts()
+	} else {
+		fmt.Println("EigenDA already deployed, skipping deployment")
 	}
 
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
@@ -206,13 +227,17 @@ func (env *Config) DeployExperiment() {
 	env.localstackRegion = "us-east-1"
 
 	fmt.Println("Generating disperser keypair")
-	err = env.GenerateDisperserKeypair()
-	if err != nil {
-		log.Panicf("could not generate disperser keypair: %v", err)
-	}
+	timeStep("Disperser keypair generation", func() {
+		err = env.GenerateDisperserKeypair()
+		if err != nil {
+			log.Panicf("could not generate disperser keypair: %v", err)
+		}
+	})
 
 	fmt.Println("Generating variables")
-	env.GenerateAllVariables()
+	timeStep("Variable generation", func() {
+		env.GenerateAllVariables()
+	})
 
 	fmt.Println("Test environment has successfully deployed!")
 }
@@ -385,11 +410,15 @@ func (env *Config) StopBinaries() {
 }
 
 func (env *Config) StartAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{}, false) // printing output causes hang
-	if err != nil {
-		log.Panicf("Failed to start anvil. Err: %s", err)
-	}
+	timeStep("Anvil startup", func() {
+		anvilPort := "8545"
+		pool, resource, err := StartDockertestWithAnvilContainer(anvilPort)
+		if err != nil {
+			log.Panicf("Failed to start anvil container. Err: %s", err)
+		}
+		env.anvilPool = pool
+		env.anvilResource = resource
+	})
 }
 
 func (env *Config) StopAnvil() {
