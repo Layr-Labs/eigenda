@@ -18,9 +18,15 @@ type loadGeneratorMetrics struct {
 	validatorReadFailures  *prometheus.CounterVec
 }
 
-// newLoadGeneratorMetrics creates a new loadGeneratorMetrics.0
+// newLoadGeneratorMetrics creates a new loadGeneratorMetrics.
 func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetrics {
-	operationsInFlight := promauto.With(registry).NewGaugeVec(
+	// This workaround is needed because of the bug-prone API promauto provides.
+	// See https://github.com/prometheus/client_golang/issues/1830 for more details.
+	var registerer prometheus.Registerer
+	if registry != nil {
+		registerer = registry
+	}
+	operationsInFlight := promauto.With(registerer).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "operations_in_flight",
@@ -29,7 +35,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{"operation"},
 	)
 
-	dispersalSuccesses := promauto.With(registry).NewCounterVec(
+	dispersalSuccesses := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "dispersal_successes",
@@ -38,7 +44,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
-	dispersalFailures := promauto.With(registry).NewCounterVec(
+	dispersalFailures := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 
@@ -48,7 +54,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
-	relayReadSuccesses := promauto.With(registry).NewCounterVec(
+	relayReadSuccesses := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "relay_read_successes",
@@ -57,7 +63,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
-	relayReadFailures := promauto.With(registry).NewCounterVec(
+	relayReadFailures := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "relay_read_failures",
@@ -66,7 +72,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
-	validatorReadSuccesses := promauto.With(registry).NewCounterVec(
+	validatorReadSuccesses := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "validator_read_successes",
@@ -75,7 +81,7 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
-	validatorReadFailures := promauto.With(registry).NewCounterVec(
+	validatorReadFailures := promauto.With(registerer).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "validator_read_failures",
