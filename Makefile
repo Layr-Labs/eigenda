@@ -78,6 +78,8 @@ unit-tests:
 
 live-tests:
 	go test -v ./test/v2/live -v -timeout 60m
+live-tests-v1:
+	go test -v ./api/clients --live-test
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
