@@ -287,7 +287,7 @@ func NewNode(
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
 		relayClientConfig := &relay.RelayClientConfig{
-			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
