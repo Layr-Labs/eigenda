@@ -12,6 +12,14 @@ library InitializableLib {
         return InitializableStorage.layout();
     }
 
+    function initialize() internal {
+        setInitializedVersion(1);
+    }
+
+    function reinitialize(uint8 version) internal {
+        setInitializedVersion(version);
+    }
+
     function setInitializedVersion(uint8 version) internal {
         if (s().initialized >= version) {
             revert AlreadyInitialized();
