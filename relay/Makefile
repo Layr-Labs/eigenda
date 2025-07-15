@@ -5,7 +5,7 @@ clean:
 	rm -rf ./bin
 
 # Build the light node.
-build: clean
+build:
 	go mod tidy
 	go build -o ./bin/relay ./cmd
 

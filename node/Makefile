@@ -15,11 +15,11 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-build: clean
+build:
 	go mod tidy
 	go build -o ./bin/node ./cmd
 
-build-plugin: clean
+build-plugin:
 	go mod tidy
 	go build -o ./bin/node_plugin ./plugin/cmd
 

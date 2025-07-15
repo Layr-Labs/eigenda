@@ -1,4 +1,4 @@
-build: clean
+build:
 	go mod tidy
 	go build -o ./bin/quorumscan ./cmd
 
