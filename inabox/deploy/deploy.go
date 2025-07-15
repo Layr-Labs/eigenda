@@ -422,11 +422,7 @@ func (env *Config) StartAnvil() {
 }
 
 func (env *Config) StopAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{}, true)
-	if err != nil {
-		log.Panicf("Failed to stop anvil. Err: %s", err)
-	}
+	PurgeDockertestAnvilResources(env.anvilPool, env.anvilResource)
 }
 
 

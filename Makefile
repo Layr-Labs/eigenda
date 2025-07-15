@@ -83,7 +83,7 @@ fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
 
 integration-tests-churner:
-	go test -v ./churner/tests
+	go test -v ./operators/churner/tests
 
 integration-tests-indexer:
 	go test -v ./core/indexer
