@@ -224,9 +224,30 @@ func startGraphNodeContainer(pool *dockertest.Pool, networkID, postgresHost, ipf
 		return nil, err
 	}
 
-	// TODO: add a health check for graph-node.
-	// Currently no endpoint is available, see https://github.com/graphprotocol/graph-node/issues/5484
-	fmt.Println("Graph Node container started successfully")
+	// Health check for Graph Node - verify GraphQL endpoint is available
+	pool.MaxWait = 60 * time.Second
+	if err := pool.Retry(func() error {
+		fmt.Println("Waiting for Graph Node GraphQL endpoint to be ready")
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		// TODO: document why we wait on this endpoint given that the one we use in the yarn commands that follow is 8020.
+		resp, err := client.Get("http://0.0.0.0:8000")
+		if err != nil {
+			return fmt.Errorf("GraphQL endpoint is not ready: %w", err)
+		}
+		defer core.CloseLogOnError(resp.Body, "graph node response body", nil)
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("GraphQL endpoint returned status %d", resp.StatusCode)
+		}
+
+		fmt.Println("GraphQL up")
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to start graph node: %w", err)
+	}
+
+	fmt.Println("Graph node started .....")
 
 	return resource, nil
 }
