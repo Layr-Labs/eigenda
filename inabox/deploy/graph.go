@@ -16,6 +16,7 @@ type GraphResources struct {
 	PostgresResource *dockertest.Resource
 	IpfsResource     *dockertest.Resource
 	GraphResource    *dockertest.Resource
+	NetworkResource  *docker.Network
 }
 
 // Shared configuration constants for postgres
@@ -48,7 +49,7 @@ func StartDockertestWithGraphServices() (*GraphResources, error) {
 		return nil, fmt.Errorf("could not create docker network: %w", err)
 	}
 
-	resources := &GraphResources{Pool: pool}
+	resources := &GraphResources{Pool: pool, NetworkResource: network}
 
 	// Start Postgres first
 	fmt.Println("Starting Postgres container")
@@ -274,6 +275,14 @@ func PurgeDockertestGraphResources(resources *GraphResources) {
 			if err := resources.Pool.Purge(resources.PostgresResource); err != nil {
 				log.Printf("Could not purge postgres resource: %s", err)
 			}
+		}
+	}
+
+	// Remove the network last, after all containers are cleaned up
+	if resources.NetworkResource != nil && resources.Pool != nil {
+		fmt.Println("Removing docker network")
+		if err := resources.Pool.Client.RemoveNetwork(resources.NetworkResource.ID); err != nil {
+			log.Printf("Could not remove docker network: %s", err)
 		}
 	}
 }

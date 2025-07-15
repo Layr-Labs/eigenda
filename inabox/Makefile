@@ -22,6 +22,7 @@ deploy-all:
 stop-infra:
 # 	We rm forcefully instead of using `docker stop` because it is much faster and we don't care about graceful shutdowns in tests.
 	docker rm -f graph-node graph-postgres graph-ipfs anvil-inabox localstack-test 2>/dev/null || true
+	docker network rm graph-network 2>/dev/null || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
