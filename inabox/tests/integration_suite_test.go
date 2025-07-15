@@ -84,7 +84,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nograph.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
