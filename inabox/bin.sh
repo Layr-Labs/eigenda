@@ -239,6 +239,15 @@ function start_anvil {
     echo "Starting anvil server ....."
     anvil --host 0.0.0.0 > /dev/null &
     anvil_pid=$!
+    
+    # Wait for anvil to be ready
+    ./wait-for 0.0.0.0:8545 -- echo "Anvil ready"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to start anvil server"
+        exit 1
+    fi
+    
     echo "Anvil server started ....."
 
     echo $anvil_pid > ./anvil.pid
