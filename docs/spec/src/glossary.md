@@ -30,4 +30,5 @@ A sequence of procedures to convert a byte array representing a DA certificate t
 
 ## Preimage Oracle
 
-An interface for fetching additional data during EigenDA blob derivation.
+An object with an interface for fetching additional data during EigenDA blob derivation by using some keys generated from the data. Multiple implementations of the preimage oracle show up in the EigenDA. In proxy, ETH rpc serves as the preimage oracle for DAcert validity; EigenDA network rpc
+serves as the preimage oracle for EigenDA blob.
