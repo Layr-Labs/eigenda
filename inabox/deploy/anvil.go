@@ -40,7 +40,7 @@ func StartDockertestWithAnvilContainer(anvilPort string) (*dockertest.Pool, *doc
 	}
 
 	fmt.Printf("Running container with cmd: %v\n", runOpts.Cmd)
-	
+
 	resource, err := pool.RunWithOptions(runOpts, func(config *docker.HostConfig) {
 		// set AutoRemove to true so that stopped container goes away by itself
 		config.AutoRemove = true
@@ -62,7 +62,7 @@ func StartDockertestWithAnvilContainer(anvilPort string) (*dockertest.Pool, *doc
 	pool.MaxWait = 10 * time.Second
 	if err := pool.Retry(func() error {
 		fmt.Println("Waiting for anvil to start")
-		
+
 		// Try to connect to Anvil RPC endpoint
 		client := &http.Client{Timeout: 2 * time.Second}
 		req, err := http.NewRequest("POST", fmt.Sprintf("http://0.0.0.0:%s", anvilPort), nil)
@@ -70,7 +70,7 @@ func StartDockertestWithAnvilContainer(anvilPort string) (*dockertest.Pool, *doc
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
-		
+
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println("Anvil is not running:", err)

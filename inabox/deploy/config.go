@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-
 )
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
@@ -500,7 +499,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 	return v
 }
 
-
 func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile string) {
 	if env.Environment.IsLocal() {
 		logPath = ""
@@ -535,7 +533,6 @@ func (env *Config) GenerateAllVariables() {
 	// Create envs directory
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
-
 
 	// Create participants
 	port := env.Services.BasePort

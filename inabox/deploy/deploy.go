@@ -425,7 +425,6 @@ func (env *Config) StopAnvil() {
 	PurgeDockertestAnvilResources(env.anvilPool, env.anvilResource)
 }
 
-
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 
