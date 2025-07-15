@@ -14,11 +14,11 @@ Side car server as a part of rollup and used for secure and trustless communicat
 
 ## EigenDA Client
 
-A collection of client [modules](https://github.com/Layr-Labs/eigenda/tree/bb91b829995c28e813fce46412a77f9fa428b0af/api/clients/v2) used for securely dispersing and reading EigenDA blobs.
+A collection of [clients](https://github.com/Layr-Labs/eigenda/tree/bb91b829995c28e813fce46412a77f9fa428b0af/api/clients/v2) used for securely dispersing and reading EigenDA blobs.
 
 ## Rollup Payload
 
-Compressed batches of transactions or state transition diffs.
+Compressed batches of transactions or state diffs.
 
 ## DA Certificate (DACert)
 

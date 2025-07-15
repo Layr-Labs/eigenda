@@ -54,13 +54,12 @@ When validation fails, the DA Cert is discarded and nothing is forwarded downstr
 
 #### Cert Validity Check Failed
 - Certificate doesn't satisfy [quorum-attestation constraint](#2-cert-validation)
-- Host provides false validity information via preimage oracle
+- Host provides an incorrect validity boolean via preimage oracle
 
 #### Decode Blob Failed
 - EigenDA blob cannot be decoded back to rollup payload per [spec](./3-datastructs.md#data-structs)
 - Causes:
-  - Batcher intentionally corrupts encoding
-  - Host transmits incorrect data
+  - Host or Batcher intentionally corrupts encoding
 
 **Success:** If no failures occur, the pipeline outputs the expected payload.
 
@@ -78,7 +77,7 @@ Each integration can be tailored to fit specifi rollup protocol constraints.
 Rollups can split the derivation pipeline between on-chain and off-chain verification:
 
 **Examples:**
-- **Arbitrum with EigenDA V1:** All components through cert validity checked in rollup inbox
+- **Arbitrum with EigenDA V1:** All steps up to the cert validity are checked onchain in the rollup inbox
 - **OP Integration:** Entire EigenDA blob derivation takes place off-chain 
 
 ### VM for Optimistic Fault Proof
