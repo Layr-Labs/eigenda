@@ -166,7 +166,7 @@ func startIpfsContainer(pool *dockertest.Pool, networkID string) (*dockertest.Re
 
 	// Simple readiness check for IPFS - ensure it's ready to accept connections
 	// This mimics the docker-compose "service_started" condition
-	pool.MaxWait = 10 * time.Second
+	pool.MaxWait = 30 * time.Second
 	if err := pool.Retry(func() error {
 		fmt.Println("Waiting for IPFS to be ready to accept connections")
 
