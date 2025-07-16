@@ -10,25 +10,18 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
-	NtpServer         string
-	NtpSyncInterval   time.Duration
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -64,7 +57,6 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
-	ntpClock           *core.NTPSyncedClock
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -89,7 +81,7 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -103,26 +95,11 @@ func NewDisperserClient(logger logging.Logger, config *DisperserClientConfig, si
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
-	// Set default NTP config if not provided
-	if config.NtpServer == "" {
-		config.NtpServer = "pool.ntp.org"
-	}
-	if config.NtpSyncInterval == 0 {
-		config.NtpSyncInterval = 5 * time.Minute
-	}
-
-	// Initialize NTP synced clock
-	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger.With("component", "DisperserClient"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NTP clock: %w", err)
-	}
-
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
 		prover:     prover,
 		accountant: accountant,
-		ntpClock:   ntpClock,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -134,21 +111,15 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId)
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
 	}
 
-	paymentStateProto, err := c.GetPaymentState(ctx)
+	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
-	// Convert protobuf types to native Go types using meterer conversion function
-	paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, err := meterer.ConvertPaymentStateFromProtobuf(paymentStateProto)
-	if err != nil {
-		return fmt.Errorf("error converting payment state from protobuf: %w", err)
-	}
-
-	err = c.accountant.SetPaymentState(paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords)
+	err = c.accountant.SetPaymentState(paymentState)
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
@@ -216,7 +187,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(c.ntpClock.Now().UnixNano(), uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
@@ -303,8 +274,6 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
-		// TODO: rollback payment for the accountant if the blob fails to disperse
-		// because ondemand request hits global ratelimit.
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
 	}
 
@@ -370,7 +339,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -388,143 +357,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
-	request := &disperser_rpc.GetPaymentStateForAllQuorumsRequest{
+	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	allQuorumsReply, err := c.client.GetPaymentStateForAllQuorums(ctx, request)
-	if err != nil {
-		// Check if error is "method not found" or "unimplemented"
-		if isMethodNotFoundError(err) {
-			// Fall back to old method
-			return c.getPaymentStateFromLegacyAPI(ctx, accountID, signature, timestamp)
-		}
-		return nil, err
-	}
-
-	return allQuorumsReply, nil
-}
-
-// this is true if we are targeting a disperser that hasn't upgraded to the new API yet.
-func isMethodNotFoundError(err error) bool {
-	if st, ok := status.FromError(err); ok {
-		return st.Code() == codes.Unimplemented
-	}
-	return false
-}
-
-// getPaymentStateFromLegacyAPI retrieves the payment state from the legacy GetPaymentState grpc method.
-// It is needed until we have upgraded all dispersers (testnet and mainnet) to the new API.
-// Check those endpoints for GetPaymentStateForAllQuorums using:
-// `grpcurl disperser-testnet-holesky.eigenda.xyz:443 list disperser.v2.Disperser`
-// `grpcurl disperser.eigenda.xyz:443 list disperser.v2.Disperser`
-func (c *disperserClient) getPaymentStateFromLegacyAPI(
-	ctx context.Context, accountID gethcommon.Address, signature []byte, timestamp uint64,
-) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
-	oldRequest := &disperser_rpc.GetPaymentStateRequest{
-		AccountId: accountID.Hex(),
-		Signature: signature,
-		Timestamp: timestamp,
-	}
-
-	oldResult, err := c.client.GetPaymentState(ctx, oldRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return convertLegacyPaymentStateToNew(oldResult)
-}
-
-// convertLegacyPaymentStateToNew converts the old GetPaymentStateReply to the new GetPaymentStateForAllQuorumsReply format
-func convertLegacyPaymentStateToNew(legacyReply *disperser_rpc.GetPaymentStateReply) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
-
-	if legacyReply.PaymentGlobalParams == nil {
-		return nil, fmt.Errorf("legacy payment state received from disperser does not contain global params")
-	}
-	// Convert PaymentGlobalParams to PaymentVaultParams
-	var paymentVaultParams *disperser_rpc.PaymentVaultParams
-	{
-		paymentVaultParams = &disperser_rpc.PaymentVaultParams{
-			QuorumPaymentConfigs:  make(map[uint32]*disperser_rpc.PaymentQuorumConfig),
-			QuorumProtocolConfigs: make(map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig),
-			OnDemandQuorumNumbers: legacyReply.PaymentGlobalParams.OnDemandQuorumNumbers,
-		}
-
-		// Apply the global params to all quorums, both on-demand and reservation.
-		onDemandQuorums := legacyReply.GetPaymentGlobalParams().GetOnDemandQuorumNumbers()
-		if len(onDemandQuorums) == 0 {
-			// Disperser v0.9.0 has a bug where it does not return on-demand quorums: https://github.com/Layr-Labs/eigenda/pull/1699
-			// Until we upgrade all dispersers, we will assume that on-demand quorums are 0 and 1.
-			// TODO: this should instead return an error once we have upgraded all dispersers.
-			onDemandQuorums = []uint32{0, 1}
-		}
-		reservationQuorums := legacyReply.GetReservation().GetQuorumNumbers()
-		// There may be overlapping quorums but it doesn't matter since we will apply the same global params to all of them.
-		allQuorums := append(reservationQuorums, onDemandQuorums...)
-
-		for _, quorumID := range allQuorums {
-			paymentVaultParams.QuorumPaymentConfigs[quorumID] = &disperser_rpc.PaymentQuorumConfig{
-				ReservationSymbolsPerSecond: 0, // Not available in legacy format
-				OnDemandSymbolsPerSecond:    legacyReply.PaymentGlobalParams.GlobalSymbolsPerSecond,
-				OnDemandPricePerSymbol:      legacyReply.PaymentGlobalParams.PricePerSymbol,
-			}
-
-			paymentVaultParams.QuorumProtocolConfigs[quorumID] = &disperser_rpc.PaymentQuorumProtocolConfig{
-				MinNumSymbols: legacyReply.PaymentGlobalParams.MinNumSymbols,
-				// ReservationAdvanceWindow is not used offchain at the moment so it's okay to set to any value.
-				ReservationAdvanceWindow:   0,
-				ReservationRateLimitWindow: legacyReply.PaymentGlobalParams.ReservationWindow,
-				OnDemandRateLimitWindow:    0, // Not available in legacy format
-			}
-		}
-
-		for _, quorumID := range onDemandQuorums {
-			paymentVaultParams.QuorumProtocolConfigs[quorumID].OnDemandEnabled = true
-		}
-	}
-
-	// If no reservation is available, return early with only payment vault params and cumulative payment info.
-	if legacyReply.Reservation == nil {
-		return &disperser_rpc.GetPaymentStateForAllQuorumsReply{
-			PaymentVaultParams:       paymentVaultParams,
-			CumulativePayment:        legacyReply.CumulativePayment,
-			OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
-		}, nil
-	}
-
-	// Otherwise there is a reservation available, so we need to convert it to the per-quorum format.
-
-	// We first make sure that the disperser returned valid data.
-	if len(legacyReply.PeriodRecords) == 0 {
-		return nil, fmt.Errorf("legacy payment state received from disperser does not contain period records")
-	}
-	if len(legacyReply.Reservation.QuorumNumbers) == 0 {
-		return nil, fmt.Errorf("legacy payment state received from disperser does not contain reservation quorums")
-	}
-
-	reservations := make(map[uint32]*disperser_rpc.QuorumReservation)
-	periodRecords := make(map[uint32]*disperser_rpc.PeriodRecords)
-
-	// Apply the reservation to all reservationQuorums mentioned in the reservation
-	for _, quorumID := range legacyReply.Reservation.QuorumNumbers {
-		reservations[quorumID] = &disperser_rpc.QuorumReservation{
-			SymbolsPerSecond: legacyReply.Reservation.SymbolsPerSecond,
-			StartTimestamp:   legacyReply.Reservation.StartTimestamp,
-			EndTimestamp:     legacyReply.Reservation.EndTimestamp,
-		}
-		periodRecords[quorumID] = &disperser_rpc.PeriodRecords{
-			Records: legacyReply.PeriodRecords,
-		}
-	}
-
-	return &disperser_rpc.GetPaymentStateForAllQuorumsReply{
-		PaymentVaultParams:       paymentVaultParams,
-		PeriodRecords:            periodRecords,
-		Reservations:             reservations,
-		CumulativePayment:        legacyReply.CumulativePayment,
-		OnchainCumulativePayment: legacyReply.OnchainCumulativePayment,
-	}, nil
+	return c.client.GetPaymentState(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
