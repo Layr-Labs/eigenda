@@ -381,7 +381,7 @@ func (n *Node) Start(ctx context.Context) error {
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
-		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
+		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.ChurnerUseSecureGrpc, n.Config.Timeout, n.Logger)
 		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)

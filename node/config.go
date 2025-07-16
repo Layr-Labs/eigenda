@@ -77,7 +77,7 @@ type Config struct {
 	NumBatchDeserializationWorkers  int
 	EnableGnarkBundleEncoding       bool
 	ClientIPHeader                  string
-	UseSecureGrpc                   bool
+	ChurnerUseSecureGrpc            bool
 	RelayUseSecureGrpc              bool
 	RelayMaxMessageSize             uint
 	ReachabilityPollIntervalSec     uint64
@@ -371,7 +371,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		NumBatchDeserializationWorkers:      ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
 		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
-		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
