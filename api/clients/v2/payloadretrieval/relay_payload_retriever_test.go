@@ -475,9 +475,7 @@ func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 	require.NoError(t, err)
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)
-	fmt.Println("blob header", blobBytes[:32])
 	blobBytes[1] = 0xFF // Invalid encoding version - this will cause decode to fail
-	fmt.Println("blob header", blobBytes[:32])
 
 	blobKey, blobCert := buildCertFromBlobBytes(t, blobBytes, relayKeys)
 
