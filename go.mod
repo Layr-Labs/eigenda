@@ -32,7 +32,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
-	github.com/beevik/ntp v1.4.3
 	github.com/consensys/gnark-crypto v0.18.0
 	github.com/dchest/siphash v1.2.3
 	github.com/docker/go-units v0.5.0
