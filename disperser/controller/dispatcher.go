@@ -216,6 +216,8 @@ func (d *Dispatcher) HandleBatch(
 		validatorProbe.SetStage("pool_submission")
 
 		d.pool.Submit(func() {
+			defer validatorProbe.End()
+
 			validatorProbe.SetStage("get_client")
 
 			host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
@@ -251,7 +253,6 @@ func (d *Dispatcher) HandleBatch(
 				return
 			}
 
-			defer validatorProbe.End()
 			validatorProbe.SetStage("put_dispersal_request")
 
 			req := &corev2.DispersalRequest{
