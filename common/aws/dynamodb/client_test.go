@@ -50,7 +50,7 @@ func setup(m *testing.M) {
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container")
+			panic("failed to start localstack container: " + err.Error())
 		}
 	}
 

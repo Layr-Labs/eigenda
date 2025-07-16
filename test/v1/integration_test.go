@@ -273,7 +273,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container" + err.Error())
+			panic("failed to start localstack container: " + err.Error())
 		}
 	}
 
