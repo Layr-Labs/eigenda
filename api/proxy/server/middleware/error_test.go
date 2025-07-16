@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
-	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -36,14 +36,14 @@ func TestWithErrorHandling_HTTPStatusCodes(t *testing.T) {
 		{
 			name: "418 CertVerificationFailedError",
 			handleFn: func(w http.ResponseWriter, r *http.Request) error {
-				return eigendav2store.ErrInvalidCertDerivationError
+				return coretypes.ErrInvalidCertDerivationError
 			},
 			expectStatus: http.StatusTeapot,
 		},
 		{
 			name: "418 RBNRecencyCheckFailedError",
 			handleFn: func(w http.ResponseWriter, r *http.Request) error {
-				return eigendav2store.NewRBNRecencyCheckFailedError(1, 2, 3)
+				return coretypes.NewRBNRecencyCheckFailedError(1, 2, 3)
 			},
 			expectStatus: http.StatusTeapot,
 		},
@@ -97,17 +97,18 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 		expectHTTPStatus             int
 		expectVerificationStatusCode uint8
 	}{
+		// TODO: add 2 other errors
 		{
 			name:                         "CertVerificationFailedError",
-			err:                          eigendav2store.ErrInvalidCertDerivationError.WithMessage("some arbitrary msg"),
+			err:                          coretypes.ErrInvalidCertDerivationError.WithMessage("some arbitrary msg"),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: eigendav2store.ErrInvalidCertDerivationError.StatusCode,
+			expectVerificationStatusCode: coretypes.ErrInvalidCertDerivationError.StatusCode,
 		},
 		{
 			name:                         "RBNRecencyCheckFailedError",
-			err:                          eigendav2store.NewRBNRecencyCheckFailedError(1, 2, 3),
+			err:                          coretypes.NewRBNRecencyCheckFailedError(1, 2, 3),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: eigendav2store.ErrRecencyCheckFailedDerivationError.StatusCode,
+			expectVerificationStatusCode: coretypes.ErrRecencyCheckFailedDerivationError.StatusCode,
 		},
 	}
 

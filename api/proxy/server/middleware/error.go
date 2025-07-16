@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 )
 
 // Error handling middleware (innermost) transforms internal errors to HTTP errors,
@@ -23,7 +23,7 @@ func withErrorHandling(
 		// Or maybe we should just add a requestID to the error, and log the request-specific information
 		// in the logging middleware, so that we can correlate the error with the request?
 
-		var derivationErr eigenda.DerivationError
+		var derivationErr coretypes.DerivationError
 		switch {
 		case proxyerrors.Is400(err):
 			http.Error(w, err.Error(), http.StatusBadRequest)

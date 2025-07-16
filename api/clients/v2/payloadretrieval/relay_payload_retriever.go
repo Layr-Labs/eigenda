@@ -135,7 +135,8 @@ func (pr *RelayPayloadRetriever) GetPayload(
 					malicious dispersed data. It should not be possible for a commitment to verify for an
 					invalid blob!`,
 				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
-			return nil, fmt.Errorf("decode blob: %w", err)
+			return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(
+				fmt.Sprintf("blob %v from relay %v: %v", blobKey.Hex(), relayKey, err))
 		}
 
 		return payload, nil

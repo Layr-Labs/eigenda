@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
-	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -41,7 +40,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
 				require.Equal(t,
-					int(eigendav2store.ErrRecencyCheckFailedDerivationError.StatusCode),
+					int(coretypes.ErrRecencyCheckFailedDerivationError.StatusCode),
 					invalidCommitmentErr.StatusCode)
 			},
 		},
@@ -57,7 +56,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(eigendav2store.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -72,7 +71,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(eigendav2store.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -87,10 +86,10 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(eigendav2store.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
-		// TODO: add a test for [eigendav2store.ErrBlobDecodingFailedDerivationError]
+		// TODO: add a test for [coretypes.ErrBlobDecodingFailedDerivationError]
 		// once we add code to process and return this error.
 	}
 

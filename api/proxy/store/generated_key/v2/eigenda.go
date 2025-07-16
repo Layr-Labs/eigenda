@@ -191,7 +191,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
-		return NewCertParsingFailedError(
+		return coretypes.NewCertParsingFailedError(
 			hex.EncodeToString(versionedCert.SerializedCert),
 			"version 0 byte certs should never be verified by the EigenDA V2 store",
 		)
@@ -201,7 +201,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 		var eigenDACertV2 coretypes.EigenDACertV2
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
 		if err != nil {
-			return NewCertParsingFailedError(
+			return coretypes.NewCertParsingFailedError(
 				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v1 cert: %v", err))
 		}
 
@@ -212,7 +212,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 		var eigenDACertV3 coretypes.EigenDACertV3
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV3)
 		if err != nil {
-			return NewCertParsingFailedError(
+			return coretypes.NewCertParsingFailedError(
 				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v3 cert: %v", err))
 		}
 
@@ -220,7 +220,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 		sumDACert = &eigenDACertV3
 
 	default:
-		return NewCertParsingFailedError(
+		return coretypes.NewCertParsingFailedError(
 			hex.EncodeToString(versionedCert.SerializedCert),
 			fmt.Sprintf("unknown EigenDA cert version: %d", versionedCert.Version))
 	}
@@ -239,7 +239,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 		if errors.As(err, &certVerifierInvalidCertErr) {
 			// We convert the cert verifier failure error, which contains the low-level detailed status code,
 			// into the higher-level CertDerivationError which will get converted to a 418 HTTP error by the error middleware.
-			return ErrInvalidCertDerivationError.WithMessage(certVerifierInvalidCertErr.Error())
+			return coretypes.ErrInvalidCertDerivationError.WithMessage(certVerifierInvalidCertErr.Error())
 		}
 		// Other errors are internal proxy errors, so we just wrap them for extra context.
 		// They will be converted to 500 HTTP errors by the error middleware.
@@ -295,7 +295,7 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 
 	// Actual Recency Check
 	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) { //nolint:staticcheck // inequality is clearer as is
-		return NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
+		return coretypes.NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
 	}
 	return nil
 }
