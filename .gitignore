@@ -17,8 +17,7 @@ lightnode/docker/args.sh
 .idea
 .env
 .vscode
-.cursor
-.serena
+.claude
 
 icicle/*
 
