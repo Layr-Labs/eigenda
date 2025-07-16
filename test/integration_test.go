@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	"github.com/stretchr/testify/require"
 
@@ -427,6 +428,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			Transactor:              tx,
 			PubIPProvider:           pubIPProvider,
 			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
+			ValidationPool:          workerpool.New(1),
 		}
 
 		rateLimiter := &commonmock.NoopRatelimiter{}
