@@ -15,24 +15,27 @@ type MockOnchainPaymentState struct {
 
 var _ meterer.OnchainPayment = (*MockOnchainPaymentState)(nil)
 
+func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
+	args := m.Called()
+	var value uint32
+	if args.Get(0) != nil {
+		value = args.Get(0).(uint32)
+	}
+	return value, args.Error(1)
+}
+
 func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
-	args := m.Called(ctx)
+	args := m.Called()
 	return args.Error(0)
 }
 
-func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
-	args := m.Called(ctx, accountID, quorumNumbers)
-	var value map[core.QuorumID]*core.ReservedPayment
-	if fn, ok := args.Get(0).(func(context.Context, gethcommon.Address, []core.QuorumID) map[core.QuorumID]*core.ReservedPayment); ok {
-		value = fn(ctx, accountID, quorumNumbers)
-	} else if args.Get(0) != nil {
-		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID)
+	var value *core.ReservedPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.ReservedPayment)
 	}
-	var err error
-	if len(args) > 1 {
-		err = args.Error(1)
-	}
-	return value, err
+	return value, args.Error(1)
 }
 
 func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
@@ -44,20 +47,36 @@ func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Contex
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetQuorumNumbers(ctx context.Context) ([]core.QuorumID, error) {
-	args := m.Called(ctx)
-	var value []core.QuorumID
+func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	args := m.Called()
+	var value []uint8
 	if args.Get(0) != nil {
-		value = args.Get(0).([]core.QuorumID)
+		value = args.Get(0).([]uint8)
 	}
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetPaymentGlobalParams() (*meterer.PaymentVaultParams, error) {
+func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	args := m.Called()
-	var value *meterer.PaymentVaultParams
-	if args.Get(0) != nil {
-		value = args.Get(0).(*meterer.PaymentVaultParams)
-	}
-	return value, args.Error(1)
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetMinNumSymbols() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetPricePerSymbol() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetReservationWindow() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
 }

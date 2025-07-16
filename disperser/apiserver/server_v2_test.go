@@ -515,40 +515,16 @@ func newTestServerV2(t *testing.T) *testComponents {
 	// append test name to each table name for an unique store
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
-	// Setup mock payment vault params for server v2 test
-	serverV2MockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				OnDemandSymbolsPerSecond: 1009,
-				OnDemandPricePerSymbol:   2,
-			},
-			1: {
-				OnDemandSymbolsPerSecond: 1009,
-				OnDemandPricePerSymbol:   2,
-			},
-		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              3,
-				ReservationRateLimitWindow: 1,
-				OnDemandRateLimitWindow:    1,
-			},
-			1: {
-				MinNumSymbols:              3,
-				ReservationRateLimitWindow: 1,
-				OnDemandRateLimitWindow:    1,
-			},
-		},
-		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
-	}
-	mockState.On("GetPaymentGlobalParams").Return(serverV2MockParams, nil)
+	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
+	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
+	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
+	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint64(3), nil)
 
 	now := uint64(time.Now().Unix())
-	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
-		1: &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
-	}, nil)
+	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
+	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
