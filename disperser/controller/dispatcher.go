@@ -212,8 +212,10 @@ func (d *Dispatcher) HandleBatch(
 		opID := opID
 		op := op
 
+		validatorProbe := d.metrics.newSendToValidatorProbe()
+		validatorProbe.SetStage("pool_submission")
+
 		d.pool.Submit(func() {
-			validatorProbe := d.metrics.newSendToValidatorProbe()
 			validatorProbe.SetStage("get_client")
 
 			host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
@@ -248,8 +250,6 @@ func (d *Dispatcher) HandleBatch(
 				}
 				return
 			}
-
-			validatorProbe.SetStage("pool_submission")
 
 			defer validatorProbe.End()
 			validatorProbe.SetStage("put_dispersal_request")
