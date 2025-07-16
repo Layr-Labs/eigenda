@@ -31,6 +31,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 
 	EnableGnarkBundleEncoding bool
 }
@@ -45,6 +46,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if !kmsConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
+
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -83,6 +85,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),

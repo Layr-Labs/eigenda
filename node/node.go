@@ -75,6 +75,8 @@ type Node struct {
 	ChainID                 *big.Int
 	// a worker pool used to download chunk data from the relays
 	DownloadPool *workerpool.WorkerPool
+	// a worker pool used to validate batches
+	ValidationPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -123,7 +125,7 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +210,15 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}
 
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	// Get service manager address from address directory
+	addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+	}
+	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address: %w", err)
+	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -229,7 +239,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr,
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -239,6 +249,12 @@ func NewNode(
 		downloadPoolSize = 1
 	}
 	downloadPool := workerpool.New(downloadPoolSize)
+
+	validationPoolSize := config.NumBatchValidators
+	if validationPoolSize < 1 {
+		validationPoolSize = 1
+	}
+	validationPool := workerpool.New(validationPoolSize)
 
 	n := &Node{
 		Config:                  config,
@@ -256,6 +272,7 @@ func NewNode(
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
+		ValidationPool:          validationPool,
 	}
 
 	if !config.EnableV2 {
@@ -659,8 +676,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 	getStateDuration := time.Since(start)
 
-	pool := workerpool.New(n.Config.NumBatchValidators)
-	err = n.Validator.ValidateBatch(header, blobs, operatorState, pool)
+	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.ValidationPool)
 	if err != nil {
 		h, hashErr := operatorState.Hash()
 		if hashErr != nil {

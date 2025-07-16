@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	"github.com/stretchr/testify/require"
 
@@ -224,43 +225,20 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState := &coremock.MockOnchainPaymentState{}
 	reservationLimit := uint64(1024)
 	paymentLimit := big.NewInt(512)
-	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	}), mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{
-		0: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-		1: &core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}},
-	}, nil)
-	mockState.On("GetReservedPaymentByAccountAndQuorums", mock.Anything, mock.Anything, mock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{}, errors.New("reservation not found"))
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
 	})).Return(&core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{}, errors.New("payment not found"))
-	// Setup mock payment vault params for integration test
-	integrationMockParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				OnDemandSymbolsPerSecond: 1024,
-				OnDemandPricePerSymbol:   1,
-			},
-			1: {
-				OnDemandSymbolsPerSecond: 1024,
-				OnDemandPricePerSymbol:   1,
-			},
-		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              128,
-				ReservationRateLimitWindow: 60,
-			},
-			1: {
-				MinNumSymbols:              128,
-				ReservationRateLimitWindow: 60,
-			},
-		},
-		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
-	}
-	mockState.On("GetPaymentGlobalParams").Return(integrationMockParams, nil)
+	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1024), nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint32(1), nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint32(128), nil)
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
@@ -450,6 +428,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			Transactor:              tx,
 			PubIPProvider:           pubIPProvider,
 			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
+			ValidationPool:          workerpool.New(1),
 		}
 
 		rateLimiter := &commonmock.NoopRatelimiter{}

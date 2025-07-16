@@ -1,11 +1,11 @@
 package eth
 
 import (
+	"fmt"
 	"math/big"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/pingcap/errors"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -15,9 +15,6 @@ import (
 
 var (
 	maxNumberOfQuorums = 192
-
-	// ErrPaymentDoesNotExist is returned when a reservation/deposit does not exist (is zero)
-	ErrPaymentDoesNotExist = errors.New("payment does not exist")
 )
 
 type BN254G1Point struct {
@@ -135,37 +132,25 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
 	return reservation.SymbolsPerSecond == 0 &&
 		reservation.StartTimestamp == 0 &&
-		reservation.EndTimestamp == 0
+		reservation.EndTimestamp == 0 &&
+		len(reservation.QuorumNumbers) == 0 &&
+		len(reservation.QuorumSplits) == 0
 }
 
-func CheckOnDemandPayment(payment *big.Int) error {
-	if payment.Cmp(big.NewInt(0)) == 0 {
-		return ErrPaymentDoesNotExist
-	}
-	return nil
-}
-
-// ConvertToReservedPayments converts a upstream binding data structure to local definition.
-// Returns core.ErrPaymentDoesNotExist if the input reservation is zero-valued.
-func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
+// ConvertToReservedPayment converts a upstream binding data structure to local definition.
+// Returns an error if the input reservation is zero-valued.
+func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation) (*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
-		return nil, ErrPaymentDoesNotExist
+		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
 
-	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
-	for _, quorumId := range reservation.QuorumNumbers {
-		reservedPayments[core.QuorumID(quorumId)] = &core.ReservedPayment{
-			SymbolsPerSecond: reservation.SymbolsPerSecond,
-			StartTimestamp:   reservation.StartTimestamp,
-			EndTimestamp:     reservation.EndTimestamp,
-			// They are now handled at the quorum level in the new contract design; right now we are keeping for minimal changes
-			// TODO: the core type will be updated to be specific to a single quorum
-			QuorumNumbers: []byte{},
-			QuorumSplits:  []uint8{},
-		}
-	}
-
-	return reservedPayments, nil
+	return &core.ReservedPayment{
+		SymbolsPerSecond: reservation.SymbolsPerSecond,
+		StartTimestamp:   reservation.StartTimestamp,
+		EndTimestamp:     reservation.EndTimestamp,
+		QuorumNumbers:    reservation.QuorumNumbers,
+		QuorumSplits:     reservation.QuorumSplits,
+	}, nil
 }
 
 // GetAllQuorumIDs returns a slice of all possible QuorumIDs from 0 to quorumCount-1
@@ -175,4 +160,35 @@ func GetAllQuorumIDs(quorumCount uint8) []core.QuorumID {
 		quorumIDs[i] = core.QuorumID(i)
 	}
 	return quorumIDs
+}
+
+// ContractNames defines the standard contract names used in the address directory
+// TODO: consider auto-generating this from the address directory contract
+// These values must match exactly the constants defined in AddressDirectoryConstants.sol.
+var ContractNames = struct {
+	ServiceManager         string
+	OperatorStateRetriever string
+	RegistryCoordinator    string
+	BLSApkRegistry         string
+	IndexRegistry          string
+	StakeRegistry          string
+	SocketRegistry         string
+	PaymentVault           string
+	EjectionManager        string
+	RelayRegistry          string
+	ThresholdRegistry      string
+	DisperserRegistry      string
+}{
+	ServiceManager:         "SERVICE_MANAGER",
+	OperatorStateRetriever: "OPERATOR_STATE_RETRIEVER",
+	RegistryCoordinator:    "REGISTRY_COORDINATOR",
+	BLSApkRegistry:         "BLS_APK_REGISTRY",
+	IndexRegistry:          "INDEX_REGISTRY",
+	StakeRegistry:          "STAKE_REGISTRY",
+	SocketRegistry:         "SOCKET_REGISTRY",
+	PaymentVault:           "PAYMENT_VAULT",
+	EjectionManager:        "EJECTION_MANAGER",
+	RelayRegistry:          "RELAY_REGISTRY",
+	ThresholdRegistry:      "THRESHOLD_REGISTRY",
+	DisperserRegistry:      "DISPERSER_REGISTRY",
 }

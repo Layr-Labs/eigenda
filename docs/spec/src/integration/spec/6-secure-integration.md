@@ -1,16 +1,121 @@
 # Secure Integration
 
-This page is meant to be read by eigenda and rollup developers who are writing a secure integration and need to understand the details. For users who just want a high-level understanding of what a secure integration is, please visit our [secure integration overview](https://docs.eigenda.xyz/integrations-guides/rollup-guides/integrations-overview) page instead.
+> **Audience:** This page is for EigenDA and rollup developers implementing secure integrations. For a high-level overview, see our [secure integration overview](https://docs.eigenda.xyz/integrations-guides/rollup-guides/integrations-overview).
 
-## Validity Conditions
+## Overview
 
-EigenDA is a service that assures the availability and integrity of payloads posted to it for 14 days.
-When deriving a rollup chain by running its derivation pipeline, only EigenDA `DACerts` that satisfy the three validity conditions are considered valid and used:
-1. RBN Recency Validation - ensure that the DA Cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fault proof window.
-2. Cert Validation - ensures sufficient operator stake has signed to make the blob available, for all specified quorums. The stake is obtained onchain at a given reference block number (RBN) specified inside the cert.
-3. Blob Validation - ensures that the blob used is consistent with the KZG commitment inside the Cert.
+A secure integration must handle malicious data posted on Ethereum L1, unlike trusted integrations. Potential threats include:
 
-If #1 or #2 fails, then the `DA Cert` is treated as invalid and MUST be discarded from the rollup's derivation pipeline.
+- **Malicious batcher:** Posts invalid or malformed DA certificates (DA Cert)
+- **Malicious proposer:** Publishes incorrect L2 state roots 
+
+## EigenDA Blob Derivation
+
+This section describes the canonical procedure for deriving a rollup payload from a DA Certificate. This derivation is integral to rollup consensus and must be integrated in both rollup nodes and the proof system in secure integrations.
+
+### Current Implementations
+
+- **EigenDA Proxy**
+- **OP EigenDA Secure Integration** ([Hokulea](https://github.com/Layr-Labs/hokulea/tree/master))
+
+### Derivation Process
+
+The diagram below shows the step-by-step transformation from input to final rollup payload:
+
+**Key Components:**
+- **Input:** Serialized DA Cert (as calldata) + block number of DA Cert inclusion
+- **Blob Derivation:** Routes DA cert through validation to one of several terminal states
+- **Preimage Oracle:** Interface for fetching additional data during derivation
+  - Implementation varies by requirement (e.g., key-value mapping for optimistic fault proofs)
+- **Host:** Entity that provides preimage oracle responses
+
+![](../../assets/integration/eigenda-blob-derivation.png)
+
+### Terminal States
+
+All inputs to the EigenDA derivation pipeline end in exactly one of these states:
+
+| State | Description |
+|-------|-------------|
+| **Dropped** | Input rejected and ignored by rollup execution |
+| **Stalled** | Required preimage data unavailable at the moment, and it should be retried |
+| **Rollup Payload** | ✅ Success - desired payload bytes produced |
+
+### Failure Cases
+
+When validation fails, the DA Cert is discarded and nothing is forwarded downstream:
+
+#### Parse Failed
+- Batcher submitted improperly-serialized or unrecognized DA Cert
+
+#### Recency Check Failed
+- DA Cert reached rollup inbox after reference block number + recency window 
+- Host provides false recency window size that leads to failure
+
+#### Cert Validity Check Failed
+- Certificate doesn't satisfy [quorum-attestation constraint](../spec/6-secure-integration.md#2-cert-validation)
+- Host provides false validity information via preimage oracle
+
+#### Decode Blob Failed
+- EigenDA blob cannot be decoded back to rollup payload per [spec](../spec/3-data-structs.md#data-structs)
+- Causes:
+  - Host or Batcher intentionally corrupts encoding
+
+**Success:** If no failures occur, the pipeline outputs the expected payload.
+
+## Secure Integration Framework
+
+Rollup consensus must cover all aspects of EigenDA blob derivation. Designers have two degrees of freedom:
+
+1. **Derivation Split:** Choose which parts are executed on-chain (pessimistically via native execution) vs secured off-chain (via proving system)
+2. **Proving VM Choice:** Select the on-chain proving virtual machine
+
+Each integration can be tailored to fit specific rollup protocol constraints.
+
+### Splitting EigenDA Blob Derivation
+
+Rollups can split the derivation pipeline between on-chain execution and off-chain verification which is secured by some proof system. This degree
+of freedom allows for variants of integrations that tailored to individual stacks. For examples,
+- **Arbitrum with EigenDA V1:** All components through cert validity checked in rollup inbox
+- **OP Optimstic Fault Proof Integration:** Entire EigenDA blob derivation executes off-chain, and they are secured by the OP [FPVM](https://specs.optimism.io/fault-proof/index.html#fault-proof-vm) proof system. 
+
+### Securely integrating with any VM
+
+In order to secure parts from the EigenDA blob derivation taking place off-chain:
+
+1. **Integration Required:** Blob derivation must be imported into L2 consensus as a library
+2. **Compilation:** The library compiles to instructions replayable by on-chain VM
+3. **Security:** Off-chain derivation secured by proof system
+4. **Complete Coverage:** The combined on-chain (pessimistic native execution) and off-chain logics covers entire derivation
+
+**Preimage Oracle Requirement:** Both on-chain and off-chain implementations needed. 
+
+![](../../assets/integration/secure-integration-model.png)
+
+### Secure integration with ZKVM
+
+The ZKVM integration must also satisfy the requirements described above. Using a ZKVM can also eliminate the need for pessimistic on‑chain execution,
+but more importantly it allows the system to either act as a ZK rollup or as a standard optimistic rollup that relies on a challenge mechanism.
+- ZK rollup integration: Every time the L2 state is updated to L1, a ZK proof must accompany it, covering all state changes since the previous valid update.
+- Optimistic ZK fault‑proof integration: Functionally identical to the standard Optimistic Fault‑Proof integration, except the proof system runs on the ZKVM.
+
+## EigenDA Blob Derivation in EigenDA Proxy
+
+We have dedicated pages for [secure integrations](../rollup-stacks/), but let's review the **EigenDA Proxy** GET path implementation, which has been used in rollup consensus nodes since EigenDA integration began. Proxy also implements WRITE path, solely used by rollup batcher for rollup liveness.
+
+### Proxy Architecture for Blob Derivation
+
+The proxy combines:
+- **Blob derivation logic**
+- **Retrieval clients** for preimage data
+  - **Cert validity:** ETH RPC
+  - **EigenDA blob:** gRPC connection to EigenDA network
+  - **Recency window:** Input parameter at binary startup 
+
+![](../../assets/integration/proxy-preimage-derivation-impl.png)
+
+
+## Derivation validation In Depth
 
 ### 1. RBN Recency Validation
 
