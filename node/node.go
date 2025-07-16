@@ -76,7 +76,7 @@ type Node struct {
 	// a worker pool used to download chunk data from the relays
 	DownloadPool *workerpool.WorkerPool
 	// a worker pool used to validate batches
-	validationPool *workerpool.WorkerPool
+	ValidationPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -272,7 +272,7 @@ func NewNode(
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
-		validationPool:          validationPool,
+		ValidationPool:          validationPool,
 	}
 
 	if !config.EnableV2 {
@@ -676,7 +676,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 	getStateDuration := time.Since(start)
 
-	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.validationPool)
+	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.ValidationPool)
 	if err != nil {
 		h, hashErr := operatorState.Hash()
 		if hashErr != nil {
