@@ -60,7 +60,6 @@ type DispersalServerV2 struct {
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
 
-	ntpClock *core.NTPSyncedClock
 	// ReservedOnly mode doesn't support on-demand payments
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
@@ -80,7 +79,6 @@ func NewDispersalServerV2(
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
-	ntpClock *core.NTPSyncedClock,
 	ReservedOnly bool,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
@@ -127,7 +125,6 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ntpClock:     ntpClock,
 		ReservedOnly: ReservedOnly,
 	}, nil
 }
