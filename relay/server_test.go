@@ -188,7 +188,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
-		require.Equal(t, data, response.Blob)
+		require.Equal(t, data, response.GetBlob())
 	}
 
 	// Read the blobs back again to test caching.
@@ -200,7 +200,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
-		require.Equal(t, data, response.Blob)
+		require.Equal(t, data, response.GetBlob())
 	}
 }
 
@@ -361,7 +361,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
-			require.Equal(t, data, response.Blob)
+			require.Equal(t, data, response.GetBlob())
 		} else {
 			require.Error(t, err)
 			require.Nil(t, response)
@@ -387,7 +387,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
-			require.Equal(t, data, response.Blob)
+			require.Equal(t, data, response.GetBlob())
 		} else {
 			require.Error(t, err)
 			require.Nil(t, response)
@@ -507,9 +507,9 @@ func TestReadWriteChunks(t *testing.T) {
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i, frame := range bundle {
@@ -542,9 +542,9 @@ func TestReadWriteChunks(t *testing.T) {
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i, frame := range bundle {
@@ -576,9 +576,9 @@ func TestReadWriteChunks(t *testing.T) {
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i := startIndex; i < endIndex; i++ {
@@ -613,9 +613,9 @@ func TestReadWriteChunks(t *testing.T) {
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i := 0; i < len(indices); i++ {
@@ -750,12 +750,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, keyCount, len(response.Data))
+		require.Equal(t, keyCount, len(response.GetData()))
 
 		for keyIndex, key := range keys {
 			data := expectedData[key]
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyIndex])
 			require.NoError(t, err)
 
 			for frameIndex, frame := range bundle {
@@ -907,9 +907,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i, frame := range bundle {
@@ -956,9 +956,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i, frame := range bundle {
@@ -1005,9 +1005,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i := startIndex; i < endIndex; i++ {
@@ -1053,9 +1053,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i := 0; i < len(indices); i++ {
@@ -1246,12 +1246,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		if allInCorrectShard {
 			require.NoError(t, err)
 
-			require.Equal(t, keyCount+1, len(response.Data))
+			require.Equal(t, keyCount+1, len(response.GetData()))
 
 			for keyIndex, key := range keys {
 				data := expectedData[key]
 
-				bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+				bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyIndex])
 				require.NoError(t, err)
 
 				for frameIndex, frame := range bundle {
@@ -1263,7 +1263,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 			key := keys[0]
 			data := expectedData[key][len(expectedData[key])/2:]
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[keyCount])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyCount])
 			require.NoError(t, err)
 
 			for frameIndex, frame := range bundle {

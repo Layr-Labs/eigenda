@@ -13,6 +13,8 @@ type Config struct {
 	AsyncPutWorkers int
 	FallbackTargets []string
 	CacheTargets    []string
+
+	WriteOnCacheMiss bool
 }
 
 // checkTargets ... verifies that a backend target slice is constructed correctly
