@@ -11,7 +11,7 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - If a line is being modified, it's probably reasonable to fix any style issues that exist on that line.
    - If style issues exist in close proximity to changes being made, it *may* make sense to fix the issues.
    - Style fixes shouldn't be allowed to overshadow the main point of a PR.
-   - If large quantity of style fixes are necessary, it's best to split them into a separate PR. E.g. don't turn a
+   - If a large quantity of style fixes are necessary, it's best to split them into a separate PR. E.g. don't turn a
    5 line PR into a 50 line PR just for the sake of style fixes!
 3. Recognize that everyone has unique preferences, and be respectful of alternate viewpoints:
    - Pursuing personal style *opinions* on code you are changing is perfectly acceptable: by touching the code, your
@@ -21,7 +21,7 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - If there is a disagreement between engineers about style, the team should come to consensus and enshrine the
    result as an entry in this style guide.
 
-### 2. Error handling
+### 2. Error Handling
 
 1. Return errors explicitly; don't panic except for unrecoverable errors, where returning an error is not plausible.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
@@ -92,11 +92,13 @@ Good code has good names. Bad names yield bad code.
 
 ### 6. Code Structure
 
-1. Keep functions short and readable. If a function gets too long or complicated, split out helper functions. Some
-   good candidates for logic to split out of complex functions are:
-   - The logic inside a `for` loop or `if` block
-   - Input validation
-   - Complex calculations
+1. Keep functions short and readable.
+   - A good rule of thumb is to keep functions <50 lines, but this isn't a strict limit.
+   - Just because a function is <50 lines doesn't mean it shouldn't be split!
+   - Some good candidates for logic to split out of complex functions are:
+      - The logic inside a `for` loop or `if` block
+      - Input validation
+      - Complex calculations
 2. Keep nesting as shallow as possible. Ideally, you'd never have > 1 block deep of nesting. Practically, some amount of
    multi-level nesting is unavoidable, but efforts should be made to keep it to a minimum:
    - Split out helper functions
@@ -124,11 +126,14 @@ Good code has good names. Bad names yield bad code.
         }
         return nil
         ```
+3. Place the most important functions at the top of the file.
+4. Public static functions that lack a tight coupling to a specific struct (e.g. a constructor) should be placed in
+files with a `_utils` suffix.
 
 ### 7. Defensive Coding
 
 1. Prefer using constructors over raw struct instantiation.
-   - Raw struct instantiation is bug prone: fields can be removed by mistake, or newly added fields may not be
+   - Raw struct instantiation is bug-prone: fields can be removed by mistake, or newly added fields may not be
    universally added to all usages.
    - Constructors are a convenient place to validate new struct instantiations.
 2. If it is even remotely possible that something could be `nil`, *check it*.
@@ -144,3 +149,4 @@ should consider creating a PR to add a new section.
 
 1. Package organization and naming
 2. Interface/struct design and naming
+3. Solidity style
