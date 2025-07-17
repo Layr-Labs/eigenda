@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +26,11 @@ var (
 
 // GetEnvironmentConfigPaths returns a list of paths to the environment config files.
 func GetEnvironmentConfigPaths() ([]string, error) {
+	// Golang tests are always run with CWD set to the dir in which the test file is located.
+	// These relative paths should thus only be used for tests in direct subdirs of `test/v2`,
+	// such as `test/v2/live` where they are currently used from.
+	// TODO: GetEnvironmentConfigPaths should take a base path as an argument
+	// to allow for more flexibility in where the config files are located.
 	configDir, err := util.SanitizePath("../config/environment")
 	if err != nil {
 		return nil, fmt.Errorf("failed to sanitize path: %w", err)
@@ -70,6 +76,14 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	// Resolve relative SRS path based on config file location
+	if config.SRSPath != "" && !filepath.IsAbs(config.SRSPath) {
+		configDir := filepath.Dir(configFile)
+		absPath := filepath.Join(configDir, config.SRSPath)
+		config.SRSPath = filepath.Clean(absPath)
+		// to debug this, you can print filepath.Abs(config.SRSPath)
 	}
 
 	configMap[configPath] = config
