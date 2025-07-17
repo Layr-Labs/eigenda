@@ -53,6 +53,7 @@ and professional. They should be checked and carefully maintained.
 3. Spelling should be checked, with some caveats:
    - If there are multiple correct spellings for a word, no one "correct" spelling should be asserted over another
    - Neologisms are permitted
+4. Colloquial language that is appropriate in a professional setting is acceptable: don't be the "fun police".
 
 ### 4. Naming
 
