@@ -216,6 +216,10 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
 		}
+		if config.EigenDAServiceManagerAddr != "" && eigenDAServiceManagerAddr.String() != config.EigenDAServiceManagerAddr {
+			return nil, fmt.Errorf("EigenDAServiceManagerAddr passed in as config (%v) does not match the one retrieved from EigenDADirectory (%v)",
+				config.EigenDADirectory, eigenDAServiceManagerAddr.Hex())
+		}
 	} else {
 		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
 			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
