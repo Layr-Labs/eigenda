@@ -73,16 +73,16 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	ctx context.Context,
 	request *pb.GetChunksRequest) ([]byte, error) {
 
-	if request.OperatorId == nil || len(request.OperatorId) != 32 {
+	if request.GetOperatorId() == nil || len(request.GetOperatorId()) != 32 {
 		return nil, errors.New("invalid operator ID")
 	}
 
-	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))
+	key, err := a.getOperatorKey(ctx, core.OperatorID(request.GetOperatorId()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator key: %w", err)
 	}
 
-	g1Point, err := (&core.G1Point{}).Deserialize(request.OperatorSignature)
+	g1Point, err := (&core.G1Point{}).Deserialize(request.GetOperatorSignature())
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
 	}

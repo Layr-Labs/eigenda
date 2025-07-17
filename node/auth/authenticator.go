@@ -95,7 +95,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	request *grpc.StoreChunksRequest,
 	now time.Time) ([]byte, error) {
 
-	key, err := a.getDisperserKey(ctx, now, request.DisperserID)
+	key, err := a.getDisperserKey(ctx, now, request.GetDisperserID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator key: %w", err)
 	}

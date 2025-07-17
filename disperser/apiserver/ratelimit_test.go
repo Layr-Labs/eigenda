@@ -242,13 +242,13 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 	reply, err := stream.RecvToClient()
 	assert.NoError(t, err)
 
-	authHeaderReply, ok := reply.Payload.(*pb.AuthenticatedReply_BlobAuthHeader)
+	authHeaderReply, ok := reply.GetPayload().(*pb.AuthenticatedReply_BlobAuthHeader)
 	assert.True(t, ok)
 
 	authHeader := core.BlobAuthHeader{
 		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
-		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
+		Nonce:           authHeaderReply.BlobAuthHeader.GetChallengeParameter(),
 	}
 
 	authData, err := signer.SignBlobRequest(authHeader)
@@ -270,10 +270,10 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 		reply, err = stream.RecvToClient()
 		assert.NoError(t, err)
 
-		disperseReply, ok := reply.Payload.(*pb.AuthenticatedReply_DisperseReply)
+		disperseReply, ok := reply.GetPayload().(*pb.AuthenticatedReply_DisperseReply)
 		assert.True(t, ok)
 
-		assert.Equal(t, disperseReply.DisperseReply.Result, pb.BlobStatus_PROCESSING)
+		assert.Equal(t, disperseReply.DisperseReply.GetResult(), pb.BlobStatus_PROCESSING)
 
 	}
 
