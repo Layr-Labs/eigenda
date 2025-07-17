@@ -36,7 +36,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:    DeprecatedEthRPCFlagName,
-			Usage:   "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/",
+			Usage:   "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigencloud.xyz/products/eigenda/networks/mainnet",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "ETH_RPC")},
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
