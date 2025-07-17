@@ -210,14 +210,21 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}
 
-	// Get service manager address from address directory
-	addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-	}
-	eigenDAServiceManagerAddr, err := addressReader.GetServiceManagerAddress()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service manager address: %w", err)
+	// If EigenDADirectory is provided, use it to get service manager addresses
+	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
+	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
+		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+		}
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
+		}
+	} else {
+		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. " +
+			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.")
 	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
