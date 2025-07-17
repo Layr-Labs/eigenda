@@ -6,7 +6,7 @@ for human engineers, and to provide AI agents with a checklist for code review.
 
 ### 1. Error handling
 
-1. Return errors explicitly; don't panic except for unrecoverable errors.
+1. Return errors explicitly; don't panic except for unrecoverable errors, where returning an error is not plausible.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
 2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
    - Ensure that `%w` is used for error wrapping, *not* `%v`.
