@@ -282,11 +282,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
-	if !gethcommon.IsHexAddress(req.AccountId) {
+	if !gethcommon.IsHexAddress(req.GetAccountId()) {
 		return nil, api.NewErrorInvalidArg("invalid account ID")
 	}
 
-	accountID := gethcommon.HexToAddress(req.AccountId)
+	accountID := gethcommon.HexToAddress(req.GetAccountId())
 
 	// validate the signature
 	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {

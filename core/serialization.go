@@ -480,7 +480,7 @@ func BlobHeaderFromProtobuf(h *pb.BlobHeader) (*BlobHeader, error) {
 			Length:           uint(h.GetLength()),
 		},
 		QuorumInfos: quorumHeaders,
-		AccountID:   h.AccountId,
+		AccountID:   h.GetAccountId(),
 	}, nil
 }
 

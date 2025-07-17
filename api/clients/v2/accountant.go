@@ -247,8 +247,8 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 			periodRecords[i] = PeriodRecord{Index: 0, Usage: 0}
 		} else {
 			periodRecords[i] = PeriodRecord{
-				Index: record.Index,
-				Usage: record.Usage,
+				Index: record.GetIndex(),
+				Usage: record.GetUsage(),
 			}
 		}
 	}
