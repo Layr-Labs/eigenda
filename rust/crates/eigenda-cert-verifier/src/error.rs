@@ -6,34 +6,34 @@ pub enum SignaturesVerificationError<'a> {
     EmptyQuorumNumbers,
 
     #[error(
-        "Quorum numbers length ({quorum_numbers_len}) does not match quorum apks length ({quorum_apks_len})"
+        "Quorum numbers length ({signed_quorum_numbers_len}) does not match quorum apks length ({quorum_apks_len})"
     )]
     QuorumNumbersAndQuorumApksLengthMismatch {
-        quorum_numbers_len: usize,
+        signed_quorum_numbers_len: usize,
         quorum_apks_len: usize,
     },
 
     #[error(
-        "Quorum numbers length ({quorum_numbers_len}) does not match quorum apk indices length ({quorum_apk_indices_len})"
+        "Quorum numbers length ({signed_quorum_numbers_len}) does not match quorum apk indices length ({quorum_apk_indices_len})"
     )]
     QuorumNumbersAndQuorumApkIndicesLengthMismatch {
-        quorum_numbers_len: usize,
+        signed_quorum_numbers_len: usize,
         quorum_apk_indices_len: usize,
     },
 
     #[error(
-        "Quorum numbers length ({quorum_numbers_len}) does not match total stake indices length ({total_stake_indices_len})"
+        "Quorum numbers length ({signed_quorum_numbers_len}) does not match total stake indices length ({total_stake_indices_len})"
     )]
     QuorumNumbersAndTotalStakeIndicesLengthMismatch {
-        quorum_numbers_len: usize,
+        signed_quorum_numbers_len: usize,
         total_stake_indices_len: usize,
     },
 
     #[error(
-        "Quorum numbers length ({quorum_numbers_len}) does not match non signer stake indices length ({non_signer_stake_indices_len})"
+        "Quorum numbers length ({signed_quorum_numbers_len}) does not match non signer stake indices length ({non_signer_stake_indices_len})"
     )]
     QuorumNumbersAndNonSignerStakeIndicesLengthMismatch {
-        quorum_numbers_len: usize,
+        signed_quorum_numbers_len: usize,
         non_signer_stake_indices_len: usize,
     },
 
@@ -76,5 +76,5 @@ pub enum SignaturesVerificationError<'a> {
     },
 
     #[error("Expected to find a matching bitmap from the hash of a signer's pubkey")]
-    SignerBitmapNotFound,
+    SignerBitmapNotFoundOrPubkeyAtInfinity,
 }

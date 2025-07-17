@@ -1,47 +1,47 @@
 use crate::{error::SignaturesVerificationError, types::NonSignerStakesAndSignature};
 
 pub fn validate_inputs<'a>(
-    quorum_numbers: &[u8],
+    signed_quorum_numbers: &[u8],
     reference_block_number: u32,
     current_block_number: u32,
     params: &NonSignerStakesAndSignature,
 ) -> Result<(), SignaturesVerificationError<'a>> {
     use SignaturesVerificationError::*;
 
-    if quorum_numbers.is_empty() {
+    if signed_quorum_numbers.is_empty() {
         return Err(EmptyQuorumNumbers);
     }
 
-    let quorum_numbers_len = quorum_numbers.len();
+    let signed_quorum_numbers_len = signed_quorum_numbers.len();
 
     let quorum_apks_len = params.quorum_apks.len();
-    if quorum_numbers_len != quorum_apks_len {
+    if signed_quorum_numbers_len != quorum_apks_len {
         return Err(QuorumNumbersAndQuorumApksLengthMismatch {
-            quorum_numbers_len,
+            signed_quorum_numbers_len,
             quorum_apks_len,
         });
     }
 
     let quorum_apk_indices_len = params.quorum_apk_indices.len();
-    if quorum_numbers_len != quorum_apk_indices_len {
+    if signed_quorum_numbers_len != quorum_apk_indices_len {
         return Err(QuorumNumbersAndQuorumApkIndicesLengthMismatch {
-            quorum_numbers_len,
+            signed_quorum_numbers_len,
             quorum_apk_indices_len,
         });
     }
 
     let total_stake_indices_len = params.total_stake_indices.len();
-    if quorum_numbers_len != total_stake_indices_len {
+    if signed_quorum_numbers_len != total_stake_indices_len {
         return Err(QuorumNumbersAndTotalStakeIndicesLengthMismatch {
-            quorum_numbers_len,
+            signed_quorum_numbers_len,
             total_stake_indices_len,
         });
     }
 
     let non_signer_stake_indices_len = params.non_signer_stake_indices.len();
-    if quorum_numbers_len != non_signer_stake_indices_len {
+    if signed_quorum_numbers_len != non_signer_stake_indices_len {
         return Err(QuorumNumbersAndNonSignerStakeIndicesLengthMismatch {
-            quorum_numbers_len,
+            signed_quorum_numbers_len,
             non_signer_stake_indices_len,
         });
     }
@@ -74,43 +74,56 @@ mod tests {
     use ark_bn254::G1Affine;
 
     use crate::{
-        BlsSignaturesVerifier, NonSignerStakesAndSignature, SignatureVerifier,
-        error::SignaturesVerificationError, types::ReferenceBlock,
+        NonSignerStakesAndSignature, error::SignaturesVerificationError, types::ReferenceBlock,
+        validation::validate_inputs,
     };
 
     #[test]
-    fn test_verify_signatures_fails_given_empty_quorum_numbers() {
-        let signatures_verifier = BlsSignaturesVerifier::default();
+    fn validate_inputs_succeeds_given_valid_inputs() {
+        let signed_quorum_numbers = vec![0; 2];
+        let params = NonSignerStakesAndSignature {
+            quorum_apks: vec![G1Affine::default(); 2],
+            quorum_apk_indices: vec![0; 2],
+            total_stake_indices: vec![0; 2],
+            non_signer_stake_indices: vec![0; 2],
+            ..Default::default()
+        };
+        let reference_block = ReferenceBlock::default();
+        let current_block_number = reference_block.number + 1;
 
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![];
-        let reference_block_number = 0u32;
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
+            current_block_number,
+            &params,
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn verify_signatures_fails_given_empty_signed_quorum_numbers() {
+        let signed_quorum_numbers = vec![];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature::default();
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::EmptyQuorumNumbers
         );
     }
 
     #[test]
-    fn test_verify_signatures_fails_due_to_quorum_numbers_and_quorum_apks_length_mismatch() {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 0u32;
+    fn verify_signatures_fails_due_to_signed_quorum_numbers_and_quorum_apks_length_mismatch() {
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 42],
@@ -119,34 +132,30 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
+            ..Default::default()
         };
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::QuorumNumbersAndQuorumApksLengthMismatch {
-                quorum_numbers_len: quorum_numbers.len(),
+                signed_quorum_numbers_len: signed_quorum_numbers.len(),
                 quorum_apks_len: params.quorum_apks.len(),
             }
         );
     }
 
     #[test]
-    fn test_verify_signatures_fails_due_to_quorum_numbers_and_quorum_apk_indices_length_mismatch() {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 0u32;
+    fn verify_signatures_fails_due_to_signed_quorum_numbers_and_quorum_apk_indices_length_mismatch()
+    {
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 1],
@@ -155,35 +164,30 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
+            ..Default::default()
         };
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::QuorumNumbersAndQuorumApkIndicesLengthMismatch {
-                quorum_numbers_len: quorum_numbers.len(),
+                signed_quorum_numbers_len: signed_quorum_numbers.len(),
                 quorum_apk_indices_len: params.quorum_apk_indices.len(),
             }
         );
     }
 
     #[test]
-    fn test_verify_signatures_fails_due_to_quorum_numbers_and_total_stake_indices_length_mismatch()
-    {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 0u32;
+    fn verify_signatures_fails_due_to_signed_quorum_numbers_and_total_stake_indices_length_mismatch()
+     {
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 1],
@@ -192,35 +196,30 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
+            ..Default::default()
         };
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::QuorumNumbersAndTotalStakeIndicesLengthMismatch {
-                quorum_numbers_len: quorum_numbers.len(),
+                signed_quorum_numbers_len: signed_quorum_numbers.len(),
                 total_stake_indices_len: params.total_stake_indices.len(),
             }
         );
     }
 
     #[test]
-    fn test_verify_signatures_fails_due_to_quorum_numbers_and_non_signer_stake_indices_length_mismatch()
+    fn verify_signatures_fails_due_to_signed_quorum_numbers_and_non_signer_stake_indices_length_mismatch()
      {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 0u32;
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 1],
@@ -229,35 +228,30 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 42],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
+            ..Default::default()
         };
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::QuorumNumbersAndNonSignerStakeIndicesLengthMismatch {
-                quorum_numbers_len: quorum_numbers.len(),
+                signed_quorum_numbers_len: signed_quorum_numbers.len(),
                 non_signer_stake_indices_len: params.non_signer_stake_indices.len(),
             }
         );
     }
 
     #[test]
-    fn test_verify_signatures_fails_due_to_non_signer_pubkeys_and_non_signer_quorum_bitmap_indices_length_mismatch()
+    fn verify_signatures_fails_due_to_non_signer_pubkeys_and_non_signer_quorum_bitmap_indices_length_mismatch()
      {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 0u32;
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 1u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 1],
@@ -266,20 +260,19 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 42],
             non_signer_quorum_bitmap_indices: vec![0u8; 41],
+            ..Default::default()
         };
         let reference_block = ReferenceBlock::default();
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::NonSignerPubkeysAndNonSignerQuorumBitmapIndicesLengthMismatch {
                 non_signer_pubkeys_len: params.non_signer_pubkeys.len(),
                 non_signer_quorum_bitmap_indices_len: params.non_signer_quorum_bitmap_indices.len(),
@@ -288,12 +281,8 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_signatures_fails_with_reference_block_not_preceding_current_block() {
-        let signatures_verifier = BlsSignaturesVerifier::default();
-
-        let msg_hash = [0u8; 32];
-        let quorum_numbers = vec![0u8; 1];
-        let reference_block_number = 42u32;
+    fn verify_signatures_fails_with_reference_block_not_preceding_current_block() {
+        let signed_quorum_numbers = vec![0u8; 1];
         let current_block_number = 41u32;
         let params = NonSignerStakesAndSignature {
             quorum_apks: vec![G1Affine::default(); 1],
@@ -302,22 +291,24 @@ mod tests {
             non_signer_stake_indices: vec![0u8; 1],
             non_signer_pubkeys: vec![G1Affine::default(); 1],
             non_signer_quorum_bitmap_indices: vec![0u8; 1],
+            ..Default::default()
         };
-        let reference_block = ReferenceBlock::default();
+        let reference_block = ReferenceBlock {
+            number: 42,
+            ..Default::default()
+        };
 
-        let signatures_verification = signatures_verifier.verify_signatures(
-            msg_hash,
-            &quorum_numbers,
-            reference_block_number,
+        let result = validate_inputs(
+            &signed_quorum_numbers,
+            reference_block.number,
             current_block_number,
             &params,
-            &reference_block,
         );
 
         assert_eq!(
-            signatures_verification.unwrap_err(),
+            result.unwrap_err(),
             SignaturesVerificationError::ReferenceBlockDoesNotPrecedeCurrentBlock {
-                reference_block_number,
+                reference_block_number: reference_block.number,
                 current_block_number
             }
         );

@@ -64,7 +64,7 @@ mod tests {
     use crate::error::SignaturesVerificationError::*;
 
     #[test]
-    fn test_bit_indices_to_bitmap_succeeds_given_empty_input() {
+    fn bit_indices_to_bitmap_succeeds_given_empty_input() {
         let bit_indices = vec![];
         let upper_bound_bit_index = u8::MAX;
         let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
@@ -72,62 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bit_indices_to_bitmap_fails_when_it_exceeds_max_len() {
-        let bit_indices = vec![0u8; 257];
-        let upper_bound_bit_index = u8::MAX;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
-        assert_eq!(
-            result.unwrap_err(),
-            BitIndicesGreaterThanMaxLength {
-                bit_indices_len: bit_indices.len(),
-                max_bit_indices_len: MAX_BIT_INDICES_LENGTH
-            }
-        );
-    }
-
-    #[test]
-    fn test_bit_indices_to_bitmap_fails_if_not_sorted() {
-        let bit_indices = vec![42u8, 41u8, 43u8];
-        let upper_bound_bit_index = u8::MAX;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
-        assert_eq!(
-            result.unwrap_err(),
-            BitIndicesNotSorted {
-                bit_indices: &bit_indices
-            }
-        );
-    }
-
-    #[test]
-    fn test_bit_indices_to_bitmap_fails_if_greater_than_upper_bound() {
-        let bit_indices = vec![40u8, 41u8, 43u8];
-        let upper_bound_bit_index = 42u8;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
-        assert_eq!(
-            result.unwrap_err(),
-            BitIndexGreaterThanOrEqualToUpperBound {
-                bit_indices: &bit_indices,
-                upper_bound_bit_index,
-            }
-        );
-    }
-
-    #[test]
-    fn test_bit_indices_to_bitmap_fails_if_equal_to_upper_bound() {
-        let bit_indices = vec![40u8, 41u8, 42u8];
-        let upper_bound_bit_index = 42u8;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
-        assert_eq!(
-            result.unwrap_err(),
-            BitIndexGreaterThanOrEqualToUpperBound {
-                bit_indices: &bit_indices,
-                upper_bound_bit_index,
-            }
-        );
-    }
-
-    #[test]
-    fn test_bit_indices_to_bitmap_succeeds_when_setting_the_0th_bit() {
+    fn bit_indices_to_bitmap_succeeds_when_setting_the_0th_bit() {
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
         // index: | 255 | 254 | 253 | 252 |...|  3  |  2  | *1* | *0* |
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
@@ -144,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bit_indices_to_bitmap_succeeds_when_targeting_decimal_8_as_bitmap() {
+    fn bit_indices_to_bitmap_succeeds_when_targeting_decimal_8_as_bitmap() {
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
         // index: | 255 | 254 | 253 | 252 |...| *3* |  2  |  1  |  0  |
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
@@ -159,5 +104,73 @@ mod tests {
         expected.set(3, true);
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_fails_when_it_exceeds_max_len() {
+        let bit_indices = vec![0u8; 257];
+        let upper_bound_bit_index = u8::MAX;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(
+            result.unwrap_err(),
+            BitIndicesGreaterThanMaxLength {
+                bit_indices_len: bit_indices.len(),
+                max_bit_indices_len: MAX_BIT_INDICES_LENGTH
+            }
+        );
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_fails_if_not_sorted() {
+        let bit_indices = vec![42u8, 41u8, 43u8];
+        let upper_bound_bit_index = u8::MAX;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(
+            result.unwrap_err(),
+            BitIndicesNotSorted {
+                bit_indices: &bit_indices
+            }
+        );
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_fails_if_greater_than_upper_bound() {
+        let bit_indices = vec![40u8, 41u8, 43u8];
+        let upper_bound_bit_index = 42u8;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(
+            result.unwrap_err(),
+            BitIndexGreaterThanOrEqualToUpperBound {
+                bit_indices: &bit_indices,
+                upper_bound_bit_index,
+            }
+        );
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_fails_if_equal_to_upper_bound() {
+        let bit_indices = vec![40u8, 41u8, 42u8];
+        let upper_bound_bit_index = 42u8;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(
+            result.unwrap_err(),
+            BitIndexGreaterThanOrEqualToUpperBound {
+                bit_indices: &bit_indices,
+                upper_bound_bit_index,
+            }
+        );
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_fails_with_duplicate_bit_indices() {
+        let bit_indices = vec![42u8, 42u8];
+        let upper_bound_bit_index = 42u8;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(
+            result.unwrap_err(),
+            BitIndicesNotUnique {
+                bit_indices: &bit_indices
+            },
+        );
     }
 }
