@@ -37,6 +37,7 @@ type ISecondary interface {
 		verifyOpts common.CertVerificationOpts,
 	) ([]byte, error)
 	WriteSubscriptionLoop(ctx context.Context)
+	WriteOnCacheMissEnabled() bool
 }
 
 // PutNotify ... notification received by primary manager to perform insertion across
@@ -57,6 +58,7 @@ type SecondaryManager struct {
 	verifyLock       sync.RWMutex
 	topic            chan PutNotify
 	concurrentWrites bool
+	writeOnCacheMiss bool
 }
 
 // NewSecondaryManager ... creates a new secondary storage manager
@@ -65,16 +67,18 @@ func NewSecondaryManager(
 	m metrics.Metricer,
 	caches []common.SecondaryStore,
 	fallbacks []common.SecondaryStore,
+	writeOnCacheMiss bool,
 ) ISecondary {
 	return &SecondaryManager{
 		topic: make(
 			chan PutNotify,
 		), // channel is un-buffered which dispersing consumption across routines helps alleviate
-		log:        log,
-		m:          m,
-		caches:     caches,
-		fallbacks:  fallbacks,
-		verifyLock: sync.RWMutex{},
+		log:              log,
+		m:                m,
+		caches:           caches,
+		fallbacks:        fallbacks,
+		verifyLock:       sync.RWMutex{},
+		writeOnCacheMiss: writeOnCacheMiss,
 	}
 }
 
@@ -93,6 +97,10 @@ func (sm *SecondaryManager) CachingEnabled() bool {
 
 func (sm *SecondaryManager) FallbackEnabled() bool {
 	return len(sm.fallbacks) > 0
+}
+
+func (sm *SecondaryManager) WriteOnCacheMissEnabled() bool {
+	return sm.CachingEnabled() && sm.writeOnCacheMiss
 }
 
 // HandleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)

@@ -121,24 +121,26 @@ jobs:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
 
-  e2e-tests-preprod:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: jdx/mise-action@v2
-        with:
-          version: ${{ env.MISE_VERSION }}
-          experimental: true
-          working_directory: api/proxy
-      - run: go mod download
-        working-directory: api/proxy
-      - run: make test-e2e-preprod
-        working-directory: api/proxy
-        env:
-          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
-          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+  #  TODO: preprod relay and operators no longer expose a public DNS, to minimize egress costs.
+  #        We need to run these tests from inside the cluster, either using a self-hosted runner or k8s cron job live test.
+  # e2e-tests-preprod:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #     - uses: jdx/mise-action@v2
+  #       with:
+  #         version: ${{ env.MISE_VERSION }}
+  #         experimental: true
+  #         working_directory: api/proxy
+  #     - run: go mod download
+  #       working-directory: api/proxy
+  #     - run: make test-e2e-preprod
+  #       working-directory: api/proxy
+  #       env:
+  #         SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
+  #         ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
 
   e2e-tests-sepolia:
     runs-on: ubuntu-latest
