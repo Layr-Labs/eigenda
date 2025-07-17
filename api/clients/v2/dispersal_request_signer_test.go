@@ -108,7 +108,7 @@ func TestRequestSigning(t *testing.T) {
 			signature, err := signer.SignStoreChunksRequest(context.Background(), request)
 			require.NoError(t, err)
 
-			require.Nil(t, request.Signature)
+			require.Nil(t, request.GetSignature())
 			request.Signature = signature
 			hash, err := auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestRequestSigning(t *testing.T) {
 			require.Nil(t, hash)
 
 			// Changing a byte in the middle of the request should make the verification fail
-			request.DisperserID = request.DisperserID + 1
+			request.DisperserID = request.GetDisperserID() + 1
 			request.Signature = signature
 			hash, err = auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.Error(t, err)

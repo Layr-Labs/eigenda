@@ -172,13 +172,13 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) certTypes.EigenDATy
 			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
 			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
-			ChunkLength:                     quorum.ChunkLength,
+			ChunkLength:                     quorum.GetChunkLength(),
 		}
 	}
 	return certTypes.EigenDATypesV1BlobHeader{
 		Commitment: certTypes.BN254G1Point{
-			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
-			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
+			X: new(big.Int).SetBytes(blobHeader.GetCommitment().GetX()),
+			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().GetY()),
 		},
 		DataLength:       blobHeader.GetDataLength(),
 		QuorumBlobParams: quorums,

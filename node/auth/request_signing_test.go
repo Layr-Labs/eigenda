@@ -25,7 +25,7 @@ func TestHashing(t *testing.T) {
 	// modify the disperser id
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.DisperserID = request.DisperserID + 1
+	request.DisperserID = request.GetDisperserID() + 1
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -33,7 +33,7 @@ func TestHashing(t *testing.T) {
 	// remove a blob cert
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates = request.Batch.BlobCertificates[:len(request.Batch.BlobCertificates)-1]
+	request.Batch.BlobCertificates = request.GetBatch().GetBlobCertificates()[:len(request.GetBatch().GetBlobCertificates())-1]
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -41,7 +41,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].RelayKeys[0] = request.Batch.BlobCertificates[0].RelayKeys[0] + 1
+	request.Batch.BlobCertificates[0].RelayKeys[0] = request.GetBatch().GetBlobCertificates()[0].GetRelayKeys()[0] + 1
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -50,7 +50,7 @@ func TestHashing(t *testing.T) {
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].RelayKeys =
-		request.Batch.BlobCertificates[0].RelayKeys[:len(request.Batch.BlobCertificates[0].RelayKeys)-1]
+		request.GetBatch().GetBlobCertificates()[0].GetRelayKeys()[:len(request.GetBatch().GetBlobCertificates()[0].GetRelayKeys())-1]
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -67,7 +67,7 @@ func TestHashing(t *testing.T) {
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[0] =
-		request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[0] + 1
+		request.GetBatch().GetBlobCertificates()[0].GetBlobHeader().GetQuorumNumbers()[0] + 1
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -76,8 +76,8 @@ func TestHashing(t *testing.T) {
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers =
-		request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[:len(
-			request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers)-1]
+		request.GetBatch().GetBlobCertificates()[0].GetBlobHeader().GetQuorumNumbers()[:len(
+			request.GetBatch().GetBlobCertificates()[0].GetBlobHeader().GetQuorumNumbers())-1]
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
@@ -198,7 +198,7 @@ func TestRequestSigning(t *testing.T) {
 	require.Error(t, err)
 
 	// Changing a field in the request should make it invalid
-	request.DisperserID = request.DisperserID + 1
+	request.DisperserID = request.GetDisperserID() + 1
 	request.Signature = signature
 	_, err = VerifyStoreChunksRequest(publicAddress, request)
 	require.Error(t, err)
