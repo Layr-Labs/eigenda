@@ -47,8 +47,10 @@ for human engineers, and to provide AI agents with a checklist for code review.
 5. TODO comments should be added to denote future work.
    - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
    can understand.
-   - TODO comments that must be addressed prior to merging a PR should clearly be marked, e.g.
-   `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
+   - TODO comments that must be addressed *prior* to merging a PR should clearly be marked,
+   e.g. `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
+   - TODO comments that are intended to be merged into `master` should be attributed to the engineer adding the TODO,
+   e.g. `// TODO(litt3): we should consider optimizing this algorithm`
 
 ### 4. Spelling and Grammar
 
