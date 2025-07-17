@@ -38,8 +38,8 @@ GLOBAL OPTIONS:
    --eigenda.disable-tls                                                    Disable TLS for gRPC communication with the EigenDA disperser. Default is false. (default: false) [$EIGENDA_PROXY_EIGENDA_GRPC_DISABLE_TLS]
    --eigenda.disperser-rpc value                                            RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_DISPERSER_RPC]
    --eigenda.eth-rpc value                                                  URL of the Ethereum RPC endpoint. Needed to confirm blobs landed onchain. [$EIGENDA_PROXY_EIGENDA_ETH_RPC]
-   --eigenda.max-blob-length value                                          Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-                                                                                      loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH]
+   --eigenda.max-blob-length value                                          Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
+                                                                                      loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH]
    --eigenda.put-blob-encoding-version value                                Blob encoding version to use when writing blobs from the high-level interface. (default: 0) [$EIGENDA_PROXY_EIGENDA_PUT_BLOB_ENCODING_VERSION]
    --eigenda.put-retries value                                              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_PUT_RETRIES]
    --eigenda.response-timeout value                                         Flag used to configure the underlying disperser-client. Total time to wait for the disperseBlob call to return or disperseAuthenticatedBlob stream to finish and close. (default: 1m0s) [$EIGENDA_PROXY_EIGENDA_RESPONSE_TIMEOUT]
@@ -63,8 +63,8 @@ governance and is injected in the BlobHeader before dispersing. Currently only s
    --eigenda.v2.disperser-rpc value                                    RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC]
    --eigenda.v2.eigenda-directory value                                Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.. [$EIGENDA_PROXY_EIGENDA_V2_EIGENDA_DIRECTORY]
    --eigenda.v2.eth-rpc value                                          URL of the Ethereum RPC endpoint. [$EIGENDA_PROXY_EIGENDA_V2_ETH_RPC]
-   --eigenda.v2.max-blob-length value                                  Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH]
+   --eigenda.v2.max-blob-length value                                  Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
+loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH]
    --eigenda.v2.network value  The EigenDA network that is being used. This is an optional flag, to configure
 default values for eigenda.v2.disperser-rpc, eigenda.v2.service-manager-addr, and eigenda.v2.bls-operator-state-retriever-addr. If all of these fields are explicitly configured, the
 network flag may be omitted. If some or all of these fields are configured, and the network
