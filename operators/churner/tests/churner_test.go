@@ -138,7 +138,7 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
+		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.EigenDADirectory, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
 		assert.NoError(t, err)
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
@@ -166,10 +166,10 @@ func TestChurner(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
-		[]byte(request.OperatorAddress),
-		request.OperatorToRegisterPubkeyG1,
-		request.OperatorToRegisterPubkeyG2,
-		request.Salt,
+		[]byte(request.GetOperatorAddress()),
+		request.GetOperatorToRegisterPubkeyG1(),
+		request.GetOperatorToRegisterPubkeyG2(),
+		request.GetSalt(),
 	)
 	copy(requestHash[:], requestHashBytes)
 
@@ -184,13 +184,13 @@ func TestChurner(t *testing.T) {
 	reply, err := server.Churn(ctx, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply)
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetExpiry())
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSignature())
-	assert.Equal(t, 65, len(reply.SignatureWithSaltAndExpiry.GetSignature()))
-	assert.Len(t, reply.OperatorsToChurn, 2)
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetExpiry())
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSignature())
+	assert.Equal(t, 65, len(reply.GetSignatureWithSaltAndExpiry().GetSignature()))
+	assert.Len(t, reply.GetOperatorsToChurn(), 2)
 	actualQuorums := make([]uint32, 0)
-	for _, param := range reply.OperatorsToChurn {
+	for _, param := range reply.GetOperatorsToChurn() {
 		actualQuorums = append(actualQuorums, param.GetQuorumId())
 		assert.Equal(t, lowestStakeOperatorAddr, gethcommon.BytesToAddress(param.GetOperator()))
 		assert.Equal(t, lowestStakeOperatorPubKey.Serialize(), param.GetPubkey())
@@ -204,7 +204,7 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Writer, error) {
+func createTransactorFromScratch(privateKey, eigenDADirectory string, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Writer, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -217,7 +217,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	return eth.NewWriter(logger, gethClient, eigenDADirectory, operatorStateRetriever, serviceManager)
 }
 
 func newTestServer(t *testing.T) *churner.Server {
@@ -231,11 +231,13 @@ func newTestServer(t *testing.T) *churner.Server {
 		LoggerConfig:                  *common.DefaultLoggerConfig(),
 		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
 		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
+		EigenDADirectory:              testConfig.EigenDA.EigenDADirectory,
 		ChurnApprovalInterval:         15 * time.Minute,
 	}
 
 	operatorTransactorChurner, err := createTransactorFromScratch(
 		churnerPrivateKeyHex,
+		testConfig.EigenDA.EigenDADirectory,
 		testConfig.EigenDA.OperatorStateRetriever,
 		testConfig.EigenDA.ServiceManager,
 		logger,

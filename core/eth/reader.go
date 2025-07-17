@@ -8,6 +8,9 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/Layr-Labs/eigenda/common"
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -17,6 +20,7 @@ import (
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
+	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -25,10 +29,8 @@ import (
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pingcap/errors"
 
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
@@ -52,6 +54,7 @@ type ContractBindings struct {
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
+	EigenDADirectory      *eigendadirectory.ContractIEigenDADirectory
 }
 
 type Reader struct {
@@ -65,7 +68,8 @@ var _ core.Reader = (*Reader)(nil)
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
-	blsOperatorStateRetrieverHexAddr string,
+	eigendaDirectoryHexAddr,
+	blsOperatorStateRetrieverHexAddr,
 	eigenDAServiceManagerHexAddr string) (*Reader, error) {
 
 	e := &Reader{
@@ -73,13 +77,38 @@ func NewReader(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
+	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
+	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
+	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
+		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+		}
 
-	return e, err
+		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress()
+		if err != nil {
+			return nil, err
+		}
+
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
+		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
+	}
+
+	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
+	}
+	return e, nil
 }
 
+// updateContractBindings updates the contract bindings for the reader
+// TODO: update to use address directory contract once all contracts are written into the directory
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
@@ -804,83 +833,64 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-// TODO: later add quorumIds specifications
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
+	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
+	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
+		Context: ctx,
+	}, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	reservationsMap := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
-
-	// In the new API, we need to query reservations per quorum and account
-	// For now, there's only one reservation per account, applied to multiple quorums
-	// TODO: update this to handle multiple quorums
-	for _, accountID := range accountIDs {
-		//TODO: add quorumId to the call
-		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
-			Context: ctx,
-		}, accountID)
-
+	// since reservations are returned in the same order as the accountIDs, we can directly map them
+	for i, reservation := range reservations {
+		res, err := ConvertToReservedPayment(reservation)
 		if err != nil {
-			t.logger.Warn("failed to get reservation", "account", accountID, "err", err)
+			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
 			continue
 		}
 
-		res, err := ConvertToReservedPayments(reservation)
-		if err != nil {
-			t.logger.Warn("failed to convert reservation", "account", accountID, "err", err)
-			continue
-		}
-
-		reservationsMap[accountID] = res
+		reservationsMap[accountIDs[i]] = res
 	}
 
 	return reservationsMap, nil
 }
 
-// TODO: this function should take in a list of quorumIds
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
-
 	if err != nil {
 		return nil, err
 	}
-
-	return ConvertToReservedPayments(reservation)
+	return ConvertToReservedPayment(reservation)
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
+	payments, err := t.bindings.PaymentVault.GetOnDemandTotalDeposits(&bind.CallOpts{
+		Context: ctx}, accountIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: update to use default of quorum 0 for deposits
-	// quorumId := uint64(0)
-	for _, accountID := range accountIDs {
-		onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
-			Context: ctx,
-		}, accountID)
-
-		if err != nil {
-			t.logger.Warn("failed to get on-demand deposit", "account", accountID, "err", err)
+	// since payments are returned in the same order as the accountIDs, we can directly map them
+	for i, payment := range payments {
+		if payment.Cmp(big.NewInt(0)) == 0 {
+			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i])
 			continue
 		}
-
-		if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
-			t.logger.Debug("on-demand deposit is zero for account", "account", accountID)
-			continue
-		}
-
-		paymentsMap[accountID] = &core.OnDemandPayment{
-			CumulativePayment: onDemandDeposit,
+		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
+			CumulativePayment: payment,
 		}
 	}
 
@@ -891,26 +901,21 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-
-	// In the new API, we need to specify a quorumId (only 0 enabled for deposits)
-	onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
+	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
-
 	if err != nil {
 		return nil, err
 	}
-
-	if err := CheckOnDemandPayment(onDemandDeposit); err != nil {
-		return nil, err
+	if onDemandPayment.Cmp(big.NewInt(0)) == 0 {
+		return nil, errors.New("ondemand payment does not exist for given account")
 	}
-
 	return &core.OnDemandPayment{
-		CumulativePayment: onDemandDeposit,
+		CumulativePayment: onDemandPayment,
 	}, nil
 }
 
-func (t *Reader) GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -924,7 +929,7 @@ func (t *Reader) GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNum
 	return globalSymbolsPerSecond, nil
 }
 
-func (t *Reader) GetOnDemandGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}

@@ -209,49 +209,50 @@ func (d *Dispatcher) HandleBatch(
 	state := batchData.OperatorState
 	sigChan := make(chan core.SigningMessage, len(state.IndexedOperators))
 	for opID, op := range state.IndexedOperators {
-
-		validatorProbe := d.metrics.newSendToValidatorProbe()
-		validatorProbe.SetStage("get_client")
-
 		opID := opID
 		op := op
-		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
-		if err != nil {
-			d.logger.Warn("failed to parse operator socket, check if the socket format is correct",
-				"operator", opID.Hex(),
-				"socket", op.Socket,
-				"err", err)
-			sigChan <- core.SigningMessage{
-				Signature:       nil,
-				Operator:        opID,
-				BatchHeaderHash: batchData.BatchHeaderHash,
-				TimeReceived:    time.Now(),
-				Err:             fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
-			}
-			continue
-		}
 
-		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
-		if err != nil {
-			d.logger.Warn("failed to get node client; node may not be reachable",
-				"operator", opID.Hex(),
-				"host", host,
-				"v2DispersalPort", v2DispersalPort,
-				"err", err)
-			sigChan <- core.SigningMessage{
-				Signature:       nil,
-				Operator:        opID,
-				BatchHeaderHash: batchData.BatchHeaderHash,
-				TimeReceived:    time.Now(),
-				Err:             err,
-			}
-			continue
-		}
-
+		validatorProbe := d.metrics.newSendToValidatorProbe()
 		validatorProbe.SetStage("pool_submission")
 
 		d.pool.Submit(func() {
 			defer validatorProbe.End()
+
+			validatorProbe.SetStage("get_client")
+
+			host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
+			if err != nil {
+				d.logger.Warn("failed to parse operator socket, check if the socket format is correct",
+					"operator", opID.Hex(),
+					"socket", op.Socket,
+					"err", err)
+				sigChan <- core.SigningMessage{
+					Signature:       nil,
+					Operator:        opID,
+					BatchHeaderHash: batchData.BatchHeaderHash,
+					TimeReceived:    time.Now(),
+					Err:             fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+				}
+				return
+			}
+
+			client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
+			if err != nil {
+				d.logger.Warn("failed to get node client; node may not be reachable",
+					"operator", opID.Hex(),
+					"host", host,
+					"v2DispersalPort", v2DispersalPort,
+					"err", err)
+				sigChan <- core.SigningMessage{
+					Signature:       nil,
+					Operator:        opID,
+					BatchHeaderHash: batchData.BatchHeaderHash,
+					TimeReceived:    time.Now(),
+					Err:             err,
+				}
+				return
+			}
+
 			validatorProbe.SetStage("put_dispersal_request")
 
 			req := &corev2.DispersalRequest{
@@ -262,7 +263,7 @@ func (d *Dispatcher) HandleBatch(
 				DispersedAt:     uint64(time.Now().UnixNano()),
 				BatchHeader:     *batch.BatchHeader,
 			}
-			err := d.blobMetadataStore.PutDispersalRequest(ctx, req)
+			err = d.blobMetadataStore.PutDispersalRequest(ctx, req)
 			if err != nil {
 				d.logger.Error("failed to put dispersal request", "err", err)
 				sigChan <- core.SigningMessage{

@@ -1,0 +1,123 @@
+name: Live Network Tests
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
+  workflow_dispatch: {}         # Allow manual triggering
+
+env:
+  MISE_VERSION: 2024.12.14
+
+jobs:
+  test-v2:
+    runs-on: ubuntu-latest
+    env:
+      LIVE_TESTS: "true"
+      LIVE_TEST_PREPROD_HOLESKY_KEY: ${{ secrets.LIVE_TEST_PREPROD_HOLESKY_KEY }}
+      LIVE_TEST_TESTNET_HOLESKY_KEY: ${{ secrets.LIVE_TEST_TESTNET_HOLESKY_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: go version
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run Live Network Tests
+        run: make live-tests
+
+      - name: Notify Slack
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR="good"
+            STATUS_EMOJI="✅"
+            MENTION=""
+          else
+            COLOR="danger"
+            STATUS_EMOJI="❌"
+            MENTION="@here "
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg channel "#da-live-tests" \
+            --arg text "${MENTION}Live Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg title "logs" \
+            --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg color "$COLOR" \
+            '{
+              channel: $channel,
+              text: $text,
+              attachments: [
+                {
+                  color: $color,
+                  title: $title,
+                  title_link: $title_link
+                }
+              ]
+            }')
+
+          curl -X POST -H "Authorization: Bearer ${{ secrets.DA_TEST_REPORTER_SLACK_OATH_TOKEN }}" \
+               -H 'Content-type: application/json; charset=utf-8' \
+               --data "$PAYLOAD" \
+               https://slack.com/api/chat.postMessage
+
+
+  test-v1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: go version
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run live v1 eigenda-client tests
+        run: make live-tests-v1
+
+      - name: Notify Slack
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR="good"
+            STATUS_EMOJI="✅"
+            MENTION=""
+          else
+            COLOR="danger"
+            STATUS_EMOJI="❌"
+            MENTION="@here "
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg channel "#da-live-tests" \
+            --arg text "${MENTION}Live Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg title "logs" \
+            --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg color "$COLOR" \
+            '{
+              channel: $channel,
+              text: $text,
+              attachments: [
+                {
+                  color: $color,
+                  title: $title,
+                  title_link: $title_link
+                }
+              ]
+            }')
+
+          curl -X POST -H "Authorization: Bearer ${{ secrets.DA_TEST_REPORTER_SLACK_OATH_TOKEN }}" \
+               -H 'Content-type: application/json; charset=utf-8' \
+               --data "$PAYLOAD" \
+               https://slack.com/api/chat.postMessage

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -171,14 +172,15 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	}
 
 	node := &node.Node{
-		Config:     config,
-		Logger:     logger,
-		KeyPair:    keyPair,
-		BLSSigner:  signer,
-		Metrics:    metrics,
-		Store:      store,
-		ChainState: chainState,
-		Validator:  val,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		Store:          store,
+		ChainState:     chainState,
+		Validator:      val,
+		ValidationPool: workerpool.New(1),
 	}
 	return grpc.NewServer(config, node, logger, ratelimiter)
 }
@@ -345,7 +347,7 @@ func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool)
 func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
-	assert.True(t, resp.Semver == ">=0.9.0-rc.1")
+	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
@@ -422,7 +424,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -435,7 +437,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -459,7 +461,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).DeserializeGnark(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).DeserializeGnark(gnarkEncodedChunk)
@@ -472,7 +474,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -494,7 +496,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -507,7 +509,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 

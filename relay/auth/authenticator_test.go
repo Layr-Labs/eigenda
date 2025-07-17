@@ -134,7 +134,7 @@ func TestBadSignature(t *testing.T) {
 	require.Equal(t, expectedHash, hash)
 
 	// Change a byte in the signature to make it invalid
-	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
+	request.OperatorSignature[0] = request.GetOperatorSignature()[0] ^ 1
 
 	_, err = authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.Error(t, err)

@@ -5,10 +5,11 @@ run:
   timeout: 5m
 
 linters:
+  enable:
+    - protogetter # reports direct reads from proto message fields when getters should be used.
   # Right now revive raises 50+ issues, whereas golint didn't have any.
   # despite revive being recommended as a replacement for golint.
   # TODO: should we turn on revive and fix the issues?
-  #   enable:
   #     - revive # drop-in replacement for golint
   exclusions:
     rules:
