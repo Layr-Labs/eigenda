@@ -12,7 +12,10 @@ const (
 )
 
 // GetEigenDADirectory returns, as a string, the address of the EigenDADirectory contract for the network.
+// For more information about networks and contract addresses, see https://docs.eigenlayer.xyz/eigenda/networks/
 func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
+	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
+	// to reduce duplication and ensure consistency across the codebase
 	switch n {
 	case MainnetEigenDANetwork:
 		return "0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4", nil
@@ -28,7 +31,10 @@ func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
 }
 
 // GetServiceManagerAddress returns, as a string, the address of the EigenDAServiceManager contract for the network.
+// For more information about networks and contract addresses, see https://docs.eigenlayer.xyz/eigenda/networks/
 func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
+	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
+	// to reduce duplication and ensure consistency across the codebase
 	switch n {
 	case MainnetEigenDANetwork:
 		return "0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0", nil
@@ -45,7 +51,10 @@ func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
 
 // GetDisperserAddress gets a string representing the address of the disperser for the network.
 // The format of the returned address is "<hostname>:<port>"
+// For more information about networks and disperser endpoints, see https://docs.eigenlayer.xyz/eigenda/networks/
 func (n EigenDANetwork) GetDisperserAddress() (string, error) {
+	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
+	// to reduce duplication and ensure consistency across the codebase
 	switch n {
 	case MainnetEigenDANetwork:
 		return "disperser.eigenda.xyz:443", nil
@@ -62,7 +71,10 @@ func (n EigenDANetwork) GetDisperserAddress() (string, error) {
 
 // GetBLSOperatorStateRetrieverAddress returns, as a string, the address of the OperatorStateRetriever contract for the
 // network
+// For more information about networks and contract addresses, see https://docs.eigenlayer.xyz/eigenda/networks/
 func (n EigenDANetwork) GetBLSOperatorStateRetrieverAddress() (string, error) {
+	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
+	// to reduce duplication and ensure consistency across the codebase
 	switch n {
 	case MainnetEigenDANetwork:
 		return "0xEC35aa6521d23479318104E10B4aA216DBBE63Ce", nil
