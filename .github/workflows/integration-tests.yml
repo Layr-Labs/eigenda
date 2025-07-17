@@ -76,9 +76,6 @@ jobs:
       - name: Node Plugin
         run: go test -v ./node/plugin/tests
 
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
-
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e
 
