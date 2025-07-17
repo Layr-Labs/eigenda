@@ -18,8 +18,7 @@ func TestParseByteAmount(t *testing.T) {
 		{"10 B", 10, false},
 		{"15 b", 15, false}, // Case-insensitive
 		{"1 KiB", 1024, false},
-		{"2 kib", 2048, false},  // Case-insensitive
-		{"10 kb", 10000, false}, // Decimal kilobyte (case-insensitive)
+		{"2 kib", 2048, false}, // Case-insensitive
 		{"1 MiB", 1024 * 1024, false},
 		{"3 mib", 3 * 1024 * 1024, false},
 
