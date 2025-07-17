@@ -57,12 +57,8 @@ func ParseBytesAmount(s string) (uint64, error) {
 		return uint64(num), nil
 	case "kib":
 		return uint64(num * 1024), nil
-	case "kb":
-		return uint64(num * 1000), nil // Decimal kilobyte
 	case "mib":
 		return uint64(num * 1024 * 1024), nil
-	case "mb":
-		return uint64(num * 1000 * 1000), nil // Decimal megabyte
 	default:
 		return 0, fmt.Errorf("unsupported unit: %s", unit)
 	}
