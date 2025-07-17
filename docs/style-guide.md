@@ -134,3 +134,11 @@ Good code has good names. Bad names yield bad code.
    invalidate original assumptions.
    - At minimum, any situation where a `nil` check is skipped must be explicitly commented, stating the reason that
    it's safe.
+
+### 8. TODO(litt3): Missing Guidelines
+
+The following topics are good candidates for future additions to this style guide. Anyone with a strong opinion
+should consider creating a PR to add a new section.
+
+1. Package organization and naming
+2. Interface/struct design and naming
