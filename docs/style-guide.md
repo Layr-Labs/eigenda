@@ -4,14 +4,31 @@ This style guide contains coding style guidelines for the EigenDA project. This 
 builds on top of the guidelines expressed in [Effective Go](https://go.dev/doc/effective_go). It is intended as a guide
 for human engineers, and to provide AI agents with a checklist for code review.
 
-### 1. Error handling
+### 1. Style Enforcement Guidelines
+
+1. Style guidelines should be enforced for all new code and documentation.
+2. The decision of whether to modify pre-existing code to adhere to the guidelines must be made on a case-by-case basis:
+   - If a line is being modified, it's probably reasonable to fix any style issues that exist on that line.
+   - If style issues exist in close proximity to changes being made, it *may* make sense to fix the issues.
+   - Style fixes shouldn't be allowed to overshadow the main point of a PR.
+   - If large quantity of style fixes are necessary, it's best to split them into a separate PR. E.g. don't turn a
+   5 line PR into a 50 line PR just for the sake of style fixes!
+3. Recognize that everyone has unique preferences, and be respectful of alternate viewpoints:
+   - Pursuing personal style *opinions* on code you are changing is perfectly acceptable: by touching the code, your
+   preferences supersede the preferences of the previous engineer.
+   - Changes may be made in surrounding code for the sake of readability, but there's a fine line between
+   "improving readability", and "aggressively imposing personal preference".
+   - If there is a disagreement between engineers about style, the team should come to consensus and enshrine the
+   result as an entry in this style guide.
+
+### 2. Error handling
 
 1. Return errors explicitly; don't panic except for unrecoverable errors, where returning an error is not plausible.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
 2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
    - Ensure that `%w` is used for error wrapping, *not* `%v`.
 
-### 2. Code Documentation
+### 3. Code Documentation
 
 1. Document all exported functions/types in production code.
 2. Document unexported functions/types that contain non-trivial logic.
@@ -33,7 +50,7 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - TODO comments that must be addressed prior to merging a PR should clearly be marked, e.g.
    `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
 
-### 3. Spelling and Grammar
+### 4. Spelling and Grammar
 
 Proper spelling and grammar are important, because they help keep code and documentation unambiguous, easy to read, 
 and professional. They should be checked and carefully maintained.
@@ -55,7 +72,7 @@ and professional. They should be checked and carefully maintained.
    - Neologisms are permitted
 4. Colloquial language that is appropriate in a professional setting is acceptable: don't be the "fun police".
 
-### 4. Naming
+### 5. Naming
 
 Good code has good names. Bad names yield bad code.
 
@@ -71,7 +88,7 @@ Good code has good names. Bad names yield bad code.
    - E.g., you shouldn't try to usurp the word `Component` to mean a specific part of the system, since it's already
    used in many generic contexts.
 
-### 5. Code Structure
+### 6. Code Structure
 
 1. Keep functions short and readable. If a function gets too long or complicated, split out helper functions. Some
    good candidates for logic to split out of complex functions are:
@@ -106,7 +123,7 @@ Good code has good names. Bad names yield bad code.
         return nil
         ```
 
-### 6. Defensive Coding
+### 7. Defensive Coding
 
 1. Prefer using constructors over raw struct instantiation.
    - Raw struct instantiation is bug prone: fields can be removed by mistake, or newly added fields may not be
