@@ -99,15 +99,16 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		}
 	})
 	n := &node.Node{
-		Config:       config,
-		Logger:       logger,
-		KeyPair:      keyPair,
-		Metrics:      nil,
-		Store:        store,
-		ChainState:   chainState,
-		Validator:    mockVal,
-		Transactor:   tx,
-		DownloadPool: workerpool.New(1),
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		Metrics:        nil,
+		Store:          store,
+		ChainState:     chainState,
+		Validator:      mockVal,
+		Transactor:     tx,
+		DownloadPool:   workerpool.New(1),
+		ValidationPool: workerpool.New(1),
 	}
 	n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	return &components{

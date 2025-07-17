@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -171,14 +172,15 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	}
 
 	node := &node.Node{
-		Config:     config,
-		Logger:     logger,
-		KeyPair:    keyPair,
-		BLSSigner:  signer,
-		Metrics:    metrics,
-		Store:      store,
-		ChainState: chainState,
-		Validator:  val,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		Store:          store,
+		ChainState:     chainState,
+		Validator:      val,
+		ValidationPool: workerpool.New(1),
 	}
 	return grpc.NewServer(config, node, logger, ratelimiter)
 }
