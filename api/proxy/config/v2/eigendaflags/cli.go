@@ -194,10 +194,11 @@ loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 default values for %s, %s, and %s. If all of these fields are explicitly configured, the
 network flag may be omitted. If some or all of these fields are configured, and the network
 is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, & %s.`,
+EigenDANetwork values include %s, %s, %s, & %s.`,
 				DisperserFlagName,
 				ServiceManagerAddrFlagName,
 				BLSOperatorStateRetrieverFlagName,
+				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
