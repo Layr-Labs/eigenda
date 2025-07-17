@@ -217,8 +217,9 @@ func NewNode(
 			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
 		}
 	} else {
-		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. " +
-			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.")
+		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
+			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
+			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
 	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
