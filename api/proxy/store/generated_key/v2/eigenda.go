@@ -162,11 +162,11 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	switch c := cert.(type) {
+	switch cert := cert.(type) {
 	case *coretypes.EigenDACertV2:
 		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
 	case *coretypes.EigenDACertV3:
-		return c.Serialize(coretypes.CertSerializationRLP)
+		return cert.Serialize(coretypes.CertSerializationRLP)
 	default:
 		return nil, fmt.Errorf("unsupported cert version: %T", cert)
 	}

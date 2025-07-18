@@ -59,11 +59,11 @@ func (cv *CertVerifier) CheckDACert(
 	// EigenDACertV3 is the only version that is supported by the CheckDACert function
 	var certV3 *coretypes.EigenDACertV3
 	var err error
-	switch c := cert.(type) {
+	switch cert := cert.(type) {
 	case *coretypes.EigenDACertV3:
-		certV3 = c
+		certV3 = cert
 	case *coretypes.EigenDACertV2:
-		certV3, err = c.ToV3()
+		certV3, err = cert.ToV3()
 		if err != nil {
 			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
 		}
