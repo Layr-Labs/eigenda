@@ -465,7 +465,7 @@ func TestErrorClose(t *testing.T) {
 // with valid data, but could indicate malicious dispersed data.
 func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 	tester := buildRelayPayloadRetrieverTester(t)
-	// We keep the blob on coeff form so that we can manipulate it directly (otherwise it gets IFFT'd)
+	// We keep the blob in coeff form so that we can manipulate it directly (otherwise it gets IFFT'd)
 	tester.RelayPayloadRetriever.config.PayloadPolynomialForm = codecs.PolynomialFormCoeff
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
