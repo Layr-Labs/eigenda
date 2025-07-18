@@ -2,12 +2,14 @@ package deploy
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ory/dockertest/v3"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,20 +18,6 @@ type Staker struct {
 	Address    string `json:"address"`
 	PrivateKey string `json:"private"`
 	Stake      string `json:"stake"`
-}
-
-// Docker compose
-type testbed struct {
-	Services map[string]map[string]interface{} `yaml:"services"`
-}
-
-type Service struct {
-	Image         string   `yaml:"image"`
-	Volumes       []string `yaml:"volumes"`
-	Ports         []string `yaml:"ports"`
-	EnvFile       []string `yaml:"env_file"`
-	Command       []string `yaml:"command"`
-	ContainerName string   `yaml:"container_name"`
 }
 
 type EnvList map[string]string
@@ -206,6 +194,13 @@ type Config struct {
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
+
+	// Dockertest resources for Anvil
+	anvilPool     *dockertest.Pool
+	anvilResource *dockertest.Resource
+
+	// Dockertest resources for Graph Node services
+	graphResources *GraphResources
 }
 
 func (env *Config) IsEigenDADeployed() bool {
@@ -226,7 +221,9 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 		configPath = testPath + "/config.yaml"
 
 	}
+	fmt.Println("Loading test config from:", configPath)
 	data := readFile(configPath)
+	fmt.Println("Test config data:", string(data))
 
 	err = yaml.Unmarshal(data, &testEnv)
 	if err != nil {

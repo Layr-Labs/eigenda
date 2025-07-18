@@ -2,18 +2,8 @@
 
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
 
-setup-geth:
-	cd geth && rm -rf data && ./run.sh setup 10 ../secrets/ecdsa_keys/private_key_hex.txt ./secret/geth-account-password
 
-start-geth:
-	cd geth && docker compose up -d 
-	./wait-for http://0.0.0.0:8545 -- echo "Geth up"
-
-stop-geth:
-	cd geth && docker compose down
-
-
-.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil new-anvil-nochurner chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -23,27 +13,16 @@ new-anvil-nochurner:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
 
-
-new-docker-anvil:
-	mkdir -p "testdata/$(dt)"
-	cp ./templates/testconfig-anvil-docker.yaml "testdata/$(dt)/config.yaml"
-
-chain:
-	go run ./deploy/cmd -localstack-port 4570 chain
-
-localstack:
-	go run ./deploy/cmd -localstack-port 4570 localstack
-
-exp: 
-	go run ./deploy/cmd exp
+clean:
+	rm -rf testdata/*
 
 deploy-all:
 	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
 
 stop-infra:
-	./bin.sh stop-anvil
-	./bin.sh stop-graph
-	docker stop localstack-test
+# 	We rm forcefully instead of using `docker stop` because it is much faster and we don't care about graceful shutdowns in tests.
+	docker rm -f graph-node graph-postgres graph-ipfs anvil-inabox localstack-test 2>/dev/null || true
+	docker network rm graph-network 2>/dev/null || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
@@ -54,5 +33,14 @@ run-e2e-nochurner:
 run-e2e-nograph:
 	go test ./tests -v -config=../templates/testconfig-anvil-nograph.yaml
 
-clean:
-	rm -rf testdata/*
+### Debug indidividual deploy targets
+
+# chain deploys both anvil and thegraph
+deploy-anvil-and-graph:
+	go run ./deploy/cmd -localstack-port 4570 chain
+
+deploy-localstack:
+	go run ./deploy/cmd -localstack-port 4570 localstack
+
+deploy-exp: 
+	go run ./deploy/cmd exp
