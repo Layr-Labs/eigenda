@@ -273,6 +273,59 @@ func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
+func TestProxyWriteCacheOnMissV1(t *testing.T) {
+	testProxyWriteCacheOnMiss(t, common.V1EigenDABackend)
+}
+
+func TestProxyWriteCacheOnMissV2(t *testing.T) {
+	testProxyWriteCacheOnMiss(t, common.V2EigenDABackend)
+}
+
+func testProxyWriteCacheOnMiss(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	testCfg.UseS3Caching = true
+	testCfg.WriteOnCacheMiss = true
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	cfg := &standard_client.Config{
+		URL: ts.Address(),
+	}
+	daClient := standard_client.New(cfg)
+	expectedBlob := testutils.RandBytes(1_000_000)
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.Ctx, expectedBlob)
+	require.NoError(t, err)
+
+	_, err = daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+
+	exists, err := testutils.ExistsBlobInfotInBucket(tsConfig.StoreBuilderConfig.S3Config.Bucket, blobInfo)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	t.Log("Erase blob from the cache...")
+	err = testutils.RemoveBlobInfoFromBucket(tsConfig.StoreBuilderConfig.S3Config.Bucket, blobInfo)
+	require.NoError(t, err)
+	exists, err = testutils.ExistsBlobInfotInBucket(tsConfig.StoreBuilderConfig.S3Config.Bucket, blobInfo)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Blob created in disperser, removed from S3
+	t.Log("Getting input data from proxy server...")
+	actualBlob, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, expectedBlob, actualBlob)
+
+	exists, err = testutils.ExistsBlobInfotInBucket(tsConfig.StoreBuilderConfig.S3Config.Bucket, blobInfo)
+	require.NoError(t, err)
+	require.True(t, exists)
+}
+
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
 	testProxyMemConfigClientCanGetAndPatch(t, common.V1EigenDABackend)
 }
