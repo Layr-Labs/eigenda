@@ -35,12 +35,19 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// ADMIN ///
 
+    /// For a fully secure integration, the owner of this contract should be a timelocked contract.
     function initialize(address _initialOwner, address certVerifier) external initializer {
         _transferOwnership(_initialOwner);
         // Add a default cert verifier at block 0, which will be used for all blocks before the first ABN.
         _addCertVerifier(0, certVerifier);
     }
 
+    /// @notice Adds a cert verifier to the router.
+    /// @param activationBlockNumber The block number at which the cert verifier will be activated.
+    /// @param certVerifier The address of the cert verifier to be added.
+    /// Note: for a fully secure integration, the owner of this contract should be a timelocked contract,
+    /// such that new certs can only be activated after a certain period of time. When submitting this transaction,
+    /// make sure that the activationBlockNumber is greater than the timelock period by some margin.
     function addCertVerifier(uint32 activationBlockNumber, address certVerifier) external onlyOwner {
         // We disallow adding cert verifiers at the current block number to avoid a race condition of
         // adding a cert verifier at the current block and verifying in the same block
