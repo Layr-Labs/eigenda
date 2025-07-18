@@ -412,3 +412,32 @@ func EnsureDirectoryExists(dirPath string, fsync bool) error {
 
 	return nil
 }
+
+// DeepDelete deletes a regular file. If the file is a symlink, the symlink and the file pointed to by the symlink
+// are both deleted. This method can delete an empty directory, but will return an error if asked to delete a
+// non-empty directory. For the sake of simplicity, this method does not traverse chain of symlinks. If the symlink
+// points to another symlink, it will only delete original symlink and the symlink that the original symlink points to.
+func DeepDelete(path string) error {
+	isSymlink, err := IsSymlink(path)
+	if err != nil {
+		return fmt.Errorf("failed to check if path %s is a symlink: %w", path, err)
+	}
+
+	if isSymlink {
+		// remove the file where the symlink points
+		actualFile, err := os.Readlink(path)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %w", path, err)
+		}
+		if err := os.Remove(actualFile); err != nil {
+			return fmt.Errorf("failed to remove actual file %s: %w", actualFile, err)
+		}
+	}
+
+	err = os.Remove(path)
+	if err != nil {
+		return fmt.Errorf("failed to remove file %s: %w", path, err)
+	}
+
+	return nil
+}

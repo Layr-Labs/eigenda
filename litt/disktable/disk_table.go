@@ -22,9 +22,6 @@ import (
 
 var _ litt.ManagedTable = (*DiskTable)(nil)
 
-// segmentDirectory is the directory where segment files are stored, relative to the root directory.
-const segmentDirectory = "segments"
-
 // keymapReloadBatchSize is the size of the batch used for reloading keys from segments into the keymap.
 const keymapReloadBatchSize = 1024
 
@@ -41,11 +38,11 @@ type DiskTable struct {
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
 	errorMonitor *util.ErrorMonitor
 
-	// The root directories for the disk table.
+	// The root directories for the disk table. Each of these directories' name matches the name of the table.
 	roots []string
 
-	// The directories where segment files are stored.
-	segmentDirectories []string
+	// Configures the location where segment data is stored.
+	segmentPaths []*segment.SegmentPath
 
 	// The table's name.
 	name string
@@ -84,6 +81,15 @@ type DiskTable struct {
 
 	// Encapsulates metrics for the database.
 	metrics *metrics.LittDBMetrics
+
+	// Set to true when the table is closed. This is used to prevent double closing.
+	closed atomic.Bool
+
+	// Set to true when the table is destroyed. This is used to prevent double destroying.
+	destroyed atomic.Bool
+
+	// If true then ensure file operations are synced to disk.
+	fsync bool
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -101,36 +107,28 @@ func NewDiskTable(
 		return nil, errors.New("garbage collection period must be greater than 0")
 	}
 
-	// If the root directories don't exist, create them.
-	for _, root := range roots {
-		exists, err := util.Exists(root)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if root directory exists: %w", err)
-		}
-		if !exists {
-			err = os.MkdirAll(root, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %w", err)
-			}
-		}
+	qualifiedRoots := make([]string, len(roots))
+	for i, root := range roots {
+		qualifiedRoots[i] = path.Join(root, name)
 	}
 
 	// For each root directory, create a segment directory if it doesn't exist.
-	segDirs := make([]string, 0, len(roots))
-	for _, root := range roots {
-		segDir := path.Join(root, segmentDirectory)
-		segDirs = append(segDirs, segDir)
-
-		exists, err := util.Exists(segDir)
+	segmentPaths, err := segment.BuildSegmentPaths(roots, config.SnapshotDirectory, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build segment paths: %w", err)
+	}
+	for _, segmentPath := range segmentPaths {
+		err = segmentPath.MakeDirectories(config.Fsync)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment directory exists: %w", err)
+			return nil, fmt.Errorf("failed to create segment directories: %w", err)
 		}
+	}
 
-		if !exists {
-			err := os.MkdirAll(segDir, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create segment directory: %w", err)
-			}
+	// Delete any orphaned swap files:
+	for _, root := range qualifiedRoots {
+		err = util.DeleteOrphanedSwapFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete orphaned swap files in %s: %w", root, err)
 		}
 	}
 
@@ -138,7 +136,7 @@ func NewDiskTable(
 	var metadata *tableMetadata
 
 	// Find the table metadata file or create a new one.
-	for _, root := range roots {
+	for _, root := range qualifiedRoots {
 		possibleMetadataPath := metadataPath(root)
 		exists, err := util.Exists(possibleMetadataPath)
 		if err != nil {
@@ -157,7 +155,7 @@ func NewDiskTable(
 	if metadataFilePath == "" {
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
-		metadataDir := roots[0]
+		metadataDir := qualifiedRoots[0]
 		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor, config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %w", err)
@@ -175,25 +173,31 @@ func NewDiskTable(
 	errorMonitor := util.NewErrorMonitor(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
-		logger:             config.Logger,
-		errorMonitor:       errorMonitor,
-		clock:              config.Clock,
-		roots:              roots,
-		segmentDirectories: segDirs,
-		name:               name,
-		metadata:           metadata,
-		keymap:             keymap,
-		keymapPath:         keymapPath,
-		keymapTypeFile:     keymapTypeFile,
-		metrics:            metrics,
+		logger:         config.Logger,
+		errorMonitor:   errorMonitor,
+		clock:          config.Clock,
+		roots:          qualifiedRoots,
+		segmentPaths:   segmentPaths,
+		name:           name,
+		metadata:       metadata,
+		keymap:         keymap,
+		keymapPath:     keymapPath,
+		keymapTypeFile: keymapTypeFile,
+		metrics:        metrics,
+		fsync:          config.Fsync,
 	}
 
+	snapshottingEnabled := config.SnapshotDirectory != ""
+
+	// Load segments.
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
 			errorMonitor,
-			table.segmentDirectories,
+			table.segmentPaths,
+			snapshottingEnabled,
 			config.Clock(),
+			true,
 			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
@@ -224,11 +228,13 @@ func NewDiskTable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to read salt: %w", err)
 	}
+
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		errorMonitor,
 		nextSegmentIndex,
-		segDirs,
+		segmentPaths,
+		snapshottingEnabled,
 		metadata.GetShardingFactor(),
 		salt,
 		config.Fsync)
@@ -251,15 +257,29 @@ func NewDiskTable(
 
 	tableSaltShaker := rand.New(rand.NewSource(config.SaltShaker.Int63()))
 
+	var upperBoundSnapshotFile *BoundaryFile
+	if config.SnapshotDirectory != "" {
+		// Initialize snapshot files if snapshotting is enabled.
+		upperBoundSnapshotFile, err = table.repairSnapshot(
+			config.SnapshotDirectory,
+			lowestSegmentIndex,
+			highestSegmentIndex,
+			segments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to repair snapshot: %w", err)
+		}
+	}
+
 	// Start the flush loop.
 	fLoop := &flushLoop{
-		logger:       config.Logger,
-		diskTable:    table,
-		errorMonitor: errorMonitor,
-		flushChannel: make(chan any, tableFlushChannelCapacity),
-		metrics:      metrics,
-		clock:        config.Clock,
-		name:         name,
+		logger:                 config.Logger,
+		diskTable:              table,
+		errorMonitor:           errorMonitor,
+		flushChannel:           make(chan any, tableFlushChannelCapacity),
+		metrics:                metrics,
+		clock:                  config.Clock,
+		name:                   name,
+		upperBoundSnapshotFile: upperBoundSnapshotFile,
 	}
 	table.flushLoop = fLoop
 	go fLoop.run()
@@ -279,7 +299,8 @@ func NewDiskTable(
 		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
 		maxKeyCount:             config.MaxSegmentKeyCount,
 		clock:                   config.Clock,
-		segmentDirectories:      segDirs,
+		segmentPaths:            segmentPaths,
+		snapshottingEnabled:     snapshottingEnabled,
 		saltShaker:              tableSaltShaker,
 		metadata:                metadata,
 		fsync:                   config.Fsync,
@@ -305,6 +326,93 @@ func (d *DiskTable) KeyCount() uint64 {
 
 func (d *DiskTable) Size() uint64 {
 	return d.size.Load()
+}
+
+// repairSnapshot is responsible for making any required repairs to the snapshot directories. This is needed
+// if there is a crash, resulting in a segment not being fully snapshotted. It is also needed if LittDB has
+// been rebased (which breaks symlinks) or manually modified (e.g. by the LittDB cli). Returns the new upper bound
+// file for the repaired snapshot.
+func (d *DiskTable) repairSnapshot(
+	symlinkDirectory string,
+	lowestSegmentIndex uint32,
+	highestSegmentIndex uint32,
+	segments map[uint32]*segment.Segment) (*BoundaryFile, error) {
+
+	symlinkTableDirectory := path.Join(symlinkDirectory, d.name)
+
+	err := util.EnsureDirectoryExists(symlinkTableDirectory, d.fsync)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure symlink table directory exists: %w", err)
+	}
+
+	upperBoundSnapshotFile, err := LoadBoundaryFile(UpperBound, symlinkTableDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+	}
+
+	// Prevent other processes from messing with the symlink table directory while we are working on it.
+	lockPath := path.Join(symlinkTableDirectory, util.LockfileName)
+	lock, err := util.NewFileLock(d.logger, lockPath, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock on symlink table directory: %w", err)
+	}
+	defer lock.Release()
+
+	symlinkSegmentsDirectory := path.Join(symlinkTableDirectory, segment.SegmentDirectory)
+	exists, err := util.Exists(symlinkSegmentsDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if symlink segments directory exists: %w", err)
+	}
+	if exists {
+		// Delete all data from the previous snapshot. This directory will contain a bunch of symlinks. It's a lot
+		// simpler to just rebuild this from scratch than it is to try to figure out which symlinks are valid
+		// and which are not. Building this is super fast, so this is not a performance concern.
+		err = os.RemoveAll(symlinkSegmentsDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove symlink segments directory: %w", err)
+		}
+	}
+
+	err = os.MkdirAll(symlinkSegmentsDirectory, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create symlink segments directory: %w", err)
+	}
+
+	if len(segments) <= 1 {
+		// There is only the mutable segment, nothing else to do.
+		return upperBoundSnapshotFile, nil
+	}
+
+	lowerBoundSnapshotFile, err := LoadBoundaryFile(LowerBound, symlinkTableDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+	}
+
+	firstSegmentToConsider := lowestSegmentIndex
+	if lowerBoundSnapshotFile.IsDefined() {
+		// The lower bound file contains the index of the highest segment that has been GC'd by an external process.
+		// We should ignore the segment at this index, and all segments with lower indices.
+		firstSegmentToConsider = lowerBoundSnapshotFile.BoundaryIndex() + 1
+	}
+
+	// Skip iterating over the highest segment index (i.e. don't do i <= highestSegmentIndex). The highest segment
+	// index is mutable and cannot be snapshotted until it has been sealed.
+	for i := firstSegmentToConsider; i < highestSegmentIndex; i++ {
+		seg := segments[i]
+		err = seg.Snapshot()
+		if err != nil {
+			return nil, fmt.Errorf("failed to snapshot segment %d: %w", i, err)
+		}
+	}
+
+	// Signal that the segment files are now fully snapshotted and safe to use.
+	// The highest segment index is the mutable segment, which is not snapshotted.
+	err = upperBoundSnapshotFile.Update(highestSegmentIndex - 1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update upper bound snapshot file: %w", err)
+	}
+
+	return upperBoundSnapshotFile, nil
 }
 
 // reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't
@@ -379,6 +487,11 @@ func (d *DiskTable) Name() string {
 
 // Close stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Close() error {
+	firstTimeClosing := d.closed.CompareAndSwap(false, true)
+	if !firstTimeClosing {
+		return nil
+	}
+
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
@@ -405,8 +518,9 @@ func (d *DiskTable) Close() error {
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("cannot process Destroy() request, DB is in panicked state due to error: %w", err)
+	firstTimeDestroying := d.destroyed.CompareAndSwap(false, true)
+	if !firstTimeDestroying {
+		return nil // already destroyed
 	}
 
 	err := d.Close()
@@ -432,11 +546,26 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
-	// delete all segment directories
-	for _, segDir := range d.segmentDirectories {
-		err = os.Remove(segDir)
+	// delete all segment directories (ignore snapshots -- this is the responsibility of an outside process to clean)
+	for _, segmentPath := range d.segmentPaths {
+		err = os.Remove(segmentPath.SegmentDirectory())
 		if err != nil {
 			return fmt.Errorf("failed to remove segment directory: %w", err)
+		}
+	}
+
+	// delete the snapshot hardlink directory
+	for _, root := range d.roots {
+		snapshotDir := path.Join(root, segment.HardLinkDirectory)
+		exists, err := util.Exists(snapshotDir)
+		if err != nil {
+			return fmt.Errorf("failed to check if snapshot directory exists: %w", err)
+		}
+		if exists {
+			err = os.RemoveAll(snapshotDir)
+			if err != nil {
+				return fmt.Errorf("failed to remove snapshot directory: %w", err)
+			}
 		}
 	}
 

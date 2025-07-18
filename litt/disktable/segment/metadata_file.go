@@ -87,9 +87,8 @@ type metadataFile struct {
 	// to this segment. This value is encoded in the file.
 	sealed bool
 
-	// The parent directory containing this file. This value is not encoded in file, and is stored here
-	// for bookkeeping purposes.
-	parentDirectory string
+	// Path data for the segment file. This information is not serialized in the metadata file.
+	segmentPath *SegmentPath
 
 	// If true, then use fsync to make metadata updates atomic. Should always be true in production, but can be
 	// set to false in tests to speed up unit tests. Not serialized to the file.
@@ -102,13 +101,14 @@ func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
 	salt [16]byte,
-	parentDirectory string,
-	fsync bool) (*metadataFile, error) {
+	path *SegmentPath,
+	fsync bool,
+) (*metadataFile, error) {
 
 	file := &metadataFile{
-		index:           index,
-		parentDirectory: parentDirectory,
-		fsync:           fsync,
+		index:       index,
+		segmentPath: path,
+		fsync:       fsync,
 	}
 
 	file.segmentVersion = LatestSegmentVersion
@@ -124,30 +124,31 @@ func createMetadataFile(
 
 // loadMetadataFile loads the metadata file from disk, looking in the given parent directories until it finds the file.
 // If the file is not found, it returns an error.
-func loadMetadataFile(index uint32, parentDirectories []string, fsync bool) (*metadataFile, error) {
+func loadMetadataFile(index uint32, segmentPaths []*SegmentPath, fsync bool) (*metadataFile, error) {
 	metadataFileName := fmt.Sprintf("%d%s", index, MetadataFileExtension)
-	metadataPath, err := lookForFile(parentDirectories, metadataFileName)
+	metadataPath, err := lookForFile(segmentPaths, metadataFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find metadata file: %w", err)
 	}
-	if metadataPath == "" {
+	if metadataPath == nil {
 		return nil, fmt.Errorf("failed to find metadata file %s", metadataFileName)
 	}
-	parentDirectory := path.Dir(metadataPath)
 
 	file := &metadataFile{
-		index:           index,
-		parentDirectory: parentDirectory,
-		fsync:           fsync,
+		index:       index,
+		segmentPath: metadataPath,
+		fsync:       fsync,
 	}
 
-	data, err := os.ReadFile(metadataPath)
+	filePath := file.path()
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read metadata file %s: %v", metadataPath, err)
+		return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
 	}
 	err = file.deserialize(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", metadataPath, err)
+		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
 	}
 
 	return file, nil
@@ -184,7 +185,7 @@ func (m *metadataFile) name() string {
 
 // Path returns the full path to this metadata file.
 func (m *metadataFile) path() string {
-	return path.Join(m.parentDirectory, m.name())
+	return path.Join(m.segmentPath.SegmentDirectory(), m.name())
 }
 
 // Seal seals the segment. This action will atomically write the metadata file to disk one final time,
@@ -354,12 +355,27 @@ func (m *metadataFile) write() error {
 	return nil
 }
 
-// delete deletes the metadata file from disk.
-func (m *metadataFile) delete() error {
-	err := os.Remove(m.path())
-	if err != nil {
-		return fmt.Errorf("failed to remove metadata file %s: %v", m.path(), err)
+// snapshot creates a hard link to the file in the snapshot directory, and a soft link to the hard linked file in the
+// soft link directory. Requires that the file is sealed and that snapshotting is enabled.
+func (m *metadataFile) snapshot() error {
+	if !m.sealed {
+		return fmt.Errorf("file %s is not sealed, cannot take Snapshot", m.path())
 	}
 
+	err := m.segmentPath.Snapshot(m.name())
+	if err != nil {
+		return fmt.Errorf("failed to create Snapshot: %v", err)
+	}
+
+	return nil
+}
+
+// delete deletes the metadata file from disk. If the file is a snapshot (i.e., a symlink), this method will also
+// delete the actual file that the symlink points to.
+func (m *metadataFile) delete() error {
+	err := util.DeepDelete(m.path())
+	if err != nil {
+		return fmt.Errorf("failed to delete metadata file %s: %w", m.path(), err)
+	}
 	return nil
 }
