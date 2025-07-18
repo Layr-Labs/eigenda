@@ -114,11 +114,12 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
 	}
 	// TODO: We should move this length check inside PutBlob
-	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
+	encodedBloblen := uint64(len(encodedBlob))
+	if encodedBloblen > e.cfg.MaxBlobSizeBytes {
 		return nil, fmt.Errorf(
 			"%w: blob length %d, max blob size %d",
 			proxyerrors.ErrProxyOversizedBlob,
-			len(value),
+			encodedBloblen,
 			e.cfg.MaxBlobSizeBytes,
 		)
 	}
