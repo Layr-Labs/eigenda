@@ -120,7 +120,7 @@ func TestSnapshot(t *testing.T) {
 
 		// There should be a boundary file in the snapshot directory signaling the highest legal segment index in the
 		// snapshot.
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(snapshotDir, tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(snapshotDir, tableName))
 		require.NoError(t, err)
 		require.True(t, boundaryFile.IsDefined())
 		require.Equal(t, snapshotHighestSegmentIndex, boundaryFile.BoundaryIndex())
@@ -366,7 +366,7 @@ func TestSnapshotRebuilding(t *testing.T) {
 
 		// There should be a boundary file in the snapshot directory signaling the highest legal segment index in the
 		// snapshot.
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(snapshotDir, tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(snapshotDir, tableName))
 		require.NoError(t, err)
 		require.True(t, boundaryFile.IsDefined())
 		require.Equal(t, snapshotHighestSegmentIndex, boundaryFile.BoundaryIndex())
@@ -515,7 +515,7 @@ func TestSnapshotLowerBound(t *testing.T) {
 
 		lowerBound := snapshotLowestSegmentIndex + (snapshotHighestSegmentIndex-snapshotLowestSegmentIndex)/2
 		lowerBoundsByTable[tableName] = lowerBound
-		boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(snapshotDir, tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(snapshotDir, tableName))
 		require.NoError(t, err)
 		err = boundaryFile.Update(lowerBound)
 		require.NoError(t, err)
@@ -591,13 +591,13 @@ func TestSnapshotLowerBound(t *testing.T) {
 
 		// There should be a boundary file in the snapshot directory signaling the highest legal segment index in the
 		// snapshot.
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(snapshotDir, tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(snapshotDir, tableName))
 		require.NoError(t, err)
 		require.True(t, boundaryFile.IsDefined())
 		require.Equal(t, snapshotHighestSegmentIndex, boundaryFile.BoundaryIndex())
 
 		// The lower bound file we previously wrote should still be present.
-		lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(snapshotDir, tableName))
+		lowerBoundFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(snapshotDir, tableName))
 		require.NoError(t, err)
 		require.True(t, lowerBoundFile.IsDefined())
 		require.Equal(t, lowerBoundsByTable[tableName], lowerBoundFile.BoundaryIndex())

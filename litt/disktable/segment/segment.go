@@ -535,7 +535,8 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	}, nil
 }
 
-// Snapshot takes a snapshot of the files in the segment.
+// Snapshot takes a snapshot of the files in the segment if snapshotting is enabled. If snapshotting is not enabled,
+// then this method is a no-op.
 func (s *Segment) Snapshot() error {
 	if !s.snapshottingEnabled {
 		return nil

@@ -15,7 +15,7 @@ import (
 const SegmentDirectory = "segments"
 
 // The name of the directory where hard links to segment files are stored for snapshotting (if enabled).
-// The hard link directory is created at "$STORAGE_PATH/$TABLE_NAME/Snapshot".
+// The hard link directory is created at "$STORAGE_PATH/$TABLE_NAME/snapshot".
 const HardLinkDirectory = "snapshot"
 
 // SegmentPath encapsulates various file paths utilized by segment files.
@@ -35,7 +35,8 @@ type SegmentPath struct {
 // The storageRoot is a location where LittDB is storing data, i.e. one of the paths from Litt.Config.Paths.
 //
 // softlinkRoot will be an empty string if snapshotting is not enabled, or a path to the root directory where
-// Snapshot soft links will be created.
+// Snapshot soft links will be created. The presence (or absence) of this path is used by LittDB to
+// determine if snapshotting is enabled.
 //
 // The tableName is the name of the table that owns the segment file.
 func NewSegmentPath(
@@ -48,14 +49,21 @@ func NewSegmentPath(
 		return nil, fmt.Errorf("storage path cannot be empty")
 	}
 
+	segmentDirectory := path.Join(storageRoot, tableName, SegmentDirectory)
+
 	softlinkPath := ""
 	if softlinkRoot != "" {
 		softlinkPath = path.Join(softlinkRoot, tableName, SegmentDirectory)
 	}
 
+	hardLinkPath := ""
+	if softlinkRoot != "" {
+		hardLinkPath = path.Join(storageRoot, tableName, HardLinkDirectory)
+	}
+
 	return &SegmentPath{
-		segmentDirectory: path.Join(storageRoot, tableName, SegmentDirectory),
-		hardlinkPath:     path.Join(storageRoot, tableName, HardLinkDirectory),
+		segmentDirectory: segmentDirectory,
+		hardlinkPath:     hardLinkPath,
 		softlinkPath:     softlinkPath,
 	}, nil
 }

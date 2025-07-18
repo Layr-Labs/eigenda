@@ -332,28 +332,9 @@ func (v *valueFile) delete() error {
 	// As an extra safety check, make it so that all future reads fail before they do I/O.
 	v.flushedSize.Store(0)
 
-	filePath := v.path()
-
-	fileInfo, err := os.Lstat(filePath)
+	err := util.DeepDelete(v.path())
 	if err != nil {
-		return fmt.Errorf("failed to call lstat for %s: %v", filePath, err)
-	}
-	isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
-
-	if isSymlink {
-		// remove the file where the symlink points
-		actualFile, err := os.Readlink(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read symlink %s: %v", filePath, err)
-		}
-		if err := os.Remove(actualFile); err != nil {
-			return fmt.Errorf("failed to remove actual file %s: %v", actualFile, err)
-		}
-	}
-
-	err = os.Remove(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to remove file %s: %v", filePath, err)
+		return fmt.Errorf("failed to delete value file %s: %v", v.path(), err)
 	}
 
 	return nil

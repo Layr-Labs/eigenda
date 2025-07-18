@@ -33,7 +33,7 @@ func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
 
-// Look for a table's keymap directory in the provided root paths.
+// Look for a table's keymap directory in the provided segment paths.
 func FindKeymapLocation(
 	rootPaths []string,
 	tableName string,
@@ -41,7 +41,7 @@ func FindKeymapLocation(
 
 	if len(rootPaths) == 0 {
 		return "", false, nil,
-			fmt.Errorf("no root paths provided for keymap search")
+			fmt.Errorf("no segment paths provided for keymap search")
 	}
 
 	potentialKeymapDirectories := make([]string, len(rootPaths))

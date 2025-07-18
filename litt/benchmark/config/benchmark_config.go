@@ -83,7 +83,8 @@ type BenchmarkConfig struct {
 	// If true, fsync cohort files to ensure atomicity. Can be set to false for unit tests that need to be fast.
 	Fsync bool
 
-	// If non-zero, then the benchmark will run for this many seconds and then stop.
+	// If non-zero, then the benchmark will run for this many seconds and then stop. If zero,
+	// the benchmark will run until it is manually stopped.
 	TimeLimitSeconds float64
 }
 
