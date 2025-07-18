@@ -6,11 +6,20 @@ Please see [Releases](https://github.com/Layr-Labs/eigenda/releases) and we reco
 
 ## Audit reports
 
-Audit reports are published in the `docs` folder: https://github.com/Layr-Labs/eigenda/master/docs/audits 
+Audit reports for EigenDA are published in the `docs` folder: [https://github.com/Layr-Labs/eigenda/blob/master/docs/audits](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits)
 
+Audit reports for EigenDA Proxy published in the `docs` folder: [https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/audits](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/audits)
+
+### EigenDA
 | Date | Report Link |
 | ------- | ----------- |
 | 202404 | [pdf](https://github.com/Layr-Labs/eigenda/blob/security-doc/docs/audits/Sigma_Prime_EigenDA_Offchain_Security_Assessment_Report.pdf) |
+
+### EigenDA Proxy
+| Date | Release (Commit) Audited | Report Link | Findings Addressed in Release |
+| ------- | ----------- | ----------- | ----------- |
+| 202501 | v1.6.1 (9e1b746)	| [pdf](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/audits/Sigma_Prime_EigenDA_Proxy_Security_Assessment_Report.pdf) | v1.6.2 |
+
 
 ## Reporting a Vulnerability
 
