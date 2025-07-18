@@ -47,28 +47,30 @@ func NewCertVerifier(
 }
 
 // CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
-// This method returns nil if the certificate is successfully verified; otherwise, it returns one of
-// [CertVerifierInputError], [CertVerifierInvalidCertError], or [CertVerifierInternalError] errors.
+// This method returns nil if the certificate is successfully verified; otherwise, it returns a
+// [CertVerifierInvalidCertError] or [CertVerifierInternalError] error.
 func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// 1 - switch on the certificate version to determine which underlying type to decode into
-	//     and which contract to call
-
-	// EigenDACertV3 is the only version that is supported by the CheckDACert function
+	// 1 - switch on the certificate type to determine which contract to call
 	var certV3 *coretypes.EigenDACertV3
 	var err error
 	switch cert := cert.(type) {
 	case *coretypes.EigenDACertV3:
 		certV3 = cert
 	case *coretypes.EigenDACertV2:
+		// EigenDACertV3 is the only version that is supported by the CheckDACert function
+		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
 		certV3, err = cert.ToV3()
 		if err != nil {
 			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
 		}
 	default:
-		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %T", cert)}
+		// If golang had enums the world would be a better place.
+		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
+			"construct offchain should have a CertVerifier contract which we can call to "+
+			"verify the certificate", cert))
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate

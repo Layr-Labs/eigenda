@@ -6,15 +6,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
-// CertVerifierInputError represents a 4xx-like error (invalid input, misuse, unsupported, etc.)
-type CertVerifierInputError struct {
-	Msg string
-}
-
-func (e *CertVerifierInputError) Error() string {
-	return e.Msg
-}
-
 // CertVerifierInternalError represents a 5xx-like error (unexpected, internal, infra, etc.)
 //
 // Our recommendation is to always retry Internal errors in case they were due to a temporary (network) issue.
