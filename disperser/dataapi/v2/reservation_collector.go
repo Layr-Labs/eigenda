@@ -79,7 +79,7 @@ func (c *ReservationExpirationCollector) updateCounts(ctx context.Context) {
 
 	for _, res := range reservations {
 		// Calculate time until expiration
-		expirationTime := time.Unix(int64(res.EndTimestamp), 0)
+		expirationTime := time.Unix(res.EndTimestamp, 0)
 		timeUntilExpiration := expirationTime.Sub(now)
 
 		// Skip already expired reservations

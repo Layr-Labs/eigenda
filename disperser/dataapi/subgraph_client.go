@@ -100,7 +100,7 @@ type (
 	}
 	Reservation struct {
 		Account      string
-		EndTimestamp uint64
+		EndTimestamp int64
 	}
 	subgraphClient struct {
 		api    subgraph.Api
@@ -117,11 +117,11 @@ func NewSubgraphClient(api subgraph.Api, logger logging.Logger) *subgraphClient 
 func (sc *subgraphClient) QueryBatchesWithLimit(ctx context.Context, limit, skip int) ([]*Batch, error) {
 	subgraphBatches, err := sc.api.QueryBatches(ctx, true, "blockTimestamp", limit, skip)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query batches: %w", err)
 	}
 	batches, err := convertBatches(subgraphBatches)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert batches: %w", err)
 	}
 	return batches, nil
 }
@@ -129,13 +129,13 @@ func (sc *subgraphClient) QueryBatchesWithLimit(ctx context.Context, limit, skip
 func (sc *subgraphClient) QueryOperatorsWithLimit(ctx context.Context, limit int) ([]*Operator, error) {
 	operatorsGql, err := sc.api.QueryOperators(ctx, limit)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query operators: %w", err)
 	}
 	operators := make([]*Operator, len(operatorsGql))
 	for i, operatorGql := range operatorsGql {
 		operator, err := convertOperator(operatorGql)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert operator at index %d: %w", i, err)
 		}
 		operators[i] = operator
 	}
@@ -146,14 +146,14 @@ func (sc *subgraphClient) QueryOperatorInfoByOperatorId(ctx context.Context, ope
 	operatorInfo, err := sc.api.QueryOperatorInfoByOperatorIdAtBlockNumber(ctx, operatorId, 0)
 	if err != nil {
 		sc.logger.Error(fmt.Sprintf("failed to query operator info for operator %s", operatorId))
-		return nil, err
+		return nil, fmt.Errorf("failed to query operator info for operator %s: %w", operatorId, err)
 	}
 
 	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info for operator %s", operatorId)
 		sc.logger.Error(errorMessage)
-		return nil, err
+		return nil, fmt.Errorf("failed to convert operator info for operator %s: %w", operatorId, err)
 	}
 	return indexedOperatorInfo, nil
 }
@@ -161,13 +161,13 @@ func (sc *subgraphClient) QueryOperatorInfoByOperatorId(ctx context.Context, ope
 func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context, startTime, endTime int64) ([]*BatchNonSigningInfo, error) {
 	batchNonSigningInfoGql, err := sc.api.QueryBatchNonSigningInfo(ctx, startTime, endTime)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query batch non-signing info for interval %d-%d: %w", startTime, endTime, err)
 	}
 	batchNonSigningInfo := make([]*BatchNonSigningInfo, len(batchNonSigningInfoGql))
 	for i, infoGql := range batchNonSigningInfoGql {
 		info, err := convertNonSigningInfo(infoGql)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert non-signing info at index %d: %w", i, err)
 		}
 		batchNonSigningInfo[i] = info
 	}
@@ -177,7 +177,7 @@ func (sc *subgraphClient) QueryBatchNonSigningInfoInInterval(ctx context.Context
 func (sc *subgraphClient) QueryBatchNonSigningOperatorIdsInInterval(ctx context.Context, intervalSeconds int64) (map[string]int, error) {
 	batchNonSigningOperatorIdsGql, err := sc.api.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query batch non-signing operator IDs for interval %d seconds: %w", intervalSeconds, err)
 	}
 	batchNonSigningOperatorIds := make(map[string]int, len(batchNonSigningOperatorIdsGql))
 	for _, batchNonSigningOperatorIdsGql := range batchNonSigningOperatorIdsGql {
@@ -199,7 +199,7 @@ func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlo
 	pool.Submit(func() {
 		added, errQ := sc.api.QueryOperatorAddedToQuorum(ctx, startBlock, endBlock)
 		if errQ != nil {
-			err = errQ
+			err = fmt.Errorf("failed to query operators added to quorum for blocks %d-%d: %w", startBlock, endBlock, errQ)
 		}
 		operatorAddedQuorum = added
 	})
@@ -208,7 +208,7 @@ func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlo
 		removed, errQ := sc.api.QueryOperatorRemovedFromQuorum(ctx, startBlock, endBlock)
 
 		if errQ != nil {
-			err = errQ
+			err = fmt.Errorf("failed to query operators removed from quorum for blocks %d-%d: %w", startBlock, endBlock, errQ)
 		}
 		operatorRemovedQuorum = removed
 	})
@@ -220,11 +220,11 @@ func (sc *subgraphClient) QueryOperatorQuorumEvent(ctx context.Context, startBlo
 
 	addedQuorum, err := parseOperatorQuorum(operatorAddedQuorum)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse added operator quorum events: %w", err)
 	}
 	removedQuorum, err := parseOperatorQuorum(operatorRemovedQuorum)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse removed operator quorum events: %w", err)
 	}
 
 	addedQuorumMap := make(map[string][]*OperatorQuorum)
@@ -258,7 +258,7 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 		// Get OperatorsInfo for DeRegistered Operators
 		deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to query deregistered operators for %d days: %w", days, err)
 		}
 
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
@@ -267,7 +267,7 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 		// Get OperatorsInfo for Registered Operators
 		registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to query registered operators for %d days: %w", days, err)
 		}
 
 		operators = make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
@@ -292,12 +292,12 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 	if operatorId == "" {
 		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds, first, skip)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to query operator ejections for %d days: %w", days, err)
 		}
 	} else {
 		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx, lastNDayInSeconds, operatorId, first, skip)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to query operator ejections for operator %s for %d days: %w", operatorId, days, err)
 		}
 	}
 
@@ -305,12 +305,12 @@ func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Contex
 	for i, ejection := range ejections {
 		blockNumber, err := strconv.ParseUint(string(ejection.BlockNumber), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse block number for ejection at index %d: %w", i, err)
 		}
 
 		timestamp, err := strconv.ParseInt(string(ejection.BlockTimestamp), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse block timestamp for ejection at index %d: %w", i, err)
 		}
 
 		t := time.Unix(timestamp, 0)
@@ -332,7 +332,7 @@ func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx con
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	deregisteredOperators, err := sc.api.QueryDeregisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query deregistered operators for %d days: %w", days, err)
 	}
 
 	operators := make(map[core.OperatorID]*QueriedOperatorInfo, len(deregisteredOperators))
@@ -349,7 +349,7 @@ func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx conte
 	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
 	registeredOperators, err := sc.api.QueryRegisteredOperatorsGreaterThanBlockTimestamp(ctx, lastNDayInSeconds)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query registered operators for %d days: %w", days, err)
 	}
 
 	operators := make(map[core.OperatorID]*QueriedOperatorInfo, len(registeredOperators))
@@ -366,14 +366,14 @@ func (sc *subgraphClient) QueryIndexedRegisteredOperatorsForTimeWindow(ctx conte
 func (sc *subgraphClient) QueryReservations(ctx context.Context, currentTimestamp uint64, limit, skip int) ([]*Reservation, error) {
 	reservationsGql, err := sc.api.QueryReservations(ctx, currentTimestamp, limit, skip)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query reservations: %w", err)
 	}
 
 	reservations := make([]*Reservation, len(reservationsGql))
 	for i, resGql := range reservationsGql {
-		endTimestamp, err := strconv.ParseUint(string(resGql.EndTimestamp), 10, 64)
+		endTimestamp, err := strconv.ParseInt(string(resGql.EndTimestamp), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse end timestamp for reservation at index %d: %w", i, err)
 		}
 		reservations[i] = &Reservation{
 			Account:      string(resGql.Account),
@@ -429,19 +429,19 @@ func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
 	for i, batch := range subgraphBatches {
 		batchId, err := strconv.ParseUint(string(batch.BatchId), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse batch ID at index %d: %w", i, err)
 		}
 		timestamp, err := strconv.ParseUint(string(batch.BlockTimestamp), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse block timestamp at index %d: %w", i, err)
 		}
 		blockNum, err := strconv.ParseUint(string(batch.BlockNumber), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse block number at index %d: %w", i, err)
 		}
 		gasFees, err := convertGasFees(batch.GasFees)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert gas fees at index %d: %w", i, err)
 		}
 
 		batches[i] = &Batch{
@@ -460,15 +460,15 @@ func convertBatches(subgraphBatches []*subgraph.Batches) ([]*Batch, error) {
 func convertGasFees(gasFees subgraph.GasFees) (*GasFees, error) {
 	gasUsed, err := strconv.ParseUint(string(gasFees.GasUsed), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse gas used: %w", err)
 	}
 	gasPrice, err := strconv.ParseUint(string(gasFees.GasPrice), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse gas price: %w", err)
 	}
 	txFee, err := strconv.ParseUint(string(gasFees.TxFee), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse transaction fee: %w", err)
 	}
 	return &GasFees{
 		Id:       []byte(gasFees.Id),
@@ -481,11 +481,11 @@ func convertGasFees(gasFees subgraph.GasFees) (*GasFees, error) {
 func convertOperator(operator *subgraph.Operator) (*Operator, error) {
 	timestamp, err := strconv.ParseUint(string(operator.BlockTimestamp), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse operator block timestamp: %w", err)
 	}
 	blockNum, err := strconv.ParseUint(string(operator.BlockNumber), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse operator block number: %w", err)
 	}
 
 	return &Operator{
@@ -513,11 +513,11 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 	for i, opq := range operatorQuorum {
 		blockNum, err := strconv.ParseUint(string(opq.BlockNumber), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse operator quorum block number at index %d: %w", i, err)
 		}
 		blockTimestamp, err := strconv.ParseUint(string(opq.BlockTimestamp), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse operator quorum block timestamp at index %d: %w", i, err)
 		}
 		if len(opq.QuorumNumbers) < 2 || len(opq.QuorumNumbers)%2 != 0 {
 			return nil, fmt.Errorf("the QuorumNumbers is expected to start with 0x and have an even length, QuorumNumbers: %s", string(opq.QuorumNumbers))
@@ -529,7 +529,7 @@ func parseOperatorQuorum(operatorQuorum []*subgraph.OperatorQuorum) ([]*Operator
 			pair := quorumStr[i : i+2]
 			quorum, err := strconv.Atoi(pair)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse quorum number pair '%s' at index %d: %w", pair, i, err)
 			}
 			quorumNumbers = append(quorumNumbers, uint8(quorum))
 		}
@@ -555,17 +555,17 @@ func convertNonSigningInfo(infoGql *subgraph.BatchNonSigningInfo) (*BatchNonSign
 	for i, q := range infoGql.BatchHeader.QuorumNumbers {
 		quorum, err := strconv.ParseUint(string(q), 10, 8)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse quorum number at index %d: %w", i, err)
 		}
 		quorums[i] = uint8(quorum)
 	}
 	blockNum, err := strconv.ParseUint(string(infoGql.BatchHeader.ReferenceBlockNumber), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse reference block number: %w", err)
 	}
 	confirmBlockNum, err := strconv.ParseUint(string(infoGql.BlockNumber), 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse confirmation block number: %w", err)
 	}
 	nonSigners := make([]string, len(infoGql.NonSigning.NonSigners))
 	for i, nonSigner := range infoGql.NonSigning.NonSigners {
