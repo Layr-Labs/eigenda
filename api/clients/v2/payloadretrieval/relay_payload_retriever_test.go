@@ -100,7 +100,7 @@ func buildBlobAndCert(
 }
 
 // buildCert builds a blob key, blob bytes, and valid certificate from the given blob and relay keys.
-// It is used to generate a valid cert from an invalid blob, to test for decoding errors.
+// It is used to generate a valid cert from a wrongly encoded blob, to test for decoding errors.
 func buildCertFromBlobBytes(
 	t *testing.T,
 	blobBytes []byte,
@@ -479,7 +479,7 @@ func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 
 	blobKey, blobCert := buildCertFromBlobBytes(t, blobBytes, relayKeys)
 
-	// Mock the relay to return our malicious blob
+	// Mock the relay to return our incorrectly encoded blob
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
 
 	// Try to get the payload - this should fail during blob to payload conversion
