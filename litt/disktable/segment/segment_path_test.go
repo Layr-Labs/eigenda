@@ -25,7 +25,7 @@ func TestSegmentPathWithSnapshotDir(t *testing.T) {
 
 	for i, segmentPath := range segmentPaths {
 
-		require.True(t, segmentPath.SnapshottingEnabled())
+		require.True(t, segmentPath.snapshottingEnabled())
 		require.Equal(t, path.Join(roots[i], tableName, SegmentDirectory), segmentPath.SegmentDirectory())
 		require.Equal(t, path.Join(roots[i], tableName, HardLinkDirectory), segmentPath.HardlinkPath())
 		require.Equal(t, path.Join(snapshotDir, tableName, SegmentDirectory), segmentPath.SoftlinkPath())
@@ -62,9 +62,10 @@ func TestSegmentPathWithoutSnapshotDir(t *testing.T) {
 
 	for i, segmentPath := range segmentPaths {
 
-		require.False(t, segmentPath.SnapshottingEnabled())
+		require.False(t, segmentPath.snapshottingEnabled())
 		require.Equal(t, path.Join(roots[i], tableName, SegmentDirectory), segmentPath.SegmentDirectory())
-		require.Equal(t, path.Join(roots[i], tableName, HardLinkDirectory), segmentPath.HardlinkPath())
+		require.Equal(t, "", segmentPath.HardlinkPath())
+		require.Equal(t, "", segmentPath.SoftlinkPath())
 
 		err = segmentPath.MakeDirectories(false)
 		require.NoError(t, err)

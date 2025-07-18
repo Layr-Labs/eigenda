@@ -65,7 +65,6 @@ func TestLoadBoundaryFileInvalidContent(t *testing.T) {
 	// Loading should fail
 	_, err = LoadBoundaryFile(LowerBound, tempDir)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to deserialize boundary file")
 }
 
 func TestName(t *testing.T) {

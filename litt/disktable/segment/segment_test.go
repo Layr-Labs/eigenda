@@ -57,6 +57,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		1,
 		salt,
 		false)
@@ -145,6 +146,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -205,6 +207,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		shardCount,
 		salt,
 		false)
@@ -298,6 +301,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -362,6 +366,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		shardCount,
 		salt,
 		false)
@@ -421,6 +426,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		false)
 	require.NoError(t, err)
@@ -471,6 +477,7 @@ func TestGetFilePaths(t *testing.T) {
 		errorMonitor,
 		index,
 		[]*SegmentPath{segmentPath},
+		false,
 		shardingFactor,
 		([16]byte)(salt),
 		false)

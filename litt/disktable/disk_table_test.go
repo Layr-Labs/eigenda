@@ -455,6 +455,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 		logger,
 		errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -575,6 +576,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -768,6 +770,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -966,6 +969,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -993,6 +997,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -1194,6 +1199,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -1221,6 +1227,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -1443,6 +1450,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)
@@ -1469,6 +1477,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 		logger,
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
 		true,
 		false)

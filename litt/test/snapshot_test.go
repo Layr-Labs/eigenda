@@ -94,6 +94,7 @@ func TestSnapshot(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)
@@ -105,6 +106,7 @@ func TestSnapshot(t *testing.T) {
 			logger,
 			errorMonitor,
 			[]*segment.SegmentPath{snapshotSegmentPath},
+			false,
 			time.Now(),
 			false,
 			false)
@@ -289,6 +291,7 @@ func TestSnapshotRebuilding(t *testing.T) {
 			logger,
 			errorMonitor,
 			[]*segment.SegmentPath{snapshotSegmentPath},
+			false,
 			time.Now(),
 			false,
 			false)
@@ -340,6 +343,7 @@ func TestSnapshotRebuilding(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)
@@ -351,6 +355,7 @@ func TestSnapshotRebuilding(t *testing.T) {
 			logger,
 			errorMonitor,
 			[]*segment.SegmentPath{snapshotSegmentPath},
+			false,
 			time.Now(),
 			false,
 			false)
@@ -508,6 +513,7 @@ func TestSnapshotLowerBound(t *testing.T) {
 			logger,
 			errorMonitor,
 			[]*segment.SegmentPath{snapshotSegmentPath},
+			false,
 			time.Now(),
 			false,
 			false)
@@ -567,6 +573,7 @@ func TestSnapshotLowerBound(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)
@@ -578,6 +585,7 @@ func TestSnapshotLowerBound(t *testing.T) {
 			logger,
 			errorMonitor,
 			[]*segment.SegmentPath{snapshotSegmentPath},
+			false,
 			time.Now(),
 			false,
 			false)

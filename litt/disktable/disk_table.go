@@ -187,12 +187,15 @@ func NewDiskTable(
 		fsync:          config.Fsync,
 	}
 
+	snapshottingEnabled := config.SnapshotDirectory != ""
+
 	// Load segments.
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
 			errorMonitor,
 			table.segmentPaths,
+			snapshottingEnabled,
 			config.Clock(),
 			true,
 			config.Fsync)
@@ -225,11 +228,13 @@ func NewDiskTable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to read salt: %w", err)
 	}
+
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		errorMonitor,
 		nextSegmentIndex,
 		segmentPaths,
+		snapshottingEnabled,
 		metadata.GetShardingFactor(),
 		salt,
 		config.Fsync)
@@ -295,6 +300,7 @@ func NewDiskTable(
 		maxKeyCount:             config.MaxSegmentKeyCount,
 		clock:                   config.Clock,
 		segmentPaths:            segmentPaths,
+		snapshottingEnabled:     snapshottingEnabled,
 		saltShaker:              tableSaltShaker,
 		metadata:                metadata,
 		fsync:                   config.Fsync,

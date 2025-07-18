@@ -20,9 +20,9 @@ const UpperBoundFileName = "upper-bound.txt"
 type BoundaryType bool
 
 const (
-	// A boundary file that defines the lowest segment valid segment index in a snapshot directory.
+	// A boundary file that defines the lowest valid segment index in a snapshot directory.
 	LowerBound BoundaryType = true
-	// A boundary file that defines the highest segment valid segment index in a snapshot directory.
+	// A boundary file that defines the highest valid segment index in a snapshot directory.
 	UpperBound BoundaryType = false
 )
 
