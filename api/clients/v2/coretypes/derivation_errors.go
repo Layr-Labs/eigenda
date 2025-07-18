@@ -26,15 +26,6 @@ func (e DerivationError) Error() string {
 	return fmt.Sprintf("derivation error: status code %d, message: %s", e.StatusCode, e.Msg)
 }
 
-// Validate that the status code is an integer between 1 and 4, and panic if it is not.
-func (e DerivationError) Validate() {
-	if e.StatusCode < 1 || e.StatusCode > 4 {
-		panic(fmt.Sprintf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode))
-	}
-	// The Msg field should ideally be a human-readable string that explains the error,
-	// but we don't enforce it.
-}
-
 // Marshalled to JSON and returned as an HTTP 418 body
 // to indicate that the cert should be discarded from rollups' derivation pipelines.
 // We panic if marshalling fails, since the caller won't be able to handle the derivation error
@@ -57,9 +48,22 @@ func (e DerivationError) WithMessage(msg string) DerivationError {
 	}
 }
 
+// Validate that the DerivationError has a valid status code.
+// The only valid status codes are 1-4, as defined in the sentinel errors below, eg [ErrCertParsingFailedDerivationError].
+func (e DerivationError) Validate() {
+	if e.StatusCode < 1 || e.StatusCode > 4 {
+		panic(fmt.Sprintf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode))
+	}
+	// The Msg field should ideally be a human-readable string that explains the error,
+	// but we don't enforce it.
+}
+
 // These errors can be used as sentinels to indicate specific derivation errors,
 // but they should be used with the `WithMessage` method to add context.
 // Also see the constructors below for creating these errors with context.
+//
+// Note: we purposefully don't use StatusCode 0 here, to prevent default value bugs in case people
+// create a DerivationError by hand without using the constructors or sentinel errors defined here.
 var (
 	// Signifies that the input can't be parsed into a versioned cert.
 	ErrCertParsingFailedDerivationError = DerivationError{StatusCode: 1}
