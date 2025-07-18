@@ -86,8 +86,8 @@ func (c *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*d
 	var reply *disperser_rpc.BlobStatusReply
 	if args.Get(0) != nil {
 		reply = (args.Get(0)).(*disperser_rpc.BlobStatusReply)
-		if reply.Status == disperser_rpc.BlobStatus_FINALIZED {
-			retrievalKey := fmt.Sprintf("%s-%d", base64.StdEncoding.EncodeToString(reply.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash), reply.Info.BlobVerificationProof.BlobIndex)
+		if reply.GetStatus() == disperser_rpc.BlobStatus_FINALIZED {
+			retrievalKey := fmt.Sprintf("%s-%d", base64.StdEncoding.EncodeToString(reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()), reply.GetInfo().GetBlobVerificationProof().GetBlobIndex())
 			requestIDKey := base64.StdEncoding.EncodeToString(key)
 			c.mockRetrievalStore[retrievalKey] = c.mockRequestIDStore[requestIDKey]
 		}
