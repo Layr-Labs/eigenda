@@ -97,18 +97,29 @@ func TestWithErrorHandling_418TeapotErrors(t *testing.T) {
 		expectHTTPStatus             int
 		expectVerificationStatusCode uint8
 	}{
-		// TODO: add 2 other errors
 		{
-			name:                         "CertVerificationFailedError",
-			err:                          coretypes.ErrInvalidCertDerivationError.WithMessage("some arbitrary msg"),
+			name:                         "CertParsingFailedDerivationError",
+			err:                          coretypes.ErrCertParsingFailedDerivationError.WithMessage("some arbitrary msg"),
 			expectHTTPStatus:             http.StatusTeapot,
-			expectVerificationStatusCode: coretypes.ErrInvalidCertDerivationError.StatusCode,
+			expectVerificationStatusCode: coretypes.ErrCertParsingFailedDerivationError.StatusCode,
 		},
 		{
 			name:                         "RBNRecencyCheckFailedError",
 			err:                          coretypes.NewRBNRecencyCheckFailedError(1, 2, 3),
 			expectHTTPStatus:             http.StatusTeapot,
 			expectVerificationStatusCode: coretypes.ErrRecencyCheckFailedDerivationError.StatusCode,
+		},
+		{
+			name:                         "InvalidCertDerivationError",
+			err:                          coretypes.ErrInvalidCertDerivationError.WithMessage("some arbitrary msg"),
+			expectHTTPStatus:             http.StatusTeapot,
+			expectVerificationStatusCode: coretypes.ErrInvalidCertDerivationError.StatusCode,
+		},
+		{
+			name:                         "BlobDecodingFailedDerivationError",
+			err:                          coretypes.ErrBlobDecodingFailedDerivationError.WithMessage("some arbitrary msg"),
+			expectHTTPStatus:             http.StatusTeapot,
+			expectVerificationStatusCode: coretypes.ErrBlobDecodingFailedDerivationError.StatusCode,
 		},
 	}
 
