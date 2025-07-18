@@ -273,7 +273,7 @@ func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) 
 	if useGnarkBundleEncoding {
 		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
-			quorum := quorumHeader.QuorumId
+			quorum := quorumHeader.GetQuorumId()
 			if chunksData, ok := blob.EncodedBundles[uint8(quorum)]; ok {
 				if chunksData.Format != core.GnarkChunkEncodingFormat {
 					chunksData, err = chunksData.ToGnarkFormat()
@@ -298,7 +298,7 @@ func getBlobMessage(blob *core.EncodedBlobMessage, useGnarkBundleEncoding bool) 
 	} else {
 		// the ordering of quorums in bundles must be same as in quorumHeaders
 		for i, quorumHeader := range quorumHeaders {
-			quorum := quorumHeader.QuorumId
+			quorum := quorumHeader.GetQuorumId()
 			if chunksData, ok := blob.EncodedBundles[uint8(quorum)]; ok {
 				if chunksData.Format != core.GobChunkEncodingFormat {
 					chunksData, err = chunksData.ToGobFormat()

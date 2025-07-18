@@ -51,10 +51,10 @@ func TestChurn(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
-		[]byte(request.OperatorAddress),
-		request.OperatorToRegisterPubkeyG1,
-		request.OperatorToRegisterPubkeyG2,
-		request.Salt,
+		[]byte(request.GetOperatorAddress()),
+		request.GetOperatorToRegisterPubkeyG1(),
+		request.GetOperatorToRegisterPubkeyG2(),
+		request.GetSalt(),
 	)
 	copy(requestHash[:], requestHashBytes)
 
@@ -68,12 +68,12 @@ func TestChurn(t *testing.T) {
 	reply, err := s.Churn(ctx, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply)
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetExpiry())
-	assert.Equal(t, expectedReplySignature, reply.SignatureWithSaltAndExpiry.GetSignature())
-	assert.Equal(t, 2, len(reply.OperatorsToChurn))
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetExpiry())
+	assert.Equal(t, expectedReplySignature, reply.GetSignatureWithSaltAndExpiry().GetSignature())
+	assert.Equal(t, 2, len(reply.GetOperatorsToChurn()))
 	actualQuorums := make([]uint32, 0)
-	for _, param := range reply.OperatorsToChurn {
+	for _, param := range reply.GetOperatorsToChurn() {
 		actualQuorums = append(actualQuorums, param.GetQuorumId())
 		if param.GetQuorumId() == 0 {
 			// no churning for quorum 0
@@ -109,9 +109,9 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
-		request.OperatorToRegisterPubkeyG1,
-		request.OperatorToRegisterPubkeyG2,
-		request.Salt,
+		request.GetOperatorToRegisterPubkeyG1(),
+		request.GetOperatorToRegisterPubkeyG2(),
+		request.GetSalt(),
 	)
 	copy(requestHash[:], requestHashBytes)
 
