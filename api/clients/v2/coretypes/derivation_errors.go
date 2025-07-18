@@ -13,7 +13,7 @@ import (
 // https://github.com/Layr-Labs/eigenda/blob/f4ef5cd5/docs/spec/src/integration/spec/6-secure-integration.md#derivation-process
 //
 // This error is meant to be marshalled to JSON and returned as an HTTP 418 body
-// to indicate that the cert should be discarded from rollups' derivation pipeline.
+// to indicate that the cert should be discarded from rollups' derivation pipelines.
 //
 // See https://github.com/Layr-Labs/optimism/pull/50 for how this is
 // used in optimism's derivation pipeline.
@@ -36,7 +36,7 @@ func (e DerivationError) Validate() {
 }
 
 // Marshalled to JSON and returned as an HTTP 418 body
-// to indicate that the cert should be discarded from rollups' derivation pipeline.
+// to indicate that the cert should be discarded from rollups' derivation pipelines.
 // We panic if marshalling fails, since the caller won't be able to handle the derivation error
 // properly, so they'll receive a 500 and must retry.
 func (e DerivationError) MarshalToTeapotBody() string {
