@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
-	eigendav2store "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -16,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO: update this to test all 4 derivation error cases.
+// Right now this test relies on our op fork's InvalidCommitmentError definition, which we are
+// changing in https://github.com/Layr-Labs/optimism/pull/50...
+// Prob best to merge that PR first, and then update this test suite.
+//
 // RBN Recency Check is only available for V2
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
 func TestOPContractTestRBNRecentyCheck(t *testing.T) {
@@ -40,7 +44,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// expect proxy to return a 418 error which the client converts to this structured error
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(eigendav2store.StatusRBNRecencyCheckFailed), invalidCommitmentErr.StatusCode)
+				require.Equal(t,
+					int(coretypes.ErrRecencyCheckFailedDerivationError.StatusCode),
+					invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -51,17 +57,11 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			requireErrorFn: func(t *testing.T, err error) {
 				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
-				// invalid).
-				// This test is brittle because it depends on the ordering of too many checks:
-				// internal ordering that proxy calls the contract after RBN recency check, as well as the ordering of
-				// checks
-				// in the CertVerifier contract (such that statusCode 2 is returned for inclusion proof invalid).
-				// TODO: we should mock the CertVerifier contract call in the proxy, and inject a mock StatusCode which
-				// would make
-				// this test more robust to contract changes.
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.StatusInvalidInclusionProof), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -70,20 +70,13 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			certRBN:              100,
 			certL1IBN:            201,
 			requireErrorFn: func(t *testing.T, err error) {
-				// rest of proxy verification (after skipped RBN recency check) fails because "inclusion proof is
-				// invalid"
-				// TODO: proxy shouldn't return a 500 here, and proxy error handling should be better so that
-				// this test doesnt have to depend on error checking, which is very brittle.
-				// This test is brittle because it depends on the ordering of too many checks:
-				// internal ordering that proxy calls the contract after RBN recency check, as well as the ordering of
-				// checks
-				// in the CertVerifier contract (such that statusCode 2 is returned for inclusion proof invalid).
-				// TODO: we should mock the CertVerifier contract call in the proxy, and inject a mock StatusCode which
-				// would make
-				// this test more robust to contract changes.
+				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
+				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.StatusInvalidInclusionProof), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -92,13 +85,13 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			certRBN:              100,
 			certL1IBN:            0,
 			requireErrorFn: func(t *testing.T, err error) {
-				// rest of proxy verification (after skipped RBN recency check) fails because "inclusion proof is
-				// invalid"
-				// TODO: proxy shouldn't return a 500 here, and proxy error handling should be better so that
-				// this test doesnt have to depend on error checking, which is very brittle.
+				// After RBN check succeeds, CertVerifier.checkDACert contract call is made,
+				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
+				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
+				// and returned as the body of a 418 response by the proxy.
 				var invalidCommitmentErr altda.InvalidCommitmentError
 				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.StatusInvalidInclusionProof), invalidCommitmentErr.StatusCode)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
 	}

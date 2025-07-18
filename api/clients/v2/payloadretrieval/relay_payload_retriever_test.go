@@ -39,7 +39,10 @@ type RelayPayloadRetrieverTester struct {
 	RelayPayloadRetriever *RelayPayloadRetriever
 	MockRelayClient       *clientsmock.MockRelayClient
 	G1Srs                 []bn254.G1Affine
-	PayloadPolynomialForm codecs.PolynomialForm
+}
+
+func (t *RelayPayloadRetrieverTester) PayloadPolynomialForm() codecs.PolynomialForm {
+	return t.RelayPayloadRetriever.config.PayloadPolynomialForm
 }
 
 // buildRelayPayloadRetrieverTester sets up a client with mocks necessary for testing
@@ -76,7 +79,6 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		RelayPayloadRetriever: client,
 		MockRelayClient:       &mockRelayClient,
 		G1Srs:                 g1Srs,
-		PayloadPolynomialForm: clientConfig.PayloadPolynomialForm,
 	}
 }
 
@@ -88,11 +90,22 @@ func buildBlobAndCert(
 ) (core.BlobKey, []byte, *coretypes.EigenDACertV3) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm)
+	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
 	require.NoError(t, err)
-
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)
+	blobKey, cert := buildCertFromBlobBytes(t, blobBytes, relayKeys)
+	return blobKey, blobBytes, cert
+
+}
+
+// buildCert builds a blob key, blob bytes, and valid certificate from the given blob and relay keys.
+// It is used to generate a valid cert from a wrongly encoded blob, to test for decoding errors.
+func buildCertFromBlobBytes(
+	t *testing.T,
+	blobBytes []byte,
+	relayKeys []core.RelayKey,
+) (core.BlobKey, *coretypes.EigenDACertV3) {
 
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../../../inabox/resources/kzg/g1.point",
@@ -141,7 +154,7 @@ func buildBlobAndCert(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	return *blobKey, blobBytes, eigenDACert
+	return *blobKey, eigenDACert
 }
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
@@ -443,6 +456,41 @@ func TestErrorClose(t *testing.T) {
 
 	err := tester.RelayPayloadRetriever.Close()
 	require.NotNil(t, err)
+
+	tester.MockRelayClient.AssertExpectations(t)
+}
+
+// TestCommitmentVerifiesButBlobToPayloadFails tests the case where commitment verification succeeds
+// but conversion from blob to payload fails. This is a critical edge case that should not be possible
+// with valid data, but could indicate malicious dispersed data.
+func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
+	tester := buildRelayPayloadRetrieverTester(t)
+	// We keep the blob in coeff form so that we can manipulate it directly (otherwise it gets IFFT'd)
+	tester.RelayPayloadRetriever.config.PayloadPolynomialForm = codecs.PolynomialFormCoeff
+	relayKeys := make([]core.RelayKey, 1)
+	relayKeys[0] = tester.Random.Uint32()
+
+	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
+	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
+	require.NoError(t, err)
+	blobBytes := blob.Serialize()
+	require.NotNil(t, blobBytes)
+	blobBytes[1] = 0xFF // Invalid encoding version - this will cause decode to fail
+
+	blobKey, blobCert := buildCertFromBlobBytes(t, blobBytes, relayKeys)
+
+	// Mock the relay to return our incorrectly encoded blob
+	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
+
+	// Try to get the payload - this should fail during blob to payload conversion
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
+	require.Nil(t, payload)
+	require.Error(t, err)
+
+	// Verify it's specifically a DerivationError with status code 4 (blob decoding failed)
+	derivationErr := coretypes.DerivationError{}
+	require.ErrorAs(t, err, &derivationErr)
+	require.Equal(t, coretypes.ErrBlobDecodingFailedDerivationError.StatusCode, derivationErr.StatusCode)
 
 	tester.MockRelayClient.AssertExpectations(t)
 }

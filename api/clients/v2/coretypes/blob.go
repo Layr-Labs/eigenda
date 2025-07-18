@@ -116,7 +116,7 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 
 	encodedPayload, err := encodedPayloadFromElements(payloadElements, maxPermissiblePayloadLength)
 	if err != nil {
-		return nil, fmt.Errorf("encoded payload from elements %w", err)
+		return nil, fmt.Errorf("encoded payload from elements: %w", err)
 	}
 
 	return encodedPayload, nil

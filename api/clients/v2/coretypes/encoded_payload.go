@@ -44,6 +44,16 @@ func newEncodedPayload(payload *Payload) (*encodedPayload, error) {
 
 // decode applies the inverse of PayloadEncodingVersion0 to an encodedPayload, and returns the decoded Payload
 func (ep *encodedPayload) decode() (*Payload, error) {
+	if len(ep.bytes) < 32 {
+		return nil, fmt.Errorf("encoded payload must be at least 32 bytes long, but got %d bytes", len(ep.bytes))
+	}
+	if ep.bytes[0] != 0x00 {
+		return nil, fmt.Errorf("encoded payload header first byte must be 0x00, but got %x", ep.bytes[0])
+	}
+	if ep.bytes[1] != byte(codecs.PayloadEncodingVersion0) {
+		return nil, fmt.Errorf("encoded payload header version byte must be %x, but got %x", codecs.PayloadEncodingVersion0, ep.bytes[1])
+	}
+
 	claimedLength := binary.BigEndian.Uint32(ep.bytes[2:6])
 
 	// decode raw data modulo bn254

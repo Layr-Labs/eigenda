@@ -3,6 +3,7 @@ package eigenda
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +60,7 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 			certL1IBN:             201,
 			rbnRecencyWindowSize:  100,
 			expectError:           true,
-			expectedErrorContains: NewRBNRecencyCheckFailedError(100, 201, 100).Error(),
+			expectedErrorContains: coretypes.NewRBNRecencyCheckFailedError(100, 201, 100).Error(),
 		},
 	}
 
