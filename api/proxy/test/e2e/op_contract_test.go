@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO: update this to test all 4 derivation error cases.
+// Right now this test relies on our op fork's InvalidCommitmentError definition, which we are
+// changing in https://github.com/Layr-Labs/optimism/pull/50...
+// Prob best to merge that PR first, and then update this test suite.
+//
 // RBN Recency Check is only available for V2
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
 func TestOPContractTestRBNRecentyCheck(t *testing.T) {
@@ -89,8 +94,6 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
 			},
 		},
-		// TODO: add a test for [coretypes.ErrBlobDecodingFailedDerivationError]
-		// once we add code to process and return this error.
 	}
 
 	for _, tt := range testTable {
