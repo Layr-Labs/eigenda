@@ -37,11 +37,11 @@ func (c *Certificate) NoNilFields() error {
 		return fmt.Errorf("BlobVerificationProof is nil")
 	}
 
-	if c.BlobVerificationProof.BatchMetadata == nil {
+	if c.BlobVerificationProof.GetBatchMetadata() == nil {
 		return fmt.Errorf("BlobVerificationProof.BatchMetadata is nil")
 	}
 
-	if c.BlobVerificationProof.BatchMetadata.BatchHeader == nil {
+	if c.BlobVerificationProof.GetBatchMetadata().GetBatchHeader() == nil {
 		return fmt.Errorf("BlobVerificationProof.BatchMetadata.BatchHeader is nil")
 	}
 
@@ -49,7 +49,7 @@ func (c *Certificate) NoNilFields() error {
 		return fmt.Errorf("BlobHeader is nil")
 	}
 
-	if c.BlobHeader.Commitment == nil {
+	if c.BlobHeader.GetCommitment() == nil {
 		return fmt.Errorf("BlobHeader.Commitment is nil")
 	}
 
@@ -69,17 +69,17 @@ func (c *Certificate) ValidFieldLengths() error {
 
 	// 1.a necessary since only first 32 bytes of header hash are checked
 	//     in verification equivalence check which could allow data padding at end
-	if hashLen := len(bvp.BatchMetadata.BatchHeaderHash); hashLen != 32 {
+	if hashLen := len(bvp.GetBatchMetadata().GetBatchHeaderHash()); hashLen != 32 {
 		return fmt.Errorf("BlobVerification.BatchMetadata.BatchHeaderHash is not 32 bytes, got %d", hashLen)
 	}
 
 	// 1.b necessary since commitment verification parses the byte field byte arrays
 	//     into a field element representation which disregards 0x0 padded bytes
-	if xLen := len(bh.Commitment.X); xLen != 32 {
+	if xLen := len(bh.GetCommitment().GetX()); xLen != 32 {
 		return fmt.Errorf("BlobHeader.Commitment.X is not 32 bytes, got %d", xLen)
 	}
 
-	if yLen := len(bh.Commitment.Y); yLen != 32 {
+	if yLen := len(bh.GetCommitment().GetY()); yLen != 32 {
 		return fmt.Errorf("BlobHeader.Commitment.Y is not 32 bytes, got %d", yLen)
 	}
 
@@ -87,11 +87,11 @@ func (c *Certificate) ValidFieldLengths() error {
 	//     verification since these values are used as input for batch metadata hash
 	//     recomputation. Capturing here is more efficient!
 
-	if hashLen := len(bvp.BatchMetadata.SignatoryRecordHash); hashLen != 32 {
+	if hashLen := len(bvp.GetBatchMetadata().GetSignatoryRecordHash()); hashLen != 32 {
 		return fmt.Errorf("BlobVerification.BatchMetadata.SignatoryRecordHash is not 32 bytes, got %d", hashLen)
 	}
 
-	if hashLen := len(bvp.BatchMetadata.BatchHeader.BatchRoot); hashLen != 32 {
+	if hashLen := len(bvp.GetBatchMetadata().GetBatchHeader().GetBatchRoot()); hashLen != 32 {
 		return fmt.Errorf("BlobVerification.BatchMetadata.BatchHeader.BatchRoot is not 32 bytes, got %d", hashLen)
 	}
 
@@ -99,32 +99,32 @@ func (c *Certificate) ValidFieldLengths() error {
 }
 
 func (c *Certificate) BlobIndex() uint32 {
-	return c.BlobVerificationProof.BlobIndex
+	return c.BlobVerificationProof.GetBlobIndex()
 }
 
 func (c *Certificate) BatchHeaderRoot() []byte {
-	return c.BlobVerificationProof.BatchMetadata.BatchHeader.BatchRoot
+	return c.BlobVerificationProof.GetBatchMetadata().GetBatchHeader().GetBatchRoot()
 }
 
 func (c *Certificate) ReadBlobHeader() BlobHeader {
 	// parse quorum params
 
-	qps := make([]QuorumBlobParam, len(c.BlobHeader.BlobQuorumParams))
-	for i, qp := range c.BlobHeader.BlobQuorumParams {
+	qps := make([]QuorumBlobParam, len(c.BlobHeader.GetBlobQuorumParams()))
+	for i, qp := range c.BlobHeader.GetBlobQuorumParams() {
 		qps[i] = QuorumBlobParam{
-			QuorumNumber:                    uint8(qp.QuorumNumber),                    // #nosec G115
-			AdversaryThresholdPercentage:    uint8(qp.AdversaryThresholdPercentage),    // #nosec G115
-			ConfirmationThresholdPercentage: uint8(qp.ConfirmationThresholdPercentage), // #nosec G115
-			ChunkLength:                     qp.ChunkLength,
+			QuorumNumber:                    uint8(qp.GetQuorumNumber()),                    // #nosec G115
+			AdversaryThresholdPercentage:    uint8(qp.GetAdversaryThresholdPercentage()),    // #nosec G115
+			ConfirmationThresholdPercentage: uint8(qp.GetConfirmationThresholdPercentage()), // #nosec G115
+			ChunkLength:                     qp.GetChunkLength(),
 		}
 	}
 
 	return BlobHeader{
 		Commitment: G1Point{
-			X: new(big.Int).SetBytes(c.BlobHeader.Commitment.X),
-			Y: new(big.Int).SetBytes(c.BlobHeader.Commitment.Y),
+			X: new(big.Int).SetBytes(c.BlobHeader.GetCommitment().GetX()),
+			Y: new(big.Int).SetBytes(c.BlobHeader.GetCommitment().GetY()),
 		},
-		DataLength:       c.BlobHeader.DataLength,
+		DataLength:       c.BlobHeader.GetDataLength(),
 		QuorumBlobParams: qps,
 	}
 }

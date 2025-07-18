@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/gammazero/workerpool"
 )
 
 type requestMetadata struct {
@@ -181,7 +180,6 @@ func (n *Node) ValidateBatchV2(
 	if err := n.ValidatorV2.ValidateBatchHeader(ctx, batch.BatchHeader, batch.BlobCertificates); err != nil {
 		return fmt.Errorf("failed to validate batch header: %v", err)
 	}
-	pool := workerpool.New(n.Config.NumBatchValidators)
 	blobVersionParams := n.BlobVersionParams.Load()
-	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, pool, operatorState)
+	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, n.ValidationPool, operatorState)
 }

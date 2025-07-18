@@ -160,9 +160,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name: MaxBlobLengthFlagName,
-			Usage: `Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-						loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
-						slightly exceeds 1GB.`,
+			Usage: `Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
+						loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH")},
 			Value:    "16MiB",
 			Category: category,
