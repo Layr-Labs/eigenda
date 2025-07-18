@@ -38,7 +38,7 @@ func setup(m *testing.M) {
 	var err error
 	p, v, err = makeTestComponents()
 	if err != nil {
-		panic("failed to start localstack container")
+		panic("failed to start localstack container: " + err.Error())
 	}
 }
 

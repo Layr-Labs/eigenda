@@ -2,8 +2,10 @@ package clients
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	coreEth "github.com/Layr-Labs/eigenda/core/eth"
@@ -21,6 +23,7 @@ import (
 type CertBuilder struct {
 	logger                  logging.Logger
 	opsrCaller              *opsrbinding.ContractOperatorStateRetrieverCaller
+	opsrAddr                gethcommon.Address
 	registryCoordinatorAddr gethcommon.Address
 }
 
@@ -35,6 +38,16 @@ func NewCertBuilder(
 	if logger == nil {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
+	if ethClient == nil {
+		return nil, fmt.Errorf("ethClient cannot be nil")
+	}
+	if opsrAddr == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("opsrAddr cannot be empty")
+	}
+	if registryCoordinatorAddr == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("registryCoordinatorAddr cannot be empty")
+	}
+
 	// Create the Operator State Retriever caller
 	opsrCaller, err := opsrbinding.NewContractOperatorStateRetrieverCaller(opsrAddr, ethClient)
 	if err != nil {
@@ -44,6 +57,7 @@ func NewCertBuilder(
 	return &CertBuilder{
 		logger:                  logger,
 		opsrCaller:              opsrCaller,
+		opsrAddr:                opsrAddr,
 		registryCoordinatorAddr: registryCoordinatorAddr,
 	}, nil
 }
@@ -113,10 +127,24 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	rbn := signedBatch.GetHeader().GetReferenceBlockNumber()
 
 	// 3 - call operator state retriever to fetch signature indices
+	nonSignerOperatorIDsHex := make([]string, len(nonSignerOperatorIDs))
+	for i, id := range nonSignerOperatorIDs {
+		nonSignerOperatorIDsHex[i] = "0x" + hex.EncodeToString(id[:])
+	}
 	checkSigIndices, err := cb.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(rbn))},
 		cb.registryCoordinatorAddr, uint32(rbn), quorumNumbers, nonSignerOperatorIDs)
 
 	if err != nil {
+		// We log the call parameters for debugging purposes: input them into tenderly to simulate the call and get more context.
+		cb.logger.Error("eth-call failed",
+			"contract", "OperatorStateRetriever",
+			"contractAddr", cb.opsrAddr.Hex(),
+			"method", "GetCheckSignaturesIndices",
+			"registryCoordinatorAddr", cb.registryCoordinatorAddr.Hex(),
+			"referenceBlockNumber", rbn,
+			"quorumNumbers", "0x"+hex.EncodeToString(quorumNumbers),
+			"nonSignerOperatorIDs", "["+strings.Join(nonSignerOperatorIDsHex, ",")+"]",
+		)
 		return nil, fmt.Errorf("check sig indices call: %w", err)
 	}
 
