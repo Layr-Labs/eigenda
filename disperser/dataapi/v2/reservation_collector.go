@@ -48,7 +48,7 @@ func (c *ReservationExpirationCollector) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
-	c.updateCounts(ctx)
+	c.updateMetrics(ctx)
 
 	// Collect metrics
 	c.reservationsActive.Collect(ch)
@@ -56,7 +56,7 @@ func (c *ReservationExpirationCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // updateCounts queries the GraphQL endpoint and updates the metrics
-func (c *ReservationExpirationCollector) updateCounts(ctx context.Context) {
+func (c *ReservationExpirationCollector) updateMetrics(ctx context.Context) {
 	// Query all active reservations
 	currentTimestamp := uint64(time.Now().Unix())
 	reservations, err := c.subgraphClient.QueryReservations(ctx, currentTimestamp, 1000, 0)
