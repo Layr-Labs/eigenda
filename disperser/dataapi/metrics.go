@@ -205,7 +205,6 @@ func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics
 	}
 }
 
-
 func (g *Metrics) updateStakeMetrics(rankedOperators []*operators.OperatorStakeShare, label string) {
 	indices := []int{0, 1, 2, 4, 7, 9}
 	accuStake := float64(0)
