@@ -99,8 +99,12 @@ type (
 		NonSigners []string
 	}
 	Reservation struct {
-		Account      string
-		EndTimestamp int64
+		Account          string
+		SymbolsPerSecond uint64
+		QuorumNumbers    string
+		QuorumSplits     string
+		StartTimeStamp   int64
+		EndTimestamp     int64
 	}
 	subgraphClient struct {
 		api    subgraph.Api
@@ -371,13 +375,25 @@ func (sc *subgraphClient) QueryReservations(ctx context.Context, currentTimestam
 
 	reservations := make([]*Reservation, len(reservationsGql))
 	for i, resGql := range reservationsGql {
+		symbolsPerSecond, err := strconv.ParseUint(string(resGql.SymbolsPerSecond), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse symbols per second for reservation at index %d: %w", i, err)
+		}
+		startTimestamp, err := strconv.ParseInt(string(resGql.StartTimestamp), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse start timestamp for reservation at index %d: %w", i, err)
+		}
 		endTimestamp, err := strconv.ParseInt(string(resGql.EndTimestamp), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse end timestamp for reservation at index %d: %w", i, err)
 		}
 		reservations[i] = &Reservation{
-			Account:      string(resGql.Account),
-			EndTimestamp: endTimestamp,
+			Account:          string(resGql.Account),
+			SymbolsPerSecond: symbolsPerSecond,
+			QuorumNumbers:    string(resGql.QuorumNumbers),
+			QuorumSplits:     string(resGql.QuorumSplits),
+			StartTimeStamp:   startTimestamp,
+			EndTimestamp:     endTimestamp,
 		}
 	}
 	return reservations, nil

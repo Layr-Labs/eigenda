@@ -82,8 +82,12 @@ type (
 		Metadata    *Operator
 	}
 	Reservation struct {
-		Account      graphql.String
-		EndTimestamp graphql.String
+		Account          graphql.String
+		SymbolsPerSecond graphql.String
+		QuorumNumbers    graphql.String
+		QuorumSplits     graphql.String
+		StartTimestamp   graphql.String
+		EndTimestamp     graphql.String
 	}
 	queryBatches struct {
 		Batches []*Batches `graphql:"batches(orderDirection: $orderDirection, orderBy: $orderBy, first: $first, skip: $skip)"`
@@ -122,6 +126,6 @@ type (
 		OperatorEjections []*OperatorEjection `graphql:"operatorEjecteds(orderBy: blockTimestamp, where: {and: [{blockTimestamp_gte: $blockTimestamp_gte}, {operatorId: $operatorId}]}, first: $first, skip: $skip)"`
 	}
 	queryReservations struct {
-		Reservations []*Reservation `graphql:"currentReservations(where: {startTimestamp_lte: $currentTimestamp, endTimestamp_gte: $currentTimestamp}, orderBy: startTimestamp, orderDirection: asc, first: $first, skip: $skip)"`
+		Reservations []*Reservation `graphql:"reservations(where: {startTimestamp_lte: $currentTimestamp, endTimestamp_gte: $currentTimestamp}, orderBy: startTimestamp, orderDirection: asc, first: $first, skip: $skip)"`
 	}
 )
