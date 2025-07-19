@@ -25,8 +25,6 @@ type MetricsConfig struct {
 }
 
 type Metrics struct {
-	registry *prometheus.Registry
-
 	NumRequests    *prometheus.CounterVec
 	CacheHitsTotal *prometheus.CounterVec
 	Latency        *prometheus.SummaryVec
@@ -40,6 +38,7 @@ type Metrics struct {
 	SemversStakePctQuorum1 *prometheus.GaugeVec
 	SemversStakePctQuorum2 *prometheus.GaugeVec
 
+	registry *prometheus.Registry
 	httpPort string
 	logger   logging.Logger
 }
@@ -47,7 +46,7 @@ type Metrics struct {
 func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
 	if reg == nil {
-		reg = prometheus.NewRegistry()
+		panic("registry must not be nil")
 	}
 
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

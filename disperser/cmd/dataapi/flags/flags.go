@@ -77,6 +77,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
+	SubgraphApiPaymentsAddrFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "sub-payments-socket-addr"),
+		//We need the socket address of the subgraph payments api to pull the subgraph data from.
+		Usage:    "the socket address of the subgraph payments api",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_PAYMENTS_API_SOCKET_ADDR"),
+		Required: true,
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
@@ -153,6 +160,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
+	SubgraphApiPaymentsAddrFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,
