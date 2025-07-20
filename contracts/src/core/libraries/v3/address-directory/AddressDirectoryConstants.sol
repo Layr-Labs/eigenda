@@ -9,6 +9,7 @@ library AddressDirectoryConstants {
     string internal constant SERVICE_MANAGER_NAME = "SERVICE_MANAGER";
     string internal constant THRESHOLD_REGISTRY_NAME = "THRESHOLD_REGISTRY";
     string internal constant PAYMENT_VAULT_NAME = "PAYMENT_VAULT";
+    string internal constant USAGE_AUTHORIZATION_REGISTRY_NAME = "USAGE_AUTHORIZATION_REGISTRY";
 
     /// MIDDLEWARE
 
@@ -23,7 +24,6 @@ library AddressDirectoryConstants {
     /// PERIPHERY
 
     string internal constant OPERATOR_STATE_RETRIEVER_NAME = "OPERATOR_STATE_RETRIEVER";
-
     string internal constant CERT_VERIFIER_NAME = "CERT_VERIFIER";
     string internal constant CERT_VERIFIER_ROUTER_NAME = "CERT_VERIFIER_ROUTER";
 
