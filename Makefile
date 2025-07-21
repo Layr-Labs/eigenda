@@ -120,14 +120,11 @@ integration-tests-dataapi:
 	make dataapi-build
 	go test -v ./disperser/dataapi
 
-docker-release-build:
-	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
-	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy ${PUSH_FLAG}
-
 semver:
 	echo "${SEMVER}"
+
+release-build:
+	GORELEASER_PREVIOUS_TAG=v0.0.0 GORELEASER_CURRENT_TAG=latest goreleaser release --skip publish --clean --snapshot
 
 ##### Proxies to other local Makefiles #####
 mdbook-serve:
