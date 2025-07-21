@@ -617,14 +617,14 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 		return nil, nil
 	}
 
-	if !gethcommon.IsHexAddress(ph.AccountId) {
-		return nil, fmt.Errorf("invalid account ID: %s", ph.AccountId)
+	if !gethcommon.IsHexAddress(ph.GetAccountId()) {
+		return nil, fmt.Errorf("invalid account ID: %s", ph.GetAccountId())
 	}
 
 	return &PaymentMetadata{
-		AccountID:         gethcommon.HexToAddress(ph.AccountId),
-		Timestamp:         ph.Timestamp,
-		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+		AccountID:         gethcommon.HexToAddress(ph.GetAccountId()),
+		Timestamp:         ph.GetTimestamp(),
+		CumulativePayment: new(big.Int).SetBytes(ph.GetCumulativePayment()),
 	}, nil
 }
 
@@ -646,28 +646,6 @@ type ReservedPayment struct {
 type OnDemandPayment struct {
 	// Total amount deposited by the user
 	CumulativePayment *big.Int
-}
-
-// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
-type PaymentQuorumConfig struct {
-	ReservationSymbolsPerSecond uint64
-
-	// OnDemand is initially only enabled on Quorum 0
-	OnDemandSymbolsPerSecond uint64
-	OnDemandPricePerSymbol   uint64
-}
-
-// PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
-// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
-type PaymentQuorumProtocolConfig struct {
-	MinNumSymbols              uint64
-	ReservationAdvanceWindow   uint64
-	ReservationRateLimitWindow uint64
-
-	// OnDemand is initially only enabled on Quorum 0
-	OnDemandRateLimitWindow uint64
-	OnDemandEnabled         bool
 }
 
 type BlobVersionParameters struct {
@@ -692,15 +670,11 @@ func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
 
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
-	return WithinTime(time.Unix(int64(currentTimestamp), 0), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
+	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
 }
 
-// IsActiveByNanosecond returns true if the reservation is active at the given timestamp
+// IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
-	return WithinTime(time.Unix(0, currentTimestamp), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
-}
-
-// WithinTime returns true if the timestamp is within the time range, inclusive of the start and end timestamps
-func WithinTime(timestamp time.Time, startTimestamp time.Time, endTimestamp time.Time) bool {
-	return !timestamp.Before(startTimestamp) && !timestamp.After(endTimestamp)
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

@@ -73,8 +73,11 @@ type controlLoop struct {
 	// clock is the time source used by the disk table.
 	clock func() time.Time
 
-	// The directories where segment files are stored.
-	segmentDirectories []string
+	// The locations where segment files are stored.
+	segmentPaths []*segment.SegmentPath
+
+	// Controls if snapshotting is enabled or not.
+	snapshottingEnabled bool
 
 	// The table's metadata.
 	metadata *tableMetadata
@@ -321,7 +324,8 @@ func (c *controlLoop) expandSegments() error {
 		c.logger,
 		c.errorMonitor,
 		c.highestSegmentIndex+1,
-		c.segmentDirectories,
+		c.segmentPaths,
+		c.snapshottingEnabled,
 		c.metadata.GetShardingFactor(),
 		salt,
 		c.fsync)

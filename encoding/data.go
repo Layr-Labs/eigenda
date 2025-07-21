@@ -103,17 +103,17 @@ func (c *BlobCommitments) Equal(c1 *BlobCommitments) bool {
 }
 
 func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {
-	commitment, err := new(G1Commitment).Deserialize(c.Commitment)
+	commitment, err := new(G1Commitment).Deserialize(c.GetCommitment())
 	if err != nil {
 		return nil, err
 	}
 
-	lengthCommitment, err := new(G2Commitment).Deserialize(c.LengthCommitment)
+	lengthCommitment, err := new(G2Commitment).Deserialize(c.GetLengthCommitment())
 	if err != nil {
 		return nil, err
 	}
 
-	lengthProof, err := new(G2Commitment).Deserialize(c.LengthProof)
+	lengthProof, err := new(G2Commitment).Deserialize(c.GetLengthProof())
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
-		Length:           uint(c.Length),
+		Length:           uint(c.GetLength()),
 	}, nil
 }
 

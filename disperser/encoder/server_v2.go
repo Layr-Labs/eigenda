@@ -253,35 +253,35 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		return blobKey, params, errors.New("blob key cannot be nil")
 	}
 
-	if req.EncodingParams == nil {
+	if req.GetEncodingParams() == nil {
 		return blobKey, params, errors.New("encoding parameters cannot be nil")
 	}
 
 	// Since these are uint32 in the proto, we only need to check for positive values
-	if req.EncodingParams.ChunkLength == 0 {
+	if req.GetEncodingParams().GetChunkLength() == 0 {
 		return blobKey, params, errors.New("chunk length must be greater than zero")
 	}
-	if req.EncodingParams.ChunkLength&(req.EncodingParams.ChunkLength-1) != 0 {
+	if req.GetEncodingParams().GetChunkLength()&(req.GetEncodingParams().GetChunkLength()-1) != 0 {
 		return blobKey, params, errors.New("chunk length must be power of 2")
 	}
 
-	if req.EncodingParams.NumChunks == 0 {
+	if req.GetEncodingParams().GetNumChunks() == 0 {
 		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
-	if req.BlobSize == 0 || uint64(encoding.GetBlobLength(uint(req.BlobSize))) > req.EncodingParams.ChunkLength*req.EncodingParams.NumChunks {
+	if req.GetBlobSize() == 0 || uint64(encoding.GetBlobLength(uint(req.GetBlobSize()))) > req.GetEncodingParams().GetChunkLength()*req.GetEncodingParams().GetNumChunks() {
 		return blobKey, params, errors.New("blob size is invalid")
 	}
 
-	blobKey, err := corev2.BytesToBlobKey(req.BlobKey)
+	blobKey, err := corev2.BytesToBlobKey(req.GetBlobKey())
 	if err != nil {
 		return blobKey, params, fmt.Errorf("invalid blob key: %v", err)
 	}
 
 	// Convert proto EncodingParams to our domain type
 	params = encoding.EncodingParams{
-		ChunkLength: req.EncodingParams.ChunkLength,
-		NumChunks:   req.EncodingParams.NumChunks,
+		ChunkLength: req.GetEncodingParams().GetChunkLength(),
+		NumChunks:   req.GetEncodingParams().GetNumChunks(),
 	}
 
 	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
