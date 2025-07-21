@@ -38,11 +38,7 @@ func NewKeymapTypeFile(keymapPath string, keymapType KeymapType) *KeymapTypeFile
 func LoadKeymapTypeFile(keymapPath string) (*KeymapTypeFile, error) {
 	filePath := path.Join(keymapPath, KeymapTypeFileName)
 
-	exists, err := util.Exists(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("error checking for keymap type file: %w", err)
-	}
-	if !exists {
+	if err := util.ErrIfNotExists(filePath); err != nil {
 		return nil, fmt.Errorf("keymap type file does not exist: %v", filePath)
 	}
 
