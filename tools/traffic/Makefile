@@ -1,8 +1,4 @@
-clean:
-	rm -rf ./bin
-
-build: clean
-	# cd ../.. && make protoc
+build:
 	go mod tidy
 	go build -o ./bin/server ./cmd
 
@@ -15,3 +11,6 @@ run: build
 	TRAFFIC_GENERATOR_DATA_SIZE=1000 \
 	TRAFFIC_GENERATOR_RANDOMIZE_BLOBS=true \
 	./bin/server
+
+clean:
+	rm -rf ./bin
