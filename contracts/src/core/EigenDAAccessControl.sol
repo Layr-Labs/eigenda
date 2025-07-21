@@ -6,7 +6,7 @@ import {AccessControlConstants} from "src/core/libraries/v3/access-control/Acces
 
 contract EigenDAAccessControl is AccessControl {
     constructor(address owner) {
-        _setupRole(AccessControlConstants.OWNER_ROLE, owner);
+        _grantRole(AccessControlConstants.OWNER_ROLE, owner);
     }
 
     function setupRole(bytes32 role, address account) external {
