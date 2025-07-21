@@ -54,7 +54,7 @@ func buildCLIParser() *cli.App {
 				Action: nil, // tableInfoCommand, // TODO this will be added in a follow up PR
 			},
 			{
-				Name:  "rebase", // TODO fix documentation
+				Name:  "rebase",
 				Usage: "Restructure LittDB file system layout.",
 				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
 					"--dest <destination-path1> ... --dest <destination-pathN>",
