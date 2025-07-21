@@ -33,7 +33,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 		requireErrorFn       func(t *testing.T, err error)
 	}{
 		{
-			name:                 "RBN recency check failed - invalid cert",
+			name:                 "RBN recency check failed",
 			RBNRecencyWindowSize: 100,
 			certRBN:              100,
 			certL1IBN:            201,
@@ -47,7 +47,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			},
 		},
 		{
-			name:                 "RBN recency check passed - valid cert",
+			name:                 "RBN recency check passed",
 			RBNRecencyWindowSize: 100,
 			certRBN:              100,
 			certL1IBN:            199,
