@@ -132,7 +132,7 @@ rg --line-number --ignore-case --json -C 5 "ERROR|FAIL|CRITICAL" "<original_log_
 After running each search profile, split the results into manageable shards:
 
 ```bash
-# Split search results into 1800-line shards (same size as log splitting)
+# Split search results into 1800-line shards
 split -l 1800 -d -a 3 "<original_log_directory>/analysis/search_results/test_failures_search.jsonl" \
   "<original_log_directory>/analysis/search_results/test_failures_shard_"
 ```
@@ -209,7 +209,7 @@ For each match entry (`"type":"match"`) in the ripgrep JSON output, perform the 
 >                                                               <-- if the test group has already been added to the report, add the test failure entry under the existing heading
 >
 > 1. `TestParallelProcessing`                                   <-- this is the name of the test
->   - failure location: `unit_tests_shard_003` line 62      <-- record where the error can be found in the shard files
+>   - failure location: `unit_tests_shard_003` line 62          <-- record where the error can be found in the shard files
 >   - failure class: `consistency assertion failed in MainLoop` <-- determined failure class
 >   - relevant log lines:                                       <-- try to show a brief selection of log lines that make it easy to understand what happened
 >     ```
@@ -255,10 +255,9 @@ best efforts to limit what's being loaded.
 
 ### Strategies for managing large result sets:
 
-1. **Use samples for initial analysis**: When search results are sharded, start with the `*_sample.jsonl` files
-2. **Process shards sequentially**: Load and analyze one shard at a time, maintaining running totals/summaries
-3. **Prioritize unique failures**: Focus on distinct error patterns rather than repetitive instances
-4. **Discard processed content**: After extracting relevant information from a shard, clear it from context
+1. **Process shards sequentially**: Load and analyze one shard at a time, maintaining running totals/summaries
+2. **Prioritize unique failures**: Focus on distinct error patterns rather than repetitive instances
+3. **Discard processed content**: After extracting relevant information from a shard, clear it from context
 
 Discard context related to literal log contents first: retain in context information related to what specific 
 tests have failed, and what classes of failure are being observed.
