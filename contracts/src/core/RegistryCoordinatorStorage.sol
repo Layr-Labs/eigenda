@@ -11,7 +11,7 @@ import {ISocketRegistry} from "lib/eigenlayer-middleware/src/interfaces/ISocketR
 abstract contract RegistryCoordinatorStorage is IRegistryCoordinator {
     /**
      *
-     *                            CONSTANTS AND IMMUTABLES 
+     *                            CONSTANTS AND IMMUTABLES
      *
      */
 
@@ -47,7 +47,7 @@ abstract contract RegistryCoordinatorStorage is IRegistryCoordinator {
 
     /**
      *
-     *                                    STATE 
+     *                                    STATE
      *
      */
 

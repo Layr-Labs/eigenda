@@ -110,7 +110,7 @@ contract RegistryCoordinator is
 
     /**
      *
-     *                         EXTERNAL FUNCTIONS 
+     *                         EXTERNAL FUNCTIONS
      *
      */
 
