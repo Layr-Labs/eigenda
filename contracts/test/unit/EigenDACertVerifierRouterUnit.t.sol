@@ -21,7 +21,11 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         quorumNumbersRequired = hex"00";
         _deployDA();
         eigenDACertVerifierRouter = new EigenDACertVerifierRouter();
-        eigenDACertVerifierRouter.initialize(address(this), address(0)); // adding a default cert verifier that should fail.
+        uint32[] memory rbns = new uint32[](1);
+        rbns[0] = 0;
+        address[] memory certVerifiers = new address[](1);
+        certVerifiers[0] = address(eigenDACertVerifier);
+        eigenDACertVerifierRouter.initialize(address(this), rbns, certVerifiers); // adding a default cert verifier that should fail.
     }
 
     function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
