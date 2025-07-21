@@ -148,19 +148,18 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         emptyContract = new EmptyContract();
 
+        eigenDAAccessControl = new EigenDAAccessControl(addressConfig.eigenLayerCommunityMultisig);
+
         eigenDADirectoryImplementation = new EigenDADirectory();
         eigenDADirectory = EigenDADirectory(
             address(
                 new TransparentUpgradeableProxy(
                     address(eigenDADirectoryImplementation),
                     address(eigenDAProxyAdmin),
-                    abi.encodeWithSelector(EigenDADirectory.initialize.selector, msg.sender)
+                    abi.encodeWithSelector(EigenDADirectory.initialize.selector, address(eigenDAAccessControl))
                 )
             )
         );
-
-        eigenDAAccessControl = new EigenDAAccessControl(addressConfig.eigenLayerCommunityMultisig);
-        eigenDADirectory.addAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME, address(eigenDAAccessControl));
 
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
@@ -406,7 +405,5 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(eigenDARelayRegistryImplementation),
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
-
-        eigenDADirectory.transferOwnership(addressConfig.eigenLayerCommunityMultisig);
     }
 }
