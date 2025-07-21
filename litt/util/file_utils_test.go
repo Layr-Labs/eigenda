@@ -1368,6 +1368,9 @@ func TestDeepDelete(t *testing.T) {
 	exists, err = Exists(symlinkPath)
 	require.NoError(t, err, "Failed to check if symlink to file exists after deletion")
 	require.False(t, exists, "Symlink to file should not exist after deletion")
+	exists, err = Exists(targetFile)
+	require.NoError(t, err, "Failed to check if original file exists after deleting symlink")
+	require.False(t, exists, "Original file should not exist after deleting symlink")
 
 	// Delete a symlink that points to a directory
 	dirToLink := filepath.Join(directory, "dir-to-link")
@@ -1387,4 +1390,26 @@ func TestDeepDelete(t *testing.T) {
 	exists, err = Exists(dirToLink)
 	require.NoError(t, err, "Failed to check if original directory exists after deleting symlink")
 	require.False(t, exists, "Original directory should not exist after deleting symlink")
+
+	// Delete a symlink that points to a non-empty directory
+	nonEmptyDirForSymlink := filepath.Join(directory, "non-empty-dir-for-symlink")
+	err = os.Mkdir(nonEmptyDirForSymlink, 0755)
+	require.NoError(t, err, "Failed to create non-empty directory for symlink")
+	subFileForSymlink := filepath.Join(nonEmptyDirForSymlink, "subfile-for-symlink.txt")
+	err = os.WriteFile(subFileForSymlink, []byte("subfile content for symlink"), 0644)
+	require.NoError(t, err, "Failed to create subfile in non-empty directory for symlink")
+	symlinkNonEmptyDirPath := filepath.Join(directory, "symlink-to-non-empty-dir")
+	err = os.Symlink(nonEmptyDirForSymlink, symlinkNonEmptyDirPath)
+	require.NoError(t, err, "Failed to create symlink to non-empty directory")
+	exists, err = Exists(symlinkNonEmptyDirPath)
+	require.NoError(t, err, "Failed to check if symlink to non-empty directory exists")
+	require.True(t, exists, "Symlink to non-empty directory should exist before deletion")
+	err = DeepDelete(symlinkNonEmptyDirPath)
+	require.Error(t, err, "Expected error due to non-empty directory")
+	exists, err = Exists(symlinkNonEmptyDirPath)
+	require.NoError(t, err, "Failed to check if symlink to non-empty directory exists after deletion")
+	require.True(t, exists, "Symlink to non-empty directory should exist after failed deletion")
+	exists, err = Exists(nonEmptyDirForSymlink)
+	require.NoError(t, err, "Failed to check if original non-empty directory exists after deleting symlink")
+	require.True(t, exists, "Original non-empty directory should still exist after failed deletion")
 }

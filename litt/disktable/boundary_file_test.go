@@ -47,7 +47,7 @@ func TestLoadBoundaryFileExistingFile(t *testing.T) {
 	require.Equal(t, uint32(123), lowerBoundary.BoundaryIndex())
 
 	// Load upper bound file
-	upperBoundary, err := LoadBoundaryFile(LowerBound, tempDir)
+	upperBoundary, err := LoadBoundaryFile(UpperBound, tempDir)
 	require.NoError(t, err)
 	require.NotNil(t, upperBoundary)
 	require.True(t, upperBoundary.IsDefined())
@@ -95,7 +95,7 @@ func TestPath(t *testing.T) {
 	require.Equal(t, expectedLowerPath, lowerBoundary.Path())
 
 	// Test upper bound file path
-	upperBoundary, err := LoadBoundaryFile(LowerBound, tempDir)
+	upperBoundary, err := LoadBoundaryFile(UpperBound, tempDir)
 	require.NoError(t, err)
 	expectedUpperPath := filepath.Join(tempDir, UpperBoundFileName)
 	require.Equal(t, expectedUpperPath, upperBoundary.Path())
