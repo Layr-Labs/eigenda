@@ -16,9 +16,6 @@ import (
 )
 
 // TODO: update this to test all 4 derivation error cases.
-// Right now this test relies on our op fork's InvalidCommitmentError definition, which we are
-// changing in https://github.com/Layr-Labs/optimism/pull/50...
-// Prob best to merge that PR first, and then update this test suite.
 //
 // RBN Recency Check is only available for V2
 // Contract Test here refers to https://pactflow.io/blog/what-is-contract-testing/, not evm contracts.
@@ -42,11 +39,11 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			certL1IBN:            201,
 			requireErrorFn: func(t *testing.T, err error) {
 				// expect proxy to return a 418 error which the client converts to this structured error
-				var invalidCommitmentErr altda.InvalidCommitmentError
-				require.ErrorAs(t, err, &invalidCommitmentErr)
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
 				require.Equal(t,
 					int(coretypes.ErrRecencyCheckFailedDerivationError.StatusCode),
-					invalidCommitmentErr.StatusCode)
+					dropEigenDACommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -59,9 +56,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
 				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
 				// and returned as the body of a 418 response by the proxy.
-				var invalidCommitmentErr altda.InvalidCommitmentError
-				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -74,9 +71,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
 				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
 				// and returned as the body of a 418 response by the proxy.
-				var invalidCommitmentErr altda.InvalidCommitmentError
-				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
 			},
 		},
 		{
@@ -89,9 +86,9 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				// which returns a [verification.CertVerificationFailedError] with StatusCode 2 (inclusion proof
 				// invalid). This gets converted to a [eigendav2store.ErrInvalidCertDerivationError] which gets marshalled
 				// and returned as the body of a 418 response by the proxy.
-				var invalidCommitmentErr altda.InvalidCommitmentError
-				require.ErrorAs(t, err, &invalidCommitmentErr)
-				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), invalidCommitmentErr.StatusCode)
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
 			},
 		},
 	}
