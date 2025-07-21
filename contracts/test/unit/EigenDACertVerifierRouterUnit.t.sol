@@ -24,7 +24,7 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         uint32[] memory rbns = new uint32[](1);
         rbns[0] = 0;
         address[] memory certVerifiers = new address[](1);
-        certVerifiers[0] = address(eigenDACertVerifier);
+        certVerifiers[0] = address(0);
         eigenDACertVerifierRouter.initialize(address(this), rbns, certVerifiers); // adding a default cert verifier that should fail.
     }
 
