@@ -64,7 +64,7 @@ func TestMain(m *testing.M) {
 
 	p, v, err = makeTestComponents()
 	if err != nil {
-		panic("failed to start localstack container")
+		panic("failed to start localstack container: " + err.Error())
 	}
 
 	code := m.Run()

@@ -148,13 +148,13 @@ func TestEncodeBlob(t *testing.T) {
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
 		assert.NotNil(t, resp, "Response should not be nil")
-		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
+		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
+		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
 	})
 
 	expectedFragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: resp.FragmentInfo.TotalChunkSizeBytes,
-		FragmentSizeBytes:   resp.FragmentInfo.FragmentSizeBytes,
+		TotalChunkSizeBytes: resp.GetFragmentInfo().GetTotalChunkSizeBytes(),
+		FragmentSizeBytes:   resp.GetFragmentInfo().GetFragmentSizeBytes(),
 	}
 
 	// Verify chunk store data
@@ -191,8 +191,8 @@ func TestEncodeBlob(t *testing.T) {
 			return
 		}
 
-		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
+		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
+		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
 		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	})

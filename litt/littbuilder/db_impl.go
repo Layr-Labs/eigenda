@@ -4,20 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
-
-// All table names must match this regex. Permits uppercase and lowercase letters, numbers, underscores, and dashes.
-// Must be at least one character long.
-var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
@@ -59,20 +55,25 @@ type db struct {
 
 	// The HTTP server for metrics. nil if metrics are disabled or if an external party is managing the server.
 	metricsServer *http.Server
+
+	// A function that releases file locks.
+	releaseLocks func()
+
+	// Set to true when the database is closed.
+	closed bool
 }
 
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
 func NewDB(config *litt.Config) (litt.DB, error) {
-	var err error
-
 	if config.Logger == nil {
+		var err error
 		config.Logger, err = buildLogger(config)
 		if err != nil {
 			return nil, fmt.Errorf("error building logger: %w", err)
 		}
 	}
 
-	err = config.SanityCheck()
+	err := config.SanityCheck()
 	if err != nil {
 		return nil, fmt.Errorf("error checking config: %w", err)
 	}
@@ -102,7 +103,18 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
-	var err error
+
+	for _, rootPath := range config.Paths {
+		err := util.EnsureDirectoryExists(rootPath, config.Fsync)
+		if err != nil {
+			return nil, fmt.Errorf("error ensuring directory %s exists: %w", rootPath, err)
+		}
+	}
+
+	releaseLocks, err := util.LockDirectories(config.Logger, config.Paths, util.LockfileName, config.Fsync)
+	if err != nil {
+		return nil, fmt.Errorf("error acquiring locks on paths %v: %w", config.Paths, err)
+	}
 
 	if config.Logger == nil {
 		config.Logger, err = buildLogger(config)
@@ -117,6 +129,11 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		dbMetrics, metricsServer = buildMetrics(config, config.Logger)
 	}
 
+	if config.SnapshotDirectory != "" {
+		config.Logger.Infof("LittDB rolling snapshots enabled, snapshot data will be stored in %s",
+			config.SnapshotDirectory)
+	}
+
 	database := &db{
 		ctx:           config.CTX,
 		logger:        config.Logger,
@@ -127,6 +144,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		tables:        make(map[string]litt.ManagedTable),
 		metrics:       dbMetrics,
 		metricsServer: metricsServer,
+		releaseLocks:  releaseLocks,
 	}
 
 	if config.MetricsEnabled {
@@ -164,18 +182,13 @@ func (d *db) lockFreeSize() uint64 {
 	return size
 }
 
-// isTableNameValid returns true if the table name is valid.
-func (d *db) isTableNameValid(name string) bool {
-	return tableNameRegex.MatchString(name)
-}
-
 func (d *db) GetTable(name string) (litt.Table, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	table, ok := d.tables[name]
 	if !ok {
-		if !d.isTableNameValid(name) {
+		if !litt.IsTableNameValid(name) {
 			return nil, fmt.Errorf(
 				"table name '%s' is invalid, must be at least one character long and "+
 					"contain only letters, numbers, and underscores, and dashes", name)
@@ -188,7 +201,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		}
 		d.logger.Infof(
 			"Table '%s' initialized, table contains %d key-value pairs and has a size of %s.",
-			name, table.KeyCount(), util.PrettyPrintBytes(table.Size()))
+			name, table.KeyCount(), common.PrettyPrintBytes(table.Size()))
 
 		d.tables[name] = table
 	}
@@ -220,6 +233,14 @@ func (d *db) DropTable(name string) error {
 func (d *db) Close() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+	return d.closeUnsafe()
+}
+
+func (d *db) closeUnsafe() error {
+	if d.closed {
+		// closing more than once is a no-op
+		return nil
+	}
 
 	d.logger.Infof("Stopping LittDB, estimated data size: %d", d.lockFreeSize())
 	d.stopped.Store(true)
@@ -231,6 +252,8 @@ func (d *db) Close() error {
 		}
 	}
 
+	d.releaseLocks()
+
 	return nil
 }
 
@@ -238,7 +261,10 @@ func (d *db) Destroy() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	d.stopped.Store(true)
+	err := d.closeUnsafe()
+	if err != nil {
+		return fmt.Errorf("error closing database: %w", err)
+	}
 
 	for name, table := range d.tables {
 		err := table.Destroy()
