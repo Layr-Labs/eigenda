@@ -9,14 +9,16 @@ import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRe
 import {ISocketRegistry} from "lib/eigenlayer-middleware/src/interfaces/ISocketRegistry.sol";
 
 abstract contract RegistryCoordinatorStorage is IRegistryCoordinator {
-
-    /*******************************************************************************
-                               CONSTANTS AND IMMUTABLES 
-    *******************************************************************************/
+    /**
+     *
+     *                            CONSTANTS AND IMMUTABLES 
+     *
+     */
 
     /// @notice The EIP-712 typehash for the `DelegationApproval` struct used by the contract
-    bytes32 public constant OPERATOR_CHURN_APPROVAL_TYPEHASH =
-        keccak256("OperatorChurnApproval(address registeringOperator,bytes32 registeringOperatorId,OperatorKickParam[] operatorKickParams,bytes32 salt,uint256 expiry)OperatorKickParam(uint8 quorumNumber,address operator)");
+    bytes32 public constant OPERATOR_CHURN_APPROVAL_TYPEHASH = keccak256(
+        "OperatorChurnApproval(address registeringOperator,bytes32 registeringOperatorId,OperatorKickParam[] operatorKickParams,bytes32 salt,uint256 expiry)OperatorKickParam(uint8 quorumNumber,address operator)"
+    );
     /// @notice The EIP-712 typehash used for registering BLS public keys
     bytes32 public constant PUBKEY_REGISTRATION_TYPEHASH = keccak256("BN254PubkeyRegistration(address operator)");
     /// @notice The maximum value of a quorum bitmap
@@ -43,9 +45,11 @@ abstract contract RegistryCoordinatorStorage is IRegistryCoordinator {
     /// @notice the Socket Registry contract that will keep track of operators' sockets
     ISocketRegistry public immutable socketRegistry;
 
-    /*******************************************************************************
-                                       STATE 
-    *******************************************************************************/
+    /**
+     *
+     *                                    STATE 
+     *
+     */
 
     /// @notice the current number of quorums supported by the registry coordinator
     uint8 public quorumCount;
