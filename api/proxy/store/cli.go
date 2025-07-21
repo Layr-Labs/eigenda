@@ -14,6 +14,7 @@ var (
 	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
 	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
 	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
+	WriteOnCacheMissFlagName = withFlagPrefix("write-on-cache-miss")
 )
 
 func withFlagPrefix(s string) string {
@@ -65,6 +66,13 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "CONCURRENT_WRITE_THREADS"),
 			Category: category,
 		},
+		&cli.BoolFlag{
+			Name:     WriteOnCacheMissFlagName,
+			Usage:    "While doing a GET, write to the secondary storage if the cert/blob is not found in the cache but is found in EigenDA.",
+			Value:    false,
+			EnvVars:  withEnvPrefix(envPrefix, "WRITE_ON_CACHE_MISS"),
+			Category: category,
+		},
 	}
 }
 
@@ -94,5 +102,6 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
 		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
 		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),
+		WriteOnCacheMiss: ctx.Bool(WriteOnCacheMissFlagName),
 	}, nil
 }

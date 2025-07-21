@@ -129,6 +129,10 @@ func (m *Manager) Get(ctx context.Context,
 		// 2 - read blob from EigenDA
 		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, verifyOpts)
 		if err == nil {
+			if m.secondary.WriteOnCacheMissEnabled() {
+				m.backupToSecondary(ctx, versionedCert.SerializedCert, data)
+			}
+
 			return data, nil
 		}
 
@@ -171,23 +175,28 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, value 
 	}
 
 	// 2 - Put blob into secondary storage backends
-	if m.secondary.Enabled() &&
-		m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
+	if m.secondary.Enabled() {
+		m.backupToSecondary(ctx, commit, value)
+	}
+
+	return commit, nil
+}
+
+func (m *Manager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
+	if m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
 		m.log.Debug("Publishing data to async secondary stores")
 		m.secondary.Topic() <- secondary.PutNotify{
-			Commitment: commit,
+			Commitment: commitment,
 			Value:      value,
 		}
 		// secondary is available only for synchronous writes
-	} else if m.secondary.Enabled() && !m.secondary.AsyncWriteEntry() {
+	} else {
 		m.log.Debug("Publishing data to single threaded secondary stores")
-		err := m.secondary.HandleRedundantWrites(ctx, commit, value)
+		err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
 		if err != nil {
 			m.log.Error("Secondary insertions failed", "error", err.Error())
 		}
 	}
-
-	return commit, nil
 }
 
 // getVerifyMethod returns the correct verify method based on commitment type

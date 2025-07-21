@@ -182,9 +182,8 @@ governance and is injected in the BlobHeader before dispersing. Currently only s
 		},
 		&cli.StringFlag{
 			Name: MaxBlobLengthFlagName,
-			Usage: `Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
-slightly exceeds 1GB.`,
+			Usage: `Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
+loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH")},
 			Value:    "16MiB",
 			Category: category,
@@ -195,10 +194,11 @@ slightly exceeds 1GB.`,
 default values for %s, %s, and %s. If all of these fields are explicitly configured, the
 network flag may be omitted. If some or all of these fields are configured, and the network
 is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, & %s.`,
+EigenDANetwork values include %s, %s, %s, & %s.`,
 				DisperserFlagName,
 				ServiceManagerAddrFlagName,
 				BLSOperatorStateRetrieverFlagName,
+				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
