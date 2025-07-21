@@ -9,9 +9,6 @@ go 1.24
 // See https://tip.golang.org/doc/devel/release#go1.24.0
 toolchain go1.24.4
 
-// We need to keep eigenda-proxy clients separate because they are imported from modules that are not on go1.24 yet.
-replace github.com/Layr-Labs/eigenda-proxy/clients => ./api/proxy/clients
-
 // Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/49
 // TODO: update to a proper version once we make the next release.
 replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v1.13.1-0.20250616152614-59132dd56ae5
@@ -23,7 +20,7 @@ replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v
 replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101503.2-rc.5
 
 require (
-	github.com/Layr-Labs/eigenda-proxy/clients v1.0.1
+	github.com/Layr-Labs/eigenda/api/proxy/clients v1.0.1
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
 	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28
 	github.com/avast/retry-go/v4 v4.6.0

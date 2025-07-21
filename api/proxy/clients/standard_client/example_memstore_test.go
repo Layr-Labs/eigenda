@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
