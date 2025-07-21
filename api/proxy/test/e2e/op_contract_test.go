@@ -129,3 +129,100 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 		})
 	}
 }
+
+// Test that proxy DerivationErrors are correctly parsed as DropCommitmentErrors on op side,
+// for parsing and cert validation errors.
+func TestOPContractTestValidAndInvalidCertErrors(t *testing.T) {
+	t.Parallel()
+	if testutils.GetBackend() == testutils.MemstoreBackend {
+		t.Skip("Don't run for memstore backend, since verifying certs is only done for eigenda v2 backend")
+	}
+
+	var testTable = []struct {
+		name           string
+		certCreationFn func() ([]byte, error)
+		requireErrorFn func(t *testing.T, err error)
+	}{
+		{
+			// TODO: need to figure out why this is happening, since ErrNotFound is supposed to be a keccak only error.
+			// Seems like op-client allows submitting an empty cert, and because its not a valid cert request, it gets
+			// matched by proxy's keccak commitment handler, which returns ErrNotFound (there is no such key in the store).
+			// I think this is ok behavior... since it would be a bug to submit an empty cert....?
+			// But need to think about this more.
+			name: "empty cert returns ErrNotFound",
+			certCreationFn: func() ([]byte, error) {
+				return []byte{}, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				require.ErrorIs(t, err, altda.ErrNotFound)
+			},
+		},
+		{
+			name: "cert parsing error",
+			certCreationFn: func() ([]byte, error) {
+				cert := make([]byte, 10)
+				return cert, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrCertParsingFailedDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+		{
+			name: "invalid (default) cert",
+			certCreationFn: func() ([]byte, error) {
+				// Build + Serialize invalid default cert
+				certV3 := coretypes.EigenDACertV3{}
+				serializedCertV3, err := rlp.EncodeToBytes(certV3)
+				if err != nil {
+					return nil, err
+				}
+				return serializedCertV3, nil
+			},
+			requireErrorFn: func(t *testing.T, err error) {
+				var dropEigenDACommitmentErr altda.DropEigenDACommitmentError
+				require.ErrorAs(t, err, &dropEigenDACommitmentErr)
+				require.Equal(t, int(coretypes.ErrInvalidCertDerivationError.StatusCode), dropEigenDACommitmentErr.StatusCode)
+			},
+		},
+	}
+
+	testCfg := testutils.NewTestConfig(
+		testutils.GetBackend(),
+		common.V2EigenDABackend,
+		[]common.EigenDABackend{common.V2EigenDABackend})
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	t.Cleanup(kill)
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			t.Log("Running test: ", tt.name)
+			serializedCert, err := tt.certCreationFn()
+			require.NoError(t, err)
+
+			altdaCommitment, err := commitments.EncodeCommitment(
+				certs.NewVersionedCert(serializedCert, certs.V2VersionByte),
+				commitments.OptimismGenericCommitmentMode)
+			require.NoError(t, err)
+			// the op client expects a typed commitment, so we have to decode the altdaCommitment
+			commitmentData, err := altda.DecodeCommitmentData(altdaCommitment)
+			require.NoError(t, err)
+
+			daClient := altda.NewDAClient(ts.Address(), false, false)
+			_, err = daClient.GetInput(ts.Ctx, commitmentData, 0)
+
+			tt.requireErrorFn(t, err)
+		})
+	}
+
+}
+
+func TestOPContractTestBlobDecodingErrors(t *testing.T) {
+	// Writing this test is a lot more involved... because we need to populate mock relay backends
+	// that would return a blob that doesn't decode properly.
+	// Probably will require adding this after we've created a better test suite framework for the eigenda clients.
+	t.Skip("TODO: implement blob decoding errors test")
+}
