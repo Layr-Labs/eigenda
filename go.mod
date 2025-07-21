@@ -20,7 +20,9 @@ replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v
 replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101503.2-rc.5
 
 require (
-	github.com/Layr-Labs/eigenda/api/proxy/clients v1.0.1
+	// TODO: update this to correct version after we've tested that it works
+	// should we use 0.2.1 which is the current eigenda-proxy/clients module version?
+	github.com/Layr-Labs/eigenda/api/proxy/clients v0.1.0
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
 	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28
 	github.com/avast/retry-go/v4 v4.6.0
