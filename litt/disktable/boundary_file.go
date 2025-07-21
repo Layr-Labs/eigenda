@@ -16,9 +16,19 @@ const LowerBoundFileName = "lower-bound.txt"
 // The name of the file that defines the upper bound of a LittDB snapshot directory.
 const UpperBoundFileName = "upper-bound.txt"
 
+// BoundaryType is an enum that describes the type of boundary file.
+type BoundaryType bool
+
+const (
+	// A boundary file that defines the lowest valid segment index in a snapshot directory.
+	LowerBound BoundaryType = true
+	// A boundary file that defines the highest valid segment index in a snapshot directory.
+	UpperBound BoundaryType = false
+)
+
 type BoundaryFile struct {
-	// If true, then this represents a lower bound file. If false, then it represents an upper bound file.
-	lower bool
+	// The type of this boundary file.
+	boundaryType BoundaryType
 
 	// The parent directory where this file is stored.
 	parentDirectory string
@@ -27,15 +37,19 @@ type BoundaryFile struct {
 	// If undefined, the boundary index should be considered invalid.
 	defined bool
 
-	// The index of the boundary. Describes a lower/upper segment index.
+	// The segment index of the boundary. Describes a lower/upper segment index. If this is a lower bound file,
+	// it describes the lowest segment index that is valid within the snapshot directory (inclusive). If this is
+	// an upper bound file, it describes the highest segment index that is valid within the snapshot directory
+	// (also inclusive).
 	boundaryIndex uint32
 }
 
 // LoadBoundaryFile loads a boundary file from the specified parent directory. If the boundary file does not exist,
-// then this method returns nil.
-func LoadBoundaryFile(lower bool, parentDirectory string) (*BoundaryFile, error) {
+// then this method returns an object that can be used to create a new boundary file at the specified path (i.e. by
+// calling Write() or Update()).
+func LoadBoundaryFile(boundaryType BoundaryType, parentDirectory string) (*BoundaryFile, error) {
 	boundary := &BoundaryFile{
-		lower:           lower,
+		boundaryType:    boundaryType,
 		parentDirectory: parentDirectory,
 	}
 
@@ -68,6 +82,11 @@ func (b *BoundaryFile) Update(newBoundary uint32) error {
 		return nil
 	}
 
+	if newBoundary < b.boundaryIndex {
+		return fmt.Errorf("boundary index may only increase, cannot set to %d (current: %d)",
+			newBoundary, b.boundaryIndex)
+	}
+
 	b.defined = true
 	b.boundaryIndex = newBoundary
 	err := b.Write()
@@ -83,7 +102,7 @@ func (b *BoundaryFile) Name() string {
 		return ""
 	}
 
-	if b.lower {
+	if b.boundaryType == LowerBound {
 		return LowerBoundFileName
 	}
 	return UpperBoundFileName

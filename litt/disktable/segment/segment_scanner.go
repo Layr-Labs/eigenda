@@ -297,6 +297,7 @@ func GatherSegmentFiles(
 	logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	segmentPaths []*SegmentPath,
+	snapshottingEnabled bool,
 	now time.Time,
 	cleanOrphans bool,
 	fsync bool,
@@ -356,7 +357,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := LoadSegment(logger, errorMonitor, i, segmentPaths, now, fsync)
+			segment, err := LoadSegment(logger, errorMonitor, i, segmentPaths, snapshottingEnabled, now, fsync)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

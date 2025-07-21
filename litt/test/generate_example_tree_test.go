@@ -69,7 +69,9 @@ func TestGenerateExampleTree(t *testing.T) {
 
 	// Simulate a lower bound files. This normally only gets generated when there is GC done externally.
 	for _, tableName := range []string{"tableA", "tableB", "tableC"} {
-		lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(testDir, "rolling_snapshot", tableName))
+		lowerBoundFile, err := disktable.LoadBoundaryFile(
+			disktable.LowerBound,
+			path.Join(testDir, "rolling_snapshot", tableName))
 		require.NoError(t, err)
 		err = lowerBoundFile.Update(0)
 		require.NoError(t, err)

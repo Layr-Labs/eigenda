@@ -76,6 +76,9 @@ type controlLoop struct {
 	// The locations where segment files are stored.
 	segmentPaths []*segment.SegmentPath
 
+	// Controls if snapshotting is enabled or not.
+	snapshottingEnabled bool
+
 	// The table's metadata.
 	metadata *tableMetadata
 
@@ -322,6 +325,7 @@ func (c *controlLoop) expandSegments() error {
 		c.errorMonitor,
 		c.highestSegmentIndex+1,
 		c.segmentPaths,
+		c.snapshottingEnabled,
 		c.metadata.GetShardingFactor(),
 		salt,
 		c.fsync)

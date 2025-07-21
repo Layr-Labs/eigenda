@@ -100,6 +100,7 @@ func CreateSegment(
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
 	segmentPaths []*SegmentPath,
+	snapshottingEnabled bool,
 	shardingFactor uint32,
 	salt [16]byte,
 	fsync bool) (*Segment, error) {
@@ -107,7 +108,6 @@ func CreateSegment(
 	if len(segmentPaths) == 0 {
 		return nil, errors.New("no segment paths provided")
 	}
-	snapshottingEnabled := segmentPaths[0].SnapshottingEnabled()
 
 	metadata, err := createMetadataFile(index, shardingFactor, salt, segmentPaths[0], fsync)
 	if err != nil {
@@ -183,6 +183,7 @@ func LoadSegment(logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
 	segmentPaths []*SegmentPath,
+	snapshottingEnabled bool,
 	now time.Time,
 	fsync bool,
 ) (*Segment, error) {
@@ -190,7 +191,6 @@ func LoadSegment(logger logging.Logger,
 	if len(segmentPaths) == 0 {
 		return nil, errors.New("no segment paths provided")
 	}
-	snapshottingEnabled := segmentPaths[0].SnapshottingEnabled()
 
 	// Look for the metadata file.
 	metadata, err := loadMetadataFile(index, segmentPaths, fsync)
@@ -535,7 +535,8 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	}, nil
 }
 
-// Snapshot takes a snapshot of the files in the segment.
+// Snapshot takes a snapshot of the files in the segment if snapshotting is enabled. If snapshotting is not enabled,
+// then this method is a no-op.
 func (s *Segment) Snapshot() error {
 	if !s.snapshottingEnabled {
 		return nil

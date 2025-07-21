@@ -15,7 +15,7 @@ import (
 const SegmentDirectory = "segments"
 
 // The name of the directory where hard links to segment files are stored for snapshotting (if enabled).
-// The hard link directory is created at "$STORAGE_PATH/$TABLE_NAME/Snapshot".
+// The hard link directory is created at "$STORAGE_PATH/$TABLE_NAME/snapshot".
 const HardLinkDirectory = "snapshot"
 
 // SegmentPath encapsulates various file paths utilized by segment files.
@@ -35,7 +35,8 @@ type SegmentPath struct {
 // The storageRoot is a location where LittDB is storing data, i.e. one of the paths from Litt.Config.Paths.
 //
 // softlinkRoot will be an empty string if snapshotting is not enabled, or a path to the root directory where
-// Snapshot soft links will be created.
+// Snapshot soft links will be created. The presence (or absence) of this path is used by LittDB to
+// determine if snapshotting is enabled.
 //
 // The tableName is the name of the table that owns the segment file.
 func NewSegmentPath(
@@ -48,14 +49,18 @@ func NewSegmentPath(
 		return nil, fmt.Errorf("storage path cannot be empty")
 	}
 
+	segmentDirectory := path.Join(storageRoot, tableName, SegmentDirectory)
+
 	softlinkPath := ""
+	hardLinkPath := ""
 	if softlinkRoot != "" {
 		softlinkPath = path.Join(softlinkRoot, tableName, SegmentDirectory)
+		hardLinkPath = path.Join(storageRoot, tableName, HardLinkDirectory)
 	}
 
 	return &SegmentPath{
-		segmentDirectory: path.Join(storageRoot, tableName, SegmentDirectory),
-		hardlinkPath:     path.Join(storageRoot, tableName, HardLinkDirectory),
+		segmentDirectory: segmentDirectory,
+		hardlinkPath:     hardLinkPath,
 		softlinkPath:     softlinkPath,
 	}, nil
 }
@@ -92,8 +97,8 @@ func (p *SegmentPath) SoftlinkPath() string {
 	return p.softlinkPath
 }
 
-// SnapshottingEnabled checks if snapshotting is enabled.
-func (p *SegmentPath) SnapshottingEnabled() bool {
+// snapshottingEnabled checks if snapshotting is enabled.
+func (p *SegmentPath) snapshottingEnabled() bool {
 	return p.softlinkPath != ""
 }
 
@@ -104,7 +109,7 @@ func (p *SegmentPath) MakeDirectories(fsync bool) error {
 		return fmt.Errorf("failed to ensure segment directory exists: %w", err)
 	}
 
-	if p.SnapshottingEnabled() {
+	if p.snapshottingEnabled() {
 		err = util.EnsureDirectoryExists(p.hardlinkPath, fsync)
 		if err != nil {
 			return fmt.Errorf("failed to ensure hard link directory exists: %w", err)
@@ -123,7 +128,7 @@ func (p *SegmentPath) MakeDirectories(fsync bool) error {
 // directory. The fileName should just be the name of the file, not its full path. The file is expected to be in the
 // segmentDirectory.
 func (p *SegmentPath) Snapshot(fileName string) error {
-	if !p.SnapshottingEnabled() {
+	if !p.snapshottingEnabled() {
 		return fmt.Errorf("snapshotting is not enabled, cannot Snapshot file %s", fileName)
 	}
 

@@ -370,31 +370,12 @@ func (m *metadataFile) snapshot() error {
 	return nil
 }
 
-// delete deletes the metadata file from disk.
+// delete deletes the metadata file from disk. If the file is a snapshot (i.e., a symlink), this method will also
+// delete the actual file that the symlink points to.
 func (m *metadataFile) delete() error {
-	filePath := m.path()
-
-	fileInfo, err := os.Lstat(filePath)
+	err := util.DeepDelete(m.path())
 	if err != nil {
-		return fmt.Errorf("failed to call lstat for %s: %v", filePath, err)
+		return fmt.Errorf("failed to delete metadata file %s: %w", m.path(), err)
 	}
-	isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
-
-	if isSymlink {
-		// remove the file where the symlink points
-		actualFile, err := os.Readlink(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read symlink %s: %v", filePath, err)
-		}
-		if err := os.Remove(actualFile); err != nil {
-			return fmt.Errorf("failed to remove actual file %s: %v", actualFile, err)
-		}
-	}
-
-	err = os.Remove(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to remove file %s: %v", filePath, err)
-	}
-
 	return nil
 }

@@ -187,12 +187,15 @@ func NewDiskTable(
 		fsync:          config.Fsync,
 	}
 
+	snapshottingEnabled := config.SnapshotDirectory != ""
+
 	// Load segments.
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
 			errorMonitor,
 			table.segmentPaths,
+			snapshottingEnabled,
 			config.Clock(),
 			true,
 			config.Fsync)
@@ -225,11 +228,13 @@ func NewDiskTable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to read salt: %w", err)
 	}
+
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		errorMonitor,
 		nextSegmentIndex,
 		segmentPaths,
+		snapshottingEnabled,
 		metadata.GetShardingFactor(),
 		salt,
 		config.Fsync)
@@ -295,6 +300,7 @@ func NewDiskTable(
 		maxKeyCount:             config.MaxSegmentKeyCount,
 		clock:                   config.Clock,
 		segmentPaths:            segmentPaths,
+		snapshottingEnabled:     snapshottingEnabled,
 		saltShaker:              tableSaltShaker,
 		metadata:                metadata,
 		fsync:                   config.Fsync,
@@ -324,7 +330,8 @@ func (d *DiskTable) Size() uint64 {
 
 // repairSnapshot is responsible for making any required repairs to the snapshot directories. This is needed
 // if there is a crash, resulting in a segment not being fully snapshotted. It is also needed if LittDB has
-// been rebased (which breaks symlinks) or manually modified (e.g. by the LittDB cli).
+// been rebased (which breaks symlinks) or manually modified (e.g. by the LittDB cli). Returns the new upper bound
+// file for the repaired snapshot.
 func (d *DiskTable) repairSnapshot(
 	symlinkDirectory string,
 	lowestSegmentIndex uint32,
@@ -338,7 +345,7 @@ func (d *DiskTable) repairSnapshot(
 		return nil, fmt.Errorf("failed to ensure symlink table directory exists: %w", err)
 	}
 
-	upperBoundSnapshotFile, err := LoadBoundaryFile(false, symlinkTableDirectory)
+	upperBoundSnapshotFile, err := LoadBoundaryFile(UpperBound, symlinkTableDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
 	}
@@ -376,7 +383,7 @@ func (d *DiskTable) repairSnapshot(
 		return upperBoundSnapshotFile, nil
 	}
 
-	lowerBoundSnapshotFile, err := LoadBoundaryFile(true, symlinkTableDirectory)
+	lowerBoundSnapshotFile, err := LoadBoundaryFile(LowerBound, symlinkTableDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
 	}
