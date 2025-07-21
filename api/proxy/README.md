@@ -12,7 +12,7 @@ A basic REST proxy server to interact with the EigenDA network:
 [![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
 
 
-[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda-proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
+[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
 
 ## Overview
 
