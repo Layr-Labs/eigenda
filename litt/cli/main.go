@@ -15,7 +15,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = buildCLIParser().Run(os.Args)
+	err = buildCLIParser(logger).Run(os.Args)
 	if err != nil {
 		logger.Errorf("Execution failed: %v\n", err)
 		os.Exit(1)
