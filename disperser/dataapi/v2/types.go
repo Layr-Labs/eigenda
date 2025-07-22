@@ -239,9 +239,8 @@ func createBlobMetadata(bm *disperserv2.BlobMetadata) *BlobMetadata {
 // Account types
 type (
 	AccountResponse struct {
-		AccountID      string `json:"account_id"`
-		Address        string `json:"address"`
-		LastActivityAt string `json:"last_activity_at"` // RFC3339 format
+		Address     string `json:"address"`
+		DispersedAt string `json:"dispersed_at"` // RFC3339 format
 	}
 
 	AccountFeedResponse struct {

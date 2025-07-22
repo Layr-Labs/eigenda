@@ -61,14 +61,14 @@ const (
 	maxOperatorsStakeAge    = 300 // not expect the stake changes frequently
 	maxOperatorPortCheckAge = 60  // not expect validator port changes frequently, but it's consequential to have right port
 
-	// Live content
+	// Live content - used to set max-age (seconds) in cache-control header
 	maxMetricAge        = 5
 	maxThroughputAge    = 5
 	maxBlobFeedAge      = 5
 	maxBatchFeedAge     = 5
 	maxDispersalFeedAge = 5
 	maxSigningInfoAge   = 5
-	maxAccountAge       = 300 // 5 minutes
+	maxAccountAge       = 5
 )
 
 type (

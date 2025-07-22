@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -109,7 +110,7 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 //	@Summary	Fetch accounts within a time window (sorted by latest timestamp)
 //	@Tags		Accounts
 //	@Produce	json
-//	@Param		lookback_hours	query		int	false	"Number of hours to look back [default: 24; max: 168 (7 days)]"
+//	@Param		lookback_hours	query		int	false	"Number of hours to look back [default: 24; max: 24000 (1000 days)]"
 //	@Success	200				{object}	AccountFeedResponse
 //	@Failure	400				{object}	ErrorResponse	"error: Bad request"
 //	@Failure	500				{object}	ErrorResponse	"error: Server error"
@@ -127,8 +128,8 @@ func (s *ServerV2) FetchAccountFeed(c *gin.Context) {
 			invalidParamsErrorResponse(c, fmt.Errorf("invalid lookback_hours parameter: %w", err))
 			return
 		}
-		if parsedHours > 168 { // max 7 days
-			lookbackHours = 168
+		if parsedHours > 24000 { // max 1000 days
+			lookbackHours = 24000
 		} else if parsedHours > 0 {
 			lookbackHours = parsedHours
 		}
@@ -159,10 +160,17 @@ func (s *ServerV2) FetchAccountFeed(c *gin.Context) {
 	// Convert to API response format
 	accountResponses := make([]AccountResponse, len(accounts))
 	for i, account := range accounts {
+		// Safely convert uint64 to int64 with bounds checking
+		var timestamp int64
+		if account.UpdatedAt > math.MaxInt64 {
+			timestamp = 0
+		} else {
+			timestamp = int64(account.UpdatedAt)
+		}
+
 		accountResponses[i] = AccountResponse{
-			AccountID:      account.Address.Hex(),
-			Address:        account.Address.Hex(),
-			LastActivityAt: time.Unix(int64(account.UpdatedAt), 0).UTC().Format(time.RFC3339),
+			Address:     account.Address.Hex(),
+			DispersedAt: time.Unix(timestamp, 0).UTC().Format(time.RFC3339),
 		}
 	}
 
