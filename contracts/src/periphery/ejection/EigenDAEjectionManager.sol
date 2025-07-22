@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
 import {EigenDAEjectionLib, EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
@@ -33,6 +34,14 @@ contract EigenDAEjectionManager {
         _depositAmount = depositAmount_;
         _registryCoordinator = registryCoordinator_;
         _signatureVerifier = signatureVerifier_;
+    }
+
+    function initialize(
+        uint64 delay,
+        uint64 cooldown
+    ) external {
+        InitializableLib.setInitializedVersion(1);
+        EigenDAEjectionLib.initialize(delay, cooldown);
     }
 
     modifier onlyWatcher(address sender) {
@@ -132,19 +141,23 @@ contract EigenDAEjectionManager {
     }
 
     function ejectionTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().proceedingParams[operator].proceedingTime;
+        return EigenDAEjectionLib.ejectionParams(operator).proceedingTime;
     }
 
     function lastEjectionInitiated(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().proceedingParams[operator].lastProceedingInitiated;
+        return EigenDAEjectionLib.ejectionParams(operator).lastProceedingInitiated;
+    }
+
+    function ejectionQuorums(address operator) external view returns (bytes memory) {
+        return EigenDAEjectionLib.ejectionParams(operator).quorums;
     }
 
     function ejectionDelay() external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().delay;
+        return EigenDAEjectionLib.delay();
     }
 
     function ejectionCooldown() external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionStorage().cooldown;
+        return EigenDAEjectionLib.cooldown();
     }
 
     /// INTERNAL FUNCTIONS
@@ -199,7 +212,7 @@ contract EigenDAEjectionManager {
     function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
-                CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionStorage().proceedingParams[operator], recipient
+                CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionParams(operator), recipient
             )
         );
     }
@@ -214,5 +227,9 @@ contract EigenDAEjectionManager {
             BLSSignatureChecker(_signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
         require(valid, "EigenDAEjectionManager: Invalid signature");
+    }
+
+    function getInitializedVersion() external view returns (uint8) {
+        return InitializableLib.getInitializedVersion();
     }
 }
