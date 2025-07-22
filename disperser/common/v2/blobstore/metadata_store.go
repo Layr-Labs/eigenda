@@ -133,6 +133,10 @@ type MetadataStore interface {
 	// Combined Operations
 	// These methods provide convenient access to related data in a single call
 	GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error)
+
+	// Account Index Operations
+	// These methods manage account activity tracking
+	UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error
 }
 
 // Equal returns true if the cursor is equal to the given <requestedAt, blobKey>

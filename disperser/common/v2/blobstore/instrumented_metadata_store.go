@@ -205,6 +205,14 @@ func (m *InstrumentedMetadataStore) GetBlobMetadataByAccountID(
 	return metadata, err
 }
 
+func (m *InstrumentedMetadataStore) UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	defer m.trackInFlight("UpdateAccountIndex")()
+	startTime := time.Now()
+	err := m.metadataStore.UpdateAccountIndex(ctx, accountID, timestamp)
+	m.recordMetrics("UpdateAccountIndex", startTime, err)
+	return err
+}
+
 func (m *InstrumentedMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
 	defer m.trackInFlight("GetBlobMetadataByStatus")()
 	start := time.Now()

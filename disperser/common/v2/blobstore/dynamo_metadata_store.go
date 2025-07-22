@@ -44,6 +44,10 @@ const (
 	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
 
+	// AccountIndex constants
+	accountIndexPK     = "AccountIndex"
+	accountIndexPrefix = "AccountID#"
+
 	// The number of nanoseconds for a requestedAt bucket (1h).
 	// The rationales are:
 	// - 1h would be a good estimate for blob feed request (e.g. fetch blobs in past hour can be a common use case)
@@ -474,6 +478,27 @@ func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
 	}
 
 	return blobs, nil
+}
+
+// UpdateAccountIndex updates the AccountIndex partition to track account activity.
+// This method performs an upsert operation, creating or updating an entry for the given account
+// with the current timestamp.
+func (s *BlobMetadataStore) UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	s.logger.Debug("updating account index", "accountID", accountID.Hex(), "timestamp", timestamp)
+
+	item := commondynamodb.Item{
+		"PK":        &types.AttributeValueMemberS{Value: accountIndexPK},
+		"SK":        &types.AttributeValueMemberS{Value: accountIndexPrefix + accountID.Hex()},
+		"Address":   &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"UpdatedAt": &types.AttributeValueMemberN{Value: strconv.FormatUint(timestamp, 10)},
+	}
+
+	err := s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	if err != nil {
+		return fmt.Errorf("failed to update account index for accountID %s: %w", accountID.Hex(), err)
+	}
+
+	return nil
 }
 
 // queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
