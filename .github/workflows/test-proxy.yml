@@ -2,14 +2,10 @@ name: test-proxy # this name appears in the badge on the README
 
 on:
   push:
-    branches: ["master"]
-    paths:
-      - "api/proxy/**"
-      - ".github/workflows/per-pr-proxy.yml"
+    branches: 
+      - master
   pull_request:
-    paths:
-      - "api/proxy/**"
-      - ".github/workflows/per-pr-proxy.yml"
+  merge_group:
 
 env:
   MISE_VERSION: 2024.12.14
