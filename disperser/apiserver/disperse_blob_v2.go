@@ -34,13 +34,6 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
-	// Update AccountIndex after successful validation
-	accountID := blobHeader.PaymentMetadata.AccountID
-	timestamp := uint64(time.Now().Unix())
-	if err := s.blobMetadataStore.UpdateAccountIndex(ctx, accountID, timestamp); err != nil {
-		s.logger.Warn("failed to update account index", "accountID", accountID.Hex(), "error", err)
-	}
-
 	if err := s.checkBlobExistence(ctx, blobHeader); err != nil {
 		return nil, err
 	}
@@ -62,6 +55,15 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
+
+	// Update AccountIndex asynchronously after successful blob storage
+	go func() {
+		accountID := blobHeader.PaymentMetadata.AccountID
+		timestamp := uint64(time.Now().Unix())
+		if err := s.blobMetadataStore.UpdateAccountIndex(context.Background(), accountID, timestamp); err != nil {
+			s.logger.Warn("failed to update account index", "accountID", accountID.Hex(), "error", err)
+		}
+	}()
 
 	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
