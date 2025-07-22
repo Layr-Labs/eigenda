@@ -487,11 +487,10 @@ func (s *BlobMetadataStore) UpdateAccount(ctx context.Context, accountID gethcom
 	s.logger.Debug("updating account", "accountID", accountID.Hex(), "timestamp", timestamp)
 
 	item := commondynamodb.Item{
-		"PK":          &types.AttributeValueMemberS{Value: accountPK},
-		"SK":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"Address":     &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"UpdatedAt":   &types.AttributeValueMemberN{Value: strconv.FormatUint(timestamp, 10)},
-		"AccountType": &types.AttributeValueMemberS{Value: accountIndexPK},
+		"PK":           &types.AttributeValueMemberS{Value: accountPK},
+		"SK":           &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"UpdatedAt":    &types.AttributeValueMemberN{Value: strconv.FormatUint(timestamp, 10)},
+		"AccountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
 	}
 
 	err := s.dynamoDBClient.PutItem(ctx, s.tableName, item)
@@ -511,16 +510,16 @@ func (s *BlobMetadataStore) GetAccounts(ctx context.Context, lookbackSeconds uin
 	cutoffTime := now - lookbackSeconds
 
 	// Query the AccountUpdatedAtIndex GSI with time filter
-	// All account records have AccountType = "AccountIndex" which allows us to query
+	// All account records have AccountIndex = "AccountIndex" which allows us to query
 	// all accounts after the cutoff time efficiently
 	items, err := s.dynamoDBClient.QueryIndex(
 		ctx,
 		s.tableName,
 		AccountUpdatedAtIndexName,
-		"AccountType = :accountType AND UpdatedAt > :cutoff",
+		"AccountIndex = :accountIndex AND UpdatedAt > :cutoff",
 		commondynamodb.ExpressionValues{
-			":accountType": &types.AttributeValueMemberS{Value: accountIndexPK},
-			":cutoff":      &types.AttributeValueMemberN{Value: strconv.FormatUint(cutoffTime, 10)},
+			":accountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
+			":cutoff":       &types.AttributeValueMemberN{Value: strconv.FormatUint(cutoffTime, 10)},
 		},
 	)
 	if err != nil {
@@ -1457,7 +1456,7 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
-				AttributeName: aws.String("AccountType"),
+				AttributeName: aws.String("AccountIndex"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 		},
@@ -1597,7 +1596,7 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				IndexName: aws.String(AccountUpdatedAtIndexName),
 				KeySchema: []types.KeySchemaElement{
 					{
-						AttributeName: aws.String("AccountType"),
+						AttributeName: aws.String("AccountIndex"),
 						KeyType:       types.KeyTypeHash,
 					},
 					{
