@@ -8,7 +8,7 @@ import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IService
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {ISocketRegistry} from "lib/eigenlayer-middleware/src/interfaces/ISocketRegistry.sol";
 
-abstract contract RegistryCoordinatorStorage is IRegistryCoordinator {
+abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
     /**
      *
      *                            CONSTANTS AND IMMUTABLES

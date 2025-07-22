@@ -6,7 +6,7 @@ import {PauserRegistry} from
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
-import {RegistryCoordinator} from "src/core/RegistryCoordinator.sol";
+import {EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {OperatorStateRetriever} from "../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
@@ -63,7 +63,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDACertVerifierV2 public legacyEigenDACertVerifier;
     EigenDACertVerifier public eigenDACertVerifier;
     EigenDACertVerifierRouter public eigenDACertVerifierRouter;
-    RegistryCoordinator public registryCoordinator;
+    EigenDARegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
     ISocketRegistry public socketRegistry;
@@ -186,7 +186,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME, address(eigenDACertVerifierRouter)
         );
 
-        registryCoordinator = RegistryCoordinator(
+        registryCoordinator = EigenDARegistryCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
         eigenDADirectory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(registryCoordinator));
@@ -270,7 +270,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(socketRegistry))), address(socketRegistryImplementation)
         );
 
-        registryCoordinatorImplementation = new RegistryCoordinator(
+        registryCoordinatorImplementation = new EigenDARegistryCoordinator(
             IServiceManager(address(eigenDAServiceManager)), stakeRegistry, apkRegistry, indexRegistry, socketRegistry
         );
 
@@ -301,7 +301,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 TransparentUpgradeableProxy(payable(address(registryCoordinator))),
                 address(registryCoordinatorImplementation),
                 abi.encodeWithSelector(
-                    RegistryCoordinator.initialize.selector,
+                    EigenDARegistryCoordinator.initialize.selector,
                     addressConfig.eigenDACommunityMultisig,
                     addressConfig.churner,
                     addressConfig.ejector,

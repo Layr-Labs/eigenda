@@ -29,7 +29,7 @@ import {RegistryCoordinatorStorage} from "lib/eigenlayer-middleware/src/Registry
  *
  * @author Layr Labs, Inc.
  */
-contract RegistryCoordinator is
+contract EigenDARegistryCoordinator is
     EIP712,
     Initializable,
     Pausable,

@@ -5,7 +5,7 @@ import {PauserRegistry} from
     "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
-import {RegistryCoordinator} from "src/core/RegistryCoordinator.sol";
+import {EigenDARegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
