@@ -3,6 +3,7 @@ name: PR Title Linting
 on:
   pull_request:
     types: [opened, edited, synchronize]
+  merge_group:
 
 jobs:
   lint-pr-title:
