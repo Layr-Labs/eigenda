@@ -352,5 +352,7 @@ target "nodeplugin-release" {
 
 target "proxy-release" {
   inherits = ["proxy", "_release"]
+  # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
+  # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
   tags     = ["${REGISTRY}/eigenda-proxy:${BUILD_TAG}"]
 }
