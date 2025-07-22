@@ -2,20 +2,23 @@ use ark_bn254::{Fq, G1Affine};
 use ark_ec::AffineRepr;
 use ark_ff::{BigInt, Field, MontFp, PrimeField};
 
-use crate::hash::{self, BeHash};
+use crate::{
+    error::CertVerificationError::{self, *},
+    hash::{self, BeHash},
+};
 
 const ONE: Fq = MontFp!("1");
 const THREE: Fq = MontFp!("3");
 
-pub fn point_to_hash(point: &G1Affine) -> Option<BeHash> {
-    point.xy().map(|(x, y)| {
-        let x_bytes = fq_to_bytes_be(&x);
-        let y_bytes = fq_to_bytes_be(&y);
-        hash::keccak256(&[&x_bytes, &y_bytes])
-    })
+pub fn point_to_hash(point: G1Affine) -> Result<BeHash, CertVerificationError> {
+    let (x, y) = point.xy().ok_or(PointAtInfinity)?;
+    let x_bytes = fq_to_bytes_be(x);
+    let y_bytes = fq_to_bytes_be(y);
+    let hash = hash::keccak256(&[&x_bytes, &y_bytes]);
+    Ok(hash)
 }
 
-pub fn hash_to_point<'a>(hash: &BeHash) -> G1Affine {
+pub fn hash_to_point(hash: BeHash) -> G1Affine {
     let x = hash_to_big_int(hash);
     let mut x = Fq::from(x);
     // Won't overflow the stack because:
@@ -34,7 +37,7 @@ pub fn hash_to_point<'a>(hash: &BeHash) -> G1Affine {
     }
 }
 
-pub fn hash_to_big_int(hash: &BeHash) -> BigInt<4> {
+fn hash_to_big_int(hash: BeHash) -> BigInt<4> {
     let mut limbs = [0u64; 4];
 
     for (i, chunk) in hash.chunks_exact(8).enumerate() {
@@ -46,11 +49,11 @@ pub fn hash_to_big_int(hash: &BeHash) -> BigInt<4> {
     BigInt::new(limbs)
 }
 
-pub fn fq_to_bytes_be(fq: &Fq) -> [u8; 32] {
+pub fn fq_to_bytes_be(fq: Fq) -> [u8; 32] {
     let fq = fq.into_bigint();
     let mut bytes_be = [0u8; 32];
     // .rev() to make it big-endian
-    for (i, limb) in fq.0.iter().rev().enumerate() {
+    for (i, limb) in fq.0.into_iter().rev().enumerate() {
         bytes_be[i * 8..(i + 1) * 8].copy_from_slice(&limb.to_be_bytes());
     }
     bytes_be
@@ -61,15 +64,22 @@ mod tests {
     use ark_bn254::G1Affine;
     use ark_ec::AffineRepr;
 
-    use crate::convert;
+    use crate::{convert, error::CertVerificationError};
 
     #[test]
     fn convert_point_to_hash() {
         let point = G1Affine::generator();
-        let actual = convert::point_to_hash(&point).unwrap();
+        let actual = convert::point_to_hash(point).unwrap();
         let actual = hex::encode(actual);
-        let generated_from_js = "e90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0";
+        let expected = "e90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0";
 
-        assert_eq!(actual, generated_from_js);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn convert_infinity_to_hash() {
+        let point = G1Affine::identity();
+        let actual = convert::point_to_hash(point).unwrap_err();
+        assert_eq!(actual, CertVerificationError::PointAtInfinity);
     }
 }
