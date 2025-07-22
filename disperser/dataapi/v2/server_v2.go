@@ -68,6 +68,7 @@ const (
 	maxBatchFeedAge     = 5
 	maxDispersalFeedAge = 5
 	maxSigningInfoAge   = 5
+	maxAccountAge       = 300 // 5 minutes
 )
 
 type (
@@ -104,6 +105,9 @@ type ServerV2 struct {
 
 	// KV caches for batches, keyed by batch header hash
 	batchResponseCache *lru.Cache[string, *BatchResponse]
+
+	// Account cache
+	accountCache *lru.Cache[string, *AccountFeedResponse]
 }
 
 func NewServerV2(
@@ -161,6 +165,11 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
 
+	accountCache, err := lru.New[string, *AccountFeedResponse](100) // Cache up to 100 different limit combinations
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accountCache: %w", err)
+	}
+
 	operatorHandler, err := dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
@@ -186,6 +195,7 @@ func NewServerV2(
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
+		accountCache:                     accountCache,
 	}, nil
 }
 
@@ -241,6 +251,7 @@ func (s *ServerV2) Start() error {
 		accounts := v2.Group("/accounts")
 		{
 			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+			accounts.GET("", s.FetchAccountFeed)
 		}
 		operators := v2.Group("/operators")
 		{

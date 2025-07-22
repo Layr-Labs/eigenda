@@ -135,8 +135,9 @@ type MetadataStore interface {
 	GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error)
 
 	// Account Index Operations
-	// These methods manage account activity tracking
+	// These methods manage account tracking
 	UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error
+	GetAccounts(ctx context.Context, lookbackSeconds uint64) ([]*v2.Account, error)
 }
 
 // Equal returns true if the cursor is equal to the given <requestedAt, blobKey>

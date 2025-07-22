@@ -6,6 +6,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type BlobStatus uint
@@ -97,4 +98,10 @@ type BlobMetadata struct {
 type BlobAttestationInfo struct {
 	InclusionInfo *corev2.BlobInclusionInfo
 	Attestation   *corev2.Attestation
+}
+
+// Account represents account information from the AccountIndex
+type Account struct {
+	Address   gethcommon.Address `json:"address"`
+	UpdatedAt uint64             `json:"updated_at"` // unix timestamp in seconds
 }

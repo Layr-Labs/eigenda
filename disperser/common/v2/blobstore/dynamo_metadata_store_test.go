@@ -2226,3 +2226,20 @@ func TestBlobMetadataStoreUpdateAccountIndex(t *testing.T) {
 	err = blobMetadataStore.UpdateAccountIndex(ctx, accountID2, timestamp)
 	require.NoError(t, err)
 }
+
+func TestBlobMetadataStoreGetAccounts(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with 1-hour lookback
+	lookbackSeconds := uint64(3600) // 1 hour
+
+	// Should not return an error even if no results
+	accounts, err := blobMetadataStore.GetAccounts(ctx, lookbackSeconds)
+	require.NoError(t, err)
+	assert.NotNil(t, accounts)
+
+	// Test with different lookback periods
+	accounts24h, err := blobMetadataStore.GetAccounts(ctx, 24*3600) // 24 hours
+	require.NoError(t, err)
+	assert.NotNil(t, accounts24h)
+}

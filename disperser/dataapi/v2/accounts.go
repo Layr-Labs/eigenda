@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -100,5 +101,80 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchAccountBlobFeed")
 	s.metrics.ObserveLatency("FetchAccountBlobFeed", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobFeedAge))
+	c.JSON(http.StatusOK, response)
+}
+
+// FetchAccountFeed godoc
+//
+//	@Summary	Fetch accounts within a time window (sorted by latest timestamp)
+//	@Tags		Accounts
+//	@Produce	json
+//	@Param		lookback_hours	query		int	false	"Number of hours to look back [default: 24; max: 168 (7 days)]"
+//	@Success	200				{object}	AccountFeedResponse
+//	@Failure	400				{object}	ErrorResponse	"error: Bad request"
+//	@Failure	500				{object}	ErrorResponse	"error: Server error"
+//	@Router		/accounts [get]
+func (s *ServerV2) FetchAccountFeed(c *gin.Context) {
+	handlerStart := time.Now()
+
+	// Parse lookback_hours parameter
+	lookbackHoursStr := c.Query("lookback_hours")
+	lookbackHours := 24 // default to 24 hours
+	if lookbackHoursStr != "" {
+		parsedHours, err := strconv.Atoi(lookbackHoursStr)
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchAccountFeed")
+			invalidParamsErrorResponse(c, fmt.Errorf("invalid lookback_hours parameter: %w", err))
+			return
+		}
+		if parsedHours > 168 { // max 7 days
+			lookbackHours = 168
+		} else if parsedHours > 0 {
+			lookbackHours = parsedHours
+		}
+	}
+
+	lookbackSeconds := uint64(lookbackHours * 3600) // convert hours to seconds
+
+	// Check cache first
+	cacheKey := fmt.Sprintf("account_feed:%d", lookbackHours)
+	if cached, ok := s.accountCache.Get(cacheKey); ok {
+		s.metrics.IncrementCacheHit("FetchAccountFeed")
+		s.metrics.IncrementSuccessfulRequestNum("FetchAccountFeed")
+		s.metrics.ObserveLatency("FetchAccountFeed", time.Since(handlerStart))
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxAccountAge))
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
+	// Query accounts within time window
+	accounts, err := s.blobMetadataStore.GetAccounts(c.Request.Context(), lookbackSeconds)
+	if err != nil {
+		s.logger.Error("failed to fetch accounts", "error", err, "lookbackHours", lookbackHours)
+		s.metrics.IncrementFailedRequestNum("FetchAccountFeed")
+		errorResponse(c, err)
+		return
+	}
+
+	// Convert to API response format
+	accountResponses := make([]AccountResponse, len(accounts))
+	for i, account := range accounts {
+		accountResponses[i] = AccountResponse{
+			AccountID:      account.Address.Hex(),
+			Address:        account.Address.Hex(),
+			LastActivityAt: time.Unix(int64(account.UpdatedAt), 0).UTC().Format(time.RFC3339),
+		}
+	}
+
+	response := &AccountFeedResponse{
+		Accounts: accountResponses,
+	}
+
+	// Cache the response
+	s.accountCache.Add(cacheKey, response)
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchAccountFeed")
+	s.metrics.ObserveLatency("FetchAccountFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxAccountAge))
 	c.JSON(http.StatusOK, response)
 }
