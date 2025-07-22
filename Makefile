@@ -124,7 +124,7 @@ docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake node-group-release ${PUSH_FLAG}
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy ${PUSH_FLAG}
+	docker buildx bake proxy-release ${PUSH_FLAG}
 
 semver:
 	echo "${SEMVER}"
