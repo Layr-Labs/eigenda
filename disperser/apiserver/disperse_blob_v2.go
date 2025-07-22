@@ -60,7 +60,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	go func() {
 		accountID := blobHeader.PaymentMetadata.AccountID
 		timestamp := uint64(time.Now().Unix())
-		if err := s.blobMetadataStore.UpdateAccount(context.Background(), accountID, timestamp); err != nil {
+
+		// Use a timeout context for the async database operation
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.blobMetadataStore.UpdateAccount(ctx, accountID, timestamp); err != nil {
 			s.logger.Warn("failed to update account", "accountID", accountID.Hex(), "error", err)
 		}
 	}()
