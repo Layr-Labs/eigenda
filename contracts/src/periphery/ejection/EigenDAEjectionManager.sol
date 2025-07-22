@@ -36,10 +36,7 @@ contract EigenDAEjectionManager {
         _signatureVerifier = signatureVerifier_;
     }
 
-    function initialize(
-        uint64 delay,
-        uint64 cooldown
-    ) external {
+    function initialize(uint64 delay, uint64 cooldown) external {
         InitializableLib.setInitializedVersion(1);
         EigenDAEjectionLib.initialize(delay, cooldown);
     }
@@ -95,31 +92,6 @@ contract EigenDAEjectionManager {
     function cancelEjection() external {
         msg.sender.cancelEjection();
         _returnDeposit(msg.sender);
-    }
-
-    /// @notice Finds the lowest stake operator via an exhaustive search and eject them.
-    function churn(uint8 quorumId) external {
-        bytes32[] memory operators = IRegistryCoordinator(_registryCoordinator).indexRegistry()
-            .getOperatorListAtBlockNumber(quorumId, uint32(block.number));
-
-        uint96[] memory stakes = new uint96[](operators.length);
-        for (uint256 i; i < operators.length; i++) {
-            stakes[i] = IRegistryCoordinator(_registryCoordinator).stakeRegistry().getStakeAtBlockNumber(
-                operators[i], 0, uint32(block.number)
-            );
-        }
-        bytes32 lowestStakeOperator = operators[0];
-        uint96 lowestStake = stakes[0];
-        for (uint256 i = 1; i < operators.length; i++) {
-            if (stakes[i] < lowestStake) {
-                lowestStake = stakes[i];
-                lowestStakeOperator = operators[i];
-            }
-        }
-        _tryEjectOperator(
-            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().pubkeyHashToOperator(lowestStakeOperator),
-            bytes(abi.encodePacked(quorumId))
-        );
     }
 
     /// GETTERS
@@ -210,11 +182,7 @@ contract EigenDAEjectionManager {
     }
 
     function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionParams(operator), recipient
-            )
-        );
+        return keccak256(abi.encode(CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionParams(operator), recipient));
     }
 
     function _verifySig(

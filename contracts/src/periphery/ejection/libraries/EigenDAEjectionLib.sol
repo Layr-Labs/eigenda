@@ -19,30 +19,20 @@ library EigenDAEjectionLib {
 
     /// @notice Starts an ejection process for an operator.
     function startEjection(address operator, bytes memory quorums) internal {
-        EigenDAEjectionTypes.EjectionParams storage operatorParams =
-            s().ejectionParams[operator];
+        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
 
         require(operatorParams.proceedingTime == 0, "Ejection already in progress");
-        require(
-            operatorParams.lastProceedingInitiated + s().cooldown <= block.timestamp,
-            "Ejection cooldown not met"
-        );
+        require(operatorParams.lastProceedingInitiated + s().cooldown <= block.timestamp, "Ejection cooldown not met");
 
         operatorParams.quorums = quorums;
         operatorParams.proceedingTime = uint64(block.timestamp) + s().delay;
         operatorParams.lastProceedingInitiated = uint64(block.timestamp);
-        emit EjectionStarted(
-            operator,
-            quorums,
-            operatorParams.lastProceedingInitiated,
-            operatorParams.proceedingTime
-        );
+        emit EjectionStarted(operator, quorums, operatorParams.lastProceedingInitiated, operatorParams.proceedingTime);
     }
 
     /// @notice Cancels an ejection process for an operator.
     function cancelEjection(address operator) internal {
-        EigenDAEjectionTypes.EjectionParams storage operatorParams =
-            s().ejectionParams[operator];
+        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
         require(operatorParams.proceedingTime > 0, "No ejection in progress");
 
         operatorParams.quorums = hex"";
@@ -53,8 +43,7 @@ library EigenDAEjectionLib {
     /// @notice Completes an ejection process for an operator.
     function completeEjection(address operator, bytes memory quorums) internal {
         require(quorumsEqual(s().ejectionParams[operator].quorums, quorums), "Quorums do not match");
-        EigenDAEjectionTypes.EjectionParams storage operatorParams =
-            s().ejectionParams[operator];
+        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
         require(operatorParams.proceedingTime > 0, "No proceeding in progress");
 
         require(block.timestamp >= operatorParams.proceedingTime, "Proceeding not yet due");
@@ -74,11 +63,7 @@ library EigenDAEjectionLib {
         return keccak256(quorums1) == keccak256(quorums2);
     }
 
-    function ejectionParams(address operator)
-        internal
-        view
-        returns (EigenDAEjectionTypes.EjectionParams storage)
-    {
+    function ejectionParams(address operator) internal view returns (EigenDAEjectionTypes.EjectionParams storage) {
         return s().ejectionParams[operator];
     }
 
