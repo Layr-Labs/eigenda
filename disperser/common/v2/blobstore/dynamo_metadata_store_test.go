@@ -2205,25 +2205,25 @@ func TestCheckBlobExists(t *testing.T) {
 	require.False(t, exists, "Random blob key should not exist")
 }
 
-func TestBlobMetadataStoreUpdateAccountIndex(t *testing.T) {
+func TestBlobMetadataStoreUpdateAccount(t *testing.T) {
 	ctx := context.Background()
 
 	// Test account
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	timestamp := uint64(time.Now().Unix())
 
-	// Test updating account index - should not return an error
-	err := blobMetadataStore.UpdateAccountIndex(ctx, accountID, timestamp)
+	// Test updating account - should not return an error
+	err := blobMetadataStore.UpdateAccount(ctx, accountID, timestamp)
 	require.NoError(t, err)
 
 	// Test updating the same account with a new timestamp - should not return an error
 	newTimestamp := timestamp + 100
-	err = blobMetadataStore.UpdateAccountIndex(ctx, accountID, newTimestamp)
+	err = blobMetadataStore.UpdateAccount(ctx, accountID, newTimestamp)
 	require.NoError(t, err)
 
 	// Test with different account
 	accountID2 := gethcommon.HexToAddress("0x9876543210987654321098765432109876543210")
-	err = blobMetadataStore.UpdateAccountIndex(ctx, accountID2, timestamp)
+	err = blobMetadataStore.UpdateAccount(ctx, accountID2, timestamp)
 	require.NoError(t, err)
 }
 

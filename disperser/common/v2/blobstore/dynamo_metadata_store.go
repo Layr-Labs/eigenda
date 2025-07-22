@@ -480,11 +480,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
 	return blobs, nil
 }
 
-// UpdateAccountIndex updates the AccountIndex partition to track account activity.
+// UpdateAccount updates the Account partition to track account activity.
 // This method performs an upsert operation, creating or updating an entry for the given account
 // with the current timestamp.
-func (s *BlobMetadataStore) UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
-	s.logger.Debug("updating account index", "accountID", accountID.Hex(), "timestamp", timestamp)
+func (s *BlobMetadataStore) UpdateAccount(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	s.logger.Debug("updating account", "accountID", accountID.Hex(), "timestamp", timestamp)
 
 	item := commondynamodb.Item{
 		"PK":          &types.AttributeValueMemberS{Value: accountPK},
@@ -496,7 +496,7 @@ func (s *BlobMetadataStore) UpdateAccountIndex(ctx context.Context, accountID ge
 
 	err := s.dynamoDBClient.PutItem(ctx, s.tableName, item)
 	if err != nil {
-		return fmt.Errorf("failed to update account index for accountID %s: %w", accountID.Hex(), err)
+		return fmt.Errorf("failed to update account for accountID %s: %w", accountID.Hex(), err)
 	}
 
 	return nil
@@ -511,7 +511,7 @@ func (s *BlobMetadataStore) GetAccounts(ctx context.Context, lookbackSeconds uin
 	cutoffTime := now - lookbackSeconds
 
 	// Query the AccountUpdatedAtIndex GSI with time filter
-	// All account records have AccountType = "Account" which allows us to query
+	// All account records have AccountType = "AccountIndex" which allows us to query
 	// all accounts after the cutoff time efficiently
 	items, err := s.dynamoDBClient.QueryIndex(
 		ctx,
@@ -524,7 +524,7 @@ func (s *BlobMetadataStore) GetAccounts(ctx context.Context, lookbackSeconds uin
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query account activity index: %w", err)
+		return nil, fmt.Errorf("failed to query accounts: %w", err)
 	}
 
 	// Convert to Account structs

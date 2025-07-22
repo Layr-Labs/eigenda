@@ -100,7 +100,7 @@ type BlobAttestationInfo struct {
 	Attestation   *corev2.Attestation
 }
 
-// Account represents account information from the AccountIndex
+// Account represents account information from the Account table
 type Account struct {
 	Address   gethcommon.Address `json:"address"`
 	UpdatedAt uint64             `json:"updated_at"` // unix timestamp in seconds

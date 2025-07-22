@@ -134,9 +134,9 @@ type MetadataStore interface {
 	// These methods provide convenient access to related data in a single call
 	GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error)
 
-	// Account Index Operations
+	// Account Operations
 	// These methods manage account tracking
-	UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error
+	UpdateAccount(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error
 	GetAccounts(ctx context.Context, lookbackSeconds uint64) ([]*v2.Account, error)
 }
 

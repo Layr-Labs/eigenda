@@ -205,11 +205,11 @@ func (m *InstrumentedMetadataStore) GetBlobMetadataByAccountID(
 	return metadata, err
 }
 
-func (m *InstrumentedMetadataStore) UpdateAccountIndex(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
-	defer m.trackInFlight("UpdateAccountIndex")()
+func (m *InstrumentedMetadataStore) UpdateAccount(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	defer m.trackInFlight("UpdateAccount")()
 	startTime := time.Now()
-	err := m.metadataStore.UpdateAccountIndex(ctx, accountID, timestamp)
-	m.recordMetrics("UpdateAccountIndex", startTime, err)
+	err := m.metadataStore.UpdateAccount(ctx, accountID, timestamp)
+	m.recordMetrics("UpdateAccount", startTime, err)
 	return err
 }
 

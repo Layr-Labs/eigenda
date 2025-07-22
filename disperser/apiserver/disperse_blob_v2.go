@@ -56,12 +56,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
 
-	// Update AccountIndex asynchronously after successful blob storage
+	// Update Account asynchronously after successful blob storage
 	go func() {
 		accountID := blobHeader.PaymentMetadata.AccountID
 		timestamp := uint64(time.Now().Unix())
-		if err := s.blobMetadataStore.UpdateAccountIndex(context.Background(), accountID, timestamp); err != nil {
-			s.logger.Warn("failed to update account index", "accountID", accountID.Hex(), "error", err)
+		if err := s.blobMetadataStore.UpdateAccount(context.Background(), accountID, timestamp); err != nil {
+			s.logger.Warn("failed to update account", "accountID", accountID.Hex(), "error", err)
 		}
 	}()
 
