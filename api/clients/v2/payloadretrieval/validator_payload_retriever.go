@@ -102,10 +102,9 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.logger.Error(
-				`Commitment verification was successful, but conversion from blob to payload failed!
-					This is likely a problem with the local configuration, but could potentially indicate
-					malicious dispersed data. It should not be possible for a commitment to verify for an
-					invalid blob!`,
+				`Commitment verification was successful, but decoding of blob to payload failed!
+					This client only supports blobs that were encoded using the codec(s) defined in
+					https://github.com/Layr-Labs/eigenda/blob/86e27fa03/api/clients/codecs/blob_codec.go.`,
 				"blobKey", blobKey.Hex(), "quorumID", quorumID, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
