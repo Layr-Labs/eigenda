@@ -190,20 +190,6 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// Create new blacklist store
-	// We disable seeks compaction and enable sync writes to ensure that the blacklist is always up to date.
-	// This is because the blacklist is used to check if a disperser is blacklisted, and if it is, we need to
-	// stop accepting requests from that disperser.
-	blacklistStore, err := NewLevelDBBlacklistStore(
-		config.DbPath+"/blacklist",
-		logger,
-		true, // disable seeks compaction
-		true, // enable sync writes
-		DefaultTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
-	}
-
 	// If EigenDADirectory is provided, use it to get service manager addresses
 	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
@@ -268,7 +254,7 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		BlacklistStore:          blacklistStore,
+		BlacklistStore:          nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
