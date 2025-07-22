@@ -81,11 +81,11 @@ func BatchHeaderProtoToIEigenDATypesBinding(inputHeader *commonv2.BatchHeader) (
 }
 
 func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*contractEigenDACertVerifier.EigenDATypesV2Attestation, error) {
-	if len(inputAttestation.QuorumApks) != len(inputAttestation.QuorumNumbers) {
+	if len(inputAttestation.GetQuorumApks()) != len(inputAttestation.GetQuorumNumbers()) {
 		return nil, fmt.Errorf(
 			"quorum apks and quorum numbers must have the same length (apks: %d, numbers: %d)",
-			len(inputAttestation.QuorumApks),
-			len(inputAttestation.QuorumNumbers))
+			len(inputAttestation.GetQuorumApks()),
+			len(inputAttestation.GetQuorumNumbers()))
 	}
 	nonSignerPubkeys, err := repeatedBytesToBN254G1Points(inputAttestation.GetNonSignerPubkeys())
 	if err != nil {

@@ -242,7 +242,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while receiving: %w", err)
 	}
-	authHeaderReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
+	authHeaderReply, ok := reply.GetPayload().(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
 		return nil, nil, api.NewErrorInternal(fmt.Sprintf("client expected challenge from disperser, instead received: %v", reply))
 	}
@@ -250,7 +250,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	authHeader := core.BlobAuthHeader{
 		BlobCommitments: encoding.BlobCommitments{},
 		AccountID:       "",
-		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
+		Nonce:           authHeaderReply.BlobAuthHeader.GetChallengeParameter(),
 	}
 	authData, err := c.signer.SignBlobRequest(authHeader)
 	if err != nil {
@@ -271,7 +271,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while receiving final reply: %w", err)
 	}
-	disperseReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_DisperseReply) // Process the final disperse_reply
+	disperseReply, ok := reply.GetPayload().(*disperser_rpc.AuthenticatedReply_DisperseReply) // Process the final disperse_reply
 	if !ok {
 		return nil, nil, api.NewErrorInternal(fmt.Sprintf("client expected DisperseReply from disperser, instead received: %v", reply))
 	}
@@ -321,7 +321,7 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 	if err != nil {
 		return nil, err
 	}
-	return reply.Data, nil
+	return reply.GetData(), nil
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.

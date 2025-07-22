@@ -135,5 +135,5 @@ func TestRetrieveBlob(t *testing.T) {
 		QuorumId:             0,
 	})
 	require.NoError(t, err)
-	require.Equal(t, gettysburgAddressBytes, retrievalReply.Data)
+	require.Equal(t, gettysburgAddressBytes, retrievalReply.GetData())
 }

@@ -195,7 +195,9 @@ linters:
           - unparam
 
       # Allow certain patterns to be ignored by lll (long lines)
-      - source: '".{120,}"' # Ignores double-quoted strings longer than 120 chars
+      # This should probably be 120 to match our golines formatter, but there is a weird interaction which an external contributor hit.
+      # The bug was a string smaller than 120, but with key + string made the line bigger than 120, which invalidated the exclusion rule.
+      - source: '".{100,}"' # Ignores double-quoted strings longer than 100 chars
         linters: [lll]
       - source: "// https?://" # This pattern matches comments containing URLs
         linters: [lll]

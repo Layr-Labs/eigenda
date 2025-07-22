@@ -156,9 +156,9 @@ func (v *Verifier) VerifyCommitment(certCommitment *grpccommon.G1Commitment, blo
 	}
 
 	certCommitmentX := &fp.Element{}
-	certCommitmentX.Unmarshal(certCommitment.X)
+	certCommitmentX.Unmarshal(certCommitment.GetX())
 	certCommitmentY := &fp.Element{}
-	certCommitmentY.Unmarshal(certCommitment.Y)
+	certCommitmentY.Unmarshal(certCommitment.GetY())
 
 	certCommitmentAffine := bn254.G1Affine{
 		X: *certCommitmentX,
@@ -191,10 +191,10 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 
 	// require that the security param in each blob is met
 	for i := 0; i < len(blobHeader.QuorumBlobParams); i++ {
-		if batchHeader.QuorumNumbers[i] != blobHeader.QuorumBlobParams[i].QuorumNumber {
+		if batchHeader.GetQuorumNumbers()[i] != blobHeader.QuorumBlobParams[i].QuorumNumber {
 			return fmt.Errorf(
 				"quorum number mismatch, expected: %d, got: %d",
-				batchHeader.QuorumNumbers[i],
+				batchHeader.GetQuorumNumbers()[i],
 				blobHeader.QuorumBlobParams[i].QuorumNumber)
 		}
 
@@ -218,7 +218,7 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 			return fmt.Errorf("adversary threshold percentage must be >= quorum adversary threshold percentage")
 		}
 
-		if batchHeader.QuorumSignedPercentages[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
+		if batchHeader.GetQuorumSignedPercentages()[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
 			return fmt.Errorf(
 				"signed stake for quorum must be >= to confirmation threshold percentage",
 			)
@@ -228,7 +228,7 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 	}
 
 	// ensure that required quorums are present in the confirmed ones
-	for _, quorum := range requiredQuorum(batchHeader.ReferenceBlockNumber, v) {
+	for _, quorum := range requiredQuorum(batchHeader.GetReferenceBlockNumber(), v) {
 		if !confirmedQuorums[quorum] {
 			return fmt.Errorf("quorum %d is required but not present in confirmed quorums", quorum)
 		}
