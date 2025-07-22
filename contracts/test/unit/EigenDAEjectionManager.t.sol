@@ -25,12 +25,12 @@ contract EigenDAEjectionManagerTest is Test {
 
     function setUp() public {
         token = new ERC20Mintable("TestToken", "TTK");
-        // 
+        //
         ejectionManager = new EigenDAEjectionManager(
-            address(token),  // depositToken
-            DEPOSIT_AMOUNT,            // depositAmount
-            address(0),  // registryCoordinator (UNTESTED)
-            address(0)   // signatureVerifier (UNTESTED)
+            address(token), // depositToken
+            DEPOSIT_AMOUNT, // depositAmount
+            address(0), // registryCoordinator (UNTESTED)
+            address(0) // signatureVerifier (UNTESTED)
         );
     }
 
@@ -49,7 +49,7 @@ contract EigenDAEjectionManagerTest is Test {
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
             ejectee,
-            "0x",  // quorums (empty for this test)
+            "0x", // quorums (empty for this test)
             uint64(block.timestamp),
             uint64(block.timestamp + ejectionManager.ejectionDelay())
         );
