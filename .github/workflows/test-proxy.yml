@@ -10,6 +10,7 @@ on:
     paths:
       - "api/proxy/**"
       - ".github/workflows/per-pr-proxy.yml"
+  merge_group:
 
 env:
   MISE_VERSION: 2024.12.14

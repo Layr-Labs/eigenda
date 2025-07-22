@@ -10,6 +10,7 @@ on:
       - master
     paths:
       - 'subgraphs/**'
+  merge_group:
 
 jobs:
   test-subgraphs:
