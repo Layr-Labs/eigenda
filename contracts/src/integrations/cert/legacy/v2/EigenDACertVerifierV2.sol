@@ -9,7 +9,7 @@ import {EigenDACertVerificationV1Lib as CertV1Lib} from
 import {EigenDACertVerificationV2Lib as CertV2Lib} from
     "src/integrations/cert/legacy/v2/EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IRegistryCoordinator} from "src/core/RegistryCoordinator.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 

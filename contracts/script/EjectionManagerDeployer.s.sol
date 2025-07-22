@@ -4,7 +4,7 @@ pragma solidity =0.8.12;
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {EjectionManager} from "../lib/eigenlayer-middleware/src/EjectionManager.sol";
 import {IEjectionManager} from "../lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
-import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {RegistryCoordinator} from "src/core/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IStakeRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";

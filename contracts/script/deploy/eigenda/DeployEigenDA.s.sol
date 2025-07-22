@@ -13,7 +13,7 @@ import {IndexRegistry} from "lib/eigenlayer-middleware/src/IndexRegistry.sol";
 import {IStakeRegistry, StakeRegistry} from "lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
-import {RegistryCoordinator, IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {RegistryCoordinator, IRegistryCoordinator} from "src/core/RegistryCoordinator.sol";
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";

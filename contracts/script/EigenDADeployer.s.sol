@@ -6,7 +6,7 @@ import {PauserRegistry} from
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
-import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {RegistryCoordinator} from "src/core/RegistryCoordinator.sol";
 import {OperatorStateRetriever} from "../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
