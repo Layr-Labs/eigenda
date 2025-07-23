@@ -15,6 +15,45 @@ const docTemplateV2 = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/accounts": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch accounts within a time window (sorted by latest timestamp)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Number of hours to look back [default: 24; max: 24000 (1000 days)]",
+                        "name": "lookback_hours",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{account_id}/blobs": {
             "get": {
                 "produces": [
@@ -1220,6 +1259,29 @@ const docTemplateV2 = `{
                     "items": {
                         "$ref": "#/definitions/v2.BlobInfo"
                     }
+                }
+            }
+        },
+        "v2.AccountFeedResponse": {
+            "type": "object",
+            "properties": {
+                "accounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.AccountResponse"
+                    }
+                }
+            }
+        },
+        "v2.AccountResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "dispersed_at": {
+                    "description": "RFC3339 format",
+                    "type": "string"
                 }
             }
         },
