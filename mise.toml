@@ -25,8 +25,7 @@ yq = "latest"
 ripgrep = "latest"
 
 # api/proxy dependencies
-# TODO: we inherited those dependencies from https://github.com/Layr-Labs/eigenda-proxy
-# when we merged the two repos. We should probably use these for the rest of monorepo.
+# TODO: we should use these for the rest of test suites in the monorepo.
 "go:go.uber.org/mock/mockgen" = "0.5.0"
 "go:gotest.tools/gotestsum" = "1.12.0"
 "go:github.com/segmentio/golines" = "0.12.0"

@@ -190,7 +190,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		if errors.Is(err, verify.ErrBatchMetadataHashMismatch) {
 			// This error might have been caused by an L1 reorg.
 			// See
-			// https://github.com/Layr-Labs/eigenda-proxy/blob/main/docs/troubleshooting_v1.md#batch-hash-mismatch-error
+			// https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/troubleshooting_v1.md#batch-hash-mismatch-error
 			// We could try to update the cert's confirmation block number here,
 			// but it's currently not possible because the client.PutBlob call doesn't return the
 			// request_id to be able to query the GetBlobStatus endpoint...
@@ -241,7 +241,7 @@ func (e Store) Verify(ctx context.Context, serializedCert []byte, payload []byte
 	err = e.verifier.VerifyCert(ctx, &cert)
 	if errors.Is(err, verify.ErrBatchMetadataHashMismatch) {
 		// This error might have been caused by an L1 reorg.
-		// See https://github.com/Layr-Labs/eigenda-proxy/blob/main/docs/troubleshooting_v1.md#batch-hash-mismatch-error
+		// See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/troubleshooting_v1.md#batch-hash-mismatch-error
 		// We would want to update the cert's confirmation block number here,
 		// but it's currently not possible because the request_id to be able to query the GetBlobStatus endpoint
 		// is not stored in the v1 cert.... :(

@@ -206,3 +206,14 @@ func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestampByOperatorId(ct
 
 	return value, args.Error(1)
 }
+
+func (m *MockSubgraphApi) QueryReservations(ctx context.Context, currentTimestamp uint64, first, skip int) ([]*subgraph.Reservation, error) {
+	args := m.Called()
+
+	var value []*subgraph.Reservation
+	if args.Get(0) != nil {
+		value = args.Get(0).([]*subgraph.Reservation)
+	}
+
+	return value, args.Error(1)
+}
