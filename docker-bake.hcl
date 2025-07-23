@@ -73,7 +73,7 @@ group "ci-release" {
     "controller",
     "relay",
     "blobapi",
-    "proxy",
+    "proxy-release",
   ]
 }
 
@@ -294,7 +294,7 @@ target "proxy" {
   target     = "proxy"
   # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
   # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
-  tags       = ["${REGISTRY}/layr-labs/eigenda-proxy-init:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/layr-labs/proxy:${BUILD_TAG}"]
 }
 
 target "proxy-internal" {

@@ -200,7 +200,7 @@ jobs:
           -e EIGENDA_PROXY_ADDR=0.0.0.0 \
           -e EIGENDA_PROXY_PORT=6666 \
           -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
-          ghcr.io/layr-labs/eigenda-proxy:dev
+          ghcr.io/layr-labs/eigenda-proxy:latest
         working-directory: api/proxy
       - name: Wait for rpc to come up
         shell: bash
