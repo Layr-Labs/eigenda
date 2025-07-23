@@ -32,6 +32,7 @@ const (
 	RequestedAtIndexName       = "RequestedAtIndex"
 	AttestedAtIndexName        = "AttestedAtAIndex"
 	AccountBlobIndexName       = "AccountBlobIndex"
+	AccountUpdatedAtIndexName  = "AccountUpdatedAtIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -43,6 +44,9 @@ const (
 	batchHeaderSK             = "BatchHeader"
 	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
+
+	accountPK      = "Account"
+	accountIndexPK = "AccountIndex"
 
 	// The number of nanoseconds for a requestedAt bucket (1h).
 	// The rationales are:
@@ -474,6 +478,66 @@ func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
 	}
 
 	return blobs, nil
+}
+
+// UpdateAccount updates the Account partition to track account activity.
+// This method performs an upsert operation, creating or updating an entry for the given account
+// with the current timestamp.
+func (s *BlobMetadataStore) UpdateAccount(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	s.logger.Debug("updating account", "accountID", accountID.Hex(), "timestamp", timestamp)
+
+	item := commondynamodb.Item{
+		"PK":           &types.AttributeValueMemberS{Value: accountPK},
+		"SK":           &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"UpdatedAt":    &types.AttributeValueMemberN{Value: strconv.FormatUint(timestamp, 10)},
+		"AccountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
+	}
+
+	err := s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	if err != nil {
+		return fmt.Errorf("failed to update account for accountID %s: %w", accountID.Hex(), err)
+	}
+
+	return nil
+}
+
+// GetAccounts returns accounts within the specified lookback period (newest first)
+func (s *BlobMetadataStore) GetAccounts(ctx context.Context, lookbackSeconds uint64) ([]*v2.Account, error) {
+	s.logger.Debug("querying accounts", "lookbackSeconds", lookbackSeconds)
+
+	// Calculate the cutoff timestamp
+	now := uint64(time.Now().Unix())
+	cutoffTime := now - lookbackSeconds
+
+	// Query the AccountUpdatedAtIndex GSI with time filter
+	// All account records have AccountIndex = "AccountIndex" which allows us to query
+	// all accounts after the cutoff time efficiently
+	items, err := s.dynamoDBClient.QueryIndex(
+		ctx,
+		s.tableName,
+		AccountUpdatedAtIndexName,
+		"AccountIndex = :accountIndex AND UpdatedAt > :cutoff",
+		commondynamodb.ExpressionValues{
+			":accountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
+			":cutoff":       &types.AttributeValueMemberN{Value: strconv.FormatUint(cutoffTime, 10)},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query accounts: %w", err)
+	}
+
+	// Convert to Account structs
+	accounts := make([]*v2.Account, 0, len(items))
+	for _, item := range items {
+		account, err := UnmarshalAccount(item)
+		if err != nil {
+			s.logger.Warn("failed to unmarshal account", "error", err)
+			continue
+		}
+		accounts = append(accounts, account)
+	}
+
+	return accounts, nil
 }
 
 // queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
@@ -1391,6 +1455,10 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("AttestedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("AccountIndex"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -1513,6 +1581,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					},
 					{
 						AttributeName: aws.String("AttestedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
+				IndexName: aws.String(AccountUpdatedAtIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AccountIndex"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("UpdatedAt"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
@@ -1866,4 +1954,34 @@ func UnmarshalAttestation(item commondynamodb.Item) (*corev2.Attestation, error)
 	}
 
 	return &attestation, nil
+}
+
+func UnmarshalAccount(item commondynamodb.Item) (*v2.Account, error) {
+	// Extract the address from SK
+	skVal, ok := item["SK"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid SK field")
+	}
+
+	// SK is now directly the address
+	address := skVal.Value
+	if !gethcommon.IsHexAddress(address) {
+		return nil, fmt.Errorf("invalid address format: %s", address)
+	}
+
+	// Extract UpdatedAt timestamp
+	updatedAtVal, ok := item["UpdatedAt"].(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid UpdatedAt field")
+	}
+
+	updatedAt, err := strconv.ParseUint(updatedAtVal.Value, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse UpdatedAt: %w", err)
+	}
+
+	return &v2.Account{
+		Address:   gethcommon.HexToAddress(address),
+		UpdatedAt: updatedAt,
+	}, nil
 }
