@@ -5,20 +5,26 @@ import {InitializableLib} from "src/core/libraries/v3/initializable/Initializabl
 import {EigenDAEjectionLib, EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IEigenDADirectory} from "src/core/interfaces/IEigenDADirectory.sol";
 import {IIndexRegistry} from "lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
+import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+
+import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract EigenDAEjectionManager {
+    using AddressDirectoryLib for string;
     using EigenDAEjectionLib for address;
     using SafeERC20 for IERC20;
 
     address internal immutable _depositToken;
     uint256 internal immutable _depositAmount;
-    address internal immutable _registryCoordinator;
-    address internal immutable _signatureVerifier;
+    address internal immutable _addressDirectory;
 
     bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
         "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
@@ -27,13 +33,11 @@ contract EigenDAEjectionManager {
     constructor(
         address depositToken_,
         uint256 depositAmount_,
-        address registryCoordinator_,
-        address signatureVerifier_
+        address addressDirectory_
     ) {
         _depositToken = depositToken_;
         _depositAmount = depositAmount_;
-        _registryCoordinator = registryCoordinator_;
-        _signatureVerifier = signatureVerifier_;
+        _addressDirectory = addressDirectory_;
     }
 
     function initialize(uint64 delay, uint64 cooldown) external {
@@ -41,27 +45,27 @@ contract EigenDAEjectionManager {
         EigenDAEjectionLib.initialize(delay, cooldown);
     }
 
-    modifier onlyWatcher(address sender) {
-        _onlyWatcher(sender);
+    modifier onlyEjector(address sender) {
+        _onlyEjector(sender);
         _;
     }
 
     /// WATCHER FUNCTIONS
 
     /// @notice Starts the ejection process for an operator. Takes a deposit from the watcher.
-    function startEjection(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
+    function startEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         _takeDeposit(msg.sender);
         operator.startEjection(quorums);
     }
 
     /// @notice Cancels the ejection process initiated by a watcher.
-    function cancelEjectionByWatcher(address operator) external onlyWatcher(msg.sender) {
+    function cancelEjectionByWatcher(address operator) external onlyEjector(msg.sender) {
         _returnDeposit(msg.sender);
         operator.cancelEjection();
     }
 
     /// @notice Completes the ejection process for an operator. Transfers the deposit back to the watcher.
-    function completeEjection(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
+    function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
         _returnDeposit(msg.sender);
@@ -80,8 +84,11 @@ contract EigenDAEjectionManager {
         BN254.G1Point memory sigma,
         address recipient
     ) external {
+        address blsApkRegistry = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
+
         (BN254.G1Point memory apk,) =
-            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
+            IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
@@ -95,10 +102,6 @@ contract EigenDAEjectionManager {
     }
 
     /// GETTERS
-
-    function getRegistryCoordinator() external view returns (address) {
-        return _registryCoordinator;
-    }
 
     function getDepositToken() external view returns (address) {
         return _depositToken;
@@ -155,10 +158,13 @@ contract EigenDAEjectionManager {
         view
         returns (uint96[] memory weights)
     {
+        address stakeRegistry = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey());
         weights = new uint96[](quorumNumbers.length);
         for (uint256 i; i < quorumNumbers.length; i++) {
             uint8 quorumNumber = uint8(quorumNumbers[i]);
-            weights[i] = IRegistryCoordinator(_registryCoordinator).stakeRegistry().weightOfOperatorForQuorum(
+            
+            weights[i] = IStakeRegistry(stakeRegistry).weightOfOperatorForQuorum(
                 quorumNumber, operator
             );
         }
@@ -172,13 +178,20 @@ contract EigenDAEjectionManager {
         IERC20(_depositToken).safeTransfer(receiver, _depositAmount);
     }
 
-    function _onlyWatcher(address sender) internal view virtual {
-        sender; // TODO: PLACEHOLDER UNTIL ACCESS CONTROL IS IMPLEMENTED
+    function _onlyEjector(address sender) internal view virtual {
+        require(
+            IAccessControl(IEigenDADirectory(_addressDirectory)
+                .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey()))
+                .hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+            "EigenDAEjectionManager: Caller is not an ejector"
+        );
     }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
-        try IRegistryCoordinator(_registryCoordinator).ejectOperator(operator, quorums) {} catch {}
+        address registryCoordinator = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey());
+        try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
     function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
@@ -191,8 +204,10 @@ contract EigenDAEjectionManager {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
+        address signatureVerifier = IEigenDADirectory(_addressDirectory)
+            .getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
         (bool paired, bool valid) =
-            BLSSignatureChecker(_signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
+            BLSSignatureChecker(signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
         require(valid, "EigenDAEjectionManager: Invalid signature");
     }

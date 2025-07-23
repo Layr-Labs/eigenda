@@ -13,4 +13,7 @@ library AccessControlConstants {
     function QUORUM_OWNER_ROLE(uint64 quorumId) internal pure returns (bytes32) {
         return bytes32(uint256(QUORUM_OWNER_SEED) + quorumId);
     }
+
+    /// @notice This role is allowed to initiate ejections in the ejection manager.
+    bytes32 internal constant EJECTOR_ROLE = keccak256("EJECTOR");
 }

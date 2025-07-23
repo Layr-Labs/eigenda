@@ -7,6 +7,12 @@ import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionMana
 import {EigenDAEjectionLib} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 import {EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionTypes.sol";
 
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
+import {EigenDADirectory} from "src/core/EigenDADirectory.sol";
+
+import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 contract ERC20Mintable is ERC20 {
@@ -18,20 +24,26 @@ contract ERC20Mintable is ERC20 {
 }
 
 contract EigenDAEjectionManagerTest is Test {
+    EigenDADirectory directory;
+    EigenDAAccessControl accessControl;
     EigenDAEjectionManager ejectionManager;
     ERC20Mintable token;
 
     uint256 constant DEPOSIT_AMOUNT = 1e18;
 
     function setUp() public {
+
         token = new ERC20Mintable("TestToken", "TTK");
-        //
+        accessControl = new EigenDAAccessControl(address(this));
+        directory = new EigenDADirectory();
+        directory.initialize(address(accessControl));
         ejectionManager = new EigenDAEjectionManager(
-            address(token), // depositToken
-            DEPOSIT_AMOUNT, // depositAmount
-            address(0), // registryCoordinator (UNTESTED)
-            address(0) // signatureVerifier (UNTESTED)
+            address(token), 
+            DEPOSIT_AMOUNT, 
+            address(directory)
         );
+        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, address(this));
+        directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
     }
 
     /// 1. Takes a deposit from the caller.
