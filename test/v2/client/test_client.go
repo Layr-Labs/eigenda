@@ -56,6 +56,7 @@ type TestClient struct {
 	indexedChainState           core.IndexedChainState
 	validatorClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	proxyWrapper                *ProxyWrapper
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
@@ -334,6 +335,14 @@ func NewTestClient(
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
+	var proxyWrapper *ProxyWrapper
+	if config.EnableProxy {
+		proxyWrapper, err = NewProxyWrapper(context.Background(), logger, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create proxy wrapper: %w", err)
+		}
+	}
+
 	return &TestClient{
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
@@ -352,6 +361,7 @@ func NewTestClient(
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
+		proxyWrapper:                proxyWrapper,
 	}, nil
 }
 
@@ -489,6 +499,11 @@ func (c *TestClient) GetMetricsRegistry() *prometheus.Registry {
 // Stop stops the test client.
 func (c *TestClient) Stop() {
 	c.metrics.stop()
+	if c.proxyWrapper != nil {
+		if err := c.proxyWrapper.Stop(); err != nil {
+			c.logger.Errorf("failed to stop proxy wrapper: %v", err)
+		}
+	}
 }
 
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
@@ -715,4 +730,12 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	return nil
+}
+
+// GetProxyWrapper returns the proxy wrapper. If the proxy wrapper is not enabled, this method returns an error.
+func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
+	if c.proxyWrapper == nil {
+		return nil, fmt.Errorf("proxy wrapper is not enabled in the test client configuration")
+	}
+	return c.proxyWrapper, nil
 }

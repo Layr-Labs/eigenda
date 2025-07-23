@@ -10,13 +10,17 @@ type LoadGeneratorConfig struct {
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times. If less than 1, then this value
 	// is treated as a probability. For example, if this is set to 0.5, then each blob is read back
-	// from each relay with a 50% chance.
+	// from each relay with a 50% chance. Ignored if the load generator is configured to use the proxy.
 	RelayReadAmplification float64
 	// By default, this utility reads chunks once. The number of chunk reads is multiplied
 	// by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,
 	// then this value is treated as a probability. For example, if this is set to 0.5, then
-	// each chunk is read back from validators with a 50% chance.
+	// each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured
+	// to use the proxy.
 	ValidatorReadAmplification float64
+	// The number of times to read each blob from the proxy. Ignored if the load generator is not configured to use
+	// the proxy.
+	ProxyReadAmplification float64
 	// A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.
 	// If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.
 	ValidatorVerificationFraction float64

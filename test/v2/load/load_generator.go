@@ -225,7 +225,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	<-l.validatorReadLimiter
 }
 
-// Submits a single blob to the network.
+// Submits a single blob to the network using the GRPC clients.
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
@@ -268,7 +268,59 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	return blobKey, payload, eigenDACert, nil
 }
 
-// readBlobFromRelays reads a blob from the relays.
+// Disperses a blob using the proxy (as opposed to using the GRPC clients directly). Returns the blob cert in byte
+// form since this is how the proxy forces the user to interact with it.
+func (l *LoadGenerator) disperseBlobWithProxy(rand *random.TestRandom) (
+	cert []byte,
+	payload []byte,
+	err error,
+) {
+
+	// TODO wire into metrics
+	// TODO timeout?
+
+	payload = rand.Bytes(int(l.payloadSize))
+
+	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	l.metrics.startOperation("dispersal")
+	defer func() {
+		l.metrics.endOperation("dispersal")
+		cancel()
+	}()
+
+	proxyWrapper, err := l.client.GetProxyWrapper()
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to get proxy wrapper: %v", err)
+		return nil, nil, fmt.Errorf("failed to get proxy wrapper: %w", err)
+	}
+
+	cert, err = proxyWrapper.SendPayload(ctx, payload)
+	if err != nil {
+		l.metrics.reportDispersalFailure()
+		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
+		return nil, nil, fmt.Errorf("failed to send payload via proxy: %w", err)
+	}
+
+	l.metrics.reportDispersalSuccess()
+	return cert, payload, nil
+}
+
+// Reads the blob using the proxy client. The proxy may in theory read the blob from the relays or validators, but
+// unless the relays are malfunctioning it will always read from the relays.
+func (l *LoadGenerator) readBlobWithProxy(
+	cert []byte,
+	expectedPayload []byte,
+) error {
+	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
+
+	// TODO future cody: continue here
+
+}
+
+// readBlobFromRelays reads a blob from the relays using the GRPC clients.
 func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
@@ -317,7 +369,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 	}
 }
 
-// readBlobFromValidators reads a blob from the validators using the validator retrieval client.
+// readBlobFromValidators reads a blob from the validators using the validator GRPC client.
 func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
 	payload []byte,

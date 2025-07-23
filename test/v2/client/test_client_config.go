@@ -69,6 +69,9 @@ type TestClientConfig struct {
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// If true, spin up a proxy instance. If a proxy instance is not started, then calling methods that exercise
+	// the proxy will return errors.
+	EnableProxy bool
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
