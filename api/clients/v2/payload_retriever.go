@@ -16,4 +16,6 @@ type PayloadRetriever interface {
 	// GetPayload should return a [coretypes.ErrBlobDecodingFailedDerivationError] if the blob cannot be decoding according
 	// to one of the encodings available via [codecs.PayloadEncodingVersion]s.
 	GetPayload(ctx context.Context, eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.Payload, error)
+	// Type returns the type of the payload retriever
+	Type() coretypes.PayloadRetrieverType
 }

@@ -54,6 +54,11 @@ func NewRelayPayloadRetriever(
 	}, nil
 }
 
+// Type returns the type of the payload retriever, which is PayloadRetrieverTypeRelays for RelayPayloadRetriever.
+func (pr *RelayPayloadRetriever) Type() coretypes.PayloadRetrieverType {
+	return coretypes.PayloadRetrieverTypeRelays
+}
+
 // GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
 // blob certificate. The relays are attempted in random order.
 //
