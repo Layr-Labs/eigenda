@@ -1,4 +1,4 @@
-// little-endian is more efficient but Ethereum relies on little-endian
+// little-endian is more efficient but Ethereum relies on big-endian
 // little-endian is more natural to reason about in the context of bitmaps
 use bitvec::array::BitArray;
 
@@ -13,39 +13,34 @@ pub fn bit_indices_to_bitmap(
     upper_bound_bit_index: u8,
 ) -> Result<Bitmap, CertVerificationError> {
     use CertVerificationError::*;
+    use core::cmp::Ordering::*;
 
-    // abort early here even though other checks (sorted + unique) would catch it
-    let bit_indices_len = bit_indices.len();
-    if bit_indices_len > MAX_BIT_INDICES_LENGTH {
-        return Err(BitIndicesGreaterThanMaxLength);
-    }
+    match bit_indices.len() {
+        0 => return Ok(Bitmap::default()),
+        // abort early here even though other checks (sorted + unique) would catch it
+        len if len > MAX_BIT_INDICES_LENGTH => return Err(BitIndicesGreaterThanMaxLength),
+        _ => {
+            // safe to unwrap since we're in a branch where bit_indices is non-empty
+            if *bit_indices.last().unwrap() >= upper_bound_bit_index {
+                return Err(BitIndexNotLessThanUpperBound);
+            }
 
-    if bit_indices_len == 0 {
-        return Ok(Bitmap::default());
-    }
+            let mut prev_bit_index = None;
+            let mut bitmap = Bitmap::default();
+            for bit_index in bit_indices {
+                match Some(bit_index).cmp(&prev_bit_index) {
+                    Less => return Err(BitIndicesNotSorted),
+                    Equal => return Err(BitIndicesNotUnique),
+                    Greater => {
+                        prev_bit_index = Some(bit_index);
+                        bitmap.set(*bit_index as usize, true);
+                    }
+                }
+            }
 
-    let mut prev_bit_index = None;
-    let mut bitmap = Bitmap::default();
-    for bit_index in bit_indices {
-        if Some(bit_index) < prev_bit_index {
-            return Err(BitIndicesNotSorted);
+            Ok(bitmap)
         }
-
-        if Some(bit_index) == prev_bit_index {
-            return Err(BitIndicesNotUnique);
-        }
-
-        prev_bit_index = Some(bit_index);
-
-        bitmap.set(*bit_index as usize, true);
     }
-
-    // safe to unwrap since empty bit_indices has already been checked
-    if *bit_indices.last().unwrap() >= upper_bound_bit_index {
-        return Err(BitIndexNotLessThanUpperBound);
-    }
-
-    Ok(bitmap)
 }
 
 #[cfg(test)]
@@ -133,8 +128,16 @@ mod tests {
     #[test]
     fn bit_indices_to_bitmap_fails_with_duplicate_bit_indices() {
         let bit_indices = vec![42u8, 42u8];
-        let upper_bound_bit_index = 42u8;
+        let upper_bound_bit_index = 43u8;
         let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndicesNotUnique);
+    }
+
+    #[test]
+    fn bit_indices_to_bitmap_succeeds_with_empty_input_and_zero_upper_bound() {
+        let bit_indices = vec![];
+        let upper_bound_bit_index = 0u8;
+        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        assert_eq!(result.unwrap(), Bitmap::default());
     }
 }

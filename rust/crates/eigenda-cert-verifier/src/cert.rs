@@ -13,6 +13,8 @@ pub fn verify(cert: Cert, chain: Chain) -> Result<(), CertVerificationError> {
         reference_block,
         signed_quorums,
         params,
+        blob_inclusion_info,
+        security_thresholds,
     } = cert;
 
     let NonSignerStakesAndSignature {
@@ -36,6 +38,8 @@ pub fn verify(cert: Cert, chain: Chain) -> Result<(), CertVerificationError> {
         total_stake_history_by_quorum,
         apk_trunc_hash_history_by_quorum,
         last_updated_at_block_by_quorum,
+        relay_key_to_relay_info,
+        version_to_versioned_blob_params,
     } = chain;
 
     if reference_block >= current_block {
@@ -158,6 +162,18 @@ pub fn verify(cert: Cert, chain: Chain) -> Result<(), CertVerificationError> {
 
     let _signatory_record_hash = hash::signature_record(reference_block, &non_signers);
 
+    check::relay_keys_are_set(
+        &blob_inclusion_info.blob_certificate.relay_keys,
+        &relay_key_to_relay_info,
+    )?;
+
+    let version = blob_inclusion_info.blob_certificate.blob_header.version;
+    check::security_assumptions_are_met(
+        version,
+        &version_to_versioned_blob_params,
+        &security_thresholds,
+    )?;
+
     Ok(())
 }
 
@@ -174,7 +190,8 @@ mod tests {
         error::CertVerificationError::*,
         hash::BeHash,
         types::{
-            Cert, Chain, NonSignerStakesAndSignature,
+            BlobCertificate, BlobHeaderV2, BlobInclusionInfo, Cert, Chain,
+            NonSignerStakesAndSignature, RelayInfo, SecurityThresholds, VersionedBlobParams,
             history::{History, Update},
         },
     };
@@ -412,6 +429,24 @@ mod tests {
         assert_eq!(err, SignatureVerificationFailed);
     }
 
+    #[test]
+    fn relay_keys_not_set() {
+        let (cert, mut chain) = success_inputs();
+        let relay_info = chain.relay_key_to_relay_info.get_mut(&42).unwrap();
+        relay_info.address = Default::default();
+        let err = cert::verify(cert, chain).unwrap_err();
+        assert_eq!(err, RelayKeyNotSet);
+    }
+
+    #[test]
+    fn security_assumptions_not_met() {
+        let (cert, mut chain) = success_inputs();
+        let params = chain.version_to_versioned_blob_params.get_mut(&42).unwrap();
+        params.num_chunks = 43;
+        let err = cert::verify(cert, chain).unwrap_err();
+        assert_eq!(err, UnmetSecurityAssumptions);
+    }
+
     fn success_inputs() -> (Cert, Chain) {
         let g1 = G1Projective::generator();
         let g2 = G2Projective::generator();
@@ -473,6 +508,27 @@ mod tests {
             signed_quorums: signed_quorums.to_vec(),
 
             params,
+            blob_inclusion_info: BlobInclusionInfo {
+                blob_certificate: BlobCertificate {
+                    relay_keys: vec![42],
+                    blob_header: BlobHeaderV2 {
+                        version: 42,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            security_thresholds: SecurityThresholds {
+                // further down I set coding_rate = 42
+                // since (confirmation_threshold - adversary_threshold) * coding_rate >= 100
+                // and confirmation_threshold > adversary_threshold
+                // I set the following:
+                // the above condition would be met with confirmation_threshold: 100
+                // but would result in n = 0 in `n < max_num_operators` thus not meeting security assumptions
+                confirmation_threshold: 101,
+                adversary_threshold: 0,
+            },
         };
 
         let non_signer0_pk_hash = convert::point_to_hash(non_signer0_g1_pk).unwrap();
@@ -543,8 +599,8 @@ mod tests {
             .zip(apk_for_each_quorum)
             .map(|(quorum, apk)| {
                 let apk_hash = convert::point_to_hash(apk).unwrap();
-                let apk_trunch_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
-                let update = Update::new(41, 43, apk_trunch_hash).unwrap();
+                let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
+                let update = Update::new(41, 43, apk_trunc_hash).unwrap();
                 let history = HashMap::from([(0, update)]);
                 (quorum, History(history))
             })
@@ -554,6 +610,23 @@ mod tests {
             .into_iter()
             .map(|quorum| (quorum, 42))
             .collect();
+
+        let relay_key_to_relay_info = HashMap::from([(
+            42,
+            RelayInfo {
+                address: [42u8; 20],
+                url: "".into(),
+            },
+        )]);
+
+        let version_to_versioned_blob_params = HashMap::from([(
+            42,
+            VersionedBlobParams {
+                max_num_operators: 42,
+                num_chunks: 44,
+                coding_rate: 42,
+            },
+        )]);
 
         let chain = Chain {
             initialized_quorums_count: u8::MAX,
@@ -565,6 +638,8 @@ mod tests {
             total_stake_history_by_quorum,
             apk_trunc_hash_history_by_quorum,
             last_updated_at_block_by_quorum,
+            relay_key_to_relay_info,
+            version_to_versioned_blob_params,
         };
 
         (cert, chain)

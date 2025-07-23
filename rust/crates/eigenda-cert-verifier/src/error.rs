@@ -55,4 +55,19 @@ pub enum CertVerificationError {
 
     #[error("Underflow")]
     Underflow,
+
+    #[error("Missing relay key entry")]
+    MissingRelayKeyEntry,
+
+    #[error("Relay key not set")]
+    RelayKeyNotSet,
+
+    #[error("Missing version entry")]
+    MissingVersionEntry,
+
+    #[error("Confirmation threshold not greater than adversary threshold")]
+    ConfirmationThresholdNotGreaterThanAdversaryThreshold,
+
+    #[error("Unmet security assumptions")]
+    UnmetSecurityAssumptions,
 }

@@ -75,7 +75,7 @@ use crate::{
 // Since the signature is over the batch root from a tree of all blob certificates
 // it means that a signer either signs all quorums it was assigned to
 // (because the batch root represents all) or signs none at all,
-// that is, it they cannot sign some quorums but not others. This is important for the
+// that is, they cannot sign some quorums but not others. This is important for the
 // correctness of this implementation
 //
 // At its core the calculation iterates over non-signer quorum membership bitmaps
@@ -109,7 +109,7 @@ use crate::{
 // Signer 5: |  0  |  0  |  0  |   &   |  1  |  0  |  1  |  =  |  0  |  0  |  0  |
 //           +-----+-----+-----+       +-----+-----+-----+     +-----+-----+-----+
 //
-// In the above, Sigenrs 3, 4 and 5 are not `non_signers` so they are have never been
+// In the above, Signers 3, 4 and 5 are not `non_signers` so they have never been
 // included in the calculation.
 //
 // Signers 0, 1 and 2 are non-signers and the resulting `missing_signatures` bitmap
@@ -173,7 +173,7 @@ pub fn aggregate(
             let missing_signatures = non_signer.quorum_membership & signed_quorums;
             let missing_signatures = missing_signatures.count_ones();
             let missing_signatures = Fr::from(missing_signatures as u64);
-            // todo: benchmark then consider implementing `scalar_mul_tiny`
+            // TODO: benchmark then consider implementing `scalar_mul_tiny`
             non_signer.pk * missing_signatures
         })
         .sum::<G1Projective>();
