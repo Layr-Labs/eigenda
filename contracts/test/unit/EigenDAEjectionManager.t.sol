@@ -32,16 +32,11 @@ contract EigenDAEjectionManagerTest is Test {
     uint256 constant DEPOSIT_AMOUNT = 1e18;
 
     function setUp() public {
-
         token = new ERC20Mintable("TestToken", "TTK");
         accessControl = new EigenDAAccessControl(address(this));
         directory = new EigenDADirectory();
         directory.initialize(address(accessControl));
-        ejectionManager = new EigenDAEjectionManager(
-            address(token), 
-            DEPOSIT_AMOUNT, 
-            address(directory)
-        );
+        ejectionManager = new EigenDAEjectionManager(address(token), DEPOSIT_AMOUNT, address(directory));
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, address(this));
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
     }
@@ -53,6 +48,7 @@ contract EigenDAEjectionManagerTest is Test {
     /// 2c. sets proceeding initiated time to current timestamp
     /// 3. Emits EjectionStarted event.
     function testStartEjection(address caller, address ejectee) public {
+        accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, caller);
         token.mint(caller, DEPOSIT_AMOUNT);
 
         vm.startPrank(caller);

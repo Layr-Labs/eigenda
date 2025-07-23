@@ -30,11 +30,7 @@ contract EigenDAEjectionManager {
         "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
     );
 
-    constructor(
-        address depositToken_,
-        uint256 depositAmount_,
-        address addressDirectory_
-    ) {
+    constructor(address depositToken_, uint256 depositAmount_, address addressDirectory_) {
         _depositToken = depositToken_;
         _depositAmount = depositAmount_;
         _addressDirectory = addressDirectory_;
@@ -84,11 +80,10 @@ contract EigenDAEjectionManager {
         BN254.G1Point memory sigma,
         address recipient
     ) external {
-        address blsApkRegistry = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
+        address blsApkRegistry =
+            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME.getKey());
 
-        (BN254.G1Point memory apk,) =
-            IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
+        (BN254.G1Point memory apk,) = IBLSApkRegistry(blsApkRegistry).getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
@@ -158,15 +153,13 @@ contract EigenDAEjectionManager {
         view
         returns (uint96[] memory weights)
     {
-        address stakeRegistry = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey());
+        address stakeRegistry =
+            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME.getKey());
         weights = new uint96[](quorumNumbers.length);
         for (uint256 i; i < quorumNumbers.length; i++) {
             uint8 quorumNumber = uint8(quorumNumbers[i]);
-            
-            weights[i] = IStakeRegistry(stakeRegistry).weightOfOperatorForQuorum(
-                quorumNumber, operator
-            );
+
+            weights[i] = IStakeRegistry(stakeRegistry).weightOfOperatorForQuorum(quorumNumber, operator);
         }
     }
 
@@ -180,17 +173,18 @@ contract EigenDAEjectionManager {
 
     function _onlyEjector(address sender) internal view virtual {
         require(
-            IAccessControl(IEigenDADirectory(_addressDirectory)
-                .getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey()))
-                .hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+            IAccessControl(
+                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+            ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
             "EigenDAEjectionManager: Caller is not an ejector"
         );
     }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
-        address registryCoordinator = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey());
+        address registryCoordinator = IEigenDADirectory(_addressDirectory).getAddress(
+            AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME.getKey()
+        );
         try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
@@ -204,8 +198,8 @@ contract EigenDAEjectionManager {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        address signatureVerifier = IEigenDADirectory(_addressDirectory)
-            .getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
+        address signatureVerifier =
+            IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME.getKey());
         (bool paired, bool valid) =
             BLSSignatureChecker(signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
