@@ -122,9 +122,9 @@ integration-tests-dataapi:
 
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
+	docker buildx bake node-group-release ${PUSH_FLAG} --provenance=false --sbom=false
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy ${PUSH_FLAG}
+	docker buildx bake proxy ${PUSH_FLAG} --provenance=false --sbom=false
 
 semver:
 	echo "${SEMVER}"
