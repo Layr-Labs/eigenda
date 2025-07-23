@@ -10,6 +10,7 @@ Audit reports are published in the `docs` folder: https://github.com/Layr-Labs/e
 
 | Date | Report Link |
 | ------- | ----------- |
+| 202505 | [LittDB Audit](https://github.com/Layr-Labs/eigenda/blob/master/docs/audits/ChainLight_EigenDA_LittDB_Security_Audit_Report_Rev_1.1.pdf) 
 | 202404 | [pdf](https://github.com/Layr-Labs/eigenda/blob/security-doc/docs/audits/Sigma_Prime_EigenDA_Offchain_Security_Assessment_Report.pdf) |
 
 ## Reporting a Vulnerability
