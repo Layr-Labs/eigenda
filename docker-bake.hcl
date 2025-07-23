@@ -73,7 +73,7 @@ group "ci-release" {
     "controller",
     "relay",
     "blobapi",
-    "proxy-release",
+    "proxy",
   ]
 }
 
