@@ -8,11 +8,9 @@ import {AccessControlConstants} from "src/core/libraries/v3/access-control/Acces
 /// @notice This contract is to serve as the centralized source of truth for access control in all EigenDA contracts.
 contract EigenDAAccessControl is AccessControl {
     constructor(address owner) {
+        // The DEFAULT_ADMIN_ROLE can set the admin role for all other roles, and should be put behind a timelock.
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        // The OWNER_ROLE is the default ownership role for EigenDA contracts.
         _grantRole(AccessControlConstants.OWNER_ROLE, owner);
-    }
-
-    function setupRole(bytes32 role, address account) external {
-        require(hasRole(AccessControlConstants.OWNER_ROLE, msg.sender), "Caller is not the owner");
-        _grantRole(role, account);
     }
 }
