@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 library AddressDirectoryConstants {
     /// CORE
 
+    string internal constant ACCESS_CONTROL_NAME = "ACCESS_CONTROL";
     string internal constant DISPERSER_REGISTRY_NAME = "DISPERSER_REGISTRY";
     string internal constant RELAY_REGISTRY_NAME = "RELAY_REGISTRY";
     string internal constant SERVICE_MANAGER_NAME = "SERVICE_MANAGER";
