@@ -38,7 +38,7 @@ pub struct Chain {
     pub version_to_versioned_blob_params: HashMap<Version, VersionedBlobParams>,
 }
 
-// todo: match the data schema of IEigenDAStructs.sol
+// TODO: match the data schema of IEigenDAStructs.sol
 #[derive(Default, Debug, Clone)]
 pub struct Cert {
     pub msg_hash: BeHash,

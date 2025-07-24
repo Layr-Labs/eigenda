@@ -165,7 +165,7 @@ pub fn aggregate(
         .iter()
         .map(|quorum| quorum.number)
         .collect::<Vec<_>>();
-    let signed_quorums = bit_indices_to_bitmap(&bit_indices, initialized_quorums_count)?;
+    let signed_quorums = bit_indices_to_bitmap(&bit_indices, Some(initialized_quorums_count))?;
 
     let non_signers_apk = non_signers
         .iter()

@@ -53,6 +53,9 @@ pub enum CertVerificationError {
     #[error("Empty vec")]
     EmptyVec,
 
+    #[error("Overflow")]
+    Overflow,
+
     #[error("Underflow")]
     Underflow,
 
@@ -70,4 +73,10 @@ pub enum CertVerificationError {
 
     #[error("Unmet security assumptions")]
     UnmetSecurityAssumptions,
+
+    #[error("Required quorums not subset of blob quorums")]
+    BlobQuorumsDoNotContainRequiredQuorums,
+
+    #[error("Blob quorums not subset of confirmed quorums")]
+    ConfirmedQuorumsDoNotContainBlobQuorums,
 }

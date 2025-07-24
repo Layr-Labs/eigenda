@@ -3,13 +3,16 @@ use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
 use crate::{
+    bitmap::{Bitmap, bit_indices_to_bitmap},
     convert,
     error::CertVerificationError::{self, *},
     types::{
-        Address, NonSigner, RelayInfo, RelayKey, SecurityThresholds, Version, VersionedBlobParams,
-        history::History,
+        Address, NonSigner, Quorum, QuorumNumber, RelayInfo, RelayKey, SecurityThresholds, Version,
+        VersionedBlobParams, history::History,
     },
 };
+
+const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol, TODO: is it required?
 
 pub fn non_zero_equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
     match lengths.first() {
@@ -153,6 +156,58 @@ pub fn security_assumptions_are_met(
     Ok(())
 }
 
+pub fn confirmed_quorums_contain_blob_quorums(
+    confirmation_threshold: u8,
+    quorums: &[Quorum],
+    blob_quorums: &[QuorumNumber],
+) -> Result<(), CertVerificationError> {
+    let blob_quorums = bit_indices_to_bitmap(blob_quorums, None)?;
+
+    let mut confirmed_quorums = Bitmap::default();
+
+    quorums.iter().try_for_each(|quorum| {
+        let Quorum {
+            number,
+            total_stake,
+            signed_stake,
+            ..
+        } = *quorum;
+
+        let left = signed_stake
+            .checked_mul(THRESHOLD_DENOMINATOR)
+            .ok_or(Overflow)?;
+
+        let right = total_stake
+            .checked_mul(confirmation_threshold as u128)
+            .ok_or(Overflow)?;
+
+        confirmed_quorums.set(number as usize, left >= right);
+
+        Ok(())
+    })?;
+
+    contains(blob_quorums, confirmed_quorums)
+        .then_some(())
+        .ok_or(ConfirmedQuorumsDoNotContainBlobQuorums)
+}
+
+pub fn blob_quorums_contain_required_quorums(
+    blob_quorums: &[QuorumNumber],
+    required_quorums: &[QuorumNumber],
+) -> Result<(), CertVerificationError> {
+    let required_quorums = bit_indices_to_bitmap(required_quorums, None)?;
+    let blob_quorums = bit_indices_to_bitmap(blob_quorums, None)?;
+    contains(blob_quorums, required_quorums)
+        .then_some(())
+        .ok_or(BlobQuorumsDoNotContainRequiredQuorums)
+}
+
+/// Returns true if `container` contains all bits set in `contained`
+#[inline]
+fn contains(container: Bitmap, contained: Bitmap) -> bool {
+    container & contained == contained
+}
+
 #[cfg(test)]
 mod test_non_zero_equal_lengths {
     use crate::{check, error::CertVerificationError::*};
@@ -198,7 +253,7 @@ mod test_non_signers_strictly_sorted_by_hash {
             ..Default::default()
         });
         let result = check::non_signers_strictly_sorted_by_hash(non_signers);
-        assert!(result.is_ok());
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
@@ -224,7 +279,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     #[test]
     fn empty_vec() {
         let result = check::non_signers_strictly_sorted_by_hash(&[]);
-        assert!(result.is_ok());
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
@@ -234,7 +289,7 @@ mod test_non_signers_strictly_sorted_by_hash {
             ..Default::default()
         });
         let result = check::non_signers_strictly_sorted_by_hash(non_signers);
-        assert!(result.is_ok());
+        assert_eq!(result, Ok(()));
     }
 }
 
@@ -261,7 +316,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
             window,
         );
 
-        assert!(result.is_ok());
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
@@ -390,7 +445,7 @@ mod test_cert_apks_equal_chain_apks {
             apk_trunc_hash_history_by_quorum,
         );
 
-        assert!(result.is_ok());
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
@@ -723,5 +778,207 @@ mod test_security_assumptions_are_met {
             version_to_versioned_blob_params,
             security_thresholds,
         )
+    }
+}
+
+#[cfg(test)]
+mod test_confirmed_quorums_contains_blob_quorums {
+    use crate::{check, error::CertVerificationError::*, types::Quorum};
+    use ark_bn254::G1Affine;
+
+    #[test]
+    fn success_when_confirmed_quorums_contain_blob_quorums() {
+        let confirmation_threshold = 100;
+
+        // in this example:
+        //     quorum is confirmed if signed_stake * 100 > total_stake * 100
+        //     quorum is confirmed if signed_stake * THRESHOLD_DENOMINATOR >= total_skate * confirmation_threshold
+        let quorums = [
+            Quorum {
+                number: 0,
+                total_stake: 42,
+                signed_stake: 43,
+                ..Default::default()
+            },
+            Quorum {
+                number: 1,
+                apk: G1Affine::default(),
+                total_stake: 42,
+                signed_stake: 42,
+                ..Default::default()
+            },
+            Quorum {
+                number: 2,
+                total_stake: 42,
+                signed_stake: 41,
+                ..Default::default()
+            },
+        ];
+
+        // in this example blob_quorums contains only confirmed quorums (0 and 1)
+        let blob_quorums = [0, 1];
+
+        let result = check::confirmed_quorums_contain_blob_quorums(
+            confirmation_threshold,
+            &quorums,
+            &blob_quorums,
+        );
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn confirmed_quorums_do_not_contain_blob_quorums() {
+        let confirmation_threshold = 100;
+
+        let quorums = [
+            Quorum {
+                number: 0,
+                total_stake: 42,
+                signed_stake: 43,
+                ..Default::default()
+            },
+            Quorum {
+                number: 1,
+                apk: G1Affine::default(),
+                total_stake: 42,
+                signed_stake: 42,
+                ..Default::default()
+            },
+            Quorum {
+                number: 2,
+                total_stake: 42,
+                signed_stake: 41,
+                ..Default::default()
+            },
+        ];
+
+        // blob_quorums contains unconfirmed quorum 1
+        let blob_quorums = [1, 2];
+
+        let err = check::confirmed_quorums_contain_blob_quorums(
+            confirmation_threshold,
+            &quorums,
+            &blob_quorums,
+        )
+        .unwrap_err();
+
+        assert_eq!(err, ConfirmedQuorumsDoNotContainBlobQuorums);
+    }
+
+    #[test]
+    fn overflow_in_signed_stake_multiplication() {
+        let confirmation_threshold = 100;
+
+        let quorums = [Quorum {
+            number: 0,
+            total_stake: 42,
+            signed_stake: u128::MAX, // Will overflow when multiplied by THRESHOLD_DENOMINATOR
+            ..Default::default()
+        }];
+
+        let blob_quorums = [0];
+
+        let err = check::confirmed_quorums_contain_blob_quorums(
+            confirmation_threshold,
+            &quorums,
+            &blob_quorums,
+        )
+        .unwrap_err();
+
+        assert_eq!(err, Overflow);
+    }
+
+    #[test]
+    fn overflow_in_total_stake_multiplication() {
+        let confirmation_threshold = u8::MAX; // Will cause overflow when cast to u128 and multiplied
+
+        let quorums = [Quorum {
+            number: 0,
+            total_stake: u128::MAX,
+            signed_stake: 43,
+            ..Default::default()
+        }];
+
+        let blob_quorums = [0];
+
+        let err = check::confirmed_quorums_contain_blob_quorums(
+            confirmation_threshold,
+            &quorums,
+            &blob_quorums,
+        )
+        .unwrap_err();
+
+        assert_eq!(err, Overflow);
+    }
+
+    #[test]
+    fn blob_quorums_bit_indices_not_sorted() {
+        let confirmation_threshold = 100;
+        let quorums = [Quorum {
+            number: 0,
+            total_stake: 42,
+            signed_stake: 43,
+            ..Default::default()
+        }];
+
+        let blob_quorums = [1, 0]; // Not sorted
+
+        let err = check::confirmed_quorums_contain_blob_quorums(
+            confirmation_threshold,
+            &quorums,
+            &blob_quorums,
+        )
+        .unwrap_err();
+
+        assert_eq!(err, BitIndicesNotSorted);
+    }
+}
+
+#[cfg(test)]
+mod test_blob_quorums_contains_required_quorums {
+    use crate::{check, error::CertVerificationError::*};
+
+    #[test]
+    fn success_when_blob_quorums_contain_required_quorums() {
+        let blob_quorums = [0, 1, 2, 3];
+        let required_quorums = [1, 2];
+
+        let result = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn blob_quorums_do_not_contain_required_quorums() {
+        let blob_quorums = [0, 1];
+        let required_quorums = [1, 2, 3]; // 2 and 3 are not in blob_quorums
+
+        let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
+            .unwrap_err();
+
+        assert_eq!(err, BlobQuorumsDoNotContainRequiredQuorums);
+    }
+
+    #[test]
+    fn required_quorums_bit_indices_not_sorted() {
+        let blob_quorums = [0, 1];
+        let required_quorums = [2, 1]; // Not sorted
+
+        let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
+            .unwrap_err();
+
+        assert_eq!(err, BitIndicesNotSorted);
+    }
+
+    #[test]
+    fn blob_quorums_bit_indices_not_sorted() {
+        let blob_quorums = [1, 0]; // Not sorted
+        let required_quorums = [0];
+
+        let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
+            .unwrap_err();
+
+        assert_eq!(err, BitIndicesNotSorted);
     }
 }
