@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
-	"github.com/Layr-Labs/eigenda/api/proxy/config"
+	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/server"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -26,7 +27,7 @@ type ProxyWrapper struct {
 func NewProxyWrapper(
 	ctx context.Context,
 	logger logging.Logger,
-	proxyConfig *config.AppConfig) (*ProxyWrapper, error) {
+	proxyConfig *proxyconfig.AppConfig) (*ProxyWrapper, error) {
 
 	err := proxyConfig.Check()
 	if err != nil {
@@ -50,6 +51,7 @@ func NewProxyWrapper(
 
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)
+	proxyServer.SetDispersalBackend(proxycommon.V2EigenDABackend)
 	err = proxyServer.Start(router)
 	if err != nil {
 		return nil, fmt.Errorf("start proxy server: %w", err)
@@ -57,7 +59,7 @@ func NewProxyWrapper(
 
 	client := standard_client.New(
 		&standard_client.Config{
-			URL: "localhost:" + fmt.Sprint(proxyConfig.ServerConfig.Port),
+			URL: fmt.Sprintf("http://localhost:%d", proxyConfig.ServerConfig.Port),
 		})
 
 	return &ProxyWrapper{

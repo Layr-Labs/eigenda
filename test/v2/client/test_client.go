@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
@@ -17,12 +18,18 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
+	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/store"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
@@ -335,12 +342,59 @@ func NewTestClient(
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
-	var proxyWrapper *ProxyWrapper
-	if config.EnableProxy {
-		proxyWrapper, err = NewProxyWrapper(context.Background(), logger, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create proxy wrapper: %w", err)
-		}
+	proxyWrapper, err := NewProxyWrapper(context.Background(), logger,
+		&proxyconfig.AppConfig{
+			SecretConfig: proxycommon.SecretConfigV2{
+				SignerPaymentKey: privateKey,
+				EthRPCURL:        config.EthRPCURLs[0],
+			},
+			ServerConfig: proxyserver.Config{
+				Host:        "localhost",
+				Port:        config.ProxyPort,
+				EnabledAPIs: []string{"admin"},
+			},
+			MetricsServerConfig: proxymetrics.Config{
+				Enabled: false, // TODO enable this
+			},
+			StoreBuilderConfig: builder.Config{
+				StoreConfig: store.Config{
+					BackendsToEnable: []proxycommon.EigenDABackend{proxycommon.V2EigenDABackend},
+					DispersalBackend: proxycommon.V2EigenDABackend,
+					AsyncPutWorkers:  32,
+				},
+				ClientConfigV2: proxycommon.ClientConfigV2{
+					DisperserClientCfg: clientsv2.DisperserClientConfig{
+						Hostname:          config.DisperserHostname,
+						Port:              fmt.Sprintf("%d", config.DisperserPort),
+						UseSecureGrpcFlag: true,
+					},
+					PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
+						PayloadClientConfig:    *payloadClientConfig,
+						DisperseBlobTimeout:    5 * time.Minute,
+						BlobCompleteTimeout:    5 * time.Minute,
+						BlobStatusPollInterval: 1 * time.Second,
+						ContractCallTimeout:    5 * time.Second,
+					},
+					RelayPayloadRetrieverCfg: payloadretrieval.RelayPayloadRetrieverConfig{
+						PayloadClientConfig: *payloadClientConfig,
+						RelayTimeout:        5 * time.Second,
+					},
+					PutTries:                           3,
+					MaxBlobSizeBytes:                   16 * units.MiB,
+					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
+					BLSOperatorStateRetrieverAddr:      config.BLSOperatorStateRetrieverAddr,
+					EigenDAServiceManagerAddr:          config.EigenDAServiceManagerAddr,
+					EigenDADirectory:                   config.EigenDADirectory,
+					RetrieversToEnable: []proxycommon.RetrieverType{
+						proxycommon.RelayRetrieverType,
+						proxycommon.ValidatorRetrieverType,
+					},
+				},
+				KzgConfig: *kzgConfig,
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create proxy wrapper: %w", err)
 	}
 
 	return &TestClient{
@@ -509,12 +563,10 @@ func (c *TestClient) Stop() {
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
 // it back from the relays and the validators.
 func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) error {
-	start := time.Now()
 	eigenDACert, err := c.DispersePayload(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
-	c.metrics.reportCertificationTime(time.Since(start))
 
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
@@ -580,6 +632,21 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		true)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
+	}
+
+	return nil
+}
+
+// Similar to DisperseAndVerify, but uses the proxy instead of using the clients directly.
+func (c *TestClient) DisperseAndVerifyWithProxy(ctx context.Context, payload []byte) error {
+	cert, err := c.DispersePayloadWithProxy(ctx, payload)
+	if err != nil {
+		return fmt.Errorf("failed to disperse payload with proxy: %w", err)
+	}
+
+	_, err = c.ReadBlobWithProxy(ctx, cert, payload, 0)
+	if err != nil {
+		return fmt.Errorf("failed to read blob with proxy: %w", err)
 	}
 
 	return nil

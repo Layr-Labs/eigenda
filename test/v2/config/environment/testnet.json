@@ -19,5 +19,7 @@
   "MetricsPort": 9101,
   "DisableMetrics": true,
   "ValidatorReadConnectionPoolSize": 20,
-  "ValidatorReadComputePoolSize": 20
+  "ValidatorReadComputePoolSize": 20,
+  "ProxyPort": 1234,
+  "EigenDADirectory": "placeholder"
 }

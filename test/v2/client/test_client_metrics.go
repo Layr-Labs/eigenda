@@ -23,7 +23,6 @@ type testClientMetrics struct {
 	registry *prometheus.Registry
 
 	dispersalTime     *prometheus.SummaryVec
-	certificationTime *prometheus.SummaryVec
 	relayReadTime     *prometheus.SummaryVec
 	validatorReadTime *prometheus.SummaryVec
 	proxyReadTime     *prometheus.SummaryVec
@@ -62,20 +61,6 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 			Namespace: namespace,
 			Name:      "dispersal_time_ms",
 			Help:      "Time taken to disperse a blob, in milliseconds",
-			Objectives: map[float64]float64{
-				0.5:  0.05,
-				0.9:  0.01,
-				0.99: 0.001,
-			},
-		},
-		[]string{},
-	)
-
-	certificationTime := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: namespace,
-			Name:      "certification_time_ms",
-			Help:      "Time taken to certify a blob, in milliseconds",
 			Objectives: map[float64]float64{
 				0.5:  0.05,
 				0.9:  0.01,
@@ -214,7 +199,6 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		server:                 server,
 		registry:               registry,
 		dispersalTime:          dispersalTime,
-		certificationTime:      certificationTime,
 		relayReadTime:          relayReadTime,
 		validatorReadTime:      validatorReadTime,
 		proxyReadTime:          proxyReadTime,
@@ -261,13 +245,6 @@ func (m *testClientMetrics) reportDispersalTime(duration time.Duration) {
 	m.dispersalTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *testClientMetrics) reportCertificationTime(duration time.Duration) {
-	if m == nil {
-		return
-	}
-	m.certificationTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
 func (m *testClientMetrics) reportRelayReadTime(duration time.Duration, relayID uint32) {
 	if m == nil {
 		return
@@ -291,42 +268,72 @@ func (m *testClientMetrics) reportProxyReadTime(duration time.Duration) {
 
 // startOperation should be called when starting the process of dispersing + verifying a blob
 func (m *testClientMetrics) startOperation(operation string) {
+	if m == nil {
+		return
+	}
 	m.operationsInFlight.WithLabelValues(operation).Inc()
 }
 
 // endOperation should be called when finishing the process of dispersing + verifying a blob
 func (m *testClientMetrics) endOperation(operation string) {
+	if m == nil {
+		return
+	}
 	m.operationsInFlight.WithLabelValues(operation).Dec()
 }
 
 func (m *testClientMetrics) reportDispersalSuccess() {
+	if m == nil {
+		return
+	}
 	m.dispersalSuccesses.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportDispersalFailure() {
+	if m == nil {
+		return
+	}
 	m.dispersalFailures.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportRelayReadSuccess() {
+	if m == nil {
+		return
+	}
 	m.relayReadSuccesses.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportRelayReadFailure() {
+	if m == nil {
+		return
+	}
 	m.relayReadFailures.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportValidatorReadSuccess() {
+	if m == nil {
+		return
+	}
 	m.validatorReadSuccesses.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportValidatorReadFailure() {
+	if m == nil {
+		return
+	}
 	m.validatorReadFailures.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportProxyReadSuccess() {
+	if m == nil {
+		return
+	}
 	m.proxyReadSuccesses.WithLabelValues().Inc()
 }
 
 func (m *testClientMetrics) reportProxyReadFailure() {
+	if m == nil {
+		return
+	}
 	m.proxyReadFailures.WithLabelValues().Inc()
 }
