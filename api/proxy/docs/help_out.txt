@@ -55,7 +55,7 @@ GLOBAL OPTIONS:
    --eigenda.v2.blob-version value               Blob params version used when dispersing. This refers to a global version maintained by EigenDA
 governance and is injected in the BlobHeader before dispersing. Currently only supports (0). (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION]
    --eigenda.v2.bls-operator-state-retriever-addr value                [Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract. [$EIGENDA_PROXY_EIGENDA_V2_BLS_OPERATOR_STATE_RETRIEVER_ADDR]
-   --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value  Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. Required for performing eth_calls to verify EigenDA certificates. [$EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR]
+   --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value  Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier (V3 or above) contract. Required for performing eth_calls to verify EigenDA certificates, as well as fetching required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes). [$EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR]
    --eigenda.v2.contract-call-timeout value                            Timeout used when performing smart contract call operation (i.e, eth_call). (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_CONTRACT_CALL_TIMEOUT]
    --eigenda.v2.disable-point-evaluation                               Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISABLE_POINT_EVALUATION]
    --eigenda.v2.disable-tls                                            Disable TLS for gRPC communication with the EigenDA disperser and retrieval subnet. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS]
@@ -65,11 +65,13 @@ governance and is injected in the BlobHeader before dispersing. Currently only s
    --eigenda.v2.eth-rpc value                                          URL of the Ethereum RPC endpoint. [$EIGENDA_PROXY_EIGENDA_V2_ETH_RPC]
    --eigenda.v2.max-blob-length value                                  Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
 loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH]
-   --eigenda.v2.network value  The EigenDA network that is being used. This is an optional flag, to configure
-default values for eigenda.v2.disperser-rpc, eigenda.v2.service-manager-addr, and eigenda.v2.bls-operator-state-retriever-addr. If all of these fields are explicitly configured, the
-network flag may be omitted. If some or all of these fields are configured, and the network
-is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include mainnet, holesky_testnet, holesky_preprod, & sepolia_testnet. [$EIGENDA_PROXY_EIGENDA_V2_NETWORK]
+   --eigenda.v2.network value  The EigenDA network that is being used. This is an optional flag, 
+to configure default values for different EigenDA contracts and disperser URL. 
+See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
+for the exact values getting set by this flag. All of those values can also be manually
+set via their respective flags, and take precedence over the default values set by the network flag.
+If all of those other flags are manually configured, the network flag may be omitted. 
+Permitted EigenDANetwork values include mainnet, holesky_testnet, holesky_preprod, & sepolia_testnet. [$EIGENDA_PROXY_EIGENDA_V2_NETWORK]
    --eigenda.v2.put-retries value              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
    --eigenda.v2.rbn-recency-window-size value  Allowed distance (in L1 blocks) between the eigenDA cert's reference 
 block number (RBN) and the L1 block number at which the cert was included 
