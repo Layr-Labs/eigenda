@@ -589,16 +589,28 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
+	c.metrics.startOperation("dispersal")
+
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+	defer func() {
+		c.metrics.endOperation("dispersal")
+		if err == nil {
+			c.metrics.reportDispersalSuccess()
+			c.metrics.reportDispersalTime(time.Since(start))
+		} else {
+			c.metrics.reportDispersalFailure()
+		}
+	}()
 
 	payload := coretypes.NewPayload(payloadBytes)
 
-	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
+	var cert coretypes.EigenDACert
+	cert, err = c.GetPayloadDisperser().SendPayload(ctx, payload)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload, %s", err)
 	}
-
-	c.metrics.reportDispersalTime(time.Since(start))
 
 	return cert, nil
 }
@@ -609,16 +621,27 @@ func (c *TestClient) DispersePayloadWithProxy(ctx context.Context, payloadBytes 
 	if c.proxyWrapper == nil {
 		return nil, fmt.Errorf("proxy wrapper not initialized")
 	}
-
 	c.logger.Debugf("Dispersing payload of length %d with proxy", len(payloadBytes))
+
 	start := time.Now()
+	c.metrics.startOperation("dispersal")
+
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	defer func() {
+		c.metrics.endOperation("dispersal")
+		if err == nil {
+			c.metrics.reportDispersalSuccess()
+		} else {
+			c.metrics.reportDispersalFailure()
+		}
+		c.metrics.reportDispersalTime(time.Since(start))
+	}()
 
 	cert, err = c.proxyWrapper.SendPayload(ctx, payloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send payload via proxy: %w", err)
 	}
 
-	c.metrics.reportDispersalTime(time.Since(start))
 	return cert, nil
 }
 
@@ -635,6 +658,7 @@ func (c *TestClient) ReadBlobFromRelays(
 
 	for _, relayID := range relayKeys {
 		err := c.ReadBlobFromRelay(ctx, key, relayID, expectedPayload, blobLengthSymbols, timeout)
+
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay %d: %w", relayID, err)
 		}
@@ -653,20 +677,31 @@ func (c *TestClient) ReadBlobFromRelay(
 	timeout time.Duration,
 ) error {
 
-	start := time.Now()
-
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+
+	c.metrics.startOperation("relay_read")
+	start := time.Now()
+
+	defer func() {
+		c.metrics.endOperation("relay_read")
+		if err == nil {
+			c.metrics.reportRelayReadTime(time.Since(start), relayKey)
+		} else {
+			c.metrics.reportRelayReadFailure()
+		}
+	}()
+
 	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relay: %w", err)
 	}
-
-	c.metrics.reportRelayReadTime(time.Since(start), relayKey)
 
 	blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
 	if err != nil {
@@ -705,11 +740,28 @@ func (c *TestClient) ReadBlobFromValidators(
 		defer cancel()
 	}
 
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+
+	c.metrics.startOperation("validator_read")
+	start := time.Now()
+
+	defer func() {
+		c.metrics.endOperation("validator_read")
+		if err == nil {
+			if validateAndDecode {
+				// Only report timing if we actually do the full operation. Skip report if we only download the blob.
+				c.metrics.reportValidatorReadTime(time.Since(start))
+			}
+			c.metrics.reportValidatorReadSuccess()
+		} else {
+			c.metrics.reportValidatorReadFailure()
+		}
+	}()
+
 	if validateAndDecode {
-
-		start := time.Now()
-
-		retrievedBlobBytes, err := c.validatorClient.GetBlob(
+		var retrievedBlobBytes []byte
+		retrievedBlobBytes, err = c.validatorClient.GetBlob(
 			ctx,
 			header,
 			uint64(referenceBlockNumber))
@@ -717,17 +769,15 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		// Since retrieval is now agnostic to quorum ID, we default quorumID parameters to zero.
-		quorumID := core.QuorumID(0)
-		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
-
 		blobLengthSymbols := uint32(header.BlobCommitments.Length)
-		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+		var blob *coretypes.Blob
+		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
 
-		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+		var retrievedPayload *coretypes.Payload
+		retrievedPayload, err = blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to convert blob to payload: %w", err)
 		}
@@ -740,7 +790,7 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		// Just download the blob without validating or decoding. Don't report timing metrics for this operation.
 
-		_, err := c.onlyDownloadValidatorClient.GetBlob(
+		_, err = c.onlyDownloadValidatorClient.GetBlob(
 			ctx,
 			header,
 			uint64(referenceBlockNumber))
@@ -766,9 +816,24 @@ func (c *TestClient) ReadBlobWithProxy(ctx context.Context,
 		defer cancel()
 	}
 
-	start := time.Now()
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
 
-	data, err := c.proxyWrapper.GetPayload(ctx, cert)
+	start := time.Now()
+	c.metrics.startOperation("proxy_read")
+
+	defer func() {
+		c.metrics.endOperation("proxy_read")
+		if err == nil {
+			c.metrics.reportProxyReadSuccess()
+			c.metrics.reportProxyReadTime(time.Since(start))
+		} else {
+			c.metrics.reportProxyReadFailure()
+		}
+	}()
+
+	var data []byte
+	data, err = c.proxyWrapper.GetPayload(ctx, cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read blob from proxy: %w", err)
 	}

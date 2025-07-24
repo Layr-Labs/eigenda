@@ -123,44 +123,44 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 	}
 }
 
-// startOperation should be called when starting the process of dispersing + verifying a blob
-func (m *loadGeneratorMetrics) startOperation(operation string) {
-	m.operationsInFlight.WithLabelValues(operation).Inc()
-}
-
-// endOperation should be called when finishing the process of dispersing + verifying a blob
-func (m *loadGeneratorMetrics) endOperation(operation string) {
-	m.operationsInFlight.WithLabelValues(operation).Dec()
-}
-
-func (m *loadGeneratorMetrics) reportDispersalSuccess() {
-	m.dispersalSuccesses.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportDispersalFailure() {
-	m.dispersalFailures.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportRelayReadSuccess() {
-	m.relayReadSuccesses.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportRelayReadFailure() {
-	m.relayReadFailures.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportValidatorReadSuccess() {
-	m.validatorReadSuccesses.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportValidatorReadFailure() {
-	m.validatorReadFailures.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportProxyReadSuccess() {
-	m.proxyReadSuccesses.WithLabelValues().Inc()
-}
-
-func (m *loadGeneratorMetrics) reportProxyReadFailure() {
-	m.proxyReadFailures.WithLabelValues().Inc()
-}
+//// startOperation should be called when starting the process of dispersing + verifying a blob
+//func (m *loadGeneratorMetrics) startOperation(operation string) {
+//	m.operationsInFlight.WithLabelValues(operation).Inc()
+//}
+//
+//// endOperation should be called when finishing the process of dispersing + verifying a blob
+//func (m *loadGeneratorMetrics) endOperation(operation string) {
+//	m.operationsInFlight.WithLabelValues(operation).Dec()
+//}
+//
+//func (m *loadGeneratorMetrics) reportDispersalSuccess() {
+//	m.dispersalSuccesses.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportDispersalFailure() {
+//	m.dispersalFailures.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportRelayReadSuccess() {
+//	m.relayReadSuccesses.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportRelayReadFailure() {
+//	m.relayReadFailures.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportValidatorReadSuccess() {
+//	m.validatorReadSuccesses.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportValidatorReadFailure() {
+//	m.validatorReadFailures.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportProxyReadSuccess() {
+//	m.proxyReadSuccesses.WithLabelValues().Inc()
+//}
+//
+//func (m *loadGeneratorMetrics) reportProxyReadFailure() {
+//	m.proxyReadFailures.WithLabelValues().Inc()
+//}
