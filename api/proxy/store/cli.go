@@ -3,7 +3,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/urfave/cli/v2"
