@@ -276,9 +276,6 @@ func (l *LoadGenerator) disperseBlobWithProxy(rand *random.TestRandom) (
 	err error,
 ) {
 
-	// TODO wire into metrics
-	// TODO timeout?
-
 	payload = rand.Bytes(int(l.payloadSize))
 
 	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
@@ -289,35 +286,49 @@ func (l *LoadGenerator) disperseBlobWithProxy(rand *random.TestRandom) (
 		cancel()
 	}()
 
-	proxyWrapper, err := l.client.GetProxyWrapper()
-	if err != nil {
-		l.client.GetLogger().Errorf("failed to get proxy wrapper: %v", err)
-		return nil, nil, fmt.Errorf("failed to get proxy wrapper: %w", err)
-	}
-
-	cert, err = proxyWrapper.SendPayload(ctx, payload)
+	cert, err = l.client.DispersePayloadWithProxy(ctx, payload)
 	if err != nil {
 		l.metrics.reportDispersalFailure()
-		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
-		return nil, nil, fmt.Errorf("failed to send payload via proxy: %w", err)
+		l.client.GetLogger().Errorf("failed to disperse blob with proxy: %v", err)
+		return nil, nil, fmt.Errorf("failed to disperse blob with proxy: %w", err)
+	} else {
+		l.metrics.reportDispersalSuccess()
 	}
 
-	l.metrics.reportDispersalSuccess()
 	return cert, payload, nil
 }
 
 // Reads the blob using the proxy client. The proxy may in theory read the blob from the relays or validators, but
 // unless the relays are malfunctioning it will always read from the relays.
-func (l *LoadGenerator) readBlobWithProxy(
+func (l *LoadGenerator) doReadsWithProxy(
+	rand *random.TestRandom,
 	cert []byte,
 	expectedPayload []byte,
 ) error {
-	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
-	ctx, cancel := context.WithTimeout(l.ctx, timeout)
-	defer cancel()
 
-	// TODO future cody: continue here
+	var readCount int
+	if l.config.ProxyReadAmplification < 1 {
+		if rand.Float64() < l.config.ProxyReadAmplification {
+			readCount = 1
+		} else {
+			return nil // Skip reading this time
+		}
+	} else {
+		readCount = int(l.config.ProxyReadAmplification)
+	}
 
+	for i := 0; i < readCount; i++ {
+		_, err := l.client.ReadBlobWithProxy(l.ctx, cert, expectedPayload, 0)
+		if err == nil {
+			l.metrics.reportProxyReadSuccess()
+		} else {
+			l.metrics.reportProxyReadFailure()
+			l.client.GetLogger().Errorf("failed to read blob from proxy: %v", err)
+			return fmt.Errorf("failed to read blob from proxy: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // readBlobFromRelays reads a blob from the relays using the GRPC clients.

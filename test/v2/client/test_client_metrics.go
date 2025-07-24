@@ -27,6 +27,7 @@ type testClientMetrics struct {
 	certificationTime *prometheus.SummaryVec
 	relayReadTime     *prometheus.SummaryVec
 	validatorReadTime *prometheus.SummaryVec
+	proxyReadTime     *prometheus.SummaryVec
 }
 
 // newTestClientMetrics creates a new testClientMetrics.
@@ -103,6 +104,20 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		[]string{"quorum"},
 	)
 
+	proxyReadTime := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: namespace,
+			Name:      "proxy_read_time_ms",
+			Help:      "Time taken to read a blob from a proxy, in milliseconds",
+			Objectives: map[float64]float64{
+				0.5:  0.05,
+				0.9:  0.01,
+				0.99: 0.001,
+			},
+		},
+		[]string{},
+	)
+
 	return &testClientMetrics{
 		logger:            logger,
 		server:            server,
@@ -111,6 +126,7 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		certificationTime: certificationTime,
 		relayReadTime:     relayReadTime,
 		validatorReadTime: validatorReadTime,
+		proxyReadTime:     proxyReadTime,
 	}
 }
 
@@ -168,4 +184,12 @@ func (m *testClientMetrics) reportValidatorReadTime(duration time.Duration, quor
 		return
 	}
 	m.validatorReadTime.WithLabelValues(fmt.Sprintf("%d", quorum)).Observe(common.ToMilliseconds(duration))
+}
+
+// reportProxyReadTime reports the time taken to read a blob from a proxy.
+func (m *testClientMetrics) reportProxyReadTime(duration time.Duration) {
+	if m == nil {
+		return
+	}
+	m.proxyReadTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }

@@ -603,6 +603,25 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 	return cert, nil
 }
 
+// DispersePayloadWithProxy sends a payload to the proxy wrapper, which then disperses it to EigenDA. Returns the cert
+// in byte format, since that's what the proxy returns.
+func (c *TestClient) DispersePayloadWithProxy(ctx context.Context, payloadBytes []byte) (cert []byte, err error) {
+	if c.proxyWrapper == nil {
+		return nil, fmt.Errorf("proxy wrapper not initialized")
+	}
+
+	c.logger.Debugf("Dispersing payload of length %d with proxy", len(payloadBytes))
+	start := time.Now()
+
+	cert, err = c.proxyWrapper.SendPayload(ctx, payloadBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send payload via proxy: %w", err)
+	}
+
+	c.metrics.reportDispersalTime(time.Since(start))
+	return cert, nil
+}
+
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
 //
 // The timeout provided is a timeout for each individual relay read, not all reads as a whole.
@@ -677,7 +696,8 @@ func (c *TestClient) ReadBlobFromValidators(
 	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
-	validateAndDecode bool) error {
+	validateAndDecode bool,
+) error {
 
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -730,6 +750,36 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	return nil
+}
+
+// ReadBlobWithProxy reads a blob from the proxy wrapper and compares it to the expected payload bytes.
+// The timeout is ignored if zero. If the proxy wrapper is not enabled, this method returns an error.
+func (c *TestClient) ReadBlobWithProxy(ctx context.Context,
+	cert []byte,
+	expectedPayloadBytes []byte,
+	timeout time.Duration,
+) ([]byte, error) {
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	start := time.Now()
+
+	data, err := c.proxyWrapper.GetPayload(ctx, cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read blob from proxy: %w", err)
+	}
+
+	if !bytes.Equal(data, expectedPayloadBytes) {
+		return nil, fmt.Errorf("read payload does not match expected payload")
+	}
+
+	c.metrics.reportProxyReadTime(time.Since(start))
+
+	return data, nil
 }
 
 // GetProxyWrapper returns the proxy wrapper. If the proxy wrapper is not enabled, this method returns an error.

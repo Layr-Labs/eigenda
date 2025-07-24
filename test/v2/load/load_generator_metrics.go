@@ -16,6 +16,8 @@ type loadGeneratorMetrics struct {
 	relayReadFailures      *prometheus.CounterVec
 	validatorReadSuccesses *prometheus.CounterVec
 	validatorReadFailures  *prometheus.CounterVec
+	proxyReadSuccesses     *prometheus.CounterVec
+	proxyReadFailures      *prometheus.CounterVec
 }
 
 // newLoadGeneratorMetrics creates a new loadGeneratorMetrics.
@@ -90,6 +92,24 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{},
 	)
 
+	proxyReadSuccesses := promauto.With(registerer).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "proxy_read_successes",
+			Help:      "Number of proxy read successes",
+		},
+		[]string{},
+	)
+
+	proxyReadFailures := promauto.With(registerer).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "proxy_read_failures",
+			Help:      "Number of proxy read failures",
+		},
+		[]string{},
+	)
+
 	return &loadGeneratorMetrics{
 		operationsInFlight:     operationsInFlight,
 		dispersalSuccesses:     dispersalSuccesses,
@@ -98,6 +118,8 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		relayReadFailures:      relayReadFailures,
 		validatorReadSuccesses: validatorReadSuccesses,
 		validatorReadFailures:  validatorReadFailures,
+		proxyReadSuccesses:     proxyReadSuccesses,
+		proxyReadFailures:      proxyReadFailures,
 	}
 }
 
@@ -133,4 +155,12 @@ func (m *loadGeneratorMetrics) reportValidatorReadSuccess() {
 
 func (m *loadGeneratorMetrics) reportValidatorReadFailure() {
 	m.validatorReadFailures.WithLabelValues().Inc()
+}
+
+func (m *loadGeneratorMetrics) reportProxyReadSuccess() {
+	m.proxyReadSuccesses.WithLabelValues().Inc()
+}
+
+func (m *loadGeneratorMetrics) reportProxyReadFailure() {
+	m.proxyReadFailures.WithLabelValues().Inc()
 }
