@@ -282,6 +282,21 @@ func buildEigenDAV2Backend(
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
+	if !isRouter {
+		// We call GetCertVersion to ensure that the cert verifier is at least version 3. See
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol#L12
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/EigenDACertVerifier.sol#L79
+		// We pass in block 0 because a static certVerifierAddress provider is used when not using a router,
+		// so the block number is not relevant.
+		// TODO: we might want to only enforce this if the proxy is started in dispersal mode, to allow for
+		// proxy to be started in verification-only mode using a CertVerifierV2?
+		_, err = certVerifier.GetCertVersion(ctx, 0)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%s doesn't appear to be a CertVerifier version >= V3: failed to call certVersion(): %w",
+				routerOrImmutableVerifierAddr.Hex(), err)
+		}
+	}
 
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range config.ClientConfigV2.RetrieversToEnable {
