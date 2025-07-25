@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
@@ -53,10 +52,10 @@ const (
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	config                      *TestClientConfig
-	payloadClientConfig         *clients.PayloadClientConfig
+	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
-	disperserClient             clients.DisperserClient
+	disperserClient             clientsv2.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
@@ -67,7 +66,7 @@ type TestClient struct {
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
-	certBuilder                 *clients.CertBuilder
+	certBuilder                 *clientsv2.CertBuilder
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -143,13 +142,13 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
 	}
 
-	disperserConfig := &clients.DisperserClientConfig{
+	disperserConfig := &clientsv2.DisperserClientConfig{
 		Hostname:          config.DisperserHostname,
 		Port:              fmt.Sprintf("%d", config.DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
 
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
@@ -194,7 +193,7 @@ func NewTestClient(
 	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
 	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
 	//  options.
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
+	payloadClientConfig := clientsv2.GetDefaultPayloadClientConfig()
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,
@@ -208,7 +207,7 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
+	certBuilder, err := clientsv2.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}
@@ -496,7 +495,7 @@ func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
 }
 
 // GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() clients.DisperserClient {
+func (c *TestClient) GetDisperserClient() clientsv2.DisperserClient {
 	return c.disperserClient
 }
 
@@ -536,7 +535,7 @@ func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
 }
 
 // GetCertBuilder returns the test client's cert builder.
-func (c *TestClient) GetCertBuilder() *clients.CertBuilder {
+func (c *TestClient) GetCertBuilder() *clientsv2.CertBuilder {
 	return c.certBuilder
 }
 
@@ -759,6 +758,7 @@ func (c *TestClient) ReadBlobFromRelay(
 	defer func() {
 		c.metrics.endOperation("relay_read")
 		if err == nil {
+			c.metrics.reportRelayReadSuccess()
 			c.metrics.reportRelayReadTime(time.Since(start), relayKey)
 		} else {
 			c.metrics.reportRelayReadFailure()

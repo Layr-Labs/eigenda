@@ -190,7 +190,11 @@ func (l *LoadGenerator) run() {
 
 		l.lifecycleLimiter <- struct{}{}
 		go func() {
-			l.readAndWriteBlob()
+			if l.config.UseProxy {
+				l.readAndWriteBlobWithProxy()
+			} else {
+				l.readAndWriteBlob()
+			}
 			<-l.lifecycleLimiter
 		}()
 	}
@@ -203,6 +207,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	defer l.randPool.Put(randObj) // Return to pool when done
 
 	l.submissionLimiter <- struct{}{}
+
 	blobKey, payload, eigenDACert, err := l.disperseBlob(rand)
 	<-l.submissionLimiter
 	if err != nil {
@@ -260,6 +265,29 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	return blobKey, payload, eigenDACert, nil
 }
 
+func (l *LoadGenerator) readAndWriteBlobWithProxy() {
+	// Get a random generator from the pool
+	randObj := l.randPool.Get()
+	rand := randObj.(*random.TestRandom)
+	defer l.randPool.Put(randObj) // Return to pool when done
+
+	l.submissionLimiter <- struct{}{}
+
+	payload, cert, err := l.disperseBlobWithProxy(rand)
+	<-l.submissionLimiter
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
+		return
+	}
+
+	l.relayReadLimiter <- struct{}{}
+	err = l.doReadsWithProxy(rand, cert, payload)
+	<-l.relayReadLimiter
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to read blob from proxy: %w", err)
+	}
+}
+
 // Disperses a blob using the proxy (as opposed to using the GRPC clients directly). Returns the blob cert in byte
 // form since this is how the proxy forces the user to interact with it.
 func (l *LoadGenerator) disperseBlobWithProxy(rand *random.TestRandom) (
@@ -291,14 +319,14 @@ func (l *LoadGenerator) doReadsWithProxy(
 ) error {
 
 	var readCount int
-	if l.config.ProxyReadAmplification < 1 {
-		if rand.Float64() < l.config.ProxyReadAmplification {
+	if l.config.RelayReadAmplification < 1 {
+		if rand.Float64() < l.config.RelayReadAmplification {
 			readCount = 1
 		} else {
 			return nil // Skip reading this time
 		}
 	} else {
-		readCount = int(l.config.ProxyReadAmplification)
+		readCount = int(l.config.RelayReadAmplification)
 	}
 
 	for i := 0; i < readCount; i++ {
