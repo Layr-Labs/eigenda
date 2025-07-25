@@ -44,8 +44,6 @@ type LoadGenerator struct {
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
 	finishedChan chan struct{}
-	// The metrics for the load generator.
-	metrics *loadGeneratorMetrics
 	// Pool of random number generators
 	randPool *sync.Pool
 	// The time when the load generator started.
@@ -108,8 +106,6 @@ func NewLoadGenerator(
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
-	metrics := newLoadGeneratorMetrics(client.GetMetricsRegistry())
-
 	if config.EnablePprof {
 		pprofProfiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", config.PprofHttpPort), client.GetLogger())
 		go pprofProfiler.Start()
@@ -138,7 +134,6 @@ func NewLoadGenerator(
 		alive:                atomic.Bool{},
 		finishedChan:         make(chan struct{}),
 		randPool:             randPool,
-		metrics:              metrics,
 		startTime:            time.Now(),
 		payloadSize:          payloadSize,
 	}, nil
