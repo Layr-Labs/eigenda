@@ -107,7 +107,7 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    Metrics
 
    --metrics.addr value  Metrics listening address (default: "0.0.0.0") [$EIGENDA_PROXY_METRICS_ADDR]
-   --metrics.enabled     Enable the metrics server (default: false) [$EIGENDA_PROXY_METRICS_ENABLED]
+   --metrics.enabled     Enable the metrics server. On by default, so use --metrics.enabled=false to disable. (default: true) [$EIGENDA_PROXY_METRICS_ENABLED]
    --metrics.port value  Metrics listening port (default: 7300) [$EIGENDA_PROXY_METRICS_PORT]
 
    Proxy Server
