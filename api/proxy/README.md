@@ -283,13 +283,12 @@ The default value is 8. Using 0 is dangerous: see [troubleshooting the batch-has
 An ephemeral memory store backend can be used for faster feedback testing when testing rollup integrations. To target this feature, use the CLI flags `--memstore.enabled`, `--memstore.expiration`.
 
 #### Asynchronous Secondary Insertions <!-- omit from toc -->
-An optional `--routing.concurrent-write-routines` flag can be provided to enable asynchronous processing for secondary writes - allowing for more efficient dispersals in the presence of a hefty secondary routing layer. This flag specifies the number of write routines spun-up with supported thread counts in range `[1, 100)`.
-
-#### Storage Fallback <!-- omit from toc -->
-An optional storage fallback CLI flag `--routing.fallback-targets` can be leveraged to ensure resiliency when **reading**. When enabled, a blob is persisted to a fallback target after being successfully dispersed. Fallback targets use the keccak256 hash of the existing EigenDA commitment as their key, for succinctness. In the event that blobs cannot be read from EigenDA, they will then be retrieved in linear order from the provided fallback targets. 
+An optional `--storage.concurrent-write-routines` flag can be provided to enable asynchronous processing for secondary writes - allowing for more efficient dispersals in the presence of a hefty secondary routing layer. This flag specifies the number of write routines spun-up with supported thread counts in range `[1, 100)`.
 
 #### Storage Caching <!-- omit from toc -->
-An optional storage caching CLI flag `--routing.cache-targets` can be leveraged to ensure less redundancy and more optimal reading. When enabled, a blob is persisted to each cache target after being successfully dispersed using the keccak256 hash of the existing EigenDA commitment for the fallback target key. This ensure second order keys are succinct. Upon a blob retrieval request, the cached targets are first referenced to read the blob data before referring to EigenDA. 
+An optional flag `--storage.cache-targets` can be enabled to persist successfully dispersed blobs to each cache target, with the keccak256 hash of the constructed cert used as the key.
+Upon blob retrieval requests, the cached targets will each be tried before reading from EigenDA. `--storage.write-on-cache-miss` can also be set to true to write the blob after retrievals,
+which can be used to populate caches during archival syncs, as one example.
 
 #### Failover Signals <!-- omit from toc -->
 In the event that the EigenDA disperser or network is down, the proxy will return a 503 (Service Unavailable) status code as a response to POST requests, which rollup batchers can use to failover and start submitting blobs to the L1 chain instead. For more info, see our failover designs for [op-stack](https://github.com/ethereum-optimism/specs/issues/434) and for [arbitrum](https://hackmd.io/@epociask/SJUyIZlZkx).

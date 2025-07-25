@@ -223,56 +223,6 @@ func testProxyCachingWithRedis(t *testing.T, dispersalBackend common.EigenDABack
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
-func TestProxyReadFallbackV1(t *testing.T) {
-	testProxyReadFallback(t, common.V1EigenDABackend)
-}
-
-func TestProxyReadFallbackV2(t *testing.T) {
-	testProxyReadFallback(t, common.V2EigenDABackend)
-}
-
-/*
-Ensure that fallback location is read from when EigenDA blob is not available.
-This is done by setting the memstore expiration time to 1ms and waiting for the blob to expire
-before attempting to read it.
-*/
-func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	if testutils.GetBackend() != testutils.MemstoreBackend {
-		t.Skip(`test only runs with memstore, since fallback relies on blob fetch failing, and it won't fail
-						against actual eigen DA`)
-	}
-
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
-	testCfg.UseS3Fallback = true
-	// ensure that blob memstore eviction times result in near immediate activation
-	testCfg.Expiration = time.Millisecond * 1
-
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	cfg := &standard_client.Config{
-		URL: ts.Address(),
-	}
-	daClient := standard_client.New(cfg)
-	expectedBlob := testutils.RandBytes(1_000_000)
-	t.Log("Setting input data on proxy server...")
-	blobInfo, err := daClient.SetData(ts.Ctx, expectedBlob)
-	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
-	t.Log("Getting input data from proxy server...")
-	actualBlob, err := daClient.GetData(ts.Ctx, blobInfo)
-	require.NoError(t, err)
-	require.Equal(t, expectedBlob, actualBlob)
-
-	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
 func TestProxyWriteCacheOnMissV1(t *testing.T) {
 	testProxyWriteCacheOnMiss(t, common.V1EigenDABackend)
 }
