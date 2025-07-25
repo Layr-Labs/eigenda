@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/Layr-Labs/eigenda/common"
 	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,7 +16,7 @@ type EigenDADirectoryReader struct {
 }
 
 // NewEigenDADirectoryReader creates a new EigenDADirectoryReader
-func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client common.EthClient) (*EigenDADirectoryReader, error) {
+func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client bind.ContractBackend) (*EigenDADirectoryReader, error) {
 	if eigendaDirectoryHexAddr == "" || !gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
 		return nil, fmt.Errorf("address directory must be a valid hex address: %s", eigendaDirectoryHexAddr)
 	}
@@ -62,6 +61,25 @@ func (r *EigenDADirectoryReader) GetOperatorStateRetrieverAddress() (gethcommon.
 // GetServiceManagerAddress returns the service manager address with validation
 func (r *EigenDADirectoryReader) GetServiceManagerAddress() (gethcommon.Address, error) {
 	return r.getAddressWithValidation(ContractNames.ServiceManager)
+}
+
+// GetAllAddresses returns all contract addresses from the directory in a map keyed by contract name
+func (r *EigenDADirectoryReader) GetAllAddresses() (map[string]gethcommon.Address, error) {
+	names, err := r.contract.GetAllNames(&bind.CallOpts{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all contract names: %w", err)
+	}
+
+	addresses := make(map[string]gethcommon.Address)
+	for _, name := range names {
+		addr, err := r.contract.GetAddress0(&bind.CallOpts{}, name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get %s address: %w", name, err)
+		}
+		addresses[name] = addr
+	}
+
+	return addresses, nil
 }
 
 // TODO: add other getters for other contracts; they are not needed for the current usage
