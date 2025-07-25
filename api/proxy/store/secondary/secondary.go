@@ -23,16 +23,15 @@ const (
 	Failed  MetricExpression = "failed"
 )
 
+// Interface to manage secondary storage backends aka caches.
 type ISecondary interface {
 	AsyncWriteEntry() bool
-	Enabled() bool
 	Topic() chan<- PutNotify
 	CachingEnabled() bool
-	FallbackEnabled() bool
 	HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error
 	// verify fn signature has to match that of common/store.go's GeneratedKeyStore.Verify fn.
 	MultiSourceRead(
-		ctx context.Context, commitment []byte, fallback bool,
+		ctx context.Context, commitment []byte,
 		verify func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
 		verifyOpts common.CertVerificationOpts,
 	) ([]byte, error)
@@ -52,8 +51,7 @@ type SecondaryManager struct {
 	log logging.Logger
 	m   metrics.Metricer
 
-	caches    []common.SecondaryStore
-	fallbacks []common.SecondaryStore
+	caches []common.SecondaryStore
 
 	verifyLock       sync.RWMutex
 	topic            chan PutNotify
@@ -66,7 +64,6 @@ func NewSecondaryManager(
 	log logging.Logger,
 	m metrics.Metricer,
 	caches []common.SecondaryStore,
-	fallbacks []common.SecondaryStore,
 	writeOnCacheMiss bool,
 ) ISecondary {
 	return &SecondaryManager{
@@ -76,7 +73,6 @@ func NewSecondaryManager(
 		log:              log,
 		m:                m,
 		caches:           caches,
-		fallbacks:        fallbacks,
 		verifyLock:       sync.RWMutex{},
 		writeOnCacheMiss: writeOnCacheMiss,
 	}
@@ -87,27 +83,18 @@ func (sm *SecondaryManager) Topic() chan<- PutNotify {
 	return sm.topic
 }
 
-func (sm *SecondaryManager) Enabled() bool {
-	return sm.CachingEnabled() || sm.FallbackEnabled()
-}
-
 func (sm *SecondaryManager) CachingEnabled() bool {
 	return len(sm.caches) > 0
-}
-
-func (sm *SecondaryManager) FallbackEnabled() bool {
-	return len(sm.fallbacks) > 0
 }
 
 func (sm *SecondaryManager) WriteOnCacheMissEnabled() bool {
 	return sm.CachingEnabled() && sm.writeOnCacheMiss
 }
 
-// HandleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
+// HandleRedundantWrites ... writes to both enabled caches
 // and returns an error if NONE of them succeed
 func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
 	sources := sm.caches
-	sources = append(sources, sm.fallbacks...)
 
 	key := crypto.Keccak256(commitment)
 	successes := 0
@@ -172,20 +159,12 @@ func (sm *SecondaryManager) WriteSubscriptionLoop(ctx context.Context) {
 func (sm *SecondaryManager) MultiSourceRead(
 	ctx context.Context,
 	commitment []byte,
-	fallback bool,
 	// verifyOpts are passed to the verification function
 	verify func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
 	verifyOpts common.CertVerificationOpts,
 ) ([]byte, error) {
-	var sources []common.SecondaryStore
-	if fallback {
-		sources = sm.fallbacks
-	} else {
-		sources = sm.caches
-	}
-
 	key := crypto.Keccak256(commitment)
-	for _, src := range sources {
+	for _, src := range sm.caches {
 		cb := sm.m.RecordSecondaryRequest(src.BackendType().String(), http.MethodGet)
 		data, err := src.Get(ctx, key)
 		if err != nil {

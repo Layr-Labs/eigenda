@@ -114,14 +114,14 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    --api-enabled value [ --api-enabled value ]  List of API types to enable (e.g. admin) [$EIGENDA_PROXY_API_ENABLED]
    --port value                                 Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
 
-   Redis Cache/Fallback
+   Redis Cache
 
    --redis.db value        Redis database (default: 0) [$EIGENDA_PROXY_REDIS_DB]
    --redis.endpoint value  Redis endpoint [$EIGENDA_PROXY_REDIS_ENDPOINT]
    --redis.eviction value  Redis eviction time (default: 24h0m0s) [$EIGENDA_PROXY_REDIS_EVICTION]
    --redis.password value  Redis password [$EIGENDA_PROXY_REDIS_PASSWORD]
 
-   S3 Cache/Fallback
+   S3 Cache
 
    --s3.access-key-id value      access key id for S3 storage [$EIGENDA_PROXY_S3_ACCESS_KEY_ID]
    --s3.access-key-secret value  access key secret for S3 storage [$EIGENDA_PROXY_S3_ACCESS_KEY_SECRET]
@@ -137,6 +137,5 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    --storage.cache-targets value [ --storage.cache-targets value ]            List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
    --storage.concurrent-write-routines value                                  Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
    --storage.dispersal-backend value                                          Target EigenDA backend version for blob dispersal (e.g. V1 or V2). (default: "V1") [$EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND]
-   --storage.fallback-targets value [ --storage.fallback-targets value ]      List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
    --storage.write-on-cache-miss                                              While doing a GET, write to the secondary storage if the cert/blob is not found in the cache but is found in EigenDA. (default: false) [$EIGENDA_PROXY_STORAGE_WRITE_ON_CACHE_MISS]
 

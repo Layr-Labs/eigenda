@@ -176,7 +176,6 @@ type TestConfig struct {
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
 	UseRedisCaching    bool
-	UseS3Fallback      bool
 }
 
 // NewTestConfig returns a new TestConfig
@@ -203,7 +202,6 @@ func NewTestConfig(
 		UseKeccak256ModeS3: false,
 		UseS3Caching:       false,
 		UseRedisCaching:    false,
-		UseS3Fallback:      false,
 		WriteThreadCount:   0,
 		WriteOnCacheMiss:   false,
 	}
@@ -378,9 +376,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		builderConfig.S3Config = createS3Config()
 	case testCfg.UseS3Caching:
 		builderConfig.StoreConfig.CacheTargets = []string{"S3"}
-		builderConfig.S3Config = createS3Config()
-	case testCfg.UseS3Fallback:
-		builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
 		builderConfig.S3Config = createS3Config()
 	case testCfg.UseRedisCaching:
 		builderConfig.StoreConfig.CacheTargets = []string{"redis"}

@@ -11,7 +11,6 @@ import (
 var (
 	BackendsToEnableFlagName = withFlagPrefix("backends-to-enable")
 	DispersalBackendFlagName = withFlagPrefix("dispersal-backend")
-	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
 	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
 	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
 	WriteOnCacheMissFlagName = withFlagPrefix("write-on-cache-miss")
@@ -44,13 +43,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: false,
 			Value:    "V1",
-		},
-		&cli.StringSliceFlag{
-			Name:     FallbackTargetsFlagName,
-			Usage:    "List of read fallback targets to rollover to if cert can't be read from EigenDA.",
-			Value:    cli.NewStringSlice(),
-			EnvVars:  withEnvPrefix(envPrefix, "FALLBACK_TARGETS"),
-			Category: category,
 		},
 		&cli.StringSliceFlag{
 			Name:     CacheTargetsFlagName,
@@ -100,7 +92,6 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		BackendsToEnable: backends,
 		DispersalBackend: dispersalBackend,
 		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
-		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
 		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),
 		WriteOnCacheMiss: ctx.Bool(WriteOnCacheMissFlagName),
 	}, nil

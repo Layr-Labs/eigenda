@@ -120,11 +120,10 @@ func BuildStoreManager(
 		}
 	}
 
-	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
+	secondary := secondary.NewSecondaryManager(log, metrics, caches, config.StoreConfig.WriteOnCacheMiss)
 
-	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
+	if secondary.CachingEnabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
 
 		for i := 0; i < config.StoreConfig.AsyncPutWorkers; i++ {
@@ -138,9 +137,8 @@ func BuildStoreManager(
 		"eigenda_v2", eigenDAV2Store != nil,
 		"s3", s3Store != nil,
 		"redis", redisStore != nil,
-		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
-		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
+		"async_secondary_writes", (secondary.CachingEnabled() && config.StoreConfig.AsyncPutWorkers > 0),
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 

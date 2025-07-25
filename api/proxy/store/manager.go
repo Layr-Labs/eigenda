@@ -43,7 +43,7 @@ type Manager struct {
 	eigendaV2        common.EigenDAV2Store // >= v1 version bytes
 	dispersalBackend atomic.Value          // stores the EigenDABackend to write blobs to
 
-	// secondary storage backends (caching and fallbacks)
+	// secondary storage backends (caches)
 	secondary secondary.ISecondary
 }
 
@@ -118,35 +118,26 @@ func (m *Manager) Get(ctx context.Context,
 		// 1 - read blob from cache if enabled
 		if m.secondary.CachingEnabled() {
 			m.log.Debug("Retrieving data from cached backends")
-			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, false, verifyMethod, verifyOpts)
+			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, verifyMethod, verifyOpts)
 			if err == nil {
 				return data, nil
 			}
-
 			m.log.Warn("Failed to read from cache targets", "err", err)
 		}
 
 		// 2 - read blob from EigenDA
 		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, verifyOpts)
-		if err == nil {
-			if m.secondary.WriteOnCacheMissEnabled() {
-				m.backupToSecondary(ctx, versionedCert.SerializedCert, data)
-			}
-
-			return data, nil
+		if err != nil {
+			return nil, fmt.Errorf("getFromCorrectEigenDABackend: %w", err)
 		}
 
-		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
-		if m.secondary.FallbackEnabled() {
-			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod, verifyOpts)
-			if err != nil {
-				m.log.Error("Failed to read from fallback targets", "err", err)
-				return nil, err
-			}
-		} else {
-			return nil, err
+		// 3 - write to cache if enabled
+		if m.secondary.WriteOnCacheMissEnabled() {
+			m.backupToSecondary(ctx, versionedCert.SerializedCert, data)
 		}
-		return data, err
+
+		return data, nil
+
 	case commitments.OptimismKeccakCommitmentMode:
 		// TODO: we should refactor the manager to not deal with keccak commitments at all.
 		return nil, fmt.Errorf("INTERNAL BUG: call GetOPKeccakValueFromS3 instead")
@@ -175,7 +166,7 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, value 
 	}
 
 	// 2 - Put blob into secondary storage backends
-	if m.secondary.Enabled() {
+	if m.secondary.CachingEnabled() {
 		m.backupToSecondary(ctx, commit, value)
 	}
 
