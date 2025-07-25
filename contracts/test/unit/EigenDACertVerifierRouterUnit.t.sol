@@ -40,6 +40,55 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         );
     }
 
+    function test_initializeMultiple(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10;
+        initABNs[1] = initABNs[0] + seed % 10 + 1;
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](3);
+        initCertVerifiers[0] = address(1);
+        initCertVerifiers[1] = address(2);
+        initCertVerifiers[2] = address(3);
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
+
+        for (uint256 i = 0; i < initABNs.length; i++) {
+            assertEq(testRouter.certVerifiers(initABNs[i]), initCertVerifiers[i]);
+            assertEq(testRouter.certVerifierABNs(i), initABNs[i]);
+        }
+    }
+
+    function test_cannotInitializeWithMismatchedLengths(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10;
+        initABNs[1] = initABNs[0] + seed % 10 + 1;
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](2); // Mismatched length
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        vm.expectRevert(EigenDACertVerifierRouter.LengthMismatch.selector);
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
+    }
+
+    function test_cannotInitializeWithBadABNOrder(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10 + 1;
+        initABNs[1] = initABNs[0] - 1; // Invalid order
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](3);
+        initCertVerifiers[0] = address(1);
+        initCertVerifiers[1] = address(2);
+        initCertVerifiers[2] = address(3);
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        vm.expectRevert(abi.encodeWithSelector(EigenDACertVerifierRouter.ABNNotGreaterThanLast.selector, initABNs[1]));
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
+    }
+
     function test_verifyDACert(uint256 seed1, uint256 seed2, uint256 seed3) public {
         EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(seed1);
         uint32 rbn = cert.batchHeader.referenceBlockNumber;
