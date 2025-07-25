@@ -268,7 +268,7 @@ func (l *LoadGenerator) readAndWriteBlobWithProxy() {
 
 	l.submissionLimiter <- struct{}{}
 
-	payload, cert, err := l.disperseBlobWithProxy(rand)
+	cert, payload, err := l.disperseBlobWithProxy(rand)
 	<-l.submissionLimiter
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
