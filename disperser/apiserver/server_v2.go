@@ -14,6 +14,7 @@ import (
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -23,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -143,8 +145,12 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	loggingOpts := []grpclogging.Option{
+		grpclogging.WithLogOnEvents(grpclogging.StartCall, grpclogging.FinishCall),
+	}
 	gs := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			grpclogging.UnaryServerInterceptor(common.InterceptorLogger(s.logger), loggingOpts...),
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
 		), opt)
 	reflection.Register(gs)
