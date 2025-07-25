@@ -345,7 +345,7 @@ func NewTestClient(
 		&proxyconfig.AppConfig{
 			SecretConfig: proxycommon.SecretConfigV2{
 				SignerPaymentKey: privateKey,
-				EthRPCURL:        config.EthRPCURLs[0],
+				EthRPCURL:        ethRPCUrls[0],
 			},
 			ServerConfig: proxyserver.Config{
 				Host:        "localhost",
