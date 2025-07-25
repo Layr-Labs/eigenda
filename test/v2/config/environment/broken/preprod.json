@@ -3,7 +3,6 @@
   "KeyPath": "~/.test-v2/preprod-private-key.txt",
   "KeyVar": "LIVE_TEST_PREPROD_HOLESKY_KEY",
   "DisperserHostname": "disperser-preprod-holesky.eigenda.xyz",
-  "DisperserPort": 443,
   "EthRPCURLs": [
     "https://ethereum-holesky-rpc.publicnode.com"
   ],
@@ -13,10 +12,5 @@
   "EigenDACertVerifierAddressQuorums0_1_2": "0x2ccB62f3349DD04FEeff189C7f0568193eFd4430",
   "EigenDACertVerifierAddressQuorums2":     "0xBC23d765540b77803910E65F62BF01a9F8CaB30A",
   "SubgraphURL": "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
-  "SRSOrder": 268435456,
-  "MaxBlobSize": 16777216,
-  "MetricsPort": 9101,
-  "DisableMetrics": true,
-  "ValidatorReadConnectionPoolSize": 20,
-  "ValidatorReadComputePoolSize": 20
+  "DisableMetrics": true
 }
