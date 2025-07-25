@@ -37,7 +37,6 @@ func (cfg *Config) checkCacheTargets(targets []string) error {
 
 // Check ... verifies that configuration values are adequately set
 func (cfg *Config) Check() error {
-
 	err := cfg.checkCacheTargets(cfg.CacheTargets)
 	if err != nil {
 		return err

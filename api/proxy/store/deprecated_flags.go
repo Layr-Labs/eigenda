@@ -24,8 +24,8 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "FALLBACK_TARGETS"),
 			Category: category,
 			Action: func(*cli.Context, []string) error {
-				return fmt.Errorf("Fallback reads are deprecated in favor of cache reads. "+
-					"flag --%s (env var %s) is thus deprecated; use --%s (env var %s) instead.",
+				return fmt.Errorf("fallback reads are deprecated in favor of cache reads: "+
+					"flag --%s (env var %s) is thus deprecated; use --%s (env var %s) instead",
 					FallbackTargetsFlagName, withEnvPrefix(envPrefix, "FALLBACK_TARGETS"),
 					CacheTargetsFlagName, withEnvPrefix(envPrefix, "CACHE_TARGETS"))
 			},
