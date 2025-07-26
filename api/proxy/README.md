@@ -85,7 +85,38 @@ The source of truth for the routes is defined by our gorilla mux router in [./se
 
 #### Standard Routes
 
-TODO
+These routes are used by standard clients (e.g., Arbitrum Nitro, AVS, and other stacks) that don't require special prefix bytes in their commitments. They provide a simple interface for storing and retrieving data from EigenDA.
+
+```text
+Request:
+  POST /put?commitment_mode=standard
+  Content-Type: application/octet-stream
+  Body: <payload_bytes>
+
+Response:
+  200 OK
+  Content-Type: application/octet-stream
+  Body: <commitment_bytes>
+```
+
+Where the `<commitment_bytes>` is the serialized versioned EigenDA certificate:
+
+| version_byte | payload         |
+| ------------ | --------------- |
+| 0x00         | eigenda_cert_v1 |
+| 0x01         | eigenda_cert_v2 |
+
+```text
+Request:
+  GET /get/<hex_encoded_commitment>?commitment_mode=standard
+
+Response:
+  200 OK
+  Content-Type: application/octet-stream
+  Body: <payload_bytes>
+```
+
+Where `<hex_encoded_commitment>` is the hex-encoded commitment returned from the POST request above.
 
 #### Optimism Routes
 
