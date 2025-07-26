@@ -28,13 +28,15 @@ Create a configuration file in the `config/` directory with the following format
 ```json
 {
   "initialOwner": "0x0000000000000000000000000000000000000001",
-  "initialCertVerifier": "0x0000000000000000000000000000000000000002",
+  "initialRBNs": [0],
+  "initialCertVerifiers": ["0x0000000000000000000000000000000000000002"],
   "proxyAdmin": "0x0000000000000000000000000000000000000003"
 }
 ```
 
 - The `initialOwner` parameter specifies the address that will be set as the owner of the deployed router contract.
-- The `initialCertVerifier` parameter specifies the initial address of the cert verifier initialized at block height 0.
+- The `initialRBNs` parameter specifies the reference block numbers that each initial cert verifier will be placed at.
+- The `initialCertVerifiers` parameter specifies the initial address of the cert verifier initialized at the respective initialRBN block height. This should be the same length as initialRBNs.
 - The `proxyAdmin` parameter specifies the address of the proxy admin for the transparent proxy.
 
 ### Post-Deployment

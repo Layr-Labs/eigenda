@@ -26,7 +26,8 @@ contract CertVerifierRouterDeployer is Script, Test {
     // Configuration parameters
     address initialOwner;
     address proxyAdmin;
-    address initialCertVerifier;
+    uint32[] initialRBNs;
+    address[] initialCertVerifiers;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1. Read the configuration from the JSON input file
@@ -34,14 +35,10 @@ contract CertVerifierRouterDeployer is Script, Test {
         string memory configData = vm.readFile(configPath);
 
         // Parse configuration parameters
-        bytes memory raw = stdJson.parseRaw(configData, ".initialOwner");
-        initialOwner = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(configData, ".initialCertVerifier");
-        initialCertVerifier = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(configData, ".proxyAdmin");
-        proxyAdmin = abi.decode(raw, (address));
+        initialOwner = stdJson.readAddress(configData, ".initialOwner");
+        initialRBNs = toU32Array(stdJson.readUintArray(configData, ".initialRBNs"));
+        initialCertVerifiers = stdJson.readAddressArray(configData, ".initialCertVerifiers");
+        proxyAdmin = stdJson.readAddress(configData, ".proxyAdmin");
 
         // 2. Deploy the implementation and proxy contracts
         vm.startBroadcast();
@@ -50,13 +47,10 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         // Deploy proxy and initialize in one step
         bytes memory initData =
-            abi.encodeWithSignature("initialize(address,address)", initialOwner, initialCertVerifier);
+            abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initialRBNs, initialCertVerifiers));
 
         TransparentUpgradeableProxy proxy =
-            new TransparentUpgradeableProxy(address(implementation), address(tx.origin), initData);
-
-        // 3. Transfer proxy admin to the specified address
-        proxy.changeAdmin(proxyAdmin);
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
 
         vm.stopBroadcast();
 
@@ -69,5 +63,14 @@ contract CertVerifierRouterDeployer is Script, Test {
         finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouterImplementation", address(implementation));
 
         vm.writeJson(finalJson, outputPath);
+    }
+
+    function toU32Array(uint256[] memory arr) internal pure returns (uint32[] memory) {
+        uint32[] memory result = new uint32[](arr.length);
+        for (uint256 i; i < arr.length; i++) {
+            require(arr[i] <= type(uint32).max, "Value exceeds uint32 limit");
+            result[i] = uint32(arr[i]);
+        }
+        return result;
     }
 }
