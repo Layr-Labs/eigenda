@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/pubip"
@@ -122,13 +123,22 @@ func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
 	return nil
 }
 
-func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) (string, error) {
-	ip, err := provider.PublicIPAddress(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
+func SocketAddress(ctx context.Context, provider pubip.Provider, hostname, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) (string, error) {
+	address := hostname
+	if address == "" || isLocalhost(address) {
+		// Use public IP provider if hostname is empty or contains localhost
+		ip, err := provider.PublicIPAddress(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
+		}
+		address = ip
 	}
-	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
+	socket := core.MakeOperatorSocket(address, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 	return socket.String(), nil
+}
+
+func isLocalhost(hostname string) bool {
+	return strings.Contains(hostname, "localhost") || strings.Contains(hostname, "127.0.0.1") || strings.Contains(hostname, "0.0.0.0")
 }
 
 func GetBundleEncodingFormat(blob *pb.Blob) core.BundleEncodingFormat {
