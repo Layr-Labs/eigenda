@@ -41,6 +41,7 @@ func TestClientUsingTestnet(t *testing.T) {
 
 	t.Run("PutBlobWaitForConfirmationDepth0AndGetBlob", func(t *testing.T) {
 		t.Parallel()
+		confDepth := uint64(0)
 
 		client, err := NewEigenDAClient(testutils.GetLogger(), EigenDAClientConfig{
 			RPC: testRPC,
@@ -52,7 +53,7 @@ func TestClientUsingTestnet(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      testSignerPrivateKeyHex,
 			WaitForFinalization:      false,
-			WaitForConfirmationDepth: 0,
+			WaitForConfirmationDepth: confDepth,
 			SvcManagerAddr:           testSvcManagerAddr,
 			EthRpcUrl:                testEthRpcUrl,
 		})
@@ -73,18 +74,18 @@ func TestClientUsingTestnet(t *testing.T) {
 		confDepth := uint64(3)
 
 		client, err := NewEigenDAClient(testutils.GetLogger(), EigenDAClientConfig{
-			RPC: "disperser-holesky.eigenda.xyz:443",
+			RPC: testRPC,
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
 			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
 			// plus wait for 3 blocks of confirmation.
-			StatusQueryTimeout:       20 * time.Minute,
-			StatusQueryRetryInterval: 5 * time.Second,
+			StatusQueryTimeout:       testStatusQueryTimeout,
+			StatusQueryRetryInterval: testStatusQueryRetryInterval,
 			CustomQuorumIDs:          []uint{},
-			SignerPrivateKeyHex:      "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1",
+			SignerPrivateKeyHex:      testSignerPrivateKeyHex,
 			WaitForFinalization:      false,
 			WaitForConfirmationDepth: confDepth,
-			SvcManagerAddr:           "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
-			EthRpcUrl:                "https://1rpc.io/holesky",
+			SvcManagerAddr:           testSvcManagerAddr,
+			EthRpcUrl:                testEthRpcUrl,
 		})
 		data := "hello world!"
 		assert.NoError(t, err)

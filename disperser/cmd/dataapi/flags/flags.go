@@ -59,15 +59,15 @@ var (
 	}
 	SubgraphApiBatchMetadataAddrFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "sub-batch-metadata-socket-addr"),
-		//We need the socket address of the subgraph batch metadata api to pull the subgraph data from.
-		Usage:    "the socket address of the subgraph batch metadata api",
+		//We need the URL of the subgraph batch metadata api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph batch metadata api",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_BATCH_METADATA_API_SOCKET_ADDR"),
 		Required: true,
 	}
 	SubgraphApiOperatorStateAddrFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "sub-op-state-socket-addr"),
-		//We need the socket address of the subgraph operator state api to pull the subgraph data from.
-		Usage:    "the socket address of the subgraph operator state api",
+		//We need the URL of the subgraph operator state api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph operator state api",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_OPERATOR_STATE_API_SOCKET_ADDR"),
 		Required: true,
 	}
@@ -76,6 +76,13 @@ var (
 		Usage:    "Address of the EigenDA Address Directory",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
+	}
+	SubgraphApiPaymentsAddrFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "sub-payments-socket-addr"),
+		//We need the URL of the subgraph payments api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph payments api",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_PAYMENTS_API_SOCKET_ADDR"),
+		Required: true,
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
@@ -153,6 +160,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
+	SubgraphApiPaymentsAddrFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,
