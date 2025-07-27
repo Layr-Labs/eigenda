@@ -1,11 +1,13 @@
 package ephemeraldb
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -108,4 +110,57 @@ func TestPutReturnsFailoverErrorConfig(t *testing.T) {
 
 	err = db.InsertEntry(testKey, []byte("some-value"))
 	require.ErrorIs(t, err, &api.ErrorFailover{})
+}
+
+func TestGetReturnsInstructedStatusCodeConfig(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	config := testConfig()
+	db := New(ctx, config, testLogger)
+	testKey := []byte("som-key")
+
+	// status code 3 corresponds to coretypes.VerificationStatusCode
+	err := config.SetPUTWithGetReturnsDerivationError(coretypes.ErrInvalidCertDerivationError)
+	require.NoError(t, err)
+
+	// write is not affected
+	err = db.InsertEntry(testKey, []byte("some-value"))
+	require.NoError(t, err)
+
+	// read returns an error
+	_, err = db.FetchEntry(testKey)
+	require.ErrorIs(t, err, coretypes.ErrInvalidCertDerivationError)
+
+	// status code corresponds to recency error
+	err = config.SetPUTWithGetReturnsDerivationError(coretypes.ErrRecencyCheckFailedDerivationError)
+	require.NoError(t, err)
+
+	// cannot overwrite any value even in instructed mode
+	err = db.InsertEntry(testKey, []byte("another-value"))
+	require.ErrorContains(t, err, "key already exists")
+
+	anotherTestKey := []byte("som-other-key")
+	err = db.InsertEntry(anotherTestKey, []byte("another-value"))
+	require.NoError(t, err)
+
+	// read returns an error
+	_, err = db.FetchEntry(anotherTestKey)
+	require.ErrorIs(t, err, coretypes.ErrRecencyCheckFailedDerivationError)
+
+	// now deactivate Instruction mode
+	err = config.SetPUTWithGetReturnsDerivationError(nil)
+	require.NoError(t, err)
+
+	yetTestKey := []byte("yet-another-som-key")
+	err = db.InsertEntry(yetTestKey, []byte("another-value"))
+	require.NoError(t, err)
+	_, err = db.FetchEntry(yetTestKey)
+	require.NoError(t, err)
+
+	// but still you cannot overwrite anything
+	err = db.InsertEntry(anotherTestKey, []byte("another-value"))
+	require.ErrorContains(t, err, "key already exists")
 }

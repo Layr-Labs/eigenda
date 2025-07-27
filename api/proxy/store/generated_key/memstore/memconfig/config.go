@@ -2,8 +2,12 @@ package memconfig
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // Config contains properties that are used to configure the MemStore's behavior.
@@ -17,7 +21,17 @@ type Config struct {
 	// after sleeping PutLatency duration.
 	// This can be used to simulate eigenda being down.
 	PutReturnsFailoverError bool
+	// when true, any subsequent put requests will suceed without error,
+	// but when retrieving with the key, the returned value is the derivation error
+	PutWithGetReturnsDerivationError error
 }
+
+//type GetReturnsInstructedStatusCode struct {
+// return status code
+//GetReturnsStatusCode coretypes.VerificationStatusCode `json:"GetReturnsStatusCode,omitempty"`
+// if activated, GetReturnsStatusCode can be set to 1 to ensure normal operation
+//IsActivated bool `json:"IsActivated,omitempty"`
+//}
 
 // MarshalJSON implements custom JSON marshaling for Config.
 // This is needed because time.Duration is serialized to nanoseconds,
@@ -27,17 +41,19 @@ type Config struct {
 // Patches are reads as ConfigUpdates instead to handle omitted fields.
 func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		MaxBlobSizeBytes        uint64
-		BlobExpiration          string
-		PutLatency              string
-		GetLatency              string
-		PutReturnsFailoverError bool
+		MaxBlobSizeBytes                 uint64
+		BlobExpiration                   string
+		PutLatency                       string
+		GetLatency                       string
+		PutReturnsFailoverError          bool
+		PutWithGetReturnsDerivationError error
 	}{
-		MaxBlobSizeBytes:        c.MaxBlobSizeBytes,
-		BlobExpiration:          c.BlobExpiration.String(),
-		PutLatency:              c.PutLatency.String(),
-		GetLatency:              c.GetLatency.String(),
-		PutReturnsFailoverError: c.PutReturnsFailoverError,
+		MaxBlobSizeBytes:                 c.MaxBlobSizeBytes,
+		BlobExpiration:                   c.BlobExpiration.String(),
+		PutLatency:                       c.PutLatency.String(),
+		GetLatency:                       c.GetLatency.String(),
+		PutReturnsFailoverError:          c.PutReturnsFailoverError,
+		PutWithGetReturnsDerivationError: c.PutWithGetReturnsDerivationError,
 	})
 }
 
@@ -116,6 +132,39 @@ func (sc *SafeConfig) SetMaxBlobSizeBytes(maxBlobSizeBytes uint64) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	sc.config.MaxBlobSizeBytes = maxBlobSizeBytes
+}
+
+func (sc *SafeConfig) GetPUTWithGetReturnsDerivationError() error {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+
+	return sc.config.PutWithGetReturnsDerivationError
+}
+
+func (sc *SafeConfig) SetPUTWithGetReturnsDerivationError(inputError error) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	// both dynamic type and value are nil, i.e there is no error
+	if inputError == nil {
+		sc.config.PutWithGetReturnsDerivationError = nil
+		return nil
+	}
+
+	// cast into an DerivationError
+	var derivationError coretypes.DerivationError
+	if !errors.As(inputError, &derivationError) {
+		return fmt.Errorf("Unable to cast error into an DerivationError: %w", inputError)
+	}
+
+	err := derivationError.Validate()
+	if err != nil {
+		return err
+	}
+
+	sc.config.PutWithGetReturnsDerivationError = derivationError
+
+	return nil
 }
 
 func (sc *SafeConfig) Config() Config {

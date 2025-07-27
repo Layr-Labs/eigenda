@@ -19,16 +19,25 @@ type Config struct {
 	URL string // EigenDA proxy REST API URL
 }
 
+// copy derivation error to avoid cyclic deps
+// see full implementation at
+// https://github.com/Layr-Labs/eigenda/blob/e5f489aae34a1f68eb750e0da7ded52c200d7c36/api/clients/v2/coretypes/derivation_errors.go#L20
+type DerivationError struct {
+	StatusCode uint8
+	Msg        string
+}
+
 // MemConfig ... contains properties that are used to configure the MemStore's behavior.
 // this is copied directly from /store/generated_key/memstore/memconfig.
 // importing the struct isn't possible since it'd create cyclic dependency loop
 // with core proxy's go.mod
 type MemConfig struct {
-	MaxBlobSizeBytes        uint64
-	BlobExpiration          time.Duration
-	PutLatency              time.Duration
-	GetLatency              time.Duration
-	PutReturnsFailoverError bool
+	MaxBlobSizeBytes                 uint64
+	BlobExpiration                   time.Duration
+	PutLatency                       time.Duration
+	GetLatency                       time.Duration
+	PutReturnsFailoverError          bool
+	PutWithGetReturnsDerivationError DerivationError
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -36,22 +45,24 @@ type MemConfig struct {
 // which is hard to read.
 func (c MemConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(intermediaryCfg{
-		MaxBlobSizeBytes:        c.MaxBlobSizeBytes,
-		BlobExpiration:          c.BlobExpiration.String(),
-		PutLatency:              c.PutLatency.String(),
-		GetLatency:              c.GetLatency.String(),
-		PutReturnsFailoverError: c.PutReturnsFailoverError,
+		MaxBlobSizeBytes:                 c.MaxBlobSizeBytes,
+		BlobExpiration:                   c.BlobExpiration.String(),
+		PutLatency:                       c.PutLatency.String(),
+		GetLatency:                       c.GetLatency.String(),
+		PutReturnsFailoverError:          c.PutReturnsFailoverError,
+		PutWithGetReturnsDerivationError: c.PutWithGetReturnsDerivationError,
 	})
 }
 
 // intermediaryCfg ... used for decoding into a less rich type before
 // translating to a structured MemConfig
 type intermediaryCfg struct {
-	MaxBlobSizeBytes        uint64
-	BlobExpiration          string
-	PutLatency              string
-	GetLatency              string
-	PutReturnsFailoverError bool
+	MaxBlobSizeBytes                 uint64
+	BlobExpiration                   string
+	PutLatency                       string
+	GetLatency                       string
+	PutReturnsFailoverError          bool
+	PutWithGetReturnsDerivationError DerivationError
 }
 
 // IntoMemConfig ... converts an intermediary config into a memconfig
@@ -73,11 +84,12 @@ func (cfg *intermediaryCfg) IntoMemConfig() (*MemConfig, error) {
 	}
 
 	return &MemConfig{
-		MaxBlobSizeBytes:        cfg.MaxBlobSizeBytes,
-		BlobExpiration:          blobExpiration,
-		PutLatency:              putLatency,
-		GetLatency:              getLatency,
-		PutReturnsFailoverError: cfg.PutReturnsFailoverError,
+		MaxBlobSizeBytes:                 cfg.MaxBlobSizeBytes,
+		BlobExpiration:                   blobExpiration,
+		PutLatency:                       putLatency,
+		GetLatency:                       getLatency,
+		PutReturnsFailoverError:          cfg.PutReturnsFailoverError,
+		PutWithGetReturnsDerivationError: cfg.PutWithGetReturnsDerivationError,
 	}, nil
 }
 

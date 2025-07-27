@@ -18,6 +18,13 @@ const (
 	DefaultPruneInterval = 500 * time.Millisecond
 )
 
+// a wrapper around payload with status code
+// if instructed mode is not enabled, the status code is 1
+type payloadWithDerivationError struct {
+	payload         []byte
+	derivationError error // the underlying type is coretypes.DerivationError
+}
+
 // DB ... An ephemeral && simple in-memory database used to emulate
 // an EigenDA network for dispersal/retrieval operations.
 type DB struct {
@@ -27,8 +34,8 @@ type DB struct {
 
 	// mu guards the below fields
 	mu        sync.RWMutex
-	keyStarts map[string]time.Time // used for managing expiration
-	store     map[string][]byte    // db
+	keyStarts map[string]time.Time                  // used for managing expiration
+	store     map[string]payloadWithDerivationError // db
 }
 
 // New ... constructor
@@ -36,7 +43,7 @@ func New(ctx context.Context, cfg *memconfig.SafeConfig, log logging.Logger) *DB
 	db := &DB{
 		config:    cfg,
 		keyStarts: make(map[string]time.Time),
-		store:     make(map[string][]byte),
+		store:     make(map[string]payloadWithDerivationError),
 		log:       log,
 	}
 
@@ -68,14 +75,17 @@ func (db *DB) InsertEntry(key []byte, value []byte) error {
 
 	strKey := string(key)
 
+	derivationError := db.config.GetPUTWithGetReturnsDerivationError()
+
+	// disallow any overwrite
 	_, exists := db.store[strKey]
 	if exists {
 		return fmt.Errorf("payload key already exists in ephemeral db: %s", strKey)
 	}
 
-	db.store[strKey] = value
-	// add expiration if applicable
+	db.store[strKey] = payloadWithDerivationError{payload: value, derivationError: derivationError}
 
+	// add expiration if applicable
 	if db.config.BlobExpiration() > 0 {
 		db.keyStarts[strKey] = time.Now()
 	}
@@ -89,13 +99,16 @@ func (db *DB) FetchEntry(key []byte) ([]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
 
-	payload, exists := db.store[string(key)]
-
+	payloadWithDerivationError, exists := db.store[string(key)]
 	if !exists {
 		return nil, fmt.Errorf("payload not found for key: %s", hex.EncodeToString(key))
 	}
 
-	return payload, nil
+	if payloadWithDerivationError.derivationError != nil {
+		return nil, payloadWithDerivationError.derivationError
+	}
+
+	return payloadWithDerivationError.payload, nil
 }
 
 // pruningLoop ... runs a background goroutine to prune expired blobs from the store on a regular interval.

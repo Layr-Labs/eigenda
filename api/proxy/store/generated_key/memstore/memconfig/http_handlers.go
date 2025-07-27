@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -12,11 +13,12 @@ import (
 // JSON bodies received by the PATCH /memstore/config endpoint are deserialized into this struct,
 // which is then used to update the memstore configuration.
 type ConfigUpdate struct {
-	MaxBlobSizeBytes        *uint64 `json:"MaxBlobSizeBytes,omitempty"`
-	PutLatency              *string `json:"PutLatency,omitempty"`
-	GetLatency              *string `json:"GetLatency,omitempty"`
-	PutReturnsFailoverError *bool   `json:"PutReturnsFailoverError,omitempty"`
-	BlobExpiration          *string `json:"BlobExpiration,omitempty"`
+	MaxBlobSizeBytes                 *uint64                    `json:"MaxBlobSizeBytes,omitempty"`
+	PutLatency                       *string                    `json:"PutLatency,omitempty"`
+	GetLatency                       *string                    `json:"GetLatency,omitempty"`
+	PutReturnsFailoverError          *bool                      `json:"PutReturnsFailoverError,omitempty"`
+	BlobExpiration                   *string                    `json:"BlobExpiration,omitempty"`
+	PutWithGetReturnsDerivationError *coretypes.DerivationError `json:"PutWithGetReturnsDerivationError,omitempty"`
 }
 
 // HandlerHTTP is an admin HandlerHTTP for GETting and PATCHing the memstore configuration.
@@ -96,6 +98,14 @@ func (api HandlerHTTP) handleUpdateConfig(w http.ResponseWriter, r *http.Request
 			return
 		}
 		api.safeConfig.SetBlobExpiration(duration)
+	}
+
+	if update.PutWithGetReturnsDerivationError != nil {
+		err := api.safeConfig.SetPUTWithGetReturnsDerivationError(*update.PutWithGetReturnsDerivationError)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Return the current configuration
