@@ -34,7 +34,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // lsCommand, // TODO this will be added in a follow up PR
+				Action: lsCommand,
 			},
 			{
 				Name: "table-info",
