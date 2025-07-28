@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	proxycmn "github.com/Layr-Labs/eigenda/api/proxy/common"
@@ -19,7 +20,11 @@ const (
 	ethRpcUrlFlagName        = "eth-rpc-url"
 	NetworkFlagName          = "network"
 	directoryAddressFlagName = "directory-address"
-	outputFlagName           = "output"
+	outputFormatFlagName     = "output-format"
+)
+
+var (
+	validOutputFormats = []string{"table", "csv", "json"}
 )
 
 func main() {
@@ -67,14 +72,13 @@ That address can be overridden by providing the --%s flag.`,
 			EnvVars: []string{"EIGENDA_DIRECTORY_ADDRESS"},
 		},
 		&cli.StringFlag{
-			Name:    outputFlagName,
-			Usage:   "Output format: table, csv, json (default: table)",
+			Name:    outputFormatFlagName,
+			Usage:   fmt.Sprintf("Output format. Must be one of: %v", validOutputFormats),
 			Value:   "table",
 			EnvVars: []string{"OUTPUT_FORMAT"},
 			Action: func(ctx *cli.Context, v string) error {
-				validFormats := map[string]bool{"table": true, "csv": true, "json": true}
-				if _, ok := validFormats[strings.ToLower(v)]; !ok {
-					return fmt.Errorf("invalid output format: %s. Must be one of: table, csv, json", v)
+				if !slices.Contains(validOutputFormats, strings.ToLower(v)) {
+					return fmt.Errorf("invalid output format: %s. Must be one of: %v", v, validOutputFormats)
 				}
 				return nil
 			},
@@ -88,7 +92,7 @@ That address can be overridden by providing the --%s flag.`,
 }
 
 func discoverAddresses(ctx *cli.Context) error {
-	outputFormat := strings.ToLower(ctx.String(outputFlagName))
+	outputFormat := strings.ToLower(ctx.String(outputFormatFlagName))
 	rpcURL := ctx.String(ethRpcUrlFlagName)
 
 	// Simple logging
