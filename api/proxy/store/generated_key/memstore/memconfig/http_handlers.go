@@ -2,6 +2,7 @@ package memconfig
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -103,6 +104,7 @@ func (api HandlerHTTP) handleUpdateConfig(w http.ResponseWriter, r *http.Request
 	if update.PutWithGetReturnsDerivationError != nil {
 		err := api.safeConfig.SetPUTWithGetReturnsDerivationError(*update.PutWithGetReturnsDerivationError)
 		if err != nil {
+			fmt.Println("err", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

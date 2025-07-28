@@ -54,7 +54,7 @@ Specifically, users send a PATCH request that sets the desired derivation error 
 The PATCH request is sticky, meaning it will take effect on multiple GET requests unless reset.
 
 ```bash
- curl -X PATCH http://localhost:3100/memstore/config -d '{"PutWithGetReturnsDerivationError": {"StatusCode": 3}'
+ curl -X PATCH http://localhost:3100/memstore/config -d '{"PutWithGetReturnsDerivationError": {"StatusCode": 3}}'
  {"MaxBlobSizeBytes":2048,"BlobExpiration":"45m0s","PutLatency":"0s","GetLatency":"0s","PutReturnsFailoverError":false,"PutWithGetReturnsDerivationError": {"StatusCode": 3}}
 ```
 

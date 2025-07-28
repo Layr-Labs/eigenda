@@ -37,7 +37,7 @@ type MemConfig struct {
 	PutLatency                       time.Duration
 	GetLatency                       time.Duration
 	PutReturnsFailoverError          bool
-	PutWithGetReturnsDerivationError DerivationError
+	PutWithGetReturnsDerivationError *DerivationError
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -62,7 +62,7 @@ type intermediaryCfg struct {
 	PutLatency                       string
 	GetLatency                       string
 	PutReturnsFailoverError          bool
-	PutWithGetReturnsDerivationError DerivationError
+	PutWithGetReturnsDerivationError *DerivationError
 }
 
 // IntoMemConfig ... converts an intermediary config into a memconfig
@@ -148,6 +148,7 @@ func (c *Client) GetConfig(ctx context.Context) (*MemConfig, error) {
 // as a POST and modifies every associated field. This could present issues if
 // misused in a testing framework which imports it.
 func (c *Client) UpdateConfig(ctx context.Context, update *MemConfig) (*MemConfig, error) {
+	fmt.Printf("update %v\n", update)
 	body, err := update.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config update to json bytes: %w", err)
@@ -163,6 +164,8 @@ func (c *Client) UpdateConfig(ctx context.Context, update *MemConfig) (*MemConfi
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	fmt.Printf("resp.Status %v\n", resp.Header)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to update config, status code: %d", resp.StatusCode)
