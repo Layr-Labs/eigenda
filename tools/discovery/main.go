@@ -22,12 +22,6 @@ const (
 	outputFlagName           = "output"
 )
 
-// ContractInfo represents a contract name and its address
-type ContractInfo struct {
-	Name    string
-	Address string
-}
-
 func main() {
 	app := cli.NewApp()
 	if bi, ok := debug.ReadBuildInfo(); ok {
