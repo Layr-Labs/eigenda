@@ -48,6 +48,17 @@ $ curl http://localhost:3100/memstore/config | \
   curl -X PATCH http://localhost:3100/memstore/config -d @-
 ```
 
+#### PUT with GET returning derivation error
+The configuration allows users to configure memstore to inject specific derivation error responses during GET operations while allowing PUT operations to succeed normally. This enables testing client handling of derivation errors without requiring complex setup.
+Specifically, users send a PATCH request that sets the desired derivation error for all subsequent GET requests. After that, when the user sends data to the proxy, the PUT operation succeeds as normal—the error injection only affects the GET path. Behind the scenes, upon a GET request, the proxy returns either the stored data or the specified derivation error depending on its configuration.
+The PATCH request is sticky, meaning it will take effect on multiple GET requests unless reset.
+
+```bash
+ curl -X PATCH http://localhost:3100/memstore/config -d '{"PutWithGetReturnsDerivationError": {"StatusCode": 3}'
+ {"MaxBlobSizeBytes":2048,"BlobExpiration":"45m0s","PutLatency":"0s","GetLatency":"0s","PutReturnsFailoverError":false,"PutWithGetReturnsDerivationError": {"StatusCode": 3}}
+```
+
+A very important invariant is that no key can ever be overwritten.
 
 ### Golang client
 A simple HTTP client implementation lives in `/clients/memconfig_client/` and can be imported for manipulating the config using more structured types.

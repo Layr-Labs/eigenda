@@ -21,17 +21,11 @@ type Config struct {
 	// after sleeping PutLatency duration.
 	// This can be used to simulate eigenda being down.
 	PutReturnsFailoverError bool
-	// when true, any subsequent put requests will suceed without error,
-	// but when retrieving with the key, the returned value is the derivation error
+	// if nil, any subsequent put requests will succeed without error, and all gets will succeed without error
+	// if not nil, any subsequent put requests will succeed without error, and, but when retrieving with the key,
+	// the returned value is the derivation error
 	PutWithGetReturnsDerivationError error
 }
-
-//type GetReturnsInstructedStatusCode struct {
-// return status code
-//GetReturnsStatusCode coretypes.VerificationStatusCode `json:"GetReturnsStatusCode,omitempty"`
-// if activated, GetReturnsStatusCode can be set to 1 to ensure normal operation
-//IsActivated bool `json:"IsActivated,omitempty"`
-//}
 
 // MarshalJSON implements custom JSON marshaling for Config.
 // This is needed because time.Duration is serialized to nanoseconds,
@@ -154,7 +148,7 @@ func (sc *SafeConfig) SetPUTWithGetReturnsDerivationError(inputError error) erro
 	// cast into an DerivationError
 	var derivationError coretypes.DerivationError
 	if !errors.As(inputError, &derivationError) {
-		return fmt.Errorf("Unable to cast error into an DerivationError: %w", inputError)
+		return fmt.Errorf("unable to cast error into an DerivationError: %w", inputError)
 	}
 
 	err := derivationError.Validate()

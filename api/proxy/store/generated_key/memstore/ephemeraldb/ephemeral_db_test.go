@@ -112,10 +112,10 @@ func TestPutReturnsFailoverErrorConfig(t *testing.T) {
 	require.ErrorIs(t, err, &api.ErrorFailover{})
 }
 
-func TestGetReturnsInstructedStatusCodeConfig(t *testing.T) {
+func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	config := testConfig()
