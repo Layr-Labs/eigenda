@@ -329,6 +329,28 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 		Value:    5 * time.Minute,
 	}
+	MaxConnectionAgeFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "max-connection-age"),
+		Usage: "Maximum age of a gRPC connection before it is closed. " +
+			"If zero, then the server will not close connections based on age.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_SECONDS"),
+		Value:    5 * time.Minute,
+	}
+	MaxConnectionAgeGraceFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-connection-age-grace"),
+		Usage:    "Grace period after MaxConnectionAge before the connection is forcibly closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_GRACE_SECONDS"),
+		Value:    30 * time.Second,
+	}
+	MaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-idle-connection-age"),
+		Usage:    "Maximum time a connection can be idle before it is closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
+		Value:    time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -381,6 +403,9 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	MaxConnectionAgeFlag,
+	MaxConnectionAgeGraceFlag,
+	MaxIdleConnectionAgeFlag,
 }
 
 var Flags []cli.Flag

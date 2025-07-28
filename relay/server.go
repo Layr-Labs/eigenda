@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 )
@@ -558,7 +559,13 @@ func (s *Server) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
 
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption())
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     s.config.MaxIdleConnectionAge,
+		MaxConnectionAge:      s.config.MaxConnectionAge,
+		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
+	})
+
+	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
 	reflection.Register(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 
