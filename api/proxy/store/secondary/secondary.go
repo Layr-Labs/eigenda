@@ -91,15 +91,12 @@ func (sm *SecondaryManager) WriteOnCacheMissEnabled() bool {
 	return sm.CachingEnabled() && sm.writeOnCacheMiss
 }
 
-// HandleRedundantWrites ... writes to both enabled caches
-// and returns an error if NONE of them succeed
+// Writes to all enabled caches and returns an error if NONE of them succeed
 func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
-	sources := sm.caches
-
 	key := crypto.Keccak256(commitment)
 	successes := 0
 
-	for _, src := range sources {
+	for _, src := range sm.caches {
 		sm.log.Debug("Attempting to write to secondary storage", "backend", src.BackendType())
 		cb := sm.m.RecordSecondaryRequest(src.BackendType().String(), http.MethodPut)
 
