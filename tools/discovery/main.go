@@ -130,9 +130,15 @@ func discoverAddresses(ctx *cli.Context) error {
 			if chainID == nil {
 				return fmt.Errorf("received nil chainID from Ethereum client")
 			}
-			network, err = proxycmn.DefaultEigenDANetworkFromChainID(chainID.String())
+			networks, err := proxycmn.EigenDANetworksFromChainID(chainID.String())
 			if err != nil {
 				return fmt.Errorf("DefaultEigenDANetworkFromChainID (chainid: %s): %w", chainID, err)
+			}
+			network = networks[0]
+			if len(networks) > 1 {
+				logger.Printf("Multiple EigenDA networks found for chain ID %s: %v. Using the first one: %s", chainID, networks, network)
+			} else {
+				logger.Printf("Auto-detected EigenDA network from chain ID %s: %s", chainID, network)
 			}
 		}
 		directoryAddr, err = network.GetEigenDADirectory()

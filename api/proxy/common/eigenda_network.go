@@ -115,19 +115,6 @@ func EigenDANetworksFromChainID(chainID string) ([]EigenDANetwork, error) {
 	return networks, nil
 }
 
-// Useful when an rpc url is provided, but no network is specified.
-// In this case, we can use this function to automatically choose a default network.
-func DefaultEigenDANetworkFromChainID(chainID string) (EigenDANetwork, error) {
-	networks, err := EigenDANetworksFromChainID(chainID)
-	if err != nil {
-		return "", err
-	}
-	if len(networks) == 0 {
-		return "", fmt.Errorf("no EigenDA network found for chain ID: %s", chainID)
-	}
-	return networks[0], nil
-}
-
 // EigenDANetworkFromString parses an inputString to an EigenDANetwork value.
 // The returned EigenDANetwork is guaranteed to be non-nil.
 // If an invalid network is provided, an error is returned.
