@@ -24,8 +24,8 @@ const (
 
 func main() {
 	app := cli.NewApp()
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		app.Version = bi.Main.Version
+	if buildInfo, ok := debug.ReadBuildInfo(); ok {
+		app.Version = buildInfo.Main.Version
 	}
 	app.Name = "eigenda-directory"
 	app.Usage = "EigenDA Directory Contract Address Discovery Tool"
