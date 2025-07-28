@@ -293,7 +293,8 @@ func buildEigenDAV2Backend(
 		_, err = certVerifier.GetCertVersion(ctx, 0)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"%s doesn't appear to be a CertVerifier version >= V3: failed to call certVersion(): %w",
+				"failed to eth-call certVersion(), meaning that you either have network problems with your eth node, or " +
+				"%s is not a CertVerifier version >= V3, which is required by this version of proxy: %w",
 				routerOrImmutableVerifierAddr.Hex(), err)
 		}
 	}
