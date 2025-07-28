@@ -283,19 +283,25 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 	if !isRouter {
-		// We call GetCertVersion to ensure that the cert verifier is at least version 3. See
+		// We call GetCertVersion to ensure that the cert verifier is of a supported version. See
 		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol#L12
 		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/EigenDACertVerifier.sol#L79
 		// We pass in block 0 because a static certVerifierAddress provider is used when not using a router,
 		// so the block number is not relevant.
-		// TODO: we might want to only enforce this if the proxy is started in dispersal mode, to allow for
-		// proxy to be started in verification-only mode using a CertVerifierV2?
-		_, err = certVerifier.GetCertVersion(ctx, 0)
+		certVersion, err := certVerifier.GetCertVersion(ctx, 0)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to eth-call certVersion(), meaning that you either have network problems with your eth node, or " +
-				"%s is not a CertVerifier version >= V3, which is required by this version of proxy: %w",
+				"failed to eth-call certVersion(), meaning that you either have network problems with your eth node, or "+
+					"%s is not a CertVerifier version >= V3, which is required by this version of proxy: %w",
 				routerOrImmutableVerifierAddr.Hex(), err)
+		}
+		// Note that we also support certV2s, just not V2 CertVerifiers.
+		// This is because we transform certV2s into certV3s and verified using the CertVerifierV3 contract.
+		// However, the serialization logic, as well as some functions needed during the dispersal path (eg. requiredQuorums),
+		// are only compatible/available with CertVerifier V3, hence the requirement here.
+		if certVersion != 3 {
+			return nil, fmt.Errorf("this version of proxy is only compatible with CertVerifier V3 : cert verifier at address %s is version %d",
+				routerOrImmutableVerifierAddr.Hex(), certVersion)
 		}
 	}
 
