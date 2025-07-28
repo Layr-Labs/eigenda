@@ -124,19 +124,19 @@ func discoverAddresses(ctx *cli.Context) error {
 			logger.Printf("No network provided, attempting to auto-detect EigenDADirectory address from chain ID.")
 			chainID, err := client.ChainID(ctx.Context)
 			if err != nil {
-				return fmt.Errorf("failed to get chain ID from Ethereum client: %w", err)
+				return fmt.Errorf("chainID call: %w", err)
 			}
 			if chainID == nil {
-				return fmt.Errorf("failed to get chain ID from Ethereum client")
+				return fmt.Errorf("received nil chainID from Ethereum client")
 			}
 			network, err = proxycmn.DefaultEigenDANetworkFromChainID(chainID.String())
 			if err != nil {
-				return fmt.Errorf("error determining EigenDA network from chain ID %s: %w", chainID, err)
+				return fmt.Errorf("DefaultEigenDANetworkFromChainID (chainid: %s): %w", chainID, err)
 			}
 		}
 		directoryAddr, err = network.GetEigenDADirectory()
 		if err != nil {
-			return fmt.Errorf("error getting EigenDADirectory address for network %s: %w", network, err)
+			return fmt.Errorf("GetEigenDADirectory: %w", err)
 		}
 		logger.Printf("Auto-detected EigenDADirectory address %s for network %s", directoryAddr, network)
 	}
@@ -149,13 +149,13 @@ func discoverAddresses(ctx *cli.Context) error {
 	// Use the directory reader from core/eth package
 	directoryReader, err := eth.NewEigenDADirectoryReader(directoryAddr, client)
 	if err != nil {
-		return fmt.Errorf("failed to create EigenDADirectory reader: %w", err)
+		return fmt.Errorf("NewEigenDADirectoryReader: %w", err)
 	}
 
 	// Get all addresses
 	addressMap, err := directoryReader.GetAllAddresses()
 	if err != nil {
-		return fmt.Errorf("failed to get addresses from directory: %w", err)
+		return fmt.Errorf("GetAllAddresses from directory: %w", err)
 	}
 
 	// Output results
