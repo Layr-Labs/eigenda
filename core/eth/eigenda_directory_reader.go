@@ -24,7 +24,7 @@ func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client bind.Contr
 	eigendaDirectoryAddr := gethcommon.HexToAddress(eigendaDirectoryHexAddr)
 	contract, err := eigendadirectory.NewContractIEigenDADirectory(eigendaDirectoryAddr, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create EigenDADirectory contract: %w", err)
+		return nil, fmt.Errorf("create EigenDADirectory contract bindings: %w", err)
 	}
 
 	return &EigenDADirectoryReader{
@@ -37,7 +37,7 @@ func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client bind.Contr
 func (r *EigenDADirectoryReader) getAddressWithValidation(contractName string) (gethcommon.Address, error) {
 	names, err := r.contract.GetAllNames(&bind.CallOpts{})
 	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("failed to get all contract names: %w", err)
+		return gethcommon.Address{}, fmt.Errorf("eth-call: get all contract names: %w", err)
 	}
 	if !slices.Contains(names, contractName) {
 		return gethcommon.Address{}, fmt.Errorf("contract %s not found in address directory", contractName)
@@ -45,7 +45,7 @@ func (r *EigenDADirectoryReader) getAddressWithValidation(contractName string) (
 
 	addr, err := r.contract.GetAddress0(&bind.CallOpts{}, contractName)
 	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("failed to get %s address: %w", contractName, err)
+		return gethcommon.Address{}, fmt.Errorf("eth-call: get %s address: %w", contractName, err)
 	}
 	if addr == (gethcommon.Address{}) {
 		return gethcommon.Address{}, fmt.Errorf("%s address is zero", contractName)
@@ -67,14 +67,14 @@ func (r *EigenDADirectoryReader) GetServiceManagerAddress() (gethcommon.Address,
 func (r *EigenDADirectoryReader) GetAllAddresses() (map[string]gethcommon.Address, error) {
 	names, err := r.contract.GetAllNames(&bind.CallOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all contract names: %w", err)
+		return nil, fmt.Errorf("eth-call:get all contract names: %w", err)
 	}
 
 	addresses := make(map[string]gethcommon.Address)
 	for _, name := range names {
 		addr, err := r.contract.GetAddress0(&bind.CallOpts{}, name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get %s address: %w", name, err)
+			return nil, fmt.Errorf("eth-call: get %s address: %w", name, err)
 		}
 		addresses[name] = addr
 	}
