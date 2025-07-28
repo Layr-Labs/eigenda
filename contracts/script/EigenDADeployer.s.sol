@@ -389,8 +389,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
 
-        uint32[] memory initRBNs = new uint32[](1);
-        initRBNs[0] = 0; // default RBN
+        uint32[] memory initABNs = new uint32[](1);
+        initABNs[0] = 0; // default RBN
         address[] memory initCertVerifiers = new address[](1);
         initCertVerifiers[0] = address(eigenDACertVerifier);
 
@@ -399,7 +399,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(eigenDACertVerifierRouterImplementation),
             abi.encodeCall(
                 EigenDACertVerifierRouter.initialize,
-                (addressConfig.eigenDACommunityMultisig, initRBNs, initCertVerifiers)
+                (addressConfig.eigenDACommunityMultisig, initABNs, initCertVerifiers)
             )
         );
         eigenDARelayRegistryImplementation = new EigenDARelayRegistry();

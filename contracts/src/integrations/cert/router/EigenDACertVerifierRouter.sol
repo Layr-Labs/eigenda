@@ -17,9 +17,13 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier);
 
+    /// @notice Thrown when an activation block number (ABN) is not in the future when adding a cert verifier.
     error ABNNotInFuture(uint32 activationBlockNumber);
+    /// @notice Thrown when an activation block number (ABN) is not greater than the last registered ABN when adding a cert verifier.
     error ABNNotGreaterThanLast(uint32 activationBlockNumber);
+    /// @notice Thrown when the length of the cert verifier is not valid.
     error InvalidCertLength();
+    /// @notice Thrown when a reference block number (RBN) is in the future when verifying a cert.
     error RBNInFuture(uint32 referenceBlockNumber);
     /// @notice Thrown when the length of input arrays that are expected to match do not match.
     error LengthMismatch();
@@ -37,11 +41,15 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// ADMIN ///
 
-    function initialize(address _initialOwner, uint32[] memory initABNs, address[] memory initCertVerifiers)
+    /// @notice Initializes the EigenDACertVerifierRouter.
+    /// @param initialOwner The owner can add new cert verifiers. See addCertVerifier for security implications.
+    /// @param initABNs A list of ABNs that will be initialized with cert verifiers
+    /// @param initCertVerifiers A list of cert verifiers corresponding to initABNs.
+    function initialize(address initialOwner, uint32[] memory initABNs, address[] memory initCertVerifiers)
         external
         initializer
     {
-        _transferOwnership(_initialOwner);
+        _transferOwnership(initialOwner);
         if (initABNs.length != initCertVerifiers.length) {
             revert LengthMismatch();
         }
@@ -57,11 +65,11 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     }
 
     /// @notice Adds a cert verifier to the router.
-    /// @param activationBlockNumber The block number at which the cert verifier will be activated.
+    /// @param activationBlockNumber The block number at which the cert verifier will be activated. Must be in the future.
     /// @param certVerifier The address of the cert verifier to be added.
-    /// Note: for a fully secure integration, the owner of this contract should be a timelocked contract,
-    /// such that new certs can only be activated after a certain period of time. When submitting this transaction,
-    /// make sure that the activationBlockNumber is greater than the timelock period by some margin.
+    /// @dev EigenDA recommends that a mechanism be implemented to ensure a cert verifier cannot be added too close to the current block number.
+    ///      This is to prevent a malicious party from setting a cert verifier without enough time for other parties to react.
+    ///      This could be a timelock, multisig transaction restriction on activationBlockNumber, delay, ownerless contract, etc..
     function addCertVerifier(uint32 activationBlockNumber, address certVerifier) external onlyOwner {
         // We disallow adding cert verifiers at the current block number to avoid a race condition of
         // adding a cert verifier at the current block and verifying in the same block

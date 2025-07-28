@@ -7,6 +7,11 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
+struct ABNConfig {
+    uint32 blockNumber;
+    address certVerifier;
+}
+
 /**
  * @title CertVerifierRouterDeployer
  * @notice Deployment script for upgradable EigenDACertVerifierRouter
@@ -26,8 +31,8 @@ contract CertVerifierRouterDeployer is Script, Test {
     // Configuration parameters
     address initialOwner;
     address proxyAdmin;
-    uint32[] initialRBNs;
-    address[] initialCertVerifiers;
+    uint32[] initABNs;
+    address[] initCertVerifiers;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1. Read the configuration from the JSON input file
@@ -36,8 +41,7 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         // Parse configuration parameters
         initialOwner = stdJson.readAddress(configData, ".initialOwner");
-        initialRBNs = toU32Array(stdJson.readUintArray(configData, ".initialRBNs"));
-        initialCertVerifiers = stdJson.readAddressArray(configData, ".initialCertVerifiers");
+        setABNConfigs(configData);
         proxyAdmin = stdJson.readAddress(configData, ".proxyAdmin");
 
         // 2. Deploy the implementation and proxy contracts
@@ -47,7 +51,7 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         // Deploy proxy and initialize in one step
         bytes memory initData =
-            abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initialRBNs, initialCertVerifiers));
+            abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initABNs, initCertVerifiers));
 
         TransparentUpgradeableProxy proxy =
             new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
@@ -65,12 +69,15 @@ contract CertVerifierRouterDeployer is Script, Test {
         vm.writeJson(finalJson, outputPath);
     }
 
-    function toU32Array(uint256[] memory arr) internal pure returns (uint32[] memory) {
-        uint32[] memory result = new uint32[](arr.length);
-        for (uint256 i; i < arr.length; i++) {
-            require(arr[i] <= type(uint32).max, "Value exceeds uint32 limit");
-            result[i] = uint32(arr[i]);
+    function setABNConfigs(string memory configData)
+        internal
+    {
+        bytes memory raw =
+            stdJson.parseRaw(configData, ".initABNConfigs");
+        ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
+        for (uint256 i; i < configs.length; i++) {
+            initABNs[i] = configs[i].blockNumber;
+            initCertVerifiers[i] = configs[i].certVerifier;
         }
-        return result;
     }
 }
