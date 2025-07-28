@@ -1,3 +1,4 @@
+//nolint:funlen // builder functions are expected to be long.
 package builder
 
 import (
