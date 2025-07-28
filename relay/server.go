@@ -206,7 +206,13 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob %s: %v", key.Hex(), err))
+		if strings.Contains(err.Error(), "NoSuchKey") {
+			return nil, api.NewErrorNotFound(fmt.Sprintf("blob %s not found", key.Hex()))
+		} else {
+			s.logger.Errorf("error fetching blob %s: %v", key.Hex(), err)
+			return nil, api.NewErrorInternal(
+				fmt.Sprintf("relay encountered errors while attempting to fetch blob %s", key.Hex()))
+		}
 	}
 
 	s.metrics.ReportBlobBandwidthUsage(len(data))

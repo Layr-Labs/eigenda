@@ -8,8 +8,8 @@ A basic REST proxy server to interact with the EigenDA network:
 - GET routes: submit a DA Certificate to retrieve its respective blob from the EigenDA network, 
   which will be decoded, validated, and returned as a response.
 
-[![per-pr-ci](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml)
-[![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
+[![per-pr-ci](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml)
+[![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
 [V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda-proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
@@ -312,7 +312,7 @@ A normal (non-archival) Ethereum node is sufficient for running the proxy with c
 
 #### SRS Points
 
-In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/verify/cli.go#L55) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/Dockerfile#L30). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
+In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/api/proxy/store/generated_key/eigenda/verify/cli.go#L67) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/Dockerfile#L184). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
 
 #### Hardware Recommendation
 
