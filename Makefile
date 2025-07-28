@@ -41,6 +41,7 @@ lint:
 	# Uncomment this once we update to go1.23 which makes the -diff flag available.
 	# See https://tip.golang.org/doc/go1.23#go-command
 	# go mod tidy -diff
+	$(MAKE) -C api/proxy lint
 
 
 # TODO: this should also format github workflows, etc.
