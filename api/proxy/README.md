@@ -223,7 +223,7 @@ If you prefer a more controlled migration with explicit service updates, follow 
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2`, so that the proxy started with this config will immediately
 enable V2 dispersal
 
-1. **Scheduled Migration**
+3. **Scheduled Migration**
    - During a planned migration window, stop the V1-only proxy service
    - Restart the proxy service, using the prepared V2 configuration
 
