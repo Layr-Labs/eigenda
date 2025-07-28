@@ -106,24 +106,20 @@ func discoverAddresses(ctx *cli.Context) error {
 	logger.Printf("Connected to Ethereum node at %s", rpcURL)
 
 	directoryAddr := ctx.String(directoryAddressFlagName)
-	networkName := ctx.String(NetworkFlagName)
 	// cases:
 	// 1. directory address: use it directly
 	// 2. no directory address, but network provided: use the default directory address for the network
 	// 3. no directory address and no network: use the default network for the chainID
 	if directoryAddr == "" {
 		logger.Printf("No directory address provided, attempting to auto-detect.")
+		networkName := ctx.String(NetworkFlagName)
+		var network proxycmn.EigenDANetwork
 		if networkName != "" {
 			logger.Printf("network %s provided, attempting to use default directory address.", networkName)
-			network, err := proxycmn.EigenDANetworkFromString(ctx.String(NetworkFlagName))
+			network, err = proxycmn.EigenDANetworkFromString(ctx.String(NetworkFlagName))
 			if err != nil {
 				return err
 			}
-			directoryAddr, err = network.GetEigenDADirectory()
-			if err != nil {
-				return fmt.Errorf("error getting EigenDADirectory address for network %s: %w", network, err)
-			}
-			logger.Printf("Auto-detected EigenDADirectory address %s for network %s", directoryAddr, networkName)
 		} else {
 			logger.Printf("No network provided, attempting to auto-detect EigenDADirectory address from chain ID.")
 			chainID, err := client.ChainID(ctx.Context)
@@ -133,16 +129,16 @@ func discoverAddresses(ctx *cli.Context) error {
 			if chainID == nil {
 				return fmt.Errorf("failed to get chain ID from Ethereum client")
 			}
-			network, err := proxycmn.DefaultEigenDANetworkFromChainID(chainID.String())
+			network, err = proxycmn.DefaultEigenDANetworkFromChainID(chainID.String())
 			if err != nil {
 				return fmt.Errorf("error determining EigenDA network from chain ID %s: %w", chainID, err)
 			}
-			directoryAddr, err = network.GetEigenDADirectory()
-			if err != nil {
-				return fmt.Errorf("error getting EigenDADirectory address for network %s: %w", network, err)
-			}
-			logger.Printf("Auto-detected EigenDADirectory address %s for chain ID %s (network: %s)", directoryAddr, chainID, network)
 		}
+		directoryAddr, err = network.GetEigenDADirectory()
+		if err != nil {
+			return fmt.Errorf("error getting EigenDADirectory address for network %s: %w", network, err)
+		}
+		logger.Printf("Auto-detected EigenDADirectory address %s for network %s", directoryAddr, network)
 	}
 
 	// Validate directory address
