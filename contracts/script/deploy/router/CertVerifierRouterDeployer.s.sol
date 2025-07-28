@@ -69,11 +69,8 @@ contract CertVerifierRouterDeployer is Script, Test {
         vm.writeJson(finalJson, outputPath);
     }
 
-    function setABNConfigs(string memory configData)
-        internal
-    {
-        bytes memory raw =
-            stdJson.parseRaw(configData, ".initABNConfigs");
+    function setABNConfigs(string memory configData) internal {
+        bytes memory raw = stdJson.parseRaw(configData, ".initABNConfigs");
         ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
         for (uint256 i; i < configs.length; i++) {
             initABNs[i] = configs[i].blockNumber;
