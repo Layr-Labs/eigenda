@@ -73,22 +73,22 @@ type eigenDAOperatorStateSubgraphUpdater struct {
 }
 
 func (u eigenDAOperatorStateSubgraphUpdater) UpdateSubgraph(s *Subgraph, startBlock int) {
-	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.EigenDARegistryCoordinator, "0x")
+	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinator, "0x")
 	s.DataSources[0].Source.StartBlock = startBlock
 	s.DataSources[1].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[1].Source.StartBlock = startBlock
 	s.DataSources[2].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[2].Source.StartBlock = startBlock
-	s.DataSources[3].Source.Address = strings.TrimPrefix(u.c.EigenDA.EigenDARegistryCoordinator, "0x")
+	s.DataSources[3].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinator, "0x")
 	s.DataSources[3].Source.StartBlock = startBlock
 	s.DataSources[4].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
 	s.DataSources[4].Source.StartBlock = startBlock
 }
 
 func (u eigenDAOperatorStateSubgraphUpdater) UpdateNetworks(n Networks, startBlock int) {
-	n["devnet"]["EigenDARegistryCoordinator"]["address"] = u.c.EigenDA.EigenDARegistryCoordinator
-	n["devnet"]["EigenDARegistryCoordinator"]["startBlock"] = startBlock
-	n["devnet"]["RegistryCoordinator_Operator"]["address"] = u.c.EigenDA.EigenDARegistryCoordinator
+	n["devnet"]["RegistryCoordinator"]["address"] = u.c.EigenDA.RegistryCoordinator
+	n["devnet"]["RegistryCoordinator"]["startBlock"] = startBlock
+	n["devnet"]["RegistryCoordinator_Operator"]["address"] = u.c.EigenDA.RegistryCoordinator
 	n["devnet"]["RegistryCoordinator_Operator"]["startBlock"] = startBlock
 
 	n["devnet"]["BLSApkRegistry"]["address"] = u.c.EigenDA.BlsApkRegistry

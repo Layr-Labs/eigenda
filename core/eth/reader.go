@@ -16,7 +16,6 @@ import (
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -25,6 +24,7 @@ import (
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
@@ -37,24 +37,24 @@ import (
 )
 
 type ContractBindings struct {
-	RegCoordinatorAddr         gethcommon.Address
-	ServiceManagerAddr         gethcommon.Address
-	RelayRegistryAddress       gethcommon.Address
-	DelegationManager          *delegationmgr.ContractDelegationManager
-	OpStateRetriever           *opstateretriever.ContractOperatorStateRetriever
-	BLSApkRegistry             *blsapkreg.ContractBLSApkRegistry
-	IndexRegistry              *indexreg.ContractIIndexRegistry
-	EigenDARegistryCoordinator *regcoordinator.ContractRegistryCoordinator
-	StakeRegistry              *stakereg.ContractStakeRegistry
-	EigenDAServiceManager      *eigendasrvmg.ContractEigenDAServiceManager
-	EjectionManager            *ejectionmg.ContractEjectionManager
-	AVSDirectory               *avsdir.ContractAVSDirectory
-	SocketRegistry             *socketreg.ContractSocketRegistry
-	PaymentVault               *paymentvault.ContractPaymentVault
-	RelayRegistry              *relayreg.ContractEigenDARelayRegistry
-	ThresholdRegistry          *thresholdreg.ContractEigenDAThresholdRegistry
-	DisperserRegistry          *disperserreg.ContractEigenDADisperserRegistry
-	EigenDADirectory           *eigendadirectory.ContractIEigenDADirectory
+	RegCoordinatorAddr    gethcommon.Address
+	ServiceManagerAddr    gethcommon.Address
+	RelayRegistryAddress  gethcommon.Address
+	DelegationManager     *delegationmgr.ContractDelegationManager
+	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
+	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
+	IndexRegistry         *indexreg.ContractIIndexRegistry
+	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
+	StakeRegistry         *stakereg.ContractStakeRegistry
+	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
+	EjectionManager       *ejectionmg.ContractEjectionManager
+	AVSDirectory          *avsdir.ContractAVSDirectory
+	SocketRegistry        *socketreg.ContractSocketRegistry
+	PaymentVault          *paymentvault.ContractPaymentVault
+	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
+	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
+	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
+	EigenDADirectory      *eigendadirectory.ContractIEigenDADirectory
 }
 
 type Reader struct {
@@ -141,9 +141,9 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	registryCoordinatorAddr, err := contractEigenDAServiceManager.EigenDARegistryCoordinator(&bind.CallOpts{})
+	registryCoordinatorAddr, err := contractEigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch EigenDARegistryCoordinator address", "err", err)
+		t.logger.Error("Failed to fetch RegistryCoordinator address", "err", err)
 		return err
 	}
 
@@ -270,22 +270,22 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	}
 
 	t.bindings = &ContractBindings{
-		ServiceManagerAddr:         eigenDAServiceManagerAddr,
-		RegCoordinatorAddr:         registryCoordinatorAddr,
-		RelayRegistryAddress:       relayRegistryAddress,
-		AVSDirectory:               contractAVSDirectory,
-		SocketRegistry:             contractSocketRegistry,
-		OpStateRetriever:           contractBLSOpStateRetr,
-		BLSApkRegistry:             contractBLSPubkeyReg,
-		IndexRegistry:              contractIIndexReg,
-		EigenDARegistryCoordinator: contractIRegistryCoordinator,
-		EjectionManager:            contractEjectionManager,
-		StakeRegistry:              contractStakeRegistry,
-		EigenDAServiceManager:      contractEigenDAServiceManager,
-		DelegationManager:          contractDelegationManager,
-		PaymentVault:               contractPaymentVault,
-		ThresholdRegistry:          contractThresholdRegistry,
-		DisperserRegistry:          contractEigenDADisperserRegistry,
+		ServiceManagerAddr:    eigenDAServiceManagerAddr,
+		RegCoordinatorAddr:    registryCoordinatorAddr,
+		RelayRegistryAddress:  relayRegistryAddress,
+		AVSDirectory:          contractAVSDirectory,
+		SocketRegistry:        contractSocketRegistry,
+		OpStateRetriever:      contractBLSOpStateRetr,
+		BLSApkRegistry:        contractBLSPubkeyReg,
+		IndexRegistry:         contractIIndexReg,
+		RegistryCoordinator:   contractIRegistryCoordinator,
+		EjectionManager:       contractEjectionManager,
+		StakeRegistry:         contractStakeRegistry,
+		EigenDAServiceManager: contractEigenDAServiceManager,
+		DelegationManager:     contractDelegationManager,
+		PaymentVault:          contractPaymentVault,
+		ThresholdRegistry:     contractThresholdRegistry,
+		DisperserRegistry:     contractEigenDADisperserRegistry,
 	}
 	return nil
 }
@@ -295,7 +295,7 @@ func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator
 	// TODO: Properly handle the case where the operator is not registered in any quorum. The current behavior of the smart contracts is to revert instead of returning an empty bitmap.
 	//  We should probably change this.
 	emptyBitmapErr := "execution reverted: BLSRegistryCoordinator.getCurrentQuorumBitmapByOperatorId: no quorum bitmap history for operatorId"
-	quorumBitmap, err := t.bindings.EigenDARegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
+	quorumBitmap, err := t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operator)
 	if err != nil {
@@ -322,7 +322,7 @@ func (t *Reader) getRegistrationParams(
 
 	operatorAddress := t.ethClient.GetAccountAddress()
 
-	msgToSignG1_, err := t.bindings.EigenDARegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
+	msgToSignG1_, err := t.bindings.RegistryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{
 		Context: ctx,
 	}, operatorAddress)
 	if err != nil {
@@ -550,13 +550,13 @@ func (t *Reader) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quor
 }
 
 func (t *Reader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
-	return t.bindings.EigenDARegistryCoordinator.StakeRegistry(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
 		Context: ctx,
 	})
 }
 
 func (t *Reader) SocketRegistry(ctx context.Context) (gethcommon.Address, error) {
-	return t.bindings.EigenDARegistryCoordinator.SocketRegistry(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.SocketRegistry(&bind.CallOpts{
 		Context: ctx,
 	})
 }
@@ -604,7 +604,7 @@ func (t *Reader) BatchOperatorAddressToID(ctx context.Context, addresses []gethc
 }
 
 func (t *Reader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
-	return t.bindings.EigenDARegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
 	}, operatorId)
 }
@@ -622,7 +622,7 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 			Context: ctx,
 		}, t.bindings.RegCoordinatorAddr, [][32]byte{byteId}, blockNumber)
 		if err != nil {
-			if err.Error() == "execution reverted: EigenDARegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
+			if err.Error() == "execution reverted: RegistryCoordinator.getQuorumBitmapIndexAtBlockNumber: no bitmap update found for operatorId at block number" {
 				return []*big.Int{big.NewInt(0)}, nil
 			} else {
 				return nil, err
@@ -673,7 +673,7 @@ func (t *Reader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, o
 
 func (t *Reader) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
 
-	operatorSetParams, err := t.bindings.EigenDARegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
+	operatorSetParams, err := t.bindings.RegistryCoordinator.GetOperatorSetParams(&bind.CallOpts{
 		Context: ctx,
 	}, quorumID)
 	if err != nil {
@@ -717,7 +717,7 @@ func (t *Reader) CalculateOperatorChurnApprovalDigestHash(
 			Operator:     operatorsToChurn[i].Operator,
 		}
 	}
-	return t.bindings.EigenDARegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.CalculateOperatorChurnApprovalDigestHash(&bind.CallOpts{
 		Context: ctx,
 	}, operatorAddress, operatorId, opKickParams, salt, expiry)
 }
@@ -728,7 +728,7 @@ func (t *Reader) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
-	return t.bindings.EigenDARegistryCoordinator.QuorumCount(&bind.CallOpts{
+	return t.bindings.RegistryCoordinator.QuorumCount(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: big.NewInt(int64(blockNumber)),
 	})

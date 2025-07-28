@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
+	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigensdk-go/logging"

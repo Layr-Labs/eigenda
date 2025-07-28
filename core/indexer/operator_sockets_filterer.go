@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/Layr-Labs/eigenda/common"
-	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -34,7 +34,7 @@ func NewOperatorSocketsFilterer(eigenDAServiceManagerAddr gethcommon.Address, cl
 		return nil, err
 	}
 
-	blsRegAddress, err := contractEigenDAServiceManager.EigenDARegistryCoordinator(&bind.CallOpts{})
+	blsRegAddress, err := contractEigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
 	if err != nil {
 		return nil, err
 	}

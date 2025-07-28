@@ -2,7 +2,7 @@ import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   OperatorRegistered as OperatorRegisteredEvent,
   OperatorDeregistered as OperatorDeregisteredEvent
-} from "../generated/RegistryCoordinator_Operator/EigenDARegistryCoordinator"
+} from "../generated/RegistryCoordinator_Operator/RegistryCoordinator"
 import { NewPubkeyRegistration as NewPubkeyRegistrationEvent } from "../generated/BLSApkRegistry/BLSApkRegistry"
 import { Operator } from "../generated/schema"
 import { BLSApkRegistry } from "../generated/BLSApkRegistry/BLSApkRegistry"

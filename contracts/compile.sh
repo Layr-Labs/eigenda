@@ -32,7 +32,7 @@ contracts="PaymentVault \
   DelegationManager \
   BitmapUtils \
   OperatorStateRetriever \
-  EigenDARegistryCoordinator \
+  RegistryCoordinator \
   BLSApkRegistry \
   IIndexRegistry \
   StakeRegistry \
