@@ -152,7 +152,6 @@ func discoverAddresses(ctx *cli.Context) error {
 		return fmt.Errorf("NewEigenDADirectoryReader: %w", err)
 	}
 
-	// Get all addresses
 	addressMap, err := directoryReader.GetAllAddresses()
 	if err != nil {
 		return fmt.Errorf("GetAllAddresses from directory: %w", err)
