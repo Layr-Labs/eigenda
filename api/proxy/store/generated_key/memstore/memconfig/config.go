@@ -22,8 +22,8 @@ type Config struct {
 	// This can be used to simulate eigenda being down.
 	PutReturnsFailoverError bool
 	// if nil, any subsequent put requests will succeed without error, and all gets will succeed without error
-	// if not nil, any subsequent put requests will succeed without error, and, but when retrieving with the key,
-	// the returned value is the derivation error
+	// if not nil, any subsequent put requests will succeed without error, but when retrieving with the key,
+	// the returned value is the derivation error set in this config
 	PutWithGetReturnsDerivationError error
 }
 

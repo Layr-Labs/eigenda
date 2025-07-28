@@ -122,7 +122,7 @@ func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	db := New(ctx, config, testLogger)
 	testKey := []byte("som-key")
 
-	// status code 3 corresponds to coretypes.VerificationStatusCode
+	// inject InvalidCertDerivationError
 	err := config.SetPUTWithGetReturnsDerivationError(coretypes.ErrInvalidCertDerivationError)
 	require.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	_, err = db.FetchEntry(testKey)
 	require.ErrorIs(t, err, coretypes.ErrInvalidCertDerivationError)
 
-	// status code corresponds to recency error
+	// set to return recency error
 	err = config.SetPUTWithGetReturnsDerivationError(coretypes.ErrRecencyCheckFailedDerivationError)
 	require.NoError(t, err)
 
