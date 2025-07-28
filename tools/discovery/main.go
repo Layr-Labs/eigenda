@@ -197,7 +197,7 @@ func printJSON(addressMap map[string]gethcommon.Address) {
 		if i == len(addressMap)-1 {
 			comma = ""
 		}
-		fmt.Printf("  {\"name\": \"%s\", \"address\": \"%s\"}%s\n", name, addr.Hex(), comma)
+		fmt.Printf("  {\"contract_name\": \"%s\", \"address\": \"%s\"}%s\n", name, addr.Hex(), comma)
 		i++
 	}
 	fmt.Println("]")
