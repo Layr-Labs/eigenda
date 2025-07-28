@@ -5,7 +5,7 @@ import {
   OperatorRegistered as OperatorRegisteredEvent,
   OperatorSetParamsUpdated as OperatorSetParamsUpdatedEvent,
   OperatorSocketUpdate as OperatorSocketUpdateEvent
-} from "../generated/RegistryCoordinator/RegistryCoordinator"
+} from "../generated/EigenDARegistryCoordinator/EigenDARegistryCoordinator"
 import {
   ChurnApproverUpdated,
   OperatorDeregistered,

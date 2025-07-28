@@ -14,8 +14,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
@@ -81,7 +81,7 @@ func (t *Writer) RegisterOperator(
 		return err
 	}
 
-	tx, err := t.bindings.RegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
+	tx, err := t.bindings.EigenDARegistryCoordinator.RegisterOperator(opts, quorumNumbers, socket, *params, *operatorSignature)
 
 	if err != nil {
 		t.logger.Error("Failed to register operator", "err", err)
@@ -143,7 +143,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 		return err
 	}
 
-	tx, err := t.bindings.RegistryCoordinator.RegisterOperatorWithChurn(
+	tx, err := t.bindings.EigenDARegistryCoordinator.RegisterOperatorWithChurn(
 		opts,
 		quorumNumbers,
 		socket,
@@ -204,7 +204,7 @@ func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point,
 		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.bindings.RegistryCoordinator.DeregisterOperator(
+	tx, err := t.bindings.EigenDARegistryCoordinator.DeregisterOperator(
 		opts,
 		quorumIds,
 	)
@@ -228,7 +228,7 @@ func (t *Writer) UpdateOperatorSocket(ctx context.Context, socket string) error 
 		t.logger.Error("Failed to generate transact opts", "err", err)
 		return err
 	}
-	tx, err := t.bindings.RegistryCoordinator.UpdateSocket(opts, socket)
+	tx, err := t.bindings.EigenDARegistryCoordinator.UpdateSocket(opts, socket)
 	if err != nil {
 		t.logger.Error("Failed to update operator socket", "err", err)
 		return err

@@ -179,7 +179,7 @@ var _ = BeforeSuite(func() {
 		certBuilder, err = clientsv2.NewCertBuilder(
 			logger,
 			gethcommon.HexToAddress(testConfig.EigenDA.OperatorStateRetriever),
-			gethcommon.HexToAddress(testConfig.EigenDA.RegistryCoordinator),
+			gethcommon.HexToAddress(testConfig.EigenDA.EigenDARegistryCoordinator),
 			ethClient,
 		)
 
