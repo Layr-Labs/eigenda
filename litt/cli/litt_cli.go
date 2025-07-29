@@ -88,7 +88,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 				Usage:     "Run a LittDB benchmark.",
 				ArgsUsage: "<path/to/benchmark/config.json>",
 				Args:      true,
-				Action:    nil, // benchmarkCommand, // TODO this will be added in a follow up PR
+				Action:    benchmarkCommand,
 			},
 			{
 				Name:  "prune",
