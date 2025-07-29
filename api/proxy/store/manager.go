@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	_ "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
@@ -22,7 +23,7 @@ type IManager interface {
 	Put(ctx context.Context, cm commitments.CommitmentMode, value []byte) ([]byte, error)
 	// See [Manager.Get]
 	Get(ctx context.Context, versionedCert certs.VersionedCert,
-		cm commitments.CommitmentMode, verifyOpts common.CertVerificationOpts) ([]byte, error)
+		cm commitments.CommitmentMode, opts common.GETOpts) ([]byte, error)
 	// See [Manager.SetDispersalBackend]
 	SetDispersalBackend(backend common.EigenDABackend)
 	// See [Manager.GetDispersalBackend]
@@ -96,10 +97,11 @@ func NewManager(
 
 // Get fetches a value from a storage backend based on the (commitment mode, type).
 // It also validates the value retrieved and returns an error if the value is invalid.
+// If opts.ReturnEncodedPayload is true, it will return the encoded payload without decoding it.
 func (m *Manager) Get(ctx context.Context,
 	versionedCert certs.VersionedCert,
 	cm commitments.CommitmentMode,
-	verifyOpts common.CertVerificationOpts,
+	opts common.GETOpts,
 ) ([]byte, error) {
 	switch cm {
 	case commitments.StandardCommitmentMode, commitments.OptimismGenericCommitmentMode:
@@ -110,43 +112,56 @@ func (m *Manager) Get(ctx context.Context,
 			return nil, errors.New("expected EigenDA V2 backend for DA commitment type with CertV1")
 		}
 
+		// The eigendav2 verify function verifies the cert, but not the kzg commitment.
+		// TODO: should we be verifying those when retrieving from secondary storages like S3...?
 		verifyMethod, err := m.getVerifyMethod(versionedCert.Version)
 		if err != nil {
 			return nil, fmt.Errorf("get verify method: %w", err)
 		}
 
-		// 1 - read blob from cache if enabled
-		if m.secondary.CachingEnabled() {
-			m.log.Debug("Retrieving data from cached backends")
-			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, false, verifyMethod, verifyOpts)
+		// 1 - read payload from cache if enabled
+		// Secondary storages (cache and fallback) store payloads instead of blobs.
+		// For simplicity, we bypass secondary storages when requesting encoded payloads,
+		// since those requests are only for secure integrations and run by provers/challengers.
+		// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
+		// storages and make them all implement the [clients.PayloadRetriever] interface.
+		// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
+		if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
+			m.log.Debug("Retrieving payload from cached backends")
+			payload, err := m.secondary.MultiSourceRead(ctx,
+				versionedCert.SerializedCert, false, verifyMethod, opts.L1InclusionBlockNum)
 			if err == nil {
-				return data, nil
+				return payload, nil
 			}
-
-			m.log.Warn("Failed to read from cache targets", "err", err)
+			m.log.Warn("Failed to read payload from cache targets", "err", err)
 		}
 
-		// 2 - read blob from EigenDA
-		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, verifyOpts)
+		// 2 - read maybeEncodedPayload from EigenDA
+		maybeEncodedPayload, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, opts)
 		if err == nil {
-			if m.secondary.WriteOnCacheMissEnabled() {
-				m.backupToSecondary(ctx, versionedCert.SerializedCert, data)
+			// Only backup to secondary storage if we're returning the decoded payload
+			// since the secondary stores are currently hardcoded to store payloads only.
+			// TODO: we could consider also storing encoded payloads under separate keys?
+			if m.secondary.WriteOnCacheMissEnabled() && !opts.ReturnEncodedPayload {
+				m.backupToSecondary(ctx, versionedCert.SerializedCert, maybeEncodedPayload)
 			}
 
-			return data, nil
+			return maybeEncodedPayload, nil
 		}
 
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
-		if m.secondary.FallbackEnabled() {
-			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod, verifyOpts)
+		// Only use fallbacks if we're not requesting encoded payload
+		if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
+			maybeEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
+				versionedCert.SerializedCert, true, verifyMethod, opts.L1InclusionBlockNum)
 			if err != nil {
-				m.log.Error("Failed to read from fallback targets", "err", err)
+				m.log.Error("Failed to read payload from fallback targets", "err", err)
 				return nil, err
 			}
 		} else {
 			return nil, err
 		}
-		return data, err
+		return maybeEncodedPayload, err
 	case commitments.OptimismKeccakCommitmentMode:
 		// TODO: we should refactor the manager to not deal with keccak commitments at all.
 		return nil, fmt.Errorf("INTERNAL BUG: call GetOPKeccakValueFromS3 instead")
@@ -201,16 +216,20 @@ func (m *Manager) backupToSecondary(ctx context.Context, commitment []byte, valu
 
 // getVerifyMethod returns the correct verify method based on commitment type
 func (m *Manager) getVerifyMethod(certVersion certs.VersionByte) (
-	func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
+	func(context.Context, []byte, []byte, uint64) error,
 	error,
 ) {
-	v2VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, opts common.CertVerificationOpts) error {
-		return m.eigendaV2.Verify(ctx, certs.NewVersionedCert(cert, certVersion), opts)
+	v1VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+		// we don't add the cert version because EigenDA V1 only supported [certs.V0VersionByte] Certs.
+		return m.eigenda.Verify(ctx, cert, payload)
+	}
+	v2VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+		return m.eigendaV2.VerifyCert(ctx, certs.NewVersionedCert(cert, certVersion), l1InclusionBlockNumber)
 	}
 
 	switch certVersion {
 	case certs.V0VersionByte:
-		return m.eigenda.Verify, nil
+		return v1VerifyWrapper, nil
 	case certs.V1VersionByte, certs.V2VersionByte:
 		return v2VerifyWrapper, nil
 	default:
@@ -246,15 +265,20 @@ func (m *Manager) putToCorrectEigenDABackend(ctx context.Context, value []byte) 
 func (m *Manager) getFromCorrectEigenDABackend(
 	ctx context.Context,
 	versionedCert certs.VersionedCert,
-	verifyOpts common.CertVerificationOpts,
+	opts common.GETOpts,
 ) ([]byte, error) {
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
 		m.log.Debug("Reading blob from EigenDAV1 backend")
+
+		// V1 backend does not support returning encoded payloads
+		if opts.ReturnEncodedPayload {
+			return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates")
+		}
+
 		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
 		if err == nil {
-			// verify v1 (payload, cert)
-			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data, verifyOpts)
+			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data)
 			if err != nil {
 				return nil, err
 			}
@@ -264,21 +288,21 @@ func (m *Manager) getFromCorrectEigenDABackend(
 		return nil, err
 
 	case certs.V1VersionByte, certs.V2VersionByte:
-
 		// The cert must be verified before attempting to get the data, since the GET logic
-		// assumes the cert is valid. Verify v2 doesn't require a payload.
-		err := m.eigendaV2.Verify(ctx, versionedCert, verifyOpts)
+		// assumes the cert is valid. Verify v2 doesn't require a payload
+		// because the payload is checked inside the Get function below.
+		err := m.eigendaV2.VerifyCert(ctx, versionedCert, opts.L1InclusionBlockNum)
 		if err != nil {
 			return nil, fmt.Errorf("verify EigenDACert: %w", err)
 		}
 
-		m.log.Debug("Reading blob from EigenDAV2 backend")
-		data, err := m.eigendaV2.Get(ctx, versionedCert)
+		m.log.Debug("Reading blob from EigenDAV2 backend", "returnEncodedPayload", opts.ReturnEncodedPayload)
+		maybeEncodedPayload, err := m.eigendaV2.Get(ctx, versionedCert, opts.ReturnEncodedPayload)
 		if err != nil {
-			return nil, fmt.Errorf("get data from V2 backend: %w", err)
+			return nil, fmt.Errorf("get payload from EigenDA V2 backend: %w", err)
 		}
 
-		return data, nil
+		return maybeEncodedPayload, nil
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}

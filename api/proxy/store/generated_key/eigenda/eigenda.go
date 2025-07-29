@@ -218,7 +218,7 @@ func (e Store) BackendType() common.BackendType {
 
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e Store) Verify(ctx context.Context, serializedCert []byte, payload []byte, _ common.CertVerificationOpts) error {
+func (e Store) Verify(ctx context.Context, serializedCert []byte, payload []byte) error {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(serializedCert, &cert)
 	if err != nil {

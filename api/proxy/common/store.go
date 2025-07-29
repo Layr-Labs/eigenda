@@ -65,7 +65,7 @@ func StringToBackendType(s string) BackendType {
 	}
 }
 
-type CertVerificationOpts struct {
+type GETOpts struct {
 	// L1 block number at which the cert was included in the rollup batcher inbox.
 	// This is optional, and should be set to 0 to mean to skip the RBN recency check.
 	// It is impossible for a batch inbox tx to have been included in the genesis block,
@@ -78,6 +78,11 @@ type CertVerificationOpts struct {
 	// within a certain number of blocks after the RBN.
 	// validity condition is: certRBN < L1InclusionBlockNum <= RBN + RBNRecencyWindowSize
 	L1InclusionBlockNum uint64
+
+	// When true, the Get method will return the encoded_payload without decoding
+	// it. This is useful when clients need to decode the encoded_payload themselves,
+	// such as inside a fpvm to prove that a decoding fails and can thus be discarded.
+	ReturnEncodedPayload bool
 }
 
 type Store interface {
@@ -92,8 +97,8 @@ type EigenDAV1Store interface {
 	Put(ctx context.Context, payload []byte) (serializedCert []byte, err error)
 	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
 	Get(ctx context.Context, serializedCert []byte) (payload []byte, err error)
-	// Verify verifies the given key-value pair. opts is only used for EigenDA V2.
-	Verify(ctx context.Context, serializedCert []byte, payload []byte, opts CertVerificationOpts) error
+	// Verify verifies the cert and that the payload (after encoding) matches the kzg commitment in the cert.
+	Verify(ctx context.Context, serializedCert []byte, payload []byte) error
 }
 
 // EigenDAV2Store is the interface for an EigenDA V2 data store as well as V2 memstore.
@@ -102,9 +107,13 @@ type EigenDAV2Store interface {
 	// Put inserts the given value into the key-value (serializedCert-payload) data store.
 	Put(ctx context.Context, payload []byte) (serializedCert []byte, err error)
 	// Get retrieves the given key if it's present in the key-value (serializedCert-payload) data store.
-	Get(ctx context.Context, versionedCert certs.VersionedCert) (payload []byte, err error)
-	// Verify verifies the given key-value pair.
-	Verify(ctx context.Context, versionedCert certs.VersionedCert, opts CertVerificationOpts) error
+	// If returnEncodedPayload is true, the payload is returned without decoding.
+	Get(ctx context.Context,
+		versionedCert certs.VersionedCert,
+		returnEncodedPayload bool,
+	) (maybeEncodedPayload []byte, err error)
+	// VerifyCert verifies the cert validity and rbn recency.
+	VerifyCert(ctx context.Context, versionedCert certs.VersionedCert, l1InclusionBlockNum uint64) error
 }
 
 // SecondaryStore is the interface for a key-value data store that uses keccak(value) as the key.

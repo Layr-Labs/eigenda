@@ -69,7 +69,11 @@ func NewStore(
 
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert) ([]byte, error) {
+// If returnEncodedPayload is true, it returns the encoded payload without decoding.
+//
+// This function is bug-prone as is because it returns []byte which can either be a raw payload or an encoded payload.
+// TODO: Refactor to use [coretypes.EncodedPayload] and [coretypes.Payload] instead of []byte.
+func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool) ([]byte, error) {
 	var cert coretypes.RetrievableEigenDACert
 
 	switch versionedCert.Version {
@@ -96,12 +100,23 @@ func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert) ([]by
 	// Try each retriever in sequence until one succeeds
 	var errs []error
 	for _, retriever := range e.retrievers {
-		payload, err := retriever.GetPayload(ctx, cert)
-		if err == nil {
-			return payload.Serialize(), nil
+		if returnEncodedPayload {
+			// Get encoded payload if requested
+			encodedPayload, err := retriever.GetEncodedPayload(ctx, cert)
+			if err == nil {
+				return encodedPayload.Serialize(), nil
+			}
+			e.log.Debugf("Encoded payload retriever failed: %v", err)
+			errs = append(errs, err)
+		} else {
+			// Get decoded payload (default behavior)
+			payload, err := retriever.GetPayload(ctx, cert)
+			if err == nil {
+				return payload.Serialize(), nil
+			}
+			e.log.Debugf("Payload retriever failed: %v", err)
+			errs = append(errs, err)
 		}
-
-		e.log.Debugf("Payload retriever failed: %v", err)
 	}
 
 	return nil, fmt.Errorf("all retrievers failed: %w", errors.Join(errs...))
@@ -177,15 +192,15 @@ func (e Store) BackendType() common.BackendType {
 	return common.EigenDAV2BackendType
 }
 
-// Verify verifies an EigenDACert by calling the verifyEigenDACertV2 view function
+// VerifyCert verifies an EigenDACert by calling the verifyEigenDACertV2 view function
 //
 // Since v2 methods for fetching a payload are responsible for verifying the received bytes against the certificate,
-// this Verify method only needs to check the cert on chain. That is why the third parameter is ignored.
+// this VerifyCert method only needs to check the cert on chain. That is why the third parameter is ignored.
 //
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
 // Then proxy could remain a very thin server wrapper around eigenda clients.
-func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, opts common.CertVerificationOpts) error {
+func (e Store) VerifyCert(ctx context.Context, versionedCert certs.VersionedCert, l1InclusionBlockNum uint64) error {
 	var referenceBlockNumber uint64
 	var sumDACert coretypes.EigenDACert
 
@@ -226,7 +241,7 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 	}
 
 	// check recency first since it requires less processing and no IO vs verifying the cert
-	err := verifyCertRBNRecencyCheck(referenceBlockNumber, opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
+	err := verifyCertRBNRecencyCheck(referenceBlockNumber, l1InclusionBlockNum, e.rbnRecencyWindowSize)
 	if err != nil {
 		// Already a structured error converted to a 418 HTTP error by the error middleware.
 		return err

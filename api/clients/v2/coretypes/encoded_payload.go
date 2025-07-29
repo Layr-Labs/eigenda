@@ -22,6 +22,11 @@ type EncodedPayload struct {
 	bytes []byte
 }
 
+// Serialize returns the raw bytes of the encoded payload
+func (ep *EncodedPayload) Serialize() []byte {
+	return ep.bytes
+}
+
 // newEncodedPayload accepts a payload, and performs the PayloadEncodingVersion0 encoding to create an encoded payload
 func newEncodedPayload(payload *Payload) (*EncodedPayload, error) {
 	encodedPayloadHeader := make([]byte, 32)

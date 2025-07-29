@@ -50,7 +50,12 @@ func TestGetSet(t *testing.T) {
 
 	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
 
-	actual, err := msV2.Get(t.Context(), cert)
+	actual, err := msV2.Get(t.Context(), cert, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
+	
+	// Test getting the encoded payload
+	encodedPayload, err := msV2.Get(t.Context(), cert, true)
+	require.NoError(t, err)
+	require.NotEqual(t, expected, encodedPayload) // Should be different
 }

@@ -90,21 +90,31 @@ func (svr *Server) handleGetShared(
 	if err != nil {
 		return err // doesn't need to be wrapped; already a proxyerrors
 	}
-	input, err := svr.sm.Get(
+
+	// Check if client requested encoded payload
+	// This is currently used by secure integration (e.g. optimism hokulea), which need
+	// to decode the payload themselves inside the fpvm.
+	returnEncodedPayload := parseReturnEncodedPayloadQueryParam(r)
+
+	maybeEncodedPayload, err := svr.sm.Get(
 		r.Context(),
 		versionedCert,
 		mode,
-		common.CertVerificationOpts{L1InclusionBlockNum: l1InclusionBlockNum},
+		common.GETOpts{
+			L1InclusionBlockNum:  l1InclusionBlockNum,
+			ReturnEncodedPayload: returnEncodedPayload,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("get request failed with serializedCert (version %v) %v: %w",
 			versionedCert.Version, serializedCertHex, err)
 	}
 
-	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path,
+		"commitmentMode", mode, "returnEncodedPayload", returnEncodedPayload,
 		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
 
-	_, err = w.Write(input)
+	_, err = w.Write(maybeEncodedPayload)
 	if err != nil {
 		// If the write fails, we will already have sent a 200 header. But we still return an error
 		// here so that the logging middleware can log it.
@@ -131,6 +141,18 @@ func parseCommitmentInclusionL1BlockNumQueryParam(r *http.Request) (uint64, erro
 		return l1BlockNum, nil
 	}
 	return 0, nil
+}
+
+// Parses the return_encoded_payload query parameter from the request.
+// Happy path:
+//   - if the return_encoded_payload query parameter is present (with any value), it returns true
+//   - this means it accepts ?return_encoded_payload, ?return_encoded_payload=true, ?return_encoded_payload=anything
+//
+// Unhappy paths:
+//   - if the return_encoded_payload query parameter is not provided, it returns false
+func parseReturnEncodedPayloadQueryParam(r *http.Request) bool {
+	_, exists := r.URL.Query()["return_encoded_payload"]
+	return exists
 }
 
 // =================================================================================================
