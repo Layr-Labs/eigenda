@@ -79,14 +79,14 @@ Proper spelling and grammar are important, because they help keep code and docum
 and professional. They should be checked and carefully maintained.
 
 1. Overly strict adherence to arbitrary grammar and spelling "rules" that don't impact readability is not beneficial.
-   Some examples of "rules" that shouldn't be enforced or commented on are:
-   - "Don't end a sentence with a preposition"
-   - "Never split the infinitive"
-   - "Don't use passive voice"
-   - "Always spell out numbers"
-   - "Don't begin a sentence with 'And', 'But', or 'Because'"
-   - Perfect canonical comma usage
-   - Use "okay" instead of "ok"
+   This list isn't exhaustive, but here are some examples of rules you shouldn't try to enforce:
+   - "Don't end a sentence with a preposition" (sentences in natural language often end in prepositions)
+   - "Don't use passive voice" (passive voice is sometimes the correct choice)
+   - "Always spell out numbers" ('5' and 'five' are equally readable)
+   - "Don't begin a sentence with 'And', 'But', or 'Because'" (this doesn't hinder readability)
+   - "Use perfectly canonical commas" (different people use commas differently)
+   - "Use 'okay' instead of 'ok'" (both spellings are ok)
+   - "Don't use contractions" (contractions are perfectly valid, and frequently used)
 2. Some things are technically correct grammatically, yet hinder readability. Despite being "grammatically correct",
    the following things should not be tolerated:
    - Sentences with ambiguous interpretations
