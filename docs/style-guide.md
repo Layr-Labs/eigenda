@@ -103,7 +103,7 @@ Good code has good names. Bad names yield bad code.
    - `i` -> `nodeIndex`
    - `req` -> `dispersalRequest`
    - `status` -> `operatorStatus`
-   - An exception is made for golang receiver names, which are short by convention.
+   - An exception is made for golang receiver names, are permitted to be a *single character* by convention
 2. Consistency is key. A single concept should have a single term, ideally across the entire codebase.
    - The exception here is with local scoping. E.g. if you have an `OperatorId` throughout the codebase, it would be
    reasonable to refer to it as an `id` inside the `Operator` struct.
