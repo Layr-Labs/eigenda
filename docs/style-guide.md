@@ -78,14 +78,15 @@ for human engineers, and to provide AI agents with a checklist for code review.
 Proper spelling and grammar are important, because they help keep code and documentation unambiguous, easy to read, 
 and professional. They should be checked and carefully maintained.
 
-1. Overly strict adherence to arbitrary grammar "rules" that don't impact readability is not beneficial. Some 
-   examples of "rules" that shouldn't be enforced or commented on are:
+1. Overly strict adherence to arbitrary grammar and spelling "rules" that don't impact readability is not beneficial.
+   Some examples of "rules" that shouldn't be enforced or commented on are:
    - "Don't end a sentence with a preposition"
    - "Never split the infinitive"
    - "Don't use passive voice"
    - "Always spell out numbers"
    - "Don't begin a sentence with 'And', 'But', or 'Because'"
    - Perfect canonical comma usage
+   - Use "okay" instead of "ok"
 2. Some things are technically correct grammatically, yet hinder readability. Despite being "grammatically correct",
    the following things should not be tolerated:
    - Sentences with ambiguous interpretations
