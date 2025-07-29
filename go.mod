@@ -12,9 +12,9 @@ toolchain go1.24.4
 // We need to keep eigenda-proxy clients separate because they are imported from modules that are not on go1.24 yet.
 replace github.com/Layr-Labs/eigenda-proxy/clients => ./api/proxy/clients
 
-// Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/49
+// Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/50
 // TODO: update to a proper version once we make the next release.
-replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v1.13.1-0.20250616152614-59132dd56ae5
+replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v1.13.1-0.20250716111202-d4a6faccf8c5
 
 // This is copied over from op's go.mod file.
 // https://github.com/ethereum-optimism/optimism/blob/5662448279e4fb16e073e00baeb6e458b12a59b2/go.mod#L253C90-L253C106
@@ -32,7 +32,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
-	github.com/beevik/ntp v1.4.3
 	github.com/consensys/gnark-crypto v0.18.0
 	github.com/dchest/siphash v1.2.3
 	github.com/docker/go-units v0.5.0

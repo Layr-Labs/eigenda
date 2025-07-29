@@ -53,7 +53,7 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	var batchHeaderHash [32]byte
 	copy(batchHeaderHash[:], req.GetBatchHeaderHash())
 
-	batchHeader, err := s.chainClient.FetchBatchHeader(ctx, gcommon.HexToAddress(s.config.EigenDAServiceManagerAddr), req.GetBatchHeaderHash(), big.NewInt(int64(req.ReferenceBlockNumber)), nil)
+	batchHeader, err := s.chainClient.FetchBatchHeader(ctx, gcommon.HexToAddress(s.config.EigenDAServiceManagerAddr), req.GetBatchHeaderHash(), big.NewInt(int64(req.GetReferenceBlockNumber())), nil)
 	if err != nil {
 		return nil, err
 	}

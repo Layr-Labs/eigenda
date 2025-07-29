@@ -138,12 +138,7 @@ func LoadCohort(path string) (*Cohort, error) {
 	}
 
 	filePath := cohort.Path()
-	exists, err := util.Exists(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if cohort file exists: %w", err)
-	}
-
-	if !exists {
+	if err = util.ErrIfNotExists(filePath); err != nil {
 		return nil, fmt.Errorf("cohort file does not exist: %s", filePath)
 	}
 

@@ -60,6 +60,17 @@ fmt-check:
 		exit 1; \
 	fi
 
+# Go's VCS stamping logic assumes .git is always a directory, but in worktrees it's a file.
+# This causes "error obtaining VCS status" when building because Go can't parse the file format.
+# See https://github.com/golang/go/issues/58218#issuecomment-1471302281
+#
+# So we detect if we're in a git worktree (where .git is a file, not a directory)
+# and set GOFLAGS to disable VCS stamping to avoid build errors if so.
+# This is a temporary workaround until Go's VCS handling is fixed.
+ifeq ($(shell test -f .git && echo "true"),true)
+export GOFLAGS := -buildvcs=false
+$(warning Detected git worktree - disabling VCS stamping)
+endif
 build:
 	cd operators/churner && make build
 	cd disperser && make build
@@ -72,9 +83,9 @@ build:
 
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
+	docker buildx bake node-group-release ${PUSH_FLAG} --provenance=false --sbom=false
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy ${PUSH_FLAG}
+	docker buildx bake proxy-release ${PUSH_FLAG}
 
 # Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
 # TODO: we should break these up into short and long unit-tests.
@@ -102,6 +113,8 @@ integration-tests-inabox: build
 # These are e2e tests that run against live environments (preprod and holesky currently).
 live-tests:
 	go test -v ./test/v2/live -v -timeout 60m
+live-tests-v1:
+	go test -v ./api/clients --live-test
 
 semver:
 	echo "${SEMVER}"

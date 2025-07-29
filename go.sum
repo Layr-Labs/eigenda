@@ -18,8 +18,8 @@ github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28 h1:
 github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28/go.mod h1:YNzORpoebdDNv0sJLm/H9LTx72M85zA54eBSXI5DULw=
 github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28 h1:rhIC2XpFpCcRkv4QYczIUe/fXvE4T+0B1mF9f6NJCuo=
 github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28/go.mod h1:auVQv3GD/25A2C/DD0/URyQaUwniQlS2ebEVBsvlDIM=
-github.com/Layr-Labs/optimism v1.13.1-0.20250616152614-59132dd56ae5 h1:wQ65cn2wXB1R3q7bRjtgrFL34VtUvDBrqQ7hqm7iFT0=
-github.com/Layr-Labs/optimism v1.13.1-0.20250616152614-59132dd56ae5/go.mod h1:+EYGpoUAGgIoEU/OXizfCsKl8W98htyto8ghsQdAU7k=
+github.com/Layr-Labs/optimism v1.13.1-0.20250716111202-d4a6faccf8c5 h1:FRIXUd+v4nzez1bcpW7NCZvAyhhSYccdR/CNuVdOPPI=
+github.com/Layr-Labs/optimism v1.13.1-0.20250716111202-d4a6faccf8c5/go.mod h1:+EYGpoUAGgIoEU/OXizfCsKl8W98htyto8ghsQdAU7k=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 h1:TngWCqHvy9oXAN6lEVMRuU21PR1EtLVZJmdB18Gu3Rw=
@@ -87,8 +87,6 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.28.6 h1:cwIxeBttqPN3qkaAjcEcsh8NYr8n
 github.com/aws/aws-sdk-go-v2/service/sts v1.28.6/go.mod h1:FZf1/nKNEkHdGGJP/cI2MoIMquumuRK6ol3QQJNDxmw=
 github.com/aws/smithy-go v1.20.2 h1:tbp628ireGtzcHDDmLT/6ADHidqnwgF57XOXZe6tp4Q=
 github.com/aws/smithy-go v1.20.2/go.mod h1:krry+ya/rV9RDcV/Q16kpu6ypI4K2czasz0NC3qS14E=
-github.com/beevik/ntp v1.4.3 h1:PlbTvE5NNy4QHmA4Mg57n7mcFTmr1W1j3gcK7L1lqho=
-github.com/beevik/ntp v1.4.3/go.mod h1:Unr8Zg+2dRn7d8bHFuehIMSvvUYssHMxW3Q5Nx4RW5Q=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.20.0 h1:2F+rfL86jE2d/bmw7OhqUg2Sj/1rURkBn3MdfoPyRVU=

@@ -328,11 +328,11 @@ func TestStoreBatchSuccess(t *testing.T) {
 	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, 0, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
-	assert.Equal(t, chunks, blobsProto[0].Bundles[0].Chunks)
+	assert.Equal(t, chunks, blobsProto[0].GetBundles()[0].GetChunks())
 	chunks, format, err = s.GetChunks(ctx, batchHeaderHash, 1, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
-	assert.Equal(t, chunks, blobsProto[1].Bundles[0].Chunks)
+	assert.Equal(t, chunks, blobsProto[1].GetBundles()[0].GetChunks())
 
 	// Store the batch again it should be no-op.
 	_, err = s.StoreBatch(ctx, batchHeader, blobs, blobsProto)

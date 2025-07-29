@@ -61,13 +61,14 @@ const (
 	maxOperatorsStakeAge    = 300 // not expect the stake changes frequently
 	maxOperatorPortCheckAge = 60  // not expect validator port changes frequently, but it's consequential to have right port
 
-	// Live content
+	// Live content - used to set max-age (seconds) in cache-control header
 	maxMetricAge        = 5
 	maxThroughputAge    = 5
 	maxBlobFeedAge      = 5
 	maxBatchFeedAge     = 5
 	maxDispersalFeedAge = 5
 	maxSigningInfoAge   = 5
+	maxAccountAge       = 5
 )
 
 type (
@@ -104,6 +105,9 @@ type ServerV2 struct {
 
 	// KV caches for batches, keyed by batch header hash
 	batchResponseCache *lru.Cache[string, *BatchResponse]
+
+	// Account cache
+	accountCache *lru.Cache[string, *AccountFeedResponse]
 }
 
 func NewServerV2(
@@ -132,7 +136,7 @@ func NewServerV2(
 			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())-1, limit,
 		)
 	}
-	batchFeedCache := NewFeedCache[corev2.Attestation](
+	batchFeedCache := NewFeedCache(
 		maxNumBatchesToCache,
 		fetchBatchFn,
 		getBatchTimestampFn,
@@ -161,6 +165,11 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
 
+	accountCache, err := lru.New[string, *AccountFeedResponse](100) // Cache up to 100 different limit combinations
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accountCache: %w", err)
+	}
+
 	operatorHandler, err := dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
@@ -186,6 +195,7 @@ func NewServerV2(
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
+		accountCache:                     accountCache,
 	}, nil
 }
 
@@ -241,6 +251,7 @@ func (s *ServerV2) Start() error {
 		accounts := v2.Group("/accounts")
 		{
 			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+			accounts.GET("", s.FetchAccountFeed)
 		}
 		operators := v2.Group("/operators")
 		{
