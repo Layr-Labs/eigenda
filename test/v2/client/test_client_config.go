@@ -83,3 +83,5 @@ func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
 	}
 	return path.Join(root, srsFile), nil
 }
+
+// TODO ensure that RelayConnectionCount and DisperserConnectionCount have sane default values.
