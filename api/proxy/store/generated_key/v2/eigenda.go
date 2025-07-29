@@ -184,7 +184,7 @@ func (e Store) BackendType() common.BackendType {
 //
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
-// Then proxy could remain a very thing server wrapper around eigenda clients.
+// Then proxy could remain a very thin server wrapper around eigenda clients.
 func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, opts common.CertVerificationOpts) error {
 	var referenceBlockNumber uint64
 	var sumDACert coretypes.EigenDACert
