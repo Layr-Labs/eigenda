@@ -113,8 +113,6 @@ integration-tests:
 	go test -v ./operators/churner/tests
 	go test -v ./core/indexer
 	go test -v ./node/plugin/tests
-# TODO: this test is against holesky, should be moved to the live-tests.
-	go test -v ./api/clients --testnet-integration
 	go test -v ./disperser/dataapi
 
 # Tests that require a build because they start local inabox infra:
