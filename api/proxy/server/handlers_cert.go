@@ -199,6 +199,8 @@ func (svr *Server) handlePostShared(
 	default:
 		return fmt.Errorf("unknown dispersal backend: %v", svr.sm.GetDispersalBackend())
 	}
+	// Set cert version in request context for logging middleware
+	middleware.SetCertVersion(r, string(certVersion))
 	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
 
 	responseCommit, err := commitments.EncodeCommitment(versionedCert, mode)
