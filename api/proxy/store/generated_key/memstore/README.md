@@ -49,7 +49,7 @@ $ curl http://localhost:3100/memstore/config | \
 ```
 
 #### PUT with GET returning derivation error
-The configuration allows users to configure memstore to inject specific derivation error responses during GET operations while allowing PUT operations to succeed normally. This enables testing client handling of derivation errors without requiring complex setup.
+The configuration allows users to configure memstore to return specific derivation error responses during `/get` payload retrievals while still allowing `/put` request operations to succeed normally with the payload persisted to ephemeral db. This enables fast iteration testing of a rolllup client's handling of derivation errors without requiring a complex setup.
 Specifically, users send a PATCH request that sets the desired derivation error for all subsequent GET requests. After that, when the user sends data to the proxy, the PUT operation succeeds as normal—the error injection only affects the GET path. Behind the scenes, upon a GET request, the proxy returns either the stored data or the specified derivation error depending on its configuration.
 The PATCH request is sticky, meaning it will take effect on multiple GET requests unless reset.
 

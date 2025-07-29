@@ -19,10 +19,10 @@ type Config struct {
 	URL string // EigenDA proxy REST API URL
 }
 
-// this is a copy derivation error to avoid cyclic deps
+// This is a copy derivation error to avoid cyclic deps
 // see implementation at
 // https://github.com/Layr-Labs/eigenda/blob/e5f489aae34a1f68eb750e0da7ded52c200d7c36/api/clients/v2/coretypes/derivation_errors.go#L20
-// for all possible status code, see
+// for all possible status codes, see
 // https://github.com/Layr-Labs/eigenda/blob/66834223356d2ed230a8ffbbba13c6bb36d04139/api/clients/v2/coretypes/derivation_errors.go#L73
 type DerivationError struct {
 	StatusCode uint8
