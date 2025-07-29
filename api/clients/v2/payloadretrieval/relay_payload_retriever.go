@@ -54,8 +54,8 @@ func NewRelayPayloadRetriever(
 	}, nil
 }
 
-// GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
-// blob certificate. The relays are attempted in random order.
+// GetPayload iteratively attempts to retrieve a given blob from the relays 
+// listed in the EigenDACert. The relays are attempted in random order.
 //
 // If the blob is successfully retrieved, then the blob is verified against the certificate. If the verification
 // succeeds, the blob is decoded to yield the payload (the original user data, with no padding or any modification),
@@ -65,7 +65,44 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.Payload, error) {
+	eigenDACert coretypes.RetrievableEigenDACert,
+) (*coretypes.Payload, error) {
+
+	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := encodedPayload.Decode()
+	if err != nil {
+		blobKey, keyErr := eigenDACert.ComputeBlobKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("compute blob key from eigenDACert: %w", keyErr)
+		}
+
+		pr.log.Error(
+			`Commitment verification was successful, but decoding of blob to payload failed!
+				This client only supports blobs that were encoded using the codec(s) defined in
+				https://github.com/Layr-Labs/eigenda/blob/86e27fa03/api/clients/codecs/blob_codec.go.`,
+			"blobKey", blobKey.Hex(), "eigenDACert", eigenDACert, "error", err)
+		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(
+			fmt.Sprintf("blob %v: %v", blobKey.Hex(), err))
+	}
+
+	return payload, nil
+}
+
+// GetEncodedPayload iteratively attempts to retrieve a given blob from the relays 
+// listed in the EigenDACert. The relays are attempted in random order.
+//
+// If the blob is successfully retrieved, then the blob is verified against the EigenDACert.
+// If the verification succeeds, the blob is converted to an encoded payload form and returned.
+//
+// This method does NOT verify the eigenDACert on chain: it is assumed that the input
+// eigenDACert has already been verified prior to calling this method.
+func (pr *RelayPayloadRetriever) GetEncodedPayload(
+	ctx context.Context,
+	eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.EncodedPayload, error) {
 
 	relayKeys := eigenDACert.RelayKeys()
 	blobCommitments, err := eigenDACert.Commitments()
@@ -110,10 +147,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
 		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
 		//  change now, to limit the size of the refactor PR.
-		valid, err := verification.GenerateAndCompareBlobCommitment(
-			pr.g1Srs,
-			blob.Serialize(),
-			blobCommitments.Commitment)
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobCommitments.Commitment)
 		if err != nil {
 			pr.log.Warn(
 				"generate and compare blob commitment",
@@ -127,21 +161,18 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 
-		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
+		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.log.Error(
-				`Commitment verification was successful, but decoding of blob to payload failed!
-					This client only supports blobs that were encoded using the codec(s) defined in
-					https://github.com/Layr-Labs/eigenda/blob/86e27fa03/api/clients/codecs/blob_codec.go.`,
-				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
-			return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(
-				fmt.Sprintf("blob %v from relay %v: %v", blobKey.Hex(), relayKey, err))
+				"convert blob to encoded payload failed",
+				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			continue
 		}
 
-		return payload, nil
+		return encodedPayload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
+	return nil, fmt.Errorf("unable to retrieve encoded payload with blobkey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given relay, and times out based on config.FetchTimeout

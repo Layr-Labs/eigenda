@@ -50,10 +50,48 @@ func NewValidatorPayloadRetriever(
 // If the blob is successfully retrieved, then the blob verified against the EigenDACert. If the verification succeeds,
 // the blob is decoded to yield the payload (the original user data, with no padding or any modification), and the
 // payload is returned.
+//
+// This method does NOT verify the eigenDACert on chain: it is assumed that the input eigenDACert has already been
+// verified prior to calling this method.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
 ) (*coretypes.Payload, error) {
+
+	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := encodedPayload.Decode()
+	if err != nil {
+		blobKey, keyErr := eigenDACert.ComputeBlobKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("compute blob key from eigenDACert: %w", keyErr)
+		}
+		pr.logger.Error(
+			`Commitment verification was successful, but decoding of blob to payload failed!
+				This client only supports blobs that were encoded using the codec(s) defined in
+				https://github.com/Layr-Labs/eigenda/blob/86e27fa03/api/clients/codecs/blob_codec.go.`,
+			"blobKey", blobKey.Hex(), "eigenDACert", eigenDACert, "error", err)
+		return nil, fmt.Errorf("decode blob: %w", err)
+	}
+
+	return payload, nil
+}
+
+// GetEncodedPayload iteratively attempts to retrieve a given blob from the quorums
+// listed in the EigenDACert.
+//
+// If the blob is successfully retrieved, then the blob is verified against the EigenDACert.
+// If the verification succeeds, the blob is converted to an encoded payload form and returned.
+//
+// This method does NOT verify the eigenDACert on chain: it is assumed that the input
+// eigenDACert has already been verified prior to calling this method.
+func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
+	ctx context.Context,
+	eigenDACert coretypes.RetrievableEigenDACert,
+) (*coretypes.EncodedPayload, error) {
 
 	blobHeader, err := eigenDACert.BlobHeader()
 	if err != nil {
@@ -99,20 +137,18 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			continue
 		}
 
-		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
+		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.logger.Error(
-				`Commitment verification was successful, but decoding of blob to payload failed!
-					This client only supports blobs that were encoded using the codec(s) defined in
-					https://github.com/Layr-Labs/eigenda/blob/86e27fa03/api/clients/codecs/blob_codec.go.`,
-				"blobKey", blobKey.Hex(), "quorumID", quorumID, "eigenDACert", eigenDACert, "error", err)
-			return nil, fmt.Errorf("decode blob: %w", err)
+				"convert blob to encoded payload failed",
+				"blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
+			continue
 		}
 
-		return payload, nil
+		return encodedPayload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", blobHeader.QuorumNumbers)
+	return nil, fmt.Errorf("unable to retrieve encoded payload with blobkey %v from quorums %v", blobKey.Hex(), blobHeader.QuorumNumbers)
 }
 
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout

@@ -10,20 +10,20 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// encodedPayload represents a payload that has had an encoding applied to it
+// EncodedPayload represents a payload that has had an encoding applied to it,
+// meaning that it is guaranteed to be a multiple of 32 bytes in length,
+// each such 32 bytes representing a bn254 field element.
 //
 // Example encoding:
-//
-//	Encoded Payload header (32 bytes total)                   Encoded Payload Data (len is multiple of 32)
-//
-// [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
-type encodedPayload struct {
+//   - [Encoded Payload header (32 bytes total)] + [Encoded Payload Data (len is multiple of 32)]
+//   - [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
+type EncodedPayload struct {
 	// the size of these bytes is guaranteed to be a multiple of 32
 	bytes []byte
 }
 
 // newEncodedPayload accepts a payload, and performs the PayloadEncodingVersion0 encoding to create an encoded payload
-func newEncodedPayload(payload *Payload) (*encodedPayload, error) {
+func newEncodedPayload(payload *Payload) (*EncodedPayload, error) {
 	encodedPayloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
 	encodedPayloadHeader[1] = byte(codecs.PayloadEncodingVersion0) // encode version byte
@@ -39,11 +39,11 @@ func newEncodedPayload(payload *Payload) (*encodedPayload, error) {
 	encodedData := codec.PadPayload(payloadBytes)
 	encodedPayloadBytes := append(encodedPayloadHeader, encodedData...)
 
-	return &encodedPayload{encodedPayloadBytes}, nil
+	return &EncodedPayload{encodedPayloadBytes}, nil
 }
 
-// decode applies the inverse of PayloadEncodingVersion0 to an encodedPayload, and returns the decoded Payload
-func (ep *encodedPayload) decode() (*Payload, error) {
+// Decode applies the inverse of PayloadEncodingVersion0 to an EncodedPayload, and returns the decoded Payload
+func (ep *EncodedPayload) Decode() (*Payload, error) {
 	if len(ep.bytes) < 32 {
 		return nil, fmt.Errorf("encoded payload must be at least 32 bytes long, but got %d bytes", len(ep.bytes))
 	}
@@ -87,7 +87,7 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 }
 
 // toFieldElements converts the encoded payload to an array of field elements
-func (ep *encodedPayload) toFieldElements() ([]fr.Element, error) {
+func (ep *EncodedPayload) toFieldElements() ([]fr.Element, error) {
 	fieldElements, err := rs.ToFrArray(ep.bytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
@@ -99,7 +99,7 @@ func (ep *encodedPayload) toFieldElements() ([]fr.Element, error) {
 // encodedPayloadFromElements accepts an array of field elements, and converts them into an encoded payload
 //
 // maxPayloadLength is the maximum length in bytes that the contained Payload is permitted to be
-func encodedPayloadFromElements(fieldElements []fr.Element, maxPayloadLength uint32) (*encodedPayload, error) {
+func encodedPayloadFromElements(fieldElements []fr.Element, maxPayloadLength uint32) (*EncodedPayload, error) {
 	polynomialBytes := rs.SerializeFieldElements(fieldElements)
 	// this is the payload length in bytes, as claimed by the encoded payload header
 	payloadLength := binary.BigEndian.Uint32(polynomialBytes[2:6])
@@ -144,7 +144,7 @@ func encodedPayloadFromElements(fieldElements []fr.Element, maxPayloadLength uin
 	encodedPayloadBytes := make([]byte, encodedPayloadLength)
 	copy(encodedPayloadBytes, polynomialBytes[:lengthToCopy])
 
-	return &encodedPayload{encodedPayloadBytes}, nil
+	return &EncodedPayload{encodedPayloadBytes}, nil
 }
 
 // checkTrailingZeros accepts an array of bytes, and the number of bytes at the front of the array which are permitted

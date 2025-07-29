@@ -63,12 +63,12 @@ func (b *Blob) Serialize() []byte {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
 func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
-	encodedPayload, err := b.toEncodedPayload(payloadForm)
+	encodedPayload, err := b.ToEncodedPayload(payloadForm)
 	if err != nil {
 		return nil, fmt.Errorf("to encoded payload: %w", err)
 	}
 
-	payload, err := encodedPayload.decode()
+	payload, err := encodedPayload.Decode()
 	if err != nil {
 		return nil, fmt.Errorf("decode payload: %w", err)
 	}
@@ -86,11 +86,11 @@ func (b *Blob) BlobLengthBytes() uint32 {
 	return b.blobLengthSymbols * 32
 }
 
-// toEncodedPayload creates an encodedPayload from the blob
+// ToEncodedPayload creates an EncodedPayload from the blob
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
-func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayload, error) {
+func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayload, error) {
 	var payloadElements []fr.Element
 	var err error
 	switch payloadForm {
