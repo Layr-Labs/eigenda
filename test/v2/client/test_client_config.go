@@ -71,6 +71,8 @@ type TestClientConfig struct {
 	ValidatorReadComputePoolSize int
 	// The number of connections to open for each relay.
 	RelayConnectionCount int
+	// The number of connections to open for each disperser.
+	DisperserConnectionCount int
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.

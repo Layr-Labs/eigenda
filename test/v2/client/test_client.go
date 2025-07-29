@@ -136,9 +136,10 @@ func NewTestClient(
 	}
 
 	disperserConfig := &clients.DisperserClientConfig{
-		Hostname:          config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag: true,
+		Hostname:                 config.DisperserHostname,
+		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		UseSecureGrpcFlag:        true,
+		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
