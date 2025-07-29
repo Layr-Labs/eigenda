@@ -268,7 +268,7 @@ func (l *LoadGenerator) readAndWriteBlobWithProxy() {
 
 	l.submissionLimiter <- struct{}{}
 
-	cert, payload, err := l.disperseBlobWithProxy(rand)
+	cert, payload, err := l.dispersePayloadWithProxy(rand)
 	<-l.submissionLimiter
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
@@ -285,7 +285,7 @@ func (l *LoadGenerator) readAndWriteBlobWithProxy() {
 
 // Disperses a blob using the proxy (as opposed to using the GRPC clients directly). Returns the blob cert in byte
 // form since this is how the proxy forces the user to interact with it.
-func (l *LoadGenerator) disperseBlobWithProxy(rand *random.TestRandom) (
+func (l *LoadGenerator) dispersePayloadWithProxy(rand *random.TestRandom) (
 	cert []byte,
 	payload []byte,
 	err error,
@@ -325,7 +325,7 @@ func (l *LoadGenerator) doReadsWithProxy(
 	}
 
 	for i := 0; i < readCount; i++ {
-		_, err := l.client.ReadBlobWithProxy(l.ctx, cert, expectedPayload, 0)
+		_, err := l.client.ReadPayloadWithProxy(l.ctx, cert, expectedPayload, 0)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from proxy: %w", err)
 		}

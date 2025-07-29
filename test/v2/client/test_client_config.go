@@ -74,8 +74,6 @@ type TestClientConfig struct {
 	ProxyPort int
 }
 
-// TODO create default config
-
 // DefaultTestClientConfig returns a default configuration for the test client. Sets default values for fields
 // where default values make sense.
 func DefaultTestClientConfig() *TestClientConfig {

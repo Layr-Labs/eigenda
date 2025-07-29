@@ -353,7 +353,7 @@ func NewTestClient(
 				EnabledAPIs: []string{"admin"},
 			},
 			MetricsServerConfig: proxymetrics.Config{
-				Enabled: false, // TODO enable this
+				Enabled: false, // TODO (cody.littley) enable proxy metrics
 			},
 			StoreBuilderConfig: builder.Config{
 				StoreConfig: store.Config{
@@ -643,22 +643,22 @@ func (c *TestClient) DisperseAndVerifyWithProxy(ctx context.Context, payload []b
 		return fmt.Errorf("failed to disperse payload with proxy: %w", err)
 	}
 
-	_, err = c.ReadBlobWithProxy(ctx, cert, payload, 0)
+	_, err = c.ReadPayloadWithProxy(ctx, cert, payload, 0)
 	if err != nil {
-		return fmt.Errorf("failed to read blob with proxy: %w", err)
+		return fmt.Errorf("failed to read payload with proxy: %w", err)
 	}
 
 	return nil
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (cert coretypes.EigenDACert, err error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 	c.metrics.startOperation("dispersal")
 
 	// Important: don't redefine err. It's used by the deferred function to report success or failure.
-	var err error
+
 	defer func() {
 		c.metrics.endOperation("dispersal")
 		if err == nil {
@@ -670,8 +670,6 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 	}()
 
 	payload := coretypes.NewPayload(payloadBytes)
-
-	var cert coretypes.EigenDACert
 	cert, err = c.GetPayloadDisperser().SendPayload(ctx, payload)
 
 	if err != nil {
@@ -696,11 +694,11 @@ func (c *TestClient) DispersePayloadWithProxy(ctx context.Context, payloadBytes 
 	defer func() {
 		c.metrics.endOperation("dispersal")
 		if err == nil {
+			c.metrics.reportDispersalTime(time.Since(start))
 			c.metrics.reportDispersalSuccess()
 		} else {
 			c.metrics.reportDispersalFailure()
 		}
-		c.metrics.reportDispersalTime(time.Since(start))
 	}()
 
 	cert, err = c.proxyWrapper.SendPayload(ctx, payloadBytes)
@@ -869,9 +867,10 @@ func (c *TestClient) ReadBlobFromValidators(
 	return nil
 }
 
-// ReadBlobWithProxy reads a blob from the proxy wrapper and compares it to the expected payload bytes.
+// ReadPayloadWithProxy reads a payload from the proxy wrapper and compares it to the expected payload bytes.
 // The timeout is ignored if zero. If the proxy wrapper is not enabled, this method returns an error.
-func (c *TestClient) ReadBlobWithProxy(ctx context.Context,
+func (c *TestClient) ReadPayloadWithProxy(
+	ctx context.Context,
 	cert []byte,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
@@ -902,14 +901,12 @@ func (c *TestClient) ReadBlobWithProxy(ctx context.Context,
 	var data []byte
 	data, err = c.proxyWrapper.GetPayload(ctx, cert)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read blob from proxy: %w", err)
+		return nil, fmt.Errorf("failed to read payload from proxy: %w", err)
 	}
 
 	if !bytes.Equal(data, expectedPayloadBytes) {
 		return nil, fmt.Errorf("read payload does not match expected payload")
 	}
-
-	c.metrics.reportProxyReadTime(time.Since(start))
 
 	return data, nil
 }
