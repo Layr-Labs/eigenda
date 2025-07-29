@@ -7,7 +7,7 @@ extern crate alloc;
 mod bitmap;
 mod check;
 mod convert;
-mod error;
+pub mod error;
 mod hash;
 mod signature;
 pub mod types;
