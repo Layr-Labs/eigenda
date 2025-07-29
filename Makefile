@@ -41,6 +41,7 @@ lint:
 	# Uncomment this once we update to go1.23 which makes the -diff flag available.
 	# See https://tip.golang.org/doc/go1.23#go-command
 	# go mod tidy -diff
+	$(MAKE) -C api/proxy lint
 
 
 # TODO: this should also format github workflows, etc.
@@ -120,9 +121,21 @@ integration-tests-dataapi:
 	make dataapi-build
 	go test -v ./disperser/dataapi
 
+# builds all services and loads them into dockerd (such that they are available via `docker images`).
+# The images will be tagged with :dev, which is the default BUILD_TAG in docker-bake.hcl.
+# This can be changed by running for example `BUILD_TAG=master make docker-build`.
+docker-build:
+	docker buildx bake all --load
+
+# builds all services and pushes them to the configured registry (ghcr by default).
+docker-build-push:
+	docker buildx bake all --push
+
+# Should only ever be used by the docker-publish-release CI workflow.
+# We keep the node-group and proxy targets separate since we might want to release them separately in the future.
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG} --provenance=false --sbom=false
+	docker buildx bake node-group-release ${PUSH_FLAG}
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake proxy-release ${PUSH_FLAG}
 
