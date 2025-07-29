@@ -65,10 +65,12 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
-	// The size of the thread pool for read operations on the relay.
+	// The size of the thread pool for read operations.
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// The number of connections to open for each relay.
+	RelayConnectionCount int
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.

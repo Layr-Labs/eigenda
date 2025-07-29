@@ -317,6 +317,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
 		Value:    units.GiB, // intentionally large for the time being
 	}
+	RelayConnectionPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-connection-pool-size"),
+		Usage:    "The number of connections to maintain with each relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_CONNECTION_POOL_SIZE"),
+		Value:    8,
+	}
 
 	ClientIPHeaderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "client-ip-header"),
@@ -611,6 +618,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RelayConnectionPoolSizeFlag,
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,

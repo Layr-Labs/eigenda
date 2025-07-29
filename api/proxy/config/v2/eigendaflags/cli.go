@@ -38,6 +38,7 @@ var (
 	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
 	NetworkFlagName                   = withFlagPrefix("network")
 	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
+	RelayConnectionPoolSizeFlagName   = withFlagPrefix("relay-connection-pool-size")
 )
 
 func withFlagPrefix(s string) string {
@@ -216,6 +217,14 @@ This check is optional and will be skipped when set to 0.`,
 			Value:    0,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
+		},
+		&cli.IntFlag{
+			Name:     RelayConnectionPoolSizeFlagName,
+			Usage:    "Number of gRPC connections to maintain to each relay.",
+			Value:    1,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "RELAY_CONNECTION_POOL_SIZE")},
+			Category: category,
+			Required: false,
 		},
 	}
 }

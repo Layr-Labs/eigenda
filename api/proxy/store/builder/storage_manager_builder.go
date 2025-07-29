@@ -469,6 +469,7 @@ func buildRelayClient(
 		// we should never expect a message greater than our allowed max blob size.
 		// 10% of max blob size is added for additional safety
 		MaxGRPCMessageSize: uint(clientConfigV2.MaxBlobSizeBytes + (clientConfigV2.MaxBlobSizeBytes / 10)),
+		ConnectionPoolSize: clientConfigV2.RelayConnectionPoolSize,
 	}
 
 	relayClient, err := relay.NewRelayClient(relayCfg, log, relayURLProvider)

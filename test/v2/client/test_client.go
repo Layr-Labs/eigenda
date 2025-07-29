@@ -245,6 +245,7 @@ func NewTestClient(
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
+		ConnectionPoolSize: config.RelayConnectionCount,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())

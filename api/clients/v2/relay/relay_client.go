@@ -10,11 +10,11 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
-	"google.golang.org/grpc"
 )
 
 // MessageSigner is a function that signs a message with a private BLS key.
@@ -25,6 +25,8 @@ type RelayClientConfig struct {
 	MaxGRPCMessageSize uint
 	OperatorID         *core.OperatorID
 	MessageSigner      MessageSigner
+	// The number of parallel connections open to each relay.
+	ConnectionPoolSize int // TODO make sure this is configured with flags
 }
 
 type ChunkRequestByRange struct {
@@ -60,15 +62,14 @@ type relayClient struct {
 	config *RelayClientConfig
 	// relayLockProvider provides locks that correspond to individual relay keys
 	relayLockProvider *KeyLock[corev2.RelayKey]
+	// connectionPoolSize is the number of parallel connections open to each relay.
+	connectionPoolSize int
 	// relayInitializationStatus maps relay key to a bool `map[corev2.RelayKey]bool`
 	// the boolean value indicates whether the connection to that relay has been initialized
 	relayInitializationStatus sync.Map
-	// clientConnections maps relay key to the gRPC connection: `map[corev2.RelayKey]*grpc.ClientConn`
-	// this map is maintained so that connections can be closed in Close
-	clientConnections sync.Map
-	// grpcRelayClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
-	// these grpc relay clients are used to communicate with individual relays
-	grpcRelayClients sync.Map
+	// For each relay, we maintain a pool of gRPC clients that can be used to make requests to that relay. The key
+	// in this map is the relay key, and the value is a pool of gRPC clients.
+	relayClientPools sync.Map
 	// relayUrlProvider knows how to retrieve the relay URLs
 	relayUrlProvider RelayUrlProvider
 }
@@ -91,13 +92,19 @@ func NewRelayClient(
 		return nil, errors.New("max gRPC message size must be greater than 0")
 	}
 
+	connectionPoolSize := config.ConnectionPoolSize
+	if connectionPoolSize <= 0 {
+		connectionPoolSize = 1
+	}
+
 	logger.Info("creating relay client")
 
 	return &relayClient{
-		config:            config,
-		logger:            logger.With("component", "RelayClient"),
-		relayLockProvider: NewKeyLock[corev2.RelayKey](),
-		relayUrlProvider:  relayUrlProvider,
+		config:             config,
+		logger:             logger.With("component", "RelayClient"),
+		relayLockProvider:  NewKeyLock[corev2.RelayKey](),
+		relayUrlProvider:   relayUrlProvider,
+		connectionPoolSize: connectionPoolSize,
 	}, nil
 }
 
@@ -237,15 +244,15 @@ func (c *relayClient) getClient(ctx context.Context, key corev2.RelayKey) (relay
 	if err := c.initOnceGrpcConnection(ctx, key); err != nil {
 		return nil, fmt.Errorf("init grpc connection for key %d: %w", key, err)
 	}
-	maybeClient, ok := c.grpcRelayClients.Load(key)
+	maybeClientPool, ok := c.relayClientPools.Load(key)
 	if !ok {
-		return nil, fmt.Errorf("no grpc client for relay key: %v", key)
+		return nil, fmt.Errorf("no grpc client pool for relay key: %v", key)
 	}
-	client, ok := maybeClient.(relaygrpc.RelayClient)
+	clientPool, ok := maybeClientPool.(*common.GRPCClientPool[relaygrpc.RelayClient])
 	if !ok {
 		return nil, fmt.Errorf("invalid grpc client for relay key: %v", key)
 	}
-	return client, nil
+	return clientPool.GetClient(), nil
 }
 
 // initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only be completed
@@ -275,13 +282,17 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 	}
 
 	dialOptions := clients.GetGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
-	conn, err := grpc.NewClient(relayUrl, dialOptions...)
-	if err != nil {
-		return fmt.Errorf("create grpc client for key %d: %w", key, err)
 
+	pool, err := common.NewGRPClientPool(
+		relaygrpc.NewRelayClient,
+		c.config.ConnectionPoolSize,
+		relayUrl,
+		dialOptions...)
+	if err != nil {
+		return fmt.Errorf("failed to create gRPC client pool for relay %d: %w", key, err)
 	}
-	c.clientConnections.Store(key, conn)
-	c.grpcRelayClients.Store(key, relaygrpc.NewRelayClient(conn))
+
+	c.relayClientPools.Store(key, pool)
 
 	// only set the initialization status to true if everything was successful.
 	c.relayInitializationStatus.Store(key, true)
@@ -291,18 +302,18 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 
 func (c *relayClient) Close() error {
 	var errList *multierror.Error
-	c.clientConnections.Range(
+
+	c.relayClientPools.Range(
 		func(k, v interface{}) bool {
-			conn, ok := v.(*grpc.ClientConn)
+			pool, ok := v.(*common.GRPCClientPool[relaygrpc.RelayClient])
 			if !ok {
 				errList = multierror.Append(errList, fmt.Errorf("invalid connection for relay key: %v", k))
 				return true
 			}
 
-			if conn != nil {
-				err := conn.Close()
-				c.clientConnections.Delete(k)
-				c.grpcRelayClients.Delete(k)
+			if pool != nil {
+				err := pool.Close()
+				c.relayClientPools.Delete(k)
 				if err != nil {
 					c.logger.Error("failed to close connection", "err", err)
 					errList = multierror.Append(errList, err)
