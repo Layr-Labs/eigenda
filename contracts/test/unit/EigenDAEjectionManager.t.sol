@@ -69,8 +69,8 @@ contract EigenDAEjectionManagerTest is Test {
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp);
     }
 
-    function testCancelEjectionByWatcher() public {
-        // Add test logic for canceling ejection by watcher
+    function testCancelEjectionByEjector() public {
+        // Add test logic for canceling ejection by ejector
     }
 
     function testCompleteEjection() public {

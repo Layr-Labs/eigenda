@@ -11,10 +11,20 @@ library EigenDAEjectionLib {
 
     event EjectionCompleted(address operator, bytes quorums);
 
-    /// @notice Initializes the EigenDAEjectionLib storage.
-    function initialize(uint64 _delay, uint64 _cooldown) internal {
-        s().delay = _delay;
-        s().cooldown = _cooldown;
+    event DelaySet(uint64 delay);
+
+    event CooldownSet(uint64 cooldown);
+
+    /// @notice Sets the delay for ejection processes.
+    function setDelay(uint64 delay) internal {
+        s().delay = delay;
+        emit DelaySet(delay);
+    }
+
+    /// @notice Sets the cooldown for ejection processes.
+    function setCooldown(uint64 cooldown) internal {
+        s().cooldown = cooldown;
+        emit CooldownSet(cooldown);
     }
 
     /// @notice Starts an ejection process for an operator.
@@ -67,11 +77,11 @@ library EigenDAEjectionLib {
         return s().ejectionParams[operator];
     }
 
-    function delay() internal view returns (uint64) {
+    function getDelay() internal view returns (uint64) {
         return s().delay;
     }
 
-    function cooldown() internal view returns (uint64) {
+    function getCooldown() internal view returns (uint64) {
         return s().cooldown;
     }
 

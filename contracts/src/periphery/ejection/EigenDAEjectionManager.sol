@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
 import {EigenDAEjectionLib, EigenDAEjectionTypes} from "src/periphery/ejection/libraries/EigenDAEjectionLib.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
@@ -36,9 +35,9 @@ contract EigenDAEjectionManager {
         _addressDirectory = addressDirectory_;
     }
 
-    function initialize(uint64 delay, uint64 cooldown) external {
-        InitializableLib.setInitializedVersion(1);
-        EigenDAEjectionLib.initialize(delay, cooldown);
+    modifier onlyOwner(address sender) {
+        _onlyOwner(sender);
+        _;
     }
 
     modifier onlyEjector(address sender) {
@@ -46,21 +45,31 @@ contract EigenDAEjectionManager {
         _;
     }
 
-    /// WATCHER FUNCTIONS
+    /// OWNER FUNCTIONS
 
-    /// @notice Starts the ejection process for an operator. Takes a deposit from the watcher.
+    function setDelay(uint64 delay) external onlyOwner(msg.sender) {
+        EigenDAEjectionLib.setDelay(delay);
+    }
+
+    function setCooldown(uint64 cooldown) external onlyOwner(msg.sender) {
+        EigenDAEjectionLib.setCooldown(cooldown);
+    }
+
+    /// EJECTOR FUNCTIONS
+
+    /// @notice Starts the ejection process for an operator. Takes a deposit from the ejector.
     function startEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         _takeDeposit(msg.sender);
         operator.startEjection(quorums);
     }
 
-    /// @notice Cancels the ejection process initiated by a watcher.
-    function cancelEjectionByWatcher(address operator) external onlyEjector(msg.sender) {
+    /// @notice Cancels the ejection process initiated by a ejector.
+    function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
         _returnDeposit(msg.sender);
         operator.cancelEjection();
     }
 
-    /// @notice Completes the ejection process for an operator. Transfers the deposit back to the watcher.
+    /// @notice Completes the ejection process for an operator. Transfers the deposit back to the ejector.
     function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
@@ -123,11 +132,11 @@ contract EigenDAEjectionManager {
     }
 
     function ejectionDelay() external view returns (uint64) {
-        return EigenDAEjectionLib.delay();
+        return EigenDAEjectionLib.getDelay();
     }
 
     function ejectionCooldown() external view returns (uint64) {
-        return EigenDAEjectionLib.cooldown();
+        return EigenDAEjectionLib.getCooldown();
     }
 
     /// INTERNAL FUNCTIONS
@@ -171,15 +180,6 @@ contract EigenDAEjectionManager {
         IERC20(_depositToken).safeTransfer(receiver, _depositAmount);
     }
 
-    function _onlyEjector(address sender) internal view virtual {
-        require(
-            IAccessControl(
-                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
-            ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
-            "EigenDAEjectionManager: Caller is not an ejector"
-        );
-    }
-
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
     function _tryEjectOperator(address operator, bytes memory quorums) internal {
         address registryCoordinator = IEigenDADirectory(_addressDirectory).getAddress(
@@ -206,7 +206,21 @@ contract EigenDAEjectionManager {
         require(valid, "EigenDAEjectionManager: Invalid signature");
     }
 
-    function getInitializedVersion() external view returns (uint8) {
-        return InitializableLib.getInitializedVersion();
+    function _onlyOwner(address sender) internal view virtual {
+        require(
+            IAccessControl(
+                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+            ).hasRole(AccessControlConstants.OWNER_ROLE, sender),
+            "EigenDAEjectionManager: Caller is not the owner"
+        );
+    }
+
+    function _onlyEjector(address sender) internal view virtual {
+        require(
+            IAccessControl(
+                IEigenDADirectory(_addressDirectory).getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey())
+            ).hasRole(AccessControlConstants.EJECTOR_ROLE, sender),
+            "EigenDAEjectionManager: Caller is not an ejector"
+        );
     }
 }
