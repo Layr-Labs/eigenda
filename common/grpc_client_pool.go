@@ -33,6 +33,10 @@ func NewGRPClientPool[T any](
 	dialOptions ...grpc.DialOption,
 ) (*GRPCClientPool[T], error) {
 
+	if poolSize <= 0 {
+		poolSize = 1
+	}
+
 	// Create the clients up front.
 	connections := make([]*grpc.ClientConn, 0, poolSize)
 	clients := make([]T, 0, poolSize)
@@ -58,7 +62,7 @@ func NewGRPClientPool[T any](
 // one from the pool to return.
 func (m *GRPCClientPool[T]) GetClient() T {
 	var client T
-	if len(m.clients) == 0 {
+	if len(m.clients) == 1 {
 		client = m.clients[0]
 	} else {
 		index := m.callCount.Add(1)
