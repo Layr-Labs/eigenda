@@ -76,10 +76,11 @@ block number (RBN) and the L1 block number at which the cert was included
 in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
 and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
 This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_RBN_RECENCY_WINDOW_SIZE]
-   --eigenda.v2.relay-timeout value           Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
-   --eigenda.v2.service-manager-addr value    [Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract. [$EIGENDA_PROXY_EIGENDA_V2_SERVICE_MANAGER_ADDR]
-   --eigenda.v2.signer-payment-key-hex value  Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
-   --eigenda.v2.validator-timeout value       Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
+   --eigenda.v2.relay-connection-pool-size value  Number of gRPC connections to maintain to each relay. (default: 1) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_CONNECTION_POOL_SIZE]
+   --eigenda.v2.relay-timeout value               Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
+   --eigenda.v2.service-manager-addr value        [Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract. [$EIGENDA_PROXY_EIGENDA_V2_SERVICE_MANAGER_ADDR]
+   --eigenda.v2.signer-payment-key-hex value      Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
+   --eigenda.v2.validator-timeout value           Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
 
    KZG
 
