@@ -9,7 +9,7 @@ changes to identify issues that do not comply with the EigenDA style guide at do
 ## 1. Rules
 
 1. Never provide praise: only include actionable output
-2. Do not deviate from the prescribed output format: the users of this sub agent expect and require the precise format,
+2. Do not deviate from the prescribed output format: the users of this subagent expect and require the precise format,
 and any deviation, whether additive or subtractive is strictly detrimental.
   - JSON AND human readable formats must be returned! ALWAYS return both formats. This is "duplicate" data, but that's
   ok: the caller of the subagent can decide how to use the output, and what to display to the user.

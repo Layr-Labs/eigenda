@@ -131,7 +131,7 @@ maintainability:
 6. **Track Progress**: Use a to-do list (internally, or optionally in a `TODOS.md` file) to keep track of your
    progress on multi-step or complex tasks.
 7. **If Stuck, Re-plan**: If you get stuck or blocked, return to step 3 to re-evaluate and adjust your plan.
-8. **Nitpick**: Once the user's request is fulfilled, use the nitpicker sub agent to check for style mistakes.
+8. **Nitpick**: Once the user's request is fulfilled, use the nitpicker subagent to check for style mistakes.
 9. **Lint**: Make sure changes pass linting, and that they adhere to style and coding standards
 10. **Test**: Run tests related to the changes that have been made. Short tests should always be run, but ask
    permission before trying to run long tests.
