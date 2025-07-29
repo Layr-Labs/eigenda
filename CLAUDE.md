@@ -32,8 +32,6 @@ helpful to provide project context, but only within reasonable limits.
 2. @go.mod describes golang dependencies
 3. @mise.toml describes external tool dependencies
 4. @.golangci.yml contains linting configuration
-5. @.claude/commands/CLAUDE.md defines what project slash commands are available to use
-6. @docs/style-guide.md defines team coding style, and should be considered whenever making code changes
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a
 CLAUDE.md file *in the relevant subdirectory*.
@@ -133,13 +131,7 @@ maintainability:
 6. **Track Progress**: Use a to-do list (internally, or optionally in a `TODOS.md` file) to keep track of your
    progress on multi-step or complex tasks.
 7. **If Stuck, Re-plan**: If you get stuck or blocked, return to step 3 to re-evaluate and adjust your plan.
-8. **Check for related updates**: Once the user's request is fulfilled, look for any complementary changes that
-   need to be made:
-   - Code documentation / doc files that reference details that have been modified
-   - Variable names that need to be updated
-   - Error messages that use old terminology
-   - Related functions / structures that should be renamed to match new changes
-   - Links contained in documentation that were broken by the changes
+8. **Nitpick**: Once the user's request is fulfilled, use the nitpicker sub agent to check for style mistakes.
 9. **Lint**: Make sure changes pass linting, and that they adhere to style and coding standards
 10. **Test**: Run tests related to the changes that have been made. Short tests should always be run, but ask
    permission before trying to run long tests.

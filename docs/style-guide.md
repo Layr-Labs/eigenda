@@ -27,10 +27,11 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
 2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
    - Ensure that `%w` is used for error wrapping, *not* `%v`.
+   - Note that this rule only applies to `fmt.Errorf` specifically! It does NOT apply to `fmt.Sprintf`.
 
 ### 3. Code Documentation
 
-1. Document all exported functions/types in production code.
+1. Document all exported functions, structs, constants, and interfaces in production code.
 2. Document unexported functions/types that contain non-trivial logic.
    - A good rule of thumb: if you can't understand everything there is to know about a function/type by its *name*,
    you should write a doc.
@@ -44,6 +45,26 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - What side effects does calling the function have?
    - Are there any performance implications that users should be aware of?
    - Are there any performance optimizations that should/could be undertaken in the future?
+   - Documented function example:
+   ```go
+   // This preceding comment describes the function in detail, and isn't simply a rephrasing of the function name
+   //
+   // It contains the sort of information listed in `3.4`.
+   //
+   // It describes what is returned.
+   func FunctionName(
+      // common parameters like context, testing, and logger don't require documentation,
+      // unless they're being used in an unusual way
+      ctx context.Context,
+      // similarly, documentation *may* be omitted for parameters with blatantly obvious purpose
+      enabled bool,
+      // parameters without blatantly obvious purpose should contain helpful documentation which isn't just a
+      // rephrasing of the parameter name
+      param1 int,
+      ) error {
+         // ...
+   }
+   ```
 5. TODO comments should be added to denote future work.
    - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
    can understand.
@@ -82,6 +103,7 @@ Good code has good names. Bad names yield bad code.
    - `i` -> `nodeIndex`
    - `req` -> `dispersalRequest`
    - `status` -> `operatorStatus`
+   - An exception is made for golang receiver names, which are short by convention.
 2. Consistency is key. A single concept should have a single term, ideally across the entire codebase.
    - The exception here is with local scoping. E.g. if you have an `OperatorId` throughout the codebase, it would be
    reasonable to refer to it as an `id` inside the `Operator` struct.
@@ -129,6 +151,9 @@ Good code has good names. Bad names yield bad code.
 3. Place the most important functions at the top of the file.
 4. Public static functions that lack a tight coupling to a specific struct (e.g. a constructor) should be placed in
 files with a `_utils` suffix.
+5. Don't export things that don't need to be exported
+   - Member variables should almost always be unexported
+   - Structs, interfaces, and constants should only be exported if necessary
 
 ### 7. Defensive Coding
 
