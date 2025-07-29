@@ -1,3 +1,4 @@
+use alloy_primitives::Bytes;
 // little-endian is more efficient but Ethereum relies on big-endian
 // little-endian is more natural to reason about in the context of bitmaps
 use bitvec::array::BitArray;
@@ -9,7 +10,7 @@ const MAX_BIT_INDICES_LENGTH: usize = 256;
 pub type Bitmap = BitArray<[u64; 4]>;
 
 pub fn bit_indices_to_bitmap(
-    bit_indices: &[u8],
+    bit_indices: &Bytes,
     upper_bound_bit_index: Option<u8>,
 ) -> Result<Bitmap, CertVerificationError> {
     use CertVerificationError::*;
@@ -56,7 +57,7 @@ mod tests {
     fn bit_indices_to_bitmap_succeeds_given_empty_input() {
         let bit_indices = vec![];
         let upper_bound_bit_index = None;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap(), Bitmap::default());
     }
 
@@ -69,7 +70,7 @@ mod tests {
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
         let bit_indices = vec![0u8, 1u8];
         let upper_bound_bit_index = None;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         let actual = result.unwrap();
         let mut expected = Bitmap::default();
         expected.set(0, true);
@@ -86,7 +87,7 @@ mod tests {
         //        +-----+-----+-----+-----+...+-----+-----+-----+-----+
         let bit_indices = vec![3u8];
         let upper_bound_bit_index = None;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         let actual = result.unwrap();
 
         let mut expected = Bitmap::default();
@@ -99,7 +100,7 @@ mod tests {
     fn bit_indices_to_bitmap_fails_when_it_exceeds_max_len() {
         let bit_indices = vec![0u8; 257];
         let upper_bound_bit_index = None;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndicesGreaterThanMaxLength,);
     }
 
@@ -107,7 +108,7 @@ mod tests {
     fn bit_indices_to_bitmap_fails_if_not_sorted() {
         let bit_indices = vec![42u8, 41u8, 43u8];
         let upper_bound_bit_index = None;
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndicesNotSorted,);
     }
 
@@ -115,7 +116,7 @@ mod tests {
     fn bit_indices_to_bitmap_fails_if_greater_than_upper_bound() {
         let bit_indices = vec![40u8, 41u8, 43u8];
         let upper_bound_bit_index = Some(42);
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndexNotLessThanUpperBound,);
     }
 
@@ -123,7 +124,7 @@ mod tests {
     fn bit_indices_to_bitmap_fails_if_equal_to_upper_bound() {
         let bit_indices = vec![40u8, 41u8, 42u8];
         let upper_bound_bit_index = Some(42);
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndexNotLessThanUpperBound);
     }
 
@@ -131,7 +132,7 @@ mod tests {
     fn bit_indices_to_bitmap_fails_with_duplicate_bit_indices() {
         let bit_indices = vec![42u8, 42u8];
         let upper_bound_bit_index = Some(43);
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap_err(), BitIndicesNotUnique);
     }
 
@@ -139,7 +140,7 @@ mod tests {
     fn bit_indices_to_bitmap_succeeds_with_empty_input_and_zero_upper_bound() {
         let bit_indices = vec![];
         let upper_bound_bit_index = Some(0);
-        let result = bit_indices_to_bitmap(&bit_indices, upper_bound_bit_index);
+        let result = bit_indices_to_bitmap(&bit_indices.into(), upper_bound_bit_index);
         assert_eq!(result.unwrap(), Bitmap::default());
     }
 }

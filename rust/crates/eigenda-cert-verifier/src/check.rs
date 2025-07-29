@@ -1,18 +1,20 @@
 use alloc::vec::Vec;
-use ark_bn254::G1Affine;
+use alloy_primitives::{Address, Bytes};
 use hashbrown::HashMap;
 
 use crate::{
     bitmap::{Bitmap, bit_indices_to_bitmap},
     convert,
     error::CertVerificationError::{self, *},
+    hash::{Keccak256Hash, TruncatedKeccak256Hash, keccak_v256},
     types::{
-        Address, NonSigner, Quorum, QuorumNumber, RelayInfo, RelayKey, SecurityThresholds, Version,
-        VersionedBlobParams, history::History,
+        BlockNumber, NonSigner, Quorum, QuorumNumber, RelayKey, Version,
+        history::History,
+        solidity::{G1Point, RelayInfo, SecurityThresholds, VersionedBlobParams},
     },
 };
 
-const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol, TODO: is it required?
+const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol
 
 pub fn non_zero_equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
     match lengths.first() {
@@ -37,9 +39,9 @@ pub fn non_signers_strictly_sorted_by_hash(
 }
 
 pub fn quorums_last_updated_after_most_recent_stale_block(
-    signed_quorums: &[u8],
-    reference_block: u32,
-    last_updated_at_block_by_quorum: HashMap<u8, u32>,
+    signed_quorums: &[QuorumNumber],
+    reference_block: BlockNumber,
+    last_updated_at_block_by_quorum: HashMap<u8, BlockNumber>,
     window: u32,
 ) -> Result<(), CertVerificationError> {
     signed_quorums.iter().try_for_each(|signed_quorum| {
@@ -53,30 +55,30 @@ pub fn quorums_last_updated_after_most_recent_stale_block(
     })
 }
 
-pub fn cert_apks_equal_chain_apks(
-    signed_quorums: &[u8],
-    reference_block: u32,
-    apk_for_each_quorum: &[G1Affine],
-    apk_index_for_each_quorum: Vec<u32>,
-    apk_trunc_hash_history_by_quorum: HashMap<u8, History<[u8; 24]>>,
+pub fn cert_apks_equal_storage_apks(
+    signed_quorums: &[QuorumNumber],
+    reference_block: BlockNumber,
+    apk_for_each_quorum: &[G1Point],
+    apk_index_for_each_quorum: Vec<BlockNumber>,
+    apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedKeccak256Hash>>,
 ) -> Result<(), CertVerificationError> {
     signed_quorums
         .iter()
-        .zip(apk_for_each_quorum.into_iter())
+        .zip(apk_for_each_quorum.iter())
         .zip(apk_index_for_each_quorum.into_iter())
-        .try_for_each(|((signed_quorum, &cert_apk), apk_index)| {
-            let cert_apk_hash = convert::point_to_hash(cert_apk)?;
+        .try_for_each(|((signed_quorum, cert_apk), apk_index)| {
+            let cert_apk_hash = convert::point_to_hash(cert_apk);
             let cert_apk_trunc_hash = &cert_apk_hash[..24];
 
-            let chain_apk_trunc_hash = apk_trunc_hash_history_by_quorum
+            let storage_apk_trunc_hash = apk_trunc_hash_history_by_quorum
                 .get(signed_quorum)
                 .ok_or(MissingQuorumEntry)?
                 .try_get_at(apk_index)?
                 .try_get_against(reference_block)?;
 
-            (cert_apk_trunc_hash == chain_apk_trunc_hash)
+            (cert_apk_trunc_hash == storage_apk_trunc_hash)
                 .then_some(())
-                .ok_or(CertApkDoesNotEqualChainApk)
+                .ok_or(CertApkDoesNotEqualStorageApk)
         })
 }
 
@@ -88,10 +90,10 @@ pub fn relay_keys_are_set(
         let relay_info = relay_key_to_relay_info
             .get(relay_key)
             .ok_or(MissingRelayKeyEntry)?;
-        match relay_info.address == Address::default() {
-            true => Err(RelayKeyNotSet),
-            false => Ok(()),
-        }
+
+        (relay_info.relayAddress != Address::default())
+            .then_some(())
+            .ok_or(RelayKeyNotSet)
     })
 }
 
@@ -101,27 +103,27 @@ pub fn security_assumptions_are_met(
     security_thresholds: &SecurityThresholds,
 ) -> Result<(), CertVerificationError> {
     let SecurityThresholds {
-        confirmation_threshold,
-        adversary_threshold,
+        confirmationThreshold,
+        adversaryThreshold,
     } = security_thresholds;
 
     let VersionedBlobParams {
-        max_num_operators,
-        num_chunks,
-        coding_rate,
+        maxNumOperators,
+        numChunks,
+        codingRate,
     } = version_to_versioned_blob_params
         .get(&version)
         .ok_or(MissingVersionEntry)?;
 
-    if (confirmation_threshold > adversary_threshold) == false {
+    if (confirmationThreshold > adversaryThreshold) == false {
         return Err(ConfirmationThresholdNotGreaterThanAdversaryThreshold);
     }
 
-    let confirmation_threshold = *confirmation_threshold as u64;
-    let adversary_threshold = *adversary_threshold as u64;
-    let coding_rate = *coding_rate as u64;
-    let num_chunks = *num_chunks as u64;
-    let max_num_operators = *max_num_operators as u64;
+    let confirmation_threshold = *confirmationThreshold as u64;
+    let adversary_threshold = *adversaryThreshold as u64;
+    let coding_rate = *codingRate as u64;
+    let num_chunks = *numChunks as u64;
+    let max_num_operators = *maxNumOperators as u64;
 
     // safety: cannot underflow due to the `confirmation_threshold > adversary_threshold` check
     let gamma = confirmation_threshold - adversary_threshold;
@@ -142,12 +144,12 @@ pub fn security_assumptions_are_met(
     // inverse ∈ [1_000_000 / (255*255), 1_000_000 / (1*1)]
     //     in the calculation of n that follows, inverse cannot exceed 10_000
     //     so inverse must instead ∈ [1_000_000 / (255*255), 1_000_000 / 100]
-    //     which means gamma*coding_rate >= 100
-    // Conclusion: underflow will happen whenever gamma*coding_rate < 100
+    //     which means gamma*codingRate >= 100
+    // Conclusion: underflow will happen whenever gamma*codingRate < 100
     //
-    // Another consideration: n * num_chunks ∈ [0, 10_000] * [0, 2^32]
+    // Another consideration: n * numChunks ∈ [0, 10_000] * [0, 2^32]
     //     where the upper bound can overflow if represented as u32 hence the casts to u64
-    //     same for max_num_operators * 10_000
+    //     same for maxNumOperators * 10_000
 
     if n < max_num_operators * 10_000 {
         return Err(UnmetSecurityAssumptions);
@@ -159,7 +161,7 @@ pub fn security_assumptions_are_met(
 pub fn confirmed_quorums_contain_blob_quorums(
     confirmation_threshold: u8,
     quorums: &[Quorum],
-    blob_quorums: &[QuorumNumber],
+    blob_quorums: &Bytes,
 ) -> Result<(), CertVerificationError> {
     let blob_quorums = bit_indices_to_bitmap(blob_quorums, None)?;
 
@@ -186,14 +188,14 @@ pub fn confirmed_quorums_contain_blob_quorums(
         Ok(())
     })?;
 
-    contains(blob_quorums, confirmed_quorums)
+    contains(confirmed_quorums, blob_quorums)
         .then_some(())
         .ok_or(ConfirmedQuorumsDoNotContainBlobQuorums)
 }
 
 pub fn blob_quorums_contain_required_quorums(
-    blob_quorums: &[QuorumNumber],
-    required_quorums: &[QuorumNumber],
+    blob_quorums: &Bytes,
+    required_quorums: &Bytes,
 ) -> Result<(), CertVerificationError> {
     let required_quorums = bit_indices_to_bitmap(required_quorums, None)?;
     let blob_quorums = bit_indices_to_bitmap(blob_quorums, None)?;
@@ -206,6 +208,42 @@ pub fn blob_quorums_contain_required_quorums(
 #[inline]
 fn contains(container: Bitmap, contained: Bitmap) -> bool {
     container & contained == contained
+}
+
+pub fn leaf_node_belongs_to_merkle_tree(
+    leaf_node: Keccak256Hash,
+    expected_root: Keccak256Hash,
+    proof: Bytes,
+    sibling_path: u32,
+) -> Result<(), CertVerificationError> {
+    if proof.len() % 32 != 0 {
+        return Err(MerkleProofLengthNotMultipleOf32Bytes);
+    }
+
+    let sibling_path = Bitmap::new([sibling_path as u64, 0, 0, 0]);
+
+    let proof_depth = proof.len() / 32;
+    if sibling_path.len() < proof_depth {
+        return Err(MerkleProofPathTooShort);
+    }
+
+    let mut current_node = leaf_node;
+    for (i, sibling_node) in proof.chunks(32).enumerate() {
+        // safety: the above `proof.len() % 32 != 0` guarantees proof is a multiple of 32
+        let sibling_node = sibling_node.try_into().unwrap();
+        let is_sibling_node_on_the_left = sibling_path[i];
+        let (left_node, right_node) = match is_sibling_node_on_the_left {
+            true => (sibling_node, current_node),
+            false => (current_node, sibling_node),
+        };
+        let parent_node = keccak_v256([left_node, right_node].into_iter());
+        current_node = parent_node;
+    }
+
+    let actual_root = current_node;
+    (actual_root == expected_root)
+        .then_some(())
+        .ok_or(LeafNodeDoesNotBelongToMerkleTree)
 }
 
 #[cfg(test)]
@@ -249,7 +287,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     #[test]
     fn strictly_sorted_by_hash() {
         let non_signers = &[[42u8; 32], [43u8; 32], [44u8; 32]].map(|pk_hash| NonSigner {
-            pk_hash,
+            pk_hash: pk_hash.into(),
             ..Default::default()
         });
         let result = check::non_signers_strictly_sorted_by_hash(non_signers);
@@ -259,7 +297,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     #[test]
     fn sorted_by_hash_but_not_strictly() {
         let non_signers = &[[42u8; 32], [43u8; 32], [43u8; 32]].map(|pk_hash| NonSigner {
-            pk_hash,
+            pk_hash: pk_hash.into(),
             ..Default::default()
         });
         let err = check::non_signers_strictly_sorted_by_hash(non_signers).unwrap_err();
@@ -269,7 +307,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     #[test]
     fn not_sorted_by_hash() {
         let non_signers = &[[44u8; 32], [43u8; 32], [42u8; 32]].map(|pk_hash| NonSigner {
-            pk_hash,
+            pk_hash: pk_hash.into(),
             ..Default::default()
         });
         let err = check::non_signers_strictly_sorted_by_hash(non_signers).unwrap_err();
@@ -285,7 +323,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     #[test]
     fn just_one_signer() {
         let non_signers = &[[42u8; 32]].map(|pk_hash| NonSigner {
-            pk_hash,
+            pk_hash: pk_hash.into(),
             ..Default::default()
         });
         let result = check::non_signers_strictly_sorted_by_hash(non_signers);
@@ -405,16 +443,16 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
 }
 
 #[cfg(test)]
-mod test_cert_apks_equal_chain_apks {
+mod test_cert_apks_equal_storage_apks {
     use alloc::vec;
-    use ark_bn254::{Fr, G1Affine, G1Projective};
+    use ark_bn254::{Fr, G1Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
     use hashbrown::HashMap;
 
     use crate::{
         check, convert,
         error::CertVerificationError::*,
-        hash::TruncatedBeHash,
+        hash::TruncatedKeccak256Hash,
         types::{
             BlockNumber,
             history::{History, Update},
@@ -422,14 +460,14 @@ mod test_cert_apks_equal_chain_apks {
     };
 
     #[test]
-    fn cert_apk_equal_chain_apk() {
+    fn cert_apk_equal_storage_apk() {
         let apk = (G1Projective::generator() * Fr::from(42)).into_affine();
-        let apk_hash = convert::point_to_hash(apk).unwrap();
-        let apk_trunc_hash: TruncatedBeHash = apk_hash[..24].try_into().unwrap();
+        let apk_hash = convert::point_to_hash(&apk.into());
+        let apk_trunc_hash: TruncatedKeccak256Hash = apk_hash[..24].try_into().unwrap();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, apk_trunc_hash.clone()).unwrap();
@@ -437,7 +475,7 @@ mod test_cert_apks_equal_chain_apks {
         let apk_trunc_hash_history = History(history);
         let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
 
-        let result = check::cert_apks_equal_chain_apks(
+        let result = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
@@ -449,23 +487,24 @@ mod test_cert_apks_equal_chain_apks {
     }
 
     #[test]
-    fn cert_apk_does_not_equal_chain_apk() {
+    fn cert_apk_does_not_equal_storage_apk() {
         let cert_apk = (G1Projective::generator() * Fr::from(42)).into_affine();
-        let chain_apk = (G1Projective::generator() * Fr::from(43)).into_affine();
-        let chain_apk_hash = convert::point_to_hash(chain_apk).unwrap();
-        let chain_apk_trunc_hash: TruncatedBeHash = chain_apk_hash[..24].try_into().unwrap();
+        let storage_apk = (G1Projective::generator() * Fr::from(43)).into_affine();
+        let storage_apk_hash = convert::point_to_hash(&storage_apk.into());
+        let storage_apk_trunc_hash: TruncatedKeccak256Hash =
+            storage_apk_hash[..24].try_into().unwrap();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [cert_apk];
+        let apk_for_each_quorum = [cert_apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
-        let update = Update::new(42, 43, chain_apk_trunc_hash.clone()).unwrap();
+        let update = Update::new(42, 43, storage_apk_trunc_hash.clone()).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
         let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
 
-        let err = check::cert_apks_equal_chain_apks(
+        let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
@@ -474,7 +513,7 @@ mod test_cert_apks_equal_chain_apks {
         )
         .unwrap_err();
 
-        assert_eq!(err, CertApkDoesNotEqualChainApk);
+        assert_eq!(err, CertApkDoesNotEqualStorageApk);
     }
 
     #[test]
@@ -483,11 +522,11 @@ mod test_cert_apks_equal_chain_apks {
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk];
+        let apk_for_each_quorum = [apk.into()];
 
         let apk_index_for_each_quorum = vec![0];
 
-        let err = check::cert_apks_equal_chain_apks(
+        let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
@@ -500,40 +539,18 @@ mod test_cert_apks_equal_chain_apks {
     }
 
     #[test]
-    fn point_at_infinity() {
-        let apk = G1Affine::identity();
-
-        let signed_quorums = [0];
-        let reference_block = 42;
-        let apk_for_each_quorum = [apk];
-
-        let apk_index_for_each_quorum = vec![0];
-
-        let err = check::cert_apks_equal_chain_apks(
-            &signed_quorums,
-            reference_block,
-            &apk_for_each_quorum,
-            apk_index_for_each_quorum,
-            Default::default(),
-        )
-        .unwrap_err();
-
-        assert_eq!(err, PointAtInfinity);
-    }
-
-    #[test]
     fn missing_history_entry() {
         let apk = (G1Projective::generator() * Fr::from(42)).into_affine();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let apk_trunc_hash_history = History(Default::default());
         let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
 
-        let err = check::cert_apks_equal_chain_apks(
+        let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
@@ -551,7 +568,7 @@ mod test_cert_apks_equal_chain_apks {
 
         let signed_quorums = [0];
         const STALE_REFERENCE_BLOCK: BlockNumber = 41;
-        let apk_for_each_quorum = [apk];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, Default::default()).unwrap();
@@ -559,7 +576,7 @@ mod test_cert_apks_equal_chain_apks {
         let apk_trunc_hash_history = History(history);
         let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
 
-        let err = check::cert_apks_equal_chain_apks(
+        let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             STALE_REFERENCE_BLOCK,
             &apk_for_each_quorum,
@@ -575,13 +592,10 @@ mod test_cert_apks_equal_chain_apks {
 #[cfg(test)]
 mod test_relay_keys_are_set {
     use alloc::vec;
+    use alloy_primitives::Address;
     use hashbrown::HashMap;
 
-    use crate::{
-        check,
-        error::CertVerificationError::*,
-        types::{Address, RelayInfo},
-    };
+    use crate::{check, error::CertVerificationError::*, types::solidity::RelayInfo};
 
     #[test]
     fn success_when_all_relay_keys_are_set() {
@@ -590,8 +604,8 @@ mod test_relay_keys_are_set {
         let relay_key_to_relay_info = HashMap::from([(
             0,
             RelayInfo {
-                address: [42u8; 20],
-                url: Default::default(),
+                relayAddress: [42u8; 20].into(),
+                relayURL: Default::default(),
             },
         )]);
 
@@ -602,13 +616,13 @@ mod test_relay_keys_are_set {
 
     #[test]
     fn relay_keys_are_set_fails_with_missing_relay_key() {
-        let relay_keys = vec![99]; // 99 not found on chain
+        let relay_keys = vec![99]; // 99 not found on storage
 
         let relay_key_to_relay_info = HashMap::from([(
             42,
             RelayInfo {
-                address: [42u8; 20],
-                url: Default::default(),
+                relayAddress: [42u8; 20].into(),
+                relayURL: Default::default(),
             },
         )]);
 
@@ -624,8 +638,8 @@ mod test_relay_keys_are_set {
         let relay_key_to_relay_info = HashMap::from([(
             42,
             RelayInfo {
-                address: Address::default(),
-                url: Default::default(),
+                relayAddress: Address::default().into(),
+                relayURL: Default::default(),
             },
         )]);
 
@@ -642,7 +656,10 @@ mod test_security_assumptions_are_met {
     use crate::{
         check,
         error::CertVerificationError::*,
-        types::{SecurityThresholds, Version, VersionedBlobParams},
+        types::{
+            Version,
+            solidity::{SecurityThresholds, VersionedBlobParams},
+        },
     };
 
     #[test]
@@ -663,7 +680,7 @@ mod test_security_assumptions_are_met {
         let (_version, version_to_versioned_blob_params, security_thresholds) = success_inputs();
 
         let err = check::security_assumptions_are_met(
-            u16::MAX,
+            Version::MAX,
             &version_to_versioned_blob_params,
             &security_thresholds,
         )
@@ -676,7 +693,7 @@ mod test_security_assumptions_are_met {
     fn security_assumptions_are_met_fails_when_confirmation_threshold_equals_adversary_threshold() {
         let (version, version_to_versioned_blob_params, mut security_thresholds) = success_inputs();
 
-        security_thresholds.confirmation_threshold = security_thresholds.adversary_threshold;
+        security_thresholds.confirmationThreshold = security_thresholds.adversaryThreshold;
 
         let err = check::security_assumptions_are_met(
             version,
@@ -693,7 +710,7 @@ mod test_security_assumptions_are_met {
      {
         let (version, version_to_versioned_blob_params, mut security_thresholds) = success_inputs();
 
-        security_thresholds.confirmation_threshold = security_thresholds.adversary_threshold - 1;
+        security_thresholds.confirmationThreshold = security_thresholds.adversaryThreshold - 1;
 
         let err = check::security_assumptions_are_met(
             version,
@@ -710,13 +727,13 @@ mod test_security_assumptions_are_met {
         let (version, mut version_to_versioned_blob_params, mut security_thresholds) =
             success_inputs();
 
-        // to trigger overflow (gamma * coding_rate) < 100
+        // to trigger overflow (gamma * codingRate) < 100
         // where gamma = confirmation_threshold - adversary_threshold
-        security_thresholds.confirmation_threshold = 101;
-        security_thresholds.adversary_threshold = 100;
+        security_thresholds.confirmationThreshold = 101;
+        security_thresholds.adversaryThreshold = 100;
         // gamma = 101 - 100 = 1
         let params = version_to_versioned_blob_params.get_mut(&version).unwrap();
-        params.coding_rate = 99;
+        params.codingRate = 99;
 
         let err = check::security_assumptions_are_met(
             version,
@@ -736,7 +753,7 @@ mod test_security_assumptions_are_met {
         // gamma = confirmation_threshold - adversary_threshold = 101 - 1 = 100
         // since the success_inputs are at the limit
         // any disturbance will cause UnmetSecurityAssumptions so
-        security_thresholds.adversary_threshold = 2; // instead of 1, resulting in gamma = 99
+        security_thresholds.adversaryThreshold = 2; // instead of 1, resulting in gamma = 99
 
         let err = check::security_assumptions_are_met(
             version,
@@ -757,20 +774,20 @@ mod test_security_assumptions_are_met {
         let version_to_versioned_blob_params = HashMap::from([(
             version,
             VersionedBlobParams {
-                max_num_operators: 99,
-                num_chunks: 100,
-                coding_rate: 100,
+                maxNumOperators: 99,
+                numChunks: 100,
+                codingRate: 100,
             },
         )]);
         let security_thresholds = SecurityThresholds {
-            confirmation_threshold: 101,
-            adversary_threshold: 1,
+            confirmationThreshold: 101,
+            adversaryThreshold: 1,
         };
 
         // gamma = confirmation_threshold - adversary_threshold = 101 - 1 = 100
-        // inverse = 1_000_000 / (gamma * coding_rate) = 1_000_000 / (100 * 100) = 100
-        // n = (10_000 - inverse) * num_chunks = (10_000 - 100) * 100 = 990_000
-        // max_num_operators * 10_000 = 99 * 10_000 = 990_000
+        // inverse = 1_000_000 / (gamma * codingRate) = 1_000_000 / (100 * 100) = 100
+        // n = (10_000 - inverse) * numChunks = (10_000 - 100) * 100 = 990_000
+        // maxNumOperators * 10_000 = 99 * 10_000 = 990_000
         // 990_000 >= 990_000
 
         (
@@ -815,8 +832,8 @@ mod test_confirmed_quorums_contains_blob_quorums {
             },
         ];
 
-        // in this example blob_quorums contains only confirmed quorums (0 and 1)
-        let blob_quorums = [0, 1];
+        // in this example blob_quorums contains only confirmed quorums (0, 1 and 2)
+        let blob_quorums = [0, 1].into();
 
         let result = check::confirmed_quorums_contain_blob_quorums(
             confirmation_threshold,
@@ -854,7 +871,7 @@ mod test_confirmed_quorums_contains_blob_quorums {
         ];
 
         // blob_quorums contains unconfirmed quorum 1
-        let blob_quorums = [1, 2];
+        let blob_quorums = [1, 2].into();
 
         let err = check::confirmed_quorums_contain_blob_quorums(
             confirmation_threshold,
@@ -877,7 +894,7 @@ mod test_confirmed_quorums_contains_blob_quorums {
             ..Default::default()
         }];
 
-        let blob_quorums = [0];
+        let blob_quorums = [0].into();
 
         let err = check::confirmed_quorums_contain_blob_quorums(
             confirmation_threshold,
@@ -900,7 +917,7 @@ mod test_confirmed_quorums_contains_blob_quorums {
             ..Default::default()
         }];
 
-        let blob_quorums = [0];
+        let blob_quorums = [0].into();
 
         let err = check::confirmed_quorums_contain_blob_quorums(
             confirmation_threshold,
@@ -922,7 +939,7 @@ mod test_confirmed_quorums_contains_blob_quorums {
             ..Default::default()
         }];
 
-        let blob_quorums = [1, 0]; // Not sorted
+        let blob_quorums = [1, 0].into(); // Not sorted
 
         let err = check::confirmed_quorums_contain_blob_quorums(
             confirmation_threshold,
@@ -941,8 +958,8 @@ mod test_blob_quorums_contains_required_quorums {
 
     #[test]
     fn success_when_blob_quorums_contain_required_quorums() {
-        let blob_quorums = [0, 1, 2, 3];
-        let required_quorums = [1, 2];
+        let blob_quorums = [0, 1, 2, 3].into();
+        let required_quorums = [1, 2].into();
 
         let result = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums);
 
@@ -951,8 +968,8 @@ mod test_blob_quorums_contains_required_quorums {
 
     #[test]
     fn blob_quorums_do_not_contain_required_quorums() {
-        let blob_quorums = [0, 1];
-        let required_quorums = [1, 2, 3]; // 2 and 3 are not in blob_quorums
+        let blob_quorums = [0, 1].into();
+        let required_quorums = [1, 2, 3].into(); // 2 and 3 are not in blob_quorums
 
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
@@ -962,8 +979,8 @@ mod test_blob_quorums_contains_required_quorums {
 
     #[test]
     fn required_quorums_bit_indices_not_sorted() {
-        let blob_quorums = [0, 1];
-        let required_quorums = [2, 1]; // Not sorted
+        let blob_quorums = [0, 1].into();
+        let required_quorums = [2, 1].into(); // Not sorted
 
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
@@ -973,12 +990,314 @@ mod test_blob_quorums_contains_required_quorums {
 
     #[test]
     fn blob_quorums_bit_indices_not_sorted() {
-        let blob_quorums = [1, 0]; // Not sorted
-        let required_quorums = [0];
+        let blob_quorums = [1, 0].into(); // Not sorted
+        let required_quorums = [0].into();
 
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
 
         assert_eq!(err, BitIndicesNotSorted);
+    }
+}
+
+#[cfg(test)]
+mod test_leaf_node_belongs_to_merkle_tree {
+    use alloc::vec::Vec;
+    use alloy_primitives::FixedBytes;
+
+    use crate::{check, error::CertVerificationError::*, hash::keccak_v256};
+
+    #[test]
+    fn single_level_tree_left_child() {
+        //   1||2
+        //  /    \
+        // 1      2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let right_sibling: FixedBytes<32> = [2; 32].into();
+        let expected_root: FixedBytes<32> = keccak_v256([left_child, right_sibling].into_iter());
+
+        let proof = right_sibling.into();
+
+        // path: ... 0000 0000
+        let path = 0;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn single_level_tree_right_child() {
+        //   1||2
+        //  /    \
+        // 1      2
+
+        let right_child: FixedBytes<32> = [2; 32].into();
+        let left_sibling: FixedBytes<32> = [1; 32].into();
+        let expected_root: FixedBytes<32> = keccak_v256([left_sibling, right_child].into_iter());
+
+        let proof = left_sibling.into();
+
+        // path: ... 0000 0001
+        let path = 1;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(right_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn two_level_left_leaning_tree_left_child_inclusion() {
+        //      (1||2)||3
+        //        /    \
+        //    1||2      3
+        //   /    \
+        // *1*     2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let right_sibling: FixedBytes<32> = [2; 32].into();
+        let right_pibling: FixedBytes<32> = [3; 32].into();
+
+        let parent = keccak_v256([left_child, right_sibling].into_iter());
+        let expected_root = keccak_v256([parent, right_pibling].into_iter());
+
+        let proof = [&right_sibling[..], &right_pibling[..]].concat().into();
+
+        let path = 0;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn two_level_left_leaning_tree_right_child_inclusion() {
+        //     (1||2)||3
+        //       /    \
+        //   1||2      3
+        //  /    \
+        // 1     *2*
+
+        let right_child: FixedBytes<32> = [2; 32].into();
+        let left_sibling: FixedBytes<32> = [1; 32].into();
+        let right_pibling: FixedBytes<32> = [3; 32].into();
+
+        let parent = keccak_v256([right_child, left_sibling].into_iter());
+        let expected_root = keccak_v256([parent, right_pibling].into_iter());
+
+        let proof = [&left_sibling[..], &right_pibling[..]].concat().into();
+
+        // path: ... 0000 0000
+        let path = 0;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(right_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn two_level_right_leaning_tree_left_child_inclusion() {
+        // (1||2)||3
+        //   /    \
+        //  3    1||2
+        //      /    \
+        //    *1*     2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let right_sibling: FixedBytes<32> = [2; 32].into();
+        let left_pibling: FixedBytes<32> = [3; 32].into();
+
+        let parent = keccak_v256([left_child, right_sibling].into_iter());
+        let expected_root = keccak_v256([left_pibling, parent].into_iter());
+
+        let proof = [&right_sibling[..], &left_pibling[..]].concat().into();
+
+        // path: ... 0000 0010
+        let path = 2;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn two_level_right_leaning_tree_right_child_inclusion() {
+        // (1||2)||3
+        //   /    \
+        //  3    1||2
+        //      /    \
+        //     1     *2*
+
+        let right_child: FixedBytes<32> = [2; 32].into();
+        let left_sibling: FixedBytes<32> = [1; 32].into();
+        let left_pibling: FixedBytes<32> = [3; 32].into();
+
+        let parent = keccak_v256([left_sibling, right_child].into_iter());
+        let expected_root = keccak_v256([left_pibling, parent].into_iter());
+
+        let proof = [&left_sibling[..], &left_pibling[..]].concat().into();
+
+        // path: ... 0000 0011
+        let path = 3;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(right_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn three_level_tree_complex_path() {
+        //   ((3||(1||2))||4)
+        //        /    \
+        //   3||(1||2)  4
+        //  /      \
+        // 3      1||2
+        //       /    \
+        //     *1*     2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let right_sibling: FixedBytes<32> = [2; 32].into();
+        let left_pibling: FixedBytes<32> = [3; 32].into();
+        let right_grandparent: FixedBytes<32> = [4; 32].into();
+
+        let right_parent = keccak_v256([left_child, right_sibling].into_iter());
+        let left_grandparent = keccak_v256([left_pibling, right_parent].into_iter());
+        let expected_root = keccak_v256([left_grandparent, right_grandparent].into_iter());
+
+        let proof = [
+            &right_sibling[..],
+            &left_pibling[..],
+            &right_grandparent[..],
+        ]
+        .concat()
+        .into();
+
+        // path: ... 0000 0010
+        let path = 2;
+
+        let result =
+            check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn empty_proof_leaf_is_root() {
+        let leaf: FixedBytes<32> = [1; 32].into();
+        let expected_root = leaf;
+
+        let proof = [].into();
+        // path: ... 0000 0000
+        let path = 0;
+
+        let result = check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn proof_length_not_multiple_of_32() {
+        let leaf: FixedBytes<32> = [1; 32].into();
+        let expected_root: FixedBytes<32> = [2; 32].into();
+
+        let proof = [1; 31].into(); // 31 bytes, not 32
+        // path: ... 0000 0000
+        let path = 0;
+
+        let err =
+            check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path).unwrap_err();
+
+        assert_eq!(err, MerkleProofLengthNotMultipleOf32Bytes);
+    }
+
+    #[test]
+    fn path_too_short() {
+        let leaf: FixedBytes<32> = [0; 32].into();
+        let expected_root: FixedBytes<32> = [0; 32].into();
+
+        let proof = [0; 257 * 32].into(); // path.len() == 256
+        // path: ... 0000 0000
+        let path = 0;
+
+        let err =
+            check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path).unwrap_err();
+
+        assert_eq!(err, MerkleProofPathTooShort);
+    }
+
+    #[test]
+    fn invalid_proof_wrong_sibling() {
+        //    1||2
+        //   /    \
+        // *1*     2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let correct_right_sibling: FixedBytes<32> = [2; 32].into();
+        let wrong_right_sibling: FixedBytes<32> = [3; 32].into();
+        let expected_root = keccak_v256([left_child, correct_right_sibling].into_iter());
+
+        let proof = wrong_right_sibling.into();
+        // path: ... 0000 0000
+        let path = 0;
+
+        let err = check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path)
+            .unwrap_err();
+
+        assert_eq!(err, LeafNodeDoesNotBelongToMerkleTree);
+    }
+
+    #[test]
+    fn invalid_proof_wrong_position() {
+        //    1||2
+        //   /    \
+        // *1*     2
+
+        let left_child: FixedBytes<32> = [1; 32].into();
+        let right_sibling: FixedBytes<32> = [2; 32].into();
+        let expected_root = keccak_v256([left_child, right_sibling].into_iter());
+
+        let proof = right_sibling.into();
+        // path: ... 0000 0001 (should be 0000 0000)
+        let path = 1;
+
+        let err = check::leaf_node_belongs_to_merkle_tree(left_child, expected_root, proof, path)
+            .unwrap_err();
+
+        assert_eq!(err, LeafNodeDoesNotBelongToMerkleTree);
+    }
+
+    #[test]
+    fn max_depth_proof() {
+        //      ...
+        //    255||0
+        //    /     \
+        // *255*     0
+        let mut left_current_node = [255; 32].into();
+        let mut proof = Vec::new();
+
+        for i in 0..=255u8 {
+            let right_sibling_node = [i; 32].into();
+            left_current_node = keccak_v256([left_current_node, right_sibling_node].into_iter());
+            proof.extend_from_slice(right_sibling_node.as_ref());
+        }
+
+        let proof = proof.into();
+
+        let leaf = [255; 32].into();
+        let expected_root = left_current_node;
+
+        // path: ... 0000 0000
+        let path = 0;
+
+        let result = check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path);
+
+        assert_eq!(result, Ok(()));
     }
 }

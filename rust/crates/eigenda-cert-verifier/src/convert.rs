@@ -1,27 +1,25 @@
+use alloy_primitives::Uint;
 use ark_bn254::{Fq, G1Affine};
-use ark_ec::AffineRepr;
-use ark_ff::{BigInt, Field, MontFp, PrimeField};
+use ark_ff::{BigInt, BigInteger, Field, MontFp, PrimeField};
 
 use crate::{
-    error::CertVerificationError::{self, *},
-    hash::{self, BeHash},
+    hash::{self, Keccak256Hash},
+    types::solidity::G1Point,
 };
 
 const ONE: Fq = MontFp!("1");
 const THREE: Fq = MontFp!("3");
 
-pub fn point_to_hash(point: G1Affine) -> Result<BeHash, CertVerificationError> {
-    let (x, y) = point.xy().ok_or(PointAtInfinity)?;
-    let x_bytes = fq_to_bytes_be(x);
-    let y_bytes = fq_to_bytes_be(y);
-    let hash = hash::keccak256(&[&x_bytes, &y_bytes]);
-    Ok(hash)
+pub fn point_to_hash(point: &G1Point) -> Keccak256Hash {
+    let x_bytes: [u8; 32] = point.X.to_be_bytes();
+    let y_bytes: [u8; 32] = point.Y.to_be_bytes();
+    hash::keccak_v256([x_bytes, y_bytes].into_iter())
 }
 
-pub fn hash_to_point(hash: BeHash) -> G1Affine {
+pub fn hash_to_point(hash: Keccak256Hash) -> G1Affine {
     let x = hash_to_big_int(hash);
-    let mut x = Fq::from(x);
-    // Won't overflow the stack because:
+    let mut x = Fq::new(x);
+    // safety: won't overflow the stack because:
     // - exactly half of non-zero field elements satisfy y^2 = x^3 + 3
     // - it's a finite field
     // So if x does not satisfy the equation, x + 1 probably will
@@ -37,7 +35,8 @@ pub fn hash_to_point(hash: BeHash) -> G1Affine {
     }
 }
 
-fn hash_to_big_int(hash: BeHash) -> BigInt<4> {
+#[inline]
+fn hash_to_big_int(hash: Keccak256Hash) -> BigInt<4> {
     let mut limbs = [0u64; 4];
 
     for (i, chunk) in hash.chunks_exact(8).enumerate() {
@@ -49,27 +48,29 @@ fn hash_to_big_int(hash: BeHash) -> BigInt<4> {
     BigInt::new(limbs)
 }
 
+#[inline]
 pub fn fq_to_bytes_be(fq: Fq) -> [u8; 32] {
-    let fq = fq.into_bigint();
-    let mut bytes_be = [0u8; 32];
-    // .rev() to make it big-endian
-    for (i, limb) in fq.0.into_iter().rev().enumerate() {
-        bytes_be[i * 8..(i + 1) * 8].copy_from_slice(&limb.to_be_bytes());
-    }
-    bytes_be
+    // safety: Fq is 256 bits
+    fq.into_bigint().to_bytes_be().try_into().unwrap()
+}
+
+#[inline]
+pub fn fq_to_uint(fq: Fq) -> Uint<256, 4> {
+    Uint::from_limbs(fq.into_bigint().0)
 }
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::Uint;
     use ark_bn254::G1Affine;
     use ark_ec::AffineRepr;
 
-    use crate::{convert, error::CertVerificationError};
+    use crate::{convert, types::solidity::G1Point};
 
     #[test]
     fn convert_point_to_hash() {
         let point = G1Affine::generator();
-        let actual = convert::point_to_hash(point).unwrap();
+        let actual = convert::point_to_hash(&point.into());
         let actual = hex::encode(actual);
         let expected = "e90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0";
 
@@ -79,7 +80,12 @@ mod tests {
     #[test]
     fn convert_infinity_to_hash() {
         let point = G1Affine::identity();
-        let actual = convert::point_to_hash(point).unwrap_err();
-        assert_eq!(actual, CertVerificationError::PointAtInfinity);
+        let actual = convert::point_to_hash(&point.into());
+        let point = G1Point {
+            X: Uint::from_be_bytes([0u8; 32]),
+            Y: Uint::from_be_bytes([0u8; 32]),
+        };
+        let expected = convert::point_to_hash(&point);
+        assert_eq!(actual, expected);
     }
 }

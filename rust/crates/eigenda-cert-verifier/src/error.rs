@@ -17,9 +17,6 @@ pub enum CertVerificationError {
     #[error("One or more bit indices are greater than or equal to the provided upper bound")]
     BitIndexNotLessThanUpperBound,
 
-    #[error("Unexpected identity point in operation")]
-    PointAtInfinity,
-
     #[error("Expected pubkeys to be sorted by their hashes")]
     NotStrictlySortedByHash,
 
@@ -44,8 +41,8 @@ pub enum CertVerificationError {
     #[error("Missing history entry")]
     MissingHistoryEntry,
 
-    #[error("Certificate quorum apk not equal to chain quorum apk")]
-    CertApkDoesNotEqualChainApk,
+    #[error("Certificate quorum apk not equal to storage quorum apk")]
+    CertApkDoesNotEqualStorageApk,
 
     #[error("Unexpected unequal lengths")]
     UnequalLengths,
@@ -79,4 +76,13 @@ pub enum CertVerificationError {
 
     #[error("Blob quorums not subset of confirmed quorums")]
     ConfirmedQuorumsDoNotContainBlobQuorums,
+
+    #[error("Merkle proof length not multiple of 32 bytes")]
+    MerkleProofLengthNotMultipleOf32Bytes,
+
+    #[error("Leaf node does not belong to merkle tree")]
+    LeafNodeDoesNotBelongToMerkleTree,
+
+    #[error("Merkle proof path too short")]
+    MerkleProofPathTooShort,
 }

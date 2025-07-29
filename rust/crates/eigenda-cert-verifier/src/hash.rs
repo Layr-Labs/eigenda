@@ -1,54 +1,74 @@
-use alloc::vec::Vec;
+use alloy_primitives::FixedBytes;
+use alloy_sol_types::SolValue;
 use core::iter::once;
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::types::{BlockNumber, NonSigner};
+use crate::types::solidity::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 
-pub type BeHash = [u8; 32];
-pub type TruncatedBeHash = [u8; 24];
+pub type TruncatedKeccak256Hash = [u8; 24];
+pub type Keccak256Hash = FixedBytes<32>;
 
-pub fn keccak256(inputs: &[&[u8]]) -> BeHash {
+impl BlobCertificate {
+    pub fn hash_keccak_v256(&self) -> Keccak256Hash {
+        let blob_header = self.blobHeader.hash_keccak_v256();
+        let encoded = (blob_header, self.signature.clone(), self.relayKeys.clone()).abi_encode();
+        keccak_v256(once(encoded))
+    }
+}
+
+impl BlobHeaderV2 {
+    pub fn hash_keccak_v256(&self) -> Keccak256Hash {
+        let encoded = (
+            self.version,
+            self.quorumNumbers.clone(),
+            self.commitment.clone(),
+        )
+            .abi_encode();
+
+        let hashed = keccak_v256(once(encoded));
+        let encoded = (hashed, self.paymentHeaderHash).abi_encode();
+        keccak_v256(once(encoded))
+    }
+}
+
+impl BatchHeaderV2 {
+    pub fn hash_keccak_v256(&self) -> Keccak256Hash {
+        let batch_header = self.abi_encode();
+        keccak_v256(once(batch_header))
+    }
+}
+
+pub fn keccak_v256(inputs: impl Iterator<Item = impl AsRef<[u8]>>) -> Keccak256Hash {
     let mut hasher = Keccak::v256();
     for input in inputs {
-        hasher.update(input);
+        hasher.update(input.as_ref());
     }
     let mut output = [0u8; 32];
     hasher.finalize(&mut output);
-    output
+    output.into()
 }
 
-pub fn signature_record(reference_block: BlockNumber, non_signers: &[NonSigner]) -> BeHash {
+pub fn signature_record(reference_block: u32, pk_hashes: &[Keccak256Hash]) -> Keccak256Hash {
     let first = reference_block.to_be_bytes();
-
-    let inputs = once(first.as_slice())
-        .chain(
-            non_signers
-                .iter()
-                .map(|non_signer| non_signer.pk_hash.as_slice()),
-        )
-        .collect::<Vec<_>>();
-
-    keccak256(&inputs)
+    let inputs = once(first.as_ref()).chain(pk_hashes.iter().map(|pk_hash| pk_hash.as_ref()));
+    keccak_v256(inputs)
 }
 
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
 
-    use crate::{hash, types::NonSigner};
+    use crate::hash;
 
     #[test]
     fn signature_record_hash_success() {
         let reference_block = 42;
-        let non_signers = [[42u8; 32], [43u8; 32]]
+        let pk_hashes = [[42u8; 32], [43u8; 32]]
             .into_iter()
-            .map(|pk_hash| NonSigner {
-                pk_hash,
-                ..Default::default()
-            })
+            .map(|pk_hash| pk_hash.into())
             .collect::<Vec<_>>();
 
-        let actual = hash::signature_record(reference_block, &non_signers);
+        let actual = hash::signature_record(reference_block, &pk_hashes);
         let expected = [
             98, 139, 21, 105, 137, 7, 68, 235, 47, 165, 71, 215, 6, 47, 69, 231, 217, 9, 25, 96,
             61, 240, 244, 80, 244, 59, 71, 232, 252, 217, 178, 41,

@@ -5,10 +5,10 @@
 extern crate alloc;
 
 mod bitmap;
-pub mod cert;
 mod check;
 mod convert;
 mod error;
 mod hash;
 mod signature;
 pub mod types;
+pub mod verification;

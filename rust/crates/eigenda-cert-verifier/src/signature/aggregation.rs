@@ -165,7 +165,9 @@ pub fn aggregate(
         .iter()
         .map(|quorum| quorum.number)
         .collect::<Vec<_>>();
-    let signed_quorums = bit_indices_to_bitmap(&bit_indices, Some(initialized_quorums_count))?;
+
+    let signed_quorums =
+        bit_indices_to_bitmap(&bit_indices.into(), Some(initialized_quorums_count))?;
 
     let non_signers_apk = non_signers
         .iter()
@@ -237,7 +239,7 @@ mod tests {
             .zip(non_signer_quorum_memberships.into_iter())
             .map(|(pk, quorum_membership)| NonSigner {
                 pk,
-                pk_hash: convert::point_to_hash(pk).unwrap(),
+                pk_hash: convert::point_to_hash(&pk.into()),
                 quorum_membership,
             })
             .collect();

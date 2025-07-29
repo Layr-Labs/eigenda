@@ -68,11 +68,13 @@ impl<T: PartialOrd> Interval<T> {
 mod tests {
     use hashbrown::HashMap;
 
-    use crate::error::CertVerificationError::*;
-    use crate::types::BlockNumber;
-    use crate::types::history::{History, Interval};
-
-    use super::Update;
+    use crate::{
+        error::CertVerificationError::*,
+        types::{
+            BlockNumber,
+            history::{History, Interval, Update},
+        },
+    };
 
     #[test]
     fn element_before_left_is_not_in_interval() {
