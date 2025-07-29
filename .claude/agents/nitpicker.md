@@ -122,7 +122,7 @@ Example:
     },
     {
       "styleGuideSectionName": "Naming Consistency",
-      "styleGuideSectionNumber": "5",
+      "styleGuideSectionNumber": "5.2",
       "description": "Inconsistent naming after rename",
       "locations": [
         {
