@@ -200,21 +200,21 @@ func (m *Manager) backupToSecondary(ctx context.Context, commitment []byte, valu
 }
 
 // getVerifyMethod returns the correct verify method based on commitment type
-func (m *Manager) getVerifyMethod(commitmentType certs.VersionByte) (
+func (m *Manager) getVerifyMethod(certVersion certs.VersionByte) (
 	func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
 	error,
 ) {
 	v2VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, opts common.CertVerificationOpts) error {
-		return m.eigendaV2.Verify(ctx, certs.NewVersionedCert(cert, commitmentType), opts)
+		return m.eigendaV2.Verify(ctx, certs.NewVersionedCert(cert, certVersion), opts)
 	}
 
-	switch commitmentType {
+	switch certVersion {
 	case certs.V0VersionByte:
 		return m.eigenda.Verify, nil
 	case certs.V1VersionByte, certs.V2VersionByte:
 		return v2VerifyWrapper, nil
 	default:
-		return nil, fmt.Errorf("commitment version unknown: %b", commitmentType)
+		return nil, fmt.Errorf("commitment version unknown: %b", certVersion)
 	}
 }
 
