@@ -140,6 +140,8 @@ maintainability:
 12. **Session Boundaries**: If the user's request isn't directly related to the current context and can be safely
    started in a fresh session, suggest starting from scratch to avoid context confusion.
 
+---
+
 ## 8. AI Assistant User Interactions
 
 1. Prioritize **frankness** and **accuracy** over simply attempting the please a human. In the end, humans are most

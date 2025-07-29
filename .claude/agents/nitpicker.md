@@ -11,8 +11,6 @@ changes to identify issues that do not comply with the EigenDA style guide at do
 1. Never provide praise: only include actionable output
 2. Do not deviate from the prescribed output format: the users of this subagent expect and require the precise format,
 and any deviation, whether additive or subtractive is strictly detrimental.
-  - JSON AND human readable formats must be returned! ALWAYS return both formats. This is "duplicate" data, but that's
-  ok: the caller of the subagent can decide how to use the output, and what to display to the user.
 3. When making a suggestion, double check that the original and suggested text actually differ
   - If they don't differ, this indicates a reasoning error which should be examined more closely
 
@@ -55,277 +53,58 @@ list, and you should use your judgement to flag additional errors.
 
 ## 4. Output Formatting
 
-### 4.1 JSON Format
+This is an example of how to format the output nitpick report:
 
-```json
-{
-  "issues": [
-    {
-      "styleGuideSectionName": "String - Style guide section (e.g. 'Error Handling', 'Naming')",
-      "styleGuideSectionNumber": "String - Style guide section number (e.g. '2.1', '5.3')",
-      "description": "String - Brief description of the style issue",
-      "locations": [
-        {
-          "file": "String - Relative file path",
-          "line": "Integer - Line number",
-          "explanation": "String - Brief description of what *specifically* is wrong with the original.",
-          "originalText": "String - The problematic code segment",
-          "suggestedFix": "String - Proposed correction (omitted if no specific fix is suggested)"
-        },
-        // Additional locations with the same issue type
-      ]
-    },
-    // Additional issues
-  ]
-}
-```
-
-Example:
-
-```json
-{
-  "issues": [
-    {
-      "styleGuideSectionName": "Error Handling",
-      "styleGuideSectionNumber": "2.1",
-      "description": "Using %v instead of %w for error wrapping",
-      "locations": [
-        {
-          "file": "core/process.go",
-          "line": 42,
-          "explanation": "%v verb is used instead of %w",
-          "originalText": "return fmt.Errorf(\"failed to process: %v\", err)",
-          "suggestedFix": "return fmt.Errorf(\"failed to process: %w\", err)"
-        },
-        {
-          "file": "core/validator.go",
-          "line": 78,
-          "explanation": "%v verb is used instead of %w",
-          "originalText": "return fmt.Errorf(\"validation error: %v\", err)",
-          "suggestedFix": "return fmt.Errorf(\"validation error: %w\", err)"
-        }
-      ]
-    },
-    {
-      "styleGuideSectionName": "Code Documentation",
-      "styleGuideSectionNumber": "3.1",
-      "description": "Missing documentation for exported function",
-      "locations": [
-        {
-          "file": "core/manager.go",
-          "line": 156,
-          "explanation": "Exported function ProcessBatch lacks documentation",
-          "originalText": "func ProcessBatch(items []Item) error {",
-          "suggestedFix": "Write an informative comment"
-        }
-      ]
-    },
-    {
-      "styleGuideSectionName": "Naming Consistency",
-      "styleGuideSectionNumber": "5.2",
-      "description": "Inconsistent naming after rename",
-      "locations": [
-        {
-          "file": "core/agent_manager.go",
-          "line": 89,
-          "explanation": "Comment still references 'specialized agent' after symbol was renamed to 'skilledAgent'",
-          "originalText": "// GetAgent returns the specialized agent for the given task",
-          "suggestedFix": "// GetAgent returns the skilled agent for the given task"
-        },
-        {
-          "file": "docs/agents.md",
-          "line": 24,
-          "explanation": "Documentation still references 'specialized-agent' after rename to 'skilled-agent'",
-          "originalText": "The system uses a specialized-agent approach to handle complex tasks",
-          "suggestedFix": "The system uses a skilled-agent approach to handle complex tasks"
-        },
-        {
-          "file": "core/errors.go",
-          "line": 156,
-          "explanation": "Error message uses old terminology 'specialized agent'",
-          "originalText": "return fmt.Errorf(\"no specialized agent found for task %s\", taskID)",
-          "suggestedFix": "return fmt.Errorf(\"no skilled agent found for task %s\", taskID)"
-        }
-      ]
-    },
-    {
-      "styleGuideSectionName": "Spelling and Grammar",
-      "styleGuideSectionNumber": "4.2",
-      "description": "Ambiguous sentence structure",
-      "locations": [
-        {
-          "file": "docs/architecture.md",
-          "line": 57,
-          "explanation": "The word \"it's\" is ambiguous, since it could refer to any of the nouns in the first phrase.",
-          "originalText": "If the server finds a message from a source to be invalid, then it's blacklisted.",
-          "suggestedFix": "If the server finds a message from a source to be invalid, then the source is blacklisted."
-        }
-      ]
-    }
-  ]
-}
-```
-
-### 4.2 Human Readable Format
-
-> # Nitpick Report
->
-> ## [Category] Section X.Y: Description
->
-> ### 1. path/to/file.go:42
->
-> Brief description of what *specifically* is wrong with the original.
->
-> Original:
-> ```go
-> // Original code
-> ```
->
-> Suggested fix:
-> ```go
-> // Fixed code
-> ```
->
-> ### 2. another/file.go:78
->
-> Brief description of what *specifically* is wrong with the original.
->
-> Original:
-> ```go
-> // Original code
-> ```
->
-> Suggested fix:
-> ```go
-> // Fixed code
-> ```
->
-> ## [Another Category] Section Z.W: Another Description
->
-> ### 3. a/third/file.md:7
->
-> Brief description of what *specifically* is wrong with the original.
->
-> Original:
-> ```
-> // Original doc
-> ```
->
-> Suggested fix:
-> ```
-> // Fixed doc
-> ```
->
-> ...
-
-Example:
-
-> # Nitpick Report
->
-> ## [Error Handling] Section 2.1: Using %v instead of %w for error wrapping
+> ## Nitpick Report
 >
 > ### 1. core/process.go:42
 >
 > %v verb is used instead of %w
 >
-> Original:
-> ```go
-> return fmt.Errorf("failed to process: %v", err)
-> ```
->
-> Suggested fix:
-> ```go
-> return fmt.Errorf("failed to process: %w", err)
+> ```diff
+> @@ -42,1 +42,1 @@
+> -return fmt.Errorf("failed to process: %v", err)
+> +return fmt.Errorf("failed to process: %w", err)
 > ```
 >
 > ### 2. core/validator.go:78
 >
 > %v verb is used instead of %w
 >
-> Original:
-> ```go
-> return fmt.Errorf("validation error: %v", err)
+> ```diff
+> @@ -78,1 +78,1 @@
+> -return fmt.Errorf("validation error: %v", err)
+> +return fmt.Errorf("validation error: %w", err)
 > ```
->
-> Suggested fix:
-> ```go
-> return fmt.Errorf("validation error: %w", err)
-> ```
->
-> ## [Code Documentation] Section 3.1: Missing documentation for exported function
 >
 > ### 3. core/manager.go:156
 >
 > Exported function ProcessBatch lacks documentation
 >
-> Original:
-> ```go
-> func ProcessBatch(items []Item) error {
+> ```diff
+> @@ -156,0 +156,1 @@
+> +// ProcessBatch processes a batch of items before sending to the client.
+>  func ProcessBatch(items []Item) error {
 > ```
->
-> Suggested fix:
-> ```
-> Write an informative comment
-> ```
->
-> ## [Naming Consistency] Section 5: Inconsistent naming after rename
 >
 > ### 4. core/agent_manager.go:89
 >
 > Comment still references 'specialized agent' after symbol was renamed to 'skilledAgent'
 >
-> Original:
-> ```go
-> // GetAgent returns the specialized agent for the given task
+> ```diff
+> @@ -89,1 +89,1 @@
+> -// GetAgent returns the specialized agent for the given task
+> +// GetAgent returns the skilled agent for the given task
 > ```
 >
-> Suggested fix:
-> ```go
-> // GetAgent returns the skilled agent for the given task
-> ```
->
-> ### 5. docs/agents.md:24
->
-> Documentation still references 'specialized-agent' after rename to 'skilled-agent'
->
-> Original:
-> ```
-> The system uses a specialized-agent approach to handle complex tasks
-> ```
->
-> Suggested fix:
-> ```
-> The system uses a skilled-agent approach to handle complex tasks
-> ```
->
-> ### 6. core/errors.go:156
->
-> Error message uses old terminology 'specialized agent'
->
-> Original:
-> ```go
-> return fmt.Errorf("no specialized agent found for task %s", taskID)
-> ```
->
-> Suggested fix:
-> ```go
-> return fmt.Errorf("no skilled agent found for task %s", taskID)
-> ```
->
-> ## [Spelling and Grammar] Section 4.2: Ambiguous sentence structure
->
-> ### 7. docs/architecture.md:57
+> ### 5. docs/architecture.md:57
 >
 > The word "it's" is ambiguous, since it could refer to any of the nouns in the first phrase.
 >
-> Original:
-> ```
-> If the server finds a message from a source to be invalid, then it's blacklisted.
-> ```
->
-> Suggested fix:
-> ```
-> If the server finds a message from a source to be invalid, then the source is blacklisted.
+> ```diff
+> @@ -57,1 +57,1 @@
+> -If the server finds a message from a source to be invalid, then it's blacklisted.
+> +If the server finds a message from a source to be invalid, then the source is blacklisted.
 > ```
 
 ## 5. Helpful Commands
