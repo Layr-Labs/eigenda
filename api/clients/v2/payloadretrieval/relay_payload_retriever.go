@@ -54,7 +54,7 @@ func NewRelayPayloadRetriever(
 	}, nil
 }
 
-// GetPayload iteratively attempts to retrieve a given blob from the relays 
+// GetPayload iteratively attempts to retrieve a given blob from the relays
 // listed in the EigenDACert. The relays are attempted in random order.
 //
 // If the blob is successfully retrieved, then the blob is verified against the certificate. If the verification
@@ -92,7 +92,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	return payload, nil
 }
 
-// GetEncodedPayload iteratively attempts to retrieve a given blob from the relays 
+// GetEncodedPayload iteratively attempts to retrieve a given blob from the relays
 // listed in the EigenDACert. The relays are attempted in random order.
 //
 // If the blob is successfully retrieved, then the blob is verified against the EigenDACert.
