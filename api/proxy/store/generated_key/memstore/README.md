@@ -49,7 +49,7 @@ $ curl http://localhost:3100/memstore/config | \
 ```
 
 #### PUT with GET returning derivation error
-The configuration allows users to configure memstore to return specific derivation error responses during `/get` payload retrievals while still allowing `/put` request operations to succeed normally with the payload persisted to ephemeral db. This enables fast iteration testing of a rollup client's handling of derivation errors without requiring a complex setup.
+The configuration allows users to configure memstore to return specific derivation error responses during `/get` payload retrievals while still allowing `/put` request operations to succeed normally with the payload persisted to ephemeral db. This enables fast iteration testing of a rollup client's handling of derivation errors without requiring a complex setup. The error is applied to individual PUT requests in the ephemeral db.
 
 The `PutWithGetReturnsDerivationError` field supports three states:
 1. **Field omitted**: No change to current configuration
