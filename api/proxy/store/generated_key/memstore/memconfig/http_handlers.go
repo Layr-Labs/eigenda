@@ -10,15 +10,34 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// NullableDerivationError is a custom type for managing the PutWithGetReturnsDerivationError configuration.
+// It allows users to distinguish between three states:
+// 1. Field omitted from JSON: no change to current configuration
+// 2. Reset=false with embedded DerivationError: sets the derivation error to the embedded values
+// 3. Reset=true: resets the derivation error to nil (disabled)
+//
+// Usage examples:
+// - To set an error: {"PutWithGetReturnsDerivationError": {"StatusCode": 3, "Msg": "test error", "Reset": false}}
+// - To reset to nil: {"PutWithGetReturnsDerivationError": {"Reset": true}}
+// - To leave unchanged: omit the field entirely from the JSON request
+type NullableDerivationError struct {
+	// Embed the DerivationError directly. Only used when Reset=false.
+	coretypes.DerivationError
+	// Reset indicates the user's intent:
+	// - true: reset PutWithGetReturnsDerivationError to nil (disabled)
+	// - false: set PutWithGetReturnsDerivationError to the embedded DerivationError
+	Reset bool `json:"Reset"`
+}
+
 // JSON bodies received by the PATCH /memstore/config endpoint are deserialized into this struct,
 // which is then used to update the memstore configuration.
 type ConfigUpdate struct {
-	MaxBlobSizeBytes                 *uint64                    `json:"MaxBlobSizeBytes,omitempty"`
-	PutLatency                       *string                    `json:"PutLatency,omitempty"`
-	GetLatency                       *string                    `json:"GetLatency,omitempty"`
-	PutReturnsFailoverError          *bool                      `json:"PutReturnsFailoverError,omitempty"`
-	BlobExpiration                   *string                    `json:"BlobExpiration,omitempty"`
-	PutWithGetReturnsDerivationError *coretypes.DerivationError `json:"PutWithGetReturnsDerivationError,omitempty"`
+	MaxBlobSizeBytes                 *uint64                  `json:"MaxBlobSizeBytes,omitempty"`
+	PutLatency                       *string                  `json:"PutLatency,omitempty"`
+	GetLatency                       *string                  `json:"GetLatency,omitempty"`
+	PutReturnsFailoverError          *bool                    `json:"PutReturnsFailoverError,omitempty"`
+	BlobExpiration                   *string                  `json:"BlobExpiration,omitempty"`
+	PutWithGetReturnsDerivationError *NullableDerivationError `json:"PutWithGetReturnsDerivationError,omitempty"`
 }
 
 // HandlerHTTP is an admin HandlerHTTP for GETting and PATCHing the memstore configuration.
@@ -101,10 +120,20 @@ func (api HandlerHTTP) handleUpdateConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	if update.PutWithGetReturnsDerivationError != nil {
-		err := api.safeConfig.SetPUTWithGetReturnsDerivationError(*update.PutWithGetReturnsDerivationError)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if update.PutWithGetReturnsDerivationError.Reset {
+			// Reset is true means reset to nil
+			err := api.safeConfig.SetPUTWithGetReturnsDerivationError(nil)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		} else {
+			// Reset is false means set the provided value
+			err := api.safeConfig.SetPUTWithGetReturnsDerivationError(update.PutWithGetReturnsDerivationError.DerivationError)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 	}
 

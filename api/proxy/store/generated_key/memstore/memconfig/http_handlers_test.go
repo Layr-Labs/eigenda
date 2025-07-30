@@ -138,9 +138,9 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 			},
 		},
 		{
-			name:            "update instructed status code return",
+			name:            "update instructed derivation error return",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 3}}`,
+			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Value": {"StatusCode": 3, "Msg": ""}, "Reset": false}}`,
 			expectedStatus:  http.StatusOK,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
@@ -151,11 +151,22 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 		{
 			name:            "invalid update to derivation error with invalid status code (status code 100 does not exist)",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 100}}`,
+			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Value": {"StatusCode": 100}, "Reset": false}}`,
 			expectedStatus:  http.StatusBadRequest,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
 				require.Equal(t, inputConfig, outputConfig)
+			},
+		},
+		{
+			name:            "reset instructed derivation error return",
+			initialConfig:   Config{PutWithGetReturnsDerivationError: coretypes.ErrInvalidCertDerivationError},
+			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Reset": true}}`,
+			expectedStatus:  http.StatusOK,
+			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
+				outputConfig := sc.Config()
+				expectedConfig := Config{PutWithGetReturnsDerivationError: nil}
+				require.Equal(t, expectedConfig, outputConfig)
 			},
 		},
 		{

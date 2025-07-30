@@ -49,14 +49,32 @@ $ curl http://localhost:3100/memstore/config | \
 ```
 
 #### PUT with GET returning derivation error
-The configuration allows users to configure memstore to return specific derivation error responses during `/get` payload retrievals while still allowing `/put` request operations to succeed normally with the payload persisted to ephemeral db. This enables fast iteration testing of a rolllup client's handling of derivation errors without requiring a complex setup.
-Specifically, users send a PATCH request that sets the desired derivation error for all subsequent GET requests. After that, when the user sends data to the proxy, the PUT operation succeeds as normal—the error injection only affects the GET path. Behind the scenes, upon a GET request, the proxy returns either the stored data or the specified derivation error depending on its configuration.
-The PATCH request is sticky, meaning it will take effect on multiple GET requests unless reset.
+The configuration allows users to configure memstore to return specific derivation error responses during `/get` payload retrievals while still allowing `/put` request operations to succeed normally with the payload persisted to ephemeral db. This enables fast iteration testing of a rollup client's handling of derivation errors without requiring a complex setup.
+
+The `PutWithGetReturnsDerivationError` field supports three states:
+1. **Field omitted**: No change to current configuration
+2. **Set an error**: `{"PutWithGetReturnsDerivationError": {"StatusCode": 3, "Msg": "test error", "Reset": false}}`
+3. **Reset to nil (disabled)**: `{"PutWithGetReturnsDerivationError": {"Reset": true}}`
+
+##### Setting a derivation error
+Configure memstore to return a specific derivation error for all subsequent `/get` requests:
 
 ```bash
- curl -X PATCH http://localhost:3100/memstore/config -d '{"PutWithGetReturnsDerivationError": {"StatusCode": 3}}'
- {"MaxBlobSizeBytes":2048,"BlobExpiration":"45m0s","PutLatency":"0s","GetLatency":"0s","PutReturnsFailoverError":false,"PutWithGetReturnsDerivationError": {"StatusCode": 3}}
+curl -X PATCH http://localhost:3100/memstore/config \
+  -d '{"PutWithGetReturnsDerivationError": {"StatusCode": 3, "Msg": "Invalid cert", "Reset": false}}'
 ```
+
+This will cause all future `/get` requests to return an HTTP 418 error with the specified derivation error, while `/put` requests continue to succeed normally.
+
+##### Resetting derivation error behavior
+To disable the derivation error behavior and return to normal operation:
+
+```bash
+curl -X PATCH http://localhost:3100/memstore/config \
+  -d '{"PutWithGetReturnsDerivationError": {"Reset": true}}'
+```
+
+After this, `/get` requests will return stored data normally instead of errors.
 
 A very important invariant is that no key can ever be overwritten.
 
