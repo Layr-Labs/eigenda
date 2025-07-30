@@ -10,12 +10,15 @@ type LoadGeneratorConfig struct {
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times. If less than 1, then this value
 	// is treated as a probability. For example, if this is set to 0.5, then each blob is read back
-	// from each relay with a 50% chance.
+	// from each relay with a 50% chance. If running with the proxy, this value is used to determine
+	// how many times to read each blob back from the proxy (since in the normal case, proxy reads translate
+	// to relay reads).
 	RelayReadAmplification float64
 	// By default, this utility reads chunks once. The number of chunk reads is multiplied
 	// by this factor. If this is set to 3, then chunks are read back 3 times. If less than 1,
 	// then this value is treated as a probability. For example, if this is set to 0.5, then
-	// each chunk is read back from validators with a 50% chance.
+	// each chunk is read back from validators with a 50% chance. Ignored if the load generator is configured
+	// to use the proxy.
 	ValidatorReadAmplification float64
 	// A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.
 	// If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.
@@ -40,6 +43,8 @@ type LoadGeneratorConfig struct {
 	// time, in HZ/s. Frequency will start at 0 and accelerate to the target frequency at this rate. If 0, then
 	// the frequency will immediately be set to the target frequency.
 	FrequencyAcceleration float64
+	// If true, then route traffic through the proxy instead of directly using the GRPC clients.
+	UseProxy bool
 }
 
 // DefaultLoadGeneratorConfig returns a default configuration for the load generator.
@@ -59,5 +64,6 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		EnablePprof:                   false,
 		PprofHttpPort:                 6060,
 		FrequencyAcceleration:         0.0025,
+		UseProxy:                      false,
 	}
 }
