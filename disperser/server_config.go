@@ -17,7 +17,7 @@ type ServerConfig struct {
 	// connections based on age.
 	MaxConnectionAge time.Duration
 
-	// When the server closes a connection due to MaxConnectionAgeSeconds, it will wait for this grace period before
+	// When the server closes a connection due to MaxConnectionAge, it will wait for this grace period before
 	// forcibly closing the connection. This allows in-flight requests to complete.
 	MaxConnectionAgeGrace time.Duration
 
