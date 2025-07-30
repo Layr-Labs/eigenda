@@ -12,6 +12,9 @@ fi
 
 BASE_REF="$1"
 echo "Fetching history to find merge base with $BASE_REF"
+echo "Debug: Current HEAD is $(git rev-parse --short HEAD)"
+echo "Debug: Current branch has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
+echo "Debug: Git log shows: $(git log --oneline -5 2>/dev/null || echo 'no history available')"
 
 # How many commits to deepen on each iteration
 FETCH_INCREMENT=50
@@ -20,21 +23,34 @@ FETCH_INCREMENT=50
 MAX_ITERATIONS=4
 
 # Start with a shallow fetch
+echo "Debug: Fetching $FETCH_INCREMENT commits from origin/$BASE_REF"
 git fetch --depth=$FETCH_INCREMENT origin "$BASE_REF"
+echo "Debug: After fetch, origin/$BASE_REF is at $(git rev-parse --short "origin/$BASE_REF" 2>/dev/null || echo 'not available')"
 
 # Check if we already have the merge base
-if git merge-base HEAD "origin/$BASE_REF" >/dev/null 2>&1; then
-    echo "✓ Found merge base in initial fetch"
+if MERGE_BASE=$(git merge-base HEAD "origin/$BASE_REF" 2>/dev/null); then
+    echo "✓ Found merge base in initial fetch: $MERGE_BASE"
+    echo "Debug: Commits from merge base to HEAD: $(git rev-list --count "$MERGE_BASE"..HEAD 2>/dev/null || echo 'unknown')"
+    echo "Debug: Commits from merge base to origin/$BASE_REF: $(git rev-list --count "$MERGE_BASE".."origin/$BASE_REF" 2>/dev/null || echo 'unknown')"
     exit 0
+else
+    echo "Debug: merge-base command failed, checking available history..."
+    echo "Debug: HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
+    echo "Debug: origin/$BASE_REF has $(git rev-list --count "origin/$BASE_REF" 2>/dev/null || echo 'unknown') commits"
 fi
 
 # Incrementally deepen by FETCH_INCREMENT commits at a time
 for i in $(seq 1 $MAX_ITERATIONS); do
     echo "→ Merge base not found after $((i * FETCH_INCREMENT)) commits, deepening..."
+    echo "Debug: Before deepen - HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
     git fetch --deepen=$FETCH_INCREMENT origin "$BASE_REF"
+    echo "Debug: After deepen - HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
+    echo "Debug: After deepen - origin/$BASE_REF has $(git rev-list --count "origin/$BASE_REF" 2>/dev/null || echo 'unknown') commits"
     
-    if git merge-base HEAD "origin/$BASE_REF" >/dev/null 2>&1; then
-        echo "✓ Found merge base after fetching ~$(((i + 1) * FETCH_INCREMENT)) commits"
+    if MERGE_BASE=$(git merge-base HEAD "origin/$BASE_REF" 2>/dev/null); then
+        echo "✓ Found merge base after fetching ~$(((i + 1) * FETCH_INCREMENT)) commits: $MERGE_BASE"
+        echo "Debug: Commits from merge base to HEAD: $(git rev-list --count "$MERGE_BASE"..HEAD 2>/dev/null || echo 'unknown')"
+        echo "Debug: Commits from merge base to origin/$BASE_REF: $(git rev-list --count "$MERGE_BASE".."origin/$BASE_REF" 2>/dev/null || echo 'unknown')"
         exit 0
     fi
 done
