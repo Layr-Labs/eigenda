@@ -46,11 +46,33 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_STREAM_TIMEOUT"),
 		Value:    time.Second * 10,
 	}
+	MaxConnectionAgeFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "max-connection-age"),
+		Usage: "Maximum age of a gRPC connection before it is closed. " +
+			"If zero, then the server will not close connections based on age.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_SECONDS"),
+		Value:    5 * time.Minute,
+	}
+	MaxConnectionAgeGraceFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-connection-age-grace"),
+		Usage:    "Grace period after MaxConnectionAge before the connection is forcibly closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_GRACE_SECONDS"),
+		Value:    30 * time.Second,
+	}
+	MaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-idle-connection-age"),
+		Usage:    "Maximum time a connection can be idle before it is closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
+		Value:    time.Minute,
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"), // sigh
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
@@ -272,6 +294,9 @@ var optionalFlags = []cli.Flag{
 	EnablePaymentMeterer,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
+	MaxConnectionAgeFlag,
+	MaxConnectionAgeGraceFlag,
+	MaxIdleConnectionAgeFlag,
 	MaxBlobSize,
 	ReservationsTableName,
 	OnDemandTableName,
