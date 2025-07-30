@@ -14,6 +14,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 )
 
@@ -49,6 +50,7 @@ type DisperserClient interface {
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
 type disperserClient struct {
+	logger             logging.Logger
 	config             *DisperserClientConfig
 	signer             corev2.BlobRequestSigner
 	initOnceGrpc       sync.Once
@@ -82,6 +84,7 @@ var _ DisperserClient = &disperserClient{}
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
 func NewDisperserClient(
+	logger logging.Logger,
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
@@ -102,6 +105,7 @@ func NewDisperserClient(
 	}
 
 	return &disperserClient{
+		logger:     logger,
 		config:     config,
 		signer:     signer,
 		prover:     prover,
@@ -395,6 +399,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		c.clientPool, initErr = common.NewGRPClientPool(
+			c.logger,
 			disperser_rpc.NewDisperserClient,
 			c.config.DisperserConnectionCount,
 			addr,

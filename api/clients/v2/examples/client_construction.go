@@ -51,7 +51,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create kzg prover: %v", err)
 	}
 
-	disperserClient, err := createDisperserClient(privateKey, kzgProver)
+	disperserClient, err := createDisperserClient(logger, privateKey, kzgProver)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
@@ -199,7 +199,11 @@ func createRelayClient(
 		relayUrlProvider)
 }
 
-func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients.DisperserClient, error) {
+func createDisperserClient(
+	logger logging.Logger,
+	privateKey string,
+	kzgProver *prover.Prover,
+) (clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
@@ -212,6 +216,7 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 	}
 
 	return clients.NewDisperserClient(
+		logger,
 		disperserClientConfig,
 		signer,
 		kzgProver,

@@ -149,7 +149,7 @@ func NewTestClient(
 		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserConfig, signer, kzgProver, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}

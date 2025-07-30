@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 )
 
@@ -27,6 +28,7 @@ type GRPCClientPool[T any] struct {
 
 // Creates a new GRPCClientPool with the specified client builder and size.
 func NewGRPClientPool[T any](
+	logger logging.Logger,
 	clientBuilder GRPCClientBuilder[T],
 	poolSize int,
 	url string,
@@ -50,6 +52,9 @@ func NewGRPClientPool[T any](
 		client := clientBuilder(conn)
 		clients = append(clients, client)
 	}
+
+	clientType := fmt.Sprintf("%T", clients[0])
+	logger.Infof("Creating gRPC client pool of size %d for %s with URL %s", poolSize, clientType, url)
 
 	return &GRPCClientPool[T]{
 		callCount:   atomic.Uint64{},

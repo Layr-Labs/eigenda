@@ -572,6 +572,7 @@ func buildPayloadDisperser(
 	}
 
 	disperserClient, err := clients_v2.NewDisperserClient(
+		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
 		kzgProver,
