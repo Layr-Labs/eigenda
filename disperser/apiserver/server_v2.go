@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -23,7 +21,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -136,6 +136,12 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	// Serve grpc requests
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     s.serverConfig.MaxIdleConnectionAge,
+		MaxConnectionAge:      s.serverConfig.MaxConnectionAge,
+		MaxConnectionAgeGrace: s.serverConfig.MaxConnectionAgeGrace,
+	})
+
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -146,7 +152,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	gs := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
-		), opt)
+		), opt, keepAliveConfig)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 

@@ -2204,3 +2204,42 @@ func TestCheckBlobExists(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists, "Random blob key should not exist")
 }
+
+func TestBlobMetadataStoreUpdateAccount(t *testing.T) {
+	ctx := context.Background()
+
+	// Test account
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	timestamp := uint64(time.Now().Unix())
+
+	// Test updating account - should not return an error
+	err := blobMetadataStore.UpdateAccount(ctx, accountID, timestamp)
+	require.NoError(t, err)
+
+	// Test updating the same account with a new timestamp - should not return an error
+	newTimestamp := timestamp + 100
+	err = blobMetadataStore.UpdateAccount(ctx, accountID, newTimestamp)
+	require.NoError(t, err)
+
+	// Test with different account
+	accountID2 := gethcommon.HexToAddress("0x9876543210987654321098765432109876543210")
+	err = blobMetadataStore.UpdateAccount(ctx, accountID2, timestamp)
+	require.NoError(t, err)
+}
+
+func TestBlobMetadataStoreGetAccounts(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with 1-hour lookback
+	lookbackSeconds := uint64(3600) // 1 hour
+
+	// Should not return an error even if no results
+	accounts, err := blobMetadataStore.GetAccounts(ctx, lookbackSeconds)
+	require.NoError(t, err)
+	assert.NotNil(t, accounts)
+
+	// Test with different lookback periods
+	accounts24h, err := blobMetadataStore.GetAccounts(ctx, 24*3600) // 24 hours
+	require.NoError(t, err)
+	assert.NotNil(t, accounts24h)
+}

@@ -7,8 +7,10 @@ variable "REPO" {
   default = "layr-labs/eigenda"
 }
 
+# We use the `dev` tag for local development builds.
+# CI builds will overwrite this with the `master` or `v*` tag.
 variable "BUILD_TAG" {
-  default = "latest"
+  default = "dev"
 }
 
 variable "SEMVER" {
@@ -47,7 +49,8 @@ group "all" {
     "traffic-generator-v2",
     "controller",
     "relay",
-    "blobapi"
+    "blobapi",
+    "proxy",
   ]
 }
 
@@ -55,29 +58,9 @@ group "node-group" {
   targets = ["node", "nodeplugin"]
 }
 
-# Github public releases
-group "node-group-release" {
-  targets = ["node-release", "nodeplugin-release"]
-}
-
-# Github CI builds
-group "ci-release" {
-  targets = [
-    "node-group",
-    "batcher",
-    "disperser",
-    "encoder",
-    "retriever",
-    "churner",
-    "dataapi",
-    "controller",
-    "relay",
-    "blobapi",
-    "proxy",
-  ]
-}
-
-# Internal devops builds
+# Internal devops builds. These targets are used by the eigenda-devops CI pipeline.
+# TODO: refactor the ECR repo to make the `${REGISTRY}/${REPO}` tags such that we can
+# get rid of all of these internal targets.
 group "internal-release" {
   targets = [
     "node-internal",
@@ -340,12 +323,25 @@ target "_release" {
   platforms = ["linux/amd64", "linux/arm64"]
 }
 
+group "node-group-release" {
+  targets = ["node-release", "nodeplugin-release"]
+}
+
 target "node-release" {
   inherits = ["node", "_release"]
+  # We overwrite the tag with a opr- prefix for public releases.
   tags     = ["${REGISTRY}/${REPO}/opr-node:${BUILD_TAG}"]
 }
 
 target "nodeplugin-release" {
   inherits = ["nodeplugin", "_release"]
+  # We overwrite the tag with a opr- prefix for public releases.
   tags     = ["${REGISTRY}/${REPO}/opr-nodeplugin:${BUILD_TAG}"]
+}
+
+target "proxy-release" {
+  inherits = ["proxy", "_release"]
+  # We push to layr-labs/ directly instead of layr-labs/eigenda/ for historical reasons,
+  # since proxy was previously in its own repo: https://github.com/Layr-Labs/eigenda-proxy
+  tags     = ["${REGISTRY}/eigenda-proxy:${BUILD_TAG}"]
 }

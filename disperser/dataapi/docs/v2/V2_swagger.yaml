@@ -241,6 +241,21 @@ definitions:
           $ref: '#/definitions/v2.BlobInfo'
         type: array
     type: object
+  v2.AccountFeedResponse:
+    properties:
+      accounts:
+        items:
+          $ref: '#/definitions/v2.AccountResponse'
+        type: array
+    type: object
+  v2.AccountResponse:
+    properties:
+      address:
+        type: string
+      dispersed_at:
+        description: RFC3339 format
+        type: string
+    type: object
   v2.AttestationInfo:
     properties:
       attestation:
@@ -560,6 +575,32 @@ info:
   title: EigenDA Data Access API V2
   version: "2.0"
 paths:
+  /accounts:
+    get:
+      parameters:
+      - description: 'Number of hours to look back [default: 24; max: 24000 (1000
+          days)]'
+        in: query
+        name: lookback_hours
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.AccountFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch accounts within a time window (sorted by latest timestamp)
+      tags:
+      - Accounts
   /accounts/{account_id}/blobs:
     get:
       parameters:

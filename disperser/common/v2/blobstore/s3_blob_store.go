@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -48,8 +49,7 @@ func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, er
 	}
 
 	if err != nil {
-		b.logger.Errorf("failed to download blob from bucket %s: %v", b.bucketName, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to download blob from bucket %s: %v", b.bucketName, err)
 	}
 	return data, nil
 }

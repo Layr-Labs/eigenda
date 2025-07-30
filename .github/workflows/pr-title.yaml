@@ -3,6 +3,10 @@ name: PR Title Linting
 on:
   pull_request:
     types: [opened, edited, synchronize]
+  # This workflow is currently not required on github because it doesn't work
+  # for merge_group events, because of its use of '.pull_request.title' below.
+  # TODO: update this workflow to work with merge_group events.
+  # merge_group:
 
 jobs:
   lint-pr-title:
@@ -13,7 +17,7 @@ jobs:
         run: |
           PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
           echo "PR title: $PR_TITLE"
-          
+
           # Define the valid pattern (supports conventional commit format with breaking changes)
           if [[ ! "$PR_TITLE" =~ ^(feat|fix|chore|docs|refactor|test|style|ci|perf)(\([a-z0-9-]+\))?(!)?:\ .* ]]; then
             echo "❌ Invalid PR title: '$PR_TITLE'"
@@ -27,5 +31,5 @@ jobs:
             echo "- docs: update README with new instructions"
             exit 1
           fi
-          
+
           echo "✅ PR title is valid"

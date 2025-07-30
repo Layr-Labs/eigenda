@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 )
@@ -206,7 +207,13 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob %s: %v", key.Hex(), err))
+		if strings.Contains(err.Error(), "NoSuchKey") {
+			return nil, api.NewErrorNotFound(fmt.Sprintf("blob %s not found", key.Hex()))
+		} else {
+			s.logger.Errorf("error fetching blob %s: %v", key.Hex(), err)
+			return nil, api.NewErrorInternal(
+				fmt.Sprintf("relay encountered errors while attempting to fetch blob %s", key.Hex()))
+		}
 	}
 
 	s.metrics.ReportBlobBandwidthUsage(len(data))
@@ -552,7 +559,13 @@ func (s *Server) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
 
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption())
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     s.config.MaxIdleConnectionAge,
+		MaxConnectionAge:      s.config.MaxConnectionAge,
+		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
+	})
+
+	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
 	reflection.Register(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 
