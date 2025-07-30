@@ -309,7 +309,7 @@ func handlePProfMode(ctx *cli.Context, logger logging.Logger) error {
 	}
 
 	pprofPort := ctx.Int("pprof-port")
-	if pprofPort <= 0 {
+	if pprofPort <= 0 || pprofPort > 65535 {
 		return fmt.Errorf("invalid pprof port: %d", pprofPort)
 	}
 
