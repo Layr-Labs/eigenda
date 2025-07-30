@@ -111,8 +111,9 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name: CertVerifierRouterOrImmutableVerifierAddrFlagName,
-			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. " +
-				"Required for performing eth_calls to verify EigenDA certificates.",
+			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier (V3 or above) contract. " +
+				"Required for performing eth_calls to verify EigenDA certificates, as well as fetching " +
+				"required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes).",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR")},
 			Category: category,
 			Required: false,
@@ -190,14 +191,13 @@ loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 		},
 		&cli.StringFlag{
 			Name: NetworkFlagName,
-			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
-default values for %s, %s, and %s. If all of these fields are explicitly configured, the
-network flag may be omitted. If some or all of these fields are configured, and the network
-is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, %s, & %s.`,
-				DisperserFlagName,
-				ServiceManagerAddrFlagName,
-				BLSOperatorStateRetrieverFlagName,
+			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, 
+to configure default values for different EigenDA contracts and disperser URL. 
+See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
+for the exact values getting set by this flag. All of those values can also be manually
+set via their respective flags, and take precedence over the default values set by the network flag.
+If all of those other flags are manually configured, the network flag may be omitted. 
+Permitted EigenDANetwork values include %s, %s, %s, & %s.`,
 				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
