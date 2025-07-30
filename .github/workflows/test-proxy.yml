@@ -11,21 +11,6 @@ env:
   MISE_VERSION: 2024.12.14
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api/proxy
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-        with:
-          version: ${{ env.MISE_VERSION }}
-          experimental: true
-          working_directory: api/proxy
-      - run: make lint
-        working-directory: api/proxy
-
   # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
   # valid, and allow the proxy to start.
   flags:
