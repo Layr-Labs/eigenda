@@ -7,20 +7,9 @@ run:
 linters:
   enable:
     - protogetter # reports direct reads from proto message fields when getters should be used.
-  # Right now revive raises 50+ issues, whereas golint didn't have any.
-  # despite revive being recommended as a replacement for golint.
-  # TODO: should we turn on revive and fix the issues?
-  #     - revive # drop-in replacement for golint
-  exclusions:
-    rules:
-      - linters:
-          - staticcheck
-        # https://staticcheck.dev/docs/checks#QF1008
-        # There were lots of this error and I didn't feel like fixing them all.
-        text: "QF1008"
-      - linters:
-          - staticcheck
-        # https://staticcheck.dev/docs/checks#QF1003
-        # We have a lot of these and I don't want to fix them all.
-        # Also doesn't feel like a big deal.
-        text: "QF1003"
+    - revive # drop-in replacement for golint
+
+issues:
+  # Only show issues in new/modified code, not existing code
+  new: true
+  new-from-rev: master

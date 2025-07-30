@@ -17,10 +17,21 @@ jobs:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
+      # Fetch git history of the base branch so golangci-lint can analyze only the diff
+      # between the feature branch and base branch (via --new-from-rev flag)
+      - name: Fetch base branch history
+        if: github.event_name == 'pull_request'
+        run: bash .github/scripts/fetch-base-incrementally.sh "${{ github.event.pull_request.base.ref }}"
+
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-      - run: make lint
+      
+      - name: Run linter
+        run: |
+          # Use PR base branch if available, otherwise the command line flag is ignored and master is used
+          golangci-lint run --new-from-rev=origin/${{ github.event.pull_request.base.ref || 'master' }}
+      
       - run: make fmt-check
