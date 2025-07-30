@@ -22,8 +22,8 @@ check_merge_base() {
     return 1
 }
 
-FETCH_INCREMENT=1 # How many commits to deepen on each iteration
-MAX_ITERATIONS=10   # The number of times to deepen before we just fetch everything
+FETCH_INCREMENT=50 # How many commits to deepen on each iteration
+MAX_ITERATIONS=10  # The number of times to deepen before we just fetch everything
 
 # Start with a minimal fetch of just the base ref
 git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1
