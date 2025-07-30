@@ -122,7 +122,7 @@ message PaymentHeader {
   // bucket algorithm. Even after this change, the timestamp should still be populated.
   //
   // The timestamp is currently unused in the context of on-demand payments, but this is subject to change without
-  // notice! Failure to populate this with proper timestamp could result in failed dispersals and loss of associated
+  // notice! Failure to populate this with a proper timestamp could result in failed dispersals and loss of associated
   // payments.
   int64 timestamp = 2;
 
