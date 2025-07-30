@@ -103,13 +103,3 @@ This is an example of how to format the output nitpick report:
 > -If the server finds a message from a source to be invalid, then it's blacklisted.
 > +If the server finds a message from a source to be invalid, then the source is blacklisted.
 > ```
-
-## 5. Helpful Commands
-
-These commands are helpful for enforcing the style guide. They are intended to *augment* manual style checking, not
-to replace careful consideration of input: many rules included in the style guide have not been or cannot be formalized.
-
-1. Undocumented exported stuff:
-  `rg --pcre2 -n "^(?!\s*//|^\s*/\*|^\s*$)(?=\s*(?:func\s+[A-Z]\w*|type\s+[A-Z]\w*\s+(?:struct|interface)|type\s+[A-Z]\w*\s+=|const\s+[A-Z]\w*|var\s+[A-Z]\w*)).*$" <FILES>`
-2. Error wrapping verb:
-  `rg --pcre2 -n "fmt\.Errorf\([^)]*%v[^)]*\b(err|error|e)\b[^)]*\)" <FILES>`

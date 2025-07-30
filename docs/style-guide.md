@@ -25,19 +25,15 @@ for human engineers, and to provide AI agents with a checklist for code review.
 
 1. Return errors explicitly; don't panic except for unrecoverable errors, where returning an error is not plausible.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
-2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
-   - Ensure that `%w` is used for error wrapping, *not* `%v`.
-   - Note that this rule only applies to `fmt.Errorf` specifically! It does NOT apply to `fmt.Sprintf`.
 
 ### 3. Code Documentation
 
-1. Document all exported functions, structs, constants, and interfaces in production code.
-2. Document unexported functions/types that contain non-trivial logic.
+1. Functions/types that contain non-trivial logic should be documented.
    - A good rule of thumb: if you can't understand everything there is to know about a function/type by its *name*,
    you should write a doc.
-3. Function/type docs should NOT simply be a rephrasing of the function/type name.
+2. Function/type docs should NOT simply be a rephrasing of the function/type name.
    - E.g. the doc for `computeData` should NOT be "Computes the data".
-4. Function docs should consider the following helpful information, if relevant:
+3. Function docs should consider the following helpful information, if relevant:
    - What are the inputs?
    - Are there any restrictions on what the input values are permitted to be?
    - What is returned in the standard case?
@@ -65,7 +61,7 @@ for human engineers, and to provide AI agents with a checklist for code review.
          // ...
    }
    ```
-5. TODO comments should be added to denote future work.
+4. TODO comments should be added to denote future work.
    - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
    can understand.
    - TODO comments that must be addressed *prior* to merging a PR should clearly be marked,
