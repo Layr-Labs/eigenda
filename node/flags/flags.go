@@ -460,9 +460,9 @@ var (
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
-		Usage:    "The size of the download pool. The default value is 16.",
+		Usage:    "The size of the download pool.",
 		Required: false,
-		Value:    16,
+		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
 	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
