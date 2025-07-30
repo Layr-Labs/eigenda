@@ -37,6 +37,19 @@ func ErrIfSymlink(path string) error {
 	return nil
 }
 
+// IsDirectory checks if the given path is a directory. Returns false if the path is not a directory or does not exist.
+func IsDirectory(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Path does not exist, so it can't be a directory
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat path %s: %w", path, err)
+	}
+	return info.IsDir(), nil
+}
+
 // SanitizePath returns a sanitized version of the given path, doing things like expanding
 // "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
 func SanitizePath(path string) (string, error) {
