@@ -122,11 +122,7 @@ func (api HandlerHTTP) handleUpdateConfig(w http.ResponseWriter, r *http.Request
 	if update.PutWithGetReturnsDerivationError != nil {
 		if update.PutWithGetReturnsDerivationError.Reset {
 			// Reset is true means reset to nil
-			err := api.safeConfig.SetPUTWithGetReturnsDerivationError(nil)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
+			_ = api.safeConfig.SetPUTWithGetReturnsDerivationError(nil)
 		} else {
 			// Reset is false means set the provided value
 			err := api.safeConfig.SetPUTWithGetReturnsDerivationError(update.PutWithGetReturnsDerivationError.DerivationError)

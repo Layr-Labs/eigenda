@@ -140,7 +140,7 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 		{
 			name:            "update instructed derivation error return",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Value": {"StatusCode": 3, "Msg": ""}, "Reset": false}}`,
+			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 3, "Msg": "", "Reset": false}}`,
 			expectedStatus:  http.StatusOK,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
@@ -151,7 +151,7 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 		{
 			name:            "invalid update to derivation error with invalid status code (status code 100 does not exist)",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Value": {"StatusCode": 100}, "Reset": false}}`,
+			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 100, "Reset": false}}`,
 			expectedStatus:  http.StatusBadRequest,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
