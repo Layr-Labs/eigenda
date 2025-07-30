@@ -29,7 +29,7 @@ echo "Debug: After fetch, origin/$BASE_REF is at $(git rev-parse --short "origin
 
 # Now deepen to get history from both branches
 echo "Debug: Deepening by $FETCH_INCREMENT commits to fetch history from both branches"
-git fetch --deepen=$FETCH_INCREMENT
+git fetch --deepen=$FETCH_INCREMENT origin HEAD "$BASE_REF"
 echo "Debug: After deepening, HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
 echo "Debug: origin/$BASE_REF has $(git rev-list --count "origin/$BASE_REF" 2>/dev/null || echo 'unknown') commits"
 
@@ -48,9 +48,9 @@ fi
 # Incrementally deepen by FETCH_INCREMENT commits at a time
 for i in $(seq 1 $MAX_ITERATIONS); do
     TOTAL_DEEPENED=$((i * FETCH_INCREMENT + FETCH_INCREMENT))
-    echo "→ Merge base not found after initial $FETCH_INCREMENT + $((i * FETCH_INCREMENT)) = $TOTAL_DEEPENED commits, deepening..."
+    echo "→ Merge base not found after $TOTAL_DEEPENED commits, deepening..."
     echo "Debug: Before deepen - HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
-    git fetch --deepen=$FETCH_INCREMENT
+    git fetch --deepen=$FETCH_INCREMENT origin HEAD "$BASE_REF"
     echo "Debug: After deepen - HEAD has $(git rev-list --count HEAD 2>/dev/null || echo 'unknown') commits"
     echo "Debug: After deepen - origin/$BASE_REF has $(git rev-list --count "origin/$BASE_REF" 2>/dev/null || echo 'unknown') commits"
     
