@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
@@ -19,8 +21,19 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 				Aliases: []string{"d"},
 				Usage:   "Enable debug mode. Program will pause for a debugger to attach.",
 			},
+			&cli.BoolFlag{
+				Name:    "pprof",
+				Aliases: []string{"p"},
+				Usage:   "Starts a pprof server for profiling.",
+			},
+			&cli.IntFlag{
+				Name:    "pprof-port",
+				Aliases: []string{"P"},
+				Usage:   "Port for the pprof server.",
+				Value:   6060,
+			},
 		},
-		Before: buildHandleDebugMode(logger),
+		Before: buildBeforeAction(logger),
 		Commands: []*cli.Command{
 			{
 				Name:      "ls",
@@ -259,25 +272,50 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 	return app
 }
 
-// Builds a function that is executed if the --debug flag is set. Causes the program to halt until ENTER is pressed.
-func buildHandleDebugMode(logger logging.Logger) func(*cli.Context) error {
-
-	// This double nesting is required in order to bind this method to a logger, while still conforming to the
-	// interface expected by urfave/cli.
+// Builds a function that is called before any command is executed.
+func buildBeforeAction(logger logging.Logger) func(*cli.Context) error {
 	return func(ctx *cli.Context) error {
-		debugModeEnabled := ctx.Bool("debug")
+		handleDebugMode(ctx, logger)
 
-		if !debugModeEnabled {
-			return nil
+		err := handlePProfMode(ctx, logger)
+		if err != nil {
+			return fmt.Errorf("failed to start pprof: %w", err)
 		}
-
-		pid := os.Getpid()
-		logger.Infof("Waiting for debugger to attach (pid: %d).\n", pid)
-
-		logger.Infof("Press Enter to continue...")
-		reader := bufio.NewReader(os.Stdin)
-		_, _ = reader.ReadString('\n') // block until newline is read
 
 		return nil
 	}
+}
+
+// If debug mode is enabled, this function will block until the user presses Enter.
+func handleDebugMode(ctx *cli.Context, logger logging.Logger) {
+	debugModeEnabled := ctx.Bool("debug")
+	if !debugModeEnabled {
+		return
+	}
+
+	pid := os.Getpid()
+	logger.Infof("Waiting for debugger to attach (pid: %d).\n", pid)
+
+	logger.Infof("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n') // block until newline is read
+}
+
+// If pprof is enabled, this function starts the pprof server.
+func handlePProfMode(ctx *cli.Context, logger logging.Logger) error {
+	pprofEnabled := ctx.Bool("pprof")
+	if !pprofEnabled {
+		return nil
+	}
+
+	pprofPort := ctx.Int("pprof-port")
+	if pprofPort <= 0 || pprofPort > 65535 {
+		return fmt.Errorf("invalid pprof port: %d", pprofPort)
+	}
+
+	logger.Infof("pprof enabled on port %d", pprofPort)
+	profiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", pprofPort), logger)
+	go profiler.Start()
+
+	return nil
 }
