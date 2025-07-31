@@ -31,10 +31,7 @@ func (e DerivationError) Error() string {
 // We panic if marshalling fails, since the caller won't be able to handle the derivation error
 // properly, so they'll receive a 500 and must retry.
 func (e DerivationError) MarshalToTeapotBody() string {
-	err := e.Validate()
-	if err != nil {
-		panic(err)
-	}
+	e.Validate()
 	bodyJSON, err := json.Marshal(e)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal derivation error: %w", err))
@@ -53,13 +50,12 @@ func (e DerivationError) WithMessage(msg string) DerivationError {
 
 // Validate that the DerivationError has a valid status code.
 // The only valid status codes are 1-4, as defined in the sentinel errors below, eg [ErrCertParsingFailedDerivationError].
-func (e DerivationError) Validate() error {
+func (e DerivationError) Validate() {
 	if e.StatusCode < 1 || e.StatusCode > 4 {
-		return fmt.Errorf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode)
+		panic(fmt.Errorf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode))
 	}
 	// The Msg field should ideally be a human-readable string that explains the error,
 	// but we don't enforce it.
-	return nil
 }
 
 // These errors can be used as sentinels to indicate specific derivation errors,

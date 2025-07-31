@@ -29,17 +29,28 @@ type DerivationError struct {
 	Msg        string
 }
 
+// See usage at
+// store/generated_key/memstore/memconfig/http_handlers.go [memconfig.NullableDerivationError]
+type NullableDerivationError struct {
+	// Embed the DerivationError directly. Only used when Reset=false.
+	DerivationError
+	// Reset indicates the user's intent:
+	// - true: reset NullableDerivationError to nil (disabled)
+	// - false: set NullableDerivationError to the embedded DerivationError
+	Reset bool `json:"Reset"`
+}
+
 // MemConfig ... contains properties that are used to configure the MemStore's behavior.
 // this is copied directly from /store/generated_key/memstore/memconfig.
 // importing the struct isn't possible since it'd create cyclic dependency loop
 // with core proxy's go.mod
 type MemConfig struct {
-	MaxBlobSizeBytes                 uint64
-	BlobExpiration                   time.Duration
-	PutLatency                       time.Duration
-	GetLatency                       time.Duration
-	PutReturnsFailoverError          bool
-	PutWithGetReturnsDerivationError *DerivationError
+	MaxBlobSizeBytes        uint64
+	BlobExpiration          time.Duration
+	PutLatency              time.Duration
+	GetLatency              time.Duration
+	PutReturnsFailoverError bool
+	NullableDerivationError *NullableDerivationError
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -47,24 +58,24 @@ type MemConfig struct {
 // which is hard to read.
 func (c MemConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(intermediaryCfg{
-		MaxBlobSizeBytes:                 c.MaxBlobSizeBytes,
-		BlobExpiration:                   c.BlobExpiration.String(),
-		PutLatency:                       c.PutLatency.String(),
-		GetLatency:                       c.GetLatency.String(),
-		PutReturnsFailoverError:          c.PutReturnsFailoverError,
-		PutWithGetReturnsDerivationError: c.PutWithGetReturnsDerivationError,
+		MaxBlobSizeBytes:        c.MaxBlobSizeBytes,
+		BlobExpiration:          c.BlobExpiration.String(),
+		PutLatency:              c.PutLatency.String(),
+		GetLatency:              c.GetLatency.String(),
+		PutReturnsFailoverError: c.PutReturnsFailoverError,
+		NullableDerivationError: c.NullableDerivationError,
 	})
 }
 
 // intermediaryCfg ... used for decoding into a less rich type before
 // translating to a structured MemConfig
 type intermediaryCfg struct {
-	MaxBlobSizeBytes                 uint64
-	BlobExpiration                   string
-	PutLatency                       string
-	GetLatency                       string
-	PutReturnsFailoverError          bool
-	PutWithGetReturnsDerivationError *DerivationError
+	MaxBlobSizeBytes        uint64
+	BlobExpiration          string
+	PutLatency              string
+	GetLatency              string
+	PutReturnsFailoverError bool
+	NullableDerivationError *NullableDerivationError
 }
 
 // IntoMemConfig ... converts an intermediary config into a memconfig
@@ -86,12 +97,12 @@ func (cfg *intermediaryCfg) IntoMemConfig() (*MemConfig, error) {
 	}
 
 	return &MemConfig{
-		MaxBlobSizeBytes:                 cfg.MaxBlobSizeBytes,
-		BlobExpiration:                   blobExpiration,
-		PutLatency:                       putLatency,
-		GetLatency:                       getLatency,
-		PutReturnsFailoverError:          cfg.PutReturnsFailoverError,
-		PutWithGetReturnsDerivationError: cfg.PutWithGetReturnsDerivationError,
+		MaxBlobSizeBytes:        cfg.MaxBlobSizeBytes,
+		BlobExpiration:          blobExpiration,
+		PutLatency:              putLatency,
+		GetLatency:              getLatency,
+		PutReturnsFailoverError: cfg.PutReturnsFailoverError,
+		NullableDerivationError: cfg.NullableDerivationError,
 	}, nil
 }
 

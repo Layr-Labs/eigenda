@@ -112,7 +112,7 @@ func TestPutReturnsFailoverErrorConfig(t *testing.T) {
 	require.ErrorIs(t, err, &api.ErrorFailover{})
 }
 
-func TestPutWithGetReturnsDerivationError(t *testing.T) {
+func TestOverwritePutWithDerivationError(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -123,7 +123,7 @@ func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	testKey := []byte("som-key")
 
 	// inject InvalidCertDerivationError
-	err := config.SetPUTWithGetReturnsDerivationError(coretypes.ErrInvalidCertDerivationError)
+	err := config.SetOverwritePutWithDerivationError(coretypes.ErrInvalidCertDerivationError)
 	require.NoError(t, err)
 
 	// write is not affected
@@ -135,7 +135,7 @@ func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	require.ErrorIs(t, err, coretypes.ErrInvalidCertDerivationError)
 
 	// set to return recency error
-	err = config.SetPUTWithGetReturnsDerivationError(coretypes.ErrRecencyCheckFailedDerivationError)
+	err = config.SetOverwritePutWithDerivationError(coretypes.ErrRecencyCheckFailedDerivationError)
 	require.NoError(t, err)
 
 	// cannot overwrite any value even in instructed mode
@@ -151,7 +151,7 @@ func TestPutWithGetReturnsDerivationError(t *testing.T) {
 	require.ErrorIs(t, err, coretypes.ErrRecencyCheckFailedDerivationError)
 
 	// now deactivate Instruction mode
-	err = config.SetPUTWithGetReturnsDerivationError(nil)
+	err = config.SetOverwritePutWithDerivationError(nil)
 	require.NoError(t, err)
 
 	yetTestKey := []byte("yet-another-som-key")

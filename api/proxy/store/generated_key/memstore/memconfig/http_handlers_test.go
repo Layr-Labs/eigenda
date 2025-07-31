@@ -138,20 +138,20 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 			},
 		},
 		{
-			name:            "update instructed derivation error return",
+			name:            "update derivation error such that a Post would make emphemeral db to store the derivation error",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 3, "Msg": "", "Reset": false}}`,
+			requestBodyJSON: `{"NullableDerivationError": {"StatusCode": 3, "Msg": "", "Reset": false}}`,
 			expectedStatus:  http.StatusOK,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
-				inputConfig.PutWithGetReturnsDerivationError = coretypes.ErrInvalidCertDerivationError
+				inputConfig.OverwritePutWithDerivationError = coretypes.ErrInvalidCertDerivationError
 				require.Equal(t, inputConfig, outputConfig)
 			},
 		},
 		{
 			name:            "invalid update to derivation error with invalid status code (status code 100 does not exist)",
 			initialConfig:   Config{},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"StatusCode": 100, "Reset": false}}`,
+			requestBodyJSON: `{"NullableDerivationError": {"StatusCode": 100, "Reset": false}}`,
 			expectedStatus:  http.StatusBadRequest,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
@@ -159,13 +159,13 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 			},
 		},
 		{
-			name:            "reset instructed derivation error return",
-			initialConfig:   Config{PutWithGetReturnsDerivationError: coretypes.ErrInvalidCertDerivationError},
-			requestBodyJSON: `{"PutWithGetReturnsDerivationError": {"Reset": true}}`,
+			name:            "reset derivation error in the config return such that put actually stores the data",
+			initialConfig:   Config{OverwritePutWithDerivationError: coretypes.ErrInvalidCertDerivationError},
+			requestBodyJSON: `{"NullableDerivationError": {"Reset": true}}`,
 			expectedStatus:  http.StatusOK,
 			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
 				outputConfig := sc.Config()
-				expectedConfig := Config{PutWithGetReturnsDerivationError: nil}
+				expectedConfig := Config{OverwritePutWithDerivationError: nil}
 				require.Equal(t, expectedConfig, outputConfig)
 			},
 		},
@@ -205,7 +205,7 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 				inputConfig.PutLatency = 1 * time.Second
 				inputConfig.GetLatency = 2 * time.Second
 				inputConfig.PutReturnsFailoverError = true
-				inputConfig.PutWithGetReturnsDerivationError = nil
+				inputConfig.OverwritePutWithDerivationError = nil
 				require.Equal(t, inputConfig, outputConfig)
 			},
 		},

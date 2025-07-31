@@ -21,10 +21,12 @@ type Config struct {
 	// after sleeping PutLatency duration.
 	// This can be used to simulate eigenda being down.
 	PutReturnsFailoverError bool
-	// if nil, any subsequent put requests will succeed without error, and all gets will succeed without error
-	// if not nil, any subsequent put requests will succeed without error, but when retrieving with the key,
-	// the returned value is the derivation error set in this config
-	PutWithGetReturnsDerivationError error
+	// if nil, store data from the POST method in the empheral db
+	// if it is set to some derivation error, then the derivation error is stored as opposed
+	// to the data from the POST method in the empheral db
+	// TODO we use Put in the name to be consistent to the name "PutReturnsFailoverError",
+	// but they should have been named as Post from HTTP verb
+	OverwritePutWithDerivationError error
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -35,19 +37,19 @@ type Config struct {
 // Patches are reads as ConfigUpdates instead to handle omitted fields.
 func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		MaxBlobSizeBytes                 uint64
-		BlobExpiration                   string
-		PutLatency                       string
-		GetLatency                       string
-		PutReturnsFailoverError          bool
-		PutWithGetReturnsDerivationError error
+		MaxBlobSizeBytes                uint64
+		BlobExpiration                  string
+		PutLatency                      string
+		GetLatency                      string
+		PutReturnsFailoverError         bool
+		OverwritePutWithDerivationError error
 	}{
-		MaxBlobSizeBytes:                 c.MaxBlobSizeBytes,
-		BlobExpiration:                   c.BlobExpiration.String(),
-		PutLatency:                       c.PutLatency.String(),
-		GetLatency:                       c.GetLatency.String(),
-		PutReturnsFailoverError:          c.PutReturnsFailoverError,
-		PutWithGetReturnsDerivationError: c.PutWithGetReturnsDerivationError,
+		MaxBlobSizeBytes:                c.MaxBlobSizeBytes,
+		BlobExpiration:                  c.BlobExpiration.String(),
+		PutLatency:                      c.PutLatency.String(),
+		GetLatency:                      c.GetLatency.String(),
+		PutReturnsFailoverError:         c.PutReturnsFailoverError,
+		OverwritePutWithDerivationError: c.OverwritePutWithDerivationError,
 	})
 }
 
@@ -128,20 +130,20 @@ func (sc *SafeConfig) SetMaxBlobSizeBytes(maxBlobSizeBytes uint64) {
 	sc.config.MaxBlobSizeBytes = maxBlobSizeBytes
 }
 
-func (sc *SafeConfig) GetPUTWithGetReturnsDerivationError() error {
+func (sc *SafeConfig) GetOverwritePutWithDerivationError() error {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 
-	return sc.config.PutWithGetReturnsDerivationError
+	return sc.config.OverwritePutWithDerivationError
 }
 
-func (sc *SafeConfig) SetPUTWithGetReturnsDerivationError(inputError error) error {
+func (sc *SafeConfig) SetOverwritePutWithDerivationError(inputError error) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
 	// both dynamic type and value are nil, i.e there is no error
 	if inputError == nil {
-		sc.config.PutWithGetReturnsDerivationError = nil
+		sc.config.OverwritePutWithDerivationError = nil
 		return nil
 	}
 
@@ -151,12 +153,9 @@ func (sc *SafeConfig) SetPUTWithGetReturnsDerivationError(inputError error) erro
 		return fmt.Errorf("unable to cast error into an DerivationError: %w", inputError)
 	}
 
-	err := derivationError.Validate()
-	if err != nil {
-		return err
-	}
+	derivationError.Validate()
 
-	sc.config.PutWithGetReturnsDerivationError = derivationError
+	sc.config.OverwritePutWithDerivationError = derivationError
 
 	return nil
 }

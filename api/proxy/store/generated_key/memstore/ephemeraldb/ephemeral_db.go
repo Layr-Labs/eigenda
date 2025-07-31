@@ -18,8 +18,7 @@ const (
 	DefaultPruneInterval = 500 * time.Millisecond
 )
 
-// a wrapper around payload with status code
-// if instructed mode is not enabled, the status code is 1
+// a wrapper around payload with derivation error
 type payloadWithDerivationError struct {
 	payload         []byte
 	derivationError error // the underlying type is coretypes.DerivationError
@@ -75,7 +74,7 @@ func (db *DB) InsertEntry(key []byte, value []byte) error {
 
 	strKey := string(key)
 
-	derivationError := db.config.GetPUTWithGetReturnsDerivationError()
+	derivationError := db.config.GetOverwritePutWithDerivationError()
 
 	// disallow any overwrite
 	_, exists := db.store[strKey]
@@ -83,7 +82,11 @@ func (db *DB) InsertEntry(key []byte, value []byte) error {
 		return fmt.Errorf("payload key already exists in ephemeral db: %s", strKey)
 	}
 
-	db.store[strKey] = payloadWithDerivationError{payload: value, derivationError: derivationError}
+	if derivationError == nil {
+		db.store[strKey] = payloadWithDerivationError{payload: value}
+	} else {
+		db.store[strKey] = payloadWithDerivationError{derivationError: derivationError}
+	}
 
 	// add expiration if applicable
 	if db.config.BlobExpiration() > 0 {
