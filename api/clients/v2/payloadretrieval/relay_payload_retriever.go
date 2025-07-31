@@ -172,7 +172,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 		return encodedPayload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve encoded payload with blobkey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
+	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given relay, and times out based on config.FetchTimeout
