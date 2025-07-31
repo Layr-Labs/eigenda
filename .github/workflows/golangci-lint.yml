@@ -16,12 +16,8 @@ jobs:
     steps:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
-
-      # Fetch git history of the base branch so golangci-lint can analyze only the diff
-      # between the feature branch and base branch (via --new-from-rev flag)
-      - name: Fetch base branch history
-        if: github.event_name == 'pull_request'
-        run: bash .github/scripts/fetch-base-incrementally.sh "${{ github.event.pull_request.base.ref }}"
+        with:
+          fetch-depth: 0  # Fetch all history for all branches so golangci-lint can analyze the diff
 
       - uses: jdx/mise-action@v2
         with:
