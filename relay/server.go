@@ -188,8 +188,12 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf(
-			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
+		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
+			return nil, api.NewErrorNotFound(
+				fmt.Sprintf("blob %s not found, check if blob exists and is assigned to this relay", key.Hex()))
+		} else {
+			return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata for blob: %v", err))
+		}
 	}
 	metadata := mMap[v2.BlobKey(request.GetBlobKey())]
 	if metadata == nil {
@@ -307,8 +311,12 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf(
-			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
+		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
+			return nil, api.NewErrorNotFound(
+				fmt.Sprintf("blob not found, check if blob exists and is assigned to this relay:: %v", keys))
+		} else {
+			return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata for blob: %v", err))
+		}
 	}
 
 	finishedFetchingMetadata := time.Now()
