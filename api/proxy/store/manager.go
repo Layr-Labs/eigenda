@@ -136,23 +136,23 @@ func (m *Manager) Get(ctx context.Context,
 			m.log.Warn("Failed to read payload from cache targets", "err", err)
 		}
 
-		// 2 - read maybeEncodedPayload from EigenDA
-		maybeEncodedPayload, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, opts)
+		// 2 - read payloadOrEncodedPayload from EigenDA
+		payloadOrEncodedPayload, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, opts)
 		if err == nil {
 			// Only backup to secondary storage if we're returning the decoded payload
 			// since the secondary stores are currently hardcoded to store payloads only.
 			// TODO: we could consider also storing encoded payloads under separate keys?
 			if m.secondary.WriteOnCacheMissEnabled() && !opts.ReturnEncodedPayload {
-				m.backupToSecondary(ctx, versionedCert.SerializedCert, maybeEncodedPayload)
+				m.backupToSecondary(ctx, versionedCert.SerializedCert, payloadOrEncodedPayload)
 			}
 
-			return maybeEncodedPayload, nil
+			return payloadOrEncodedPayload, nil
 		}
 
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 		// Only use fallbacks if we're not requesting encoded payload
 		if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
-			maybeEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
+			payloadOrEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
 				versionedCert.SerializedCert, true, verifyMethod, opts.L1InclusionBlockNum)
 			if err != nil {
 				m.log.Error("Failed to read payload from fallback targets", "err", err)
@@ -161,7 +161,7 @@ func (m *Manager) Get(ctx context.Context,
 		} else {
 			return nil, err
 		}
-		return maybeEncodedPayload, err
+		return payloadOrEncodedPayload, err
 	case commitments.OptimismKeccakCommitmentMode:
 		// TODO: we should refactor the manager to not deal with keccak commitments at all.
 		return nil, fmt.Errorf("INTERNAL BUG: call GetOPKeccakValueFromS3 instead")
@@ -297,12 +297,12 @@ func (m *Manager) getFromCorrectEigenDABackend(
 		}
 
 		m.log.Debug("Reading blob from EigenDAV2 backend", "returnEncodedPayload", opts.ReturnEncodedPayload)
-		maybeEncodedPayload, err := m.eigendaV2.Get(ctx, versionedCert, opts.ReturnEncodedPayload)
+		payloadOrEncodedPayload, err := m.eigendaV2.Get(ctx, versionedCert, opts.ReturnEncodedPayload)
 		if err != nil {
 			return nil, fmt.Errorf("get payload from EigenDA V2 backend: %w", err)
 		}
 
-		return maybeEncodedPayload, nil
+		return payloadOrEncodedPayload, nil
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}

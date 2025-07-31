@@ -114,7 +114,7 @@ type EigenDAV2Store interface {
 	Get(ctx context.Context,
 		versionedCert certs.VersionedCert,
 		returnEncodedPayload bool,
-	) (maybeEncodedPayload []byte, err error)
+	) (payloadOrEncodedPayload []byte, err error)
 	// VerifyCert verifies the cert validity and rbn recency.
 	VerifyCert(ctx context.Context, versionedCert certs.VersionedCert, l1InclusionBlockNum uint64) error
 }

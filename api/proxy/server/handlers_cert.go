@@ -95,7 +95,7 @@ func (svr *Server) handleGetShared(
 	// to decode the payload themselves inside the fpvm.
 	returnEncodedPayload := parseReturnEncodedPayloadQueryParam(r)
 
-	maybeEncodedPayload, err := svr.sm.Get(
+	payloadOrEncodedPayload, err := svr.sm.Get(
 		r.Context(),
 		versionedCert,
 		mode,
@@ -113,7 +113,7 @@ func (svr *Server) handleGetShared(
 		"commitmentMode", mode, "returnEncodedPayload", returnEncodedPayload,
 		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
 
-	_, err = w.Write(maybeEncodedPayload)
+	_, err = w.Write(payloadOrEncodedPayload)
 	if err != nil {
 		// If the write fails, we will already have sent a 200 header. But we still return an error
 		// here so that the logging middleware can log it.
