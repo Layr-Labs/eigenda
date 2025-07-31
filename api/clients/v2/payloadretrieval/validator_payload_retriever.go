@@ -135,10 +135,11 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 
 		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
-			pr.logger.Error(
-				"convert blob to encoded payload failed",
-				"blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
-			continue
+			// TODO(samlaf): ToEncodedPayload is doing too much decoding. It shouldn't read and validate the payload header.
+			// That needs to be left to the rollup's derivation pipeline, such that a failed decoding can be skipped safely.
+			// A lot of the logic in blob->encodedPayload prob needs to happen in encodedPayload->payload instead.
+			return nil, fmt.Errorf("convert blob to encoded payload failed."+
+				" blobKey: %s, quorumID: %v, error: %v", blobKey.Hex(), quorumID, err)
 		}
 
 		return encodedPayload, nil

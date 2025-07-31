@@ -150,17 +150,18 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 		}
 		if !valid {
 			pr.log.Warn(
-				"generated commitment doesn't match cert commitment",
+				"discarding blob retrieved from relay due to commitment mismatch with cert.commitment",
 				"blobKey", blobKey.Hex(), "relayKey", relayKey)
 			continue
 		}
 
 		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
-			pr.log.Error(
-				"convert blob to encoded payload failed",
-				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
-			continue
+			// TODO(samlaf): ToEncodedPayload is doing too much decoding. It shouldn't read and validate the payload header.
+			// That needs to be left to the rollup's derivation pipeline, such that a failed decoding can be skipped safely.
+			// A lot of the logic in blob->encodedPayload prob needs to happen in encodedPayload->payload instead.
+			return nil, fmt.Errorf("convert blob to encoded payload failed."+
+				" blobKey: %s, relayKey: %v, error: %v", blobKey.Hex(), relayKey, err)
 		}
 
 		return encodedPayload, nil
