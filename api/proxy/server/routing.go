@@ -137,7 +137,7 @@ func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {
 
 // ================== QUERY PARAMS PARSING FUNCTION ==================================================
 // These query params don't affect routing, but we keep them here so that everything related to query URLs is in one place,
-// and its easy to deduct what kind of queries are supported by the proxy server by just looking at this file.
+// and its easy to deduce what kind of queries are supported by the proxy server by just looking at this file.
 // The below 2 functions are used in both standard and optimism routes (see handlers_cert.go).
 
 // Parses the l1_inclusion_block_number query param from the request.
