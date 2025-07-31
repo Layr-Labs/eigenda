@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
@@ -90,21 +89,31 @@ func (svr *Server) handleGetShared(
 	if err != nil {
 		return err // doesn't need to be wrapped; already a proxyerrors
 	}
-	input, err := svr.sm.Get(
+
+	// Check if client requested encoded payload
+	// This is currently used by secure integrations (e.g. optimism hokulea), which need
+	// to decode the payload themselves inside the fpvm.
+	returnEncodedPayload := parseReturnEncodedPayloadQueryParam(r)
+
+	payloadOrEncodedPayload, err := svr.sm.Get(
 		r.Context(),
 		versionedCert,
 		mode,
-		common.CertVerificationOpts{L1InclusionBlockNum: l1InclusionBlockNum},
+		common.GETOpts{
+			L1InclusionBlockNum:  l1InclusionBlockNum,
+			ReturnEncodedPayload: returnEncodedPayload,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("get request failed with serializedCert (version %v) %v: %w",
 			versionedCert.Version, serializedCertHex, err)
 	}
 
-	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path,
+		"commitmentMode", mode, "returnEncodedPayload", returnEncodedPayload,
 		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
 
-	_, err = w.Write(input)
+	_, err = w.Write(payloadOrEncodedPayload)
 	if err != nil {
 		// If the write fails, we will already have sent a 200 header. But we still return an error
 		// here so that the logging middleware can log it.
@@ -112,25 +121,6 @@ func (svr *Server) handleGetShared(
 			versionedCert.Version, serializedCertHex, err)
 	}
 	return nil
-}
-
-// Parses the l1_inclusion_block_number query param from the request.
-// Happy path:
-//   - if the l1_inclusion_block_number is provided, it returns the parsed value.
-//
-// Unhappy paths:
-//   - if the l1_inclusion_block_number is not provided, it returns 0 (whose meaning is to skip the check).
-//   - if the l1_inclusion_block_number is provided but isn't a valid integer, it returns an error.
-func parseCommitmentInclusionL1BlockNumQueryParam(r *http.Request) (uint64, error) {
-	l1BlockNumStr := r.URL.Query().Get("l1_inclusion_block_number")
-	if l1BlockNumStr != "" {
-		l1BlockNum, err := strconv.ParseUint(l1BlockNumStr, 10, 64)
-		if err != nil {
-			return 0, proxyerrors.NewL1InclusionBlockNumberParsingError(l1BlockNumStr, err)
-		}
-		return l1BlockNum, nil
-	}
-	return 0, nil
 }
 
 // =================================================================================================
