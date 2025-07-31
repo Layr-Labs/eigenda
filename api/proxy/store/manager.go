@@ -219,21 +219,21 @@ func (m *Manager) getVerifyMethod(certVersion certs.VersionByte) (
 	func(context.Context, []byte, []byte, uint64) error,
 	error,
 ) {
-	v1VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	v0VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
 		// we don't add the cert version because EigenDA V1 only supported [certs.V0VersionByte] Certs.
 		return m.eigenda.Verify(ctx, cert, payload)
 	}
-	v2VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	v1VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
 		return m.eigendaV2.VerifyCert(ctx, certs.NewVersionedCert(cert, certVersion), l1InclusionBlockNumber)
 	}
 
 	switch certVersion {
 	case certs.V0VersionByte:
-		return v1VerifyWrapper, nil
+		return v0VerifyWrapper, nil
 	case certs.V1VersionByte, certs.V2VersionByte:
-		return v2VerifyWrapper, nil
+		return v1VerifyWrapper, nil
 	default:
-		return nil, fmt.Errorf("commitment version unknown: %b", certVersion)
+		return nil, fmt.Errorf("cert version unknown: %b", certVersion)
 	}
 }
 
@@ -271,7 +271,7 @@ func (m *Manager) getFromCorrectEigenDABackend(
 	case certs.V0VersionByte:
 		m.log.Debug("Reading blob from EigenDAV1 backend")
 
-		// V1 backend does not support returning encoded payloads
+		// We don't support secure integrations for EigenDAV1 backend, so this feature is not available.
 		if opts.ReturnEncodedPayload {
 			return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates")
 		}
