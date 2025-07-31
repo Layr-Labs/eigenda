@@ -47,13 +47,11 @@ type Config struct {
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
 
+	EigenDADirectory                string
 	BLSOperatorStateRetrieverAddr   string
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
-
-	NtpServer       string
-	NtpSyncInterval time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -100,10 +98,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
-			GrpcPort:      ctx.GlobalString(flags.GrpcPortFlag.Name),
-			GrpcTimeout:   ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
-			PprofHttpPort: ctx.GlobalString(flags.PprofHttpPort.Name),
-			EnablePprof:   ctx.GlobalBool(flags.EnablePprof.Name),
+			GrpcPort:              ctx.GlobalString(flags.GrpcPortFlag.Name),
+			GrpcTimeout:           ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
+			MaxConnectionAge:      ctx.GlobalDuration(flags.MaxConnectionAgeFlag.Name),
+			MaxConnectionAgeGrace: ctx.GlobalDuration(flags.MaxConnectionAgeGraceFlag.Name),
+			MaxIdleConnectionAge:  ctx.GlobalDuration(flags.MaxIdleConnectionAgeFlag.Name),
+			PprofHttpPort:         ctx.GlobalString(flags.PprofHttpPort.Name),
+			EnablePprof:           ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -131,12 +132,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
+		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
-		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),
-		NtpSyncInterval:                 ctx.GlobalDuration(flags.NtpSyncIntervalFlag.Name),
 	}
 	return config, nil
 }

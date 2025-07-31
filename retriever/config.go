@@ -19,6 +19,7 @@ type Config struct {
 
 	Timeout                       time.Duration
 	NumConnections                int
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
@@ -44,6 +45,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		},
 		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
 		NumConnections:                ctx.Int(flags.NumConnectionsFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		EigenDAVersion:                version,

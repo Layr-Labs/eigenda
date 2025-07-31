@@ -204,15 +204,21 @@ var (
 	}
 	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "Address of the BLS operator state retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
 	}
 	EigenDAServiceManagerAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigen-da-service-manager-addr"),
 		Usage:    "Address of the Eigen DA service manager",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
@@ -323,6 +329,28 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 		Value:    5 * time.Minute,
 	}
+	MaxConnectionAgeFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "max-connection-age"),
+		Usage: "Maximum age of a gRPC connection before it is closed. " +
+			"If zero, then the server will not close connections based on age.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_SECONDS"),
+		Value:    5 * time.Minute,
+	}
+	MaxConnectionAgeGraceFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-connection-age-grace"),
+		Usage:    "Grace period after MaxConnectionAge before the connection is forcibly closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_GRACE_SECONDS"),
+		Value:    30 * time.Second,
+	}
+	MaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-idle-connection-age"),
+		Usage:    "Maximum time a connection can be idle before it is closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
+		Value:    time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -330,8 +358,6 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayKeysFlag,
-	BlsOperatorStateRetrieverAddrFlag,
-	EigenDAServiceManagerAddrFlag,
 	EnableMetricsFlag,
 }
 
@@ -374,6 +400,12 @@ var optionalFlags = []cli.Flag{
 	PprofHttpPortFlag,
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverAddrFlag,
+	EigenDAServiceManagerAddrFlag,
+	MaxConnectionAgeFlag,
+	MaxConnectionAgeGraceFlag,
+	MaxIdleConnectionAgeFlag,
 }
 
 var Flags []cli.Flag

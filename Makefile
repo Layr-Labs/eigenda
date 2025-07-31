@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer check-fmt
+.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-churner integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi check-fmt
 
 ifeq ($(wildcard .git/*),)
 $(warning semver disabled - building from release zip)
@@ -41,6 +41,7 @@ lint:
 	# Uncomment this once we update to go1.23 which makes the -diff flag available.
 	# See https://tip.golang.org/doc/go1.23#go-command
 	# go mod tidy -diff
+	$(MAKE) -C api/proxy lint
 
 
 # TODO: this should also format github workflows, etc.
@@ -60,6 +61,17 @@ fmt-check:
 		exit 1; \
 	fi
 
+# Go's VCS stamping logic assumes .git is always a directory, but in worktrees it's a file.
+# This causes "error obtaining VCS status" when building because Go can't parse the file format.
+# See https://github.com/golang/go/issues/58218#issuecomment-1471302281
+#
+# So we detect if we're in a git worktree (where .git is a file, not a directory)
+# and set GOFLAGS to disable VCS stamping to avoid build errors if so.
+# This is a temporary workaround until Go's VCS handling is fixed.
+ifeq ($(shell test -f .git && echo "true"),true)
+export GOFLAGS := -buildvcs=false
+$(warning Detected git worktree - disabling VCS stamping)
+endif
 build:
 	cd operators/churner && make build
 	cd disperser && make build
@@ -70,45 +82,52 @@ build:
 	cd relay && make build
 	cd litt && make build
 
-dataapi-build:
-	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
+# builds all services and loads them into dockerd (such that they are available via `docker images`).
+# The images will be tagged with :dev, which is the default BUILD_TAG in docker-bake.hcl.
+# This can be changed by running for example `BUILD_TAG=master make docker-build`.
+docker-build:
+	docker buildx bake all --load
 
+# builds all services and pushes them to the configured registry (ghcr by default).
+docker-build-push:
+	docker buildx bake all --push
+
+# Should only ever be used by the docker-publish-release CI workflow.
+# We keep the node-group and proxy targets separate since we might want to release them separately in the future.
+docker-release-build:
+	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
+	docker buildx bake node-group-release ${PUSH_FLAG}
+	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
+	docker buildx bake proxy-release ${PUSH_FLAG}
+
+# Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
+# TODO: we should break these up into short and long unit-tests.
 unit-tests:
 	./test.sh
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
 
-integration-tests-churner:
-	go test -v ./churner/tests
-
-integration-tests-indexer:
+# Integration tests use mocks
+integration-tests:
+	go test -v ./operators/churner/tests
 	go test -v ./core/indexer
-
-integration-tests-node-plugin:
 	go test -v ./node/plugin/tests
-
-integration-tests-inabox:
-	make build
-	cd inabox && make run-e2e
-
-integration-tests-inabox-nochurner:
-	make build
-	cd inabox && make run-e2e-nochurner
-
-integration-tests-graph-indexer:
-	make build
-	go test -v ./core/thegraph
-
-integration-tests-dataapi:
-	make dataapi-build
 	go test -v ./disperser/dataapi
 
-docker-release-build:
-	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
-	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy ${PUSH_FLAG}
+# Tests that require a build because they start local inabox infra:
+# either chain, subgraph, or localstack.
+integration-tests-inabox: build
+	cd inabox && make run-e2e
+#   TODO: TestIndexerIntegration in core/thegraph/state_integration_test.go fails to start its inabox dependency...
+#         Seems like it was never run in CI, and I don't know how to fix it, so just commenting and will let someone else fix.
+# 	go test -v ./core/thegraph
+
+# These are e2e tests that run against live environments (preprod and holesky currently).
+live-tests:
+	go test -v ./test/v2/live -v -timeout 60m
+live-tests-v1:
+	go test -v ./api/clients --live-test
 
 semver:
 	echo "${SEMVER}"

@@ -20,7 +20,6 @@ import (
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	start := time.Now()
-	metererSyncTime := s.ntpClock.Now() // Using NTP-synced time for metering
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
@@ -40,7 +39,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, metererSyncTime); err != nil {
+	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
 		return nil, err
 	}
 
@@ -56,6 +55,20 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
+
+	// Update Account asynchronously after successful blob storage
+	go func() {
+		accountID := blobHeader.PaymentMetadata.AccountID
+		timestamp := uint64(time.Now().Unix())
+
+		// Use a timeout context for the async database operation
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.blobMetadataStore.UpdateAccount(ctx, accountID, timestamp); err != nil {
+			s.logger.Warn("failed to update account", "accountID", accountID.Hex(), "error", err)
+		}
+	}()
 
 	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
@@ -125,11 +138,11 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	symbolsCharges, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}
-	s.metrics.reportDisperseMeteredBytes(blobHeader.QuorumNumbers, symbolsCharges)
+	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
 
 	return nil
 }

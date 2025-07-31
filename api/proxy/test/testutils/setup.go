@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"golang.org/x/exp/rand"
 
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
 	redistc "github.com/testcontainers/testcontainers-go/modules/redis"
@@ -47,16 +46,19 @@ const (
 	preprodCertVerifierAddress              = "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C"
 	preprodSvcManagerAddress                = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
 	preprodBLSOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	preprodEigenDADirectory                 = "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
 
 	disperserTestnetHostname                = "disperser-testnet-holesky.eigenda.xyz"
 	testnetCertVerifierAddress              = "0xd305aeBcdEc21D00fDF8796CE37d0e74836a6B6e"
 	testnetSvcManagerAddress                = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 	testnetBLSOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	testnetEigenDADirectory                 = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 
 	disperserSepoliaHostname                = "disperser-testnet-sepolia.eigenda.xyz"
 	sepoliaCertVerifierAddress              = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 	sepoliaSvcManagerAddress                = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
 	sepoliaBLSOperatorStateRetrieverAddress = "0x22478d082E9edaDc2baE8443E4aC9473F6E047Ff"
+	sepoliaEigenDADirectory                 = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 )
 
 var (
@@ -169,6 +171,7 @@ type TestConfig struct {
 	Expiration       time.Duration
 	MaxBlobLength    string
 	WriteThreadCount int
+	WriteOnCacheMiss bool
 	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
@@ -202,6 +205,7 @@ func NewTestConfig(
 		UseRedisCaching:    false,
 		UseS3Fallback:      false,
 		WriteThreadCount:   0,
+		WriteOnCacheMiss:   false,
 	}
 }
 
@@ -263,6 +267,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	var certVerifierAddress string
 	var svcManagerAddress string
 	var blsOperatorStateRetrieverAddress string
+	var eigenDADirectory string
 	switch testCfg.Backend {
 	case MemstoreBackend:
 		break // no need to set these fields for local tests
@@ -271,16 +276,19 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		certVerifierAddress = preprodCertVerifierAddress
 		svcManagerAddress = preprodSvcManagerAddress
 		blsOperatorStateRetrieverAddress = preprodBLSOperatorStateRetrieverAddress
+		eigenDADirectory = preprodEigenDADirectory
 	case TestnetBackend:
 		disperserHostname = disperserTestnetHostname
 		certVerifierAddress = testnetCertVerifierAddress
 		svcManagerAddress = testnetSvcManagerAddress
 		blsOperatorStateRetrieverAddress = testnetBLSOperatorStateRetrieverAddress
+		eigenDADirectory = testnetEigenDADirectory
 	case SepoliaBackend:
 		disperserHostname = disperserSepoliaHostname
 		certVerifierAddress = sepoliaCertVerifierAddress
 		svcManagerAddress = sepoliaSvcManagerAddress
 		blsOperatorStateRetrieverAddress = sepoliaBLSOperatorStateRetrieverAddress
+		eigenDADirectory = sepoliaEigenDADirectory
 	default:
 		panic("Unsupported backend")
 	}
@@ -293,6 +301,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			AsyncPutWorkers:  testCfg.WriteThreadCount,
 			BackendsToEnable: testCfg.BackendsToEnable,
 			DispersalBackend: testCfg.DispersalBackend,
+			WriteOnCacheMiss: testCfg.WriteOnCacheMiss,
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
@@ -353,6 +362,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 			EigenDAServiceManagerAddr:          svcManagerAddress,
+			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
 		},
 	}
@@ -418,15 +428,4 @@ func createS3Bucket(bucketName string) {
 	} else {
 		log.Info(fmt.Sprintf("Successfully created %s\n", bucketName))
 	}
-}
-func RandStr(n int) string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
-func RandBytes(n int) []byte {
-	return []byte(RandStr(n))
 }

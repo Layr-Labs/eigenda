@@ -37,11 +37,12 @@ type ClientConfigV2 struct {
 	// Fields required for validator payload retrieval
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 
 	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
 	// A cert is valid if cert.L1InclusionBlock <= cert.RBN + RBNRecencyWindowSize, otherwise it
-	// is considered stale and should be discarded from rollups' derivation pipeline.
+	// is considered stale and should be discarded from rollups' derivation pipelines.
 	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
 	//
 	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.
@@ -77,6 +78,10 @@ func (cfg *ClientConfigV2) Check() error {
 	}
 
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
+		if cfg.EigenDADirectory == "" {
+			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
+		}
+
 		if cfg.BLSOperatorStateRetrieverAddr == "" {
 			return fmt.Errorf(
 				"BLS operator state retriever address is required for validator retrieval in EigenDA V2 backend")

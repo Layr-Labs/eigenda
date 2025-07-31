@@ -89,6 +89,8 @@ func teardown() {
 	testConfig.StopBinaries()
 }
 
+// TODO: this test needs to be fixed, its currently broken and CI never runs it (see Makefile integration-tests-inabox target).
+// The inabox dependency fails to start for some reason that I don't understand.
 func TestIndexerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skip graph indexer integrations test in short mode")
@@ -98,7 +100,7 @@ func TestIndexerIntegration(t *testing.T) {
 
 	logger := testutils.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
-	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.EigenDADirectory, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)

@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - master
+    # TODO: these tests can't be required to pass in order to merge,
+    # because they only run on these paths so would block PRs that don't change subgraphs.
+    # Do we want to change this and always run this workflow and mark is as required?
     paths:
       - 'subgraphs/**'
   pull_request:
@@ -10,29 +13,24 @@ on:
       - master
     paths:
       - 'subgraphs/**'
+  merge_group:
 
 jobs:
   test-subgraphs:
     name: Test ${{ matrix.subgraph }}
-    runs-on: ubuntu-22.04 # https://github.com/graphprotocol/graph-tooling/issues/1546#issuecomment-2589680195
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        subgraph: [eigenda-operator-state, eigenda-batch-metadata]
+        subgraph: [eigenda-operator-state, eigenda-batch-metadata, eigenda-payments]
       fail-fast: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v2
         with:
-          node-version: '20'
-          cache: 'yarn'
-          cache-dependency-path: 'subgraphs/yarn.lock'
-
-      - name: Install global dependencies
-        run: |
-          yarn global add @graphprotocol/graph-cli@0.60.0
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
           
       - name: Output Graph version
         run: |

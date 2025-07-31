@@ -68,7 +68,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,14 @@ func RunScan(ctx *cli.Context) error {
 	if chainState == nil {
 		return errors.New("failed to create chain state")
 	}
-	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
+
+	// Create subgraph API client. Note: NewApi requires three endpoints
+	// (uiMonitoring, operatorState, payments) but this tool only uses
+	// operatorState for querying ejections. The same endpoint is passed
+	// for all three parameters as a workaround.
+	// TODO: Consider creating a more specific API constructor that only
+	// requires the endpoints actually needed.
+	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint, config.SubgraphEndpoint)
 	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
 
 	ejections, err := subgraphClient.QueryOperatorEjectionsForTimeWindow(context.Background(), int32(config.Days), config.OperatorId, config.First, config.Skip)

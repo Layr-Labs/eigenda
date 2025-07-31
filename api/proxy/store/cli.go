@@ -14,6 +14,7 @@ var (
 	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
 	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
 	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
+	WriteOnCacheMissFlagName = withFlagPrefix("write-on-cache-miss")
 )
 
 func withFlagPrefix(s string) string {
@@ -65,6 +66,13 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "CONCURRENT_WRITE_THREADS"),
 			Category: category,
 		},
+		&cli.BoolFlag{
+			Name:     WriteOnCacheMissFlagName,
+			Usage:    "While doing a GET, write to the secondary storage if the cert/blob is not found in the cache but is found in EigenDA.",
+			Value:    false,
+			EnvVars:  withEnvPrefix(envPrefix, "WRITE_ON_CACHE_MISS"),
+			Category: category,
+		},
 	}
 }
 
@@ -88,11 +96,33 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("string to eigenDA backend: %w", err)
 	}
 
+	// We need to filter the cache targets and fallback targets to remove empty strings,
+	// since our code downstream doesn't work well with empty strings.
+	// Specifically, if the env var is simply set to nothing like `EIGENDA_PROXY_STORAGE_CACHE_TARGETS=`,
+	// it will result in an empty string being added to the slice
+	// for some reason... seems like a bug in urfave/cli?
+	cacheTargets := ctx.StringSlice(CacheTargetsFlagName)
+	filteredCacheTargets := make([]string, 0, len(cacheTargets))
+	for _, target := range cacheTargets {
+		if target != "" {
+			filteredCacheTargets = append(filteredCacheTargets, target)
+		}
+	}
+
+	fallbackTargets := ctx.StringSlice(FallbackTargetsFlagName)
+	filteredFallbackTargets := make([]string, 0, len(fallbackTargets))
+	for _, target := range fallbackTargets {
+		if target != "" {
+			filteredFallbackTargets = append(filteredFallbackTargets, target)
+		}
+	}
+
 	return Config{
 		BackendsToEnable: backends,
 		DispersalBackend: dispersalBackend,
 		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
-		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
-		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),
+		FallbackTargets:  filteredFallbackTargets,
+		CacheTargets:     filteredCacheTargets,
+		WriteOnCacheMiss: ctx.Bool(WriteOnCacheMissFlagName),
 	}, nil
 }

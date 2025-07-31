@@ -52,8 +52,8 @@ const (
 var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
-		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
-		"1":     "https://app.eigenlayer.xyz/avs/eigenda",
+		"1":     "https://app.eigenlayer.xyz/avs/0x870679e138bcdf293b7ff14dd44b70fc97e12fc0",
+		"17000": "https://holesky.eigenlayer.xyz/avs/0xd4a7e1bd8015057293f0d0a557088c286942e84b/operator-set/4294967295",
 	}
 )
 
@@ -75,6 +75,8 @@ type Node struct {
 	ChainID                 *big.Int
 	// a worker pool used to download chunk data from the relays
 	DownloadPool *workerpool.WorkerPool
+	// a worker pool used to validate batches
+	ValidationPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -100,12 +102,6 @@ func NewNode(
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
 ) (*Node, error) {
-	// Setup metrics
-	// sdkClients, err := buildSdkClients(config, logger)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	nodeLogger := logger.With("component", "Node")
 
 	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
@@ -123,9 +119,9 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
 
 	// Create ChainState Client
@@ -153,7 +149,7 @@ func NewNode(
 	config.EncoderConfig.LoadG2Points = false
 	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
@@ -194,21 +190,27 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// Create new blacklist store
-	// We disable seeks compaction and enable sync writes to ensure that the blacklist is always up to date.
-	// This is because the blacklist is used to check if a disperser is blacklisted, and if it is, we need to
-	// stop accepting requests from that disperser.
-	blacklistStore, err := NewLevelDBBlacklistStore(
-		config.DbPath+"/blacklist",
-		logger,
-		true, // disable seeks compaction
-		true, // enable sync writes
-		DefaultTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
-	}
-
+	// If EigenDADirectory is provided, use it to get service manager addresses
+	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
+		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+		}
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
+		}
+		if config.EigenDAServiceManagerAddr != "" && eigenDAServiceManagerAddr.String() != config.EigenDAServiceManagerAddr {
+			return nil, fmt.Errorf("EigenDAServiceManagerAddr passed in as config (%v) does not match the one retrieved from EigenDADirectory (%v)",
+				config.EigenDADirectory, eigenDAServiceManagerAddr.Hex())
+		}
+	} else {
+		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
+			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
+			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
+	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -229,7 +231,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr,
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -240,13 +242,19 @@ func NewNode(
 	}
 	downloadPool := workerpool.New(downloadPoolSize)
 
+	validationPoolSize := config.NumBatchValidators
+	if validationPoolSize < 1 {
+		validationPoolSize = 1
+	}
+	validationPool := workerpool.New(validationPoolSize)
+
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		BlacklistStore:          blacklistStore,
+		BlacklistStore:          nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
@@ -256,6 +264,7 @@ func NewNode(
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
+		ValidationPool:          validationPool,
 	}
 
 	if !config.EnableV2 {
@@ -279,7 +288,7 @@ func NewNode(
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
 		relayClientConfig := &relay.RelayClientConfig{
-			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
@@ -373,7 +382,7 @@ func (n *Node) Start(ctx context.Context) error {
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
-		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
+		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.ChurnerUseSecureGrpc, n.Config.Timeout, n.Logger)
 		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
@@ -391,7 +400,7 @@ func (n *Node) Start(ctx context.Context) error {
 		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
 		if ok {
 			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, "+
-				"then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
+				"then please follow the EigenDA operator guide section in https://docs.eigencloud.xyz/products/eigenda/operator-guides/run-a-node/registration to register", eigenDAUrl)
 		} else {
 			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet",
 				n.ChainID.String())
@@ -659,8 +668,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 	getStateDuration := time.Since(start)
 
-	pool := workerpool.New(n.Config.NumBatchValidators)
-	err = n.Validator.ValidateBatch(header, blobs, operatorState, pool)
+	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.ValidationPool)
 	if err != nil {
 		h, hashErr := operatorState.Hash()
 		if hashErr != nil {

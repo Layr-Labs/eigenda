@@ -65,10 +65,10 @@ func (s *server) getServiceAvailability(ctx context.Context, services []string) 
 			}
 			availabilityStatuses[i] = availabilityStatus
 		} else {
-			s.logger.Info("service status", "service", serviceName, "status", response.Status.String())
+			s.logger.Info("service status", "service", serviceName, "status", response.GetStatus().String())
 			availabilityStatus = &ServiceAvailability{
 				ServiceName:   serviceName,
-				ServiceStatus: response.Status.String(),
+				ServiceStatus: response.GetStatus().String(),
 			}
 			availabilityStatuses[i] = availabilityStatus
 		}

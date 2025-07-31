@@ -29,6 +29,7 @@ var (
 	)
 	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
 	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
+	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
 	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
 	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
 	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
@@ -110,23 +111,31 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name: CertVerifierRouterOrImmutableVerifierAddrFlagName,
-			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. " +
-				"Required for performing eth_calls to verify EigenDA certificates.",
+			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier (V3 or above) contract. " +
+				"Required for performing eth_calls to verify EigenDA certificates, as well as fetching " +
+				"required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes).",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR")},
 			Category: category,
 			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     ServiceManagerAddrFlagName,
-			Usage:    "Address of the EigenDA service manager contract.",
+			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
 			Category: category,
 			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     BLSOperatorStateRetrieverFlagName,
-			Usage:    "Address of the BLS operator state retriever contract.",
+			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
+			Category: category,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     EigenDADirectoryFlagName,
+			Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain..",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "EIGENDA_DIRECTORY")},
 			Category: category,
 			Required: false,
 		},
@@ -174,23 +183,22 @@ governance and is injected in the BlobHeader before dispersing. Currently only s
 		},
 		&cli.StringFlag{
 			Name: MaxBlobLengthFlagName,
-			Usage: `Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
-slightly exceeds 1GB.`,
+			Usage: `Maximum blob length (base 2) to be written or read from EigenDA. Determines the number of SRS points
+loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH")},
 			Value:    "16MiB",
 			Category: category,
 		},
 		&cli.StringFlag{
 			Name: NetworkFlagName,
-			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
-default values for %s, %s, and %s. If all of these fields are explicitly configured, the
-network flag may be omitted. If some or all of these fields are configured, and the network
-is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, & %s.`,
-				DisperserFlagName,
-				ServiceManagerAddrFlagName,
-				BLSOperatorStateRetrieverFlagName,
+			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, 
+to configure default values for different EigenDA contracts and disperser URL. 
+See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
+for the exact values getting set by this flag. All of those values can also be manually
+set via their respective flags, and take precedence over the default values set by the network flag.
+If all of those other flags are manually configured, the network flag may be omitted. 
+Permitted EigenDANetwork values include %s, %s, %s, & %s.`,
+				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
 				common.SepoliaTestnetEigenDANetwork,
@@ -234,6 +242,15 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		}
 	}
 
+	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
+	if eigenDADirectory == "" {
+		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		}
+	}
+
 	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
 	if serviceManagerAddress == "" {
 		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
@@ -271,6 +288,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDAServiceManagerAddr:          serviceManagerAddress,
+		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 	}, nil

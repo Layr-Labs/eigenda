@@ -4,13 +4,36 @@ pragma solidity ^0.8.9;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {AddressDirectoryLib} from "src/core/libraries/v3/address-directory/AddressDirectoryLib.sol";
 import {IEigenDADirectory} from "src/core/interfaces/IEigenDADirectory.sol";
+import {AccessControlConstants} from "src/core/libraries/v3/access-control/AccessControlConstants.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {InitializableLib} from "src/core/libraries/v3/initializable/InitializableLib.sol";
 
-contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
+contract EigenDADirectory is IEigenDADirectory {
     using AddressDirectoryLib for string;
     using AddressDirectoryLib for bytes32;
 
-    function initialize(address _initialOwner) external initializer {
-        _transferOwnership(_initialOwner);
+    modifier initializer() {
+        InitializableLib.initialize();
+        _;
+    }
+
+    modifier onlyOwner() {
+        require(
+            IAccessControl(AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().getAddress()).hasRole(
+                AccessControlConstants.OWNER_ROLE, msg.sender
+            ),
+            "Caller is not the owner"
+        );
+        _;
+    }
+
+    /// @dev If doing a fresh deployment, this contract should be deployed AFTER an access control contract has been deployed.
+    function initialize(address accessControl) external initializer {
+        require(accessControl != address(0), "Access control address cannot be zero");
+        bytes32 key = AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey();
+        AddressDirectoryConstants.ACCESS_CONTROL_NAME.getKey().setAddress(accessControl);
+        emit AddressAdded(AddressDirectoryConstants.ACCESS_CONTROL_NAME, key, accessControl);
     }
 
     /// @inheritdoc IEigenDADirectory
@@ -60,6 +83,7 @@ contract EigenDADirectory is OwnableUpgradeable, IEigenDADirectory {
         }
 
         key.setAddress(address(0));
+        AddressDirectoryLib.deregisterKey(name);
 
         emit AddressRemoved(name, key);
     }

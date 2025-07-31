@@ -59,28 +59,41 @@ var (
 	}
 	SubgraphApiBatchMetadataAddrFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "sub-batch-metadata-socket-addr"),
-		//We need the socket address of the subgraph batch metadata api to pull the subgraph data from.
-		Usage:    "the socket address of the subgraph batch metadata api",
+		//We need the URL of the subgraph batch metadata api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph batch metadata api",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_BATCH_METADATA_API_SOCKET_ADDR"),
 		Required: true,
 	}
 	SubgraphApiOperatorStateAddrFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "sub-op-state-socket-addr"),
-		//We need the socket address of the subgraph operator state api to pull the subgraph data from.
-		Usage:    "the socket address of the subgraph operator state api",
+		//We need the URL of the subgraph operator state api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph operator state api",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_OPERATOR_STATE_API_SOCKET_ADDR"),
+		Required: true,
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
+	}
+	SubgraphApiPaymentsAddrFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "sub-payments-socket-addr"),
+		//We need the URL of the subgraph payments api to pull the subgraph data from.
+		Usage:    "the URL of the subgraph payments api",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_PAYMENTS_API_SOCKET_ADDR"),
 		Required: true,
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ServerModeFlag = cli.StringFlag{
@@ -147,8 +160,7 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
 	SubgraphApiOperatorStateAddrFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
+	SubgraphApiPaymentsAddrFlag,
 	PrometheusServerURLFlag,
 	PrometheusServerUsernameFlag,
 	PrometheusServerSecretFlag,
@@ -164,6 +176,9 @@ var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

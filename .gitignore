@@ -1,7 +1,7 @@
 inabox/testdata/*
 inabox/anvil.pid
 
-test/testdata/*
+test/v1/testdata/*
 inabox/resources/kzg/SRSTables/*
 encoding/kzgrs/prover/data/SRSTable/*
 resources/srs/SRSTables/*
@@ -17,8 +17,7 @@ lightnode/docker/args.sh
 .idea
 .env
 .vscode
-.cursor
-.serena
+.claude
 
 icicle/*
 

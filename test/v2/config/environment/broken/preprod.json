@@ -1,0 +1,16 @@
+{
+  "SRSPath": "../../../../resources/srs",
+  "KeyPath": "~/.test-v2/preprod-private-key.txt",
+  "KeyVar": "LIVE_TEST_PREPROD_HOLESKY_KEY",
+  "DisperserHostname": "disperser-preprod-holesky.eigenda.xyz",
+  "EthRPCURLs": [
+    "https://ethereum-holesky-rpc.publicnode.com"
+  ],
+  "BLSOperatorStateRetrieverAddr":          "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7",
+  "EigenDAServiceManagerAddr":              "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
+  "EigenDACertVerifierAddressQuorums0_1":   "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C",
+  "EigenDACertVerifierAddressQuorums0_1_2": "0x2ccB62f3349DD04FEeff189C7f0568193eFd4430",
+  "EigenDACertVerifierAddressQuorums2":     "0xBC23d765540b77803910E65F62BF01a9F8CaB30A",
+  "SubgraphURL": "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
+  "DisableMetrics": true
+}

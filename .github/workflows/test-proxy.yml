@@ -2,14 +2,10 @@ name: test-proxy # this name appears in the badge on the README
 
 on:
   push:
-    branches: ["master"]
-    paths:
-      - "api/proxy/**"
-      - ".github/workflows/per-pr-proxy.yml"
+    branches: 
+      - master
   pull_request:
-    paths:
-      - "api/proxy/**"
-      - ".github/workflows/per-pr-proxy.yml"
+  merge_group:
 
 env:
   MISE_VERSION: 2024.12.14
@@ -30,20 +26,8 @@ jobs:
       - run: make lint
         working-directory: api/proxy
 
-  # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
-  # valid, and allow the proxy to start.
+  # This checks that the flags in .env.example are valid and allow the proxy to start.
   flags:
-    strategy:
-      matrix:
-        env-file:
-          [
-            .env.exampleV1.holesky,
-            .env.exampleV2.holesky,
-            .env.exampleV1AndV2.holesky,
-            .env.exampleV1.sepolia,
-            .env.exampleV2.sepolia,
-            .env.exampleV1AndV2.sepolia,
-          ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +37,7 @@ jobs:
           experimental: true
           working_directory: api/proxy
       - name: Run flag test
-        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
+        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh .env.example
         working-directory: api/proxy
 
   # This ensures that std output generated when running binary with `--help` is reflected in docs/help_out.txt
@@ -120,24 +104,26 @@ jobs:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
 
-  e2e-tests-preprod:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: jdx/mise-action@v2
-        with:
-          version: ${{ env.MISE_VERSION }}
-          experimental: true
-          working_directory: api/proxy
-      - run: go mod download
-        working-directory: api/proxy
-      - run: make test-e2e-preprod
-        working-directory: api/proxy
-        env:
-          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
-          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+  #  TODO: preprod relay and operators no longer expose a public DNS, to minimize egress costs.
+  #        We need to run these tests from inside the cluster, either using a self-hosted runner or k8s cron job live test.
+  # e2e-tests-preprod:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #     - uses: jdx/mise-action@v2
+  #       with:
+  #         version: ${{ env.MISE_VERSION }}
+  #         experimental: true
+  #         working_directory: api/proxy
+  #     - run: go mod download
+  #       working-directory: api/proxy
+  #     - run: make test-e2e-preprod
+  #       working-directory: api/proxy
+  #       env:
+  #         SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
+  #         ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
 
   e2e-tests-sepolia:
     runs-on: ubuntu-latest
@@ -190,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make docker-build
+      - run: BUILD_TAG=dev make docker-build
         working-directory: api/proxy
       # We also test that the docker container starts up correctly.
       - name: Run container as background process

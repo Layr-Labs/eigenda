@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/core"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	mt "github.com/Layr-Labs/eigenda/core/meterer"
@@ -38,21 +37,13 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	// Set default NTP server and interval if not provided
-	if config.NtpServer == "" {
-		config.NtpServer = "pool.ntp.org"
-	}
-	if config.NtpSyncInterval == 0 {
-		config.NtpSyncInterval = 5 * time.Minute
-	}
-
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
 
-	transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	transactor, err := eth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -76,11 +67,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 
 	reg := prometheus.NewRegistry()
-
-	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
-	if err != nil {
-		return fmt.Errorf("failed to create NTP clock: %w", err)
-	}
 
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
@@ -175,7 +161,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			reg,
 			config.MetricsConfig,
-			ntpClock,
 			config.ReservedOnly,
 		)
 		if err != nil {

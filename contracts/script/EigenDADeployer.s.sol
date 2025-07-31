@@ -33,6 +33,7 @@ import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRe
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
+import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
 import {
     DeployOpenEigenLayer,
     ProxyAdmin,
@@ -70,8 +71,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IPaymentVault public paymentVault;
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
+    EigenDAAccessControl public eigenDAAccessControl;
 
     EigenDADirectory public eigenDADirectoryImplementation;
+
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
     EigenDACertVerifierRouter public eigenDACertVerifierRouterImplementation;
@@ -145,13 +148,15 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         emptyContract = new EmptyContract();
 
+        eigenDAAccessControl = new EigenDAAccessControl(addressConfig.eigenLayerCommunityMultisig);
+
         eigenDADirectoryImplementation = new EigenDADirectory();
         eigenDADirectory = EigenDADirectory(
             address(
                 new TransparentUpgradeableProxy(
                     address(eigenDADirectoryImplementation),
                     address(eigenDAProxyAdmin),
-                    abi.encodeWithSelector(EigenDADirectory.initialize.selector, msg.sender)
+                    abi.encodeWithSelector(EigenDADirectory.initialize.selector, address(eigenDAAccessControl))
                 )
             )
         );
@@ -370,7 +375,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             defaultSecurityThresholds,
             hex"0001"
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_V2_NAME, address(legacyEigenDACertVerifier));
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
+        );
 
         eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
@@ -398,7 +405,5 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(eigenDARelayRegistryImplementation),
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
-
-        eigenDADirectory.transferOwnership(addressConfig.eigenLayerCommunityMultisig);
     }
 }

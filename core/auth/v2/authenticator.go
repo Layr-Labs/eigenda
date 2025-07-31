@@ -4,10 +4,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"time"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common/replay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -66,33 +66,21 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
 // The signature is signed over the byte representation of the account ID and requestHash
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
-// Deprecated: Use AuthenticatePaymentStateForAllQuorumsRequest instead.
 func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetPaymentStateRequest) error {
-	return a.authenticatePaymentRequest(accountAddr, request.GetSignature(), request.GetTimestamp())
-}
-
-// AuthenticatePaymentStateForAllQuorumsRequest verifies the signature of the quorum specific payment state request
-// The signature is signed over the byte representation of the account ID and requestHash
-// See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
-func (a *authenticator) AuthenticatePaymentStateForAllQuorumsRequest(accountAddr common.Address, request *pb.GetPaymentStateForAllQuorumsRequest) error {
-	return a.authenticatePaymentRequest(accountAddr, request.GetSignature(), request.GetTimestamp())
-}
-
-// authenticatePaymentRequest is a helper method that handles the common authentication logic for payment requests
-func (a *authenticator) authenticatePaymentRequest(accountAddr common.Address, signature []byte, timestamp uint64) error {
+	sig := request.GetSignature()
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if len(signature) != 65 {
-		return fmt.Errorf("signature length is unexpected: %d", len(signature))
+	if len(sig) != 65 {
+		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
-	requestHash, err := hashing.HashGetPaymentStateRequest(accountAddr, timestamp)
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountAddr, request.GetTimestamp())
 	if err != nil {
 		return fmt.Errorf("failed to hash request: %w", err)
 	}
 	hash := sha256.Sum256(requestHash)
 
 	// Verify the signature
-	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], signature)
+	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}
@@ -107,6 +95,7 @@ func (a *authenticator) authenticatePaymentRequest(accountAddr common.Address, s
 		return errors.New("replay guardian is not configured for payment state requests")
 	}
 
+	timestamp := request.GetTimestamp()
 	if err := a.ReplayGuardian.VerifyRequest(requestHash, time.Unix(0, int64(timestamp))); err != nil {
 		return fmt.Errorf("failed to verify request: %v", err)
 	}

@@ -34,6 +34,7 @@ type Config struct {
 
 	// Configuration for the graph indexer.
 	EthClientConfig               geth.EthClientConfig
+	EigenDADirectory              string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChainStateConfig              thegraph.Config
@@ -49,6 +50,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if len(relayKeys) == 0 {
 		return Config{}, fmt.Errorf("no relay keys specified")
 	}
+
 	config := Config{
 		Log:               *loggerConfig,
 		AWS:               awsClientConfig,
@@ -95,12 +97,16 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				InternalGetProofsTimeout:       ctx.Duration(flags.InternalGetProofsTimeoutFlag.Name),
 				InternalGetCoefficientsTimeout: ctx.Duration(flags.InternalGetCoefficientsTimeoutFlag.Name),
 			},
-			MetricsPort:   ctx.Int(flags.MetricsPortFlag.Name),
-			EnableMetrics: ctx.Bool(flags.EnableMetricsFlag.Name),
-			EnablePprof:   ctx.Bool(flags.EnablePprofFlag.Name),
-			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
+			MetricsPort:           ctx.Int(flags.MetricsPortFlag.Name),
+			EnableMetrics:         ctx.Bool(flags.EnableMetricsFlag.Name),
+			EnablePprof:           ctx.Bool(flags.EnablePprofFlag.Name),
+			PprofHttpPort:         ctx.Int(flags.PprofHttpPortFlag.Name),
+			MaxConnectionAge:      ctx.Duration(flags.MaxConnectionAgeFlag.Name),
+			MaxConnectionAgeGrace: ctx.Duration(flags.MaxConnectionAgeGraceFlag.Name),
+			MaxIdleConnectionAge:  ctx.Duration(flags.MaxIdleConnectionAgeFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
+		EigenDADirectory:              ctx.String(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),

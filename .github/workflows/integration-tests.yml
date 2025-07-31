@@ -4,8 +4,7 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
+  merge_group:
 
 env:
   MISE_VERSION: 2024.12.14
@@ -31,28 +30,16 @@ jobs:
 
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          submodules: recursive
 
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+
       - run: go version
-
-      - name: Update Submodule Commits
-        run: |
-          git submodule update --init --recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Install graph cli
-        run: |
-          yarn global add @graphprotocol/graph-cli@0.51.0
-
-      - name: Get Forge version
-        run: forge --version
+      - run: forge --version
 
       - name: Build contract dependencies
         run: |
@@ -62,27 +49,13 @@ jobs:
         run: |
           cd contracts && forge build
 
-      # TODO: add back DA contracts if we will need them in tests.
-      # - name: Compile contracts
-      #   run: |
-      #     make compile-contracts
+      - run: make integration-tests
 
-      - name: Churner
-        run: go test -v ./operators/churner/tests
+      - run: make fuzz-tests
 
-      - name: Indexer
-        run: go test -v ./core/indexer
+      - run: make integration-tests-inabox
 
-      - name: Node Plugin
-        run: go test -v ./node/plugin/tests
-
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
-
-      - name: Inabox E2E
-        run: make build && cd inabox && make run-e2e
-
-      - name: Save logs
+      - name: Save inabox logs
         if: always()
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
         with:
@@ -91,7 +64,7 @@ jobs:
             inabox/testdata/*/logs/
             inabox/testdata/*/deploy.log
 
-      - name: Send GitHub Action trigger data to Slack workflow
+      - name: Send GitHub Action trigger data to Slack eigenda-pr channel
         if: ${{ failure() }}
         id: slack
         uses: slackapi/slack-github-action@v1.24.0

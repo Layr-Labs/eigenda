@@ -37,12 +37,13 @@ var _ core.Writer = (*Writer)(nil)
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
+	eigendaDirectoryHexAddr string,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Writer, error) {
 
-	r := &Reader{
-		ethClient: client,
-		logger:    logger.With("component", "Reader"),
+	r, err := NewReader(logger, client, eigendaDirectoryHexAddr, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
 	}
 
 	e := &Writer{
@@ -51,11 +52,7 @@ func NewWriter(
 		Reader:    r,
 	}
 
-	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
-
-	return e, err
+	return e, nil
 }
 
 // RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
@@ -120,24 +117,24 @@ func (t *Writer) RegisterOperatorWithChurn(
 
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
 
-	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.OperatorsToChurn))
-	for i := range churnReply.OperatorsToChurn {
-		if churnReply.OperatorsToChurn[i].QuorumId >= core.MaxQuorumID {
+	operatorsToChurn := make([]regcoordinator.IRegistryCoordinatorOperatorKickParam, len(churnReply.GetOperatorsToChurn()))
+	for i := range churnReply.GetOperatorsToChurn() {
+		if churnReply.GetOperatorsToChurn()[i].GetQuorumId() >= core.MaxQuorumID {
 			return errors.New("quorum id is out of range")
 		}
 
 		operatorsToChurn[i] = regcoordinator.IRegistryCoordinatorOperatorKickParam{
-			QuorumNumber: uint8(churnReply.OperatorsToChurn[i].QuorumId),
-			Operator:     gethcommon.BytesToAddress(churnReply.OperatorsToChurn[i].Operator),
+			QuorumNumber: uint8(churnReply.GetOperatorsToChurn()[i].GetQuorumId()),
+			Operator:     gethcommon.BytesToAddress(churnReply.GetOperatorsToChurn()[i].GetOperator()),
 		}
 	}
 
 	var salt [32]byte
-	copy(salt[:], churnReply.SignatureWithSaltAndExpiry.Salt[:])
+	copy(salt[:], churnReply.GetSignatureWithSaltAndExpiry().GetSalt()[:])
 	churnApproverSignature := regcoordinator.ISignatureUtilsSignatureWithSaltAndExpiry{
-		Signature: churnReply.SignatureWithSaltAndExpiry.Signature,
+		Signature: churnReply.GetSignatureWithSaltAndExpiry().GetSignature(),
 		Salt:      salt,
-		Expiry:    new(big.Int).SetInt64(churnReply.SignatureWithSaltAndExpiry.Expiry),
+		Expiry:    new(big.Int).SetInt64(churnReply.GetSignatureWithSaltAndExpiry().GetExpiry()),
 	}
 
 	opts, err := t.ethClient.GetNoSendTransactOpts()

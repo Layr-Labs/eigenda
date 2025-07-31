@@ -1,3 +1,4 @@
+//nolint:funlen // builder functions are expected to be long.
 package builder
 
 import (
@@ -122,7 +123,7 @@ func BuildStoreManager(
 
 	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
 	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
-	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks)
+	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		log.Info("Starting secondary write loop(s)", "count", config.StoreConfig.AsyncPutWorkers)
@@ -281,6 +282,28 @@ func buildEigenDAV2Backend(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
+	}
+	if !isRouter {
+		// We call GetCertVersion to ensure that the cert verifier is of a supported version. See
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol#L12
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/EigenDACertVerifier.sol#L79
+		// We pass in block 0 because a static certVerifierAddress provider is used when not using a router,
+		// so the block number is not relevant.
+		certVersion, err := certVerifier.GetCertVersion(ctx, 0)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to eth-call certVersion(), meaning that you either have network problems with your eth node, or "+
+					"%s is not a CertVerifier version >= V3, which is required by this version of proxy: %w",
+				routerOrImmutableVerifierAddr.Hex(), err)
+		}
+		// Note that we also support certV2s, just not V2 CertVerifiers.
+		// This is because we transform certV2s into certV3s and verified using the CertVerifierV3 contract.
+		// However, the serialization logic, as well as some functions needed during the dispersal path (eg. requiredQuorums),
+		// are only compatible/available with CertVerifier V3, hence the requirement here.
+		if certVersion != 3 {
+			return nil, fmt.Errorf("this version of proxy is only compatible with CertVerifier V3 : cert verifier at address %s is version %d",
+				routerOrImmutableVerifierAddr.Hex(), certVersion)
+		}
 	}
 
 	var retrievers []clients_v2.PayloadRetriever
@@ -521,6 +544,7 @@ func buildEthReader(log logging.Logger,
 	ethReader, err := eth.NewReader(
 		log,
 		ethClient,
+		clientConfigV2.EigenDADirectory,
 		clientConfigV2.BLSOperatorStateRetrieverAddr,
 		clientConfigV2.EigenDAServiceManagerAddr,
 	)
@@ -547,7 +571,6 @@ func buildPayloadDisperser(
 	}
 
 	disperserClient, err := clients_v2.NewDisperserClient(
-		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
 		kzgProver,

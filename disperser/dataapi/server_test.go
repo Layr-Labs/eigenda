@@ -28,6 +28,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,7 +54,7 @@ var (
 
 	serverVersion     = uint(1)
 	mockTx            = &coremock.MockWriter{}
-	metrics           = dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger)
+	metrics           = dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
@@ -73,7 +74,7 @@ var (
 	})
 	_                               = mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	_                               = mockTx.On("GetQuorumCount").Return(uint8(2), nil)
-	testDataApiServer, _            = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	testDataApiServer, _            = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedRequestedAt             = uint64(5567830000000000000)
 	expectedDataLength              = 32
 	expectedBatchId                 = uint32(99)
@@ -501,7 +502,7 @@ func TestFetchUnsignedBatchesHandler(t *testing.T) {
 func TestPortCheckIpValidation(t *testing.T) {
 	assert.Equal(t, false, dataapi.ValidOperatorIP("", mockLogger))
 	assert.Equal(t, false, dataapi.ValidOperatorIP("0.0.0.0:32005", mockLogger))
-	assert.Equal(t, false, dataapi.ValidOperatorIP("10.0.0.1:32005", mockLogger))
+	assert.Equal(t, true, dataapi.ValidOperatorIP("10.0.0.1:32005", mockLogger))
 	assert.Equal(t, false, dataapi.ValidOperatorIP("::ffff:192.0.2.1:32005", mockLogger))
 	assert.Equal(t, false, dataapi.ValidOperatorIP("google.com", mockLogger))
 	assert.Equal(t, true, dataapi.ValidOperatorIP("localhost:32005", mockLogger))

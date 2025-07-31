@@ -119,7 +119,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		return nil, errors.New("lengthProof is not in the subgroup")
 	}
 
-	quorumNumbers := make([]core.QuorumID, len(proto.QuorumNumbers))
+	quorumNumbers := make([]core.QuorumID, len(proto.GetQuorumNumbers()))
 	for i, q := range proto.GetQuorumNumbers() {
 		if q > MaxQuorumID {
 			return nil, errors.New("quorum number exceeds maximum allowed")

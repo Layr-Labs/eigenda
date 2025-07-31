@@ -13,6 +13,8 @@ type Config struct {
 	AsyncPutWorkers int
 	FallbackTargets []string
 	CacheTargets    []string
+
+	WriteOnCacheMiss bool
 }
 
 // checkTargets ... verifies that a backend target slice is constructed correctly
@@ -27,7 +29,7 @@ func (cfg *Config) checkTargets(targets []string) error {
 
 	for _, t := range targets {
 		if common.StringToBackendType(t) == common.UnknownBackendType {
-			return fmt.Errorf("unknown fallback target provided: %s", t)
+			return fmt.Errorf("unknown cache or fallback target provided: %s", t)
 		}
 	}
 

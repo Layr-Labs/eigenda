@@ -222,7 +222,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	operatorOnlineStatusresultsChan <- metadata
 }
 
-// Check that the socketString is not private/unspecified
+// Check that the socketString is invalid or unspecified (private IPs are allowed)
 func ValidOperatorIP(address string, logger logging.Logger) bool {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
@@ -239,7 +239,7 @@ func ValidOperatorIP(address string, logger logging.Logger) bool {
 		logger.Error("IP address is nil", "host", host, "ips", ips)
 		return false
 	}
-	isValid := !ipAddr.IsPrivate() && !ipAddr.IsUnspecified()
+	isValid := !ipAddr.IsUnspecified()
 	logger.Debug("Operator IP validation", "address", address, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
 
 	return isValid
