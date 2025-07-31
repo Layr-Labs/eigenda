@@ -451,6 +451,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
+	LittUnsafePurgeLocksFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
+		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool. The default value is 16.",
@@ -630,6 +636,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	LevelDBDisableSeeksCompactionV1Flag,
 }
 
 func init() {

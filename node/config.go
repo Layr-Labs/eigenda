@@ -136,6 +136,10 @@ type Config struct {
 	// Directories do not need to be on the same filesystem.
 	LittDBStoragePaths []string
 
+	// If true, then purge LittDB locks on startup. Potentially useful to get rid of zombie lock files,
+	// but also dangerous (multiple LittDB processes operating on the same files can lead to data corruption).
+	LittUnsafePurgeLocks bool
+
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
 	GetChunksHotCacheReadLimitMB float64
@@ -393,6 +397,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBReadCacheSizeGB:               ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name),
 		LittDBReadCacheSizeFraction:         ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
 		LittDBStoragePaths:                  ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
+		LittUnsafePurgeLocks:                ctx.GlobalBool(flags.LittUnsafePurgeLocksFlag.Name),
 		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:            ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
