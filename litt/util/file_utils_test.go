@@ -1413,3 +1413,29 @@ func TestDeepDelete(t *testing.T) {
 	require.NoError(t, err, "Failed to check if original non-empty directory exists after deleting symlink")
 	require.True(t, exists, "Original non-empty directory should still exist after failed deletion")
 }
+
+func TestIsDirectory(t *testing.T) {
+	testDir := t.TempDir()
+
+	// non-existent path
+	nonExistentPath := filepath.Join(testDir, "non-existent-dir")
+	isDir, err := IsDirectory(nonExistentPath)
+	require.NoError(t, err, "IsDirectory should not return an error for non-existent path")
+	require.False(t, isDir, "Non-existent path should not be a directory")
+
+	// path is a file
+	filePath := filepath.Join(testDir, "file.txt")
+	err = os.WriteFile(filePath, []byte("test content"), 0644)
+	require.NoError(t, err, "Failed to create test file")
+	isDir, err = IsDirectory(filePath)
+	require.NoError(t, err, "IsDirectory should not return an error for file path")
+	require.False(t, isDir, "File path should not be a directory")
+
+	// path is a directory
+	dirPath := filepath.Join(testDir, "test-dir")
+	err = os.Mkdir(dirPath, 0755)
+	require.NoError(t, err, "Failed to create test directory")
+	isDir, err = IsDirectory(dirPath)
+	require.NoError(t, err, "IsDirectory should not return an error for directory path")
+	require.True(t, isDir, "Directory path should be recognized as a directory")
+}
