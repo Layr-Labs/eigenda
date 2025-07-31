@@ -130,7 +130,7 @@ func (sc *SafeConfig) SetMaxBlobSizeBytes(maxBlobSizeBytes uint64) {
 	sc.config.MaxBlobSizeBytes = maxBlobSizeBytes
 }
 
-func (sc *SafeConfig) GetOverwritePutWithDerivationError() error {
+func (sc *SafeConfig) OverwritePutWithDerivationError() error {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 

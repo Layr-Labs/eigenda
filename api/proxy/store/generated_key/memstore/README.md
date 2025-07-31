@@ -22,7 +22,7 @@ The API consists of GET and PATCH methods on the `/memstore/config` resource.
 ### Get the current configuration
 
 ```bash
-$ curl http://localhost:3100/memstore/config | jq
+curl http://localhost:3100/memstore/config | jq
 {
   "MaxBlobSizeBytes": 16777216,
   "BlobExpiration": "25m0s",
@@ -37,13 +37,13 @@ $ curl http://localhost:3100/memstore/config | jq
 The PATCH request allows to patch the configuration. This allows only sending a subset of the configuration options. The other fields will be left intact.
 
 ```bash
-$ curl -X PATCH http://localhost:3100/memstore/config -d '{"PutReturnsFailoverError": true}'
+curl -X PATCH http://localhost:3100/memstore/config -d '{"PutReturnsFailoverError": true}'
 {"MaxBlobSizeBytes":16777216,"BlobExpiration":"25m0s","PutLatency":"0s","GetLatency":"0s","PutReturnsFailoverError":true}
 ```
 
 One can of course still build a jq pipe to produce the same result (although still using PATCH instead of PUT since that is the only method available):
 ```bash
-$ curl http://localhost:3100/memstore/config | \
+curl http://localhost:3100/memstore/config | \
   jq '.PutLatency = "5s" | .GetLatency = "2s"' | \
   curl -X PATCH http://localhost:3100/memstore/config -d @-
 ```
@@ -63,7 +63,7 @@ The `NullableDerivationError` field supports three states:
 Configure memstore to overwrite a specific derivation error
 
 ```bash
-$ curl -X PATCH http://localhost:3100/memstore/config \
+curl -X PATCH http://localhost:3100/memstore/config \
   -d '{"NullableDerivationError": {"StatusCode": 3, "Msg": "Invalid cert", "Reset": false}}'
 ```
 
@@ -73,7 +73,7 @@ This will cause all future POST request to store the specified derivation error,
 To disable the derivation error behavior and return to normal operation:
 
 ```bash
-$ curl -X PATCH http://localhost:3100/memstore/config \
+curl -X PATCH http://localhost:3100/memstore/config \
   -d '{"NullableDerivationError": {"Reset": true}}'
 ```
 

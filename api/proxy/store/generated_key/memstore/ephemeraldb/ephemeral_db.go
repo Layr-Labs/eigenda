@@ -21,7 +21,7 @@ const (
 // a wrapper around payload with derivation error
 type payloadWithDerivationError struct {
 	payload         []byte
-	derivationError error // the underlying type is coretypes.DerivationError
+	derivationError error // the underlying type is [coretypes.DerivationError]
 }
 
 // DB ... An ephemeral && simple in-memory database used to emulate
@@ -74,7 +74,7 @@ func (db *DB) InsertEntry(key []byte, value []byte) error {
 
 	strKey := string(key)
 
-	derivationError := db.config.GetOverwritePutWithDerivationError()
+	derivationError := db.config.OverwritePutWithDerivationError()
 
 	// disallow any overwrite
 	_, exists := db.store[strKey]
