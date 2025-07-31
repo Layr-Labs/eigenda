@@ -19,6 +19,27 @@ type Config struct {
 	URL string // EigenDA proxy REST API URL
 }
 
+// This is a copy derivation error to avoid cyclic deps
+// see implementation at
+// https://github.com/Layr-Labs/eigenda/blob/e5f489aae34a1f68eb750e0da7ded52c200d7c36/api/clients/v2/coretypes/derivation_errors.go#L20
+// for all possible status codes, see
+// https://github.com/Layr-Labs/eigenda/blob/66834223356d2ed230a8ffbbba13c6bb36d04139/api/clients/v2/coretypes/derivation_errors.go#L73
+type DerivationError struct {
+	StatusCode uint8
+	Msg        string
+}
+
+// See usage at
+// store/generated_key/memstore/memconfig/http_handlers.go [memconfig.NullableDerivationError]
+type NullableDerivationError struct {
+	// Embed the DerivationError directly. Only used when Reset=false.
+	DerivationError
+	// Reset indicates the user's intent:
+	// - true: reset NullableDerivationError to nil (disabled)
+	// - false: set NullableDerivationError to the embedded DerivationError
+	Reset bool `json:"Reset"`
+}
+
 // MemConfig ... contains properties that are used to configure the MemStore's behavior.
 // this is copied directly from /store/generated_key/memstore/memconfig.
 // importing the struct isn't possible since it'd create cyclic dependency loop
@@ -29,6 +50,7 @@ type MemConfig struct {
 	PutLatency              time.Duration
 	GetLatency              time.Duration
 	PutReturnsFailoverError bool
+	NullableDerivationError *NullableDerivationError
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -41,6 +63,7 @@ func (c MemConfig) MarshalJSON() ([]byte, error) {
 		PutLatency:              c.PutLatency.String(),
 		GetLatency:              c.GetLatency.String(),
 		PutReturnsFailoverError: c.PutReturnsFailoverError,
+		NullableDerivationError: c.NullableDerivationError,
 	})
 }
 
@@ -52,6 +75,7 @@ type intermediaryCfg struct {
 	PutLatency              string
 	GetLatency              string
 	PutReturnsFailoverError bool
+	NullableDerivationError *NullableDerivationError
 }
 
 // IntoMemConfig ... converts an intermediary config into a memconfig
@@ -78,6 +102,7 @@ func (cfg *intermediaryCfg) IntoMemConfig() (*MemConfig, error) {
 		PutLatency:              putLatency,
 		GetLatency:              getLatency,
 		PutReturnsFailoverError: cfg.PutReturnsFailoverError,
+		NullableDerivationError: cfg.NullableDerivationError,
 	}, nil
 }
 
