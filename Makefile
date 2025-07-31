@@ -37,7 +37,6 @@ protoc-local:
 
 lint:
 	golangci-lint run
-	go vet ./...
 	# Uncomment this once we update to go1.23 which makes the -diff flag available.
 	# See https://tip.golang.org/doc/go1.23#go-command
 	# go mod tidy -diff
