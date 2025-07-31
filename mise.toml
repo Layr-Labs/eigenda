@@ -24,11 +24,6 @@ yq = "latest"
 # Used by the /preprocess-logs claude code slash command
 ripgrep = "latest"
 
-# Protocol buffer compiler
-protoc = "23.4"
-protoc-gen-go = "v1.28.1"
-protoc-gen-go-grpc = "v1.3.0"
-
 # api/proxy dependencies
 # TODO: we should use these for the rest of test suites in the monorepo.
 "go:go.uber.org/mock/mockgen" = "0.5.0"
@@ -45,5 +40,3 @@ forge = "ubi:foundry-rs/foundry[exe=forge]"
 cast = "ubi:foundry-rs/foundry[exe=cast]"
 anvil = "ubi:foundry-rs/foundry[exe=anvil]"
 yarn = "https://github.com/mise-plugins/mise-yarn"
-protoc-gen-go = "go:google.golang.org/protobuf/cmd/protoc-gen-go"
-protoc-gen-go-grpc = "go:google.golang.org/grpc/cmd/protoc-gen-go-grpc"
