@@ -24,6 +24,9 @@ func unlockCommand(ctx *cli.Context) error {
 }
 
 // Unlocks a LittDB file system.
+//
+// DANGER: calling this method opens the door for unsafe concurrent operations on LittDB files.
+// With great power comes great responsibility.
 func Unlock(logger logging.Logger, sourcePaths []string, fsync bool) error {
 
 	return nil
