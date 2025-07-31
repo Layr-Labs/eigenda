@@ -65,6 +65,9 @@ func StringToBackendType(s string) BackendType {
 	}
 }
 
+// GETOpts defines the options for the Get method of a Store.
+// The values in here are optional query params for the cert GET routes,
+// are parsed in the handlers and passed down to the Store.Get method.
 type GETOpts struct {
 	// L1 block number at which the cert was included in the rollup batcher inbox.
 	// This is optional, and should be set to 0 to mean to skip the RBN recency check.
@@ -81,7 +84,7 @@ type GETOpts struct {
 
 	// When true, the Get method will return the encoded_payload without decoding
 	// it. This is useful when clients need to decode the encoded_payload themselves,
-	// such as inside a fpvm to prove that a decoding fails and can thus be discarded.
+	// such as inside an fpvm to prove that a decoding fails and can thus be discarded.
 	ReturnEncodedPayload bool
 }
 

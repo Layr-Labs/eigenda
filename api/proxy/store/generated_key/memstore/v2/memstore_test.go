@@ -57,5 +57,5 @@ func TestGetSet(t *testing.T) {
 	// Test getting the encoded payload
 	encodedPayload, err := msV2.Get(t.Context(), cert, true)
 	require.NoError(t, err)
-	require.NotEqual(t, expected, encodedPayload) // Should be different
+	require.NotEqual(t, expected, encodedPayload)
 }

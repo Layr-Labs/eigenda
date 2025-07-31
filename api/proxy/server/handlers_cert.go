@@ -91,7 +91,7 @@ func (svr *Server) handleGetShared(
 	}
 
 	// Check if client requested encoded payload
-	// This is currently used by secure integration (e.g. optimism hokulea), which need
+	// This is currently used by secure integrations (e.g. optimism hokulea), which need
 	// to decode the payload themselves inside the fpvm.
 	returnEncodedPayload := parseReturnEncodedPayloadQueryParam(r)
 
