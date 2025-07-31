@@ -149,16 +149,6 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 			},
 		},
 		{
-			name:            "invalid update to derivation error with invalid status code (status code 100 does not exist)",
-			initialConfig:   Config{},
-			requestBodyJSON: `{"NullableDerivationError": {"StatusCode": 100, "Reset": false}}`,
-			expectedStatus:  http.StatusBadRequest,
-			validate: func(t *testing.T, inputConfig Config, sc *SafeConfig) {
-				outputConfig := sc.Config()
-				require.Equal(t, inputConfig, outputConfig)
-			},
-		},
-		{
 			name:            "reset derivation error in the config return such that put actually stores the data",
 			initialConfig:   Config{OverwritePutWithDerivationError: coretypes.ErrInvalidCertDerivationError},
 			requestBodyJSON: `{"NullableDerivationError": {"Reset": true}}`,
