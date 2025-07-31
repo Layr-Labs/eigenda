@@ -44,8 +44,6 @@ type LoadGenerator struct {
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
 	finishedChan chan struct{}
-	// The metrics for the load generator.
-	metrics *loadGeneratorMetrics
 	// Pool of random number generators
 	randPool *sync.Pool
 	// The time when the load generator started.
@@ -108,8 +106,6 @@ func NewLoadGenerator(
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
-	metrics := newLoadGeneratorMetrics(client.GetMetricsRegistry())
-
 	if config.EnablePprof {
 		pprofProfiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", config.PprofHttpPort), client.GetLogger())
 		go pprofProfiler.Start()
@@ -138,7 +134,6 @@ func NewLoadGenerator(
 		alive:                atomic.Bool{},
 		finishedChan:         make(chan struct{}),
 		randPool:             randPool,
-		metrics:              metrics,
 		startTime:            time.Now(),
 		payloadSize:          payloadSize,
 	}, nil
@@ -190,7 +185,11 @@ func (l *LoadGenerator) run() {
 
 		l.lifecycleLimiter <- struct{}{}
 		go func() {
-			l.readAndWriteBlob()
+			if l.config.UseProxy {
+				l.readAndWriteBlobWithProxy()
+			} else {
+				l.readAndWriteBlob()
+			}
 			<-l.lifecycleLimiter
 		}()
 	}
@@ -203,15 +202,16 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	defer l.randPool.Put(randObj) // Return to pool when done
 
 	l.submissionLimiter <- struct{}{}
+
 	blobKey, payload, eigenDACert, err := l.disperseBlob(rand)
 	<-l.submissionLimiter
 	if err != nil {
+		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
 		return
 	}
 
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
-		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
 		return
 	}
@@ -225,7 +225,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	<-l.validatorReadLimiter
 }
 
-// Submits a single blob to the network.
+// Submits a single blob to the network using the GRPC clients.
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
@@ -236,15 +236,10 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 
 	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
 	ctx, cancel := context.WithTimeout(l.ctx, timeout)
-	l.metrics.startOperation("dispersal")
-	defer func() {
-		l.metrics.endOperation("dispersal")
-		cancel()
-	}()
+	defer cancel()
 
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
-		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return nil, nil, nil, err
 	}
@@ -252,23 +247,94 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	// Ensure the eigenDACert is of type EigenDACertV3
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
-		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
 		return nil, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
 	}
 
 	blobKey, err = eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
-		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
 		return nil, nil, nil, err
 	}
 
-	l.metrics.reportDispersalSuccess()
 	return blobKey, payload, eigenDACert, nil
 }
 
-// readBlobFromRelays reads a blob from the relays.
+func (l *LoadGenerator) readAndWriteBlobWithProxy() {
+	// Get a random generator from the pool
+	randObj := l.randPool.Get()
+	rand := randObj.(*random.TestRandom)
+	defer l.randPool.Put(randObj) // Return to pool when done
+
+	l.submissionLimiter <- struct{}{}
+
+	cert, payload, err := l.dispersePayloadWithProxy(rand)
+	<-l.submissionLimiter
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to disperse blob: %w", err)
+		return
+	}
+
+	l.relayReadLimiter <- struct{}{}
+	err = l.doReadsWithProxy(rand, cert, payload)
+	<-l.relayReadLimiter
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to read blob from proxy: %w", err)
+	}
+}
+
+// Disperses a blob using the proxy (as opposed to using the GRPC clients directly). Returns the blob cert in byte
+// form since this is how the proxy forces the user to interact with it.
+func (l *LoadGenerator) dispersePayloadWithProxy(rand *random.TestRandom) (
+	cert []byte,
+	payload []byte,
+	err error,
+) {
+
+	payload = rand.Bytes(int(l.payloadSize))
+
+	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
+
+	cert, err = l.client.DispersePayloadWithProxy(ctx, payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to disperse blob with proxy: %w", err)
+	}
+
+	return cert, payload, nil
+}
+
+// Reads the blob using the proxy client. The proxy may in theory read the blob from the relays or validators, but
+// unless the relays are malfunctioning it will always read from the relays.
+func (l *LoadGenerator) doReadsWithProxy(
+	rand *random.TestRandom,
+	cert []byte,
+	expectedPayload []byte,
+) error {
+
+	var readCount int
+	if l.config.RelayReadAmplification < 1 {
+		if rand.Float64() < l.config.RelayReadAmplification {
+			readCount = 1
+		} else {
+			return nil // Skip reading this time
+		}
+	} else {
+		readCount = int(l.config.RelayReadAmplification)
+	}
+
+	for i := 0; i < readCount; i++ {
+		_, err := l.client.ReadPayloadWithProxy(l.ctx, cert, expectedPayload, 0)
+		if err != nil {
+			return fmt.Errorf("failed to read blob from proxy: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// readBlobFromRelays reads a blob from the relays using the GRPC clients.
 func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
@@ -291,11 +357,6 @@ func (l *LoadGenerator) readBlobFromRelays(
 		relayReadCount = int(l.config.RelayReadAmplification)
 	}
 
-	l.metrics.startOperation("relay_read")
-	defer func() {
-		l.metrics.endOperation("relay_read")
-	}()
-
 	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
 	relayKeys := eigenDACert.RelayKeys()
 	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
@@ -308,16 +369,13 @@ func (l *LoadGenerator) readBlobFromRelays(
 			payload,
 			blobLengthSymbols,
 			0)
-		if err == nil {
-			l.metrics.reportRelayReadSuccess()
-		} else {
-			l.metrics.reportRelayReadFailure()
+		if err != nil {
 			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
 	}
 }
 
-// readBlobFromValidators reads a blob from the validators using the validator retrieval client.
+// readBlobFromValidators reads a blob from the validators using the validator GRPC client.
 func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
 	payload []byte,
@@ -338,14 +396,8 @@ func (l *LoadGenerator) readBlobFromValidators(
 		validatorReadCount = int(l.config.ValidatorReadAmplification)
 	}
 
-	l.metrics.startOperation("validator_read")
-	defer func() {
-		l.metrics.endOperation("validator_read")
-	}()
-
 	blobHeader, err := eigenDACert.BlobHeader()
 	if err != nil {
-		l.metrics.reportValidatorReadFailure()
 		l.client.GetLogger().Errorf("failed to get blob header: %v", err)
 		return
 	}
@@ -360,10 +412,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 			payload,
 			0,
 			validateAndDecode)
-		if err == nil {
-			l.metrics.reportValidatorReadSuccess()
-		} else {
-			l.metrics.reportValidatorReadFailure()
+		if err != nil {
 			l.client.GetLogger().Errorf("failed to read blob from validators: %v", err)
 		}
 	}
