@@ -469,14 +469,14 @@ func (t *Reader) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
-	blockStaleMeasure, err := t.bindings.EigenDAServiceManager.STOREDURATIONBLOCKS(&bind.CallOpts{
+	storeDurationBlocks, err := t.bindings.EigenDAServiceManager.STOREDURATIONBLOCKS(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
 		t.logger.Error("Failed to fetch STORE_DURATION_BLOCKS", err)
 		return *new(uint32), err
 	}
-	return blockStaleMeasure, nil
+	return storeDurationBlocks, nil
 }
 
 // GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
@@ -512,7 +512,7 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 	return state, nil
 }
 
-// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+// GetOperatorStakesWithSocketForQuorums returns the stakes of all operators within the supplied quorums with their socket information. The returned stakes are for the block number supplied.
 // The indices of the operators within each quorum are also returned.
 func (t *Reader) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakesWithSocket, error) {
 	quorumBytes := make([]byte, len(quorums))
