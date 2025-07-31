@@ -8,6 +8,16 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// TODO (cody.littley): convert all commands to use flags stored in these variables
+var (
+	srcFlag = &cli.StringSliceFlag{
+		Name:     "src",
+		Aliases:  []string{"s"},
+		Usage:    "Source paths where the DB data is found, at least one is required.",
+		Required: true,
+	}
+)
+
 // buildCliParser creates a command line parser for the LittDB CLI tool.
 func buildCLIParser(logger logging.Logger) *cli.App {
 	app := &cli.App{
@@ -253,6 +263,15 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 					},
 				},
 				Action: nil, // syncCommand, // TODO this will be added in a follow up PR
+			},
+			{
+				Name:      "unlock",
+				Usage:     "Manually delete LittDB lock files. Dangerous if used improperly, use with caution.",
+				ArgsUsage: "--src <path1> ... --src <pathN>",
+				Flags: []cli.Flag{
+					srcFlag,
+				},
+				Action: unlockCommand,
 			},
 		},
 	}
