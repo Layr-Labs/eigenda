@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
@@ -122,37 +121,6 @@ func (svr *Server) handleGetShared(
 			versionedCert.Version, serializedCertHex, err)
 	}
 	return nil
-}
-
-// Parses the l1_inclusion_block_number query param from the request.
-// Happy path:
-//   - if the l1_inclusion_block_number is provided, it returns the parsed value.
-//
-// Unhappy paths:
-//   - if the l1_inclusion_block_number is not provided, it returns 0 (whose meaning is to skip the check).
-//   - if the l1_inclusion_block_number is provided but isn't a valid integer, it returns an error.
-func parseCommitmentInclusionL1BlockNumQueryParam(r *http.Request) (uint64, error) {
-	l1BlockNumStr := r.URL.Query().Get("l1_inclusion_block_number")
-	if l1BlockNumStr != "" {
-		l1BlockNum, err := strconv.ParseUint(l1BlockNumStr, 10, 64)
-		if err != nil {
-			return 0, proxyerrors.NewL1InclusionBlockNumberParsingError(l1BlockNumStr, err)
-		}
-		return l1BlockNum, nil
-	}
-	return 0, nil
-}
-
-// Parses the return_encoded_payload query parameter from the request.
-// Happy path:
-//   - if the return_encoded_payload query parameter is present (with any value), it returns true
-//   - this means it accepts ?return_encoded_payload, ?return_encoded_payload=true, ?return_encoded_payload=anything
-//
-// Unhappy paths:
-//   - if the return_encoded_payload query parameter is not provided, it returns false
-func parseReturnEncodedPayloadQueryParam(r *http.Request) bool {
-	_, exists := r.URL.Query()["return_encoded_payload"]
-	return exists
 }
 
 // =================================================================================================
