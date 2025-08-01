@@ -16,11 +16,23 @@ jobs:
     steps:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          fetch-depth: 0  # Fetch all history for all branches so golangci-lint can analyze the diff
 
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-      - run: make lint
+      
+      - name: Run linter
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ -n "$PR_BASE" ]; then
+            make lint LINT_BASE_REV=origin/$PR_BASE
+          else
+            make lint
+          fi
+      
       - run: make fmt-check

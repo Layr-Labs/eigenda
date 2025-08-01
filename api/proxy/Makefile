@@ -53,9 +53,6 @@ test-fuzz:
 benchmark:
 	go test -benchmem -run=^$ -bench . ./test/benchmark -test.parallel 4
 
-.PHONY: lint
-lint:
-	golangci-lint run
 
 .PHONY: format
 format:
@@ -80,4 +77,4 @@ op-devnet-allocs:
 deps:
 	mise install
 
-.PHONY: build clean docker-build test lint format benchmark deps mocks
+.PHONY: build clean docker-build test format benchmark deps mocks

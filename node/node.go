@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -95,6 +96,7 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
+// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
 	reg *prometheus.Registry,
 	config *Config,
@@ -198,7 +200,7 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 		}
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{Context: context.Background()})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
 		}
