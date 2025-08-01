@@ -27,6 +27,7 @@
 package fft
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -93,6 +94,10 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 
 // FFTSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings
 func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *FFTSettings {
+	isPowerOf2 := blobLengthSymbols != 0 && (blobLengthSymbols&(blobLengthSymbols-1)) == 0
+	if !isPowerOf2 {
+		panic(fmt.Sprintf("blobLengthSymbols %d is not a power of 2", blobLengthSymbols))
+	}
 	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
 	return NewFFTSettings(maxScale)
 }
