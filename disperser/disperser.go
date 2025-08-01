@@ -123,9 +123,6 @@ func (m *BlobMetadata) GetBlobKey() BlobKey {
 	}
 }
 
-func (m *BlobMetadata) DoThings() {
-}
-
 func (m *BlobMetadata) IsConfirmed() (bool, error) {
 	if m.BlobStatus != Confirmed && m.BlobStatus != Finalized {
 		return false, nil
