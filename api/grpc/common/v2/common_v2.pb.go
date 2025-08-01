@@ -318,153 +318,76 @@ func (x *Batch) GetBlobCertificates() []*BlobCertificate {
 	return nil
 }
 
-// PaymentHeader contains payment information for a blob, which is crucial for validating and processing dispersal requests.
-// The PaymentHeader is designed to support two distinct payment methods within the EigenDA protocol:
+// PaymentHeader contains payment information for a blob. Payments are handled on-chain by the PaymentVault contract:
+// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol
 //
-//  1. Reservation-based payment system:
-//     This system allows users to reserve bandwidth in advance for a specified time period. It's designed for
-//     users who need predictable throughput with a fixed ratelimit bin in required or custom quorums.
-//     Under this method, the user pre-arranges a reservation with specific parameters on the desired quorums:
-//     - symbolsPerSecond: The rate at which they can disperse data
-//     - startTimestamp and endTimestamp: The timeframe during which the reservation is active
+// Two payment methods are supported:
+// 1. Reservation:
+//   - Users reserve bandwidth in advance for a specified time period.
+//   - Reservations are procured out-of-band, and are tracked in the PaymentVault.
 //
-//  2. On-demand payment system:
-//     This is a pay-as-you-go model where users deposit funds into the PaymentVault contract and
-//     payments are deducted as they make dispersal requests. This system is more flexible but has
-//     more restrictions on which quorums can be used (currently limited to quorums 0 and 1).
+// 2. On-demand:
+//   - Users pay for each dispersal individually from funds deposited into the PaymentVault, by specifying a
+//     cumulative payment.
+//   - On-demand payments are limited to quorums 0 and 1.
+//   - On-demand payments can only be used when dispersing through the EigenDA disperser. Currently, the EigenDA
+//     disperser is the *only* disperser, but this restriction will remain in place even with decentralized dispersal.
 //
-// The disperser client always attempts to use a reservation-based payment first if one exists for the account.
-// If no valid reservation exists or if the reservation doesn't have enough remaining bandwidth,
-// the client will fall back to on-demand payment, provided the user has deposited sufficient funds
-// in the PaymentVault contract.
+// The "size" of a dispersal, with respect to payments, is defined as the number of symbols being dispersed, rounded up
+// to the nearest multiple of the minNumSymbols defined in the PaymentVault contract. This size is relevant for both
+// reservation and on-demand dispersals.
 //
-// The distinction between these two payment methods is made by examining:
-// - For reservation-based: The timestamp must be within an active reservation period, and cumulative_payment is zero or empty
-// - For on-demand: The cumulative_payment field contains a non-zero value representing the total payment for all dispersals
+// The cost of an on-demand dispersal is calculated by multiplying this size by the pricePerSymbol defined in the
+// PaymentVault contract.
 //
-// Every dispersal request is metered based on the size of the data being dispersed, rounded up to the
-// nearest multiple of the minNumSymbols parameter defined in the PaymentVault contract. The size is calculated as:
-// symbols_charged = ceiling(blob_size / minNumSymbols) * minNumSymbols
-// On-demand payments take a step further by calculating the specific cost
-// cost = symbols_charged * price_per_symbol
+// Note: the quorum set being dispersed to has no impact on payment accounting with the current implementation.
 //
-// Security and Authentication:
-// The payment header is protected by a cryptographic signature that covers the entire BlobHeader.
-// This signature is verified during request processing to ensure that:
-// 1. The request is genuinely from the holder of the private key corresponding to account_id
-// 2. The payment information hasn't been tampered with
-// 3. The same request isn't being resubmitted (replay protection)
-//
-// This signature verification happens in core/auth/v2/authenticator.go where:
-// - The BlobKey (a hash of the serialized BlobHeader) is computed
-// - The signature is verified against this key
-// - The recovered public key is checked against the account_id in the payment header
-//
-// Once a payment has been processed and the signature verified, the disperser server will not
-// roll back the payment or usage records, even if subsequent processing fails. This design choice
-// prevents double-spending and ensures payment integrity.
+// TODO(litt3): once accounting logic has been properly abstracted, put a link here to provide specific documentation of
+// how payments are processed.
 type PaymentHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The account ID of the disperser client, represented as an Ethereum wallet address in hex format
-	// (e.g., "0x1234...abcd"). This field is critical for both payment methods as it:
+	// The account ID of the dispersing user, represented as an Ethereum wallet address in hex format.
 	//
-	// 1. Identifies whose reservation to check for reservation-based payments
-	// 2. Identifies whose on-chain deposit balance to check for on-demand payments
-	// 3. Provides the address against which the BlobHeader signature is verified
+	// This is the unique key which identifies the reservation to use, or the on-demand payment account to debit.
 	//
-	// The account_id has special significance in the authentication flow:
-	// - When a client signs a BlobHeader, they use their private key
-	// - The disperser server recovers the public key from this signature
-	// - The recovered public key is converted to an Ethereum address
-	// - This derived address must exactly match the account_id in this field
-	//
-	// This verification process (implemented in core/auth/v2/authenticator.go's AuthenticateBlobRequest method)
-	// ensures that only the legitimate owner of the account can submit dispersal requests charged to that account.
-	// It prevents unauthorized payments or impersonation attacks where someone might try to use another
-	// user's reservation or on-chain balance.
-	//
-	// The account_id is typically set by the client's Accountant when constructing the PaymentMetadata
-	// (see api/clients/v2/accountant.go - AccountBlob method).
+	// The account ID must correspond to the key used to sign the dispersal request for the payment to be valid.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// The timestamp represents the UNIX timestamp in nanoseconds at the time the dispersal
-	// request is created. This high-precision timestamp serves multiple critical functions in the protocol:
+	// The timestamp represents the nanosecond UNIX timestamp at the time the dispersal request is created.
 	//
-	// For reservation-based payments:
-	//  1. Reservation Period Determination:
-	//     The timestamp is used to calculate which reservation period the request belongs to using the formula:
-	//     reservation_period = floor(timestamp_ns / (reservationPeriodInterval_s * 1e9)) * reservationPeriodInterval_s
-	//     where reservationPeriodInterval_s is in seconds, and the result is in seconds.
+	// The timestamp plays the role of a nonce, optionally allowing the same blob data to be dispersed multiple times
+	// while still having a unique blob header hash.
 	//
-	//  2. Reservation Validity Check:
-	//     The timestamp must fall within an active reservation window:
-	//     - It must be >= the reservation's startTimestamp (in seconds)
-	//     - It must be < the reservation's endTimestamp (in seconds)
+	// When dealing with reservations, the timestamp determines which reservation bucket the dispersal falls into.
+	// TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a bin algorithm to track
+	// reservation usage. The timestamp is currently used for the bin algorithm, but will not be part of the leaky
+	// bucket algorithm. Even after this change, the timestamp should still be populated.
 	//
-	//  3. Period Window Check:
-	//     The server validates that the request's reservation period is either:
-	//     - The current period (based on server time)
-	//     - The immediately previous period
-	//     This prevents requests with future timestamps or very old timestamps.
-	//
-	//  4. Rate Limiting:
-	//     The server uses the timestamp to allocate the request to the appropriate rate-limiting bucket.
-	//     Each reservation period has a fixed bandwidth limit (symbolsPerSecond * reservationPeriodInterval).
-	//
-	// For on-demand payments:
-	//  1. Replay Protection:
-	//     The timestamp helps ensure each request is unique and prevent replay attacks.
-	//
-	//  2. Global Ratelimiting (TO BE IMPLEMENTED):
-	//     Treating all on-demand requests as an user-agnostic more frequent reservation, timestamp is checked
-	//     against the OnDemandSymbolsPerSecond and OnDemandPeriodInterval.
-	//
-	// The timestamp is typically acquired by calling time.Now().UnixNano() in Go and accounted for NTP offsets
-	// by periodically syncing with a configuratble NTP server endpoint. The client's Accountant component
-	// (api/clients/v2/accountant.go) expects the caller to provide this timestamp, which it then
-	// uses to determine the correct reservation period and check bandwidth availability.
+	// The timestamp is currently unused in the context of on-demand payments, but this is subject to change without
+	// notice! Failure to populate this with a proper timestamp could result in failed dispersals and loss of associated
+	// payments.
 	Timestamp int64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// The cumulative_payment field is a serialized uint256 big integer representing the total amount of tokens
-	// paid by the requesting account across all their dispersal requests, including the current one. The unit is in wei.
-	// This field is exclusively used for on-demand payments and should be zero or empty for reservation-based payments.
-	// If this field is zero or empty, disperser server's meterer will treat this request as reservation-based.
-	// For the current implementation, the choice of quorum doesn't affect the payment calculations. A client may
-	// choose to use any or all of the required quorums.
+	// The cumulative_payment field is a serialized uint256 big integer representing the total wei paid by the account
+	// for this and all previous dispersals.
 	//
-	// Detailed Payment Mechanics:
-	//  1. Cumulative Design:
-	//     Rather than sending incremental payment amounts, the protocol uses a cumulative approach where
-	//     each request states the total amount paid by the account so far. This design:
-	//     - Prevents double-spending even with concurrent requests
-	//     - Simplifies verification logic
-	//     - Requests are enforced by a strictly increasing order
+	// If this field is *not* set, or is zero, reservation accounting will be used. If this field *is* set, and non-zero,
+	// on-demand accounting will be used EVEN IF a given account has a reservation. There is no fallback between these
+	// payment mechanisms: the dispersal will either succeed or fail on the basis of the implicitly defined payment
+	// mechanism, regardless of whether the alternate mechanism would have succeeded.
 	//
-	//  2. Calculation Formula:
-	//     For a new dispersal request, the cumulative_payment is calculated as:
-	//     new_cumulative = previous_cumulative + (symbols_charged * price_per_symbol)
+	// Since the cumulative payment covers all historical on-demand dispersals, a client starting up must obtain the
+	// value of the latest cumulative payment for its account via the GetPaymentState disperser RPC.
 	//
-	//     Where:
-	//     - previous_cumulative: The highest cumulative payment value from previous dispersals
-	//     - symbols_charged: The blob size rounded up to the nearest multiple of minNumSymbols
-	//     - price_per_symbol: The cost per symbol set in the PaymentVault contract
-	//
-	//  3. Validation Process:
-	//     When the disperser receives a request with a cumulative_payment, it performs multiple validations:
-	//     - Checks that the on-chain deposit balance in the PaymentVault is sufficient to cover this payment
-	//     - Verifies the cumulative_payment is greater than the highest previous payment from this account
-	//     - Verifies the increase from the previous cumulative payment is appropriate for the blob size
-	//     - If other requests from the same account are currently processing, ensures this new cumulative
-	//     value is consistent with those (preventing double-spending)
-	//
-	//  4. On-chain Implementation:
-	//     The PaymentVault contract maintains:
-	//     - A deposit balance for each account
-	//     - Global parameters including minNumSymbols, GlobalSymbolsPerSecond and pricePerSymbol
-	//
-	// Due to the use of cumulative payments, if a client loses track of their current cumulative payment value,
-	// they can query the disperser server for their current payment state using the GetPaymentState RPC.
+	// IMPORTANT: With the current implementation, the cumulative payment of dispersals must be strictly increasing from
+	// the perspective of the entity doing the accounting. If a given cumulative payment X is <= the cumulative payment
+	// of a previous dispersal, then X is considered to be invalid. The implication is that a user must not behave in any
+	// way that could result in payments being processed out of order, or risk dispersals failing without refund. In
+	// practice, that means waiting for confirmation from the disperser that a blob has been received before submitting
+	// the next blob.
+	// TODO(litt3): to weaken this requirement, the accounting logic would need to be modified, such that up to `n`
+	// recent on-demand payments are tracked, allowing for safe dispersal of up to `n` concurrent on-demand blobs.
 	CumulativePayment []byte `protobuf:"bytes,3,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 }
 
