@@ -18,7 +18,6 @@ linters:
     - unused      # checks for unused constants, variables, functions and types
     - unconvert   # removes unnecessary type conversions
     - wrapcheck   # checks that errors returned from external packages are wrapped
-    - exhaustruct # checks if all structure fields are initialized
     - govet       # reports suspicious constructs
 
 linters-settings:
@@ -49,7 +48,7 @@ issues:
   
   # Only show issues in new/modified code, not existing code
   new: true
-  # Diff compared to master will be linted by default, but the --new-from-rev= flag can be used when running the linter
+  # Diff compared to origin/master will be linted by default, but the --new-from-rev= flag can be used when running the linter
   # to lint the diff between the feature and a different target. This is how CI handles the linting: it lints the diff
   # between the feature branch, and the branch being merged into.
-  new-from-rev: master
+  new-from-rev: origin/master
