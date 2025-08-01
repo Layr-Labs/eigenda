@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -57,7 +56,6 @@ func TestUnlock(t *testing.T) {
 			return nil
 		}
 		if strings.HasSuffix(path, util.LockfileName) {
-			fmt.Printf("Found lockfile %s\n", path) // TODO
 			lockFileCount++
 		}
 		return nil
