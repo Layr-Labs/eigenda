@@ -18,6 +18,11 @@ var (
 		Usage:    "Source paths where the DB data is found, at least one is required.",
 		Required: true,
 	}
+	forceFlag = &cli.BoolFlag{
+		Name:    "force",
+		Aliases: []string{"f"},
+		Usage:   "Force the operation without prompting for confirmation.",
+	}
 )
 
 // buildCliParser creates a command line parser for the LittDB CLI tool.
@@ -280,9 +285,10 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 			{
 				Name:      "unlock",
 				Usage:     "Manually delete LittDB lock files. Dangerous if used improperly, use with caution.",
-				ArgsUsage: "--src <path1> ... --src <pathN>",
+				ArgsUsage: "--src <path1> ... --src <pathN> [--force]",
 				Flags: []cli.Flag{
 					srcFlag,
+					forceFlag,
 				},
 				Action: unlockCommand,
 			},

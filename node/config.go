@@ -138,6 +138,21 @@ type Config struct {
 
 	// If true, then purge LittDB locks on startup. Potentially useful to get rid of zombie lock files,
 	// but also dangerous (multiple LittDB processes operating on the same files can lead to data corruption).
+	//
+	// When LittDB starts up, it attempts to create lock files. When a validator is forcefully shut down, lock files
+	// may be left behind. At startup time, if LittDB observes existing lock files, it first checks to see
+	// if the process that created the lock files is still running. The lock files contain the creator's PID, and so
+	// LittDB checks to see if there is any process with that PID still running.
+	//
+	// Although it should be rare, it's possible that another process may be started with the same PID as the
+	// PID used to create the lock files. When this happens, LittDB will be prevented from starting up out of
+	// fear of another process trying to access the same files, even though the original process that created the
+	// lock files is no longer running. If that happens, this flag is a safe way to force LittDB to start up
+	// without being blocked by those lock files. BE VERY CERTAIN THAT THE OTHER PROCESS IS ACTUALLY DEAD!
+	// If two instances of LittDB are running on the same files, it WILL lead to data corruption.
+	//
+	// An alternate way to clear the LittDB lock files is via the LittDB CLI with the "litt unlock" command.
+	// Run "litt unlock --help" for more information.
 	LittUnsafePurgeLocks bool
 
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.

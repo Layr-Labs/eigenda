@@ -636,7 +636,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
-	LevelDBDisableSeeksCompactionV1Flag,
+	LittUnsafePurgeLocksFlag,
 }
 
 func init() {

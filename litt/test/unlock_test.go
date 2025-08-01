@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,11 +21,12 @@ import (
 func TestUnlock(t *testing.T) {
 	testDir := t.TempDir()
 	rand := testrandom.NewTestRandom()
-	volumes := []string{path.Join(testDir, "volume1", path.Join(testDir, "volume2"), path.Join(testDir, "volume3"))}
+	volumes := []string{path.Join(testDir, "volume1"), path.Join(testDir, "volume2"), path.Join(testDir, "volume3")}
 
 	config, err := litt.DefaultConfig(volumes...)
 	config.Fsync = false // Disable fsync for faster tests
 	config.TargetSegmentFileSize = 100
+	config.ShardingFactor = uint32(len(volumes))
 	require.NoError(t, err)
 
 	db, err := littbuilder.NewDB(config)
@@ -55,11 +57,13 @@ func TestUnlock(t *testing.T) {
 			return nil
 		}
 		if strings.HasSuffix(path, util.LockfileName) {
+			fmt.Printf("Found lockfile %s\n", path) // TODO
 			lockFileCount++
 		}
 		return nil
 	})
 	require.NoError(t, err)
+	require.Equal(t, 3, lockFileCount)
 
 	// Unlock the DB. This should remove all lock files, but leave other files intact.
 	err = disktable.Unlock(config.Logger, volumes)

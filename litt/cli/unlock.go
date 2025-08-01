@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
@@ -18,6 +21,23 @@ func unlockCommand(ctx *cli.Context) error {
 
 	if len(sources) == 0 {
 		return fmt.Errorf("at least one source path is required")
+	}
+
+	force := ctx.Bool(forceFlag.Name)
+	if !force {
+		magicString := "I know what I am doing"
+		logger.Warnf("About to delete LittDB lock files. This is potentially dangerous. "+
+			"Type \"%s\" to continue, or use "+
+			"the --force flag.", magicString)
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSuffix(input, "\n")
+		if input != magicString {
+			return fmt.Errorf("unlock operation aborted")
+		}
 	}
 
 	return disktable.Unlock(logger, sources)
