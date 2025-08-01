@@ -85,7 +85,7 @@ message Batch {
 // Two payment methods are supported:
 // 1. Reservation:
 //    - Users reserve bandwidth in advance for a specified time period.
-//    - Reservations are procured out-of-band, and are tracked in the PaymentVault.
+//    - Reservations are procured out-of-band, and are set in the PaymentVault by the EigenFoundation.
 // 2. On-demand:
 //    - Users pay for each dispersal individually from funds deposited into the PaymentVault, by specifying a
 //    cumulative payment.
