@@ -26,10 +26,7 @@ func NewPayload(payloadBytes []byte) *Payload {
 // The payloadForm indicates how payloads are interpreted. The form of a payload dictates what conversion, if any, must
 // be performed when creating a blob from the payload.
 func (p *Payload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, error) {
-	encodedPayload, err := newEncodedPayload(p)
-	if err != nil {
-		return nil, fmt.Errorf("encoding payload: %w", err)
-	}
+	encodedPayload := newEncodedPayload(p)
 
 	fieldElements, err := encodedPayload.toFieldElements()
 	if err != nil {
