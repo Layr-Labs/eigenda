@@ -109,7 +109,7 @@ message Batch {
 // TODO(litt3): once accounting logic has been properly abstracted, put a link here to provide specific documentation of
 // how payments are processed.
 message PaymentHeader {
-  // The account ID of the dispersing user, represented as an Ethereum wallet address in hex format.
+  // The account ID of the dispersing user, represented as an Ethereum wallet address in hex format (0x prefix optional)
   //
   // This is the unique key which identifies the reservation to use, or the on-demand payment account to debit.
   //
