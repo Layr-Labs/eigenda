@@ -27,7 +27,7 @@ jobs:
       
       - name: Run linter
         run: |
-          # Use PR base branch if available, otherwise the command line flag is ignored and master is used
-          golangci-lint run --new-from-rev=origin/${{ github.event.pull_request.base.ref || 'master' }}
+          # Use PR base branch if available, otherwise master is used
+          make lint LINT_BASE_REV=origin/${{ github.event.pull_request.base.ref || 'master' }}
       
       - run: make fmt-check
