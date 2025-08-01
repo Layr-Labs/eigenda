@@ -124,6 +124,6 @@ func TestIsPowerOfTwo(t *testing.T) {
 }
 
 func TestSentinelErrors(t *testing.T) {
-	err := &FFTInputNotPowerOfTwoError{}
+	err := &InputNotPowerOfTwoError{inputLen: 44}
 	assert.True(t, errors.Is(err, ErrNotPowerOfTwo))
 }
