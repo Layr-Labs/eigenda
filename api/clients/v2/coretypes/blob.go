@@ -16,7 +16,7 @@ import (
 // A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form
 type Blob struct {
 	coeffPolynomial []fr.Element
-	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the BlobCommitment
+	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the [encoding.BlobCommitments].
 	//
 	// This value must be specified, rather than computed from the length of the coeffPolynomial, due to an edge case
 	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
