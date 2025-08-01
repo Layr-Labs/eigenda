@@ -2,8 +2,12 @@ package memconfig
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // Config contains properties that are used to configure the MemStore's behavior.
@@ -17,6 +21,12 @@ type Config struct {
 	// after sleeping PutLatency duration.
 	// This can be used to simulate eigenda being down.
 	PutReturnsFailoverError bool
+	// if nil, store data from the POST method in the empheral db
+	// if it is set to some derivation error, then the derivation error is stored as opposed
+	// to the data from the POST method in the empheral db
+	// TODO we use Put in the name to be consistent to the name "PutReturnsFailoverError",
+	// but they should have been named as Post from HTTP verb
+	OverwritePutWithDerivationError error
 }
 
 // MarshalJSON implements custom JSON marshaling for Config.
@@ -27,17 +37,19 @@ type Config struct {
 // Patches are reads as ConfigUpdates instead to handle omitted fields.
 func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		MaxBlobSizeBytes        uint64
-		BlobExpiration          string
-		PutLatency              string
-		GetLatency              string
-		PutReturnsFailoverError bool
+		MaxBlobSizeBytes                uint64
+		BlobExpiration                  string
+		PutLatency                      string
+		GetLatency                      string
+		PutReturnsFailoverError         bool
+		OverwritePutWithDerivationError error
 	}{
-		MaxBlobSizeBytes:        c.MaxBlobSizeBytes,
-		BlobExpiration:          c.BlobExpiration.String(),
-		PutLatency:              c.PutLatency.String(),
-		GetLatency:              c.GetLatency.String(),
-		PutReturnsFailoverError: c.PutReturnsFailoverError,
+		MaxBlobSizeBytes:                c.MaxBlobSizeBytes,
+		BlobExpiration:                  c.BlobExpiration.String(),
+		PutLatency:                      c.PutLatency.String(),
+		GetLatency:                      c.GetLatency.String(),
+		PutReturnsFailoverError:         c.PutReturnsFailoverError,
+		OverwritePutWithDerivationError: c.OverwritePutWithDerivationError,
 	})
 }
 
@@ -116,6 +128,36 @@ func (sc *SafeConfig) SetMaxBlobSizeBytes(maxBlobSizeBytes uint64) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	sc.config.MaxBlobSizeBytes = maxBlobSizeBytes
+}
+
+func (sc *SafeConfig) OverwritePutWithDerivationError() error {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+
+	return sc.config.OverwritePutWithDerivationError
+}
+
+func (sc *SafeConfig) SetOverwritePutWithDerivationError(inputError error) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	// both dynamic type and value are nil, i.e there is no error
+	if inputError == nil {
+		sc.config.OverwritePutWithDerivationError = nil
+		return nil
+	}
+
+	// cast into an DerivationError
+	var derivationError coretypes.DerivationError
+	if !errors.As(inputError, &derivationError) {
+		return fmt.Errorf("unable to cast error into an DerivationError: %w", inputError)
+	}
+
+	derivationError.Validate()
+
+	sc.config.OverwritePutWithDerivationError = derivationError
+
+	return nil
 }
 
 func (sc *SafeConfig) Config() Config {
