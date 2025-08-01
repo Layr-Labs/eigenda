@@ -35,6 +35,7 @@ protoc:
 protoc-local:
 	$(MAKE) -C api protoc-local
 
+# Only lints the diff between current branch and master because of settings in .golangci.yml
 lint:
 	golangci-lint run
 	# Uncomment this once we update to go1.23 which makes the -diff flag available.
