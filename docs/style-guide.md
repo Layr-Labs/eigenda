@@ -25,18 +25,15 @@ for human engineers, and to provide AI agents with a checklist for code review.
 
 1. Return errors explicitly; don't panic except for unrecoverable errors, where returning an error is not plausible.
    - Exceptions may be made for test code, where returning an error adds more complexity than benefit.
-2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context.
-   - Ensure that `%w` is used for error wrapping, *not* `%v`.
 
 ### 3. Code Documentation
 
-1. Document all exported functions/types in production code.
-2. Document unexported functions/types that contain non-trivial logic.
+1. Functions/types that contain non-trivial logic should be documented.
    - A good rule of thumb: if you can't understand everything there is to know about a function/type by its *name*,
    you should write a doc.
-3. Function/type docs should NOT simply be a rephrasing of the function/type name.
+2. Function/type docs should NOT simply be a rephrasing of the function/type name.
    - E.g. the doc for `computeData` should NOT be "Computes the data".
-4. Function docs should consider the following helpful information, if relevant:
+3. Function docs should consider the following helpful information, if relevant:
    - What are the inputs?
    - Are there any restrictions on what the input values are permitted to be?
    - What is returned in the standard case?
@@ -44,7 +41,27 @@ for human engineers, and to provide AI agents with a checklist for code review.
    - What side effects does calling the function have?
    - Are there any performance implications that users should be aware of?
    - Are there any performance optimizations that should/could be undertaken in the future?
-5. TODO comments should be added to denote future work.
+   - Documented function example:
+   ```go
+   // This preceding comment describes the function in detail, and isn't simply a rephrasing of the function name
+   //
+   // It contains the sort of information listed in `3.4`.
+   //
+   // It describes what is returned.
+   func FunctionName(
+      // common parameters like context, testing, and logger don't require documentation,
+      // unless they're being used in an unusual way
+      ctx context.Context,
+      // similarly, documentation *may* be omitted for parameters with blatantly obvious purpose
+      enabled bool,
+      // parameters without blatantly obvious purpose should contain helpful documentation which isn't just a
+      // rephrasing of the parameter name
+      param1 int,
+      ) error {
+         // ...
+   }
+   ```
+4. TODO comments should be added to denote future work.
    - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
    can understand.
    - TODO comments that must be addressed *prior* to merging a PR should clearly be marked,
@@ -57,14 +74,15 @@ for human engineers, and to provide AI agents with a checklist for code review.
 Proper spelling and grammar are important, because they help keep code and documentation unambiguous, easy to read, 
 and professional. They should be checked and carefully maintained.
 
-1. Overly strict adherence to arbitrary grammar "rules" that don't impact readability is not beneficial. Some 
-   examples of "rules" that shouldn't be enforced or commented on are:
-   - "Don't end a sentence with a preposition"
-   - "Never split the infinitive"
-   - "Don't use passive voice"
-   - "Always spell out numbers"
-   - "Don't begin a sentence with 'And', 'But', or 'Because'"
-   - Perfect canonical comma usage
+1. Overly strict adherence to arbitrary grammar and spelling "rules" that don't impact readability is not beneficial.
+   This list isn't exhaustive, but here are some examples of rules you shouldn't try to enforce:
+   - "Don't end a sentence with a preposition" (sentences in natural language often end in prepositions)
+   - "Don't use passive voice" (passive voice is sometimes the correct choice)
+   - "Always spell out numbers" ('5' and 'five' are equally readable)
+   - "Don't begin a sentence with 'And', 'But', or 'Because'" (this doesn't hinder readability)
+   - "Use perfectly canonical commas" (different people use commas differently)
+   - "Use 'okay' instead of 'ok'" (both spellings are ok)
+   - "Don't use contractions" (contractions are perfectly valid, and frequently used)
 2. Some things are technically correct grammatically, yet hinder readability. Despite being "grammatically correct",
    the following things should not be tolerated:
    - Sentences with ambiguous interpretations
@@ -82,6 +100,7 @@ Good code has good names. Bad names yield bad code.
    - `i` -> `nodeIndex`
    - `req` -> `dispersalRequest`
    - `status` -> `operatorStatus`
+   - An exception is made for golang receiver names, which are permitted to be a *single character* by convention
 2. Consistency is key. A single concept should have a single term, ideally across the entire codebase.
    - The exception here is with local scoping. E.g. if you have an `OperatorId` throughout the codebase, it would be
    reasonable to refer to it as an `id` inside the `Operator` struct.
@@ -129,6 +148,9 @@ Good code has good names. Bad names yield bad code.
 3. Place the most important functions at the top of the file.
 4. Public static functions that lack a tight coupling to a specific struct (e.g. a constructor) should be placed in
 files with a `_utils` suffix.
+5. Don't export things that don't need to be exported
+   - Member variables should almost always be unexported
+   - Structs, interfaces, and constants should only be exported if necessary
 
 ### 7. Defensive Coding
 
