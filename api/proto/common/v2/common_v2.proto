@@ -78,7 +78,8 @@ message Batch {
   repeated BlobCertificate blob_certificates = 2;
 }
 
-// PaymentHeader contains payment information for a blob. Payments are handled on-chain by the PaymentVault contract:
+// PaymentHeader contains payment information for a blob. Reservation parameters and on-demand deposits are tracked
+// on-chain in the PaymentVault contract:
 // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol
 //
 // Two payment methods are supported:
@@ -100,6 +101,11 @@ message Batch {
 // PaymentVault contract.
 //
 // Note: the quorum set being dispersed to has no impact on payment accounting with the current implementation.
+//
+// TODO(litt3): the current payment usage source-of-truth is the EigenDA disperser: reservation usage and latest
+// cumulative payment is persistently stored there. Once decentralized dispersal has been implemented, the validator
+// nodes will become the source-of-truth for reservation usage, but the EigenDA disperser will remain the
+// source-of-truth for on-demand usage.
 //
 // TODO(litt3): once accounting logic has been properly abstracted, put a link here to provide specific documentation of
 // how payments are processed.
