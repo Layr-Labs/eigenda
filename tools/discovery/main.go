@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -35,7 +36,8 @@ That address can be overridden by providing the --%s flag.`,
 			proxycmn.SepoliaTestnetEigenDANetwork,
 			discoverAddressFlag.Name,
 		),
-		EnvVars: []string{"NETWORK"},
+		Required: true,
+		EnvVars:  []string{"NETWORK"},
 		Action: func(ctx *cli.Context, v string) error {
 			if v == "" {
 				// if no network is provided, we will try to auto-detect it from the chain ID
@@ -44,7 +46,11 @@ That address can be overridden by providing the --%s flag.`,
 			// try to parse the network from the string.
 			// this will validate the network and return an error if it's invalid.
 			_, err := proxycmn.EigenDANetworkFromString(v)
-			return err
+			if err != nil {
+				return fmt.Errorf("flag validation: %w", err)
+
+			}
+			return nil
 		},
 	}
 	discoverAddressFlag = &cli.StringFlag{
@@ -90,57 +96,28 @@ func main() {
 func discoverAddresses(ctx *cli.Context) error {
 	outputFormat := strings.ToLower(ctx.String(outputFormatFlag.Name))
 	rpcURL := ctx.String(ethRpcUrlFlag.Name)
+	network, err := proxycmn.EigenDANetworkFromString(ctx.String(networkFlag.Name))
+	if err != nil {
+		return err
+	}
 
 	// Simple logging
 	logger := log.New(os.Stderr, "[discovery] ", log.LstdFlags)
 
-	// Connect to Ethereum
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
 		return fmt.Errorf("dial Ethereum node at %s: %w", rpcURL, err)
 	}
 	logger.Printf("Connected to Ethereum node at %s", rpcURL)
+	validateNetworkAndEthRpcChainIDMatch(ctx.Context, network, client)
 
 	directoryAddr := ctx.String(discoverAddressFlag.Name)
-	// cases:
-	// 1. directory address: use it directly
-	// 2. no directory address, but network provided: use the default directory address for the network
-	// 3. no directory address and no network: use the default network for the chainID
 	if directoryAddr == "" {
-		logger.Printf("No directory address provided, attempting to auto-detect.")
-		networkName := ctx.String(networkFlag.Name)
-		var network proxycmn.EigenDANetwork
-		if networkName != "" {
-			logger.Printf("network %s provided, attempting to use default directory address.", networkName)
-			network, err = proxycmn.EigenDANetworkFromString(ctx.String(networkFlag.Name))
-			if err != nil {
-				return err
-			}
-		} else {
-			logger.Printf("No network provided, attempting to auto-detect EigenDADirectory address from chain ID.")
-			chainID, err := client.ChainID(ctx.Context)
-			if err != nil {
-				return fmt.Errorf("chainID call: %w", err)
-			}
-			if chainID == nil {
-				return fmt.Errorf("received nil chainID from Ethereum client")
-			}
-			networks, err := proxycmn.EigenDANetworksFromChainID(chainID.String())
-			if err != nil {
-				return fmt.Errorf("EigenDANetworksFromChainID: %w", err)
-			}
-			network = networks[0]
-			if len(networks) > 1 {
-				logger.Printf("Multiple EigenDA networks found for chain ID %s: %v. Using the first one: %s", chainID, networks, network)
-			} else {
-				logger.Printf("Auto-detected EigenDA network from chain ID %s: %s", chainID, network)
-			}
-		}
 		directoryAddr, err = network.GetEigenDADirectory()
 		if err != nil {
 			return fmt.Errorf("GetEigenDADirectory: %w", err)
 		}
-		logger.Printf("Auto-detected EigenDADirectory address %s for network %s", directoryAddr, network)
+		logger.Printf("No explicit directory address provided, auto-detected EigenDADirectory address %s for network %s", directoryAddr, network)
 	}
 
 	// Validate directory address
@@ -203,4 +180,23 @@ func printJSON(addressMap map[string]gethcommon.Address) {
 		i++
 	}
 	fmt.Println("]")
+}
+
+func validateNetworkAndEthRpcChainIDMatch(ctx context.Context, network proxycmn.EigenDANetwork, client *ethclient.Client) {
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		log.Fatalf("Failed to get chain ID from Ethereum client: %v", err)
+	}
+	if chainID == nil {
+		log.Fatal("Received nil chain ID from Ethereum client")
+	}
+
+	expectedNetwork, err := proxycmn.EigenDANetworksFromChainID(chainID.String())
+	if err != nil {
+		log.Fatalf("Failed to get expected network from chain ID: %v", err)
+	}
+	if !slices.Contains(expectedNetwork, network) {
+		log.Fatalf("Network mismatch: provided network %s is not part of the networks %v for chain ID %s",
+			network, expectedNetwork, chainID.String())
+	}
 }
