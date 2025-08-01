@@ -101,7 +101,7 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayl
 	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
-		payloadElements, err = b.computeEvalPoly()
+		payloadElements, err = b.toEvalPoly()
 		if err != nil {
 			return nil, fmt.Errorf("compute eval poly: %w", err)
 		}
@@ -122,8 +122,8 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayl
 	return encodedPayload, nil
 }
 
-// computeEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
-func (b *Blob) computeEvalPoly() ([]fr.Element, error) {
+// toEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
+func (b *Blob) toEvalPoly() ([]fr.Element, error) {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
