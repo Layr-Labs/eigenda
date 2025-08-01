@@ -17,15 +17,54 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const (
-	ethRpcUrlFlagName        = "eth-rpc-url"
-	NetworkFlagName          = "network"
-	directoryAddressFlagName = "directory-address"
-	outputFormatFlagName     = "output-format"
-)
-
 var (
+	ethRpcUrlFlag = &cli.StringFlag{
+		Name:     "eth-rpc-url",
+		Usage:    "Ethereum RPC URL",
+		EnvVars:  []string{"ETH_RPC_URL"},
+		Required: true,
+	}
+	networkFlag = &cli.StringFlag{
+		Name: "network",
+		Usage: fmt.Sprintf(`The EigenDA network to discover (one of: %s, %s, %s, %s).
+Must match the chain-id of the ethereum rpc url provided. Used to select the hardcoded default EigenDADirectory address.
+That address can be overridden by providing the --%s flag.`,
+			proxycmn.MainnetEigenDANetwork,
+			proxycmn.HoleskyTestnetEigenDANetwork,
+			proxycmn.HoleskyPreprodEigenDANetwork,
+			proxycmn.SepoliaTestnetEigenDANetwork,
+			discoverAddressFlag.Name,
+		),
+		EnvVars: []string{"NETWORK"},
+		Action: func(ctx *cli.Context, v string) error {
+			if v == "" {
+				// if no network is provided, we will try to auto-detect it from the chain ID
+				return nil
+			}
+			// try to parse the network from the string.
+			// this will validate the network and return an error if it's invalid.
+			_, err := proxycmn.EigenDANetworkFromString(v)
+			return err
+		},
+	}
+	discoverAddressFlag = &cli.StringFlag{
+		Name:    "directory-address",
+		Usage:   "EigenDADirectory contract address (overrides the default network address)",
+		EnvVars: []string{"EIGENDA_DIRECTORY_ADDRESS"},
+	}
 	validOutputFormats = []string{"table", "csv", "json"}
+	outputFormatFlag   = &cli.StringFlag{
+		Name:    "output-format",
+		Usage:   fmt.Sprintf("Output format. Must be one of: %v", validOutputFormats),
+		Value:   "table",
+		EnvVars: []string{"OUTPUT_FORMAT"},
+		Action: func(ctx *cli.Context, v string) error {
+			if !slices.Contains(validOutputFormats, strings.ToLower(v)) {
+				return fmt.Errorf("invalid output format: %s. Must be one of: %v", v, validOutputFormats)
+			}
+			return nil
+		},
+	}
 )
 
 func main() {
@@ -36,56 +75,12 @@ func main() {
 	app.Name = "eigenda-directory"
 	app.Usage = "EigenDA Directory Contract Address Discovery Tool"
 	app.Description = "Tool for fetching all contract addresses from the EigenDADirectory contract on a specified EigenDA network."
-
 	app.Flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:     ethRpcUrlFlagName,
-			Usage:    "Ethereum RPC URL",
-			EnvVars:  []string{"ETH_RPC_URL"},
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name: NetworkFlagName,
-			Usage: fmt.Sprintf(`The EigenDA network to discover (one of: %s, %s, %s, %s).
-Must match the chain-id of the ethereum rpc url provided. Used to select the hardcoded default EigenDADirectory address.
-That address can be overridden by providing the --%s flag.`,
-				proxycmn.MainnetEigenDANetwork,
-				proxycmn.HoleskyTestnetEigenDANetwork,
-				proxycmn.HoleskyPreprodEigenDANetwork,
-				proxycmn.SepoliaTestnetEigenDANetwork,
-				directoryAddressFlagName,
-			),
-			EnvVars: []string{"NETWORK"},
-			Action: func(ctx *cli.Context, v string) error {
-				if v == "" {
-					// if no network is provided, we will try to auto-detect it from the chain ID
-					return nil
-				}
-				// try to parse the network from the string.
-				// this will validate the network and return an error if it's invalid.
-				_, err := proxycmn.EigenDANetworkFromString(v)
-				return err
-			},
-		},
-		&cli.StringFlag{
-			Name:    directoryAddressFlagName,
-			Usage:   "EigenDADirectory contract address (overrides the default network address)",
-			EnvVars: []string{"EIGENDA_DIRECTORY_ADDRESS"},
-		},
-		&cli.StringFlag{
-			Name:    outputFormatFlagName,
-			Usage:   fmt.Sprintf("Output format. Must be one of: %v", validOutputFormats),
-			Value:   "table",
-			EnvVars: []string{"OUTPUT_FORMAT"},
-			Action: func(ctx *cli.Context, v string) error {
-				if !slices.Contains(validOutputFormats, strings.ToLower(v)) {
-					return fmt.Errorf("invalid output format: %s. Must be one of: %v", v, validOutputFormats)
-				}
-				return nil
-			},
-		},
+		ethRpcUrlFlag,
+		networkFlag,
+		discoverAddressFlag,
+		outputFormatFlag,
 	}
-
 	app.Action = discoverAddresses
 	if err := app.Run(os.Args); err != nil {
 		log.Fatalf("application failed: %v", err)
@@ -93,8 +88,8 @@ That address can be overridden by providing the --%s flag.`,
 }
 
 func discoverAddresses(ctx *cli.Context) error {
-	outputFormat := strings.ToLower(ctx.String(outputFormatFlagName))
-	rpcURL := ctx.String(ethRpcUrlFlagName)
+	outputFormat := strings.ToLower(ctx.String(outputFormatFlag.Name))
+	rpcURL := ctx.String(ethRpcUrlFlag.Name)
 
 	// Simple logging
 	logger := log.New(os.Stderr, "[discovery] ", log.LstdFlags)
@@ -106,18 +101,18 @@ func discoverAddresses(ctx *cli.Context) error {
 	}
 	logger.Printf("Connected to Ethereum node at %s", rpcURL)
 
-	directoryAddr := ctx.String(directoryAddressFlagName)
+	directoryAddr := ctx.String(discoverAddressFlag.Name)
 	// cases:
 	// 1. directory address: use it directly
 	// 2. no directory address, but network provided: use the default directory address for the network
 	// 3. no directory address and no network: use the default network for the chainID
 	if directoryAddr == "" {
 		logger.Printf("No directory address provided, attempting to auto-detect.")
-		networkName := ctx.String(NetworkFlagName)
+		networkName := ctx.String(networkFlag.Name)
 		var network proxycmn.EigenDANetwork
 		if networkName != "" {
 			logger.Printf("network %s provided, attempting to use default directory address.", networkName)
-			network, err = proxycmn.EigenDANetworkFromString(ctx.String(NetworkFlagName))
+			network, err = proxycmn.EigenDANetworkFromString(ctx.String(networkFlag.Name))
 			if err != nil {
 				return err
 			}
