@@ -54,7 +54,7 @@ EigenDA blob derivation requires three pre‑images:
 
 Keys of the preimages are `keccak256(address)` of the [reserved addresses](https://github.com/Layr-Labs/hokulea/tree/master/docs) (prefixed as *type 3* per the [OP spec](https://specs.optimism.io/fault-proof/index.html#type-3-global-generic-key)).
 
-The preimage and relation between (key-value) pair can be specified by an upgradeable contract that:
+The preimage and relation between (key-value) pair can be specified by a contract that:
 
 - stores the recency‑window parameter as the preimage;  
 - uses **certVerifier Router** to establish the validity of the DA certificate, the preimage is a boolean;  
