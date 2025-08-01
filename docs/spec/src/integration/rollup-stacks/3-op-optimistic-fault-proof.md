@@ -1,4 +1,4 @@
-# OP Optimistic Fault Proof
+# OP Optimistic Fault Proof with Cannon
 
 This document explains how to integrate **EigenDA** blob derivation (via **Hokulea**) into the OP derivation pipeline and secure it with the default OP Fault‑Proof VM (FPVM).
 
