@@ -7,6 +7,11 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
+struct ABNConfig {
+    uint32 blockNumber;
+    address certVerifier;
+}
+
 /**
  * @title CertVerifierRouterDeployer
  * @notice Deployment script for upgradable EigenDACertVerifierRouter
@@ -26,7 +31,8 @@ contract CertVerifierRouterDeployer is Script, Test {
     // Configuration parameters
     address initialOwner;
     address proxyAdmin;
-    address initialCertVerifier;
+    uint32[] initABNs;
+    address[] initCertVerifiers;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1. Read the configuration from the JSON input file
@@ -34,14 +40,9 @@ contract CertVerifierRouterDeployer is Script, Test {
         string memory configData = vm.readFile(configPath);
 
         // Parse configuration parameters
-        bytes memory raw = stdJson.parseRaw(configData, ".initialOwner");
-        initialOwner = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(configData, ".initialCertVerifier");
-        initialCertVerifier = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(configData, ".proxyAdmin");
-        proxyAdmin = abi.decode(raw, (address));
+        initialOwner = stdJson.readAddress(configData, ".initialOwner");
+        setABNConfigs(configData);
+        proxyAdmin = stdJson.readAddress(configData, ".proxyAdmin");
 
         // 2. Deploy the implementation and proxy contracts
         vm.startBroadcast();
@@ -50,13 +51,10 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         // Deploy proxy and initialize in one step
         bytes memory initData =
-            abi.encodeWithSignature("initialize(address,address)", initialOwner, initialCertVerifier);
+            abi.encodeCall(EigenDACertVerifierRouter.initialize, (initialOwner, initABNs, initCertVerifiers));
 
         TransparentUpgradeableProxy proxy =
-            new TransparentUpgradeableProxy(address(implementation), address(tx.origin), initData);
-
-        // 3. Transfer proxy admin to the specified address
-        proxy.changeAdmin(proxyAdmin);
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
 
         vm.stopBroadcast();
 
@@ -69,5 +67,14 @@ contract CertVerifierRouterDeployer is Script, Test {
         finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouterImplementation", address(implementation));
 
         vm.writeJson(finalJson, outputPath);
+    }
+
+    function setABNConfigs(string memory configData) internal {
+        bytes memory raw = stdJson.parseRaw(configData, ".initABNConfigs");
+        ABNConfig[] memory configs = abi.decode(raw, (ABNConfig[]));
+        for (uint256 i; i < configs.length; i++) {
+            initABNs[i] = configs[i].blockNumber;
+            initCertVerifiers[i] = configs[i].certVerifier;
+        }
     }
 }
