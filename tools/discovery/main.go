@@ -127,7 +127,7 @@ func discoverAddresses(ctx *cli.Context) error {
 			}
 			networks, err := proxycmn.EigenDANetworksFromChainID(chainID.String())
 			if err != nil {
-				return fmt.Errorf("DefaultEigenDANetworkFromChainID (chainid: %s): %w", chainID, err)
+				return fmt.Errorf("EigenDANetworksFromChainID: %w", err)
 			}
 			network = networks[0]
 			if len(networks) > 1 {
