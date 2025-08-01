@@ -6,21 +6,39 @@ run:
 
 linters:
   enable:
-    - protogetter # reports direct reads from proto message fields when getters should be used.
-  # Right now revive raises 50+ issues, whereas golint didn't have any.
-  # despite revive being recommended as a replacement for golint.
-  # TODO: should we turn on revive and fix the issues?
-  #     - revive # drop-in replacement for golint
-  exclusions:
-    rules:
-      - linters:
-          - staticcheck
-        # https://staticcheck.dev/docs/checks#QF1008
-        # There were lots of this error and I didn't feel like fixing them all.
-        text: "QF1008"
-      - linters:
-          - staticcheck
-        # https://staticcheck.dev/docs/checks#QF1003
-        # We have a lot of these and I don't want to fix them all.
-        # Also doesn't feel like a big deal.
-        text: "QF1003"
+    - protogetter # reports direct reads from proto message fields when getters should be used
+    - lll         # enforces line length limits
+    - errorlint   # makes sure errors are wrapped correctly
+    - misspell    # checks for common misspellings
+    - nestif      # limits nesting depth
+    - exhaustive  # makes sure enum switch statements are exhaustive
+    - errcheck    # enforces that all errors are checked
+    - unused      # checks for unused constants, variables, functions and types
+    - unconvert   # removes unnecessary type conversions
+    - wrapcheck   # checks that errors returned from external packages are wrapped
+    - govet       # reports suspicious constructs
+
+linters-settings:
+  lll:
+    line-length: 120
+  errorlint:
+    # Check whether fmt.Errorf uses the %w verb for formatting errors
+    errorf: true
+
+issues:
+  # Allow certain patterns to be ignored by lll (long lines)
+  # This should probably be 120 to match our lll rule, but there is a weird interaction which an external contributor
+  # hit. The bug was a string smaller than 120, but with key + string made the line bigger than 120, which invalidated
+  # the exclusion rule.
+  exclude-rules:
+    - source: '".{100,}"' # ignores double-quoted strings longer than 100 chars
+      linters: [lll]
+    - source: "// https?://" # pattern matches comments containing URLs
+      linters: [lll]
+  
+  # Only show issues in new/modified code, not existing code
+  new: true
+  # Diff compared to origin/master will be linted by default, but the --new-from-rev= flag can be used when running the linter
+  # to lint the diff between the feature and a different target. This is how CI handles the linting: it lints the diff
+  # between the feature branch, and the branch being merged into.
+  new-from-rev: origin/master
