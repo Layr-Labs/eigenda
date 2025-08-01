@@ -65,6 +65,9 @@ type Reader struct {
 
 var _ core.Reader = (*Reader)(nil)
 
+// TODO: take a ctx since we possibly do contract calls in here.
+// Or even better don't pass directory here, do the contract calls outside of the reader just
+// pass in the stateRetriever and service manager addresses.
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
@@ -86,12 +89,12 @@ func NewReader(
 			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 		}
 
-		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress()
+		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress(&bind.CallOpts{})
 		if err != nil {
 			return nil, err
 		}
 
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{})
 		if err != nil {
 			return nil, err
 		}
