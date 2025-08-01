@@ -23,7 +23,7 @@ type Proof = bn254.G1Affine
 // Symbol is a symbol in the field used for polynomial commitments
 type Symbol = fr.Element
 
-// BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
+// BlobCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
 	Commitment       *G1Commitment `json:"commitment"`
 	LengthCommitment *G2Commitment `json:"length_commitment"`
