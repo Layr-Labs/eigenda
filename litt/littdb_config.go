@@ -156,6 +156,11 @@ type Config struct {
 	// of database snapshots. Failing to clean up the hard linked files referenced by the symlinks will result in a
 	// disk space leak.
 	SnapshotDirectory string
+
+	// If true, then purge all lock files prior to starting the database. This is potentially dangerous, as it will
+	// permit multiple databases to be opened against the same data directories. If ever there are two LittDB
+	// instances running against the same data directories, data corruption is almost a certainty.
+	PurgeLocks bool
 }
 
 // DefaultConfig returns a Config with default values.
@@ -197,6 +202,7 @@ func DefaultConfigNoPaths() *Config {
 		MetricsNamespace:         "litt",
 		MetricsPort:              9101,
 		MetricsUpdateInterval:    time.Second,
+		PurgeLocks:               false,
 	}
 }
 
