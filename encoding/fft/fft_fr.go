@@ -24,9 +24,42 @@
 package fft
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+)
+
+// InputNotPowerOfTwoError is an error that indicates that the input to the FFT is not a power of two.
+type InputNotPowerOfTwoError struct {
+	inputLen uint64
+}
+
+func (e *InputNotPowerOfTwoError) Error() string {
+	return fmt.Sprintf("(I)FFT input length %d is not a power of two", e.inputLen)
+}
+
+// Is checks if the error is an InputNotPowerOfTwoError.
+// It is implemented to allow errors.Is to work with this error type,
+// so that we can use the sentinel as errors.Is(err, ErrNotPowerOfTwo) to check for this error type.
+func (e *InputNotPowerOfTwoError) Is(target error) bool {
+	if _, ok := target.(*InputNotPowerOfTwoError); ok {
+		return true
+	}
+	return false
+}
+
+// NewFFTInputNotPowerOfTwoError creates a new FFTInputNotPowerOfTwoError with the given input length.
+func NewFFTInputNotPowerOfTwoError(inputLen uint64) *InputNotPowerOfTwoError {
+	return &InputNotPowerOfTwoError{
+		inputLen: inputLen,
+	}
+}
+
+var (
+	// ErrNotPowerOfTwo is a sentinel error that can be used to check if an error is an [FFTInputNotPowerOfTwoError].
+	// by calling errors.Is(err, ErrNotPowerOfTwo)
+	ErrNotPowerOfTwo = &InputNotPowerOfTwoError{inputLen: 0}
 )
 
 func (fs *FFTSettings) simpleFT(vals []fr.Element, valsOffset uint64, valsStride uint64, rootsOfUnity []fr.Element, rootsOfUnityStride uint64, out []fr.Element) {
@@ -77,6 +110,16 @@ func (fs *FFTSettings) _fft(vals []fr.Element, valsOffset uint64, valsStride uin
 	}
 }
 
+// FFT performs a fast Fourier transform on the provided values, using the roots of unity
+// provided in the FFTSettings.
+//
+// The input values does not have to be a power of two, because we pad them to the next power of two.
+//
+// It outputs a newly allocated slice of field elements, which is the transformed values.
+// To perform the FFT in-place, use [FFTSettings.InplaceFFT] instead.
+//
+// The only error returned is if the FFTSettings does not have enough roots of unity
+// to perform the FFT on the input values.
 func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 	n := uint64(len(vals))
 	if n > fs.MaxWidth {
@@ -94,7 +137,12 @@ func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 	}
 	out := make([]fr.Element, n)
 	if err := fs.InplaceFFT(valsCopy, out, inv); err != nil {
-		return nil, err
+		if errors.Is(err, ErrNotPowerOfTwo) {
+			panic("bug: we passed a non-power of two to FFT, " +
+				"which is not possible because we called nextPowOf2 on the input above")
+		}
+		panic(fmt.Sprintf("bug: InplaceFFT doesn't contain enough roots of unity to perform the computation, "+
+			"which is impossible because we already checked it above: %v", err))
 	}
 	return out, nil
 }
@@ -105,7 +153,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 		return fmt.Errorf("got %d values but only have %d roots of unity", n, fs.MaxWidth)
 	}
 	if !IsPowerOfTwo(n) {
-		return fmt.Errorf("got %d values but not a power of two", n)
+		return NewFFTInputNotPowerOfTwoError(n)
 	}
 	if inv {
 		var invLen fr.Element

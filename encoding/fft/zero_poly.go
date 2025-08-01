@@ -32,7 +32,8 @@
 package fft
 
 import (
-	"log"
+	"errors"
+	"fmt"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -41,8 +42,7 @@ type ZeroPolyFn func(missingIndices []uint64, length uint64) ([]fr.Element, []fr
 
 func (fs *FFTSettings) makeZeroPolyMulLeaf(dst []fr.Element, indices []uint64, domainStride uint64) error {
 	if len(dst) < len(indices)+1 {
-		log.Printf("expected bigger destination length: %d, got: %d", len(indices)+1, len(dst))
-		return ErrInvalidDestinationLength
+		return fmt.Errorf("expected bigger destination length: %d, got: %d", len(indices)+1, len(dst))
 	}
 	// zero out the unused slots
 	for i := len(indices) + 1; i < len(dst); i++ {
@@ -95,32 +95,30 @@ func padPoly(out []fr.Element, poly []fr.Element) {
 // The scratch space must be at least 3 times the output space.
 // The output must have a power of 2 length.
 // The input polynomials must not be empty, and sum to no larger than the output.
+//
+// TODO(samlaf): most errors returned should be panicing instead. But I'm unsure of the consequences of changing this.
 func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [][]fr.Element) ([]fr.Element, error) {
 	n := uint64(len(dst))
 	if !IsPowerOfTwo(n) {
-		log.Println("destination must be a power of two")
-		return nil, ErrDestNotPowerOfTwo
+		return nil, fmt.Errorf("destination must be a power of two, got %d", n)
 	}
 	if len(ps) == 0 {
-		log.Println("empty leaves")
-		return nil, ErrEmptyLeaves
+		return nil, errors.New("empty leaves")
 	}
 	// The degree of the output polynomial is the sum of the degrees of the input polynomials.
 	outDegree := uint64(0)
 	for _, p := range ps {
 		if len(p) == 0 {
-			log.Println("empty input poly")
-			return nil, ErrEmptyPoly
+			return nil, errors.New("empty input poly")
 		}
 		outDegree += uint64(len(p)) - 1
 	}
 	if min := outDegree + 1; min > n {
-		log.Printf("expected larger destination length: %d, got: %d", min, n)
-		return nil, ErrInvalidDestinationLength
+		return nil, fmt.Errorf("expected larger destination length: %d, got: %d", min, n)
 	}
 	if uint64(len(scratch)) < 3*n {
-		log.Println("not enough scratch space")
-		return nil, ErrNotEnoughScratch
+		// TODO(samlaf): this should be a panic but I'm not sure what consequences changing this would have.
+		return nil, fmt.Errorf("not enough scratch space: %d < %d", len(scratch), 3*n)
 	}
 	// Split `scratch` up into three equally sized working arrays
 	pPadded := scratch[:n]
@@ -165,12 +163,10 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 		return make([]fr.Element, length), make([]fr.Element, length), nil
 	}
 	if length > fs.MaxWidth {
-		log.Println("domain too small for requested length")
-		return nil, nil, ErrDomainTooSmall
+		return nil, nil, fmt.Errorf("domain too small for requested length: %d > %d", length, fs.MaxWidth)
 	}
 	if !IsPowerOfTwo(length) {
-		log.Println("length not a power of two")
-		return nil, nil, ErrLengthNotPowerOfTwo
+		return nil, nil, fmt.Errorf("length not a power of two: %d", length)
 	}
 	domainStride := fs.MaxWidth / length
 	perLeafPoly := uint64(64)
@@ -264,8 +260,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	if zl := uint64(len(zeroPoly)); zl < length {
 		zeroPoly = append(zeroPoly, make([]fr.Element, length-zl)...)
 	} else if zl > length {
-		log.Println("expected output smaller or equal to input length")
-		return nil, nil, ErrZeroPolyTooLarge
+		return nil, nil, fmt.Errorf("zero poly too large: %d > %d", zl, length)
 	}
 
 	zeroEval, err := fs.FFT(zeroPoly, false)
