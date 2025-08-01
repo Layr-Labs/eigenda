@@ -211,7 +211,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
-		if strings.Contains(err.Error(), "NoSuchKey") {
+		if strings.Contains(err.Error(), blobstore.ErrBlobNotFound.Error()) {
 			return nil, api.NewErrorNotFound(fmt.Sprintf("blob %s not found", key.Hex()))
 		} else {
 			s.logger.Errorf("error fetching blob %s: %v", key.Hex(), err)
