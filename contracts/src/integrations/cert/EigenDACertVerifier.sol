@@ -33,7 +33,9 @@ contract EigenDACertVerifier is
 
     bytes internal _quorumNumbersRequired;
 
-    uint8 internal constant CERT_VERSION = 3;
+    uint8 internal constant MAJOR_VERSION = 3;
+    uint8 internal constant MINOR_VERSION = 3;
+    uint8 internal constant PATCH_VERSION = 3;
 
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
@@ -84,13 +86,13 @@ contract EigenDACertVerifier is
 
     /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint8) {
-        return CERT_VERSION;
+        return MAJOR_VERSION;
     }
 
     /// @inheritdoc IEigenDASemVer
     function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
-        major = 3;
-        minor = 0;
-        patch = 0;
+        major = MAJOR_VERSION;
+        minor = MINOR_VERSION;
+        patch = PATCH_VERSION;
     }
 }
