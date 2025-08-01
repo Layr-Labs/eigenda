@@ -25,14 +25,14 @@ Both parts compile into a single MIPS‑ELF. Cannon runs it whenever a challenge
 
 ---
 
-## Proving one Step in EigenDA Blob Derivation on L1
+## Proving one Instruction in EigenDA Blob Derivation on L1
 
-| Type of VM Step | Verification type | Handling |
+| Type of VM Instruction | Verification type | Handling |
 |--------------------|--------------------|----------|
-| Execution step     | Logic              | The MIPS instructions are implemented in the smart contract to re-execute any incorrect logic (e.g., any incorrect execution when converting an encoded payload to a rollup payload)|
-| Pre‑image lookup   | Data               | Requires correct key–value pair on L1 |
+| Execution step     | Logic              | The MIPS instructions are implemented in the smart contract to re-execute any processing logic (e.g., any incorrect execution when converting an encoded payload to a rollup payload)|
+| Preimage lookup   | Data               | Requires correct key–value pair on L1 Preimage Oracle contract|
 
-If the disputed step is a pre‑image lookup, to resolve the final setp at the maximum game depth, the player must first upload the valid key-value pair. The Preimage oracle ignores the uploaded value(preimage) if the key-value is not hold. If a party cannot provide a valid preimage on time, the party loses after its clock expire.  
+When the disputed instruction is a preimage lookup, the player must first submit the correct key-value pair to preimage oracle contract, and then resolve the final instruction. The Preimage Oracle will disregard any submitted value if the required key-value pair relation does not hold. If a party fails to provide a valid preimage before its timer expires, that party forfeits the game.
 
 ---
 
@@ -46,19 +46,19 @@ mapping(bytes32 => mapping(uint256 => bytes32)) public preimageParts;
 mapping(bytes32 => mapping(uint256 => bool)) public preimagePartOk;
 ```
 
-EigenDA derivation requires three pre‑images:
+EigenDA blob derivation requires three pre‑images:
 
 1. **Recency window**  
 2. **Certificate validity**  
 3. **Point opening on blob**
 
-Keys are `keccak256(address)` of the reserved addresses (prefixed as *type 3* per the [OP spec](https://specs.optimism.io/fault-proof/index.html#type-3-global-generic-key)).
+Keys of the preimages are `keccak256(address)` of the [reserved addresses](https://github.com/Layr-Labs/hokulea/tree/master/docs) (prefixed as *type 3* per the [OP spec](https://specs.optimism.io/fault-proof/index.html#type-3-global-generic-key)).
 
-The pre‑image and relation between (key-value) pair can be specified by an upgradeable contract that:
+The preimage and relation between (key-value) pair can be specified by an upgradeable contract that:
 
 - stores the recency‑window parameter as the preimage;  
 - uses **certVerifier Router** to establish the validity of the DA certificate, the preimage is a boolean;  
-- verifies KZG point openings on a blob (using EigenDA’s `BN254` library), the preimage is bytes from the EigenDA blob;
+- verifies KZG point openings on a blob (using EigenDA’s `BN254` library), the preimage is 32 bytes from the EigenDA blob;
 
 ---
 
