@@ -20,3 +20,4 @@
   - [Rollup Stacks](./integration/rollup-stacks.md)
     - [OP Secure Integration](./integration/rollup-stacks/1-op-secure-integration-workflow.md)
     - [Hokulea Secure Integration](./integration/rollup-stacks/2-op-hokulea-secure-integration.md)
+    - [OP Optimistic Fault Proof Integration with Cannon](./integration/rollup-stacks/3-op-optimistic-fault-proof.md)
