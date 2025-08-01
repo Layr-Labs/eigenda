@@ -1,7 +1,12 @@
 package common
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
+// TODO: this should be moved outside of proxy, since it could be used by other packages/tools.
+// For example tools/discovery is currently making use of it.
 type EigenDANetwork string
 
 const (
@@ -32,6 +37,7 @@ func (n EigenDANetwork) GetEigenDADirectory() (string, error) {
 
 // GetServiceManagerAddress returns, as a string, the address of the EigenDAServiceManager contract for the network.
 // For more information about networks and contract addresses, see https://docs.eigenlayer.xyz/eigenda/networks/
+// TODO: these should be fetched from the EigenDADirectory contract instead.
 func (n EigenDANetwork) GetServiceManagerAddress() (string, error) {
 	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
 	// to reduce duplication and ensure consistency across the codebase
@@ -72,6 +78,7 @@ func (n EigenDANetwork) GetDisperserAddress() (string, error) {
 // GetBLSOperatorStateRetrieverAddress returns, as a string, the address of the OperatorStateRetriever contract for the
 // network
 // For more information about networks and contract addresses, see https://docs.eigenlayer.xyz/eigenda/networks/
+// TODO: these should be fetched from the EigenDADirectory contract instead.
 func (n EigenDANetwork) GetBLSOperatorStateRetrieverAddress() (string, error) {
 	// TODO: These hardcoded addresses should eventually be fetched from the EigenDADirectory contract
 	// to reduce duplication and ensure consistency across the codebase
@@ -99,6 +106,7 @@ var chainIDToNetworkMap = map[string][]EigenDANetwork{
 }
 
 // EigenDANetworksFromChainID returns the EigenDA network(s) for a given chain ID
+// If no error occurs, the returned slice will contain one or more EigenDANetwork values.
 func EigenDANetworksFromChainID(chainID string) ([]EigenDANetwork, error) {
 	networks, ok := chainIDToNetworkMap[chainID]
 	if !ok {
@@ -107,6 +115,9 @@ func EigenDANetworksFromChainID(chainID string) ([]EigenDANetwork, error) {
 	return networks, nil
 }
 
+// EigenDANetworkFromString parses an inputString to an EigenDANetwork value.
+// The returned EigenDANetwork is guaranteed to be non-nil.
+// If an invalid network is provided, an error is returned.
 func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	network := EigenDANetwork(inputString)
 
@@ -114,6 +125,13 @@ func EigenDANetworkFromString(inputString string) (EigenDANetwork, error) {
 	case HoleskyTestnetEigenDANetwork, HoleskyPreprodEigenDANetwork, SepoliaTestnetEigenDANetwork, MainnetEigenDANetwork:
 		return network, nil
 	default:
-		return "", fmt.Errorf("unknown network type: %s", inputString)
+		allowedNetworks := []string{
+			MainnetEigenDANetwork.String(),
+			HoleskyTestnetEigenDANetwork.String(),
+			HoleskyPreprodEigenDANetwork.String(),
+			SepoliaTestnetEigenDANetwork.String(),
+		}
+		return "", fmt.Errorf("invalid network: %s. Must be one of: %s",
+			inputString, strings.Join(allowedNetworks, ", "))
 	}
 }
