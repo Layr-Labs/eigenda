@@ -119,7 +119,7 @@ message PaymentHeader {
   // The timestamp represents the nanosecond UNIX timestamp at the time the dispersal request is created.
   //
   // The timestamp plays the role of a nonce, optionally allowing the same blob data to be dispersed multiple times
-  // while still having a unique blob header hash.
+  // while still having a unique blob header hash (which is used as an idempotency key).
   //
   // When dealing with reservations, the timestamp determines which reservation bucket the dispersal falls into.
   // TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a bin algorithm to track
