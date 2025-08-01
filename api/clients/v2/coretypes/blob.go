@@ -101,10 +101,7 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayl
 	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
-		payloadElements, err = b.toEvalPoly()
-		if err != nil {
-			return nil, fmt.Errorf("compute eval poly: %w", err)
-		}
+		payloadElements = b.toEvalPoly()
 	default:
 		return nil, fmt.Errorf("invalid polynomial form")
 	}
@@ -123,7 +120,7 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayl
 }
 
 // toEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
-func (b *Blob) toEvalPoly() ([]fr.Element, error) {
+func (b *Blob) toEvalPoly() []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
@@ -135,8 +132,8 @@ func (b *Blob) toEvalPoly() ([]fr.Element, error) {
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)
 	if err != nil {
-		return nil, fmt.Errorf("perform FFT: %w", err)
+		panic(fmt.Sprintf("bug: FFT only returns an error when it doesn't have enough roots of unity to perform the FFT, "+
+			"but we created the FFTSettings with enough roots above using FFTSettingsFromBlobLengthSymbols: %v", err))
 	}
-
-	return fftedElements, nil
+	return fftedElements
 }
