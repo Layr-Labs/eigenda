@@ -291,7 +291,8 @@ func NewNode(
 			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
-			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
+			MaxGRPCMessageSize: config.RelayMaxMessageSize,
+			ConnectionPoolSize: config.RelayConnectionPoolSize,
 		}
 
 		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())

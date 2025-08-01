@@ -14,14 +14,16 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
-	"google.golang.org/grpc"
 )
 
 type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
+	// The number of grpc connections to the disperser server.
+	DisperserConnectionCount int
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -48,12 +50,12 @@ type DisperserClient interface {
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
 type disperserClient struct {
+	logger             logging.Logger
 	config             *DisperserClientConfig
 	signer             corev2.BlobRequestSigner
 	initOnceGrpc       sync.Once
 	initOnceAccountant sync.Once
-	conn               *grpc.ClientConn
-	client             disperser_rpc.DisperserClient
+	clientPool         *common.GRPCClientPool[disperser_rpc.DisperserClient]
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
@@ -81,7 +83,14 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(
+	logger logging.Logger,
+	config *DisperserClientConfig,
+	signer corev2.BlobRequestSigner,
+	prover encoding.Prover,
+	accountant *Accountant,
+) (*disperserClient, error) {
+
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -96,6 +105,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 
 	return &disperserClient{
+		logger:     logger,
 		config:     config,
 		signer:     signer,
 		prover:     prover,
@@ -130,11 +140,11 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
 func (c *disperserClient) Close() error {
-	if c.conn != nil {
-		err := c.conn.Close()
-		c.conn = nil
-		c.client = nil
-		return err
+	if c.clientPool != nil {
+		err := c.clientPool.Close()
+		if err != nil {
+			return fmt.Errorf("error closing client pool: %w", err)
+		}
 	}
 	return nil
 }
@@ -272,7 +282,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	probe.SetStage("send_to_disperser")
 
-	reply, err := c.client.DisperseBlob(ctx, request)
+	reply, err := c.clientPool.GetClient().DisperseBlob(ctx, request)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
 	}
@@ -335,7 +345,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
-	return c.client.GetBlobStatus(ctx, request)
+	return c.clientPool.GetClient().GetBlobStatus(ctx, request)
 }
 
 // GetPaymentState returns the payment state of the disperser client
@@ -362,7 +372,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.clientPool.GetClient().GetPaymentState(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
@@ -378,7 +388,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
-	return c.client.GetBlobCommitment(ctx, request)
+	return c.clientPool.GetClient().GetBlobCommitment(ctx, request)
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
@@ -388,13 +398,12 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
-		conn, err := grpc.NewClient(addr, dialOptions...)
-		if err != nil {
-			initErr = err
-			return
-		}
-		c.conn = conn
-		c.client = disperser_rpc.NewDisperserClient(conn)
+		c.clientPool, initErr = common.NewGRPClientPool(
+			c.logger,
+			disperser_rpc.NewDisperserClient,
+			c.config.DisperserConnectionCount,
+			addr,
+			dialOptions...)
 	})
 	if initErr != nil {
 		return fmt.Errorf("initializing grpc connection: %w", initErr)
