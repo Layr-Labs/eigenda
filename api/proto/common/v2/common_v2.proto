@@ -93,12 +93,11 @@ message Batch {
 //    - On-demand payments can only be used when dispersing through the EigenDA disperser. Currently, the EigenDA
 //      disperser is the *only* disperser, but this restriction will remain in place even with decentralized dispersal.
 //
-// The "size" of a dispersal, with respect to payments, is defined as the number of symbols being dispersed, rounded up
-// to the nearest multiple of the minNumSymbols defined in the PaymentVault contract. This size is relevant for both
-// reservation and on-demand dispersals.
+// For payment calculations, dispersals have a minimum size of minNumSymbols, defined in the PaymentVault. Smaller blobs
+// are billed as `minNumSymbols`.
 //
-// The cost of an on-demand dispersal is calculated by multiplying this size by the pricePerSymbol defined in the
-// PaymentVault contract.
+// The cost of an on-demand dispersal is calculated by multiplying the number of blob symbols by the pricePerSymbol
+// defined in the PaymentVault.
 //
 // Note: the quorum set being dispersed to has no impact on payment accounting with the current implementation.
 //
