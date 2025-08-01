@@ -122,9 +122,9 @@ message PaymentHeader {
   // while still having a unique blob header hash (which is used as an idempotency key).
   //
   // When dealing with reservations, the timestamp determines which reservation bucket the dispersal falls into.
-  // TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a bin algorithm to track
-  // reservation usage. The timestamp is currently used for the bin algorithm, but will not be part of the leaky
-  // bucket algorithm. Even after this change, the timestamp should still be populated.
+  // TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a fixed window algorithm to
+  // track reservation usage. The timestamp is currently used for the fixed window algorithm, but will not be part of
+  // the leaky bucket algorithm. Even after this change, the timestamp should still be populated.
   //
   // The timestamp is currently unused in the context of on-demand payments, but this is subject to change without
   // notice! Failure to populate this with a proper timestamp could result in failed dispersals and loss of associated
