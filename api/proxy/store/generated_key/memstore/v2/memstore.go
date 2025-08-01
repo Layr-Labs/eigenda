@@ -176,10 +176,17 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (coretypes.EigenDACer
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(_ context.Context, versionedCert certs.VersionedCert) ([]byte, error) {
+// If returnEncodedPayload is true, it returns the encoded blob without decoding.
+func (e *MemStore) Get(
+	_ context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool,
+) ([]byte, error) {
 	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("fetching entry via v2 memstore: %w", err)
+	}
+
+	if returnEncodedPayload {
+		return encodedBlob, nil
 	}
 
 	return e.codec.DecodeBlob(encodedBlob)
@@ -213,8 +220,9 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	return certBytes, nil
 }
 
-func (e *MemStore) Verify(_ context.Context, _ certs.VersionedCert,
-	_ common.CertVerificationOpts) error {
+func (e *MemStore) VerifyCert(
+	_ context.Context, _ certs.VersionedCert, _ uint64,
+) error {
 	return nil
 }
 

@@ -52,7 +52,7 @@ func (e DerivationError) WithMessage(msg string) DerivationError {
 // The only valid status codes are 1-4, as defined in the sentinel errors below, eg [ErrCertParsingFailedDerivationError].
 func (e DerivationError) Validate() {
 	if e.StatusCode < 1 || e.StatusCode > 4 {
-		panic(fmt.Sprintf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode))
+		panic(fmt.Errorf("DerivationError: invalid status code %d, must be between 1 and 4", e.StatusCode))
 	}
 	// The Msg field should ideally be a human-readable string that explains the error,
 	// but we don't enforce it.

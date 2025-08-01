@@ -33,8 +33,10 @@ ripgrep = "latest"
 # Forge Dependencies
 forge = "v1.0.0"
 cast = "v1.0.0"
+anvil = "v1.0.0"
 
 [alias]
 forge = "ubi:foundry-rs/foundry[exe=forge]"
 cast = "ubi:foundry-rs/foundry[exe=cast]"
+anvil = "ubi:foundry-rs/foundry[exe=anvil]"
 yarn = "https://github.com/mise-plugins/mise-yarn"

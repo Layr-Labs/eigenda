@@ -26,21 +26,8 @@ jobs:
       - run: make lint
         working-directory: api/proxy
 
-  # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
-  # valid, and allow the proxy to start.
+  # This checks that the flags in .env.example are valid and allow the proxy to start.
   flags:
-    strategy:
-      matrix:
-        env-file:
-          [
-            .env.exampleV1.holesky,
-            .env.exampleV2.holesky,
-            .env.exampleV1AndV2.holesky,
-            .env.exampleV1.sepolia,
-            .env.exampleV2.sepolia,
-            .env.exampleV1AndV2.sepolia,
-            .env.exampleV2.mainnet,
-          ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +37,7 @@ jobs:
           experimental: true
           working_directory: api/proxy
       - name: Run flag test
-        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
+        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh .env.example
         working-directory: api/proxy
 
   # This ensures that std output generated when running binary with `--help` is reflected in docs/help_out.txt
@@ -189,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make docker-build
+      - run: BUILD_TAG=dev make docker-build
         working-directory: api/proxy
       # We also test that the docker container starts up correctly.
       - name: Run container as background process
@@ -200,7 +187,7 @@ jobs:
           -e EIGENDA_PROXY_ADDR=0.0.0.0 \
           -e EIGENDA_PROXY_PORT=6666 \
           -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
-          ghcr.io/layr-labs/eigenda-proxy:latest
+          ghcr.io/layr-labs/eigenda-proxy:dev
         working-directory: api/proxy
       - name: Wait for rpc to come up
         shell: bash
