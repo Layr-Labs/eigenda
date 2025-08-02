@@ -1,7 +1,7 @@
 package common
 
 import (
-	"fmt"
+	"errors"
 	"slices"
 
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -56,45 +56,45 @@ type ClientConfigV2 struct {
 // Check checks config invariants, and returns an error if there is a problem with the config struct
 func (cfg *ClientConfigV2) Check() error {
 	if cfg.DisperserClientCfg.Hostname == "" {
-		return fmt.Errorf("EigenDA disperser hostname is required for using EigenDA V2 backend")
+		return errors.New("EigenDA disperser hostname is required for using EigenDA V2 backend")
 	}
 
 	if cfg.DisperserClientCfg.Port == "" {
-		return fmt.Errorf("EigenDA disperser port is required for using EigenDA V2 backend")
+		return errors.New("EigenDA disperser port is required for using EigenDA V2 backend")
 	}
 
 	if cfg.EigenDACertVerifierOrRouterAddress == "" {
-		return fmt.Errorf(`immutable v3 cert verifier address or dynamic router 
+		return errors.New(`immutable v3 cert verifier address or dynamic router 
 		address is required for using EigenDA V2 backend`)
 	}
 
 	if cfg.MaxBlobSizeBytes == 0 {
-		return fmt.Errorf("max blob size is required for using EigenDA V2 backend")
+		return errors.New("max blob size is required for using EigenDA V2 backend")
 	}
 
 	// Check if at least one retriever is enabled
 	if len(cfg.RetrieversToEnable) == 0 {
-		return fmt.Errorf("at least one retriever type must be enabled for using EigenDA V2 backend")
+		return errors.New("at least one retriever type must be enabled for using EigenDA V2 backend")
 	}
 
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
 		if cfg.EigenDADirectory == "" {
-			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
+			return errors.New("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
 		}
 
 		if cfg.BLSOperatorStateRetrieverAddr == "" {
-			return fmt.Errorf(
+			return errors.New(
 				"BLS operator state retriever address is required for validator retrieval in EigenDA V2 backend")
 		}
 
 		if cfg.EigenDAServiceManagerAddr == "" {
-			return fmt.Errorf(
+			return errors.New(
 				"EigenDA service manager address is required for validator retrieval in EigenDA V2 backend")
 		}
 	}
 
 	if cfg.PutTries == 0 {
-		return fmt.Errorf("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
+		return errors.New("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 
 	return nil

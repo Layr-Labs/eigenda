@@ -2,6 +2,7 @@ package builder
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -113,16 +114,16 @@ func (cfg *Config) Check() error {
 	}
 
 	if cfg.S3Config.CredentialType == s3.CredentialTypeUnknown && cfg.S3Config.Endpoint != "" {
-		return fmt.Errorf("s3 credential type must be set")
+		return errors.New("s3 credential type must be set")
 	}
 	if cfg.S3Config.CredentialType == s3.CredentialTypeStatic {
 		if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
-			return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
+			return errors.New("s3 endpoint is set, but access key id or access key secret is not set")
 		}
 	}
 
 	if cfg.RedisConfig.Endpoint == "" && cfg.RedisConfig.Password != "" {
-		return fmt.Errorf("redis password is set, but endpoint is not")
+		return errors.New("redis password is set, but endpoint is not")
 	}
 
 	return cfg.StoreConfig.Check()
@@ -136,13 +137,13 @@ func (cfg *Config) checkV1Config() error {
 		cfg.ClientConfigV1.EdaClientCfg.EthRpcUrl = "http://0.0.0.0:666"
 	} else {
 		if cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr == "" || cfg.VerifierConfigV1.SvcManagerAddr == "" {
-			return fmt.Errorf("service manager address is required for communication with EigenDA")
+			return errors.New("service manager address is required for communication with EigenDA")
 		}
 		if cfg.ClientConfigV1.EdaClientCfg.EthRpcUrl == "" {
-			return fmt.Errorf("eth prc url is required for communication with EigenDA")
+			return errors.New("eth prc url is required for communication with EigenDA")
 		}
 		if cfg.ClientConfigV1.EdaClientCfg.RPC == "" {
-			return fmt.Errorf("using eigenda backend (memstore.enabled=false) but eigenda disperser rpc url is not set")
+			return errors.New("using eigenda backend (memstore.enabled=false) but eigenda disperser rpc url is not set")
 		}
 	}
 
@@ -155,10 +156,10 @@ func (cfg *Config) checkV1Config() error {
 				verify.CertVerificationDisabledFlagName)
 		}
 		if cfg.VerifierConfigV1.RPCURL == "" {
-			return fmt.Errorf("cert verification enabled but eth rpc is not set")
+			return errors.New("cert verification enabled but eth rpc is not set")
 		}
 		if cfg.ClientConfigV1.EdaClientCfg.SvcManagerAddr == "" || cfg.VerifierConfigV1.SvcManagerAddr == "" {
-			return fmt.Errorf("cert verification enabled but svc manager address is not set")
+			return errors.New("cert verification enabled but svc manager address is not set")
 		}
 	}
 

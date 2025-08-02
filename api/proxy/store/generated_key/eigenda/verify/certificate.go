@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -34,23 +35,23 @@ type Certificate disperser.BlobInfo
 // are nil and returns an error if so
 func (c *Certificate) NoNilFields() error {
 	if c.BlobVerificationProof == nil {
-		return fmt.Errorf("BlobVerificationProof is nil")
+		return errors.New("BlobVerificationProof is nil")
 	}
 
 	if c.BlobVerificationProof.GetBatchMetadata() == nil {
-		return fmt.Errorf("BlobVerificationProof.BatchMetadata is nil")
+		return errors.New("BlobVerificationProof.BatchMetadata is nil")
 	}
 
 	if c.BlobVerificationProof.GetBatchMetadata().GetBatchHeader() == nil {
-		return fmt.Errorf("BlobVerificationProof.BatchMetadata.BatchHeader is nil")
+		return errors.New("BlobVerificationProof.BatchMetadata.BatchHeader is nil")
 	}
 
 	if c.BlobHeader == nil {
-		return fmt.Errorf("BlobHeader is nil")
+		return errors.New("BlobHeader is nil")
 	}
 
 	if c.BlobHeader.GetCommitment() == nil {
-		return fmt.Errorf("BlobHeader.Commitment is nil")
+		return errors.New("BlobHeader.Commitment is nil")
 	}
 
 	return nil

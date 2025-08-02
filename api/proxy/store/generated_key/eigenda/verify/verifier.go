@@ -3,6 +3,7 @@ package verify
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -166,7 +167,7 @@ func (v *Verifier) VerifyCommitment(certCommitment *grpccommon.G1Commitment, blo
 	}
 
 	if !certCommitmentAffine.IsOnCurve() {
-		return fmt.Errorf("commitment (x,y) field elements are not on the BN254 curve")
+		return errors.New("commitment (x,y) field elements are not on the BN254 curve")
 	}
 
 	errMsg := ""

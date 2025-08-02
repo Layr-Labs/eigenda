@@ -77,11 +77,11 @@ func NewManager(
 ) (*Manager, error) {
 	// Enforce invariants
 	if dispersalBackend == common.V2EigenDABackend && eigenDAV2 == nil {
-		return nil, fmt.Errorf("EigenDA V2 dispersal enabled but no v2 store provided")
+		return nil, errors.New("EigenDA V2 dispersal enabled but no v2 store provided")
 	}
 
 	if dispersalBackend == common.V1EigenDABackend && eigenda == nil {
-		return nil, fmt.Errorf("EigenDA dispersal enabled but no store provided")
+		return nil, errors.New("EigenDA dispersal enabled but no store provided")
 	}
 
 	manager := &Manager{
@@ -164,7 +164,7 @@ func (m *Manager) Get(ctx context.Context,
 		return payloadOrEncodedPayload, err
 	case commitments.OptimismKeccakCommitmentMode:
 		// TODO: we should refactor the manager to not deal with keccak commitments at all.
-		return nil, fmt.Errorf("INTERNAL BUG: call GetOPKeccakValueFromS3 instead")
+		return nil, errors.New("INTERNAL BUG: call GetOPKeccakValueFromS3 instead")
 	default:
 		return nil, errors.New("could not determine which storage backend to route to based on unknown commitment mode")
 	}
@@ -184,9 +184,9 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, value 
 		}
 	case commitments.OptimismKeccakCommitmentMode:
 		// TODO: we should refactor the manager to not deal with keccak commitments at all.
-		return nil, fmt.Errorf("INTERNAL BUG: call PutOPKeccakPairInS3 instead")
+		return nil, errors.New("INTERNAL BUG: call PutOPKeccakPairInS3 instead")
 	default:
-		return nil, fmt.Errorf("unknown commitment mode")
+		return nil, errors.New("unknown commitment mode")
 	}
 
 	// 2 - Put blob into secondary storage backends
@@ -273,7 +273,7 @@ func (m *Manager) getFromCorrectEigenDABackend(
 
 		// We don't support secure integrations for EigenDAV1 backend, so this feature is not available.
 		if opts.ReturnEncodedPayload {
-			return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates")
+			return nil, errors.New("returning encoded payload is not supported for V0 certificates")
 		}
 
 		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)

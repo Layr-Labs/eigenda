@@ -81,9 +81,9 @@ func BuildStoreManager(
 	v2Enabled := slices.Contains(config.StoreConfig.BackendsToEnable, common.V2EigenDABackend)
 
 	if config.StoreConfig.DispersalBackend == common.V2EigenDABackend && !v2Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
+		return nil, errors.New("dispersal backend is set to V2, but V2 backend is not enabled")
 	} else if config.StoreConfig.DispersalBackend == common.V1EigenDABackend && !v1Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
+		return nil, errors.New("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
 	var kzgVerifier *kzgverifier.Verifier
@@ -332,7 +332,7 @@ func buildEigenDAV2Backend(
 
 	// Ensure at least one retriever is configured
 	if len(retrievers) == 0 {
-		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
+		return nil, errors.New("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
 	payloadDisperser, err := buildPayloadDisperser(

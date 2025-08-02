@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
@@ -57,7 +58,7 @@ func (cfg *Config) Check() error {
 
 	// verify that thread counts are sufficiently set
 	if cfg.AsyncPutWorkers >= 100 {
-		return fmt.Errorf("number of secondary write workers can't be greater than 100")
+		return errors.New("number of secondary write workers can't be greater than 100")
 	}
 
 	return nil

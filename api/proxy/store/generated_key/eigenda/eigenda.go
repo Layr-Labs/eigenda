@@ -55,7 +55,7 @@ func NewStoreConfig(
 	putTries int,
 ) (*StoreConfig, error) {
 	if putTries == 0 {
-		return nil, fmt.Errorf(
+		return nil, errors.New(
 			"putTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 

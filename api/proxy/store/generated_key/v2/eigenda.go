@@ -179,7 +179,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 
 	switch cert := cert.(type) {
 	case *coretypes.EigenDACertV2:
-		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
+		return nil, errors.New("EigenDA V2 certs are not supported anymore, use V3 instead")
 	case *coretypes.EigenDACertV3:
 		return cert.Serialize(coretypes.CertSerializationRLP)
 	default:
@@ -295,7 +295,7 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 		return nil
 	}
 	if certRBN == 0 {
-		return fmt.Errorf("certRBN should never be 0, this is likely a bug")
+		return errors.New("certRBN should never be 0, this is likely a bug")
 	}
 	if certL1IBN <= certRBN {
 		return fmt.Errorf(
