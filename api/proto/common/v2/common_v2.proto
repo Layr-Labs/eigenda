@@ -131,8 +131,10 @@ message PaymentHeader {
   // payments.
   int64 timestamp = 2;
 
-  // The cumulative_payment field is a serialized uint256 big integer representing the total wei paid by the account
-  // for this and all previous dispersals.
+  // The cumulative_payment field is a variable-sized big endian unsigned integer, representing the total wei paid by
+  // the account for this and all previous dispersals.
+  // TODO(litt3): we ought to limit the max size of this field to 32 bytes (256-bit unsigned int), but this isn't
+  // currently being checked. This will be fixed during the ongoing accounting reimplementation.
   //
   // If this field is *not* set, or is zero, reservation accounting will be used. If this field *is* set, and non-zero,
   // on-demand accounting will be used EVEN IF a given account has a reservation. There is no fallback between these
