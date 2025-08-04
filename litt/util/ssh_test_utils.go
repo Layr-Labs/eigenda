@@ -231,8 +231,8 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 // SetupSSHTestContainer creates and starts a Docker container with SSH server
 // If dataDir is not empty, it will be mounted in the container at /mnt/data
 func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
-	// Use a context with timeout for Docker operations
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// Use a longer timeout for the entire setup process to handle slow CI environments
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	// Create Docker client
@@ -255,10 +255,23 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	err = os.MkdirAll(mountDir, 0755)
 	require.NoError(t, err)
 
-	// Build Docker image
-	imageName := "ssh-test:latest"
-	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
-	require.NoError(t, err)
+	// Build Docker image with a unique name that includes the public key hash
+	// This allows reusing images when the public key is the same
+	h := fnv.New32a()
+	h.Write(publicKeyContent)
+	keyHash := fmt.Sprintf("%x", h.Sum32())
+	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
+	
+	// Check if image already exists to avoid rebuilding
+	_, _, err = cli.ImageInspectWithRaw(ctx, imageName)
+	if err != nil {
+		// Image doesn't exist, build it
+		t.Logf("Building SSH test Docker image: %s", imageName)
+		err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
+		require.NoError(t, err)
+	} else {
+		t.Logf("Reusing existing SSH test Docker image: %s", imageName)
+	}
 
 	// Start container
 	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir, t.Name())
@@ -346,12 +359,13 @@ func BuildSSHTestImage(
 	}
 	defer func() { _ = buildCtx.Close() }()
 
-	// Build the image
+	// Build the image with optimized settings for CI
 	buildOptions := types.ImageBuildOptions{
 		Tags:        []string{imageName},
 		Dockerfile:  "Dockerfile",
 		Remove:      true,
 		ForceRemove: true,
+		NoCache:     false, // Allow caching to speed up builds
 	}
 
 	response, err := cli.ImageBuild(ctx, buildCtx, buildOptions)
@@ -360,10 +374,19 @@ func BuildSSHTestImage(
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	// Read build output (helpful for debugging)
-	_, err = io.Copy(io.Discard, response.Body)
+	// Read build output with proper error handling for timeouts
+	// Create a buffer to capture build output for debugging on failure
+	var buildOutput strings.Builder
+	reader := io.TeeReader(response.Body, &buildOutput)
+	
+	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
-		return fmt.Errorf("failed to read build response: %w", err)
+		// Include build output in error for debugging
+		buildOutputStr := buildOutput.String()
+		if len(buildOutputStr) > 1000 {
+			buildOutputStr = buildOutputStr[:1000] + "... (truncated)"
+		}
+		return fmt.Errorf("failed to read build response: %w\nBuild output: %s", err, buildOutputStr)
 	}
 
 	return nil
