@@ -98,7 +98,9 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 func TestSSHSession_FindFiles(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t, "")
+	dataDir := t.TempDir()
+
+	container := SetupSSHTestContainer(t, dataDir)
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -114,28 +116,29 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
 
-	// Create test directory structure
-	err = session.Mkdirs("/mnt/test/search")
+	// Create a test subdirectory in the container's data directory
+	testDir := path.Join(container.GetDataDir(), "search")
+	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Create test files using the mounted directory
-	mountDir := filepath.Join(container.GetTempDir(), "ssh_mount", "search")
-	err = os.MkdirAll(mountDir, 0755)
+	// Create test files using the mounted data directory
+	searchDir := filepath.Join(dataDir, "search")
+	err = os.MkdirAll(searchDir, 0755)
 	require.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(mountDir, "test.txt"), []byte("test content"), 0644)
+	err = os.WriteFile(filepath.Join(searchDir, "test.txt"), []byte("test content"), 0644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(mountDir, "test.log"), []byte("log content"), 0644)
+	err = os.WriteFile(filepath.Join(searchDir, "test.log"), []byte("log content"), 0644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(mountDir, "other.dat"), []byte("data content"), 0644)
+	err = os.WriteFile(filepath.Join(searchDir, "other.dat"), []byte("data content"), 0644)
 	require.NoError(t, err)
 
 	// Test finding files with specific extensions
-	files, err := session.FindFiles("/mnt/test/search", []string{".txt", ".log"})
+	files, err := session.FindFiles(testDir, []string{".txt", ".log"})
 	require.NoError(t, err)
 	require.Len(t, files, 2)
-	require.Contains(t, files, "/mnt/test/search/test.txt")
-	require.Contains(t, files, "/mnt/test/search/test.log")
+	require.Contains(t, files, path.Join(testDir, "test.txt"))
+	require.Contains(t, files, path.Join(testDir, "test.log"))
 
 	// Test with non-existent directory
 	files, err = session.FindFiles("/nonexistent", []string{".txt"})
