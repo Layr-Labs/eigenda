@@ -40,5 +40,9 @@ func unlockCommand(ctx *cli.Context) error {
 		}
 	}
 
-	return disktable.Unlock(logger, sources)
+	err = disktable.Unlock(logger, sources)
+	if err != nil {
+		return fmt.Errorf("failed to unlock LittDB files: %w", err)
+	}
+	return nil
 }
