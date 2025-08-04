@@ -5,6 +5,7 @@ import (
 	"path"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/docker/go-units"
 )
 
 // TestClientConfig is the configuration for the test client.
@@ -69,6 +70,23 @@ type TestClientConfig struct {
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// The port to use for the proxy.
+	ProxyPort int
+}
+
+// DefaultTestClientConfig returns a default configuration for the test client. Sets default values for fields
+// where default values make sense.
+func DefaultTestClientConfig() *TestClientConfig {
+	return &TestClientConfig{
+		DisperserPort:                   443,
+		MaxBlobSize:                     16 * units.MiB,
+		SRSOrder:                        268435456,
+		MetricsPort:                     9101,
+		ValidatorReadConnectionPoolSize: 100,
+		ValidatorReadComputePoolSize:    20,
+		ProxyPort:                       1234,
+		EigenDADirectory:                "placeholder",
+	}
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.

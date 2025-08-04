@@ -186,6 +186,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
+	RelayUseSecureGRPC = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-use-secure-grpc"),
+		Usage:    "Whether to use secure GRPC connection to Relay (defaults to true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_USE_SECURE_GRPC"),
+	}
 	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
 		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
@@ -582,6 +588,7 @@ var optionalFlags = []cli.Flag{
 	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	RelayUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,

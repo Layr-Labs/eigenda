@@ -47,36 +47,30 @@ func NewCertVerifier(
 }
 
 // CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
-// This method returns nil if the certificate is successfully verified; otherwise, it returns an error.
+// This method returns nil if the certificate is successfully verified; otherwise, it returns a
+// [CertVerifierInvalidCertError] or [CertVerifierInternalError] error.
 func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// 1 - switch on the certificate version to determine which underlying type to decode into
-	//     and which contract to call
-
-	// EigenDACertV3 is the only version that is supported by the CheckDACert function
+	// 1 - switch on the certificate type to determine which contract to call
 	var certV3 *coretypes.EigenDACertV3
 	var err error
-	switch cert.Version() {
-	case coretypes.VersionThreeCert:
-		var ok bool
-		certV3, ok = cert.(*coretypes.EigenDACertV3)
-		if !ok {
-			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV3, got %T", cert)}
-		}
-	case coretypes.VersionTwoCert:
-		certV2, ok := cert.(*coretypes.EigenDACertV2)
-		if !ok {
-			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
-		}
-
-		certV3, err = certV2.ToV3()
+	switch cert := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		certV3 = cert
+	case *coretypes.EigenDACertV2:
+		// EigenDACertV3 is the only version that is supported by the CheckDACert function
+		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
+		certV3, err = cert.ToV3()
 		if err != nil {
 			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
 		}
 	default:
-		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %d", cert.Version())}
+		// If golang had enums the world would be a better place.
+		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
+			"construct offchain should have a CertVerifier contract which we can call to "+
+			"verify the certificate", cert))
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
@@ -108,9 +102,9 @@ func (cv *CertVerifier) CheckDACert(
 	if verifyResultCode == coretypes.StatusNullError {
 		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
 	} else if verifyResultCode != coretypes.StatusSuccess {
-		return &CertVerificationFailedError{
+		return &CertVerifierInvalidCertError{
 			StatusCode: verifyResultCode,
-			Msg:        fmt.Sprintf("cert verification failed: status code (%d) %s", verifyResultCode, verifyResultCode.String()),
+			Msg:        verifyResultCode.String(),
 		}
 	}
 	return nil
