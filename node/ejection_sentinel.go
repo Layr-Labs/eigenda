@@ -135,6 +135,7 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 	}
 
 	// TODO(cody-littley) check if we are running a software version that permits ejection defense
+	//  Minimum software version is not currently written onchain so we can't write the offchain logic yet.
 
 	s.logger.Info("Submitting ejection cancellation transaction.")
 	txn, err := s.transactor.CancelEjection(&bind.TransactOpts{Context: s.ctx})

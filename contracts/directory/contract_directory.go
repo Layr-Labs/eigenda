@@ -14,8 +14,6 @@ import (
 
 type ContractName string
 
-// Claude, for each thing in this list, create an entry in the const block below. Follow the example.
-
 const (
 	PauserRegistry                              ContractName = "PAUSER_REGISTRY"
 	BlsApkRegistry                              ContractName = "BLS_APK_REGISTRY"
