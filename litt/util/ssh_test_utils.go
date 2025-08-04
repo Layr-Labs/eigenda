@@ -9,10 +9,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"hash/fnv"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +29,47 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
+
+// SSHTestPortBase is the base port used for SSH testing to avoid port collisions in CI
+const SSHTestPortBase = 22022
+
+// GetFreeSSHTestPort returns a free port starting from SSHTestPortBase
+func GetFreeSSHTestPort() (int, error) {
+	// Try ports starting from the base port
+	for port := SSHTestPortBase; port < SSHTestPortBase+100; port++ {
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			continue // Port is in use, try next one
+		}
+		_ = listener.Close()
+		return port, nil
+	}
+	return 0, fmt.Errorf("no free port found in range %d-%d", SSHTestPortBase, SSHTestPortBase+100)
+}
+
+// GetUniqueSSHTestPort returns a unique port based on test name hash to avoid collisions
+func GetUniqueSSHTestPort(testName string) (int, error) {
+	// Create a hash of the test name to get a deterministic port offset
+	h := fnv.New32a()
+	h.Write([]byte(testName))
+	hash := h.Sum32()
+	
+	// Use hash to get a port offset (mod 100 to stay within reasonable range)
+	portOffset := int(hash % 100)
+	port := SSHTestPortBase + portOffset
+	
+	// Check if this port is free
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		// If the deterministic port is taken, fall back to the free port finder
+		return GetFreeSSHTestPort()
+	}
+	_ = listener.Close()
+	
+	return port, nil
+}
 
 // SSHTestContainer manages a Docker container with SSH server for testing
 type SSHTestContainer struct {
@@ -93,12 +137,6 @@ func (c *SSHTestContainer) Cleanup() error {
 	return nil
 }
 
-// ParsePort converts string port to uint64
-func ParsePort(port string) uint64 {
-	var p uint64
-	_, _ = fmt.Sscanf(port, "%d", &p)
-	return p
-}
 
 // GenerateSSHKeyPair creates an RSA key pair for testing
 func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
@@ -199,7 +237,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	require.NoError(t, err)
 
 	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir)
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir, t.Name())
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
@@ -315,7 +353,14 @@ func StartSSHContainer(
 	imageName string,
 	mountDir string,
 	dataDir string,
+	testName string,
 ) (string, uint64, error) {
+
+	// Get a unique port for this test based on test name hash
+	sshPort, err := GetUniqueSSHTestPort(testName)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get unique SSH port: %w", err)
+	}
 
 	containerConfig := &container.Config{
 		Image: imageName,
@@ -329,7 +374,7 @@ func StartSSHContainer(
 			"22/tcp": []nat.PortBinding{
 				{
 					HostIP:   "127.0.0.1",
-					HostPort: "0", // Let Docker assign a random port
+					HostPort: strconv.Itoa(sshPort), // Use custom port to avoid collisions in CI
 				},
 			},
 		},
@@ -368,15 +413,8 @@ func StartSSHContainer(
 		return "", 0, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	// Get the assigned SSH port
-	containerInfo, err := cli.ContainerInspect(ctx, resp.ID)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to inspect container: %w", err)
-	}
-
-	sshPort := ParsePort(containerInfo.NetworkSettings.Ports["22/tcp"][0].HostPort)
-
-	return resp.ID, sshPort, nil
+	// Use the custom SSH port (convert to uint64 for compatibility)
+	return resp.ID, uint64(sshPort), nil
 }
 
 // ArchiveDirectory creates a tar.gz archive of a directory for Docker build context
