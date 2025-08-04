@@ -26,7 +26,7 @@ type TableInfo struct {
 	IsSnapshot bool
 	// The time when the oldest segment was sealed.
 	OldestSegmentSealTime time.Time
-	// The time when the newest segment was sealed. This is used to determine the age of the oldest segment.
+	// The time when the newest segment was sealed.
 	NewestSegmentSealTime time.Time
 	// The index of the oldest segment in the table.
 	LowestSegmentIndex uint32
@@ -124,7 +124,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 		segmentPaths,
 		false,
 		time.Now(),
-		true,
+		false,
 		fsync)
 
 	if err != nil {
