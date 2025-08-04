@@ -42,12 +42,12 @@ func NewSSHSession(
 
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
+		return nil, fmt.Errorf("failed to read private key: %w", err)
 	}
 
 	key, err := ssh.ParsePrivateKey(keyData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 	config.Auth = []ssh.AuthMethod{
 		ssh.PublicKeys(key),
@@ -55,7 +55,7 @@ func NewSSHSession(
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to %s port %d: %v", host, port, err)
+		return nil, fmt.Errorf("failed to connect to %s port %d: %w", host, port, err)
 	}
 
 	return &SSHSession{
@@ -73,7 +73,7 @@ func NewSSHSession(
 func (s *SSHSession) Close() error {
 	err := s.client.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close SSH client: %v", err)
+		return fmt.Errorf("failed to close SSH client: %w", err)
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func (s *SSHSession) FindFiles(root string, extensions []string) ([]string, erro
 
 	if err != nil {
 		if !strings.Contains(stderr, "No such file or directory") {
-			return nil, fmt.Errorf("failed to execute command '%s': %v, stderr: %s",
+			return nil, fmt.Errorf("failed to execute command '%s': %w, stderr: %s",
 				command, err, stderr)
 		}
 		// There are no files since the directory does not exist.
@@ -119,7 +119,7 @@ func (s *SSHSession) Mkdirs(path string) error {
 			// Directory already exists, no error needed
 			return nil
 		}
-		return fmt.Errorf("failed to create directory '%s': %v, stderr: %s", path, err, stderr)
+		return fmt.Errorf("failed to create directory '%s': %w, stderr: %s", path, err, stderr)
 	}
 
 	return nil
@@ -168,7 +168,7 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float6
 
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to rsync data: %v", err)
+		return fmt.Errorf("failed to rsync data: %w", err)
 	}
 
 	return nil
@@ -178,7 +178,7 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float6
 func (s *SSHSession) Exec(command string) (stdout string, stderr string, err error) {
 	session, err := s.client.NewSession()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create SSH session: %v", err)
+		return "", "", fmt.Errorf("failed to create SSH session: %w", err)
 	}
 	defer func() {
 		_ = session.Close()
@@ -195,7 +195,7 @@ func (s *SSHSession) Exec(command string) (stdout string, stderr string, err err
 
 	if err = session.Run(command); err != nil {
 		return stdoutBuf.String(), stderrBuf.String(),
-			fmt.Errorf("failed to execute command '%s': %v", command, err)
+			fmt.Errorf("failed to execute command '%s': %w", command, err)
 	}
 
 	return stdoutBuf.String(), stderrBuf.String(), nil

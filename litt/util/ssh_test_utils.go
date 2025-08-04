@@ -399,7 +399,7 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			relPath, err := filepath.Rel(srcDir, path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get relative path: %w", err)
 			}
 
 			// Skip the root directory itself
@@ -409,12 +409,12 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			header, err := tar.FileInfoHeader(info, "")
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create tar header: %w", err)
 			}
 			header.Name = relPath
 
 			if err := tw.WriteHeader(header); err != nil {
-				return err
+				return fmt.Errorf("failed to write tar header for %s: %w", relPath, err)
 			}
 
 			if info.IsDir() {
@@ -423,12 +423,15 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			file, err := os.Open(path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open file %s: %w", path, err)
 			}
 			defer func() { _ = file.Close() }()
 
 			_, err = io.Copy(tw, file)
-			return err
+			if err != nil {
+				return fmt.Errorf("failed to copy file %s to tar: %w", path, err)
+			}
+			return nil
 		})
 	}()
 
