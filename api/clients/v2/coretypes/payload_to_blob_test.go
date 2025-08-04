@@ -12,7 +12,7 @@ import (
 // evaluations of a polynomial, which is then IFFT'd to produce a Blob in coefficient form.
 // This example demonstrates the process that [Payload.ToBlob] performs internally.
 func Example_payloadToBlobConversion() {
-	// We create a payload of 2 symbols (64 bytes), which with a payload head of 1 symbol (32 bytes),
+	// We create a payload of 2 symbols (64 bytes), which with an EncodedPayloadHeader of 1 symbol (32 bytes),
 	// will result in an encoded payload of 3 symbols (96 bytes). Because blobs have to be powers of 2,
 	// the blob length will be 4 symbols (128 bytes).
 	numSymbols := uint64(2)
@@ -52,7 +52,7 @@ func Example_payloadToBlobConversion() {
 	blobBytes := blob.Serialize()
 	fmt.Printf("Blob bytes (len %d):\n%s\n", len(blobBytes), hex.EncodeToString(blobBytes))
 
-	// Output: 
+	// Output:
 	// Payload bytes (len 62):
 	// 0100000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000
 	// Encoded Payload bytes (len 96):
