@@ -259,7 +259,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	// This allows reusing images when the public key is the same
 	h := fnv.New32a()
 	h.Write(publicKeyContent)
-	keyHash := fmt.Sprintf("%x", h.Sum32())
+	keyHash := fmt.Sprintf("%08x", h.Sum32()) // Pad to 8 characters with leading zeros
 	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
 	
 	// Check if image already exists to avoid rebuilding

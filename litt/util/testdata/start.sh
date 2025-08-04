@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Fix permissions on mounted directories
+# The host mounts will override directory ownership, so we need to fix it at runtime
+if [ -d "/mnt/data" ]; then
+    chown testuser:testuser /mnt/data
+    chmod 755 /mnt/data
+fi
+
+if [ -d "/mnt/test" ]; then
+    chown testuser:testuser /mnt/test
+    chmod 755 /mnt/test
+fi
+
 # Start SSH daemon in background
 /usr/sbin/sshd -D &
 SSHD_PID=$!
