@@ -101,6 +101,8 @@ func (s *EjectionSentinel) run() {
 	ticker := time.NewTicker(s.period)
 	defer ticker.Stop()
 
+	s.logger.Info("ejection sentinel run() started") // TODO remove
+
 	for {
 		select {
 		case <-ticker.C:
@@ -116,6 +118,10 @@ func (s *EjectionSentinel) run() {
 
 // checkEjectionStatus checks if the validator is being ejected and performs necessary actions based on the result.
 func (s *EjectionSentinel) checkEjectionStatus() error {
+
+	s.logger.Info("Checking ejection status...")         // TODO remove
+	defer s.logger.Info("done checking ejection status") // TODO remove
+
 	ejectionInProgress, err := s.caller.EjectionInitiated(&bind.CallOpts{Context: s.ctx}, s.selfAddress)
 	if err != nil {
 		return fmt.Errorf("failed to check ejection status: %w", err)
