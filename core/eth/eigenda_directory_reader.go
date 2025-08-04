@@ -16,6 +16,7 @@ type EigenDADirectoryReader struct {
 }
 
 // NewEigenDADirectoryReader creates a new EigenDADirectoryReader
+// TODO remove this
 func NewEigenDADirectoryReader(eigendaDirectoryHexAddr string, client bind.ContractBackend) (*EigenDADirectoryReader, error) {
 	if eigendaDirectoryHexAddr == "" || !gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
 		return nil, fmt.Errorf("address directory must be a valid hex address: %s", eigendaDirectoryHexAddr)

@@ -649,9 +649,9 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
-	DispersalAuthenticationTimeoutFlag,
 	EjectionSentinelPeriodFlag,
 	EjectionDefenseEnabledFlag,
+	IgnoreVersionForEjectionDefenseFlag,
 }
 
 func init() {

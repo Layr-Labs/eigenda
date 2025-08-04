@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	contractEigenDAEjectionManager "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAEjectionManager"
-	"github.com/Layr-Labs/eigenda/contracts/directory"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
