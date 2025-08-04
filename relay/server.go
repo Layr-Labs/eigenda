@@ -189,9 +189,11 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
+			// nolint:wrapcheck
 			return nil, api.NewErrorNotFound(
 				fmt.Sprintf("blob %s not found, check if blob exists and is assigned to this relay", key.Hex()))
 		}
+		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata for blob: %v", err))
 
 	}
@@ -312,9 +314,11 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		if strings.Contains(err.Error(), blobstore.ErrMetadataNotFound.Error()) {
+			// nolint:wrapcheck
 			return nil, api.NewErrorNotFound(
 				fmt.Sprintf("blob not found, check if blob exists and is assigned to this relay:: %v", keys))
 		}
+		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata for blob: %v", err))
 	}
 
