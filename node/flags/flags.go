@@ -500,7 +500,7 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
 	}
-	EjectionDefenseEnabledFlag = cli.BoolFlag{
+	EjectionDefenseEnabledFlag = cli.BoolTFlag{ // TODO make default false prior to merging
 		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
 		Usage:    "Whether to enable the ejection defense mechanism.",
 		Required: false,
