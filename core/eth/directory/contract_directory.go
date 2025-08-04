@@ -49,8 +49,9 @@ func NewContractDirectory(
 	}
 
 	d := &ContractDirectory{
-		logger: logger,
-		caller: caller,
+		logger:       logger,
+		addressCache: make(map[ContractName]gethcommon.Address),
+		caller:       caller,
 	}
 
 	err = d.isContractListComplete(ctx)
