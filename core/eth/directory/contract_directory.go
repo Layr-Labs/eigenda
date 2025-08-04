@@ -106,34 +106,21 @@ func (d *ContractDirectory) isContractListComplete(ctx context.Context) error {
 	for _, name := range registeredContracts {
 		registeredContractSet[name] = struct{}{}
 	}
-	knownContractSet := make(map[string]struct{}, len(knownContracts))
-	for _, contractName := range knownContracts {
-		knownContractSet[string(contractName)] = struct{}{}
-	}
 
 	for _, contractName := range knownContracts {
 		_, exists := registeredContractSet[string(contractName)]
 		if !exists {
-			d.logger.Warnf(
-				"Contract %s is known to offchain code but not registered in the EigenDA directory",
-				contractName)
-			complete = false
-		}
-	}
-	for _, contractName := range registeredContracts {
-		_, exists := knownContractSet[contractName]
-		if !exists {
-			d.logger.Warnf(
-				"Contract %s is registered in the EigenDA directory but not known to offchain code",
-				contractName)
+			d.logger.Errorf(
+				"Contract %s is known to offchain code but not registered in the "+
+					"onchain EigenDA contract directory", contractName)
 			complete = false
 		}
 	}
 
 	if complete {
-		d.logger.Infof("Offchain contract list matches onchain contract list")
+		d.logger.Infof("Onchain contract list matches offchain contract list")
 	} else {
-		d.logger.Warnf("Offchain contract list does not match onchain contract list")
+		d.logger.Warnf("Onchain contract list does not match offchain contract list")
 	}
 
 	return nil

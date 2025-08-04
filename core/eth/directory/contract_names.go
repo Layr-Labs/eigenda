@@ -1,5 +1,7 @@
 package directory
 
+// TODO: pare down this list just to the contracts we actually use offchain
+
 const (
 	PauserRegistry                              ContractName = "PAUSER_REGISTRY"
 	BlsApkRegistry                              ContractName = "BLS_APK_REGISTRY"
@@ -23,7 +25,7 @@ const (
 	EjectionManagerTestToken                    ContractName = "EJECTION_MANAGER_TEST_TOKEN"
 )
 
-// a list of all contracts currently known to the EigenDA directory.
+// a list of all contracts currently known to the EigenDA offchain code.
 var knownContracts = []ContractName{
 	PauserRegistry,
 	BlsApkRegistry,

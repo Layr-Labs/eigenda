@@ -101,7 +101,7 @@ func (s *EjectionSentinel) run() {
 	ticker := time.NewTicker(s.period)
 	defer ticker.Stop()
 
-	s.logger.Info("ejection sentinel run() started") // TODO remove
+	s.logger.Infof("ejection sentinel run() started, period is %s", s.period)
 
 	for {
 		select {
