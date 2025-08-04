@@ -55,20 +55,23 @@ func GetUniqueSSHTestPort(testName string) (int, error) {
 	h.Write([]byte(testName))
 	hash := h.Sum32()
 	
-	// Use hash to get a port offset (mod 100 to stay within reasonable range)
-	portOffset := int(hash % 100)
-	port := SSHTestPortBase + portOffset
-	
-	// Check if this port is free
-	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		// If the deterministic port is taken, fall back to the free port finder
-		return GetFreeSSHTestPort()
+	// Try multiple ports starting from the hash-based offset
+	for i := 0; i < 10; i++ {
+		portOffset := int((hash + uint32(i)) % 100)
+		port := SSHTestPortBase + portOffset
+		
+		// Check if this port is free with a short timeout
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if err != nil {
+			// Port is free (connection failed)
+			return port, nil
+		}
+		_ = conn.Close()
 	}
-	_ = listener.Close()
 	
-	return port, nil
+	// If no port found in the hash range, fall back to free port finder
+	return GetFreeSSHTestPort()
 }
 
 // SSHTestContainer manages a Docker container with SSH server for testing
@@ -121,15 +124,24 @@ func (c *SSHTestContainer) GetDataDir() string {
 
 // Cleanup removes the Docker container and cleans up resources
 func (c *SSHTestContainer) Cleanup() error {
-	ctx := context.Background()
+	// Use a context with timeout for cleanup operations
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Stop and remove container
-	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{})
+	// Stop and remove container with timeout
+	stopTimeout := 10 // seconds
+	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{
+		Timeout: &stopTimeout,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
+		// Log the error but continue with removal
+		fmt.Printf("Warning: failed to stop container %s: %v\n", c.containerID, err)
 	}
 
-	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{})
+	// Remove container even if stop failed
+	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{
+		Force: true, // Force removal even if container is still running
+	})
 	if err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
 	}
@@ -187,29 +199,41 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
-	// Try to connect multiple times with backoff
-	for i := 0; i < 100; i++ {
-		session, err := NewSSHSession(
-			logger,
-			"testuser",
-			"localhost",
-			sshPort,
-			privateKeyPath,
-			false)
-		if err == nil {
-			_ = session.Close()
-			return
-		}
-		time.Sleep(1 * time.Second)
-	}
+	// Use a context with timeout to prevent indefinite hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	require.Fail(t, "SSH server did not become ready in time")
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			require.Fail(t, "SSH server did not become ready within 30 seconds")
+			return
+		case <-ticker.C:
+			session, err := NewSSHSession(
+				logger,
+				"testuser",
+				"localhost",
+				sshPort,
+				privateKeyPath,
+				false)
+			if err == nil {
+				_ = session.Close()
+				return
+			}
+			// Continue trying on error
+		}
+	}
 }
 
 // SetupSSHTestContainer creates and starts a Docker container with SSH server
 // If dataDir is not empty, it will be mounted in the container at /mnt/data
 func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
-	ctx := context.Background()
+	// Use a context with timeout for Docker operations
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())

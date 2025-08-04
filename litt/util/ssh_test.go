@@ -14,7 +14,11 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
 	container := SetupSSHTestContainer(t, "")
-	defer func() { _ = container.Cleanup() }()
+	defer func() { 
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -59,7 +63,11 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	dataDir := t.TempDir()
 
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { _ = container.Cleanup() }()
+	defer func() { 
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -101,7 +109,11 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	dataDir := t.TempDir()
 
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { _ = container.Cleanup() }()
+	defer func() { 
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -152,7 +164,11 @@ func TestSSHSession_Rsync(t *testing.T) {
 	// Create a temporary data directory for testing
 	dataDir := t.TempDir()
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { _ = container.Cleanup() }()
+	defer func() { 
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
