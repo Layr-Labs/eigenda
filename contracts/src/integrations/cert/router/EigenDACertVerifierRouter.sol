@@ -17,15 +17,10 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier);
 
-    /// @notice Thrown when an activation block number (ABN) is not in the future when adding a cert verifier.
     error ABNNotInFuture(uint32 activationBlockNumber);
-    /// @notice Thrown when an activation block number (ABN) is not greater than the last registered ABN when adding a cert verifier.
     error ABNNotGreaterThanLast(uint32 activationBlockNumber);
-    /// @notice Thrown when the length of the cert verifier is not valid.
     error InvalidCertLength();
-    /// @notice Thrown when a reference block number (RBN) is in the future when verifying a cert.
     error RBNInFuture(uint32 referenceBlockNumber);
-    /// @notice Thrown when the length of input arrays that are expected to match do not match.
     error LengthMismatch();
 
     /// IEigenDACertVerifierRouter ///
