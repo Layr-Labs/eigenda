@@ -318,13 +318,14 @@ func (x *Batch) GetBlobCertificates() []*BlobCertificate {
 	return nil
 }
 
-// PaymentHeader contains payment information for a blob. Payments are handled on-chain by the PaymentVault contract:
+// PaymentHeader contains payment information for a blob. Reservation parameters and on-demand deposits are tracked
+// on-chain in the PaymentVault contract:
 // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol
 //
 // Two payment methods are supported:
 // 1. Reservation:
 //   - Users reserve bandwidth in advance for a specified time period.
-//   - Reservations are procured out-of-band, and are tracked in the PaymentVault.
+//   - Reservations are procured out-of-band, and are set in the PaymentVault by the EigenFoundation.
 //
 // 2. On-demand:
 //   - Users pay for each dispersal individually from funds deposited into the PaymentVault, by specifying a
@@ -333,14 +334,18 @@ func (x *Batch) GetBlobCertificates() []*BlobCertificate {
 //   - On-demand payments can only be used when dispersing through the EigenDA disperser. Currently, the EigenDA
 //     disperser is the *only* disperser, but this restriction will remain in place even with decentralized dispersal.
 //
-// The "size" of a dispersal, with respect to payments, is defined as the number of symbols being dispersed, rounded up
-// to the nearest multiple of the minNumSymbols defined in the PaymentVault contract. This size is relevant for both
-// reservation and on-demand dispersals.
+// For payment calculations, dispersals have a minimum size of minNumSymbols, defined in the PaymentVault. Smaller blobs
+// are billed as `minNumSymbols`.
 //
-// The cost of an on-demand dispersal is calculated by multiplying this size by the pricePerSymbol defined in the
-// PaymentVault contract.
+// The cost of an on-demand dispersal is calculated by multiplying the number of blob symbols by the pricePerSymbol
+// defined in the PaymentVault.
 //
 // Note: the quorum set being dispersed to has no impact on payment accounting with the current implementation.
+//
+// TODO(litt3): the current payment usage source-of-truth is the EigenDA disperser: reservation usage and latest
+// cumulative payment is persistently stored there. Once decentralized dispersal has been implemented, the validator
+// nodes will become the source-of-truth for reservation usage, but the EigenDA disperser will remain the
+// source-of-truth for on-demand usage.
 //
 // TODO(litt3): once accounting logic has been properly abstracted, put a link here to provide specific documentation of
 // how payments are processed.
@@ -349,7 +354,7 @@ type PaymentHeader struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The account ID of the dispersing user, represented as an Ethereum wallet address in hex format.
+	// The account ID of the dispersing user, represented as an Ethereum wallet address in hex format (0x prefix optional)
 	//
 	// This is the unique key which identifies the reservation to use, or the on-demand payment account to debit.
 	//
@@ -358,19 +363,24 @@ type PaymentHeader struct {
 	// The timestamp represents the nanosecond UNIX timestamp at the time the dispersal request is created.
 	//
 	// The timestamp plays the role of a nonce, optionally allowing the same blob data to be dispersed multiple times
-	// while still having a unique blob header hash.
+	// while still having a unique blob header hash (which is used as an idempotency key).
 	//
 	// When dealing with reservations, the timestamp determines which reservation bucket the dispersal falls into.
-	// TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a bin algorithm to track
-	// reservation usage. The timestamp is currently used for the bin algorithm, but will not be part of the leaky
-	// bucket algorithm. Even after this change, the timestamp should still be populated.
+	// TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a fixed window algorithm to
+	// track reservation usage. The timestamp is currently used for the fixed window algorithm, but will not be part of
+	// the leaky bucket algorithm. Even after this change, the timestamp should still be populated.
 	//
 	// The timestamp is currently unused in the context of on-demand payments, but this is subject to change without
 	// notice! Failure to populate this with a proper timestamp could result in failed dispersals and loss of associated
 	// payments.
 	Timestamp int64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// The cumulative_payment field is a serialized uint256 big integer representing the total wei paid by the account
-	// for this and all previous dispersals.
+	// The cumulative_payment field is a variable-sized big endian unsigned integer, representing the total wei paid by
+	// the account for this and all previous dispersals.
+	// TODO(litt3): we ought to limit the max size of this field to 32 bytes (256-bit unsigned int), but this isn't
+	// currently being checked. This will be fixed during the ongoing accounting reimplementation.
+	//
+	// For example, assume a new user begins dispersing blobs with on-demand payments, and each blob costs 100 wei. For
+	// the first dispersed blob, the cumulative_payment would be set to 100. For the second, 200. Then 300, and so on.
 	//
 	// If this field is *not* set, or is zero, reservation accounting will be used. If this field *is* set, and non-zero,
 	// on-demand accounting will be used EVEN IF a given account has a reservation. There is no fallback between these
