@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/contracts/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -98,6 +99,7 @@ type Node struct {
 // NewNode creates a new Node with the provided config.
 // TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
+	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
 	pubIPProvider pubip.Provider,
@@ -106,13 +108,39 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
+	if config.EigenDADirectory == "" {
+		return nil, fmt.Errorf("EigenDADirectory must be set")
+	}
+	if !gethcommon.IsHexAddress(config.EigenDADirectory) {
+		return nil, fmt.Errorf("EigenDADirectory must be a valid hex address: %s", config.EigenDADirectory)
+	}
+	contractDirectory, err := directory.NewContractDirectory(
+		ctx, logger, client, gethcommon.HexToAddress(config.EigenDADirectory))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
 	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
 	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
-	err := os.MkdirAll(config.DbPath, os.ModePerm)
+	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
+	}
+
+	// Start the ejection sentinel in a background goroutine.
+	_, err = NewEjectionSentinel(
+		ctx,
+		logger,
+		contractDirectory,
+		client,
+		gethcommon.HexToAddress(config.ID.Hex()),
+		config.EjectionSentinelPeriod,
+		config.EjectionDefenseEnabled,
+		config.IgnoreVersionForEjectionDefense)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ejection sentinel: %w", err)
 	}
 
 	chainID, err := client.ChainID(context.Background())

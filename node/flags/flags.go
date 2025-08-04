@@ -493,6 +493,25 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
 	}
+	EjectionSentinelPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-sentinel-period"),
+		Usage:    "The period at which the ejection sentinel runs to check for ejection conditions.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
+	}
+	EjectionDefenseEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
+		Usage:    "Whether to enable the ejection defense mechanism.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_DEFENSE_ENABLED"),
+	}
+	IgnoreVersionForEjectionDefenseFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ignore-version-for-ejection-defense"),
+		Usage:    "Whether to ignore the version check for ejection defense.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -630,6 +649,9 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	DispersalAuthenticationTimeoutFlag,
+	EjectionSentinelPeriodFlag,
+	EjectionDefenseEnabledFlag,
 }
 
 func init() {

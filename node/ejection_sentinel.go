@@ -54,6 +54,10 @@ func NewEjectionSentinel(
 	ignoreVersion bool,
 ) (*EjectionSentinel, error) {
 
+	if period <= 0 {
+		return nil, fmt.Errorf("period must be greater than 0, got %v", period)
+	}
+
 	ejectionContractAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ejection contract address: %w", err)

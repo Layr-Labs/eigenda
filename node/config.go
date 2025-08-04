@@ -156,6 +156,19 @@ type Config struct {
 	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
 	// from OOM-killing the process.
 	GCSafetyBufferSizeGB float64
+
+	// Controls how often the ejection sentinel checks to see if the node is being ejected. This should be configured
+	// to be smaller than the onchain ejection period.
+	EjectionSentinelPeriod time.Duration
+
+	// If true, the ejection sentinel will attempt to contest ejection by sending a transaction to cancel the ejection.
+	EjectionDefenseEnabled bool
+
+	// Under normal circumstances, honest validators should not contest an ejection if they are running software that
+	// does not meet the minimum version number as defined onchain. However, if the governing body in control of
+	// setting the minimum version number goes rogue, honest validators may want to contest ejection regardless of the
+	// claimed minimum version number.
+	IgnoreVersionForEjectionDefense bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -399,5 +412,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
 		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
+		EjectionSentinelPeriod:              ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
+		EjectionDefenseEnabled:              ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
+		IgnoreVersionForEjectionDefense:     ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
 	}, nil
 }
