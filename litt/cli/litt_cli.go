@@ -63,7 +63,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // tableInfoCommand, // TODO this will be added in a follow up PR
+				Action: tableInfoCommand,
 			},
 			{
 				Name:  "rebase",
