@@ -629,10 +629,16 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment
+// TODO(litt3): "ReservedPayment" isn't a good name. This should be renamed to "Reservation"
+//
+// TODO(litt3): this should be moved into the `payments` package
 type ReservedPayment struct {
 	// reserve number of symbols per second
+	//
+	// TODO(litt3): should this actually be a uint64? make sure we are using consistently sized ints everywhere
 	SymbolsPerSecond uint64
 	// reservation activation timestamp
+	// TODO(litt3): not enough detail in these docs. Fix them up, e.g. talk about this being nano epoch time
 	StartTimestamp uint64
 	// reservation expiration timestamp
 	EndTimestamp uint64
@@ -640,6 +646,9 @@ type ReservedPayment struct {
 	// allowed quorums
 	QuorumNumbers []uint8
 	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	//
+	// TODO(litt3): this is either deprecated, or in the process of being deprecated? double check, and then leave a
+	//	better comment here. If possible, delete this field entirely
 	QuorumSplits []byte
 }
 
