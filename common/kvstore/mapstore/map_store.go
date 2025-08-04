@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"slices"
 	"sort"
 	"sync"
 )
@@ -240,9 +241,7 @@ func (store *mapStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 	}
 
 	// Iterator must walk over keys in lexicographical order
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
+	slices.Sort(keys)
 
 	return &mapIterator{
 		keys:         keys,
