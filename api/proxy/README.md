@@ -192,7 +192,7 @@ This approach allows you to switch from V1 to V2 while the proxy is running, wit
 
 1. **Configure Both V1 and V2 Backends**
    - Use a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V1` in your configuration
       - This ensures that the proxy will continue dispersing to the V1 backend, until it's time to migrate
    - Set `EIGENDA_PROXY_API_ENABLED=admin` to expose the admin API
@@ -215,11 +215,11 @@ If you prefer a more controlled migration with explicit service updates, follow 
 
 1. **Initial Configuration (V1 Only)**
    - Start proxy with a V1-only configuration
-      - See `.env.exampleV1.holesky` for an example configuration
+      - See `.env.example` for an example configuration
 
 2. **Prepare V2 Configuration**
    - Prepare a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2`, so that the proxy started with this config will immediately
 enable V2 dispersal
 
@@ -229,10 +229,10 @@ enable V2 dispersal
 
 ### Deployment Against Real EigenDA Network
 
-We also provide network-specific example env configuration files in `.env.example.holesky` and `.env.example.mainnet` as a place to get started:
+We also provide an example env configuration file in `.env.example` as a place to get started:
 
-1. Copy example env file: `cp .env.example.holesky .env`
-2. Update env file, setting `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX`. On mainnet you will also need to set `EIGENDA_PROXY_ETH_RPC`.
+1. Copy example env file: `cp .env.example .env`
+2. Populate your `.env` file with required values.
 3. Pass into binary: `ENV_PATH=.env ./bin/eigenda-proxy --addr 127.0.0.1 --port 3100`
 
 ```bash
