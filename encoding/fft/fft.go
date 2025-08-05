@@ -93,10 +93,10 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 }
 
 // FFTSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings
-func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *FFTSettings {
+func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) (*FFTSettings, error) {
 	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
-		panic(fmt.Sprintf("blobLengthSymbols %d is not a power of 2", blobLengthSymbols))
+		return nil, fmt.Errorf("blobLengthSymbols %d is not a power of 2", blobLengthSymbols)
 	}
 	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
-	return NewFFTSettings(maxScale)
+	return NewFFTSettings(maxScale), nil
 }

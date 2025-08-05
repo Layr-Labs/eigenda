@@ -66,7 +66,10 @@ func evalToCoeffPoly(evalPoly []fr.Element, blobLengthSymbols uint32) ([]fr.Elem
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(blobLengthSymbols)
+	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(blobLengthSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("create FFT settings from blob length symbols: %w", err)
+	}
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	ifftedElements, err := fftSettings.FFT(evalPoly, true)
