@@ -54,9 +54,9 @@ func NewContractDirectory(
 		caller:       caller,
 	}
 
-	err = d.isContractListComplete(ctx)
+	err = d.verifyContractList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("IsContractListComplete: %w", err)
+		return nil, fmt.Errorf("verifyContractList: %w", err)
 	}
 
 	return d, nil
@@ -78,7 +78,6 @@ func (d *ContractDirectory) GetContractAddress(
 
 	address, ok := d.addressCache[contractName]
 	if ok {
-		d.logger.Debugf("using cached address for contract %s: %s", contractName, address.Hex())
 		return address, nil
 	}
 
@@ -86,6 +85,11 @@ func (d *ContractDirectory) GetContractAddress(
 	if err != nil {
 		return gethcommon.Address{}, fmt.Errorf("GetAddress0: %w", err)
 	}
+
+	if address == (gethcommon.Address{}) {
+		return gethcommon.Address{}, fmt.Errorf("constract %s is not registered onchain", contractName)
+	}
+
 	d.addressCache[contractName] = address
 
 	d.logger.Debugf("fetched address for contract %s: %s", contractName, address.Hex())
@@ -94,7 +98,7 @@ func (d *ContractDirectory) GetContractAddress(
 
 // Checks to see if the list of contracts tracked by this ContractDirectory matches the contracts currently registered
 // in the EigenDA directory contract. Creates some noisy logs if there are any discrepancies.
-func (d *ContractDirectory) isContractListComplete(ctx context.Context) error {
+func (d *ContractDirectory) verifyContractList(ctx context.Context) error {
 	registeredContracts, err := d.caller.GetAllNames(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("GetAllNames: %w", err)
