@@ -114,6 +114,7 @@ func NewValidatorStore(
 	littConfig.MetricsNamespace = littDBMetricsPrefix
 	littConfig.Logger = logger
 	littConfig.DoubleWriteProtection = config.LittDBDoubleWriteProtection
+	littConfig.PurgeLocks = config.LittUnsafePurgeLocks
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new litt config: %w", err)
 	}
