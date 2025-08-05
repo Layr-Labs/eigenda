@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
@@ -111,10 +112,8 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 
 	// check if the operator is already registered in the quorums
 	for _, quorumID := range churnRequest.QuorumIDs {
-		for _, quorumIDAlreadyRegisteredFor := range quorumIDsAlreadyRegisteredFor {
-			if quorumIDAlreadyRegisteredFor == quorumID {
-				return nil, api.NewErrorInvalidArg("operator is already registered in quorum")
-			}
+		if slices.Contains(quorumIDsAlreadyRegisteredFor, quorumID) {
+			return nil, api.NewErrorInvalidArg("operator is already registered in quorum")
 		}
 	}
 
