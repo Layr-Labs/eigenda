@@ -8,6 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 )
 
+// TODO: consider overflows in this. Are we being _too_ careful?
+
 // This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
 //
 // Units "leak out" of the bucket at a constant rate, creating capacity for new units. The bucket can be "filled"
@@ -30,20 +32,23 @@ type LeakyBucket struct {
 
 	// Describes alternate strategies for how the leaky bucket responds when a Fill is attempted that exceeds the
 	// available bucket capacity
-	overfillBehavior OverfillBehavior
+	overdraftBehavior OverdraftBehavior
 
 	// The total number of units that fit in the bucket
 	bucketCapacity int64
 
 	// The number of units that leak out of the bucket each second
 	//
-	// The leak rate is a uint32 on-chain, so that's what we accept in the constructor. But it's converted to an int64
+	// The leak rate is a uint64 on-chain, so that's what we accept in the constructor. But it's converted to an int64
 	// under the hood to match other int types in the struct, making syntax less verbose.
+	//
+	// The assumption that unitsPerSecondLeakRate fits in an int64 should be fine, as long as we are careful not to
+	// give out any reservations that exceed 590 exabytes.
 	unitsPerSecondLeakRate int64
 
-	// The type of bias to display, when confronted with a decision of whether to err on the side of permitting more or
-	// less traffic.
-	bias BiasBehavior
+	// The type of biasBehavior to display, when confronted with a decision of whether to err on the side of permitting
+	// more or less traffic.
+	biasBehavior BiasBehavior
 
 	// The number of units currently in the bucket
 	currentFillLevel int64
@@ -55,7 +60,7 @@ type LeakyBucket struct {
 	// is `epochNanoTime % 1e9`.
 	//
 	// Since the leaky bucket uses integers instead of floats, leak math isn't straight forward. It's easy to calculate
-	// the number of units that leak in a full second, since leak rate is defined in terms of uint32 / second. But
+	// the number of units that leak in a full second, since leak rate is defined in terms of units / second. But
 	// determining how many units leak in a number of nanoseconds requires making a rounding choice. Leak calculation
 	// N needs to take the partialSecondLeakage of calculation N-1 into account, so that the precisely correct number
 	// of units are leaked for each full second.
@@ -68,35 +73,34 @@ type LeakyBucket struct {
 // Creates a new leaky bucket, which represents the reservation of a single user
 func NewLeakyBucket(
 	timeSource func() time.Time,
-	overfillBehavior OverfillBehavior,
-	bucketCapacity int64,
-	unitsPerSecondLeakRate uint32,
-	bias BiasBehavior,
+	config *ReservationConfig,
 ) (*LeakyBucket, error) {
-	if bucketCapacity <= 0 {
-		return nil, fmt.Errorf("bucket capacity must be > 0, got %d", bucketCapacity)
+	if config.bucketCapacityDuration <= 0 {
+		return nil, fmt.Errorf("bucket capacity must be > 0, got %d", config.bucketCapacityDuration)
 	}
 
-	if unitsPerSecondLeakRate == 0 {
-		return nil, errors.New("unitsPerSecondLeakRate must be > 0")
+	bucketCapacity := int64(float64(config.symbolsPerSecond) * config.bucketCapacityDuration.Seconds())
+
+	if config.symbolsPerSecond == 0 {
+		return nil, errors.New("symbolsPerSecond must be > 0")
 	}
 
 	var currentFillLevel int64
-	switch bias {
+	switch config.biasBehavior {
 	case BiasPermitMore:
 		currentFillLevel = 0
 	case BiasPermitLess:
 		currentFillLevel = bucketCapacity
 	default:
-		return nil, fmt.Errorf("unknown bias type %s", bias)
+		return nil, fmt.Errorf("unknown bias behavior %s", config.biasBehavior)
 	}
 
 	return &LeakyBucket{
 		timeSource:                   timeSource,
-		overfillBehavior:             overfillBehavior,
+		overdraftBehavior:            config.overdraftBehavior,
 		bucketCapacity:               bucketCapacity,
-		unitsPerSecondLeakRate:       int64(unitsPerSecondLeakRate),
-		bias:                         bias,
+		unitsPerSecondLeakRate:       int64(config.symbolsPerSecond),
+		biasBehavior:                 config.biasBehavior,
 		currentFillLevel:             currentFillLevel,
 		previousLeakTime:             timeSource(),
 		previousPartialSecondLeakage: 0,
@@ -136,10 +140,10 @@ func (lb *LeakyBucket) Fill(unitCount int64) error {
 	}
 
 	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
-	switch lb.overfillBehavior {
-	case OverfillNotPermitted:
+	switch lb.overdraftBehavior {
+	case OverdraftNotPermitted:
 		return &InsufficientReservationCapacityError{unitCount}
-	case OverfillOncePermitted:
+	case OverdraftOncePermitted:
 		zeroCapacityAvailable := lb.currentFillLevel >= lb.bucketCapacity
 
 		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
@@ -150,7 +154,7 @@ func (lb *LeakyBucket) Fill(unitCount int64) error {
 		lb.currentFillLevel = newFillLevel
 		return nil
 	default:
-		return fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
+		return fmt.Errorf("unknown overfill behavior %s", lb.overdraftBehavior)
 	}
 }
 
@@ -196,8 +200,12 @@ func (lb *LeakyBucket) leak() error {
 		return nil
 	}
 
-	lb.currentFillLevel = lb.currentFillLevel - actualLeakage
+	newFillLevel, err := common.SafeSubtractInt64(lb.currentFillLevel, actualLeakage)
+	if err != nil {
+		return fmt.Errorf("safe subtract to update currentFillLevel: %w", err)
+	}
 
+	lb.currentFillLevel = newFillLevel
 	return nil
 }
 
@@ -222,7 +230,10 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, erro
 			lb.previousLeakTime.Unix())
 	}
 
-	secondsSinceLastUpdate := epochSeconds - lb.previousLeakTime.Unix()
+	secondsSinceLastUpdate, err := common.SafeSubtractInt64(epochSeconds, lb.previousLeakTime.Unix())
+	if err != nil {
+		return 0, fmt.Errorf("safe subtract to compute secondsSinceLastUpdate: %w", err)
+	}
 
 	fullSecondLeakage, err := common.SafeMultiplyInt64(secondsSinceLastUpdate, lb.unitsPerSecondLeakRate)
 	if err != nil {
@@ -236,20 +247,24 @@ func (lb *LeakyBucket) computePartialSecondLeakage(nanos int) (int64, error) {
 		return 0, fmt.Errorf("nanos must be between 0 and 1e9, got %d", nanos)
 	}
 
-	// Since nanos < 1e9 and unitsPerSecondLeakRate is uint32,
-	// the product will fit in int64 (max value would be (1e9-1) * (2^32-1) < 2^63)
-	product := int64(nanos) * int64(lb.unitsPerSecondLeakRate)
+	product, err := common.SafeMultiplyInt64(int64(nanos), lb.unitsPerSecondLeakRate)
+	if err != nil {
+		return 0, fmt.Errorf("safe multiply to compute nanos * unitsPerSecondLeakRate: %w", err)
+	}
 
-	switch lb.bias {
+	switch lb.biasBehavior {
 	case BiasPermitMore:
-		// Round up when bias is to permit more (more leakage = more capacity freed up)
+		// Round up, to permit more (more leakage = more capacity freed up)
 		// Add (1e9 - 1) before dividing to round up
-		// The result after division will always fit in uint32 since we're dividing by 1e9
-		return (product + 1e9 - 1) / 1e9, nil
+		sum, err := common.SafeAddInt64(product, 1e9-1)
+		if err != nil {
+			return 0, fmt.Errorf("safe add to compute rounding sum: %w", err)
+		}
+		return sum / 1e9, nil
 	case BiasPermitLess:
-		// Round down when bias is to permit less (less leakage = less capacity freed up)
+		// Round down, to permit less (less leakage = less capacity freed up)
 		return product / 1e9, nil
 	default:
-		return 0, fmt.Errorf("unknown bias: %s", lb.bias)
+		return 0, fmt.Errorf("unknown bias: %s", lb.biasBehavior)
 	}
 }

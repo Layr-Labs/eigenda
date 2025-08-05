@@ -634,8 +634,6 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 // TODO(litt3): this should be moved into the `payments` package
 type ReservedPayment struct {
 	// reserve number of symbols per second
-	//
-	// TODO(litt3): should this actually be a uint64? make sure we are using consistently sized ints everywhere
 	SymbolsPerSecond uint64
 	// reservation activation timestamp
 	// TODO(litt3): not enough detail in these docs. Fix them up, e.g. talk about this being nano epoch time

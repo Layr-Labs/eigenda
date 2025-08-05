@@ -1,18 +1,18 @@
 package payments
 
-// OverfillBehavior describes how leaky bucket overfills are handled
-type OverfillBehavior string
+// OverdraftBehavior describes how leaky bucket overdrafts are handled
+type OverdraftBehavior string
 
 const (
-	// Disallows any overfills.
+	// Disallows any overdrafts.
 	//
 	// If there isn't enough bucket capacity to cover a dispersal, then the dispersal will not be permitted.
-	OverfillNotPermitted OverfillBehavior = "notPermitted"
+	OverdraftNotPermitted OverdraftBehavior = "overdraftNotPermitted"
 
-	// Allows a single overfill.
+	// Allows a single overdraft.
 	//
 	// That means that if there is *any* available bucket capacity at all, then a single dispersal will be permitted,
-	// and the bucket will be overfilled. Then, the user will have to wait for the overfill to be drain before
+	// and the bucket will be filled above capacity. Then, the user will have to wait for the extra to be drain before
 	// making another dispersal.
-	OverfillOncePermitted OverfillBehavior = "overfillOncePermitted"
+	OverdraftOncePermitted OverdraftBehavior = "overdraftOncePermitted"
 )
