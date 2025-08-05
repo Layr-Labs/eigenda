@@ -123,6 +123,10 @@ type Config struct {
 	// this config value overrides the LittDBWriteCacheSizeFraction value.
 	LittDBWriteCacheSizeGB float64
 
+	// This is a derived value based on the configuration provided by LittDBWriteCacheSizeGB and
+	// LittDBWriteCacheSizeFraction. Stores the size of the LittDB write cache in bytes.
+	littDBWriteCacheSize uint64
+
 	// The percentage of the total memory to use for the read cache in littDB as a fraction of 1.0, where 1.0
 	// means that all available memory will be used for the read cache (don't actually use 1.0, that leaves no buffer
 	// for other stuff). Ignored if LittDBReadCacheSizeGB is set.
@@ -131,6 +135,10 @@ type Config struct {
 	// The size of the cache for storing recently read chunks in littDB, in gigabytes. Ignored if 0. If set,
 	// this config value overrides the LittDBReadCacheSizeFraction value.
 	LittDBReadCacheSizeGB float64
+
+	// This is a derived value based on the configuration provided by LittDBReadCacheSizeGB and
+	// LittDBReadCacheSizeFraction. Stores the size of the LittDB read cache in bytes.
+	littDBReadCacheSize uint64
 
 	// The list of paths to the littDB storage directories. Data is spread across these directories.
 	// Directories do not need to be on the same filesystem.
@@ -171,9 +179,15 @@ type Config struct {
 	// Unit is in megabytes.
 	GetChunksColdBurstLimitMB float64
 
-	// Defines a safety buffer for the garbage collector. If non-zero, then the garbage collector will be instructed
+	// GCSafetyBufferSizeFraction is the fraction of the total memory to use as a safety buffer for the garbage
+	// collector. If non-zero, the garbage collector will be instructed to aggressively garbage collect so as to
+	// keep this amount of memory free. Useful for preventing kubernetes from OOM-killing the process. Ignored if
+	// GCSafetyBufferSizeGB is greater than 0.
+	GCSafetyBufferSizeFraction float64
+
+	// Defines a safety buffer for the garbage collector. If non-zero, the garbage collector will be instructed
 	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
-	// from OOM-killing the process.
+	// from OOM-killing the process. Overrides the GCSafetyBufferSizeFraction value if greater than 0.
 	GCSafetyBufferSizeGB float64
 }
 
@@ -419,5 +433,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
 		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
+		GCSafetyBufferSizeFraction:          ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
 	}, nil
 }

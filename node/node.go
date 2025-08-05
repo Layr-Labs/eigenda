@@ -18,9 +18,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -106,11 +109,16 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
+	err := configureMemoryLimits(nodeLogger, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure memory limits: %w", err)
+	}
+
 	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
 	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
-	err := os.MkdirAll(config.DbPath, os.ModePerm)
+	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
@@ -321,6 +329,84 @@ func NewNode(
 
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
+}
+
+// configureMemoryLimits configures the memory limits for the Node. Updates derived values in the Config struct,
+// and also modifies the GC safety buffer size.
+//
+// All memory limits used by the validator should be configured within this function. This enables us to validate that
+// the total allocated memory does not exceed the maximum available memory.
+func configureMemoryLimits(logger logging.Logger, config *Config) error {
+
+	maxMemory, err := memory.GetMaximumAvailableMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get maximum available memory: %w", err)
+	}
+
+	totalAllocated := uint64(0)
+
+	safetyBufferSize := uint64(0)
+	if config.GCSafetyBufferSizeGB > 0 {
+		safetyBufferSize = uint64(config.GCSafetyBufferSizeGB * float64(units.GiB))
+		logger.Infof("GC safety buffer size configured to use %.2f GB.\n", config.GCSafetyBufferSizeGB)
+	} else {
+		safetyBufferSize = uint64(config.GCSafetyBufferSizeFraction * float64(maxMemory))
+		logger.Infof("GC safety buffer is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+			config.GCSafetyBufferSizeFraction*100.0,
+			float64(maxMemory)/float64(units.GiB),
+			float64(safetyBufferSize)/float64(units.GiB))
+	}
+	if safetyBufferSize > 0 {
+		err = memory.SetGCMemorySafetyBuffer(safetyBufferSize)
+		if err != nil {
+			return fmt.Errorf("failed to set memory limit: %w", err)
+		}
+	}
+	totalAllocated += safetyBufferSize
+
+	if config.EnableV2 {
+		var readCacheSize uint64
+		if config.LittDBWriteCacheSizeGB > 0 {
+			readCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
+			logger.Infof("LittDB write cache size configured to use %.2f GB.\n", config.LittDBWriteCacheSizeGB)
+		} else {
+			readCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB write cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBWriteCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(readCacheSize)/float64(units.GiB))
+		}
+		config.littDBReadCacheSize = readCacheSize
+		totalAllocated += readCacheSize
+
+		var writeCacheSize uint64
+		if config.LittDBReadCacheSizeGB > 0 {
+			writeCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
+			logger.Infof("LittDB read cache size configured to use %.2f GB.\n", config.LittDBReadCacheSizeGB)
+		} else {
+			writeCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB read cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBReadCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(writeCacheSize)/float64(units.GiB))
+		}
+		config.littDBWriteCacheSize = writeCacheSize
+		totalAllocated += writeCacheSize
+
+		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
+		//  limit here. It's important to ensure that all reserved memory buckets sum to less than the maximum
+		//  available memory.
+	}
+
+	if totalAllocated > maxMemory {
+		return fmt.Errorf("total memory allocated (%d bytes) "+
+			"exceeds maximum available memory (%d bytes)", totalAllocated, maxMemory)
+	}
+
+	bytesRemaining := totalAllocated - safetyBufferSize
+	logger.Infof("Total unallocated memory: %s", common.PrettyPrintBytes(bytesRemaining))
+
+	return nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just

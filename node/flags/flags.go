@@ -418,7 +418,7 @@ var (
 	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
-			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
@@ -433,7 +433,7 @@ var (
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
-			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
@@ -493,11 +493,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
 	}
 	GCSafetyBufferSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
-		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
+			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
+	}
+	GCSafetyBufferSizeFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-fraction"),
+		Usage: "The fraction of the total memory to use for the safety buffer for garbage collection. Is" +
+			" ignored if NODE_GC_SAFETY_BUFFER_SIZE_GB > 0.",
+		Required: false,
+		Value:    0.2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
