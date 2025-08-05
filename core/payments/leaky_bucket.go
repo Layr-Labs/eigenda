@@ -10,6 +10,11 @@ import (
 
 // TODO: consider overflows in this. Are we being _too_ careful?
 
+// TODO: write unit tests
+
+// TODO: rename this to reservation ledger, and use "symbols" instead of "units"? I had originally intended this to
+// be general purpose... but that probably just isn't necessary
+
 // This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
 //
 // Units "leak out" of the bucket at a constant rate, creating capacity for new units. The bucket can be "filled"
@@ -242,6 +247,7 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, erro
 	return fullSecondLeakage, nil
 }
 
+// TODO: doc
 func (lb *LeakyBucket) computePartialSecondLeakage(nanos int) (int64, error) {
 	if nanos >= 1e9 || nanos < 0 {
 		return 0, fmt.Errorf("nanos must be between 0 and 1e9, got %d", nanos)

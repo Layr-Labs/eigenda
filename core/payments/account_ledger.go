@@ -7,7 +7,14 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
+// TODO: write unit tests
+
+// TODO: work out how to fit metrics into this
+
 // TODO: this is a replacement for the accountant and the meterer
+
+// TODO: this ledger will need a queue that can be pushed on to from different go routines. Elements will then be
+// popped off of the queue, and handled via "Debit"
 type AccountLedger struct {
 	leakyBucket *LeakyBucket
 }
