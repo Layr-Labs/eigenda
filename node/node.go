@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -95,6 +96,7 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
+// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
 	reg *prometheus.Registry,
 	config *Config,
@@ -190,20 +192,6 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// Create new blacklist store
-	// We disable seeks compaction and enable sync writes to ensure that the blacklist is always up to date.
-	// This is because the blacklist is used to check if a disperser is blacklisted, and if it is, we need to
-	// stop accepting requests from that disperser.
-	blacklistStore, err := NewLevelDBBlacklistStore(
-		config.DbPath+"/blacklist",
-		logger,
-		true, // disable seeks compaction
-		true, // enable sync writes
-		DefaultTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
-	}
-
 	// If EigenDADirectory is provided, use it to get service manager addresses
 	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
@@ -212,7 +200,7 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 		}
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{Context: context.Background()})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
 		}
@@ -268,7 +256,7 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		BlacklistStore:          blacklistStore,
+		BlacklistStore:          nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
@@ -302,7 +290,7 @@ func NewNode(
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
 		relayClientConfig := &relay.RelayClientConfig{
-			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
@@ -396,7 +384,7 @@ func (n *Node) Start(ctx context.Context) error {
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
-		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
+		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.ChurnerUseSecureGrpc, n.Config.Timeout, n.Logger)
 		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)

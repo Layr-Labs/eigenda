@@ -46,7 +46,7 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg channel "#da-live-tests" \
-            --arg text "${MENTION}Live Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg text "${MENTION}Live V2 Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
             --arg title "logs" \
             --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg color "$COLOR" \
@@ -101,7 +101,7 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg channel "#da-live-tests" \
-            --arg text "${MENTION}Live Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
+            --arg text "${MENTION}Live V1 Network Tests completed, status: ${STATUS_EMOJI} ${{ job.status }}" \
             --arg title "logs" \
             --arg title_link "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --arg color "$COLOR" \

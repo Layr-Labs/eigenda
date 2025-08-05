@@ -21,7 +21,7 @@ func TestDecodeShortBytes(t *testing.T) {
 	// truncate
 	encodedPayload.bytes = encodedPayload.bytes[:len(encodedPayload.bytes)-32]
 
-	payload, err := encodedPayload.decode()
+	payload, err := encodedPayload.Decode()
 	require.Error(t, err)
 	require.Nil(t, payload)
 }
@@ -37,7 +37,7 @@ func TestDecodeLongBytes(t *testing.T) {
 	// appending 33 bytes to the encoded payload guarantees that, after removing padding, the unpadded bytes will be
 	// at least 32 bytes longer than the expected length, which is the error case we're trying to trigger here
 	encodedPayload.bytes = append(encodedPayload.bytes, make([]byte, 33)...)
-	payload2, err := encodedPayload.decode()
+	payload2, err := encodedPayload.Decode()
 	require.Error(t, err)
 	require.Nil(t, payload2)
 }

@@ -8,7 +8,7 @@ import "fmt"
 // This error can currently occur on op-stack when a L1 reorg happens (but not always!).
 // The cert's confirmation block number can changed by the reorg, whereas the cert still contains the old
 // block number. This causes the hash of the batch metadata to change, which causes the error.
-// See https://github.com/Layr-Labs/eigenda-proxy/blob/main/docs/troubleshooting_v1.md#batch-hash-mismatch-error
+// See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/docs/troubleshooting_v1.md#batch-hash-mismatch-error
 // for more details.
 //
 // We originally defined this structured error with goal to handle it.

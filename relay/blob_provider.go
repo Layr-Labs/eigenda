@@ -70,10 +70,7 @@ func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte,
 	data, err := s.blobCache.Get(ctx, blobKey)
 
 	if err != nil {
-		// It should not be possible for external users to force an error here since we won't
-		// even call this method if the blob key is invalid (so it's ok to have a noisy log here).
-		s.logger.Errorf("Failed to fetch blob: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error calling blobCache.Get: %v", err)
 	}
 
 	return data, nil
@@ -86,8 +83,7 @@ func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 
 	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
-		s.logger.Errorf("Failed to fetch blob: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error calling blobStore.GetBlob: %v", err)
 	}
 
 	return data, nil

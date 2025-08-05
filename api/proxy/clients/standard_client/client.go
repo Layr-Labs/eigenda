@@ -6,8 +6,8 @@
 //
 // Note that op rollups use a different [op-specific commitment] and should use op's [DAClient] instead.
 //
-// [standard commitment mode]: https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#standard-commitment-mode
-// [op-specific commitment]: https://github.com/Layr-Labs/eigenda-proxy#optimism-commitment-mode
+// [standard commitment mode]: https://github.com/Layr-Labs/eigenda/tree/master/api/proxy#standard-commitment-mode
+// [op-specific commitment]: https://github.com/Layr-Labs/eigenda/tree/master/api/proxy#optimism-commitment-mode
 // [DAClient]: https://pkg.go.dev/github.com/ethereum-optimism/optimism/op-alt-da#DAClient
 package standard_client
 

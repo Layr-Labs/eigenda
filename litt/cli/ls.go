@@ -18,7 +18,7 @@ import (
 func lsCommand(ctx *cli.Context) error {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
@@ -35,7 +35,7 @@ func lsCommand(ctx *cli.Context) error {
 
 	tables, err := lsPaths(logger, sources, true, true)
 	if err != nil {
-		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
+		return fmt.Errorf("failed to list tables in paths %v: %w", sources, err)
 	}
 
 	sb := &strings.Builder{}
@@ -56,7 +56,7 @@ func lsPaths(logger logging.Logger, rootPaths []string, lock bool, fsync bool) (
 	for _, rootPath := range rootPaths {
 		tables, err := ls(logger, rootPath, lock, fsync)
 		if err != nil {
-			return nil, fmt.Errorf("error finding tables: %v", err)
+			return nil, fmt.Errorf("error finding tables: %w", err)
 		}
 		for _, table := range tables {
 			tableSet[table] = struct{}{}
@@ -82,7 +82,7 @@ func ls(logger logging.Logger, rootPath string, lock bool, fsync bool) ([]string
 		lockPath := path.Join(rootPath, util.LockfileName)
 		fLock, err := util.NewFileLock(logger, lockPath, fsync)
 		if err != nil {
-			return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
+			return nil, fmt.Errorf("failed to acquire lock on %s: %w", rootPath, err)
 		}
 		defer fLock.Release()
 	}
@@ -91,7 +91,7 @@ func ls(logger logging.Logger, rootPath string, lock bool, fsync bool) ([]string
 	// of the table being the name of the directory.
 	possibleTables, err := os.ReadDir(rootPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read dir %s: %v", rootPath, err)
+		return nil, fmt.Errorf("failed to read dir %s: %w", rootPath, err)
 	}
 
 	// Each table directory will contain a "segments" directory. Infer that any directory containing this directory
@@ -104,11 +104,11 @@ func ls(logger logging.Logger, rootPath string, lock bool, fsync bool) ([]string
 		}
 
 		segmentPath := filepath.Join(rootPath, entry.Name(), segment.SegmentDirectory)
-		exists, err := util.Exists(segmentPath)
+		isDirectory, err := util.IsDirectory(segmentPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment path %s exists: %v", segmentPath, err)
+			return nil, fmt.Errorf("failed to check if segment path %s is a directory: %w", segmentPath, err)
 		}
-		if exists && entry.IsDir() {
+		if isDirectory {
 			tables = append(tables, entry.Name())
 		}
 	}

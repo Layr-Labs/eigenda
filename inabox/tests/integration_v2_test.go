@@ -6,24 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/docker/go-units"
-	"google.golang.org/grpc"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/core"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -75,121 +61,6 @@ func RandomG2Point() (encoding.G2Commitment, error) {
 	Paff.FromJacobian(&Pjac)
 	return encoding.G2Commitment(Paff), nil
 }
-
-var _ = Describe("Inabox v2 blacklisting Integration test", func() {
-	It("test end to end scenario of blacklisting", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		// random G1 point
-		g1Commitment, err := RandomG1Point()
-		if err != nil {
-			Fail("failed to generate random G1 point")
-		}
-
-		g2Commitment, err := RandomG2Point()
-		if err != nil {
-			Fail("failed to generate random G2 point")
-		}
-
-		// random data blob certificate
-		blobCert := &corev2.BlobCertificate{
-			BlobHeader: &corev2.BlobHeader{
-				BlobVersion: 2,
-				BlobCommitments: encoding.BlobCommitments{
-					Commitment:       &g1Commitment,
-					LengthCommitment: &g2Commitment,
-					LengthProof:      &g2Commitment,
-					Length:           100,
-				},
-				QuorumNumbers: []core.QuorumID{0, 1},
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID:         gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
-					Timestamp:         time.Now().UnixNano(),
-					CumulativePayment: big.NewInt(100),
-				},
-			},
-			Signature: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-			RelayKeys: []corev2.RelayKey{0, 1},
-		}
-
-		blobCertProto, err := blobCert.ToProtobuf()
-		if err != nil {
-			Fail("failed to convert blob certificate to protobuf")
-		}
-		fmt.Println("blobCertProto size", len(blobCertProto.String()))
-
-		mineAnvilBlocks(1)
-		// println("latest block number", deploy.GetLatestBlockNumber("http://localhost:8545"))
-
-		request := &nodegrpc.StoreChunksRequest{
-			Batch: &commonpb.Batch{
-				Header: &commonpb.BatchHeader{
-					BatchRoot:            []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
-					ReferenceBlockNumber: 70,
-				},
-				BlobCertificates: []*commonpb.BlobCertificate{
-					blobCertProto,
-				},
-			},
-			DisperserID: api.EigenLabsDisperserID,
-			Timestamp:   uint32(time.Now().Unix()),
-			Signature:   []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
-		}
-
-		hash, err := hashing.HashStoreChunksRequest(request)
-		if err != nil {
-			Fail("failed to hash request")
-		}
-
-		keyManager := kms.New(kms.Options{
-			Region:       "us-east-1",
-			BaseEndpoint: aws.String("http://localhost:4570"),
-		})
-
-		// pick the first key in the key manager
-		keys, err := keyManager.ListKeys(ctx, &kms.ListKeysInput{})
-		if err != nil {
-			Fail("failed to list keys")
-		}
-		keyID := keys.Keys[0].KeyId
-
-		publicKey, err := aws2.LoadPublicKeyKMS(ctx, keyManager, *keyID)
-		if err != nil {
-			Fail("failed to load public key")
-		}
-
-		signature, err := aws2.SignKMS(ctx, keyManager, *keyID, publicKey, hash)
-		if err != nil {
-			Fail("failed to sign request")
-		}
-
-		request.Signature = signature
-
-		addr := fmt.Sprintf("%v:%v", "localhost", "32017")
-		dialOptions := clients.GetGrpcDialOptions(false, 4*units.MiB)
-		// conn, err := grpc.NewClient(addr, dialOptions...)
-		// if err != nil {
-		// 	Fail("failed to create grpc connection")
-		// }
-		conn, err := grpc.NewClient(addr, dialOptions...)
-		if err != nil {
-			Fail("failed to create grpc connection")
-		}
-		dispersalClient := nodegrpc.NewDispersalClient(conn)
-
-		// after this request, the disperser should be blacklisted
-		_, err = dispersalClient.StoreChunks(ctx, request)
-		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("failed to validate blob request"))
-
-		// should get error saying disperser is blacklisted
-		_, err = dispersalClient.StoreChunks(ctx, request)
-		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("disperser is blacklisted"))
-
-	})
-})
 
 var _ = Describe("Inabox v2 Integration", func() {
 	/*

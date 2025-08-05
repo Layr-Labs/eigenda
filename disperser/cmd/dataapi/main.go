@@ -95,7 +95,7 @@ func RunDataApi(ctx *cli.Context) error {
 	var (
 		reg               = prometheus.NewRegistry()
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
+		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr, config.SubgraphApiPaymentsAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
@@ -108,6 +108,11 @@ func RunDataApi(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
+
+		// Register reservation collector
+		reservationCollector := serverv2.NewReservationExpirationCollector(subgraphClient, logger)
+		reg.MustRegister(reservationCollector)
+
 		metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{

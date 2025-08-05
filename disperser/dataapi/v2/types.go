@@ -235,3 +235,15 @@ func createBlobMetadata(bm *disperserv2.BlobMetadata) *BlobMetadata {
 		ExpiryUnixSec: bm.Expiry,
 	}
 }
+
+// Account types
+type (
+	AccountResponse struct {
+		Address     string `json:"address"`
+		DispersedAt string `json:"dispersed_at"` // RFC3339 format
+	}
+
+	AccountFeedResponse struct {
+		Accounts []AccountResponse `json:"accounts"`
+	}
+)

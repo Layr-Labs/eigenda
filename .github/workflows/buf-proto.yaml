@@ -12,14 +12,10 @@
 name: Buf Proto
 on:
   push:
-    paths:
-      - "api/proto/**"
-      - "api/buf.yaml"
+    branches:
+      - master
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths:
-      - "api/proto/**"
-      - "api/buf.yaml"
+  merge_group:
 
 permissions:
   contents: read

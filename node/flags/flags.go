@@ -186,6 +186,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
+	RelayUseSecureGRPC = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-use-secure-grpc"),
+		Usage:    "Whether to use secure GRPC connection to Relay (defaults to true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_USE_SECURE_GRPC"),
+	}
 	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
 		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
@@ -445,6 +451,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
+	LittUnsafePurgeLocksFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
+		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool. The default value is 16.",
@@ -582,6 +594,7 @@ var optionalFlags = []cli.Flag{
 	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	RelayUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,
@@ -623,6 +636,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	LittUnsafePurgeLocksFlag,
 }
 
 func init() {
