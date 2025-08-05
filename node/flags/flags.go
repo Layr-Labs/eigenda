@@ -427,7 +427,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
 		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		Value:    0.45,
+		Value:    0.15,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
@@ -450,6 +450,12 @@ var (
 		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
+	}
+	LittUnsafePurgeLocksFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
+		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -630,6 +636,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	LittUnsafePurgeLocksFlag,
 }
 
 func init() {
