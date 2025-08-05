@@ -1,15 +1,17 @@
 package payments
 
 import (
+	"errors"
 	"fmt"
-	"math"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common"
 )
 
 // This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
 //
-// Symbols "leak out" of the bucket at a constant rate, creating capacity for new symbols. The bucket can be "filled"
-// with additional symbols if there is enough available capacity.
+// Units "leak out" of the bucket at a constant rate, creating capacity for new units. The bucket can be "filled"
+// with additional units if there is enough available capacity.
 //
 // The standard golang golang.org/x/time/rate.Limiter is not suitable for our use-case, for the following reasons:
 //
@@ -21,33 +23,65 @@ import (
 //     what conditions would it be possible for the client and server representations of a given leaky bucket to
 //     diverge, and what impact would that have on our assumptions? These questions can be avoided entirely by using
 //     an integer based implementation.
+//
+// NOTE: methods on this struct should not be called from separate goroutines: it's not threadsafe.
 type LeakyBucket struct {
 	timeSource func() time.Time
 
+	// Describes alternate strategies for how the leaky bucket responds when a Fill is attempted that exceeds the
+	// available bucket capacity
 	overfillBehavior OverfillBehavior
 
-	maxWaitTime time.Duration
+	// The total number of units that fit in the bucket
+	bucketCapacity int64
 
-	bucketCapacity   uint32
-	currentFillLevel uint32
+	// The number of units that leak out of the bucket each second
+	//
+	// The leak rate is a uint32 on-chain, so that's what we accept in the constructor. But it's converted to an int64
+	// under the hood to match other int types in the struct, making syntax less verbose.
+	unitsPerSecondLeakRate int64
 
-	symbolsPerSecondLeakRate uint32
-
-	previousUpdateTime       time.Time
-	previousSubSecondLeakage uint32
-
+	// The type of bias to display, when confronted with a decision of whether to err on the side of permitting more or
+	// less traffic.
 	bias BiasBehavior
+
+	// The number of units currently in the bucket
+	currentFillLevel int64
+
+	// The time at which the previous leak calculation was made.
+	previousLeakTime time.Time
+
+	// The number of units which leaked in the "partial second" of the previous leak calculation. A "partial" second
+	// is `epochNanoTime % 1e9`.
+	//
+	// Since the leaky bucket uses integers instead of floats, leak math isn't straight forward. It's easy to calculate
+	// the number of units that leak in a full second, since leak rate is defined in terms of uint32 / second. But
+	// determining how many units leak in a number of nanoseconds requires making a rounding choice. Leak calculation
+	// N needs to take the partialSecondLeakage of calculation N-1 into account, so that the precisely correct number
+	// of units are leaked for each full second.
+	//
+	// It would be possible to recalculate this value for N-1 when doing the calculation for N, but storing this value
+	// as a member variable keeps things simple and avoids re-doing the math.
+	previousPartialSecondLeakage int64
 }
 
+// Creates a new leaky bucket, which represents the reservation of a single user
 func NewLeakyBucket(
 	timeSource func() time.Time,
-	bucketCapacity uint32,
-	bias BiasBehavior,
-	symbolsPerSecondLeakRate uint32,
 	overfillBehavior OverfillBehavior,
-	maxWaitTime time.Duration,
+	bucketCapacity int64,
+	unitsPerSecondLeakRate uint32,
+	bias BiasBehavior,
 ) (*LeakyBucket, error) {
-	var currentFillLevel uint32
+	if bucketCapacity <= 0 {
+		return nil, fmt.Errorf("bucket capacity must be > 0, got %d", bucketCapacity)
+	}
+
+	if unitsPerSecondLeakRate == 0 {
+		return nil, errors.New("unitsPerSecondLeakRate must be > 0")
+	}
+
+	var currentFillLevel int64
 	switch bias {
 	case BiasPermitMore:
 		currentFillLevel = 0
@@ -58,146 +92,106 @@ func NewLeakyBucket(
 	}
 
 	return &LeakyBucket{
-		timeSource:               timeSource,
-		overfillBehavior:         overfillBehavior,
-		maxWaitTime:              maxWaitTime,
-		bucketCapacity:           bucketCapacity,
-		currentFillLevel:         currentFillLevel,
-		symbolsPerSecondLeakRate: symbolsPerSecondLeakRate,
-		previousUpdateTime:       timeSource(),
-		bias:                     bias,
+		timeSource:                   timeSource,
+		overfillBehavior:             overfillBehavior,
+		bucketCapacity:               bucketCapacity,
+		unitsPerSecondLeakRate:       int64(unitsPerSecondLeakRate),
+		bias:                         bias,
+		currentFillLevel:             currentFillLevel,
+		previousLeakTime:             timeSource(),
+		previousPartialSecondLeakage: 0,
 	}, nil
 }
 
-func (lb *LeakyBucket) Fill(symbols uint32) error {
+// Add a number of units to the leaky bucket.
+//
+// Returns nil if the bucket has enough capacity to accept the fill. Returns an InsufficientReservationCapacityError
+// if bucket lacks capacity to permit the fill.
+//
+// If the bucket doesn't have enough capacity to accommodate the fill, unitCount IS NOT added to the bucket, i.e. a
+// failed fill doesn't count against the meter.
+//
+// TODO: consider whether we should return the available capacity from this method?
+func (lb *LeakyBucket) Fill(unitCount int64) error {
+	if unitCount <= 0 {
+		return fmt.Errorf("unitCount must be > 0, got %d", unitCount)
+	}
+
+	// leak the correct number of units, based on how long it's been since the last leak calculation
 	err := lb.leak()
 	if err != nil {
 		return fmt.Errorf("leak: %w", err)
 	}
 
-	newFillLevel := lb.currentFillLevel + symbols
+	// this is how full the bucket would be, if the fill were to be accepted
+	newFillLevel, err := common.SafeAddInt64(lb.currentFillLevel, unitCount)
+	if err != nil {
+		return fmt.Errorf("safe add to compute newFillLevel: %w", err)
+	}
+
+	// if newFillLevel is less than the total bucket capacity, no further checks are required
 	if newFillLevel < lb.bucketCapacity {
 		lb.currentFillLevel = newFillLevel
 		return nil
 	}
 
-	nonZeroCapacityAvailable := lb.currentFillLevel < lb.bucketCapacity
-
-	if nonZeroCapacityAvailable && lb.overfillBehavior == OverfillOncePermitted {
-		lb.currentFillLevel = newFillLevel
-		return nil
-	}
-	// TODO: not done yet. keep going with the logic here
-}
-
-func (lb *LeakyBucket) computeDispersalTime(symbols uint32) (*time.Time, error) {
-	var targetLevel uint32
+	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
 	switch lb.overfillBehavior {
 	case OverfillNotPermitted:
-		// TODO; consider what if this is < 0
-		targetLevel = lb.bucketCapacity - symbols
+		return &InsufficientReservationCapacityError{unitCount}
 	case OverfillOncePermitted:
-		targetLevel = lb.bucketCapacity - 1
+		zeroCapacityAvailable := lb.currentFillLevel >= lb.bucketCapacity
+
+		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
+		if zeroCapacityAvailable {
+			return &InsufficientReservationCapacityError{unitCount}
+		}
+
+		lb.currentFillLevel = newFillLevel
+		return nil
 	default:
-		return nil, fmt.Errorf("unrecognized overfill behavior %s", lb.overfillBehavior)
+		return fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
 	}
-
-	// todo: note assumption that this method is only called if you actually need to wait
-	amountToLeak := lb.currentFillLevel - targetLevel
-
-	// the amount of leakage that will happen in the remainder of the current second
-	subSecondRemainderToLeak := lb.symbolsPerSecondLeakRate - lb.previousSubSecondLeakage
-
-	nanosRemainingInCurrentSecond := int64(1e9 - lb.previousUpdateTime.Nanosecond())
-
-	if amountToLeak < subSecondRemainderToLeak {
-		// We need to wait for a fraction of the remainder of the current second
-		// Calculate how many nanos we need to wait based on the proportion of amountToLeak to symbolsPerSecondLeakRate
-
-		// The formula is:
-		//   time_to_wait = amountToLeak / symbolsPerSecondLeakRate  (in seconds)
-		//
-		//   To convert to nanoseconds:
-		//   time_to_wait_nanos = (amountToLeak / symbolsPerSecondLeakRate) * 1e9
-		//
-		//   To avoid floating point division, we rearrange:
-		//   time_to_wait_nanos = (amountToLeak * 1e9) / symbolsPerSecondLeakRate
-
-		switch lb.bias {
-		case BiasPermitMore:
-			// Round down wait time (wait less, permit sooner)
-			nanosToWait := int64(amountToLeak) * 1e9 / int64(lb.symbolsPerSecondLeakRate)
-			dispersalTime := lb.previousUpdateTime.Add(time.Duration(nanosToWait))
-			return &dispersalTime, nil
-		case BiasPermitLess:
-			// Round up wait time (wait more, be conservative)
-			nanosToWait := (int64(amountToLeak)*1e9 + int64(lb.symbolsPerSecondLeakRate) - 1) / int64(lb.symbolsPerSecondLeakRate)
-			dispersalTime := lb.previousUpdateTime.Add(time.Duration(nanosToWait))
-			return &dispersalTime, nil
-		default:
-			return nil, fmt.Errorf("unknown bias: %s", lb.bias)
-		}
-	} else if amountToLeak == subSecondRemainderToLeak {
-		// The amount to wait is exactly the sub-second time remainder
-		// We need to wait until the next whole second
-		dispersalTime := lb.previousUpdateTime.Add(time.Duration(nanosRemainingInCurrentSecond))
-		return &dispersalTime, nil
-	}
-
-	// else we have to wait for the rest of the current second to elapse, then some number of seconds, then potentially
-	// some number of nanos
-
-	// First, subtract what will leak in the remainder of the current second
-	amountToLeak -= subSecondRemainderToLeak
-
-	// Calculate how many full seconds we need to wait
-	fullSecondsToWait := amountToLeak / lb.symbolsPerSecondLeakRate
-
-	// the amount of symbols that need to leak in the final fractional second
-	nanosToLeakInFinalSecond := amountToLeak % lb.symbolsPerSecondLeakRate
-
-	// Calculate nanos for the final fractional second
-	var nanosToLeakRemainder int64
-	if nanosToLeakInFinalSecond > 0 {
-		// Apply bias for the partial second calculation
-		switch lb.bias {
-		case BiasPermitMore:
-			// Round down wait time
-			nanosToLeakRemainder = (int64(nanosToLeakInFinalSecond) * 1e9) / int64(lb.symbolsPerSecondLeakRate)
-		case BiasPermitLess:
-			// Round up wait time
-			nanosToLeakRemainder = ((int64(nanosToLeakInFinalSecond) * 1e9) + int64(lb.symbolsPerSecondLeakRate) - 1) / int64(lb.symbolsPerSecondLeakRate)
-		default:
-			return nil, fmt.Errorf("unknown bias: %s", lb.bias)
-		}
-	}
-
-	totalNanosToWait := nanosRemainingInCurrentSecond + int64(fullSecondsToWait)*1e9 + nanosToLeakRemainder
-	dispersalTime := lb.previousUpdateTime.Add(time.Duration(totalNanosToWait))
-	return &dispersalTime, nil
 }
 
+// Lets the correct number of units leak out of the bucket, based on when we last leaked
+//
+// Returns an error if any of the calculations fail, which should not happen during normal usage.
 func (lb *LeakyBucket) leak() error {
 	currentTime := lb.timeSource()
 	defer func() {
-		lb.previousUpdateTime = currentTime
+		lb.previousLeakTime = currentTime
 	}()
 
 	fullSecondLeakage, err := lb.computeFullSecondLeakage(currentTime.Unix())
 	if err != nil {
 		return fmt.Errorf("compute full second leakage: %w", err)
 	}
-	subSecondLeakage, err := lb.computeSubSecondLeakage(int64(currentTime.Nanosecond()))
+
+	// We need to correct the full-second leakage value: the previous leak calculation already let some units from a
+	// partial second period leak out, and those units shouldn't be allowed to leak twice
+	//
+	// This value can be negative if the previous leak calculation was within the same second as this calculation.
+	correctedFullSecondLeakage, err := common.SafeSubtractInt64(fullSecondLeakage, lb.previousPartialSecondLeakage)
 	if err != nil {
-		return fmt.Errorf("compute sub second leakage")
+		return fmt.Errorf("safe subtract to compute correctedFullSecondLeakage: %w", err)
+	}
+
+	partialSecondLeakage, err := lb.computePartialSecondLeakage(currentTime.Nanosecond())
+	if err != nil {
+		return fmt.Errorf("compute partial second leakage: %w", err)
 	}
 	defer func() {
-		lb.previousSubSecondLeakage = subSecondLeakage
+		lb.previousPartialSecondLeakage = partialSecondLeakage
 	}()
 
-	actualLeakage := fullSecondLeakage + subSecondLeakage - lb.previousSubSecondLeakage
+	actualLeakage, err := common.SafeAddInt64(correctedFullSecondLeakage, partialSecondLeakage)
+	if err != nil {
+		return fmt.Errorf("safe add to compute actualLeakage: %w", err)
+	}
 
-	if actualLeakage > lb.currentFillLevel {
+	// don't let the bucket leak past empty
+	if actualLeakage >= lb.currentFillLevel {
 		lb.currentFillLevel = 0
 		return nil
 	}
@@ -207,47 +201,55 @@ func (lb *LeakyBucket) leak() error {
 	return nil
 }
 
-func (lb *LeakyBucket) computeSubSecondLeakage(nanos int64) (uint32, error) {
-	// Check that nanos is less than 1 second
+// Accepts the current number of seconds since epoch. Returns the number of units that should leak from the bucket,
+// based on when we last leaked.
+//
+// Since this method only takes full seconds into consideration, the returned value must be used carefully. See leak()
+// for details.
+//
+// Returns an error if the leakage calculation fails, which should not happen during normal usage.
+func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
+	if epochSeconds < 0 {
+		return 0, fmt.Errorf("epochSeconds must be >= 0, got %d", epochSeconds)
+	}
+
+	// epoch seconds should never go backwards, but could be the same
+	if epochSeconds < lb.previousLeakTime.Unix() {
+		return 0, fmt.Errorf("current time %s (%d) is before previous time %s (%d)",
+			time.Unix(epochSeconds, 0).UTC().Format(time.RFC3339),
+			epochSeconds,
+			lb.previousLeakTime.UTC().Format(time.RFC3339),
+			lb.previousLeakTime.Unix())
+	}
+
+	secondsSinceLastUpdate := epochSeconds - lb.previousLeakTime.Unix()
+
+	fullSecondLeakage, err := common.SafeMultiplyInt64(secondsSinceLastUpdate, lb.unitsPerSecondLeakRate)
+	if err != nil {
+		return 0, fmt.Errorf("safe multiply to compute fullSecondLeakage: %w", err)
+	}
+	return fullSecondLeakage, nil
+}
+
+func (lb *LeakyBucket) computePartialSecondLeakage(nanos int) (int64, error) {
 	if nanos >= 1e9 || nanos < 0 {
 		return 0, fmt.Errorf("nanos must be between 0 and 1e9, got %d", nanos)
 	}
 
-	// Since nanos < 1e9 and symbolsPerSecondLeakRate is uint32,
+	// Since nanos < 1e9 and unitsPerSecondLeakRate is uint32,
 	// the product will fit in int64 (max value would be (1e9-1) * (2^32-1) < 2^63)
-	product := nanos * int64(lb.symbolsPerSecondLeakRate)
+	product := int64(nanos) * int64(lb.unitsPerSecondLeakRate)
 
 	switch lb.bias {
 	case BiasPermitMore:
 		// Round up when bias is to permit more (more leakage = more capacity freed up)
 		// Add (1e9 - 1) before dividing to round up
 		// The result after division will always fit in uint32 since we're dividing by 1e9
-		return uint32((product + 1e9 - 1) / 1e9), nil
+		return (product + 1e9 - 1) / 1e9, nil
 	case BiasPermitLess:
 		// Round down when bias is to permit less (less leakage = less capacity freed up)
-		return uint32(product / 1e9), nil
+		return product / 1e9, nil
 	default:
 		return 0, fmt.Errorf("unknown bias: %s", lb.bias)
 	}
-}
-
-func (lb *LeakyBucket) computeFullSecondLeakage(seconds int64) (uint32, error) {
-	if seconds < 0 {
-		return 0, fmt.Errorf("seconds must be >= 0, got %d", seconds)
-	}
-
-	if seconds < lb.previousUpdateTime.Unix() {
-		return 0, fmt.Errorf("current time %d is before previous time %d", seconds, lb.previousUpdateTime.Unix())
-	}
-
-	secondsSinceLastUpdate := seconds - lb.previousUpdateTime.Unix()
-
-	// Check if secondsDiff * symbolsPerSecondLeakRate would overflow uint32
-	if uint64(secondsSinceLastUpdate) > math.MaxUint32/uint64(lb.symbolsPerSecondLeakRate) {
-		// TODO; double check this overflow logic
-		return 0, fmt.Errorf("TODO, error message")
-	}
-
-	fullSecondLeakage := uint32(secondsSinceLastUpdate) * lb.symbolsPerSecondLeakRate
-	return fullSecondLeakage, nil
 }
