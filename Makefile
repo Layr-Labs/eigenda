@@ -27,22 +27,14 @@ compile-contracts:
 clean:
 	$(MAKE) -C api clean
 
-# Builds the protobuf files inside a docker container.
+# Builds the protobuf files
 protoc:
 	$(MAKE) -C api protoc
 
-# Builds the protobuf files locally (i.e. without docker).
-protoc-local:
-	$(MAKE) -C api protoc-local
-
-# Only lints the diff between current branch and master because of settings in .golangci.yml
+# Only lints the diff between current branch and master because of settings in .golangci.yml unless a different branch is specified in LINT_BASE_REV
 lint:
-	golangci-lint run
-	# Uncomment this once we update to go1.23 which makes the -diff flag available.
-	# See https://tip.golang.org/doc/go1.23#go-command
-	# go mod tidy -diff
-	$(MAKE) -C api/proxy lint
-
+	golangci-lint run $(if $(LINT_BASE_REV),--new-from-rev=$(LINT_BASE_REV))
+	go mod tidy -diff
 
 # TODO: this should also format github workflows, etc.
 fmt:
