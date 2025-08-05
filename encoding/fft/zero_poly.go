@@ -115,7 +115,6 @@ func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [
 		return nil, fmt.Errorf("expected larger destination length: %d, got: %d", min, n)
 	}
 	if uint64(len(scratch)) < 3*n {
-		// TODO(samlaf): this should be a panic but I'm not sure what consequences changing this would have.
 		return nil, fmt.Errorf("not enough scratch space: %d < %d", len(scratch), 3*n)
 	}
 	// Split `scratch` up into three equally sized working arrays
