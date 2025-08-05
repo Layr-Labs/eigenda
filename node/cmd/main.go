@@ -98,7 +98,7 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
+	node, err := node.NewNode(context.Background(), reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
