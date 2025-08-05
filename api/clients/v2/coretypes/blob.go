@@ -7,34 +7,38 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Blob is data that is dispersed on eigenDA.
 //
-// A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form
+// A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form.
+// A Blob must have a length (in symbols) that is a power of two. In particular, blobs of length 0 are not allowed.
+// A Blob's length must match the blobLength in the BlobHeader's [encoding.BlobCommitments.Length].
 type Blob struct {
 	coeffPolynomial []fr.Element
-	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the [encoding.BlobCommitments].
-	//
-	// This value must be specified, rather than computed from the length of the coeffPolynomial, due to an edge case
-	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
-	// bytes are trailing zeros. When a different user fetches the blob from a relay, it's possible that the relay could
-	// truncate the trailing zeros. If we were to say that blobLengthSymbols = nextPowerOf2(len(coeffPolynomial)), then the
-	// user fetching and reconstructing this blob would determine that the blob length is 1 symbol, when it's actually 2.
-	blobLengthSymbols uint32
 }
 
-// DeserializeBlob initializes a Blob from bytes
+// DeserializeBlob initializes a Blob from bytes.
+// blobLengthSymbols is the length of the blob, which is present in the BlobHeader's [encoding.BlobCommitments.Length].
+// The bytes passed in will be appended with zeros to match the blobLengthSymbols if they are shorter than that length,
+// or an error will be returned if they are longer than that length.
 func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
-	// we check that length of bytes is <= blob length, rather than checking for equality, because it's possible
-	// that the bytes being deserialized have had trailing 0s truncated.
-	if uint32(len(bytes)) > blobLengthSymbols*encoding.BYTES_PER_SYMBOL {
+	blobLengthBytes := blobLengthSymbols * encoding.BYTES_PER_SYMBOL
+	if uint32(len(bytes)) > blobLengthBytes {
 		return nil, fmt.Errorf(
 			"length (%d bytes) is greater than claimed blob length (%d bytes)",
 			len(bytes),
-			blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
+			blobLengthBytes)
+	}
+	// We pad with 0s up to blobLengthSymbols in case the bytes being deserialized have had trailing 0s truncated, as
+	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
+	// bytes are trailing zeros. When a different user fetches the blob from a relay, it's possible that the relay could
+	// truncate the trailing zeros since that doesn't affect the KZG commitment. If we were to say that
+	// blobLengthSymbols = nextPowerOf2(len(bytes)), then the user fetching and reconstructing this blob would determine
+	// that the blob length is 1 symbol, when it's actually 2.
+	if uint32(len(bytes)) < blobLengthBytes {
+		bytes = append(bytes, make([]byte, blobLengthBytes-uint32(len(bytes)))...)
 	}
 
 	coeffPolynomial, err := rs.ToFrArray(bytes)
@@ -42,15 +46,33 @@ func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 		return nil, fmt.Errorf("bytes to field elements: %w", err)
 	}
 
-	return BlobFromPolynomial(coeffPolynomial, blobLengthSymbols)
+	return BlobFromCoefficients(coeffPolynomial), nil
 }
 
-// BlobFromPolynomial initializes a blob from a polynomial
-func BlobFromPolynomial(coeffPolynomial []fr.Element, blobLengthSymbols uint32) (*Blob, error) {
+// BlobFromCoefficients initializes a blob from the coefficients of a polynomial.
+// If the coefficients are not a power of two in length, they will be padded to the next power of two.
+// This is useful for creating blobs from arbitrary coefficient arrays.
+func BlobFromCoefficients(coefficients []fr.Element) *Blob {
+	paddedCoefficients := coefficients
+	if !encoding.IsPowerOfTwo(len(coefficients)) {
+		// If the coefficients are not a power of two, we pad them to the next power of two.
+		blobLengthSymbols := uint32(encoding.NextPowerOf2(len(coefficients)))
+		paddedCoefficients = make([]fr.Element, blobLengthSymbols)
+		copy(paddedCoefficients, coefficients)
+	}
 	return &Blob{
-		coeffPolynomial:   coeffPolynomial,
-		blobLengthSymbols: blobLengthSymbols,
-	}, nil
+		coeffPolynomial: paddedCoefficients,
+	}
+}
+
+// LenSymbols returns the number of coefficient symbols in the Blob.
+func (b *Blob) LenSymbols() uint32 {
+	return uint32(len(b.coeffPolynomial))
+}
+
+// LenBytes returns the number of bytes in the Blob.
+func (b *Blob) LenBytes() uint32 {
+	return uint32(len(b.coeffPolynomial) * encoding.BYTES_PER_SYMBOL)
 }
 
 // Serialize gets the raw bytes of the Blob
@@ -62,7 +84,7 @@ func (b *Blob) Serialize() []byte {
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
-func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
+func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (Payload, error) {
 	encodedPayload, err := b.ToEncodedPayload(payloadForm)
 	if err != nil {
 		return nil, fmt.Errorf("to encoded payload: %w", err)
@@ -70,20 +92,9 @@ func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
 
 	payload, err := encodedPayload.Decode()
 	if err != nil {
-		return nil, fmt.Errorf("decode payload: %w", err)
+		return Payload{}, fmt.Errorf("decode payload: %w", err)
 	}
-
 	return payload, nil
-}
-
-// BlobLengthSymbols returns the length of the blob, in symbols
-func (b *Blob) BlobLengthSymbols() uint32 {
-	return b.blobLengthSymbols
-}
-
-// BlobLengthBytes returns the length of the blob, in bytes
-func (b *Blob) BlobLengthBytes() uint32 {
-	return b.blobLengthSymbols * 32
 }
 
 // ToEncodedPayload creates an EncodedPayload from the blob
@@ -91,40 +102,35 @@ func (b *Blob) BlobLengthBytes() uint32 {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
 func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayload, error) {
-	var payloadElements []fr.Element
+	var encodedPayloadElements []fr.Element
 	var err error
 	switch payloadForm {
 	case codecs.PolynomialFormCoeff:
 		// the payload is interpreted as coefficients of the polynomial, so no conversion needs to be done, given that
 		// eigenda also interprets blobs as coefficients
-		payloadElements = b.coeffPolynomial
+		encodedPayloadElements = b.coeffPolynomial
 	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
-		payloadElements = b.toEvalPoly()
+		encodedPayloadElements, err = b.toEvalPoly()
+		if err != nil {
+			return nil, fmt.Errorf("convert blob to eval poly: %w", err)
+		}
+
 	default:
 		panic(fmt.Sprintf("invalid codecs.PolynomialForm enum value: %d", payloadForm))
 	}
 
-	maxPermissiblePayloadLength, err := codec.BlobSymbolsToMaxPayloadSize(b.blobLengthSymbols)
-	if err != nil {
-		return nil, fmt.Errorf("get max permissible payload length: %w", err)
-	}
+	return &EncodedPayload{rs.SerializeFieldElements(encodedPayloadElements)}, nil
 
-	encodedPayload, err := encodedPayloadFromElements(payloadElements, maxPermissiblePayloadLength)
-	if err != nil {
-		return nil, fmt.Errorf("encoded payload from elements: %w", err)
-	}
-
-	return encodedPayload, nil
 }
 
 // toEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
-func (b *Blob) toEvalPoly() []fr.Element {
+func (b *Blob) toEvalPoly() ([]fr.Element, error) {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(b.blobLengthSymbols)
+	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(b.coeffPolynomial)))
 	if err != nil {
 		return nil, fmt.Errorf("create FFT settings from blob length symbols: %w", err)
 	}
@@ -132,8 +138,7 @@ func (b *Blob) toEvalPoly() []fr.Element {
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)
 	if err != nil {
-		panic(fmt.Sprintf("bug: FFT only returns an error when it doesn't have enough roots of unity to perform the FFT, "+
-			"but we created the FFTSettings with enough roots above using FFTSettingsFromBlobLengthSymbols: %v", err))
+		return nil, fmt.Errorf("perform FFT on blob coefficients: %w", err)
 	}
-	return fftedElements
+	return fftedElements, nil
 }

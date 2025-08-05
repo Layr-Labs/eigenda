@@ -36,6 +36,11 @@ import (
 	"math/bits"
 )
 
+// IsPowerOfTwo returns true if the provided integer v is a power of 2.
+func IsPowerOfTwo(v uint64) bool {
+	return (v&(v-1) == 0) && (v != 0)
+}
+
 // if not already a power of 2, return the next power of 2
 func nextPowOf2(v uint64) uint64 {
 	if v == 0 {
