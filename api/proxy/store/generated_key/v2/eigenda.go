@@ -104,6 +104,7 @@ func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, retur
 			// Get encoded payload if requested
 			encodedPayload, err := retriever.GetEncodedPayload(ctx, cert)
 			if err == nil {
+				e.log.Debugf("Store) Get encodedPayload.Serialize()")
 				return encodedPayload.Serialize(), nil
 			}
 			e.log.Debugf("Encoded payload retriever failed: %v", err)
@@ -112,6 +113,7 @@ func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, retur
 			// Get decoded payload (default behavior)
 			payload, err := retriever.GetPayload(ctx, cert)
 			if err == nil {
+				e.log.Debugf("Store) Get payload.Serialize()")
 				return payload.Serialize(), nil
 			}
 			e.log.Debugf("Payload retriever failed: %v", err)

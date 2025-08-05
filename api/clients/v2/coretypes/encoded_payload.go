@@ -27,6 +27,17 @@ func (ep *EncodedPayload) Serialize() []byte {
 	return ep.bytes
 }
 
+func NewEncodedPayloadRaw(encodedPayload []byte) (*EncodedPayload, error) {
+	return &EncodedPayload{
+		bytes: encodedPayload,
+	}, nil
+}
+
+// newEncodedPayload accepts a payload, and performs the PayloadEncodingVersion0 encoding to create an encoded payload
+func NewEncodedPayload(payload *Payload) (*EncodedPayload, error) {
+	return newEncodedPayload(payload)
+}
+
 // newEncodedPayload accepts a payload, and performs the PayloadEncodingVersion0 encoding to create an encoded payload
 func newEncodedPayload(payload *Payload) (*EncodedPayload, error) {
 	encodedPayloadHeader := make([]byte, 32)
