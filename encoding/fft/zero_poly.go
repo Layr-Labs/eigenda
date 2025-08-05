@@ -95,8 +95,6 @@ func padPoly(out []fr.Element, poly []fr.Element) {
 // The scratch space must be at least 3 times the output space.
 // The output must have a power of 2 length.
 // The input polynomials must not be empty, and sum to no larger than the output.
-//
-// TODO(samlaf): most errors returned should be panicing instead. But I'm unsure of the consequences of changing this.
 func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [][]fr.Element) ([]fr.Element, error) {
 	n := uint64(len(dst))
 	if !IsPowerOfTwo(n) {
