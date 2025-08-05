@@ -122,6 +122,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 		logger,
 		errorMonitor,
 		segmentPaths,
+		false,
 		time.Now(),
 		false,
 		true)

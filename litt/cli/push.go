@@ -213,6 +213,7 @@ func pushTable(
 		logger,
 		errorMonitor,
 		segmentPaths,
+		false,
 		time.Now(),
 		false,
 		fsync)
