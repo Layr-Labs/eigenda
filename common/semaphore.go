@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 )
 
 // semaphoreChannelSize is the size of the channels used to communicate with the semaphore control loop.
@@ -29,6 +30,9 @@ type Semaphore struct {
 
 	// This channel is closed when the semaphore is closed.
 	shutdownChan chan struct{}
+
+	// Used to make calling Close() idempotent.
+	closeCalled atomic.Bool
 
 	// The next acquireRequest that will be processed. May be nil. Only accessed from the control loop goroutine.
 	nextAcquireRequest *acquireReqeust
@@ -79,6 +83,7 @@ type releaseRequest struct {
 // Release MUST be called with the same number of tokens to release them back to the semaphore. If this method does
 // return an error, Release MUST NOT be called, and the tokens should be treated as if they were never acquired.
 func (s *Semaphore) Acquire(ctx context.Context, tokens uint64) error {
+
 	if tokens > s.totalTokens {
 		return fmt.Errorf("cannot acquire %d tokens, only %d available", tokens, s.totalTokens)
 	}
@@ -179,7 +184,9 @@ func (s *Semaphore) Release(tokens uint64) error {
 // Close releases resources associated with the semaphore. If there are pending Acquire() or Release() calls, those
 // methods may return an error as a result to this call to Close().
 func (s *Semaphore) Close() {
-	close(s.shutdownChan)
+	if s.closeCalled.CompareAndSwap(false, true) {
+		close(s.shutdownChan)
+	}
 }
 
 // controlLoop is the main loop that processes acquire and release requests. Operations are run in serialized order
@@ -239,15 +246,9 @@ func (s *Semaphore) handleReleaseRequest(req *releaseRequest) {
 // handle the pending acquire request stored in s.nextAcquireRequest.
 func (s *Semaphore) handleAcquireRequest() {
 	request := s.nextAcquireRequest
-	if request.ctx.Err() != nil {
-		// Context was canceled, give up on acquiring tokens.
-		request.acquiredChan <- false
-		s.nextAcquireRequest = nil
-		return
-	}
 
 	remainingTokens := s.totalTokens - s.acquiredTokens
-	if request.tokens >= remainingTokens {
+	if request.tokens <= remainingTokens {
 		s.acquiredTokens += request.tokens
 		request.acquiredChan <- true
 		s.nextAcquireRequest = nil
