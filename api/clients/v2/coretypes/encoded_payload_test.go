@@ -16,7 +16,8 @@ func TestDecodeInvalidPayloadLen(t *testing.T) {
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
 	encodedPayload := Payload(originalData).ToEncodedPayload()
 
-	// truncate
+	// Changed the header payload length to be longer than the actual encodedPayload length.
+	// This way the claimed payload clearly doesn't fit in the encoded payload.
 	binary.BigEndian.PutUint32(encodedPayload.bytes[2:6], uint32(len(encodedPayload.bytes)+1))
 
 	payload, err := encodedPayload.Decode()
