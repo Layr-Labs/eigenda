@@ -13,14 +13,20 @@ import (
 )
 
 // EncodedPayload represents a payload that has had an encoding applied to it,
-// meaning that it is guaranteed to be a multiple of 32 bytes in length,
-// each such 32 bytes representing a bn254 field element.
+// meaning that it must be a multiple of 32 bytes in length, each such 32 bytes
+// representing a bn254 field element. Furthermore, it must have a power of 2 number
+// of such field elements; that is, [EncodedPayload.LenSymbols] must return a power of 2.
 //
-// Always construct an EncodedPayload by using [Payload.ToEncodedPayload].
+// To uphold these invariants, always construct an EncodedPayload by using [Payload.ToEncodedPayload].
 //
 // Example encoding:
 //   - [Encoded Payload header (32 bytes total)] + [Encoded Payload Data (len is multiple of 32)]
 //   - [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
+//
+// An EncodedPayload can be interpreted as a polynomial, with each 32 byte chunk
+// representing either a coefficient or an evaluation. Interpreting as coefficients has the advantage
+// that the EncodedPayload already represents a [Blob]. Interpreting as evaluations has the advantage that
+// point openings can be made (useful for interactive fraud proofs).
 type EncodedPayload struct {
 	// the size of these bytes is guaranteed to be a multiple of 32
 	bytes []byte
