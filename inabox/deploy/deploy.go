@@ -274,7 +274,6 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	writer, err := eth.NewWriter(
 		logger,
 		ethClient,
-		env.EigenDA.EigenDADirectory,
 		env.EigenDA.OperatorStateRetriever,
 		env.EigenDA.ServiceManager,
 	)

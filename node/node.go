@@ -20,10 +20,10 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -98,6 +98,7 @@ type Node struct {
 // NewNode creates a new Node with the provided config.
 // TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
+	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
 	pubIPProvider pubip.Provider,
@@ -115,13 +116,13 @@ func NewNode(
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
 
-	chainID, err := client.ChainID(context.Background())
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -163,7 +164,7 @@ func NewNode(
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
 		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
-		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
+		staleMeasure, err := tx.GetBlockStaleMeasure(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
 		}
@@ -173,7 +174,7 @@ func NewNode(
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
 		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
-		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
+		storeDuration, err := tx.GetStoreDurationBlocks(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 		}
@@ -192,21 +193,25 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
+	// TODO (cody.littley): make contract directory config mandatory
+
 	// If EigenDADirectory is provided, use it to get service manager addresses
 	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
 	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
-		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
+		contractDirectory, err := directory.NewContractDirectory(
+			ctx,
+			logger,
+			client,
+			gethcommon.HexToAddress(config.EigenDADirectory))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
+			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{Context: context.Background()})
+
+		eigenDAServiceManagerAddr, err =
+			contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
-		}
-		if config.EigenDAServiceManagerAddr != "" && eigenDAServiceManagerAddr.String() != config.EigenDAServiceManagerAddr {
-			return nil, fmt.Errorf("EigenDAServiceManagerAddr passed in as config (%v) does not match the one retrieved from EigenDADirectory (%v)",
-				config.EigenDADirectory, eigenDAServiceManagerAddr.Hex())
+			return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
 		}
 	} else {
 		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
@@ -275,7 +280,6 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
 		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
