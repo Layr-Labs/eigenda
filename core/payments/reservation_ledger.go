@@ -109,65 +109,88 @@ func NewReservationLedger(
 	}, nil
 }
 
-// Add a number of symbols to the leaky bucket.
+// Debit the reservation with a number of symbols.
 //
-// Returns nil if the bucket has enough capacity to accept the fill. Returns an InsufficientReservationCapacityError
-// if bucket lacks capacity to permit the fill.
+// Algorithmically, that means adding a number of symbols to the leaky bucket.
+//
+// Returns nil if the leaky bucket has enough capacity to accept the fill. Returns an
+// InsufficientReservationCapacityError if bucket lacks capacity to permit the fill.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
-// failed fill doesn't count against the meter.
-func (lb *ReservationLedger) Debit(symbolCount int64) error {
+// failed debit doesn't count against the meter.
+func (rl *ReservationLedger) Debit(symbolCount int64) error {
 	if symbolCount <= 0 {
 		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
 	}
 
-	// leak the correct number of symbols, based on how long it's been since the last leak calculation
-	err := lb.leak()
+	err := rl.leak()
 	if err != nil {
 		return fmt.Errorf("leak: %w", err)
 	}
 
 	// this is how full the bucket would be, if the fill were to be accepted
-	newFillLevel, err := common.SafeAddInt64(lb.currentFillLevel, symbolCount)
+	newFillLevel, err := common.SafeAddInt64(rl.currentFillLevel, symbolCount)
 	if err != nil {
 		return fmt.Errorf("safe add to compute newFillLevel: %w", err)
 	}
 
 	// if newFillLevel is less than the total bucket capacity, no further checks are required
-	if newFillLevel < lb.bucketCapacity {
-		lb.currentFillLevel = newFillLevel
+	if newFillLevel < rl.bucketCapacity {
+		rl.currentFillLevel = newFillLevel
 		return nil
 	}
 
 	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
-	switch lb.overdraftBehavior {
+	switch rl.overdraftBehavior {
 	case OverdraftNotPermitted:
 		return &InsufficientReservationCapacityError{symbolCount}
 	case OverdraftOncePermitted:
-		zeroCapacityAvailable := lb.currentFillLevel >= lb.bucketCapacity
+		zeroCapacityAvailable := rl.currentFillLevel >= rl.bucketCapacity
 
 		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
 		if zeroCapacityAvailable {
 			return &InsufficientReservationCapacityError{symbolCount}
 		}
 
-		lb.currentFillLevel = newFillLevel
+		rl.currentFillLevel = newFillLevel
 		return nil
 	default:
-		return fmt.Errorf("unknown overfill behavior %s", lb.overdraftBehavior)
+		return fmt.Errorf("unknown overfill behavior %s", rl.overdraftBehavior)
 	}
+}
+
+// Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
+//
+// Algorithmically, that means removing a number of symbols from the leaky bucket.
+func (rl *ReservationLedger) RevertDebit(symbolCount int64) error {
+	if symbolCount <= 0 {
+		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+	}
+
+	err := rl.leak()
+	if err != nil {
+		return fmt.Errorf("leak: %w", err)
+	}
+
+	newFillLevel, err := common.SafeSubtractInt64(rl.currentFillLevel, symbolCount)
+	if err != nil {
+		return fmt.Errorf("safe subtract to compute newFillLevel: %w", err)
+	}
+
+	rl.currentFillLevel = newFillLevel
+	return nil
 }
 
 // Lets the correct number of symbols leak out of the bucket, based on when we last leaked
 //
 // Returns an error if any of the calculations fail, which should not happen during normal usage.
-func (lb *ReservationLedger) leak() error {
-	currentTime := lb.timeSource()
+func (rl *ReservationLedger) leak() error {
+	currentTime := rl.timeSource()
 	defer func() {
-		lb.previousLeakTime = currentTime
+		rl.previousLeakTime = currentTime
 	}()
 
-	fullSecondLeakage, err := lb.computeFullSecondLeakage(currentTime.Unix())
+	fullSecondLeakage, err := rl.computeFullSecondLeakage(currentTime.Unix())
 	if err != nil {
 		return fmt.Errorf("compute full second leakage: %w", err)
 	}
@@ -176,17 +199,17 @@ func (lb *ReservationLedger) leak() error {
 	// partial second period leak out, and those symbols shouldn't be allowed to leak twice
 	//
 	// This value can be negative if the previous leak calculation was within the same second as this calculation.
-	correctedFullSecondLeakage, err := common.SafeSubtractInt64(fullSecondLeakage, lb.previousPartialSecondLeakage)
+	correctedFullSecondLeakage, err := common.SafeSubtractInt64(fullSecondLeakage, rl.previousPartialSecondLeakage)
 	if err != nil {
 		return fmt.Errorf("safe subtract to compute correctedFullSecondLeakage: %w", err)
 	}
 
-	partialSecondLeakage, err := lb.computePartialSecondLeakage(currentTime.Nanosecond())
+	partialSecondLeakage, err := rl.computePartialSecondLeakage(currentTime.Nanosecond())
 	if err != nil {
 		return fmt.Errorf("compute partial second leakage: %w", err)
 	}
 	defer func() {
-		lb.previousPartialSecondLeakage = partialSecondLeakage
+		rl.previousPartialSecondLeakage = partialSecondLeakage
 	}()
 
 	actualLeakage, err := common.SafeAddInt64(correctedFullSecondLeakage, partialSecondLeakage)
@@ -195,17 +218,17 @@ func (lb *ReservationLedger) leak() error {
 	}
 
 	// don't let the bucket leak past empty
-	if actualLeakage >= lb.currentFillLevel {
-		lb.currentFillLevel = 0
+	if actualLeakage >= rl.currentFillLevel {
+		rl.currentFillLevel = 0
 		return nil
 	}
 
-	newFillLevel, err := common.SafeSubtractInt64(lb.currentFillLevel, actualLeakage)
+	newFillLevel, err := common.SafeSubtractInt64(rl.currentFillLevel, actualLeakage)
 	if err != nil {
 		return fmt.Errorf("safe subtract to update currentFillLevel: %w", err)
 	}
 
-	lb.currentFillLevel = newFillLevel
+	rl.currentFillLevel = newFillLevel
 	return nil
 }
 
@@ -216,26 +239,26 @@ func (lb *ReservationLedger) leak() error {
 // for details.
 //
 // Returns an error if the leakage calculation fails, which should not happen during normal usage.
-func (lb *ReservationLedger) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
+func (rl *ReservationLedger) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
 	if epochSeconds < 0 {
 		return 0, fmt.Errorf("epochSeconds must be >= 0, got %d", epochSeconds)
 	}
 
 	// epoch seconds should never go backwards, but could be the same
-	if epochSeconds < lb.previousLeakTime.Unix() {
+	if epochSeconds < rl.previousLeakTime.Unix() {
 		return 0, fmt.Errorf("current time %s (%d) is before previous time %s (%d)",
 			time.Unix(epochSeconds, 0).UTC().Format(time.RFC3339),
 			epochSeconds,
-			lb.previousLeakTime.UTC().Format(time.RFC3339),
-			lb.previousLeakTime.Unix())
+			rl.previousLeakTime.UTC().Format(time.RFC3339),
+			rl.previousLeakTime.Unix())
 	}
 
-	secondsSinceLastUpdate, err := common.SafeSubtractInt64(epochSeconds, lb.previousLeakTime.Unix())
+	secondsSinceLastUpdate, err := common.SafeSubtractInt64(epochSeconds, rl.previousLeakTime.Unix())
 	if err != nil {
 		return 0, fmt.Errorf("safe subtract to compute secondsSinceLastUpdate: %w", err)
 	}
 
-	fullSecondLeakage, err := common.SafeMultiplyInt64(secondsSinceLastUpdate, lb.symbolsPerSecondLeakRate)
+	fullSecondLeakage, err := common.SafeMultiplyInt64(secondsSinceLastUpdate, rl.symbolsPerSecondLeakRate)
 	if err != nil {
 		return 0, fmt.Errorf("safe multiply to compute fullSecondLeakage: %w", err)
 	}
@@ -243,17 +266,17 @@ func (lb *ReservationLedger) computeFullSecondLeakage(epochSeconds int64) (int64
 }
 
 // TODO: doc
-func (lb *ReservationLedger) computePartialSecondLeakage(nanos int) (int64, error) {
+func (rl *ReservationLedger) computePartialSecondLeakage(nanos int) (int64, error) {
 	if nanos >= 1e9 || nanos < 0 {
 		return 0, fmt.Errorf("nanos must be between 0 and 1e9, got %d", nanos)
 	}
 
-	product, err := common.SafeMultiplyInt64(int64(nanos), lb.symbolsPerSecondLeakRate)
+	product, err := common.SafeMultiplyInt64(int64(nanos), rl.symbolsPerSecondLeakRate)
 	if err != nil {
 		return 0, fmt.Errorf("safe multiply to compute nanos * symbolsPerSecondLeakRate: %w", err)
 	}
 
-	switch lb.biasBehavior {
+	switch rl.biasBehavior {
 	case BiasPermitMore:
 		// Round up, to permit more (more leakage = more capacity freed up)
 		// Add (1e9 - 1) before dividing to round up
@@ -266,6 +289,6 @@ func (lb *ReservationLedger) computePartialSecondLeakage(nanos int) (int64, erro
 		// Round down, to permit less (less leakage = less capacity freed up)
 		return product / 1e9, nil
 	default:
-		return 0, fmt.Errorf("unknown bias: %s", lb.biasBehavior)
+		return 0, fmt.Errorf("unknown bias: %s", rl.biasBehavior)
 	}
 }
