@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+// TODO: specialize this global error
 #[derive(Error, Debug, PartialEq)]
 pub enum CertVerificationError {
     #[error("Reference block must precede current block")]

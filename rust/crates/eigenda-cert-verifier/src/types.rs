@@ -1,9 +1,10 @@
+use alloy_primitives::B256;
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
 use crate::{
     bitmap::Bitmap,
-    hash::{Keccak256Hash, TruncatedKeccak256Hash},
+    hash::TruncatedB256,
     types::{
         history::History,
         solidity::{RelayInfo, VersionedBlobParams},
@@ -28,11 +29,10 @@ pub struct Storage {
     pub reject_staleness: bool,
     pub min_withdrawal_delay_blocks: BlockNumber,
 
-    pub quorum_membership_history_by_signer: HashMap<Keccak256Hash, History<Bitmap>>,
-    pub stake_history_by_signer_and_quorum:
-        HashMap<Keccak256Hash, HashMap<QuorumNumber, History<Stake>>>,
+    pub quorum_membership_history_by_signer: HashMap<B256, History<Bitmap>>,
+    pub stake_history_by_signer_and_quorum: HashMap<B256, HashMap<QuorumNumber, History<Stake>>>,
     pub total_stake_history_by_quorum: HashMap<QuorumNumber, History<Stake>>,
-    pub apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedKeccak256Hash>>,
+    pub apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedB256>>,
 
     pub last_updated_at_block_by_quorum: HashMap<QuorumNumber, BlockNumber>,
     pub relay_key_to_relay_info: HashMap<RelayKey, RelayInfo>,
@@ -50,6 +50,6 @@ pub(crate) struct Quorum {
 #[derive(Default, Debug, Clone)]
 pub(crate) struct NonSigner {
     pub pk: G1Affine,
-    pub pk_hash: Keccak256Hash,
+    pub pk_hash: B256,
     pub quorum_membership: Bitmap,
 }

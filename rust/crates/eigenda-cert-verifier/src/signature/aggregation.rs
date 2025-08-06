@@ -197,7 +197,7 @@ mod tests {
         convert,
         error::CertVerificationError::*,
         signature::aggregation::aggregate,
-        types::{NonSigner, Quorum},
+        types::{NonSigner, Quorum, conversions::IntoExt},
     };
 
     #[test]
@@ -239,7 +239,7 @@ mod tests {
             .zip(non_signer_quorum_memberships.into_iter())
             .map(|(pk, quorum_membership)| NonSigner {
                 pk,
-                pk_hash: convert::point_to_hash(&pk.into()),
+                pk_hash: convert::point_to_hash(&pk.into_ext()),
                 quorum_membership,
             })
             .collect();

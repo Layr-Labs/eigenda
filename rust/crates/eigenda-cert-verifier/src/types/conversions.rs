@@ -1,51 +1,94 @@
+use alloc::vec;
 use alloy_primitives::Uint;
 use ark_bn254::{Fq, Fq2, G1Affine, G2Affine};
 use ark_ec::AffineRepr;
 use ark_ff::PrimeField;
+use eigenda_cert::{BlobCommitment, G1Point, G2Point};
 
-use crate::{
-    convert,
-    types::solidity::{G1Point, G2Point},
-};
+use crate::convert;
 
-impl From<G1Affine> for G1Point {
-    fn from(affine: G1Affine) -> Self {
+pub trait DefaultExt: Sized {
+    fn default_ext() -> Self;
+}
+
+impl DefaultExt for BlobCommitment {
+    fn default_ext() -> Self {
+        Self {
+            commitment: G1Point::default_ext(),
+            length_commitment: G2Point::default_ext(),
+            length_proof: G2Point::default_ext(),
+            length: u32::default(),
+        }
+    }
+}
+
+impl DefaultExt for G1Point {
+    fn default_ext() -> Self {
+        Self {
+            x: Uint::ZERO,
+            y: Uint::ZERO,
+        }
+    }
+}
+
+impl DefaultExt for G2Point {
+    fn default_ext() -> Self {
+        Self {
+            x: vec![Uint::ZERO, Uint::ZERO],
+            y: vec![Uint::ZERO, Uint::ZERO],
+        }
+    }
+}
+
+pub trait FromExt<T>: Sized {
+    fn from_ext(value: T) -> Self;
+}
+
+pub trait IntoExt<T>: Sized {
+    fn into_ext(self) -> T;
+}
+
+impl<T, U> IntoExt<U> for T
+where
+    U: FromExt<T>,
+{
+    fn into_ext(self) -> U {
+        FromExt::from_ext(self)
+    }
+}
+
+impl FromExt<G1Affine> for G1Point {
+    fn from_ext(affine: G1Affine) -> Self {
         match affine.xy() {
             Some((x, y)) => G1Point {
-                X: convert::fq_to_uint(x),
-                Y: convert::fq_to_uint(y),
+                x: convert::fq_to_uint(x),
+                y: convert::fq_to_uint(y),
             },
-            None => G1Point {
-                X: Uint::ZERO,
-                Y: Uint::ZERO,
-            },
+            None => G1Point::default_ext(),
         }
     }
 }
 
-impl From<G2Affine> for G2Point {
-    fn from(affine: G2Affine) -> Self {
+impl FromExt<G2Affine> for G2Point {
+    fn from_ext(affine: G2Affine) -> Self {
         match affine.xy() {
             Some((x, y)) => G2Point {
-                X: [convert::fq_to_uint(x.c0), convert::fq_to_uint(x.c1)],
-                Y: [convert::fq_to_uint(y.c0), convert::fq_to_uint(y.c1)],
+                x: vec![convert::fq_to_uint(x.c0), convert::fq_to_uint(x.c1)],
+                y: vec![convert::fq_to_uint(y.c0), convert::fq_to_uint(y.c1)],
             },
-            None => G2Point {
-                X: [Uint::ZERO, Uint::ZERO],
-                Y: [Uint::ZERO, Uint::ZERO],
-            },
+            None => G2Point::default_ext(),
         }
     }
 }
 
-impl From<G1Point> for G1Affine {
-    fn from(point: G1Point) -> G1Affine {
-        if point.X.is_zero() && point.Y.is_zero() {
+impl FromExt<G1Point> for G1Affine {
+    fn from_ext(point: G1Point) -> G1Affine {
+        if point.x.is_zero() && point.y.is_zero() {
             return G1Affine::identity();
         }
 
-        let x_bytes: [u8; 32] = point.X.to_be_bytes();
-        let y_bytes: [u8; 32] = point.Y.to_be_bytes();
+        let x_bytes: [u8; 32] = point.x.to_be_bytes();
+        let y_bytes: [u8; 32] = point.y.to_be_bytes();
 
         let x = Fq::from_be_bytes_mod_order(&x_bytes);
         let y = Fq::from_be_bytes_mod_order(&y_bytes);
@@ -54,20 +97,20 @@ impl From<G1Point> for G1Affine {
     }
 }
 
-impl From<G2Point> for G2Affine {
-    fn from(point: G2Point) -> Self {
-        if point.X[0].is_zero()
-            && point.Y[0].is_zero()
-            && point.X[1].is_zero()
-            && point.Y[1].is_zero()
+impl FromExt<G2Point> for G2Affine {
+    fn from_ext(point: G2Point) -> Self {
+        if point.x[0].is_zero()
+            && point.y[0].is_zero()
+            && point.x[1].is_zero()
+            && point.y[1].is_zero()
         {
             return G2Affine::identity();
         }
 
-        let x_c0_bytes: [u8; 32] = point.X[0].to_be_bytes();
-        let x_c1_bytes: [u8; 32] = point.X[1].to_be_bytes();
-        let y_c0_bytes: [u8; 32] = point.Y[0].to_be_bytes();
-        let y_c1_bytes: [u8; 32] = point.Y[1].to_be_bytes();
+        let x_c0_bytes: [u8; 32] = point.x[0].to_be_bytes();
+        let x_c1_bytes: [u8; 32] = point.x[1].to_be_bytes();
+        let y_c0_bytes: [u8; 32] = point.y[0].to_be_bytes();
+        let y_c1_bytes: [u8; 32] = point.y[1].to_be_bytes();
 
         let x_c0 = Fq::from_be_bytes_mod_order(&x_c0_bytes);
         let x_c1 = Fq::from_be_bytes_mod_order(&x_c1_bytes);
@@ -89,11 +132,11 @@ mod tests {
     #[test]
     fn test_point_to_affine() {
         let point = G1Point {
-            X: uint!(123456789_U256),
-            Y: uint!(987654321_U256),
+            x: uint!(123456789_U256),
+            y: uint!(987654321_U256),
         };
 
-        let affine: G1Affine = point.into();
+        let affine: G1Affine = point.into_ext();
         assert!(!affine.is_zero());
     }
 
@@ -111,8 +154,8 @@ mod tests {
         ]);
         let point = G1Affine::new_unchecked(x, y);
 
-        let converted: G1Point = point.into();
-        let back_converted: G1Affine = converted.into();
+        let converted: G1Point = point.into_ext();
+        let back_converted: G1Affine = converted.into_ext();
 
         assert_eq!(point, back_converted);
     }
@@ -120,31 +163,31 @@ mod tests {
     #[test]
     fn test_affine_to_point_identity() {
         let affine = G1Affine::identity();
-        let point: G1Point = affine.into();
+        let point: G1Point = affine.into_ext();
 
-        assert_eq!(point.X, Uint::ZERO);
-        assert_eq!(point.Y, Uint::ZERO);
+        assert_eq!(point.x, Uint::ZERO);
+        assert_eq!(point.y, Uint::ZERO);
     }
 
     #[test]
     fn test_point_to_affine_zero() {
         let point = G1Point {
-            X: Uint::ZERO,
-            Y: Uint::ZERO,
+            x: Uint::ZERO,
+            y: Uint::ZERO,
         };
 
-        let affine: G1Affine = point.into();
+        let affine: G1Affine = point.into_ext();
         assert_eq!(affine, G1Affine::identity());
     }
 
     #[test]
     fn test_point_to_affine_g2() {
         let point = G2Point {
-            X: [uint!(123456789_U256), uint!(111222333_U256)],
-            Y: [uint!(987654321_U256), uint!(444555666_U256)],
+            x: vec![uint!(123456789_U256), uint!(111222333_U256)],
+            y: vec![uint!(987654321_U256), uint!(444555666_U256)],
         };
 
-        let affine: G2Affine = point.into();
+        let affine: G2Affine = point.into_ext();
         assert!(!affine.is_zero());
     }
 
@@ -174,8 +217,8 @@ mod tests {
         let y = Fq2::new(y_c0, y_c1);
         let affine = G2Affine::new_unchecked(x, y);
 
-        let converted: G2Point = affine.into();
-        let back_converted: G2Affine = converted.into();
+        let converted: G2Point = affine.into_ext();
+        let back_converted: G2Affine = converted.into_ext();
 
         assert_eq!(affine, back_converted);
     }
@@ -183,22 +226,22 @@ mod tests {
     #[test]
     fn test_affine_to_point_identity_g2() {
         let affine = G2Affine::identity();
-        let point: G2Point = affine.into();
+        let point: G2Point = affine.into_ext();
 
-        assert_eq!(point.X[0], Uint::ZERO);
-        assert_eq!(point.X[1], Uint::ZERO);
-        assert_eq!(point.Y[0], Uint::ZERO);
-        assert_eq!(point.Y[1], Uint::ZERO);
+        assert_eq!(point.x[0], Uint::ZERO);
+        assert_eq!(point.x[1], Uint::ZERO);
+        assert_eq!(point.y[0], Uint::ZERO);
+        assert_eq!(point.y[1], Uint::ZERO);
     }
 
     #[test]
     fn test_point_to_affine_zero_g2() {
         let point = G2Point {
-            X: [Uint::ZERO, Uint::ZERO],
-            Y: [Uint::ZERO, Uint::ZERO],
+            x: vec![Uint::ZERO, Uint::ZERO],
+            y: vec![Uint::ZERO, Uint::ZERO],
         };
 
-        let affine: G2Affine = point.into();
+        let affine: G2Affine = point.into_ext();
         assert_eq!(affine, G2Affine::identity());
     }
 }

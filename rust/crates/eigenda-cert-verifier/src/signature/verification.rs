@@ -1,3 +1,4 @@
+use alloy_primitives::B256;
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
 use ark_ec::{
     AffineRepr, CurveGroup,
@@ -7,19 +8,14 @@ use ark_ff::{AdditiveGroup, PrimeField};
 
 use crate::{
     convert,
-    hash::{self, Keccak256Hash},
+    hash::{self},
 };
 
 /// Verifies the `sigma` signature over `msg_hash` by the (`apk_g1`, `apk_g2`) pubkey
 /// by checking e(sigma + apk_g1 * gamma, -G2) * e(msg_hash + G1 * gamma, apk_g2) == 1
 ///
 /// Where gamma = keccak256(msg || apk_g1 || apk_g2 || sigma)
-pub fn verify(
-    msg_hash: Keccak256Hash,
-    apk_g1: G1Affine,
-    apk_g2: G2Affine,
-    sigma: G1Affine,
-) -> bool {
+pub fn verify(msg_hash: B256, apk_g1: G1Affine, apk_g2: G2Affine, sigma: G1Affine) -> bool {
     let Some(gamma) = compute_gamma(msg_hash, apk_g1, apk_g2, sigma) else {
         return false;
     };
@@ -39,7 +35,7 @@ pub fn verify(
 }
 
 fn compute_gamma(
-    msg_hash: Keccak256Hash,
+    msg_hash: B256,
     apk_g1: G1Affine,
     apk_g2: G2Affine,
     sigma: G1Affine,

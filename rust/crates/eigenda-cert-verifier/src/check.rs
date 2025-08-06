@@ -1,16 +1,17 @@
 use alloc::vec::Vec;
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::{Address, B256, Bytes};
+use eigenda_cert::G1Point;
 use hashbrown::HashMap;
 
 use crate::{
     bitmap::{Bitmap, bit_indices_to_bitmap},
     convert,
     error::CertVerificationError::{self, *},
-    hash::{Keccak256Hash, TruncatedKeccak256Hash, keccak_v256},
+    hash::{TruncatedB256, keccak_v256},
     types::{
         BlockNumber, NonSigner, Quorum, QuorumNumber, RelayKey, Version,
         history::History,
-        solidity::{G1Point, RelayInfo, SecurityThresholds, VersionedBlobParams},
+        solidity::{RelayInfo, SecurityThresholds, VersionedBlobParams},
     },
 };
 
@@ -60,7 +61,7 @@ pub fn cert_apks_equal_storage_apks(
     reference_block: BlockNumber,
     apk_for_each_quorum: &[G1Point],
     apk_index_for_each_quorum: Vec<BlockNumber>,
-    apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedKeccak256Hash>>,
+    apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedB256>>,
 ) -> Result<(), CertVerificationError> {
     signed_quorums
         .iter()
@@ -211,8 +212,8 @@ fn contains(container: Bitmap, contained: Bitmap) -> bool {
 }
 
 pub fn leaf_node_belongs_to_merkle_tree(
-    leaf_node: Keccak256Hash,
-    expected_root: Keccak256Hash,
+    leaf_node: B256,
+    expected_root: B256,
     proof: Bytes,
     sibling_path: u32,
 ) -> Result<(), CertVerificationError> {
@@ -452,9 +453,10 @@ mod test_cert_apks_equal_storage_apks {
     use crate::{
         check, convert,
         error::CertVerificationError::*,
-        hash::TruncatedKeccak256Hash,
+        hash::TruncatedB256,
         types::{
             BlockNumber,
+            conversions::IntoExt,
             history::{History, Update},
         },
     };
@@ -462,12 +464,12 @@ mod test_cert_apks_equal_storage_apks {
     #[test]
     fn cert_apk_equal_storage_apk() {
         let apk = (G1Projective::generator() * Fr::from(42)).into_affine();
-        let apk_hash = convert::point_to_hash(&apk.into());
-        let apk_trunc_hash: TruncatedKeccak256Hash = apk_hash[..24].try_into().unwrap();
+        let apk_hash = convert::point_to_hash(&apk.into_ext());
+        let apk_trunc_hash: TruncatedB256 = apk_hash[..24].try_into().unwrap();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into()];
+        let apk_for_each_quorum = [apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, apk_trunc_hash.clone()).unwrap();
@@ -490,13 +492,12 @@ mod test_cert_apks_equal_storage_apks {
     fn cert_apk_does_not_equal_storage_apk() {
         let cert_apk = (G1Projective::generator() * Fr::from(42)).into_affine();
         let storage_apk = (G1Projective::generator() * Fr::from(43)).into_affine();
-        let storage_apk_hash = convert::point_to_hash(&storage_apk.into());
-        let storage_apk_trunc_hash: TruncatedKeccak256Hash =
-            storage_apk_hash[..24].try_into().unwrap();
+        let storage_apk_hash = convert::point_to_hash(&storage_apk.into_ext());
+        let storage_apk_trunc_hash: TruncatedB256 = storage_apk_hash[..24].try_into().unwrap();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [cert_apk.into()];
+        let apk_for_each_quorum = [cert_apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, storage_apk_trunc_hash.clone()).unwrap();
@@ -522,7 +523,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into()];
+        let apk_for_each_quorum = [apk.into_ext()];
 
         let apk_index_for_each_quorum = vec![0];
 
@@ -544,7 +545,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into()];
+        let apk_for_each_quorum = [apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
         let apk_trunc_hash_history = History(Default::default());
@@ -568,7 +569,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         const STALE_REFERENCE_BLOCK: BlockNumber = 41;
-        let apk_for_each_quorum = [apk.into()];
+        let apk_for_each_quorum = [apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, Default::default()).unwrap();
