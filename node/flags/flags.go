@@ -415,7 +415,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
 			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
@@ -430,7 +430,7 @@ var (
 		Value:    0.15,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
-	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+	LittDBReadCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
 			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
@@ -492,7 +492,7 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
 	}
-	GCSafetyBufferSizeGBFlag = cli.IntFlag{
+	GCSafetyBufferSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
 		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
 			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
