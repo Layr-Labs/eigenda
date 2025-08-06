@@ -180,16 +180,22 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (coretypes.EigenDACer
 func (e *MemStore) Get(
 	_ context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool,
 ) ([]byte, error) {
-	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
+	encodedBlobBytes, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("fetching entry via v2 memstore: %w", err)
 	}
 
 	if returnEncodedPayload {
-		return encodedBlob, nil
+		return encodedBlobBytes, nil
 	}
 
-	return e.codec.DecodeBlob(encodedBlob)
+	encodedPayload, _ := coretypes.NewEncodedPayloadRaw(encodedBlobBytes)
+
+	payload, err := encodedPayload.Decode()
+	if err != nil {
+		return nil, fmt.Errorf("encodedPayload.Decode via v2 memstore: %w", err)
+	}
+	return payload.Serialize(), nil
 }
 
 // Put inserts a value into the store.
@@ -197,12 +203,14 @@ func (e *MemStore) Get(
 // this is done to verify that a rollup must be able to provide
 // the same certificate used in dispersal for retrieval
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
-	encodedVal, err := e.codec.EncodeBlob(value)
+	payload := coretypes.NewPayload(value)
+	encodedVal, err := coretypes.NewEncodedPayload(payload)
+	//e.codec.EncodeBlob(value)
 	if err != nil {
 		return nil, err
 	}
 
-	artificialV2Cert, err := e.generateRandomCert(encodedVal)
+	artificialV2Cert, err := e.generateRandomCert(encodedVal.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf("generating random cert: %w", err)
 	}
@@ -212,7 +220,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("rlp decode v2 cert: %w", err)
 	}
 
-	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), encodedVal)
+	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), encodedVal.Serialize())
 	if err != nil { // don't wrap here so api.ErrorFailover{} isn't modified
 		return nil, err
 	}

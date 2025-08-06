@@ -83,6 +83,9 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
 	}
 
+	fmt.Println("payload", payload.Serialize())
+	fmt.Println("payload", payload)
+
 	return payload, nil
 }
 
@@ -163,6 +166,9 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			return nil, fmt.Errorf("convert blob to encoded payload failed."+
 				" blobKey: %s, relayKey: %v, error: %v", blobKey.Hex(), relayKey, err)
 		}
+
+		fmt.Println("GetEncodedPayload", encodedPayload.Serialize())
+		fmt.Println("GetEncodedPayload", encodedPayload)
 
 		return encodedPayload, nil
 	}
