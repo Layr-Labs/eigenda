@@ -354,6 +354,10 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to compute size: %w", err)
 	}
+	err = memory.SetGCMemorySafetyBuffer(safetyBufferSize)
+	if err != nil {
+		return fmt.Errorf("failed to set GC memory safety buffer: %w", err)
+	}
 	totalAllocated += safetyBufferSize
 
 	if config.EnableV2 {
@@ -366,6 +370,7 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
+		config.littDBReadCacheSize = readCacheSize
 		totalAllocated += readCacheSize
 
 		writeCacheSize, err := computeMemoryPoolSize(
@@ -377,6 +382,7 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
+		config.littDBWriteCacheSize = writeCacheSize
 		totalAllocated += writeCacheSize
 
 		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
