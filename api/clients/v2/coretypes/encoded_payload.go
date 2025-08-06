@@ -16,6 +16,8 @@ import (
 // meaning that it is guaranteed to be a multiple of 32 bytes in length,
 // each such 32 bytes representing a bn254 field element.
 //
+// Always construct an EncodedPayload by using [Payload.ToEncodedPayload].
+//
 // Example encoding:
 //   - [Encoded Payload header (32 bytes total)] + [Encoded Payload Data (len is multiple of 32)]
 //   - [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
@@ -31,7 +33,7 @@ func (ep *EncodedPayload) Serialize() []byte {
 
 // LenSymbols returns the number of symbols in the encoded payload
 func (ep *EncodedPayload) LenSymbols() uint32 {
-	return uint32(len(ep.bytes)+encoding.BYTES_PER_SYMBOL-1) / encoding.BYTES_PER_SYMBOL
+	return uint32(len(ep.bytes)) / encoding.BYTES_PER_SYMBOL
 }
 
 // Decode applies the inverse of PayloadEncodingVersion0 to an EncodedPayload, and returns the decoded Payload
