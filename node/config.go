@@ -189,6 +189,39 @@ type Config struct {
 	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
 	// from OOM-killing the process. Overrides the GCSafetyBufferSizeFraction value if greater than 0.
 	GCSafetyBufferSizeGB float64
+
+	// The maximum amount of time to wait to acquire buffer capacity to serve a GetChunks() gRPC request.
+	GetChunksBufferTimeout time.Duration
+
+	// getChunksBufferSize controls the maximum memory that can be used to serve GetChunks() gRPC requests,
+	// as a fraction of the total memory available to the process. Ignored if GetChunksBufferSizeGB is greater than 0.
+	GetChunksBufferSizeFraction float64
+
+	// GetChunksBufferSizeGB controls the maximum memory that can be used to serve GetChunks() gRPC requests,
+	// in gigabytes. If set, this config value overrides the GetChunksBufferSizeFraction value if greater than 0.
+	GetChunksBufferSizeGB float64
+
+	// getChunksBufferSize is a derived value based on the configuration provided by GetChunksBufferSizeGB and
+	//GetChunksBufferSizeFraction. Stores the size of the buffer used to serve GetChunks() gRPC requests in bytes.
+	getChunksBufferSize uint64
+
+	// The maximum amount of time to wait to acquire buffer capacity to store chunks in the StoreChunks() gRPC request.
+	StoreChunksBufferTimeout time.Duration
+
+	// StoreChunksBufferSizeFraction controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, as a fraction of the total memory available to the process.
+	// Ignored if StoreChunksBufferSizeGB is greater than 0.
+	StoreChunksBufferSizeFraction float64
+
+	// StoreChunksBufferSizeGB controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, in gigabytes. If set, this config value overrides the
+	// StoreChunksBufferSizeFraction value if greater than 0.
+	StoreChunksBufferSizeGB float64
+
+	// storeChunksBufferSize is a derived value based on the configuration provided by StoreChunksBufferSizeGB and
+	// StoreChunksBufferSizeFraction. Stores the size of the buffer used to store chunks in the StoreChunks() gRPC
+	// request in bytes.
+	storeChunksBufferSize uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -434,5 +467,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
 		GCSafetyBufferSizeFraction:          ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
+		GetChunksBufferSizeFraction:         ctx.GlobalFloat64(flags.GetChunksBufferSizeFractionFlag.Name),
+		GetChunksBufferSizeGB:               ctx.GlobalFloat64(flags.GetChunksBufferSizeGBFlag.Name),
+		StoreChunksBufferSizeFraction:       ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
+		StoreChunksBufferSizeGB:             ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name),
 	}, nil
 }

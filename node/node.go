@@ -385,9 +385,29 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 		config.littDBWriteCacheSize = writeCacheSize
 		totalAllocated += writeCacheSize
 
-		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
-		//  limit here. It's important to ensure that all reserved memory buckets sum to less than the maximum
-		//  available memory.
+		getChunksBufferSize, err := computeMemoryPoolSize(
+			logger,
+			"GetChunks Buffer",
+			config.GetChunksBufferSizeGB,
+			config.GetChunksBufferSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		config.getChunksBufferSize = getChunksBufferSize
+		totalAllocated += getChunksBufferSize
+
+		storeChunksBufferSize, err := computeMemoryPoolSize(
+			logger,
+			"StoreChunks Buffer",
+			config.StoreChunksBufferSizeGB,
+			config.StoreChunksBufferSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		config.storeChunksBufferSize = storeChunksBufferSize
+		totalAllocated += storeChunksBufferSize
 	}
 
 	if totalAllocated > maxMemory {
