@@ -56,6 +56,7 @@ func (n *Node) DownloadBundles(
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
 	rawBundles := make([]*RawBundle, len(batch.BlobCertificates))
 	requests := make(map[corev2.RelayKey]*relayRequest)
+	var requiredCapacity uint64
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
@@ -86,6 +87,12 @@ func (n *Node) DownloadBundles(
 			continue
 		}
 
+		chunkSize, err := getChunkLengthFromBlobCert(cert)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get chunk size from blob certificate: %v", err)
+		}
+		requiredCapacity += uint64(assgn.NumChunks()) * chunkSize
+
 		req, ok := requests[relayKey]
 		if !ok {
 			req = &relayRequest{
@@ -104,6 +111,14 @@ func (n *Node) DownloadBundles(
 			assignment:     assgn,
 		})
 
+	}
+
+	probe.SetStage("acquire_buffer_capacity")
+	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.GetChunksBufferTimeout)
+	defer cancel()
+	err := n.getChunksSemaphore.Acquire(semaphoreCtx, requiredCapacity)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to acquire semaphore: %w", err)
 	}
 
 	probe.SetStage("download")
@@ -140,7 +155,6 @@ func (n *Node) DownloadBundles(
 
 	probe.SetStage("deserialize")
 
-	var err error
 	for i := 0; i < len(requests); i++ {
 		resp := responses[i]
 		if resp.err != nil {
@@ -165,6 +179,15 @@ func (n *Node) DownloadBundles(
 	}
 
 	return blobShards, rawBundles, nil
+}
+
+// TODO consider moving this somewhere else
+func getChunkLengthFromBlobCert(cert *corev2.BlobCertificate) (uint64, error) {
+
+	// TODO future Cody: implement this
+	// it might be wise to first implement a utility for looking up blob version params
+
+	return 0, nil // TODO
 }
 
 func (n *Node) ValidateBatchV2(

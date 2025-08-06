@@ -96,6 +96,13 @@ type Node struct {
 	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
 	// QuorumCount is the number of quorums in the network.
 	QuorumCount atomic.Uint32
+
+	// TODO future cody: this is not wired in yet
+	// Used to limit the maximum amount of memory used to serve GetChunks() gRPC requests.
+	getChunksSemaphore *common.Semaphore
+
+	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
+	storeChunksSemaphore *common.Semaphore
 }
 
 // NewNode creates a new Node with the provided config.
@@ -258,6 +265,15 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
+	getChunksSemaphore, err := common.NewSemaphore(config.getChunksBufferSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create getChunks semaphore: %w", err)
+	}
+	storeChunksSemaphore, err := common.NewSemaphore(config.storeChunksBufferSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storeChunks semaphore: %w", err)
+	}
+
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -275,6 +291,8 @@ func NewNode(
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
+		getChunksSemaphore:      getChunksSemaphore,
+		storeChunksSemaphore:    storeChunksSemaphore,
 	}
 
 	if !config.EnableV2 {
