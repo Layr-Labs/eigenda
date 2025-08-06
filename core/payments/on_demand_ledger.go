@@ -35,6 +35,7 @@ func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) err
 	}
 
 	// TODO continue work here
+	return nil
 }
 
 // Accountant struct fields related to on-demand payments:

@@ -16,7 +16,7 @@ import (
 // TODO: this ledger will need a queue that can be pushed on to from different go routines. Elements will then be
 // popped off of the queue, and handled via "Debit"
 type AccountLedger struct {
-	leakyBucket *LeakyBucket
+	reservationLedger *ReservationLedger
 }
 
 func NewAccountLedger(
@@ -24,23 +24,23 @@ func NewAccountLedger(
 	// TODO: may be nil if no reservation exists
 	reservationConfig *ReservationConfig,
 ) (*AccountLedger, error) {
-	var leakyBucket *LeakyBucket
+	var leakyBucket *ReservationLedger
 	if reservationConfig != nil {
 		var err error
-		leakyBucket, err = NewLeakyBucket(timeSource, reservationConfig)
+		leakyBucket, err = NewReservationLedger(timeSource, reservationConfig)
 		if err != nil {
 			return nil, fmt.Errorf("new leaky bucket: %w", err)
 		}
 	}
 
 	return &AccountLedger{
-		leakyBucket: leakyBucket,
+		reservationLedger: leakyBucket,
 	}, nil
 }
 
 func (al *AccountLedger) Debit(blob coretypes.Blob) error {
-	if al.leakyBucket != nil {
-		err := al.leakyBucket.Fill(int64(blob.BlobLengthSymbols()))
+	if al.reservationLedger != nil {
+		err := al.reservationLedger.Debit(int64(blob.BlobLengthSymbols()))
 
 		if err != nil {
 			return nil
