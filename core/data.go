@@ -505,6 +505,32 @@ type PaymentMetadata struct {
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
+// TODO doc
+func NewPaymentMetadata(
+	accountID gethcommon.Address,
+	timestamp time.Time,
+	cumulativePayment *big.Int,
+) (*PaymentMetadata, error) {
+	if accountID == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("account ID cannot be zero address")
+	}
+
+	var nonNilCumulativePayment *big.Int
+	if cumulativePayment == nil {
+		nonNilCumulativePayment = big.NewInt(0)
+	}
+
+	if nonNilCumulativePayment.Sign() < 0 {
+		return nil, fmt.Errorf("cumulative payment cannot be negative")
+	}
+
+	return &PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         timestamp.UnixNano(),
+		CumulativePayment: nonNilCumulativePayment,
+	}, nil
+}
+
 // Hash returns the Keccak256 hash of the PaymentMetadata
 func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 	if pm == nil {
@@ -629,14 +655,14 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment
-// TODO(litt3): "ReservedPayment" isn't a good name. This should be renamed to "Reservation"
 //
-// TODO(litt3): this should be moved into the `payments` package
+// TODO(litt3): this structure is used in the bin-based payment system, which is in the process of being deprecated.
+// It should be deleted when the old payment system is removed. The counterpart to this struct in the new payment
+// system is payments.Reservation
 type ReservedPayment struct {
 	// reserve number of symbols per second
 	SymbolsPerSecond uint64
 	// reservation activation timestamp
-	// TODO(litt3): not enough detail in these docs. Fix them up, e.g. talk about this being nano epoch time
 	StartTimestamp uint64
 	// reservation expiration timestamp
 	EndTimestamp uint64
@@ -644,9 +670,6 @@ type ReservedPayment struct {
 	// allowed quorums
 	QuorumNumbers []uint8
 	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-	//
-	// TODO(litt3): this is either deprecated, or in the process of being deprecated? double check, and then leave a
-	//	better comment here. If possible, delete this field entirely
 	QuorumSplits []byte
 }
 
@@ -685,3 +708,5 @@ func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
 	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
 	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }
+
+func (ar *ReservedPayment) 

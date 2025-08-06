@@ -1,0 +1,35 @@
+package payments
+
+import (
+	"fmt"
+	"time"
+)
+
+// TODO: docs
+// TODO: consider config pointers throughout
+
+type ReservationLedgerConfig struct {
+	reservation       Reservation
+	biasBehavior      BiasBehavior
+	overdraftBehavior OverdraftBehavior
+	// bucketCapacity is how much time worth of reservations should the capacity be
+	bucketCapacityDuration time.Duration
+}
+
+func NewReservationLedgerConfig(
+	reservation Reservation,
+	biasBehavior BiasBehavior,
+	overdraftBehavior OverdraftBehavior,
+	bucketCapacityDuration time.Duration,
+) (*ReservationLedgerConfig, error) {
+	if bucketCapacityDuration <= 0 {
+		return nil, fmt.Errorf("bucket capacity duration must be > 0, got %d", bucketCapacityDuration)
+	}
+
+	return &ReservationLedgerConfig{
+		reservation:            reservation,
+		biasBehavior:           biasBehavior,
+		overdraftBehavior:      overdraftBehavior,
+		bucketCapacityDuration: bucketCapacityDuration,
+	}, nil
+}

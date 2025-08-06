@@ -1,16 +1,25 @@
 package payments
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 // TODO: consider overflows in this. Are we being _too_ careful?
 
 // TODO: write unit tests
+
+// TODO: where do we check whether a dispersal fits within the correct time? it seems like we might need to return
+// the time to put into the payment header when doing the debit function....
+
+// TODO: consider extracting leaky bucket out of here after all. As I go, there is more and more stuff that isn't related
+// to leaky bucket being added.
+
+// TODO: at what point in the process will be construct the payment header? I don't want to do it in this class,
+// since then it won't be reusable: only the client should be creating the payment header, everyone else should
+// be extracting data, and verifying that the dispersal is permitted.
 
 // This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
 //
@@ -30,84 +39,31 @@ import (
 //
 // NOTE: methods on this struct should not be called from separate goroutines: it's not threadsafe.
 type ReservationLedger struct {
-	timeSource func() time.Time
+	config ReservationLedgerConfig
 
-	// Describes alternate strategies for how the leaky bucket responds when a Fill is attempted that exceeds the
-	// available bucket capacity
-	overdraftBehavior OverdraftBehavior
+	getNow func() time.Time
 
-	// The total number of symbols that fit in the bucket
-	bucketCapacity int64
-
-	// The number of symbols that leak out of the bucket each second
-	//
-	// The leak rate is a uint64 on-chain, so that's what we accept in the constructor. But it's converted to an int64
-	// under the hood to match other int types in the struct, making syntax less verbose.
-	//
-	// The assumption that symbolsPerSecondLeakRate fits in an int64 should be fine, as long as we are careful not to
-	// give out any reservations that exceed 590 exabytes.
-	symbolsPerSecondLeakRate int64
-
-	// The type of biasBehavior to display, when confronted with a decision of whether to err on the side of permitting
-	// more or less traffic.
-	biasBehavior BiasBehavior
-
-	// The number of symbols currently in the bucket
-	currentFillLevel int64
-
-	// The time at which the previous leak calculation was made.
-	previousLeakTime time.Time
-
-	// The number of symbols which leaked in the "partial second" of the previous leak calculation. A "partial" second
-	// is `epochNanoTime % 1e9`.
-	//
-	// Since the leaky bucket uses integers instead of floats, leak math isn't straight forward. It's easy to calculate
-	// the number of symbols that leak in a full second, since leak rate is defined in terms of symbols / second. But
-	// determining how many symbols leak in a number of nanoseconds requires making a rounding choice. Leak calculation
-	// N needs to take the partialSecondLeakage of calculation N-1 into account, so that the precisely correct number
-	// of symbols are leaked for each full second.
-	//
-	// It would be possible to recalculate this value for N-1 when doing the calculation for N, but storing this value
-	// as a member variable keeps things simple and avoids re-doing the math.
-	previousPartialSecondLeakage int64
+	leakyBucket *LeakyBucket
 }
 
 // Creates a new reservation ledger, which represents the reservation of a single user with a leaky bucket
 func NewReservationLedger(
-	timeSource func() time.Time,
-	config *ReservationConfig,
+	config ReservationLedgerConfig,
+	getNow func() time.Time,
 ) (*ReservationLedger, error) {
-	if config.bucketCapacityDuration <= 0 {
-		return nil, fmt.Errorf("bucket capacity must be > 0, got %d", config.bucketCapacityDuration)
-	}
-
-	bucketCapacity := int64(float64(config.symbolsPerSecond) * config.bucketCapacityDuration.Seconds())
-
-	if config.symbolsPerSecond == 0 {
-		return nil, errors.New("symbolsPerSecond must be > 0")
-	}
-
-	var currentFillLevel int64
-	switch config.biasBehavior {
-	case BiasPermitMore:
-		currentFillLevel = 0
-	case BiasPermitLess:
-		currentFillLevel = bucketCapacity
-	default:
-		return nil, fmt.Errorf("unknown bias behavior %s", config.biasBehavior)
+	leakyBucket, err := NewLeakyBucket(config, getNow())
+	if err != nil {
+		return nil, fmt.Errorf("new leaky bucket: %w", err)
 	}
 
 	return &ReservationLedger{
-		timeSource:                   timeSource,
-		overdraftBehavior:            config.overdraftBehavior,
-		bucketCapacity:               bucketCapacity,
-		symbolsPerSecondLeakRate:     int64(config.symbolsPerSecond),
-		biasBehavior:                 config.biasBehavior,
-		currentFillLevel:             currentFillLevel,
-		previousLeakTime:             timeSource(),
-		previousPartialSecondLeakage: 0,
+		getNow:      getNow,
+		config:      config,
+		leakyBucket: leakyBucket,
 	}, nil
 }
+
+// TODO: consider whether the concept of a debit slip makes sense
 
 // Debit the reservation with a number of symbols.
 //
@@ -118,177 +74,38 @@ func NewReservationLedger(
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
-func (rl *ReservationLedger) Debit(symbolCount int64) error {
-	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
-	}
-
-	err := rl.leak()
+func (rl *ReservationLedger) Debit(symbolCount int64, quorums []core.QuorumID) (*core.PaymentMetadata, error) {
+	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
-		return fmt.Errorf("leak: %w", err)
+		return nil, fmt.Errorf("check quorums permitted: %w", err)
 	}
 
-	// this is how full the bucket would be, if the fill were to be accepted
-	newFillLevel, err := common.SafeAddInt64(rl.currentFillLevel, symbolCount)
+	now := rl.getNow()
+
+	err = rl.config.reservation.CheckTime(now)
 	if err != nil {
-		return fmt.Errorf("safe add to compute newFillLevel: %w", err)
+		
 	}
 
-	// if newFillLevel is less than the total bucket capacity, no further checks are required
-	if newFillLevel < rl.bucketCapacity {
-		rl.currentFillLevel = newFillLevel
-		return nil
+	err = rl.leakyBucket.Fill(now, symbolCount)
+	if err != nil {
+		return nil, fmt.Errorf("fill leaky bucket: %w", err)
 	}
 
-	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
-	switch rl.overdraftBehavior {
-	case OverdraftNotPermitted:
-		return &InsufficientReservationCapacityError{symbolCount}
-	case OverdraftOncePermitted:
-		zeroCapacityAvailable := rl.currentFillLevel >= rl.bucketCapacity
-
-		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
-		if zeroCapacityAvailable {
-			return &InsufficientReservationCapacityError{symbolCount}
-		}
-
-		rl.currentFillLevel = newFillLevel
-		return nil
-	default:
-		return fmt.Errorf("unknown overfill behavior %s", rl.overdraftBehavior)
+	paymentMetadata, err := core.NewPaymentMetadata(rl.config.reservation.accountID, now, nil)
+	if err != nil {
+		return nil, fmt.Errorf("new payment metadata: %w", err)
 	}
+
+	return paymentMetadata, nil
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
-//
-// Algorithmically, that means removing a number of symbols from the leaky bucket.
 func (rl *ReservationLedger) RevertDebit(symbolCount int64) error {
-	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
-	}
-
-	err := rl.leak()
+	err := rl.leakyBucket.RevertFill(rl.getNow(), symbolCount)
 	if err != nil {
-		return fmt.Errorf("leak: %w", err)
+		return fmt.Errorf("revert fill: %w", err)
 	}
 
-	newFillLevel, err := common.SafeSubtractInt64(rl.currentFillLevel, symbolCount)
-	if err != nil {
-		return fmt.Errorf("safe subtract to compute newFillLevel: %w", err)
-	}
-
-	rl.currentFillLevel = newFillLevel
 	return nil
-}
-
-// Lets the correct number of symbols leak out of the bucket, based on when we last leaked
-//
-// Returns an error if any of the calculations fail, which should not happen during normal usage.
-func (rl *ReservationLedger) leak() error {
-	currentTime := rl.timeSource()
-	defer func() {
-		rl.previousLeakTime = currentTime
-	}()
-
-	fullSecondLeakage, err := rl.computeFullSecondLeakage(currentTime.Unix())
-	if err != nil {
-		return fmt.Errorf("compute full second leakage: %w", err)
-	}
-
-	// We need to correct the full-second leakage value: the previous leak calculation already let some symbols from a
-	// partial second period leak out, and those symbols shouldn't be allowed to leak twice
-	//
-	// This value can be negative if the previous leak calculation was within the same second as this calculation.
-	correctedFullSecondLeakage, err := common.SafeSubtractInt64(fullSecondLeakage, rl.previousPartialSecondLeakage)
-	if err != nil {
-		return fmt.Errorf("safe subtract to compute correctedFullSecondLeakage: %w", err)
-	}
-
-	partialSecondLeakage, err := rl.computePartialSecondLeakage(currentTime.Nanosecond())
-	if err != nil {
-		return fmt.Errorf("compute partial second leakage: %w", err)
-	}
-	defer func() {
-		rl.previousPartialSecondLeakage = partialSecondLeakage
-	}()
-
-	actualLeakage, err := common.SafeAddInt64(correctedFullSecondLeakage, partialSecondLeakage)
-	if err != nil {
-		return fmt.Errorf("safe add to compute actualLeakage: %w", err)
-	}
-
-	// don't let the bucket leak past empty
-	if actualLeakage >= rl.currentFillLevel {
-		rl.currentFillLevel = 0
-		return nil
-	}
-
-	newFillLevel, err := common.SafeSubtractInt64(rl.currentFillLevel, actualLeakage)
-	if err != nil {
-		return fmt.Errorf("safe subtract to update currentFillLevel: %w", err)
-	}
-
-	rl.currentFillLevel = newFillLevel
-	return nil
-}
-
-// Accepts the current number of seconds since epoch. Returns the number of symbols that should leak from the bucket,
-// based on when we last leaked.
-//
-// Since this method only takes full seconds into consideration, the returned value must be used carefully. See leak()
-// for details.
-//
-// Returns an error if the leakage calculation fails, which should not happen during normal usage.
-func (rl *ReservationLedger) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
-	if epochSeconds < 0 {
-		return 0, fmt.Errorf("epochSeconds must be >= 0, got %d", epochSeconds)
-	}
-
-	// epoch seconds should never go backwards, but could be the same
-	if epochSeconds < rl.previousLeakTime.Unix() {
-		return 0, fmt.Errorf("current time %s (%d) is before previous time %s (%d)",
-			time.Unix(epochSeconds, 0).UTC().Format(time.RFC3339),
-			epochSeconds,
-			rl.previousLeakTime.UTC().Format(time.RFC3339),
-			rl.previousLeakTime.Unix())
-	}
-
-	secondsSinceLastUpdate, err := common.SafeSubtractInt64(epochSeconds, rl.previousLeakTime.Unix())
-	if err != nil {
-		return 0, fmt.Errorf("safe subtract to compute secondsSinceLastUpdate: %w", err)
-	}
-
-	fullSecondLeakage, err := common.SafeMultiplyInt64(secondsSinceLastUpdate, rl.symbolsPerSecondLeakRate)
-	if err != nil {
-		return 0, fmt.Errorf("safe multiply to compute fullSecondLeakage: %w", err)
-	}
-	return fullSecondLeakage, nil
-}
-
-// TODO: doc
-func (rl *ReservationLedger) computePartialSecondLeakage(nanos int) (int64, error) {
-	if nanos >= 1e9 || nanos < 0 {
-		return 0, fmt.Errorf("nanos must be between 0 and 1e9, got %d", nanos)
-	}
-
-	product, err := common.SafeMultiplyInt64(int64(nanos), rl.symbolsPerSecondLeakRate)
-	if err != nil {
-		return 0, fmt.Errorf("safe multiply to compute nanos * symbolsPerSecondLeakRate: %w", err)
-	}
-
-	switch rl.biasBehavior {
-	case BiasPermitMore:
-		// Round up, to permit more (more leakage = more capacity freed up)
-		// Add (1e9 - 1) before dividing to round up
-		sum, err := common.SafeAddInt64(product, 1e9-1)
-		if err != nil {
-			return 0, fmt.Errorf("safe add to compute rounding sum: %w", err)
-		}
-		return sum / 1e9, nil
-	case BiasPermitLess:
-		// Round down, to permit less (less leakage = less capacity freed up)
-		return product / 1e9, nil
-	default:
-		return 0, fmt.Errorf("unknown bias: %s", rl.biasBehavior)
-	}
 }
