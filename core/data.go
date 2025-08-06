@@ -662,6 +662,26 @@ type BlobVersionParameters struct {
 	NumChunks uint32
 }
 
+// Get the length of a chunk in bytes for a blob with these parameters and a given blob length in
+// (TODO symbols/bytes?).
+func (bvp *BlobVersionParameters) GetChunkLength(blobLength uint32) (uint32, error) {
+	if blobLength == 0 {
+		return 0, fmt.Errorf("blob length must be greater than 0")
+	}
+
+	// Check that the blob length is a power of 2 using bit manipulation
+	if blobLength&(blobLength-1) != 0 {
+		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLength)
+	}
+
+	chunkLength := blobLength * bvp.CodingRate / bvp.NumChunks
+	if chunkLength == 0 {
+		chunkLength = 1
+	}
+
+	return chunkLength, nil
+}
+
 // GetReconstructionThreshold returns the minimum difference between the ConfirmationThreshold
 // and AdversaryThreshold that is valid for a given BlobVersionParameters.
 func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {

@@ -61,6 +61,9 @@ var (
 	}
 )
 
+// TODO (cody.littley): refactor all exported fields in this struct to private fields and ensure that all interaction
+//  is mediated by methods.
+
 type Node struct {
 	Config                  *Config
 	Logger                  logging.Logger

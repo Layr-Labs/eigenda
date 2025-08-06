@@ -81,17 +81,16 @@ func (n *Node) DownloadBundles(
 		}
 
 		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
-
 		if err != nil {
 			n.Logger.Errorf("failed to get assignment: %v", err)
 			continue
 		}
 
-		chunkSize, err := getChunkLengthFromBlobCert(cert)
+		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get chunk size from blob certificate: %w", err)
+			return nil, nil, fmt.Errorf("failed to get chunk length: %w", err)
 		}
-		requiredCapacity += uint64(assgn.NumChunks()) * chunkSize
+		requiredCapacity += uint64(assgn.NumChunks() * chunkLength)
 
 		req, ok := requests[relayKey]
 		if !ok {
@@ -113,12 +112,19 @@ func (n *Node) DownloadBundles(
 
 	}
 
+	// TODO future cody:
+	//  - do the same thing for GetChunks()
+	//  - test this on preprod
+	//  - strip out the contract directory changes... they don't need to be a prerequisite for this
+
+	// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
+	// is capacity in the store chunks buffer. Doing this reduces risk of OOM.
 	probe.SetStage("acquire_buffer_capacity")
 	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.GetChunksBufferTimeout)
 	defer cancel()
 	err := n.getChunksSemaphore.Acquire(semaphoreCtx, int64(requiredCapacity))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to acquire semaphore: %w", err)
+		return nil, nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
 	}
 
 	probe.SetStage("download")
@@ -179,15 +185,6 @@ func (n *Node) DownloadBundles(
 	}
 
 	return blobShards, rawBundles, nil
-}
-
-// TODO consider moving this somewhere else
-func getChunkLengthFromBlobCert(cert *corev2.BlobCertificate) (uint64, error) {
-
-	// TODO future Cody: implement this
-	// it might be wise to first implement a utility for looking up blob version params
-
-	return 0, nil // TODO
 }
 
 func (n *Node) ValidateBatchV2(
