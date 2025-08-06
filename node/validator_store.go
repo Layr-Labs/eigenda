@@ -128,12 +128,12 @@ func NewValidatorStore(
 		return nil, fmt.Errorf("failed to get chunks table: %w", err)
 	}
 
-	err = chunkTable.SetWriteCacheSize(config.littDBWriteCacheSize)
+	err = chunkTable.SetWriteCacheSize(config.LittDBWriteCacheSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set write cache size for chunks table: %w", err)
 	}
 
-	err = chunkTable.SetReadCacheSize(config.littDBReadCacheSize)
+	err = chunkTable.SetReadCacheSize(config.LittDBReadCacheSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set read cache size for chunks table: %w", err)
 	}
