@@ -100,6 +100,15 @@ func (p *SRSTable) GetSubTables(
 	table, ok := p.Tables[param]
 	if !ok {
 		log.Printf("Table with params: DimE=%v CosetSize=%v does not exist\n", dimE, cosetSize)
+
+		// Check if we have enough SRS points loaded for precomputation
+		// We need polynomial degree m < len(SRS)
+		// (Actually we only access up to index m-cosetSize, but this simpler check is safer)
+		if m >= uint64(len(p.s1)) {
+			return nil, fmt.Errorf("cannot precompute table: insufficient SRS points loaded (have %d, need at least %d). Consider increasing DISPERSER_ENCODER_SRS_LOAD or using precomputed tables",
+				len(p.s1), m+1)
+		}
+
 		log.Printf("Generating the table. May take a while\n")
 		log.Printf("... ...\n")
 		filename := fmt.Sprintf("dimE%v.coset%v", dimE, cosetSize)
