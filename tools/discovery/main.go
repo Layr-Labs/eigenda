@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	proxycmn "github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -94,6 +95,7 @@ func main() {
 }
 
 func discoverAddresses(ctx *cli.Context) error {
+	outputFormat := strings.ToLower(ctx.String(outputFormatFlag.Name))
 	rpcURL := ctx.String(ethRpcUrlFlag.Name)
 	network, err := proxycmn.EigenDANetworkFromString(ctx.String(networkFlag.Name))
 	if err != nil {
@@ -122,6 +124,24 @@ func discoverAddresses(ctx *cli.Context) error {
 	// Validate directory address
 	if !gethcommon.IsHexAddress(directoryAddr) {
 		return fmt.Errorf("invalid EigenDADirectory address: %s", directoryAddr)
+	}
+
+	addressMap, err := directory.GetContractAddressMap(
+		context.Background(),
+		client,
+		gethcommon.HexToAddress(directoryAddr))
+	if err != nil {
+		return fmt.Errorf("GetAllAddresses from directory: %w", err)
+	}
+
+	// Output results
+	switch outputFormat {
+	case "table":
+		printTable(addressMap)
+	case "csv":
+		printCSV(addressMap)
+	case "json":
+		printJSON(addressMap)
 	}
 
 	return nil

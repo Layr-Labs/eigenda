@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/common"
 	contractIEigenDADirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -39,11 +38,11 @@ type ContractDirectory struct {
 func NewContractDirectory(
 	ctx context.Context,
 	logger logging.Logger,
-	ethClient common.EthClient,
+	client bind.ContractBackend,
 	directoryAddress gethcommon.Address,
 ) (*ContractDirectory, error) {
 
-	caller, err := contractIEigenDADirectory.NewContractIEigenDADirectoryCaller(directoryAddress, ethClient)
+	caller, err := contractIEigenDADirectory.NewContractIEigenDADirectoryCaller(directoryAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("NewContractDirectory: %w", err)
 	}
