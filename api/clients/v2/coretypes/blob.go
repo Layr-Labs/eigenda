@@ -12,7 +12,8 @@ import (
 
 // Blob is data that is dispersed on eigenDA.
 //
-// A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form.
+// A Blob is represented under the hood by an array of field elements (symbols),
+// which represent a polynomial in coefficient form.
 // A Blob must have a length (in symbols) that is a power of two. In particular, blobs of length 0 are not allowed.
 // A Blob's length must match the blobLength in the BlobHeader's [encoding.BlobCommitments.Length].
 type Blob struct {
@@ -49,9 +50,11 @@ func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 	return BlobFromCoefficients(coeffPolynomial), nil
 }
 
-// BlobFromCoefficients initializes a blob from the coefficients of a polynomial.
-// If the coefficients are not a power of two in length, they will be padded to the next power of two.
-// This is useful for creating blobs from arbitrary coefficient arrays.
+// BlobFromCoefficients creates a blob from the coefficients of a polynomial.
+// A Blob must have a power of two coefficients. Thus:
+// - If the passed coefficients are a power of 2 in length, they will be used as is.
+// - If the coefficients are not a power of two in length, they will be copied to a new slice that is padded with zeros
+//   to the next power of two in length.
 func BlobFromCoefficients(coefficients []fr.Element) *Blob {
 	paddedCoefficients := coefficients
 	if !encoding.IsPowerOfTwo(len(coefficients)) {
