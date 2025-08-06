@@ -32,6 +32,9 @@ type ContractDirectory struct {
 	// a handle for calling the EigenDA directory contract.
 	caller *contractIEigenDADirectory.ContractIEigenDADirectoryCaller
 
+	// A set of all known contract addresses. Used to prevent magic strings from sneaking into the codebase.
+	legalAddressSet map[ContractName]struct{}
+
 	// Used to make this utility thread safe.
 	lock sync.Mutex
 }
@@ -54,10 +57,16 @@ func NewContractDirectory(
 		return nil, fmt.Errorf("NewContractDirectory: %w", err)
 	}
 
+	legalAddressSet := make(map[ContractName]struct{})
+	for _, contractName := range knownContracts {
+		legalAddressSet[contractName] = struct{}{}
+	}
+
 	d := &ContractDirectory{
-		logger:       logger,
-		addressCache: make(map[ContractName]gethcommon.Address),
-		caller:       caller,
+		logger:          logger,
+		addressCache:    make(map[ContractName]gethcommon.Address),
+		caller:          caller,
+		legalAddressSet: legalAddressSet,
 	}
 
 	err = d.verifyContractList(ctx)
@@ -85,6 +94,11 @@ func (d *ContractDirectory) GetContractAddress(
 	address, ok := d.addressCache[contractName]
 	if ok {
 		return address, nil
+	}
+
+	// Before we look up the address, make sure it's in our list of known contracts.
+	if _, exists := d.legalAddressSet[contractName]; !exists {
+		return gethcommon.Address{}, fmt.Errorf("contract %s is not a known contract", contractName)
 	}
 
 	address, err := d.caller.GetAddress0(&bind.CallOpts{Context: ctx}, (string)(contractName))
