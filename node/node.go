@@ -24,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -98,10 +99,10 @@ type Node struct {
 
 	// TODO future cody: this is not wired in yet
 	// Used to limit the maximum amount of memory used to serve GetChunks() gRPC requests.
-	getChunksSemaphore *common.Semaphore
+	getChunksSemaphore *semaphore.Weighted
 
 	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
-	storeChunksSemaphore *common.Semaphore
+	storeChunksSemaphore *semaphore.Weighted
 }
 
 // NewNode creates a new Node with the provided config.
@@ -264,14 +265,8 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
-	getChunksSemaphore, err := common.NewSemaphore(config.GetChunksBufferSizeBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create getChunks semaphore: %w", err)
-	}
-	storeChunksSemaphore, err := common.NewSemaphore(config.StoreChunksBufferSizeBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storeChunks semaphore: %w", err)
-	}
+	getChunksSemaphore := semaphore.NewWeighted(int64(config.GetChunksBufferSizeBytes))
+	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
 
 	n := &Node{
 		Config:                  config,

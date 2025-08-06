@@ -116,7 +116,7 @@ func (n *Node) DownloadBundles(
 	probe.SetStage("acquire_buffer_capacity")
 	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.GetChunksBufferTimeout)
 	defer cancel()
-	err := n.getChunksSemaphore.Acquire(semaphoreCtx, requiredCapacity)
+	err := n.getChunksSemaphore.Acquire(semaphoreCtx, int64(requiredCapacity))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to acquire semaphore: %w", err)
 	}
