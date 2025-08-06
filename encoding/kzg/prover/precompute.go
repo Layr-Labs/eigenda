@@ -105,7 +105,8 @@ func (p *SRSTable) GetSubTables(
 		// We need polynomial degree m < len(SRS)
 		// (Actually we only access up to index m-cosetSize, but this simpler check is safer)
 		if m >= uint64(len(p.s1)) {
-			return nil, fmt.Errorf("cannot precompute table: insufficient SRS points loaded (have %d, need at least %d). Consider increasing loaded SRS points or using precomputed tables",
+			return nil, fmt.Errorf("cannot precompute table: insufficient SRS points loaded (have %d, need at least %d). "+
+				"Consider increasing loaded SRS points or using precomputed tables",
 				len(p.s1), m+1)
 		}
 

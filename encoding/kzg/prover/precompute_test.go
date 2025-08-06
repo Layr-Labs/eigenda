@@ -58,8 +58,10 @@ func TestSRSTable_InsufficientSRSPoints_NoPanic(t *testing.T) {
 
 	// Initialize with some dummy points (doesn't matter what they are for this test)
 	var generator bn254.G1Affine
-	generator.X.SetString("1")
-	generator.Y.SetString("2")
+	_, err := generator.X.SetString("1")
+	require.NoError(t, err)
+	_, err = generator.Y.SetString("2")
+	require.NoError(t, err)
 	for i := range limitedSRS {
 		limitedSRS[i] = generator
 	}
