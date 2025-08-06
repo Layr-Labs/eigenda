@@ -2,6 +2,7 @@ package payments
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -11,20 +12,19 @@ import (
 // and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
 // which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
 
-// EXTRACTED FROM accountant.go - ON-DEMAND PAYMENT RELATED CODE
-
-// Variables related to on-demand payments
-// OnDemandQuorums contains the required quorum numbers for on-demand payments as a set
-var OnDemandQuorums = map[core.QuorumID]bool{
-	0: true,
-	1: true,
-}
-
 type OnDemandLedger struct {
+	config            OnDemandLedgerConfig
+	cumulativePayment *big.Int
 }
 
-func NewOnDemandLedger() (*OnDemandLedger, error) {
-	return &OnDemandLedger{}, nil
+func NewOnDemandLedger(config OnDemandLedgerConfig) (*OnDemandLedger, error) {
+	// TODO: get this from the disperser
+	cumulativePayment := big.NewInt(0)
+
+	return &OnDemandLedger{
+		config:            config,
+		cumulativePayment: cumulativePayment,
+	}, nil
 }
 
 // TODO: reconsider int64
@@ -34,12 +34,26 @@ func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) err
 	}
 
 	for _, quorum := range quorums {
-		if !OnDemandQuorums[quorum] {
-			return fmt.Errorf("quorum %d cannot be dispersed to with on-demand payments", quorum)
+		if quorum == 0 || quorum == 1 {
+			continue
 		}
+
+		return fmt.Errorf("only quorums 0 and 1 are supported for on demand payments, got %d", quorum)
 	}
 
 	// TODO continue work here
+	return nil
+}
+
+func CheckForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
+	for _, quorum := range quorumsToCheck {
+		if quorum == 0 || quorum == 1 {
+			continue
+		}
+
+		return fmt.Errorf("only quorums 0 and 1 are supported for on demand payments, got %d", quorum)
+	}
+
 	return nil
 }
 

@@ -25,7 +25,10 @@ const (
 // this struct will need to construct payment headers, wait for the individual ledgers to be available with timeouts, etc.
 // the disperser and validator nodes don't need to do any of that.
 type AccountLedger struct {
+	// TODO: add logger
+
 	reservationLedger *ReservationLedger
+	onDemandLedger    *OnDemandLedger
 
 	queue  chan coretypes.Blob
 	status atomic.Value // stores LedgerStatus
@@ -36,17 +39,25 @@ func NewAccountLedger(
 	reservationConfig *ReservationLedgerConfig,
 	getNow func() time.Time,
 ) (*AccountLedger, error) {
-	var leakyBucket *ReservationLedger
+	var reservationLedger *ReservationLedger
 	if reservationConfig != nil {
 		var err error
-		leakyBucket, err = NewReservationLedger(*reservationConfig, getNow)
+		reservationLedger, err = NewReservationLedger(*reservationConfig, getNow)
 		if err != nil {
-			return nil, fmt.Errorf("new leaky bucket: %w", err)
+			return nil, fmt.Errorf("new reservation ledger: %w", err)
 		}
 	}
 
+	// TODO: we probably want to add an on demand ledger config, and if that is nonnil, we init the on demand ledger
+
+	onDemandLedger, err := NewOnDemandLedger()
+	if err != nil {
+		return nil, fmt.Errorf("new on demand ledger: %w", err)
+	}
+
 	accountLedger := &AccountLedger{
-		reservationLedger: leakyBucket,
+		reservationLedger: reservationLedger,
+		onDemandLedger:    onDemandLedger,
 		queue:             make(chan coretypes.Blob, 100), // buffer size of 100. TODO add to config
 	}
 	accountLedger.status.Store(LedgerStatusAlive)
@@ -63,6 +74,7 @@ func (al *AccountLedger) Stop() {
 
 func (al *AccountLedger) EnqueueBlobForAccounting(ctx context.Context, blob coretypes.Blob) error {
 	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
+		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return fmt.Errorf("ledger is not alive")
 	}
 
@@ -77,12 +89,17 @@ func (al *AccountLedger) EnqueueBlobForAccounting(ctx context.Context, blob core
 // ProcessBlobQueue pops blobs off the queue and processes them
 func (al *AccountLedger) ProcessBlobQueue() {
 	for blob := range al.queue {
-		al.processBlob(blob)
+		err := al.processBlob(blob)
+
+		if err != nil {
+			// TODO: debug log
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 }
 
 // TODO: doc, also better method name
-func (al *AccountLedger) processBlob(blob coretypes.Blob) {
+func (al *AccountLedger) processBlob(blob coretypes.Blob) error {
 	if al.reservationLedger != nil {
 		// TODO: need to get quorums from blob
 		var quorums []core.QuorumID
@@ -92,13 +109,13 @@ func (al *AccountLedger) processBlob(blob coretypes.Blob) {
 		switch err.(type) {
 		case nil:
 			// Success - blob accounted for
-			return
+			return nil
 		case *InsufficientReservationCapacityError:
-			// todo: add info log
-			// handle InsufficientReservationCapacityError
+			// todo: add info log, then continue to on-demand
 		default:
-			al.status.Store(LedgerStatusDead)
-			break
+			al.Stop()
+			// return nil, since we don't want to do the sleep in the ProcessBlobQueue loop
+			return nil
 		}
 	}
 
