@@ -13,8 +13,15 @@ import (
 
 type ContractName string
 
-// A golang wrapper around the EigenDA contract directory contract. Useful for looking up contract addresses
-// from within golang code.
+// EigenDA uses many different contracts. It used to be the case that each contract address had to be provided via
+// configuration, which was hard to maintain and error-prone. Now, contract addresses are registered onchain in the
+// "EigenDA directory" contract. This struct is a convenience wrapper for interacting with the directory contract.
+//
+// Originally, the contract directory was just referred to as "the directory" or "the EigenDA directory". The term
+// "directory" is extremely overloaded and is poorly descriptive, and the prefix "EigenDA" doesn't help since everything
+// in this repo qualifies for that prefix. Unfortunately, the name of the contract is hard to change now. As a general
+// rule of thumb, we should use "contract directory" when referring to this service, and "contract directory contract"
+// when referring specifically to the solidity contract.
 type ContractDirectory struct {
 	logger logging.Logger
 
@@ -39,10 +46,10 @@ func NewContractDirectory(
 	ctx context.Context,
 	logger logging.Logger,
 	client bind.ContractBackend,
-	directoryAddress gethcommon.Address,
+	contractDirectoryAddress gethcommon.Address,
 ) (*ContractDirectory, error) {
 
-	caller, err := contractIEigenDADirectory.NewContractIEigenDADirectoryCaller(directoryAddress, client)
+	caller, err := contractIEigenDADirectory.NewContractIEigenDADirectoryCaller(contractDirectoryAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("NewContractDirectory: %w", err)
 	}
