@@ -91,10 +91,7 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 		coeffPolynomial = fieldElements
 	case codecs.PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form, since blobs are in coefficient form
-		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLengthSymbols)
-		if err != nil {
-			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
-		}
+		coeffPolynomial = evalToCoeffPoly(fieldElements, blobLengthSymbols)
 	default:
 		return nil, fmt.Errorf("unknown polynomial form: %v", payloadForm)
 	}
@@ -105,20 +102,18 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 // evalToCoeffPoly converts an evalPoly to a coeffPoly, using the IFFT operation
 //
 // blobLengthSymbols is required, to be able to choose the correct parameters when performing FFT
-func evalToCoeffPoly(evalPoly []fr.Element, blobLengthSymbols uint32) ([]fr.Element, error) {
+func evalToCoeffPoly(evalPoly []fr.Element, blobLengthSymbols uint32) []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(blobLengthSymbols)
-	if err != nil {
-		return nil, fmt.Errorf("create FFT settings from blob length symbols: %w", err)
-	}
+	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(encoding.NextPowerOf2(blobLengthSymbols))
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	ifftedElements, err := fftSettings.FFT(evalPoly, true)
 	if err != nil {
-		return nil, fmt.Errorf("perform IFFT: %w", err)
+		panic("bug: FFT only returns an error if we don't have enough roots of unity, " +
+			"which is impossible because we already checked it above")
 	}
 
-	return ifftedElements, nil
+	return ifftedElements
 }

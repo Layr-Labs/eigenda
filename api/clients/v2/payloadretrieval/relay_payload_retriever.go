@@ -155,7 +155,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-		return blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
+		return blob.ToEncodedPayload(pr.config.PayloadPolynomialForm), nil
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)

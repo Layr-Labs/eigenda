@@ -52,9 +52,9 @@ func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 
 // BlobFromCoefficients creates a blob from the coefficients of a polynomial.
 // A Blob must have a power of two coefficients. Thus:
-// - If the passed coefficients are a power of 2 in length, they will be used as is.
-// - If the coefficients are not a power of two in length, they will be copied to a new slice that is padded with zeros
-//   to the next power of two in length.
+//   - If the passed coefficients are a power of 2 in length, they will be used as is.
+//   - If the coefficients are not a power of two in length, they will be copied to a new slice that is padded with zeros
+//     to the next power of two in length.
 func BlobFromCoefficients(coefficients []fr.Element) *Blob {
 	paddedCoefficients := coefficients
 	if !encoding.IsPowerOfTwo(len(coefficients)) {
@@ -88,10 +88,7 @@ func (b *Blob) Serialize() []byte {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
 func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (Payload, error) {
-	encodedPayload, err := b.ToEncodedPayload(payloadForm)
-	if err != nil {
-		return nil, fmt.Errorf("to encoded payload: %w", err)
-	}
+	encodedPayload := b.ToEncodedPayload(payloadForm)
 
 	payload, err := encodedPayload.Decode()
 	if err != nil {
@@ -104,9 +101,8 @@ func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (Payload, error) {
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
-func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayload, error) {
+func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) *EncodedPayload {
 	var encodedPayloadElements []fr.Element
-	var err error
 	switch payloadForm {
 	case codecs.PolynomialFormCoeff:
 		// the payload is interpreted as coefficients of the polynomial, so no conversion needs to be done, given that
@@ -115,33 +111,27 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayl
 	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
-		encodedPayloadElements, err = b.toEvalPoly()
-		if err != nil {
-			return nil, fmt.Errorf("convert blob to eval poly: %w", err)
-		}
-
+		encodedPayloadElements = b.toEvalPoly()
 	default:
 		panic(fmt.Sprintf("invalid codecs.PolynomialForm enum value: %d", payloadForm))
 	}
 
-	return &EncodedPayload{rs.SerializeFieldElements(encodedPayloadElements)}, nil
+	return &EncodedPayload{rs.SerializeFieldElements(encodedPayloadElements)}
 
 }
 
 // toEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
-func (b *Blob) toEvalPoly() ([]fr.Element, error) {
+func (b *Blob) toEvalPoly() []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(b.coeffPolynomial)))
-	if err != nil {
-		return nil, fmt.Errorf("create FFT settings from blob length symbols: %w", err)
-	}
+	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(b.coeffPolynomial)))
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)
 	if err != nil {
-		return nil, fmt.Errorf("perform FFT on blob coefficients: %w", err)
+		panic("bug: FFT only returns an error if we don't have enough roots of unity, " +
+			"which is impossible because we already checked it above")
 	}
-	return fftedElements, nil
+	return fftedElements
 }
