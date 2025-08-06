@@ -531,8 +531,9 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_BUFFER_SIZE_FRACTION"),
 	}
 	StoreChunksBufferTimeoutFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
-		Usage:    "The maximum amount of time to wait to acquire buffer capacity to store chunks in the StoreChunks() gRPC request",
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
+		Usage: "The maximum amount of time to wait to acquire buffer capacity " +
+			"to store chunks in the StoreChunks() gRPC request",
 		Required: false,
 		Value:    10 * time.Second,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_TIMEOUT"),

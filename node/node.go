@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -265,11 +264,11 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
-	getChunksSemaphore, err := common.NewSemaphore(config.getChunksBufferSize)
+	getChunksSemaphore, err := common.NewSemaphore(config.GetChunksBufferSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create getChunks semaphore: %w", err)
 	}
-	storeChunksSemaphore, err := common.NewSemaphore(config.storeChunksBufferSize)
+	storeChunksSemaphore, err := common.NewSemaphore(config.StoreChunksBufferSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storeChunks semaphore: %w", err)
 	}
@@ -363,69 +362,65 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 
 	totalAllocated := uint64(0)
 
-	safetyBufferSize, err := computeMemoryPoolSize(
+	config.GCSafetyBufferSizeBytes, err = computeMemoryPoolSize(
 		logger,
 		"GC Safety Buffer",
-		config.GCSafetyBufferSizeGB,
+		config.GCSafetyBufferSizeBytes,
 		config.GCSafetyBufferSizeFraction,
 		maxMemory)
 	if err != nil {
 		return fmt.Errorf("failed to compute size: %w", err)
 	}
-	err = memory.SetGCMemorySafetyBuffer(safetyBufferSize)
+	err = memory.SetGCMemorySafetyBuffer(config.GCSafetyBufferSizeBytes)
 	if err != nil {
 		return fmt.Errorf("failed to set GC memory safety buffer: %w", err)
 	}
-	totalAllocated += safetyBufferSize
+	totalAllocated += config.GCSafetyBufferSizeBytes
 
 	if config.EnableV2 {
-		readCacheSize, err := computeMemoryPoolSize(
+		config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
 			logger,
 			"LittDB read cache",
-			config.LittDBReadCacheSizeGB,
+			config.LittDBReadCacheSizeBytes,
 			config.LittDBReadCacheSizeFraction,
 			maxMemory)
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.littDBReadCacheSize = readCacheSize
-		totalAllocated += readCacheSize
+		totalAllocated += config.LittDBReadCacheSizeBytes
 
-		writeCacheSize, err := computeMemoryPoolSize(
+		config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
 			logger,
 			"LittDB write cache",
-			config.LittDBWriteCacheSizeGB,
+			config.LittDBWriteCacheSizeBytes,
 			config.LittDBWriteCacheSizeFraction,
 			maxMemory)
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.littDBWriteCacheSize = writeCacheSize
-		totalAllocated += writeCacheSize
+		totalAllocated += config.LittDBWriteCacheSizeBytes
 
-		getChunksBufferSize, err := computeMemoryPoolSize(
+		config.GetChunksBufferSizeBytes, err = computeMemoryPoolSize(
 			logger,
 			"GetChunks Buffer",
-			config.GetChunksBufferSizeGB,
+			config.GetChunksBufferSizeBytes,
 			config.GetChunksBufferSizeFraction,
 			maxMemory)
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.getChunksBufferSize = getChunksBufferSize
-		totalAllocated += getChunksBufferSize
+		totalAllocated += config.GetChunksBufferSizeBytes
 
-		storeChunksBufferSize, err := computeMemoryPoolSize(
+		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
 			logger,
 			"StoreChunks Buffer",
-			config.StoreChunksBufferSizeGB,
+			config.StoreChunksBufferSizeBytes,
 			config.StoreChunksBufferSizeFraction,
 			maxMemory)
 		if err != nil {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.storeChunksBufferSize = storeChunksBufferSize
-		totalAllocated += storeChunksBufferSize
+		totalAllocated += config.StoreChunksBufferSizeBytes
 	}
 
 	if totalAllocated > maxMemory {
@@ -443,14 +438,14 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 func computeMemoryPoolSize(
 	logger logging.Logger,
 	poolName string,
-	constantSizeInGB float64,
+	constantSizeInBytes uint64,
 	fraction float64,
 	maxMemory uint64) (uint64, error) {
 
-	if constantSizeInGB > 0 {
-		poolSize := uint64(constantSizeInGB * float64(units.GiB))
-		logger.Infof("%s is configured to use %s memory", poolName, common.PrettyPrintBytes(poolSize))
-		return poolSize, nil
+	if constantSizeInBytes > 0 {
+		logger.Infof("%s is configured to use %s memory",
+			poolName, common.PrettyPrintBytes(constantSizeInBytes))
+		return constantSizeInBytes, nil
 	}
 
 	// If the constant size is not set, calculate the size based on the fraction of the maximum memory.

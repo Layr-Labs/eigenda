@@ -89,7 +89,7 @@ func (n *Node) DownloadBundles(
 
 		chunkSize, err := getChunkLengthFromBlobCert(cert)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get chunk size from blob certificate: %v", err)
+			return nil, nil, fmt.Errorf("failed to get chunk size from blob certificate: %w", err)
 		}
 		requiredCapacity += uint64(assgn.NumChunks()) * chunkSize
 
