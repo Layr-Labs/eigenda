@@ -13,9 +13,16 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
+import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
+
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
 
-contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
+contract EigenDACertVerifier is
+    IEigenDACertVerifier,
+    IEigenDACertVerifierBase,
+    IVersionedEigenDACertVerifier,
+    IEigenDASemVer
+{
     error InvalidSecurityThresholds();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
@@ -26,7 +33,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, 
 
     bytes internal _quorumNumbersRequired;
 
-    uint8 internal constant CERT_VERSION = 3;
+    uint8 internal constant MAJOR_VERSION = 3;
+    uint8 internal constant MINOR_VERSION = 0;
+    uint8 internal constant PATCH_VERSION = 0;
 
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
@@ -77,6 +86,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, 
 
     /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint8) {
-        return CERT_VERSION;
+        return MAJOR_VERSION;
+    }
+
+    /// @inheritdoc IEigenDASemVer
+    function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
+        major = MAJOR_VERSION;
+        minor = MINOR_VERSION;
+        patch = PATCH_VERSION;
     }
 }
