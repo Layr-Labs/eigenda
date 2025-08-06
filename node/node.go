@@ -345,52 +345,38 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 
 	totalAllocated := uint64(0)
 
-	safetyBufferSize := uint64(0)
-	if config.GCSafetyBufferSizeGB > 0 {
-		safetyBufferSize = uint64(config.GCSafetyBufferSizeGB * float64(units.GiB))
-		logger.Infof("GC safety buffer size configured to use %.2f GB.\n", config.GCSafetyBufferSizeGB)
-	} else {
-		safetyBufferSize = uint64(config.GCSafetyBufferSizeFraction * float64(maxMemory))
-		logger.Infof("GC safety buffer is configured to use %.1f%% of %.2f GB available (%.2f GB).",
-			config.GCSafetyBufferSizeFraction*100.0,
-			float64(maxMemory)/float64(units.GiB),
-			float64(safetyBufferSize)/float64(units.GiB))
-	}
-	if safetyBufferSize > 0 {
-		err = memory.SetGCMemorySafetyBuffer(safetyBufferSize)
-		if err != nil {
-			return fmt.Errorf("failed to set memory limit: %w", err)
-		}
+	safetyBufferSize, err := computeMemoryPoolSize(
+		logger,
+		"GC Safety Buffer",
+		config.GCSafetyBufferSizeGB,
+		config.GCSafetyBufferSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
 	}
 	totalAllocated += safetyBufferSize
 
 	if config.EnableV2 {
-		var readCacheSize uint64
-		if config.LittDBWriteCacheSizeGB > 0 {
-			readCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
-			logger.Infof("LittDB write cache size configured to use %.2f GB.\n", config.LittDBWriteCacheSizeGB)
-		} else {
-			readCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
-			logger.Infof("LittDB write cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
-				config.LittDBWriteCacheSizeFraction*100.0,
-				float64(maxMemory)/float64(units.GiB),
-				float64(readCacheSize)/float64(units.GiB))
+		readCacheSize, err := computeMemoryPoolSize(
+			logger,
+			"LittDB read cache",
+			config.LittDBReadCacheSizeGB,
+			config.LittDBReadCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.littDBReadCacheSize = readCacheSize
 		totalAllocated += readCacheSize
 
-		var writeCacheSize uint64
-		if config.LittDBReadCacheSizeGB > 0 {
-			writeCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
-			logger.Infof("LittDB read cache size configured to use %.2f GB.\n", config.LittDBReadCacheSizeGB)
-		} else {
-			writeCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
-			logger.Infof("LittDB read cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
-				config.LittDBReadCacheSizeFraction*100.0,
-				float64(maxMemory)/float64(units.GiB),
-				float64(writeCacheSize)/float64(units.GiB))
+		writeCacheSize, err := computeMemoryPoolSize(
+			logger,
+			"LittDB write cache",
+			config.LittDBWriteCacheSizeGB,
+			config.LittDBWriteCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
 		}
-		config.littDBWriteCacheSize = writeCacheSize
 		totalAllocated += writeCacheSize
 
 		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
@@ -403,10 +389,36 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 			"exceeds maximum available memory (%d bytes)", totalAllocated, maxMemory)
 	}
 
-	bytesRemaining := totalAllocated - safetyBufferSize
+	bytesRemaining := maxMemory - totalAllocated
 	logger.Infof("Total unallocated memory: %s", common.PrettyPrintBytes(bytesRemaining))
 
 	return nil
+}
+
+// Compute the size of a memory pool.
+func computeMemoryPoolSize(
+	logger logging.Logger,
+	poolName string,
+	constantSizeInGB float64,
+	fraction float64,
+	maxMemory uint64) (uint64, error) {
+
+	if constantSizeInGB > 0 {
+		poolSize := uint64(constantSizeInGB * float64(units.GiB))
+		logger.Infof("%s is configured to use %s memory", poolName, common.PrettyPrintBytes(poolSize))
+		return poolSize, nil
+	}
+
+	// If the constant size is not set, calculate the size based on the fraction of the maximum memory.
+	if fraction < 0.0 || fraction > 1.0 {
+		return 0, fmt.Errorf("fraction for %s must be between 0.0 and 1.0, got: %f", poolName, fraction)
+	}
+
+	poolSize := uint64(fraction * float64(maxMemory))
+	logger.Infof("%s is configured to use %0.2f%% of %s available memory (%s).",
+		poolName, fraction*100.0, common.PrettyPrintBytes(maxMemory), common.PrettyPrintBytes(poolSize))
+
+	return poolSize, nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just

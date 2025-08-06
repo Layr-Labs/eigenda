@@ -188,6 +188,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
+		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
 	}
@@ -307,6 +308,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
+		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
 	}
