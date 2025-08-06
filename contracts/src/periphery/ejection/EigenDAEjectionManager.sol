@@ -24,15 +24,19 @@ contract EigenDAEjectionManager {
     address internal immutable _depositToken;
     uint256 internal immutable _depositAmount;
     address internal immutable _addressDirectory;
+    uint256 internal immutable _estimatedGasUsed;
+
+    uint256 internal _ejectorBalance;
 
     bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
         "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
     );
 
-    constructor(address depositToken_, uint256 depositAmount_, address addressDirectory_) {
+    constructor(address depositToken_, uint256 depositAmount_, address addressDirectory_, uint256 estimatedGasUsed_) {
         _depositToken = depositToken_;
         _depositAmount = depositAmount_;
         _addressDirectory = addressDirectory_;
+        _estimatedGasUsed = estimatedGasUsed_;
     }
 
     modifier onlyOwner(address sender) {
@@ -57,15 +61,20 @@ contract EigenDAEjectionManager {
 
     /// EJECTOR FUNCTIONS
 
+    function addEjectorBalance(uint256 amount) external {
+        _ejectorBalance += amount;
+        IERC20(_depositToken).safeTransferFrom(msg.sender, address(this), amount);
+    }
+
     /// @notice Starts the ejection process for an operator. Takes a deposit from the ejector.
     function startEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
-        _takeDeposit(msg.sender);
+        _takeDeposit();
         operator.startEjection(quorums);
     }
 
     /// @notice Cancels the ejection process initiated by a ejector.
     function cancelEjectionByEjector(address operator) external onlyEjector(msg.sender) {
-        _returnDeposit(msg.sender);
+        _returnDeposit();
         operator.cancelEjection();
     }
 
@@ -73,7 +82,7 @@ contract EigenDAEjectionManager {
     function completeEjection(address operator, bytes memory quorums) external onlyEjector(msg.sender) {
         operator.completeEjection(quorums);
         _tryEjectOperator(operator, quorums);
-        _returnDeposit(msg.sender);
+        _returnDeposit();
     }
 
     /// OPERATOR FUNCTIONS
@@ -96,13 +105,13 @@ contract EigenDAEjectionManager {
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
-        _returnDeposit(recipient);
+        _refundGas(recipient);
     }
 
     /// @notice Cancels the ejection process initiated by the operator. Transfers the deposit to the operator.
     function cancelEjection() external {
         msg.sender.cancelEjection();
-        _returnDeposit(msg.sender);
+        _refundGas(msg.sender);
     }
 
     /// GETTERS
@@ -172,12 +181,19 @@ contract EigenDAEjectionManager {
         }
     }
 
-    function _takeDeposit(address sender) internal virtual {
-        IERC20(_depositToken).safeTransferFrom(sender, address(this), _depositAmount);
+    function _takeDeposit() internal virtual {
+        _ejectorBalance -= _depositAmount;
     }
 
-    function _returnDeposit(address receiver) internal virtual {
-        IERC20(_depositToken).safeTransfer(receiver, _depositAmount);
+    function _refundGas(address receiver) internal virtual {
+        uint256 estimatedRefund = _estimatedGasUsed * block.basefee;
+        IERC20(_depositToken).safeTransfer(
+            receiver, estimatedRefund > _depositAmount ? _depositAmount : estimatedRefund
+        );
+    }
+
+    function _returnDeposit() internal virtual {
+        _ejectorBalance += _depositAmount;
     }
 
     /// @notice Attempts to eject an operator. If the ejection fails, it catches the error and does nothing.
