@@ -1,7 +1,8 @@
+// nolint: lll // long lines are expected b/c of examples
 package coretypes
 
 import (
-	"encoding/binary"
+	"encoding/hex"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -10,33 +11,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDecodeShortBytes checks that an encoded payload with a length less than claimed length fails at decode time
-func TestDecodeInvalidPayloadLen(t *testing.T) {
-	testRandom := random.NewTestRandom()
-	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
-	encodedPayload := Payload(originalData).ToEncodedPayload()
+// TestEncodePayload tests that the encoding of a Payload to an EncodedPayload works as expected.
+func TestEncodeDecodePayload(t *testing.T) {
 
-	// Changed the header payload length to be longer than the actual encodedPayload length.
-	// This way the claimed payload clearly doesn't fit in the encoded payload.
-	binary.BigEndian.PutUint32(encodedPayload.bytes[2:6], uint32(len(encodedPayload.bytes)+1))
+	// map of hex-encoded payloads (inputs) and their expected EncodedPayloads (outputs)
+	testCases := map[string]string{
+		// empty payload should only have a header symbol
+		"": "0000000000000000000000000000000000000000000000000000000000000000",
+		"01": "0000000000010000000000000000000000000000000000000000000000000000" + // header with len 1 payload
+			"0001000000000000000000000000000000000000000000000000000000000000", // first byte is always 0 due to bn254 encoding
+		"0102": "0000000000020000000000000000000000000000000000000000000000000000" +
+			"0001020000000000000000000000000000000000000000000000000000000000",
+		"01020304050607080910111213141516171819202122232425262728293031": "00000000001f0000000000000000000000000000000000000000000000000000" +
+			"0001020304050607080910111213141516171819202122232425262728293031",
+	}
 
-	payload, err := encodedPayload.Decode()
-	require.Error(t, err)
-	require.Nil(t, payload)
+	for payloadHex, expectedEncodedPayloadHex := range testCases {
+		t.Run("EncodePayload "+payloadHex, func(t *testing.T) {
+			payload, err := hex.DecodeString(payloadHex)
+			require.NoError(t, err)
+			encodedPayload := Payload(payload).ToEncodedPayload()
+			require.Equal(t, expectedEncodedPayloadHex, hex.EncodeToString(encodedPayload.bytes))
+			decodedPayload, err := encodedPayload.Decode()
+			require.NoError(t, err)
+			require.Equal(t, Payload(payload), decodedPayload)
+		})
+	}
 }
 
-// TestDecodeLongBytes checks that an encoded payload with length too much greater than claimed fails at decode
-func TestDecodeLongBytes(t *testing.T) {
-	testRandom := random.NewTestRandom()
-	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
-	encodedPayload := Payload(originalData).ToEncodedPayload()
+func TestDecodePayloadErrors(t *testing.T) {
+	testCases := []struct {
+		name       string
+		encodedHex string
+	}{
+		{
+			name:       "Insufficient Length Doesn't Contain Header",
+			encodedHex: "000000000000",
+		},
+		{
+			name:       "First byte must be 0x00",
+			encodedHex: "01000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:       "Only version 0x00 is supported",
+			encodedHex: "00010000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:       "Payload length must be a multiple of 32 bytes",
+			encodedHex: "00000000000100000000000000000000000000000000000000000000" + "000100",
+		},
+		{
+			name: "wrong payload length: 32 bytes of data, but header says 64",
+			encodedHex: "00000000000200000000000000000000000000000000000000000000" +
+				"00000000000000000000000000000000000000000000000000000000",
+		},
+	}
 
-	// appending 33 bytes to the encoded payload guarantees that, after removing padding, the unpadded bytes will be
-	// at least 32 bytes longer than the expected length, which is the error case we're trying to trigger here
-	encodedPayload.bytes = append(encodedPayload.bytes, make([]byte, 33)...)
-	payload2, err := encodedPayload.Decode()
-	require.Error(t, err)
-	require.Nil(t, payload2)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			bytes, err := hex.DecodeString(tc.encodedHex)
+			require.NoError(t, err)
+
+			encodedPayload := &EncodedPayload{bytes: bytes}
+			_, err = encodedPayload.Decode()
+			require.Error(t, err)
+		})
+	}
 }
 
 // TestEncodeWithFewerElements tests that having fewer bytes than expected doesn't throw an error
