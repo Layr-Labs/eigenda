@@ -531,6 +531,11 @@ func NewPaymentMetadata(
 	}, nil
 }
 
+// TODO doc
+func (pm *PaymentMetadata) IsOnDemand() bool {
+	return pm.CumulativePayment != nil && pm.CumulativePayment.Cmp(big.NewInt(0)) != 0
+}
+
 // Hash returns the Keccak256 hash of the PaymentMetadata
 func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 	if pm == nil {

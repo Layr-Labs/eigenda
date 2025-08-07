@@ -73,7 +73,11 @@ func NewAccountLedger(
 // TODO: consider timeouts
 
 // TODO: doc, also better method name
-func (al *AccountLedger) processBlob(ctx context.Context, blobLengthSymbols uint32, quorums []core.QuorumID) (*core.PaymentMetadata, error) {
+func (al *AccountLedger) Debit(
+	ctx context.Context,
+	blobLengthSymbols uint32,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
 	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
 		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return nil, fmt.Errorf("ledger is not alive")
@@ -111,4 +115,38 @@ func (al *AccountLedger) processBlob(ctx context.Context, blobLengthSymbols uint
 	}
 
 	return nil, fmt.Errorf("TODO: make a REALLY good error here, with all sorts of juicy details")
+}
+
+// TODO: doc
+func (al *AccountLedger) RevertDebit(
+	ctx context.Context,
+	paymentMetadata *core.PaymentMetadata,
+	blobSymbolCount uint32,
+) error {
+	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
+		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
+		return fmt.Errorf("ledger is not alive")
+	}
+
+	if paymentMetadata.IsOnDemand() {
+		if al.onDemandLedger == nil {
+			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
+		}
+
+		err := al.onDemandLedger.RevertDebit(ctx, int64(blobSymbolCount))
+		if err != nil {
+			return fmt.Errorf("revert debit: %w", err)
+		}
+	} else {
+		if al.reservationLedger == nil {
+			return fmt.Errorf("unable to revert reservation payment with nil reservationLedger")
+		}
+
+		err := al.reservationLedger.RevertDebit(ctx, al.getNow(), int64(blobSymbolCount))
+		if err != nil {
+			return fmt.Errorf("revert reservation debit: %w", err)
+		}
+	}
+
+	return nil
 }

@@ -78,7 +78,7 @@ func (odl *OnDemandLedger) Debit(
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
-func (odl *OnDemandLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount int64) error {
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount int64) error {
 	if symbolCount <= 0 {
 		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
 	}
