@@ -111,7 +111,7 @@ func (cl *ClientLedger) Debit(
 	}
 
 	if cl.onDemandLedger != nil {
-		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
+		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, int64(blobLengthSymbols), quorums)
 		switch err.(type) {
 		case nil:
 			// Success - blob accounted for via on-demand

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"golang.org/x/sync/semaphore"
@@ -37,7 +36,6 @@ func NewOnDemandLedger(
 // TODO: reconsider int64
 func (odl *OnDemandLedger) Debit(
 	ctx context.Context,
-	now time.Time,
 	symbolCount int64,
 	quorums []core.QuorumID,
 ) (*big.Int, error) {
