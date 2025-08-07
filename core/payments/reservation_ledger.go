@@ -1,13 +1,13 @@
 package payments
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"golang.org/x/sync/semaphore"
 )
-
-// TODO: consider overflows in this. Are we being _too_ careful?
 
 // TODO: write unit tests
 
@@ -41,24 +41,23 @@ import (
 type ReservationLedger struct {
 	config ReservationLedgerConfig
 
-	getNow func() time.Time
-
+	lock        *semaphore.Weighted
 	leakyBucket *LeakyBucket
 }
 
 // Creates a new reservation ledger, which represents the reservation of a single user with a leaky bucket
 func NewReservationLedger(
 	config ReservationLedgerConfig,
-	getNow func() time.Time,
+	now time.Time,
 ) (*ReservationLedger, error) {
-	leakyBucket, err := NewLeakyBucket(config, getNow())
+	leakyBucket, err := NewLeakyBucket(config, now)
 	if err != nil {
 		return nil, fmt.Errorf("new leaky bucket: %w", err)
 	}
 
 	return &ReservationLedger{
-		getNow:      getNow,
 		config:      config,
+		lock:        semaphore.NewWeighted(1),
 		leakyBucket: leakyBucket,
 	}, nil
 }
@@ -74,18 +73,26 @@ func NewReservationLedger(
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
-func (rl *ReservationLedger) Debit(symbolCount int64, quorums []core.QuorumID) (*core.PaymentMetadata, error) {
+func (rl *ReservationLedger) Debit(
+	ctx context.Context,
+	now time.Time,
+	symbolCount int64,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
 	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
 		return nil, fmt.Errorf("check quorums permitted: %w", err)
 	}
 
-	now := rl.getNow()
-
 	err = rl.config.reservation.CheckTime(now)
 	if err != nil {
-		
+		// TODO: error here
 	}
+
+	if err := rl.lock.Acquire(ctx, 1); err != nil {
+		return nil, fmt.Errorf("acquire lock: %w", err)
+	}
+	defer rl.lock.Release(1)
 
 	err = rl.leakyBucket.Fill(now, symbolCount)
 	if err != nil {
@@ -101,8 +108,13 @@ func (rl *ReservationLedger) Debit(symbolCount int64, quorums []core.QuorumID) (
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
-func (rl *ReservationLedger) RevertDebit(symbolCount int64) error {
-	err := rl.leakyBucket.RevertFill(rl.getNow(), symbolCount)
+func (rl *ReservationLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount int64) error {
+	if err := rl.lock.Acquire(ctx, 1); err != nil {
+		return fmt.Errorf("acquire lock: %w", err)
+	}
+	defer rl.lock.Release(1)
+
+	err := rl.leakyBucket.RevertFill(now, symbolCount)
 	if err != nil {
 		return fmt.Errorf("revert fill: %w", err)
 	}

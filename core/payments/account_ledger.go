@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
@@ -27,99 +26,89 @@ const (
 type AccountLedger struct {
 	// TODO: add logger
 
-	reservationLedger *ReservationLedger
-	onDemandLedger    *OnDemandLedger
+	getNow func() time.Time
 
-	queue  chan coretypes.Blob
-	status atomic.Value // stores LedgerStatus
+	reservationLedger *ReservationLedger
+
+	onDemandLedger *OnDemandLedger
+
+	status atomic.Value
 }
 
 func NewAccountLedger(
 	// TODO: may be nil if no reservation exists
-	reservationConfig *ReservationLedgerConfig,
+	reservationLedgerConfig *ReservationLedgerConfig,
+	// TODO: may be nil if no on demand payments are enabled
+	onDemandLedgerConfig *OnDemandLedgerConfig,
 	getNow func() time.Time,
 ) (*AccountLedger, error) {
 	var reservationLedger *ReservationLedger
-	if reservationConfig != nil {
+	if reservationLedgerConfig != nil {
 		var err error
-		reservationLedger, err = NewReservationLedger(*reservationConfig, getNow)
+		reservationLedger, err = NewReservationLedger(*reservationLedgerConfig, getNow())
 		if err != nil {
 			return nil, fmt.Errorf("new reservation ledger: %w", err)
 		}
 	}
 
-	// TODO: we probably want to add an on demand ledger config, and if that is nonnil, we init the on demand ledger
-
-	onDemandLedger, err := NewOnDemandLedger()
-	if err != nil {
-		return nil, fmt.Errorf("new on demand ledger: %w", err)
+	var onDemandLedger *OnDemandLedger
+	if onDemandLedgerConfig != nil {
+		var err error
+		onDemandLedger, err = NewOnDemandLedger(*onDemandLedgerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("new on demand ledger: %w", err)
+		}
 	}
 
 	accountLedger := &AccountLedger{
+		getNow:            getNow,
 		reservationLedger: reservationLedger,
 		onDemandLedger:    onDemandLedger,
-		queue:             make(chan coretypes.Blob, 100), // buffer size of 100. TODO add to config
 	}
 	accountLedger.status.Store(LedgerStatusAlive)
-
-	go accountLedger.ProcessBlobQueue()
 
 	return accountLedger, nil
 }
 
-func (al *AccountLedger) Stop() {
-	al.status.Store(LedgerStatusDead)
-	close(al.queue)
-}
-
-func (al *AccountLedger) EnqueueBlobForAccounting(ctx context.Context, blob coretypes.Blob) error {
-	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
-		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
-		return fmt.Errorf("ledger is not alive")
-	}
-
-	select {
-	case al.queue <- blob:
-		return nil
-	case <-ctx.Done():
-		return fmt.Errorf("failed to enqueue blob: %w", ctx.Err())
-	}
-}
-
-// ProcessBlobQueue pops blobs off the queue and processes them
-func (al *AccountLedger) ProcessBlobQueue() {
-	for blob := range al.queue {
-		err := al.processBlob(blob)
-
-		if err != nil {
-			// TODO: debug log
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-}
+// TODO: consider timeouts
 
 // TODO: doc, also better method name
-func (al *AccountLedger) processBlob(blob coretypes.Blob) error {
+func (al *AccountLedger) processBlob(ctx context.Context, blobLengthSymbols uint32, quorums []core.QuorumID) (*core.PaymentMetadata, error) {
+	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
+		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
+		return nil, fmt.Errorf("ledger is not alive")
+	}
+
+	now := al.getNow()
+
 	if al.reservationLedger != nil {
-		// TODO: need to get quorums from blob
-		var quorums []core.QuorumID
-		// TODO: use this payment metadata
-		_, err := al.reservationLedger.Debit(int64(blob.BlobLengthSymbols()), quorums)
+		paymentMetadata, err := al.reservationLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
 
 		switch err.(type) {
 		case nil:
 			// Success - blob accounted for
-			return nil
+			return paymentMetadata, nil
 		case *InsufficientReservationCapacityError:
 			// todo: add info log, then continue to on-demand
 		default:
-			al.Stop()
-			// return nil, since we don't want to do the sleep in the ProcessBlobQueue loop
-			return nil
+			// TODO: make this a type of error which causes the client to shut down
+			al.status.Store(LedgerStatusDead)
+			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
 	}
 
-	// try on-demand if configured to do so
+	if al.onDemandLedger != nil {
+		paymentMetadata, err := al.onDemandLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
+		switch err.(type) {
+		case nil:
+			// Success - blob accounted for
+			return paymentMetadata, nil
+		default:
+			// TODO: make this a type of error which causes the client to shut down
+			al.status.Store(LedgerStatusDead)
+			return nil, fmt.Errorf("something unexpected happened, shut down")
+		}
+	}
 
-	// TODO: make a REALLY good error here, with all sorts of juicy details
+	return nil, fmt.Errorf("TODO: make a REALLY good error here, with all sorts of juicy details")
 }

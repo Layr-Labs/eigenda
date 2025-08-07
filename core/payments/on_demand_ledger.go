@@ -1,10 +1,13 @@
 package payments
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"golang.org/x/sync/semaphore"
 )
 
 // TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
@@ -14,31 +17,70 @@ import (
 
 type OnDemandLedger struct {
 	config            OnDemandLedgerConfig
+	lock              *semaphore.Weighted
 	cumulativePayment *big.Int
 }
 
-func NewOnDemandLedger(config OnDemandLedgerConfig) (*OnDemandLedger, error) {
+func NewOnDemandLedger(
+	config OnDemandLedgerConfig,
+) (*OnDemandLedger, error) {
 	// TODO: get this from the disperser
 	cumulativePayment := big.NewInt(0)
 
 	return &OnDemandLedger{
 		config:            config,
+		lock:              semaphore.NewWeighted(1), // Binary semaphore acts as a mutex
 		cumulativePayment: cumulativePayment,
 	}, nil
 }
 
 // TODO: reconsider int64
-func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) error {
+func (odl *OnDemandLedger) Debit(
+	ctx context.Context,
+	now time.Time,
+	symbolCount int64,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
 	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+		return nil, fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
 	}
 
-	for _, quorum := range quorums {
-		if quorum == 0 || quorum == 1 {
-			continue
-		}
+	err := checkForOnDemandSupport(quorums)
+	if err != nil {
+		return nil, fmt.Errorf("check for on demand support: %w", err)
+	}
 
-		return fmt.Errorf("only quorums 0 and 1 are supported for on demand payments, got %d", quorum)
+	blobCost, err := odl.computeBlobCost(symbolCount)
+	if err != nil {
+		return nil, fmt.Errorf("compute blob cost: %w", err)
+	}
+
+	if err := odl.lock.Acquire(ctx, 1); err != nil {
+		return nil, fmt.Errorf("acquire lock: %w", err)
+	}
+	defer odl.lock.Release(1)
+
+	newCumulativePayment := new(big.Int).Add(odl.cumulativePayment, big.NewInt(blobCost))
+
+	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
+		// TODO: make a specific error type with this, with appropriate fields
+		return nil, fmt.Errorf("insufficient on-demand funds")
+	}
+
+	paymentMetadata, err := core.NewPaymentMetadata(odl.config.accountID, now, newCumulativePayment)
+	if err != nil {
+		return nil, fmt.Errorf("new payment metadata: %w", err)
+	}
+
+	odl.cumulativePayment = newCumulativePayment
+
+	return paymentMetadata, nil
+}
+
+// RevertDebit reverts a previous debit operation, following a failed dispersal.
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount int64) error {
+	if symbolCount <= 0 {
+		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
 	}
 
 	blobCost, err := odl.computeBlobCost(symbolCount)
@@ -46,11 +88,16 @@ func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) err
 		return fmt.Errorf("compute blob cost: %w", err)
 	}
 
-	newCumulativePayment := odl.cumulativePayment.Add(big.NewInt(blobCost))
+	// Acquire the semaphore with context timeout
+	if err := odl.lock.Acquire(ctx, 1); err != nil {
+		return fmt.Errorf("acquire lock: %w", err)
+	}
+	defer odl.lock.Release(1)
 
-	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
-		// TODO: make a specific error type with this, with appropriate fields
-		return fmt.Errorf("insufficient on-demand funds")
+	newCumulativePayment := new(big.Int).Sub(odl.cumulativePayment, big.NewInt(blobCost))
+
+	if newCumulativePayment.Sign() < 0 {
+		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
 	}
 
 	odl.cumulativePayment = newCumulativePayment
@@ -58,7 +105,7 @@ func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) err
 	return nil
 }
 
-func CheckForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
+func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	for _, quorum := range quorumsToCheck {
 		if quorum == 0 || quorum == 1 {
 			continue
@@ -82,101 +129,3 @@ func (odl *OnDemandLedger) computeBlobCost(symbolCount int64) (int64, error) {
 
 	return billableSymbols * int64(odl.config.pricePerSymbol), nil
 }
-
-// Accountant struct fields related to on-demand payments:
-// - onDemand          *core.OnDemandPayment
-// - pricePerSymbol    uint64
-// - minNumSymbols     uint64
-// - cumulativePayment *big.Int
-
-// From NewAccountant constructor - on-demand related initialization:
-// onDemand:          onDemand,
-// pricePerSymbol:    pricePerSymbol,
-// minNumSymbols:     minNumSymbols,
-// cumulativePayment: big.NewInt(0),
-
-// From blobPaymentInfo - on-demand payment logic (lines 106-124):
-// This section handles when reservation is not available and falls back to on-demand payment
-/*
-	// reservation not available, rollback reservation records, attempt on-demand
-	//todo: rollback on-demand if disperser respond with some type of rejection?
-	relativePeriodRecord.Usage -= symbolUsage
-	incrementRequired := big.NewInt(int64(a.paymentCharged(numSymbols)))
-
-	resultingPayment := big.NewInt(0)
-	resultingPayment.Add(a.cumulativePayment, incrementRequired)
-	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
-		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			return big.NewInt(0), err
-		}
-		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
-		return a.cumulativePayment, nil
-	}
-	return big.NewInt(0), fmt.Errorf(
-		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider increasing reservation or cumulative payment on-chain. "+
-			"For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements", a.accountID.Hex())
-*/
-
-// // paymentCharged returns the chargeable price for a given data length (lines 154-156)
-// func (a *Accountant) paymentCharged(numSymbols uint64) uint64 {
-// 	return a.symbolsCharged(numSymbols) * a.pricePerSymbol
-// }
-
-// // symbolsCharged returns the number of symbols charged for a given data length (lines 159-166)
-// // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-// func (a *Accountant) symbolsCharged(numSymbols uint64) uint64 {
-// 	if numSymbols <= a.minNumSymbols {
-// 		return a.minNumSymbols
-// 	}
-// 	// Round up to the nearest multiple of MinNumSymbols
-// 	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
-// }
-
-// From SetPaymentState - on-demand payment state setting (lines 198-217):
-/*
-	a.minNumSymbols = paymentState.GetPaymentGlobalParams().GetMinNumSymbols()
-	a.pricePerSymbol = paymentState.GetPaymentGlobalParams().GetPricePerSymbol()
-
-	if paymentState.GetOnchainCumulativePayment() == nil {
-		a.onDemand = &core.OnDemandPayment{
-			CumulativePayment: big.NewInt(0),
-		}
-	} else {
-		a.onDemand = &core.OnDemandPayment{
-			CumulativePayment: new(big.Int).SetBytes(paymentState.GetOnchainCumulativePayment()),
-		}
-	}
-
-	if paymentState.GetCumulativePayment() == nil {
-		a.cumulativePayment = big.NewInt(0)
-	} else {
-		a.cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
-	}
-*/
-
-// QuorumCheck function used for on-demand payments (lines 260-270)
-// This is used to check quorums for on-demand payments against requiredQuorums
-// func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
-// 	if len(quorumNumbers) == 0 {
-// 		return fmt.Errorf("no quorum numbers provided")
-// 	}
-// 	for _, quorum := range quorumNumbers {
-// 		if !slices.Contains(allowedNumbers, quorum) {
-// 			return fmt.Errorf("provided quorum number %v not allowed", quorum)
-// 		}
-// 	}
-// 	return nil
-// }
-
-// NOTES ON ON-DEMAND PAYMENT FLOW:
-// 1. When blobPaymentInfo is called, it first tries to use reservation
-// 2. If reservation is not available (usage exceeds limit), it falls back to on-demand
-// 3. For on-demand:
-//    - It calculates incrementRequired based on paymentCharged(numSymbols)
-//    - Checks if cumulativePayment + incrementRequired <= onDemand.CumulativePayment
-//    - If yes, updates cumulativePayment and returns it (non-zero indicates on-demand)
-//    - If no, returns error about insufficient balance
-// 4. On-demand payments must use requiredQuorums (0, 1) instead of reservation quorums
-// 5. Payment calculation uses pricePerSymbol * symbolsCharged
-// 6. symbolsCharged rounds up to nearest minNumSymbols multiple
