@@ -115,11 +115,6 @@ func (n *Node) DownloadBundles(
 
 	}
 
-	// TODO future cody:
-	//  - do the same thing for GetChunks()
-	//  - test this on preprod
-	//  - strip out the contract directory changes... they don't need to be a prerequisite for this
-
 	// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
 	// is capacity in the store chunks buffer. This is an OOM safety measure.
 	probe.SetStage("acquire_buffer_capacity")

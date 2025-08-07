@@ -111,7 +111,6 @@ type Node struct {
 // NewNode creates a new Node with the provided config.
 // TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
-	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
 	pubIPProvider pubip.Provider,
@@ -134,13 +133,13 @@ func NewNode(
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
 
-	chainID, err := client.ChainID(ctx)
+	chainID, err := client.ChainID(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -182,7 +181,7 @@ func NewNode(
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
 		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
-		staleMeasure, err := tx.GetBlockStaleMeasure(ctx)
+		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
 		}
@@ -192,7 +191,7 @@ func NewNode(
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
 		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
-		storeDuration, err := tx.GetStoreDurationBlocks(ctx)
+		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 		}
@@ -217,7 +216,7 @@ func NewNode(
 	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
 		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create contract directory: %w", err)
+			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
 		}
 
 		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{Context: context.Background()})
@@ -307,7 +306,7 @@ func NewNode(
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
 
-		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
+		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
 		}
@@ -332,11 +331,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 
-		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block number: %w", err)
 		}
-		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
