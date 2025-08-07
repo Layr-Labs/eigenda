@@ -317,9 +317,6 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get bundle key: %v", err))
 	}
 
-	// TODO determine size of the request
-	// TODO acquire tokens
-
 	bundleData, err := s.node.ValidatorStore.GetBundleData(bundleKey)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
