@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type LedgerStatus string
@@ -23,8 +24,10 @@ const (
 // TODO: this is a replacement for the accountant, bu it will not be the replacement for the meterer.
 // this struct will need to construct payment headers, wait for the individual ledgers to be available with timeouts, etc.
 // the disperser and validator nodes don't need to do any of that.
-type AccountLedger struct {
+type ClientLedger struct {
 	// TODO: add logger
+
+	accountID gethcommon.Address
 
 	getNow func() time.Time
 
@@ -35,13 +38,14 @@ type AccountLedger struct {
 	status atomic.Value
 }
 
-func NewAccountLedger(
+func NewClientLedger(
+	accountID gethcommon.Address,
 	// TODO: may be nil if no reservation exists
 	reservationLedgerConfig *ReservationLedgerConfig,
 	// TODO: may be nil if no on demand payments are enabled
 	onDemandLedgerConfig *OnDemandLedgerConfig,
 	getNow func() time.Time,
-) (*AccountLedger, error) {
+) (*ClientLedger, error) {
 	var reservationLedger *ReservationLedger
 	if reservationLedgerConfig != nil {
 		var err error
@@ -60,56 +64,65 @@ func NewAccountLedger(
 		}
 	}
 
-	accountLedger := &AccountLedger{
+	clientLedger := &ClientLedger{
+		accountID:         accountID,
 		getNow:            getNow,
 		reservationLedger: reservationLedger,
 		onDemandLedger:    onDemandLedger,
 	}
-	accountLedger.status.Store(LedgerStatusAlive)
+	clientLedger.status.Store(LedgerStatusAlive)
 
-	return accountLedger, nil
+	return clientLedger, nil
 }
 
 // TODO: consider timeouts
 
 // TODO: doc, also better method name
-func (al *AccountLedger) Debit(
+func (cl *ClientLedger) Debit(
 	ctx context.Context,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
+	if cl.status.Load().(LedgerStatus) != LedgerStatusAlive {
 		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return nil, fmt.Errorf("ledger is not alive")
 	}
 
-	now := al.getNow()
+	now := cl.getNow()
 
-	if al.reservationLedger != nil {
-		paymentMetadata, err := al.reservationLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
+	if cl.reservationLedger != nil {
+		err := cl.reservationLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
 
 		switch err.(type) {
 		case nil:
-			// Success - blob accounted for
+			// Success - blob accounted for via reservation
+			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+			if err != nil {
+				return nil, fmt.Errorf("new payment metadata: %w", err)
+			}
 			return paymentMetadata, nil
 		case *InsufficientReservationCapacityError:
 			// todo: add info log, then continue to on-demand
 		default:
 			// TODO: make this a type of error which causes the client to shut down
-			al.status.Store(LedgerStatusDead)
+			cl.status.Store(LedgerStatusDead)
 			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
 	}
 
-	if al.onDemandLedger != nil {
-		paymentMetadata, err := al.onDemandLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
+	if cl.onDemandLedger != nil {
+		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
 		switch err.(type) {
 		case nil:
-			// Success - blob accounted for
+			// Success - blob accounted for via on-demand
+			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
+			if err != nil {
+				return nil, fmt.Errorf("new payment metadata: %w", err)
+			}
 			return paymentMetadata, nil
 		default:
 			// TODO: make this a type of error which causes the client to shut down
-			al.status.Store(LedgerStatusDead)
+			cl.status.Store(LedgerStatusDead)
 			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
 	}
@@ -118,31 +131,31 @@ func (al *AccountLedger) Debit(
 }
 
 // TODO: doc
-func (al *AccountLedger) RevertDebit(
+func (cl *ClientLedger) RevertDebit(
 	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
-	if al.status.Load().(LedgerStatus) != LedgerStatusAlive {
+	if cl.status.Load().(LedgerStatus) != LedgerStatusAlive {
 		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return fmt.Errorf("ledger is not alive")
 	}
 
 	if paymentMetadata.IsOnDemand() {
-		if al.onDemandLedger == nil {
+		if cl.onDemandLedger == nil {
 			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
 		}
 
-		err := al.onDemandLedger.RevertDebit(ctx, int64(blobSymbolCount))
+		err := cl.onDemandLedger.RevertDebit(ctx, int64(blobSymbolCount))
 		if err != nil {
 			return fmt.Errorf("revert debit: %w", err)
 		}
 	} else {
-		if al.reservationLedger == nil {
+		if cl.reservationLedger == nil {
 			return fmt.Errorf("unable to revert reservation payment with nil reservationLedger")
 		}
 
-		err := al.reservationLedger.RevertDebit(ctx, al.getNow(), int64(blobSymbolCount))
+		err := cl.reservationLedger.RevertDebit(ctx, cl.getNow(), int64(blobSymbolCount))
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}

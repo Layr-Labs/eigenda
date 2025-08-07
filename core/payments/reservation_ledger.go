@@ -78,10 +78,10 @@ func (rl *ReservationLedger) Debit(
 	now time.Time,
 	symbolCount int64,
 	quorums []core.QuorumID,
-) (*core.PaymentMetadata, error) {
+) error {
 	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
-		return nil, fmt.Errorf("check quorums permitted: %w", err)
+		return fmt.Errorf("check quorums permitted: %w", err)
 	}
 
 	err = rl.config.reservation.CheckTime(now)
@@ -90,21 +90,16 @@ func (rl *ReservationLedger) Debit(
 	}
 
 	if err := rl.lock.Acquire(ctx, 1); err != nil {
-		return nil, fmt.Errorf("acquire lock: %w", err)
+		return fmt.Errorf("acquire lock: %w", err)
 	}
 	defer rl.lock.Release(1)
 
 	err = rl.leakyBucket.Fill(now, symbolCount)
 	if err != nil {
-		return nil, fmt.Errorf("fill leaky bucket: %w", err)
+		return fmt.Errorf("fill leaky bucket: %w", err)
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(rl.config.reservation.accountID, now, nil)
-	if err != nil {
-		return nil, fmt.Errorf("new payment metadata: %w", err)
-	}
-
-	return paymentMetadata, nil
+	return nil
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.

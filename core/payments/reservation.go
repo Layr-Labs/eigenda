@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // TODO: write docs somewhere about implications of adding a new reservation, or an old reservation expiring, while
@@ -20,8 +19,6 @@ import (
 // usages was going to be messy. Instead, `ReservedPayment` can just be removed, when we remove the deprecated payment
 // system.
 type Reservation struct {
-	accountID gethcommon.Address
-
 	// The number of symbols / second that the holder of this reservation is entitled to disperse
 	//
 	// The leak rate is a uint64 on-chain, so that's what we accept in the constructor. But it's converted to an int64
@@ -43,16 +40,11 @@ type Reservation struct {
 
 // TODO doc
 func NewReservation(
-	accountID gethcommon.Address,
 	symbolsPerSecond uint64,
 	startTime time.Time,
 	endTime time.Time,
 	permittedQuorumIDs []core.QuorumID,
 ) (*Reservation, error) {
-	if accountID == (gethcommon.Address{}) {
-		return nil, fmt.Errorf("account ID cannot be zero address")
-	}
-
 	if symbolsPerSecond <= 0 {
 		return nil, fmt.Errorf("reservation must have >0 symbols per second, got %d", symbolsPerSecond)
 	}
@@ -78,7 +70,6 @@ func NewReservation(
 	}
 
 	return &Reservation{
-		accountID:          accountID,
 		symbolsPerSecond:   int64(symbolsPerSecond),
 		startTime:          startTime,
 		endTime:            endTime,

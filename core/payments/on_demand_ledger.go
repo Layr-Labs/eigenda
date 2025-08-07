@@ -11,7 +11,7 @@ import (
 )
 
 // TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
-// value. The account ledger will need to check whether the on demand ledger is available before trying to debit,
+// value. The client ledger will need to check whether the on demand ledger is available before trying to debit,
 // and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
 // which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
 
@@ -40,7 +40,7 @@ func (odl *OnDemandLedger) Debit(
 	now time.Time,
 	symbolCount int64,
 	quorums []core.QuorumID,
-) (*core.PaymentMetadata, error) {
+) (*big.Int, error) {
 	if symbolCount <= 0 {
 		return nil, fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
 	}
@@ -67,14 +67,9 @@ func (odl *OnDemandLedger) Debit(
 		return nil, fmt.Errorf("insufficient on-demand funds")
 	}
 
-	paymentMetadata, err := core.NewPaymentMetadata(odl.config.accountID, now, newCumulativePayment)
-	if err != nil {
-		return nil, fmt.Errorf("new payment metadata: %w", err)
-	}
-
 	odl.cumulativePayment = newCumulativePayment
 
-	return paymentMetadata, nil
+	return newCumulativePayment, nil
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.

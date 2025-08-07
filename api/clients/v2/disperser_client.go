@@ -59,7 +59,7 @@ type disperserClient struct {
 	accountant         *Accountant
 	accountantLock     sync.Mutex
 
-	accountLedger *payments.AccountLedger
+	clientLedger *payments.ClientLedger
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -89,7 +89,7 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
-	accountLedger *payments.AccountLedger,
+	clientLedger *payments.ClientLedger,
 ) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
@@ -105,11 +105,11 @@ func NewDisperserClient(
 	}
 
 	return &disperserClient{
-		config:        config,
-		signer:        signer,
-		prover:        prover,
-		accountant:    accountant,
-		accountLedger: accountLedger,
+		config:       config,
+		signer:       signer,
+		prover:       prover,
+		accountant:   accountant,
+		clientLedger: clientLedger,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -189,9 +189,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	var paymentMetadata *core.PaymentMetadata
 	successfulDispersal := false
-	if c.accountLedger != nil {
+	if c.clientLedger != nil {
 		// TODO: set probe stages
-		paymentMetadata, err = c.accountLedger.Debit(ctx, uint32(symbolLength), quorums)
+		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
 		switch err.(type) {
 		case nil:
 			break
@@ -205,7 +205,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 				return
 			}
 
-			c.accountLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+			c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
 		}()
 	} else {
 		probe.SetStage("acquire_accountant_lock")
