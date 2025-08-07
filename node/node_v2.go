@@ -56,7 +56,10 @@ func (n *Node) DownloadBundles(
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
 	rawBundles := make([]*RawBundle, len(batch.BlobCertificates))
 	requests := make(map[corev2.RelayKey]*relayRequest)
-	var requiredCapacity uint64
+
+	// Tally the number of bytes we are about to download.
+	var downloadSizeInBytes uint64
+
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
@@ -90,7 +93,7 @@ func (n *Node) DownloadBundles(
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chunk length: %w", err)
 		}
-		requiredCapacity += uint64(assgn.NumChunks() * chunkLength)
+		downloadSizeInBytes += uint64(assgn.NumChunks() * chunkLength)
 
 		req, ok := requests[relayKey]
 		if !ok {
@@ -118,11 +121,11 @@ func (n *Node) DownloadBundles(
 	//  - strip out the contract directory changes... they don't need to be a prerequisite for this
 
 	// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
-	// is capacity in the store chunks buffer. Doing this reduces risk of OOM.
+	// is capacity in the store chunks buffer. This is an OOM safety measure.
 	probe.SetStage("acquire_buffer_capacity")
 	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.GetChunksBufferTimeout)
 	defer cancel()
-	err := n.getChunksSemaphore.Acquire(semaphoreCtx, int64(requiredCapacity))
+	err := n.getChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
 	}
