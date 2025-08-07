@@ -118,7 +118,7 @@ func (n *Node) DownloadBundles(
 	// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
 	// is capacity in the store chunks buffer. This is an OOM safety measure.
 	probe.SetStage("acquire_buffer_capacity")
-	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.GetChunksBufferTimeout)
+	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.StoreChunksBufferTimeout)
 	defer cancel()
 	err := n.getChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
 	if err != nil {

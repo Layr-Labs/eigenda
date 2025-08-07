@@ -269,7 +269,6 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
-	getChunksSemaphore := semaphore.NewWeighted(int64(config.GetChunksBufferSizeBytes))
 	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
 
 	n := &Node{
@@ -289,7 +288,6 @@ func NewNode(
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
-		getChunksSemaphore:      getChunksSemaphore,
 		storeChunksSemaphore:    storeChunksSemaphore,
 	}
 
@@ -397,17 +395,6 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 			return fmt.Errorf("failed to compute size: %w", err)
 		}
 		totalAllocated += config.LittDBWriteCacheSizeBytes
-
-		config.GetChunksBufferSizeBytes, err = computeMemoryPoolSize(
-			logger,
-			"GetChunks Buffer",
-			config.GetChunksBufferSizeBytes,
-			config.GetChunksBufferSizeFraction,
-			maxMemory)
-		if err != nil {
-			return fmt.Errorf("failed to compute size: %w", err)
-		}
-		totalAllocated += config.GetChunksBufferSizeBytes
 
 		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
 			logger,

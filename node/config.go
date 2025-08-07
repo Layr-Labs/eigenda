@@ -174,17 +174,6 @@ type Config struct {
 	// from OOM-killing the process. Overrides the GCSafetyBufferSizeFraction value if greater than 0.
 	GCSafetyBufferSizeBytes uint64
 
-	// The maximum amount of time to wait to acquire buffer capacity to serve a GetChunks() gRPC request.
-	GetChunksBufferTimeout time.Duration
-
-	// getChunksBufferSize controls the maximum memory that can be used to serve GetChunks() gRPC requests,
-	// as a fraction of the total memory available to the process. Ignored if GetChunksBufferSizeGB is greater than 0.
-	GetChunksBufferSizeFraction float64
-
-	// GetChunksBufferSizeGB controls the maximum memory that can be used to serve GetChunks() gRPC requests,
-	// in bytes. If set, this config value overrides the GetChunksBufferSizeFraction value if greater than 0.
-	GetChunksBufferSizeBytes uint64
-
 	// The maximum amount of time to wait to acquire buffer capacity to store chunks in the StoreChunks() gRPC request.
 	StoreChunksBufferTimeout time.Duration
 
@@ -443,9 +432,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdBurstLimitMB:     ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeBytes:       uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
 		GCSafetyBufferSizeFraction:    ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
-		GetChunksBufferTimeout:        ctx.GlobalDuration(flags.GetChunksBufferTimeoutFlag.Name),
-		GetChunksBufferSizeFraction:   ctx.GlobalFloat64(flags.GetChunksBufferSizeFractionFlag.Name),
-		GetChunksBufferSizeBytes:      uint64(ctx.GlobalFloat64(flags.GetChunksBufferSizeGBFlag.Name) * units.GiB),
 		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
 		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
 		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
