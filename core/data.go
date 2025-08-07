@@ -713,5 +713,3 @@ func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
 	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
 	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }
-
-func (ar *ReservedPayment) 

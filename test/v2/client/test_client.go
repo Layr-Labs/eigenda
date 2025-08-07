@@ -148,7 +148,7 @@ func NewTestClient(
 		UseSecureGrpcFlag: true,
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}

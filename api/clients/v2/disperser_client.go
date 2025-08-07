@@ -10,6 +10,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -57,6 +58,8 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
+
+	accountLedger *payments.AccountLedger
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -81,7 +84,13 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(
+	config *DisperserClientConfig,
+	signer corev2.BlobRequestSigner,
+	prover encoding.Prover,
+	accountant *Accountant,
+	accountLedger *payments.AccountLedger,
+) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -96,10 +105,11 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 
 	return &disperserClient{
-		config:     config,
-		signer:     signer,
-		prover:     prover,
-		accountant: accountant,
+		config:        config,
+		signer:        signer,
+		prover:        prover,
+		accountant:    accountant,
+		accountLedger: accountLedger,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -175,30 +185,53 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
 
-	probe.SetStage("acquire_accountant_lock")
-	c.accountantLock.Lock()
-
-	probe.SetStage("accountant")
-
-	err = c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
 
-	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
-		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-		c.accountantLock.Unlock()
+	var paymentMetadata *core.PaymentMetadata
+	successfulDispersal := false
+	if c.accountLedger != nil {
+		// TODO: set probe stages
+		paymentMetadata, err = c.accountLedger.Debit(ctx, uint32(symbolLength), quorums)
+		switch err.(type) {
+		case nil:
+			break
+		default:
+			// TODO: bring everything down if unexpected error happens. no sense continuing with payments broken
+		}
+
+		// if there is a problem with the dispersal, revert the payment debit in the local ledger to recover the balance
+		defer func() {
+			if successfulDispersal {
+				return
+			}
+
+			c.accountLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+		}()
 	} else {
-		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-		defer c.accountantLock.Unlock()
+		probe.SetStage("acquire_accountant_lock")
+		c.accountantLock.Lock()
+
+		probe.SetStage("accountant")
+
+		err = c.initOncePopulateAccountant(ctx)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, [32]byte{}, api.NewErrorFailover(err)
+		}
+
+		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+		}
+
+		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
+			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+			c.accountantLock.Unlock()
+		} else {
+			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+			defer c.accountantLock.Unlock()
+		}
 	}
 
 	probe.SetStage("verify_field_element")
@@ -251,7 +284,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: *payment,
+		PaymentMetadata: *paymentMetadata,
 	}
 
 	probe.SetStage("sign_blob_request")
@@ -287,6 +320,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
+
+	// declare the dispersal a "success", so that the debit isn't reverted on the local ledger
+	successfulDispersal = true
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
 }
