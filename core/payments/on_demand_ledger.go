@@ -41,7 +41,20 @@ func (odl *OnDemandLedger) Debit(symbolCount int64, quorums []core.QuorumID) err
 		return fmt.Errorf("only quorums 0 and 1 are supported for on demand payments, got %d", quorum)
 	}
 
-	// TODO continue work here
+	blobCost, err := odl.computeBlobCost(symbolCount)
+	if err != nil {
+		return fmt.Errorf("compute blob cost: %w", err)
+	}
+
+	newCumulativePayment := odl.cumulativePayment.Add(big.NewInt(blobCost))
+
+	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
+		// TODO: make a specific error type with this, with appropriate fields
+		return fmt.Errorf("insufficient on-demand funds")
+	}
+
+	odl.cumulativePayment = newCumulativePayment
+
 	return nil
 }
 
@@ -55,6 +68,19 @@ func CheckForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	}
 
 	return nil
+}
+
+func (odl *OnDemandLedger) computeBlobCost(symbolCount int64) (int64, error) {
+	if symbolCount <= 0 {
+		return 0, fmt.Errorf("symbol count must be > 0, got %d", symbolCount)
+	}
+
+	billableSymbols := symbolCount
+	if symbolCount < int64(odl.config.minNumSymbols) {
+		billableSymbols = int64(odl.config.minNumSymbols)
+	}
+
+	return billableSymbols * int64(odl.config.pricePerSymbol), nil
 }
 
 // Accountant struct fields related to on-demand payments:
