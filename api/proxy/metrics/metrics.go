@@ -7,6 +7,7 @@ import (
 
 	ophttp "github.com/ethereum-optimism/optimism/op-service/httputil"
 
+	client_metrics "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -28,6 +29,7 @@ type Config struct {
 
 // Metricer ... Interface for metrics
 type Metricer interface {
+	client_metrics.ClientMetricer
 	RecordInfo(version string)
 	RecordUp()
 
@@ -39,6 +41,7 @@ type Metricer interface {
 
 // Metrics ... Metrics struct
 type Metrics struct {
+	client_metrics.ClientMetrics
 	Info *prometheus.GaugeVec
 	Up   prometheus.Gauge
 
@@ -65,7 +68,9 @@ func NewMetrics(subsystem string) *Metrics {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
+
 	factory := metrics.With(registry)
+	clientMetrics := client_metrics.NewClientMetrics(namespace, factory)
 
 	return &Metrics{
 		Up: factory.NewGauge(prometheus.GaugeOpts{
@@ -127,6 +132,8 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"backend_type",
 		}),
+		ClientMetrics: clientMetrics,
+
 		registry: registry,
 		factory:  factory,
 	}
@@ -189,6 +196,7 @@ func (m *Metrics) Document() []metrics.DocumentedMetric {
 }
 
 type noopMetricer struct {
+	client_metrics.NoopAccountantMetricer
 }
 
 var NoopMetrics Metricer = new(noopMetricer)

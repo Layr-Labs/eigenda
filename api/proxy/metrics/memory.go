@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	client_metrics "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -84,6 +85,7 @@ func (cm *CountMap) Get(labels ...string) (uint64, error) {
 // and is only used for E2E testing. This is needed since prometheus/client_golang doesn't provide
 // an interface for reading the count values from the codified metric.
 type EmulatedMetricer struct {
+	client_metrics.NoopAccountantMetricer
 	HTTPServerRequestsTotal *CountMap
 	// secondary metrics
 	SecondaryRequestsTotal *CountMap

@@ -7,9 +7,11 @@ import (
 	"slices"
 	"sync"
 
+	client_metrics "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -33,6 +35,9 @@ type Accountant struct {
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
+
+	// metrics reporting
+	metrics client_metrics.ClientMetricer
 }
 
 // PeriodRecord contains the index of the reservation period and the usage of the period
@@ -57,9 +62,14 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
+		metrics:           nil,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
+}
+
+func (a *Accountant) SetMetrics(metrics client_metrics.ClientMetricer) {
+	a.metrics = metrics
 }
 
 // blobPaymentInfo calculates and records payment information. The accountant
@@ -90,6 +100,7 @@ func (a *Accountant) blobPaymentInfo(
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return big.NewInt(0), err
 		}
+		// Successfully using reservation
 		return big.NewInt(0), nil
 	}
 
@@ -97,9 +108,17 @@ func (a *Accountant) blobPaymentInfo(
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+			if a.metrics != nil {
+				a.metrics.ReportPaymentFailure(a.accountID.Hex(), "quorum_mismatch")
+			}
 			return big.NewInt(0), err
 		}
-		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
+		overflowSymbols := relativePeriodRecord.Usage - binLimit
+		overflowPeriodRecord.Usage += overflowSymbols
+		// Successfully using reservation with overflow
+		if a.metrics != nil {
+			a.metrics.ReportPaymentUsed(a.accountID.Hex(), "reservation", symbolUsage)
+		}
 		return big.NewInt(0), nil
 	}
 
@@ -112,10 +131,23 @@ func (a *Accountant) blobPaymentInfo(
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
 	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
+			if a.metrics != nil {
+				a.metrics.ReportPaymentFailure(a.accountID.Hex(), "quorum_mismatch")
+			}
 			return big.NewInt(0), err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
+		// Successfully using on-demand payment
+		if a.metrics != nil {
+			a.metrics.ReportPaymentUsed(a.accountID.Hex(), "on-demand", symbolUsage)
+			a.metrics.ReportOnDemandPayment(a.accountID.Hex(), incrementRequired)
+			a.metrics.ReportCumulativePayment(a.accountID.Hex(), a.cumulativePayment)
+		}
 		return a.cumulativePayment, nil
+	}
+	// Report insufficient balance failure
+	if a.metrics != nil {
+		a.metrics.ReportPaymentFailure(a.accountID.Hex(), "insufficient_balance")
 	}
 	return big.NewInt(0), fmt.Errorf(
 		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
@@ -129,9 +161,15 @@ func (a *Accountant) AccountBlob(
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
 	if len(quorums) == 0 {
+		if a.metrics != nil {
+			a.metrics.ReportPaymentFailure(a.accountID.Hex(), "no_quorums_provided")
+		}
 		return nil, fmt.Errorf("no quorums provided")
 	}
 	if numSymbols == 0 {
+		if a.metrics != nil {
+			a.metrics.ReportPaymentFailure(a.accountID.Hex(), "zero_symbols")
+		}
 		return nil, ErrZeroSymbols
 	}
 

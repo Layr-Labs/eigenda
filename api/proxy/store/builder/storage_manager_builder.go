@@ -115,7 +115,7 @@ func BuildStoreManager(
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier)
+		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, metrics)
 		if err != nil {
 			return nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -210,6 +210,7 @@ func buildEigenDAV2Backend(
 	config Config,
 	secrets common.SecretConfigV2,
 	kzgVerifier *kzgverifier.Verifier,
+	metrics metrics.Metricer,
 ) (common.EigenDAV2Store, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
@@ -344,6 +345,7 @@ func buildEigenDAV2Backend(
 		kzgProver,
 		certVerifier,
 		ethReader,
+		metrics, // TODO(iquidus): prometheus registry
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build payload disperser: %w", err)
@@ -564,6 +566,7 @@ func buildPayloadDisperser(
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
 	ethReader *eth.Reader,
+	metrics metrics.Metricer,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
 	if err != nil {
@@ -578,6 +581,10 @@ func buildPayloadDisperser(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
+	}
+
+	if metrics != nil {
+		disperserClient.SetClientMetrics(metrics)
 	}
 
 	blockNumMonitor, err := verification.NewBlockNumberMonitor(
