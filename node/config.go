@@ -179,10 +179,10 @@ type Config struct {
 
 	// StoreChunksBufferSizeFraction controls the maximum memory that can be used to store chunks in the
 	// StoreChunks() gRPC request buffer, as a fraction of the total memory available to the process.
-	// Ignored if StoreChunksBufferSizeGB is greater than 0.
+	// Ignored if StoreChunksBufferSizeBytes is greater than 0.
 	StoreChunksBufferSizeFraction float64
 
-	// StoreChunksBufferSizeGB controls the maximum memory that can be used to store chunks in the
+	// StoreChunksBufferSizeBytes controls the maximum memory that can be used to store chunks in the
 	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
 	// StoreChunksBufferSizeFraction value if greater than 0.
 	StoreChunksBufferSizeBytes uint64

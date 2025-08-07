@@ -100,10 +100,6 @@ type Node struct {
 	// QuorumCount is the number of quorums in the network.
 	QuorumCount atomic.Uint32
 
-	// TODO future cody: this is not wired in yet
-	// Used to limit the maximum amount of memory used to serve GetChunks() gRPC requests.
-	getChunksSemaphore *semaphore.Weighted
-
 	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
 	storeChunksSemaphore *semaphore.Weighted
 }
@@ -297,6 +293,7 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
+		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
 		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
@@ -304,7 +301,7 @@ func NewNode(
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
 
-		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
 		}
