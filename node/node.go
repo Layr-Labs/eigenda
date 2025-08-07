@@ -22,8 +22,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
@@ -211,25 +211,22 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// TODO (cody.littley): make contract directory config mandatory
-
 	// If EigenDADirectory is provided, use it to get service manager addresses
 	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
 	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
-		contractDirectory, err := directory.NewContractDirectory(
-			ctx,
-			logger,
-			client,
-			gethcommon.HexToAddress(config.EigenDADirectory))
+		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create contract directory: %w", err)
 		}
 
-		eigenDAServiceManagerAddr, err =
-			contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{Context: context.Background()})
 		if err != nil {
-			return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
+			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
+		}
+		if config.EigenDAServiceManagerAddr != "" && eigenDAServiceManagerAddr.String() != config.EigenDAServiceManagerAddr {
+			return nil, fmt.Errorf("EigenDAServiceManagerAddr passed in as config (%v) does not match the one retrieved from EigenDADirectory (%v)",
+				config.EigenDADirectory, eigenDAServiceManagerAddr.Hex())
 		}
 	} else {
 		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+

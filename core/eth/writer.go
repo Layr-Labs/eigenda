@@ -37,10 +37,11 @@ var _ core.Writer = (*Writer)(nil)
 func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
+	eigendaDirectoryHexAddr string,
 	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Writer, error) {
 
-	r, err := NewReader(logger, client, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr)
+	r, err := NewReader(logger, client, eigendaDirectoryHexAddr, blsOperatorStateRetrieverHexAddr, eigenDAServiceManagerHexAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader with address directory: %w", err)
 	}

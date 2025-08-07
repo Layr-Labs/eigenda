@@ -10,14 +10,13 @@ import (
 	"strings"
 
 	proxycmn "github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/urfave/cli/v2"
 )
-
-// TODO what is the purpose of this tool?
 
 var (
 	ethRpcUrlFlag = &cli.StringFlag{
@@ -126,10 +125,13 @@ func discoverAddresses(ctx *cli.Context) error {
 		return fmt.Errorf("invalid EigenDADirectory address: %s", directoryAddr)
 	}
 
-	addressMap, err := directory.GetContractAddressMap(
-		context.Background(),
-		client,
-		gethcommon.HexToAddress(directoryAddr))
+	// Use the directory reader from core/eth package
+	directoryReader, err := eth.NewEigenDADirectoryReader(directoryAddr, client)
+	if err != nil {
+		return fmt.Errorf("NewEigenDADirectoryReader: %w", err)
+	}
+
+	addressMap, err := directoryReader.GetAllAddresses(&bind.CallOpts{Context: ctx.Context})
 	if err != nil {
 		return fmt.Errorf("GetAllAddresses from directory: %w", err)
 	}

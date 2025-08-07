@@ -182,9 +182,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	// TODO determine size of the request
-	// TODO acquire tokens
-
 	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
