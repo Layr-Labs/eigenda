@@ -21,23 +21,7 @@ import (
 // since then it won't be reusable: only the client should be creating the payment header, everyone else should
 // be extracting data, and verifying that the dispersal is permitted.
 
-// This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
-//
-// Symbols "leak out" of the bucket at a constant rate, creating capacity for new symbols. The bucket can be "filled"
-// with additional symbols if there is enough available capacity.
-//
-// The standard golang golang.org/x/time/rate.Limiter is not suitable for our use-case, for the following reasons:
-//
-//  1. The Limiter doesn't support the concept of overfilling the bucket. We require the concept of overfill, for cases
-//     where a bucket size might be too small to fit the largest permissible blob size. We don't want to prevent users
-//     with a small reservation size from submitting large blobs.
-//  2. The Limiter uses floating point math. Though it would *probably* be ok to use floats, it makes the distributed
-//     system harder to reason about. What level of error accumulation would we see with frequent updates? Under
-//     what conditions would it be possible for the client and server representations of a given leaky bucket to
-//     diverge, and what impact would that have on our assumptions? These questions can be avoided entirely by using
-//     an integer based implementation.
-//
-// NOTE: methods on this struct should not be called from separate goroutines: it's not threadsafe.
+
 type ReservationLedger struct {
 	config ReservationLedgerConfig
 
