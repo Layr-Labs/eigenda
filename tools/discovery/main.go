@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	proxycmn "github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -124,7 +123,7 @@ func discoverAddresses(ctx *cli.Context) error {
 		return fmt.Errorf("invalid EigenDADirectory address: %s", directoryAddr)
 	}
 
-	addressMap, err := directory.GetContractAddressMap(
+	addressMap, err := GetContractAddressMap(
 		context.Background(),
 		client,
 		gethcommon.HexToAddress(directoryAddr))
