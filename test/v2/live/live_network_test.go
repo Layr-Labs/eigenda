@@ -497,7 +497,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
+	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil, nil)
 	require.NoError(t, err)
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
