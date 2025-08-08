@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -492,12 +493,15 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 	fmt.Printf("Account ID: %s\n", accountId.Hex())
 
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          c.GetConfig().DisperserHostname,
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
+	disperserClient, err := clients.NewDisperserClient(logger, disperserConfig, signer, nil, nil)
 	require.NoError(t, err)
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
