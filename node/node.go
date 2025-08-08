@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -106,11 +108,16 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
+	err := configureMemoryLimits(nodeLogger, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure memory limits: %w", err)
+	}
+
 	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
 	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
-	err := os.MkdirAll(config.DbPath, os.ModePerm)
+	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
@@ -321,6 +328,100 @@ func NewNode(
 
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
+}
+
+// configureMemoryLimits configures the memory limits for the Node. Updates derived values in the Config struct,
+// and also modifies the GC safety buffer size.
+//
+// All memory limits used by the validator should be configured within this function. This enables us to validate that
+// the total allocated memory does not exceed the maximum available memory.
+func configureMemoryLimits(logger logging.Logger, config *Config) error {
+
+	maxMemory, err := memory.GetMaximumAvailableMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get maximum available memory: %w", err)
+	}
+
+	totalAllocated := uint64(0)
+
+	config.GCSafetyBufferSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"GC Safety Buffer",
+		config.GCSafetyBufferSizeBytes,
+		config.GCSafetyBufferSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
+	}
+	err = memory.SetGCMemorySafetyBuffer(config.GCSafetyBufferSizeBytes)
+	if err != nil {
+		return fmt.Errorf("failed to set GC memory safety buffer: %w", err)
+	}
+	totalAllocated += config.GCSafetyBufferSizeBytes
+
+	if config.EnableV2 {
+		config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB read cache",
+			config.LittDBReadCacheSizeBytes,
+			config.LittDBReadCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBReadCacheSizeBytes
+
+		config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB write cache",
+			config.LittDBWriteCacheSizeBytes,
+			config.LittDBWriteCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBWriteCacheSizeBytes
+
+		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
+		//  limit here. It's important to ensure that all reserved memory buckets sum to less than the maximum
+		//  available memory.
+	}
+
+	if totalAllocated > maxMemory {
+		return fmt.Errorf("total memory allocated (%d bytes) "+
+			"exceeds maximum available memory (%d bytes)", totalAllocated, maxMemory)
+	}
+
+	bytesRemaining := maxMemory - totalAllocated
+	logger.Infof("Total unallocated memory: %s", common.PrettyPrintBytes(bytesRemaining))
+
+	return nil
+}
+
+// Compute the size of a memory pool.
+func computeMemoryPoolSize(
+	logger logging.Logger,
+	poolName string,
+	constantSizeInBytes uint64,
+	fraction float64,
+	maxMemory uint64) (uint64, error) {
+
+	if constantSizeInBytes > 0 {
+		logger.Infof("%s is configured to use %s memory",
+			poolName, common.PrettyPrintBytes(constantSizeInBytes))
+		return constantSizeInBytes, nil
+	}
+
+	// If the constant size is not set, calculate the size based on the fraction of the maximum memory.
+	if fraction < 0.0 || fraction > 1.0 {
+		return 0, fmt.Errorf("fraction for %s must be between 0.0 and 1.0, got: %f", poolName, fraction)
+	}
+
+	poolSize := uint64(fraction * float64(maxMemory))
+	logger.Infof("%s is configured to use %0.2f%% of %s available memory (%s).",
+		poolName, fraction*100.0, common.PrettyPrintBytes(maxMemory), common.PrettyPrintBytes(poolSize))
+
+	return poolSize, nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just

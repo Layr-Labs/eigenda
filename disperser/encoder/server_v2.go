@@ -169,6 +169,10 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKe
 	fetchStart := time.Now()
 	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
+		if errors.Is(err, blobstore.ErrBlobNotFound) {
+			// nolint:wrapcheck
+			return nil, status.Error(codes.NotFound, "blob not found in blob store")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to get blob from blob store: %v", err)
 	}
 	if len(data) == 0 {

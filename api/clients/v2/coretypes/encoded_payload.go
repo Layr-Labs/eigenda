@@ -28,7 +28,7 @@ func (ep *EncodedPayload) Serialize() []byte {
 }
 
 // newEncodedPayload accepts a payload, and performs the PayloadEncodingVersion0 encoding to create an encoded payload
-func newEncodedPayload(payload *Payload) (*EncodedPayload, error) {
+func newEncodedPayload(payload *Payload) *EncodedPayload {
 	encodedPayloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
 	encodedPayloadHeader[1] = byte(codecs.PayloadEncodingVersion0) // encode version byte
@@ -44,7 +44,7 @@ func newEncodedPayload(payload *Payload) (*EncodedPayload, error) {
 	encodedData := codec.PadPayload(payloadBytes)
 	encodedPayloadBytes := append(encodedPayloadHeader, encodedData...)
 
-	return &EncodedPayload{encodedPayloadBytes}, nil
+	return &EncodedPayload{encodedPayloadBytes}
 }
 
 // Decode applies the inverse of PayloadEncodingVersion0 to an EncodedPayload, and returns the decoded Payload

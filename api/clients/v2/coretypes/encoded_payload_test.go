@@ -14,9 +14,7 @@ import (
 func TestDecodeShortBytes(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
-
-	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
-	require.NoError(t, err)
+	encodedPayload := newEncodedPayload(NewPayload(originalData))
 
 	// truncate
 	encodedPayload.bytes = encodedPayload.bytes[:len(encodedPayload.bytes)-32]
@@ -30,9 +28,7 @@ func TestDecodeShortBytes(t *testing.T) {
 func TestDecodeLongBytes(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
-
-	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
-	require.NoError(t, err)
+	encodedPayload := newEncodedPayload(NewPayload(originalData))
 
 	// appending 33 bytes to the encoded payload guarantees that, after removing padding, the unpadded bytes will be
 	// at least 32 bytes longer than the expected length, which is the error case we're trying to trigger here
@@ -54,8 +50,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 		require.NoError(t, err)
 
 		almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
-		almostTooLongEncodedPayload, err := newEncodedPayload(NewPayload(almostTooLongData))
-		require.NoError(t, err)
+		almostTooLongEncodedPayload := newEncodedPayload(NewPayload(almostTooLongData))
 		almostTooLongFieldElements, err := almostTooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
 		// there are almost too many field elements for the defined blob length, but not quite
@@ -63,8 +58,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 		require.NoError(t, err)
 
 		tooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength) + 1)
-		tooLongEncodedPayload, err := newEncodedPayload(NewPayload(tooLongData))
-		require.NoError(t, err)
+		tooLongEncodedPayload := newEncodedPayload(NewPayload(tooLongData))
 		tooLongFieldElements, err := tooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
 		// there is one too many field elements for the defined blob length
@@ -78,9 +72,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 func TestTrailingNonZeros(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
-
-	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
-	require.NoError(t, err)
+	encodedPayload := newEncodedPayload(NewPayload(originalData))
 
 	originalElements, err := encodedPayload.toFieldElements()
 	require.NoError(t, err)
@@ -107,8 +99,7 @@ func TestEncodeWithFewerElements(t *testing.T) {
 	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
 
-	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
-	require.NoError(t, err)
+	encodedPayload := newEncodedPayload(NewPayload(originalData))
 
 	originalFieldElements, err := encodedPayload.toFieldElements()
 	require.NoError(t, err)

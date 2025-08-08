@@ -27,13 +27,9 @@ compile-contracts:
 clean:
 	$(MAKE) -C api clean
 
-# Builds the protobuf files inside a docker container.
+# Builds the protobuf files
 protoc:
 	$(MAKE) -C api protoc
-
-# Builds the protobuf files locally (i.e. without docker).
-protoc-local:
-	$(MAKE) -C api protoc-local
 
 # Only lints the diff between current branch and master because of settings in .golangci.yml unless a different branch is specified in LINT_BASE_REV
 lint:
