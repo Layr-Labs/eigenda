@@ -1392,7 +1392,7 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	}
 
 	if attestation == nil {
-		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", ErrAttestationNotFound, batchHeaderHash)
 	}
 
 	return header, attestation, nil

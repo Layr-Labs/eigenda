@@ -24,10 +24,7 @@ func Example_payloadToBlobConversion() {
 	payload := NewPayload(payloadBytes)
 	fmt.Printf("Payload bytes (len %d):\n%s\n", len(payload.Serialize()), hex.EncodeToString(payload.Serialize()))
 
-	encodedPayload, err := newEncodedPayload(payload)
-	if err != nil {
-		panic(err)
-	}
+	encodedPayload := newEncodedPayload(payload)
 	fmt.Printf("Encoded Payload bytes (len %d):\n%s\n", len(encodedPayload.Serialize()), hex.EncodeToString(encodedPayload.Serialize()))
 
 	// The encoded payload field elements are interpreted as evaluations of a polynomial.
