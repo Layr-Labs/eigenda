@@ -7,4 +7,5 @@ var (
 	ErrMetadataNotFound       = errors.New("metadata not found")
 	ErrAlreadyExists          = errors.New("record already exists")
 	ErrInvalidStateTransition = errors.New("invalid state transition")
+	ErrAttestationNotFound    = errors.New("attestation not found")
 )
