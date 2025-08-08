@@ -29,8 +29,8 @@ type LeakyBucket struct {
 	// Defines whether we should err on the side of permitting more or less throughput
 	biasBehavior BiasBehavior
 
-	// Defines different ways that overdrafts, i.e. "overfilling the bucket", should be handled
-	overdraftBehavior OverdraftBehavior
+	// Defines different ways that overfilling the bucket should be handled
+	overfillBehavior OverfillBehavior
 
 	// The total number of symbols that fit in the bucket
 	bucketCapacity int64
@@ -62,12 +62,12 @@ type LeakyBucket struct {
 func NewLeakyBucket(
 	// how fast symbols leak out of the bucket
 	symbolsPerSecondLeakRate int64,
-	// the bucket capacity is the leak rate times this duration
+	// symbolsPerSecondLeakRate * bucketCapacityDuration becomes the bucket capacity
 	bucketCapacityDuration time.Duration,
 	// whether to err on the side of permitting more or less throughput
 	biasBehavior BiasBehavior,
 	// how to handle overfilling the bucket
-	overdraftBehavior OverdraftBehavior,
+	overfillBehavior OverfillBehavior,
 	// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
@@ -75,11 +75,16 @@ func NewLeakyBucket(
 		return nil, fmt.Errorf("symbolsPerSecondLeakRate must be > 0, got %d", symbolsPerSecondLeakRate)
 	}
 
-	if bucketCapacityDuration <= 0 {
-		return nil, fmt.Errorf("bucketCapacityDuration must be > 0, got %v", bucketCapacityDuration)
+	product, err := common.SafeMultiplyInt64(symbolsPerSecondLeakRate, bucketCapacityDuration.Nanoseconds())
+	if err != nil {
+		return nil, fmt.Errorf("safe multiply when computing bucket capacity: %w", err)
 	}
+	bucketCapacity := product / 1e9
 
-	bucketCapacity := int64(float64(symbolsPerSecondLeakRate) * bucketCapacityDuration.Seconds())
+	if bucketCapacity <= 0 {
+		return nil, fmt.Errorf("bucket capacity must be > 0, got %d (from leak rate %d symbols/sec and duration %s)",
+			bucketCapacity, symbolsPerSecondLeakRate, bucketCapacityDuration)
+	}
 
 	var currentFillLevel int64
 	switch biasBehavior {
@@ -95,7 +100,7 @@ func NewLeakyBucket(
 
 	return &LeakyBucket{
 		biasBehavior:                 biasBehavior,
-		overdraftBehavior:            overdraftBehavior,
+		overfillBehavior:             overfillBehavior,
 		bucketCapacity:               bucketCapacity,
 		symbolsPerSecondLeakRate:     symbolsPerSecondLeakRate,
 		currentFillLevel:             currentFillLevel,
@@ -127,17 +132,17 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount int64) error {
 		return fmt.Errorf("safe add to compute newFillLevel: %w", err)
 	}
 
-	// if newFillLevel is less than the total bucket capacity, no further checks are required
-	if newFillLevel < lb.bucketCapacity {
+	// if newFillLevel is <= the total bucket capacity, no further checks are required
+	if newFillLevel <= lb.bucketCapacity {
 		lb.currentFillLevel = newFillLevel
 		return nil
 	}
 
-	// this fill would result in the bucket being overfilled, so we check the overdraft behavior to decide what to do
-	switch lb.overdraftBehavior {
-	case OverdraftNotPermitted:
+	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
+	switch lb.overfillBehavior {
+	case OverfillNotPermitted:
 		return &InsufficientReservationCapacityError{symbolCount}
-	case OverdraftOncePermitted:
+	case OverfillOncePermitted:
 		zeroCapacityAvailable := lb.currentFillLevel >= lb.bucketCapacity
 
 		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
@@ -148,11 +153,13 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount int64) error {
 		lb.currentFillLevel = newFillLevel
 		return nil
 	default:
-		return fmt.Errorf("unknown overfill behavior %s", lb.overdraftBehavior)
+		return fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
 	}
 }
 
 // Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
+//
+// The input time should be the most up-to-date time, NOT the time of the original fill.
 func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount int64) error {
 	if symbolCount <= 0 {
 		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
@@ -182,6 +189,10 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount int64) error {
 //
 // Returns an error if any of the calculations fail, which should not happen during normal usage.
 func (lb *LeakyBucket) leak(now time.Time) error {
+	if now.Before(lb.previousLeakTime) {
+		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
+	}
+
 	defer func() {
 		lb.previousLeakTime = now
 	}()
@@ -200,7 +211,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 		return fmt.Errorf("safe subtract to compute correctedFullSecondLeakage: %w", err)
 	}
 
-	partialSecondLeakage, err := lb.computePartialSecondLeakage(now.Nanosecond())
+	partialSecondLeakage, err := lb.computePartialSecondLeakage(int64(now.Nanosecond()))
 	if err != nil {
 		return fmt.Errorf("compute partial second leakage: %w", err)
 	}
@@ -234,19 +245,6 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 //
 // Returns an error if the leakage calculation fails, which should not happen during normal usage.
 func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
-	if epochSeconds < 0 {
-		return 0, fmt.Errorf("epochSeconds must be >= 0, got %d", epochSeconds)
-	}
-
-	// epoch seconds should never go backwards, but could be the same
-	if epochSeconds < lb.previousLeakTime.Unix() {
-		return 0, fmt.Errorf("current time %s (%d) is before previous time %s (%d)",
-			time.Unix(epochSeconds, 0).UTC().Format(time.RFC3339),
-			epochSeconds,
-			lb.previousLeakTime.UTC().Format(time.RFC3339),
-			lb.previousLeakTime.Unix())
-	}
-
 	secondsSinceLastUpdate, err := common.SafeSubtractInt64(epochSeconds, lb.previousLeakTime.Unix())
 	if err != nil {
 		return 0, fmt.Errorf("safe subtract to compute secondsSinceLastUpdate: %w", err)
@@ -263,12 +261,8 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, erro
 //
 // Computes the number of symbols which leak out in the given fractional second. Since this deals with integers,
 // the configured bias determines which direction we round in.
-func (lb *LeakyBucket) computePartialSecondLeakage(nanos int) (int64, error) {
-	if nanos >= 1e9 || nanos < 0 {
-		return 0, fmt.Errorf("nanos must be between [0, 1e9), got %d", nanos)
-	}
-
-	product, err := common.SafeMultiplyInt64(int64(nanos), lb.symbolsPerSecondLeakRate)
+func (lb *LeakyBucket) computePartialSecondLeakage(nanos int64) (int64, error) {
+	product, err := common.SafeMultiplyInt64(nanos, lb.symbolsPerSecondLeakRate)
 	if err != nil {
 		return 0, fmt.Errorf("safe multiply to compute nanos * symbolsPerSecondLeakRate: %w", err)
 	}

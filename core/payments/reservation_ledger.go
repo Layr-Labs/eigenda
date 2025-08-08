@@ -35,7 +35,7 @@ func NewReservationLedger(
 		config.reservation.symbolsPerSecond,
 		config.bucketCapacityDuration,
 		config.biasBehavior,
-		config.overdraftBehavior,
+		config.overfillBehavior,
 		now,
 	)
 	if err != nil {
