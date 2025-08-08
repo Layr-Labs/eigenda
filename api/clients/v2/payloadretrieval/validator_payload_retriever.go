@@ -59,9 +59,11 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
 ) (*coretypes.Payload, error) {
-
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
 	if err != nil {
+		if pr.metrics != nil {
+			pr.metrics.ReportValidatorPayloadRetrieval("failure", "GetPayload", 0, 0)
+		}
 		return nil, err
 	}
 
@@ -71,8 +73,19 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		blobKey, keyErr := eigenDACert.ComputeBlobKey()
 		if keyErr == nil {
 			err = fmt.Errorf("blob %v: %w", blobKey.Hex(), err)
+			if pr.metrics != nil {
+				pr.metrics.ReportValidatorPayloadDecodeFailure(blobKey.Hex())
+			}
+		}
+		if pr.metrics != nil {
+			pr.metrics.ReportValidatorPayloadRetrieval("failure", "GetPayload", 0, 0)
 		}
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
+	}
+
+	if pr.metrics != nil {
+		payloadSize := uint64(len(payload.Serialize()))
+		pr.metrics.ReportValidatorPayloadRetrieval("success", "GetPayload", payloadSize, 0)
 	}
 
 	return payload, nil
@@ -90,6 +103,7 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
 ) (*coretypes.EncodedPayload, error) {
+	var quorumAttempts int
 
 	blobHeader, err := eigenDACert.BlobHeader()
 	if err != nil {
@@ -103,10 +117,14 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
+		quorumAttempts++
+		quorumIDStr := fmt.Sprintf("%d", quorumID)
+
 		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			blobHeader,
-			uint32(eigenDACert.ReferenceBlockNumber()))
+			uint32(eigenDACert.ReferenceBlockNumber()),
+			quorumIDStr)
 
 		if err != nil {
 			pr.logger.Error(
@@ -126,12 +144,18 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 			pr.logger.Warn(
 				"generate and compare blob commitment",
 				"blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
+			if pr.metrics != nil {
+				pr.metrics.ReportValidatorCommitmentVerificationFailure(quorumIDStr)
+			}
 			continue
 		}
 		if !valid {
 			pr.logger.Warn(
 				"generated commitment doesn't match cert commitment",
 				"blobKey", blobKey.Hex(), "quorumID", quorumID)
+			if pr.metrics != nil {
+				pr.metrics.ReportValidatorCommitmentVerificationFailure(quorumIDStr)
+			}
 			continue
 		}
 
@@ -144,7 +168,18 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 				" blobKey: %s, quorumID: %v, error: %v", blobKey.Hex(), quorumID, err)
 		}
 
+		// Report successful retrieval
+		if pr.metrics != nil {
+			payloadSize := uint64(len(encodedPayload.Serialize()))
+			pr.metrics.ReportValidatorPayloadRetrieval("success", "GetEncodedPayload", payloadSize, quorumAttempts)
+		}
+
 		return encodedPayload, nil
+	}
+
+	// Report failed retrieval
+	if pr.metrics != nil {
+		pr.metrics.ReportValidatorPayloadRetrieval("failure", "GetEncodedPayload", 0, quorumAttempts)
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from quorums %v", blobKey.Hex(), blobHeader.QuorumNumbers)
@@ -155,6 +190,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
+	quorumIDStr string,
 ) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
@@ -168,12 +204,30 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	)
 
 	if err != nil {
+		if pr.metrics != nil {
+			// Check if it's a timeout error
+			if ctx.Err() == context.DeadlineExceeded || timeoutCtx.Err() == context.DeadlineExceeded {
+				pr.metrics.ReportValidatorTimeout(quorumIDStr)
+			} else {
+				pr.metrics.ReportValidatorConnectionError(quorumIDStr)
+			}
+			pr.metrics.ReportValidatorQuorumRequest(quorumIDStr, "failure")
+		}
 		return nil, fmt.Errorf("get blob: %w", err)
 	}
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(header.BlobCommitments.Length))
 	if err != nil {
+		if pr.metrics != nil {
+			pr.metrics.ReportValidatorBlobDeserializationFailure(quorumIDStr)
+			pr.metrics.ReportValidatorQuorumRequest(quorumIDStr, "failure")
+		}
 		return nil, fmt.Errorf("deserialize blob: %w", err)
+	}
+
+	// Report successful quorum request
+	if pr.metrics != nil {
+		pr.metrics.ReportValidatorQuorumRequest(quorumIDStr, "success")
 	}
 
 	return blob, nil

@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	accountantSubsystem     = "accountant"
-	disperserSubsystem      = "disperser_client"
-	relayRetrieverSubsystem = "relay_retriever"
+	accountantSubsystem         = "accountant"
+	disperserSubsystem          = "disperser_client"
+	relayRetrieverSubsystem     = "relay_retriever"
+	validatorRetrieverSubsystem = "validator_retriever"
 )
 
 type ClientMetricer interface {
@@ -31,6 +32,14 @@ type ClientMetricer interface {
 	ReportPayloadDecodeFailure(blobKey string)
 	ReportRelayTimeout(relayKey string)
 	ReportRelayConnectionError(relayKey string)
+	// validator_retriever
+	ReportValidatorPayloadRetrieval(status, method string, payloadSize uint64, quorumAttempts int)
+	ReportValidatorQuorumRequest(quorumId string, status string)
+	ReportValidatorCommitmentVerificationFailure(quorumId string)
+	ReportValidatorBlobDeserializationFailure(quorumId string)
+	ReportValidatorPayloadDecodeFailure(blobKey string)
+	ReportValidatorTimeout(quorumId string)
+	ReportValidatorConnectionError(quorumId string)
 }
 
 type ClientMetrics struct {
@@ -60,6 +69,18 @@ type ClientMetrics struct {
 	PayloadDecodeFailures          *prometheus.CounterVec
 	RelayTimeouts                  *prometheus.CounterVec
 	RelayConnectionErrors          *prometheus.CounterVec
+	// validator_retriever
+	ValidatorPayloadRetrievalRequests       *prometheus.CounterVec
+	ValidatorPayloadRetrievalDuration       *prometheus.HistogramVec
+	ValidatorPayloadSize                    *prometheus.HistogramVec
+	ValidatorQuorumAttemptsPerRetrieval     *prometheus.HistogramVec
+	ValidatorQuorumRequests                 *prometheus.CounterVec
+	ValidatorQuorumRequestDuration          *prometheus.HistogramVec
+	ValidatorCommitmentVerificationFailures *prometheus.CounterVec
+	ValidatorBlobDeserializationFailures    *prometheus.CounterVec
+	ValidatorPayloadDecodeFailures          *prometheus.CounterVec
+	ValidatorTimeouts                       *prometheus.CounterVec
+	ValidatorConnectionErrors               *prometheus.CounterVec
 }
 
 func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
@@ -259,6 +280,100 @@ func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
 		}, []string{
 			"relay_key",
 		}),
+		ValidatorPayloadRetrievalRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "payload_retrieval_requests_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total validator payload retrieval requests by status and method",
+		}, []string{
+			"status",
+			"method",
+		}),
+		ValidatorPayloadRetrievalDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "payload_retrieval_duration_seconds",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Time taken for validator payload retrieval operations",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"method",
+		}),
+		ValidatorPayloadSize: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "payload_size_bytes",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Size distribution of validator retrieved payloads",
+			Buckets:   prometheus.ExponentialBuckets(1024, 2, 20), // 1KB to ~1GB
+		}, []string{
+			"method",
+		}),
+		ValidatorQuorumAttemptsPerRetrieval: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "quorum_attempts_per_retrieval",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Number of quorum attempts per validator retrieval operation",
+			Buckets:   []float64{1, 2, 3, 4, 5, 8, 10}, // reasonable for quorum count
+		}, []string{
+			"method",
+		}),
+		ValidatorQuorumRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "quorum_requests_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total requests to individual quorums by quorum ID and status",
+		}, []string{
+			"quorum_id",
+			"status",
+		}),
+		ValidatorQuorumRequestDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "quorum_request_duration_seconds",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Per-quorum request duration in validator retrieval",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"quorum_id",
+		}),
+		ValidatorCommitmentVerificationFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "commitment_verification_failures_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total commitment verification failures by quorum ID",
+		}, []string{
+			"quorum_id",
+		}),
+		ValidatorBlobDeserializationFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "blob_deserialization_failures_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total blob deserialization failures by quorum ID",
+		}, []string{
+			"quorum_id",
+		}),
+		ValidatorPayloadDecodeFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "payload_decode_failures_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total payload decode failures by blob key",
+		}, []string{
+			"blob_key",
+		}),
+		ValidatorTimeouts: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "timeouts_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total validator timeout errors by quorum ID",
+		}, []string{
+			"quorum_id",
+		}),
+		ValidatorConnectionErrors: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "connection_errors_total",
+			Namespace: namespace,
+			Subsystem: validatorRetrieverSubsystem,
+			Help:      "Total validator connection errors by quorum ID",
+		}, []string{
+			"quorum_id",
+		}),
 	}
 }
 
@@ -327,6 +442,36 @@ func (m *ClientMetrics) ReportRelayConnectionError(relayKey string) {
 	m.RelayConnectionErrors.WithLabelValues(relayKey).Inc()
 }
 
+func (m *ClientMetrics) ReportValidatorPayloadRetrieval(status, method string, payloadSize uint64, quorumAttempts int) {
+	m.ValidatorPayloadRetrievalRequests.WithLabelValues(status, method).Inc()
+	m.ValidatorPayloadSize.WithLabelValues(method).Observe(float64(payloadSize))
+	m.ValidatorQuorumAttemptsPerRetrieval.WithLabelValues(method).Observe(float64(quorumAttempts))
+}
+
+func (m *ClientMetrics) ReportValidatorQuorumRequest(quorumId string, status string) {
+	m.ValidatorQuorumRequests.WithLabelValues(quorumId, status).Inc()
+}
+
+func (m *ClientMetrics) ReportValidatorCommitmentVerificationFailure(quorumId string) {
+	m.ValidatorCommitmentVerificationFailures.WithLabelValues(quorumId).Inc()
+}
+
+func (m *ClientMetrics) ReportValidatorBlobDeserializationFailure(quorumId string) {
+	m.ValidatorBlobDeserializationFailures.WithLabelValues(quorumId).Inc()
+}
+
+func (m *ClientMetrics) ReportValidatorPayloadDecodeFailure(blobKey string) {
+	m.ValidatorPayloadDecodeFailures.WithLabelValues(blobKey).Inc()
+}
+
+func (m *ClientMetrics) ReportValidatorTimeout(quorumId string) {
+	m.ValidatorTimeouts.WithLabelValues(quorumId).Inc()
+}
+
+func (m *ClientMetrics) ReportValidatorConnectionError(quorumId string) {
+	m.ValidatorConnectionErrors.WithLabelValues(quorumId).Inc()
+}
+
 type NoopAccountantMetricer struct {
 }
 
@@ -372,4 +517,25 @@ func (m *NoopAccountantMetricer) ReportRelayTimeout(_ string) {
 }
 
 func (m *NoopAccountantMetricer) ReportRelayConnectionError(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorPayloadRetrieval(_ string, _ string, _ uint64, _ int) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorQuorumRequest(_ string, _ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorCommitmentVerificationFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorBlobDeserializationFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorPayloadDecodeFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorTimeout(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidatorConnectionError(_ string) {
 }
