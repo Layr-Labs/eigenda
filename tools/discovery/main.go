@@ -17,8 +17,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// TODO what is the purpose of this tool?
-
 var (
 	ethRpcUrlFlag = &cli.StringFlag{
 		Name:     "eth-rpc-url",

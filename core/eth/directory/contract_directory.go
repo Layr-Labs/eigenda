@@ -40,11 +40,6 @@ type ContractDirectory struct {
 }
 
 // Create a new ContractDirectory instance.
-//
-// The requireCompleteness flag can be used to enforce that the offchain contract list matches the onchain contract
-// list. In general, this should be enabled in test code to raise the alarm when the offchain contract list drifts
-// out of sync with the onchain contract list. In production code, this should be disabled just in case the offending
-// contracts are not important for the code to function correctly.
 func NewContractDirectory(
 	ctx context.Context,
 	logger logging.Logger,
@@ -57,16 +52,16 @@ func NewContractDirectory(
 		return nil, fmt.Errorf("NewContractDirectory: %w", err)
 	}
 
-	legalAddressSet := make(map[ContractName]struct{})
+	legalContractSet := make(map[ContractName]struct{})
 	for _, contractName := range knownContracts {
-		legalAddressSet[contractName] = struct{}{}
+		legalContractSet[contractName] = struct{}{}
 	}
 
 	d := &ContractDirectory{
 		logger:           logger,
 		addressCache:     make(map[ContractName]gethcommon.Address),
 		caller:           caller,
-		legalContractSet: legalAddressSet,
+		legalContractSet: legalContractSet,
 	}
 
 	err = d.verifyContractList(ctx)
@@ -77,8 +72,8 @@ func NewContractDirectory(
 	return d, nil
 }
 
-// GetContractAddress returns the address of a contract by its name. Only contracts defined in the const
-// block above should be used. It is sharply discouraged to use this function with a magic string.
+// GetContractAddress returns the address of a contract by its name. Only contracts defined in contract_names.go may be
+// used here. Magic strings not defined in contract_names.go will result in an error.
 func (d *ContractDirectory) GetContractAddress(
 	ctx context.Context,
 	contractName ContractName,
@@ -87,7 +82,7 @@ func (d *ContractDirectory) GetContractAddress(
 		return gethcommon.Address{}, fmt.Errorf("contract name cannot be empty")
 	}
 
-	// This is not very granular. But since this is uniquely to be a performance hotspot, we can do the simple thing.
+	// This is not very granular. But since this is unlikely to be a performance hotspot, we can do the simple thing.
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -107,7 +102,7 @@ func (d *ContractDirectory) GetContractAddress(
 	}
 
 	if address == (gethcommon.Address{}) {
-		return gethcommon.Address{}, fmt.Errorf("constract %s is not registered onchain", contractName)
+		return gethcommon.Address{}, fmt.Errorf("contract %s is not registered onchain", contractName)
 	}
 
 	d.addressCache[contractName] = address
@@ -116,8 +111,8 @@ func (d *ContractDirectory) GetContractAddress(
 	return address, nil
 }
 
-// Checks to see if the list of contracts tracked by this ContractDirectory matches the contracts currently registered
-// in the EigenDA directory contract. Creates some noisy logs if there are any discrepancies.
+// Checks to see if the list of contracts defined in contract_names.go are known to the onchain contract directory
+// contract. Creates some noisy logs if there are any discrepancies.
 func (d *ContractDirectory) verifyContractList(ctx context.Context) error {
 	registeredContracts, err := d.caller.GetAllNames(&bind.CallOpts{Context: ctx})
 	if err != nil {
