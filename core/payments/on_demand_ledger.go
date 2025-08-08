@@ -15,21 +15,19 @@ import (
 // which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
 
 type OnDemandLedger struct {
-	config            OnDemandLedgerConfig
-	lock              *semaphore.Weighted
-	cumulativePayment *big.Int
+	config                   OnDemandLedgerConfig
+	lock                     *semaphore.Weighted
+	cumulativePaymentStore   CumulativePaymentStore
 }
 
 func NewOnDemandLedger(
 	config OnDemandLedgerConfig,
+	cumulativePaymentStore CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
-	// TODO: get this from the disperser
-	cumulativePayment := big.NewInt(0)
-
 	return &OnDemandLedger{
-		config:            config,
-		lock:              semaphore.NewWeighted(1), // Binary semaphore acts as a mutex
-		cumulativePayment: cumulativePayment,
+		config:                   config,
+		lock:                     semaphore.NewWeighted(1), // Binary semaphore acts as a mutex
+		cumulativePaymentStore:   cumulativePaymentStore,
 	}, nil
 }
 
@@ -58,14 +56,21 @@ func (odl *OnDemandLedger) Debit(
 	}
 	defer odl.lock.Release(1)
 
-	newCumulativePayment := new(big.Int).Add(odl.cumulativePayment, big.NewInt(blobCost))
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
+	if err != nil {
+		return nil, fmt.Errorf("get cumulative payment: %w", err)
+	}
+
+	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, big.NewInt(blobCost))
 
 	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
 		// TODO: make a specific error type with this, with appropriate fields
 		return nil, fmt.Errorf("insufficient on-demand funds")
 	}
 
-	odl.cumulativePayment = newCumulativePayment
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(newCumulativePayment); err != nil {
+		return nil, fmt.Errorf("set cumulative payment: %w", err)
+	}
 
 	return newCumulativePayment, nil
 }
@@ -87,13 +92,20 @@ func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount int64) e
 	}
 	defer odl.lock.Release(1)
 
-	newCumulativePayment := new(big.Int).Sub(odl.cumulativePayment, big.NewInt(blobCost))
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
+	if err != nil {
+		return fmt.Errorf("get cumulative payment: %w", err)
+	}
+
+	newCumulativePayment := new(big.Int).Sub(currentCumulativePayment, big.NewInt(blobCost))
 
 	if newCumulativePayment.Sign() < 0 {
 		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
 	}
 
-	odl.cumulativePayment = newCumulativePayment
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(newCumulativePayment); err != nil {
+		return fmt.Errorf("set cumulative payment: %w", err)
+	}
 
 	return nil
 }
