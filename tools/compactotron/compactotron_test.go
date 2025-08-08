@@ -34,6 +34,7 @@ func TestCompaction(t *testing.T) {
 
 		expectedValues[key] = value
 		err = db.Put([]byte(key), value, nil)
+		require.NoError(t, err, "failed to put value into leveldb")
 	}
 
 	err = db.Close()
