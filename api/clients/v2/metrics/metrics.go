@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	accountantSubsystem = "accountant"
-	disperserSubsystem  = "disperser_client"
+	accountantSubsystem     = "accountant"
+	disperserSubsystem      = "disperser_client"
+	relayRetrieverSubsystem = "relay_retriever"
 )
 
 type ClientMetricer interface {
@@ -22,6 +23,14 @@ type ClientMetricer interface {
 	ReportBlobDispersal(method string, blobSize uint64)
 	ReportValidationError(errorType string)
 	ReportBlobKeyVerificationError()
+	// relay_retriever
+	ReportPayloadRetrieval(status, method string, payloadSize uint64, relayAttempts int)
+	ReportRelayRequest(relayKey string, status string)
+	ReportCommitmentVerificationFailure(relayKey string)
+	ReportBlobDeserializationFailure(relayKey string)
+	ReportPayloadDecodeFailure(blobKey string)
+	ReportRelayTimeout(relayKey string)
+	ReportRelayConnectionError(relayKey string)
 }
 
 type ClientMetrics struct {
@@ -39,6 +48,18 @@ type ClientMetrics struct {
 	ValidationErrors          *prometheus.CounterVec
 	BlobKeyVerificationErrors *prometheus.CounterVec
 	ConnectionErrors          *prometheus.CounterVec
+	// relay_retriever
+	PayloadRetrievalRequests       *prometheus.CounterVec
+	PayloadRetrievalDuration       *prometheus.HistogramVec
+	PayloadSize                    *prometheus.HistogramVec
+	RelayAttemptsPerRetrieval      *prometheus.HistogramVec
+	RelayRequests                  *prometheus.CounterVec
+	RelayRequestDuration           *prometheus.HistogramVec
+	CommitmentVerificationFailures *prometheus.CounterVec
+	BlobDeserializationFailures    *prometheus.CounterVec
+	PayloadDecodeFailures          *prometheus.CounterVec
+	RelayTimeouts                  *prometheus.CounterVec
+	RelayConnectionErrors          *prometheus.CounterVec
 }
 
 func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
@@ -144,6 +165,100 @@ func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
 		}, []string{
 			"reason",
 		}),
+		PayloadRetrievalRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "payload_retrieval_requests_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total payload retrieval requests by status and method",
+		}, []string{
+			"status",
+			"method",
+		}),
+		PayloadRetrievalDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "payload_retrieval_duration_seconds",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Time taken for payload retrieval operations",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"method",
+		}),
+		PayloadSize: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "payload_size_bytes",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Size distribution of retrieved payloads",
+			Buckets:   prometheus.ExponentialBuckets(1024, 2, 20), // 1KB to ~1GB
+		}, []string{
+			"method",
+		}),
+		RelayAttemptsPerRetrieval: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "relay_attempts_per_retrieval",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Number of relay attempts per retrieval operation",
+			Buckets:   []float64{1, 2, 3, 4, 5, 8, 10, 15, 20}, // reasonable for relay count
+		}, []string{
+			"method",
+		}),
+		RelayRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "relay_requests_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total requests to individual relays by relay key and status",
+		}, []string{
+			"relay_key",
+			"status",
+		}),
+		RelayRequestDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "relay_request_duration_seconds",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Per-relay request duration",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"relay_key",
+		}),
+		CommitmentVerificationFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "commitment_verification_failures_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total commitment verification failures by relay key",
+		}, []string{
+			"relay_key",
+		}),
+		BlobDeserializationFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "blob_deserialization_failures_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total blob deserialization failures by relay key",
+		}, []string{
+			"relay_key",
+		}),
+		PayloadDecodeFailures: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "payload_decode_failures_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total payload decode failures by blob key",
+		}, []string{
+			"blob_key",
+		}),
+		RelayTimeouts: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "relay_timeouts_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total relay timeout errors by relay key",
+		}, []string{
+			"relay_key",
+		}),
+		RelayConnectionErrors: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "relay_connection_errors_total",
+			Namespace: namespace,
+			Subsystem: relayRetrieverSubsystem,
+			Help:      "Total relay connection errors by relay key",
+		}, []string{
+			"relay_key",
+		}),
 	}
 }
 
@@ -182,6 +297,36 @@ func (m *ClientMetrics) ReportBlobKeyVerificationError() {
 	m.BlobKeyVerificationErrors.WithLabelValues().Inc()
 }
 
+func (m *ClientMetrics) ReportPayloadRetrieval(status, method string, payloadSize uint64, relayAttempts int) {
+	m.PayloadRetrievalRequests.WithLabelValues(status, method).Inc()
+	m.PayloadSize.WithLabelValues(method).Observe(float64(payloadSize))
+	m.RelayAttemptsPerRetrieval.WithLabelValues(method).Observe(float64(relayAttempts))
+}
+
+func (m *ClientMetrics) ReportRelayRequest(relayKey string, status string) {
+	m.RelayRequests.WithLabelValues(relayKey, status).Inc()
+}
+
+func (m *ClientMetrics) ReportCommitmentVerificationFailure(relayKey string) {
+	m.CommitmentVerificationFailures.WithLabelValues(relayKey).Inc()
+}
+
+func (m *ClientMetrics) ReportBlobDeserializationFailure(relayKey string) {
+	m.BlobDeserializationFailures.WithLabelValues(relayKey).Inc()
+}
+
+func (m *ClientMetrics) ReportPayloadDecodeFailure(blobKey string) {
+	m.PayloadDecodeFailures.WithLabelValues(blobKey).Inc()
+}
+
+func (m *ClientMetrics) ReportRelayTimeout(relayKey string) {
+	m.RelayTimeouts.WithLabelValues(relayKey).Inc()
+}
+
+func (m *ClientMetrics) ReportRelayConnectionError(relayKey string) {
+	m.RelayConnectionErrors.WithLabelValues(relayKey).Inc()
+}
+
 type NoopAccountantMetricer struct {
 }
 
@@ -206,4 +351,25 @@ func (m *NoopAccountantMetricer) ReportValidationError(_ string) {
 }
 
 func (m *NoopAccountantMetricer) ReportBlobKeyVerificationError() {
+}
+
+func (m *NoopAccountantMetricer) ReportPayloadRetrieval(_ string, _ string, _ uint64, _ int) {
+}
+
+func (m *NoopAccountantMetricer) ReportRelayRequest(_ string, _ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportCommitmentVerificationFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportBlobDeserializationFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportPayloadDecodeFailure(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportRelayTimeout(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportRelayConnectionError(_ string) {
 }

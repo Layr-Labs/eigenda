@@ -313,7 +313,7 @@ func buildEigenDAV2Backend(
 		case common.RelayRetrieverType:
 			log.Info("Initializing relay payload retriever")
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, ethReader.GetRelayRegistryAddress())
+				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, ethReader.GetRelayRegistryAddress(), metrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -321,7 +321,7 @@ func buildEigenDAV2Backend(
 		case common.ValidatorRetrieverType:
 			log.Info("Initializing validator payload retriever")
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, ethReader, kzgVerifier, kzgProver.Srs.G1)
+				log, config.ClientConfigV2, ethClient, ethReader, kzgVerifier, kzgProver.Srs.G1, metrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -458,6 +458,7 @@ func buildRelayPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
 	relayRegistryAddress geth_common.Address,
+	metrics metrics.Metricer,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
 	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddress)
 	if err != nil {
@@ -473,6 +474,10 @@ func buildRelayPayloadRetriever(
 		g1Srs)
 	if err != nil {
 		return nil, fmt.Errorf("new relay payload retriever: %w", err)
+	}
+
+	if metrics != nil {
+		relayPayloadRetriever.SetMetrics(metrics)
 	}
 
 	return relayPayloadRetriever, nil
@@ -513,6 +518,7 @@ func buildValidatorPayloadRetriever(
 	ethReader *eth.Reader,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
+	metrics metrics.Metricer,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
 	chainState := eth.NewChainState(ethReader, ethClient)
 
@@ -534,6 +540,10 @@ func buildValidatorPayloadRetriever(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new validator payload retriever: %w", err)
+	}
+
+	if metrics != nil {
+		validatorRetriever.SetMetrics(metrics)
 	}
 
 	return validatorRetriever, nil

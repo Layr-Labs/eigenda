@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -21,6 +22,7 @@ type ValidatorPayloadRetriever struct {
 	config          ValidatorPayloadRetrieverConfig
 	retrievalClient validator.ValidatorClient
 	g1Srs           []bn254.G1Affine
+	metrics         metrics.ClientMetricer
 }
 
 var _ clients.PayloadRetriever = &ValidatorPayloadRetriever{}
@@ -175,4 +177,8 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	}
 
 	return blob, nil
+}
+
+func (pr *ValidatorPayloadRetriever) SetMetrics(metrics metrics.ClientMetricer) {
+	pr.metrics = metrics
 }
