@@ -115,14 +115,19 @@ func (n *Node) DownloadBundles(
 
 	}
 
-	// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
-	// is capacity in the store chunks buffer. This is an OOM safety measure.
-	probe.SetStage("acquire_buffer_capacity")
-	semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.StoreChunksBufferTimeout)
-	defer cancel()
-	err := n.storeChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+	// storeChunksSemaphore can be nil during unit tests, since there are a bunch of places where the Node struct
+	// is instantiated directly without using the constructor.
+	if n.storeChunksSemaphore != nil {
+		// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
+		// is capacity in the store chunks buffer. This is an OOM safety measure.
+
+		probe.SetStage("acquire_buffer_capacity")
+		semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.StoreChunksBufferTimeout)
+		defer cancel()
+		err := n.storeChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+		}
 	}
 
 	probe.SetStage("download")
@@ -173,6 +178,7 @@ func (n *Node) DownloadBundles(
 
 		for j, bundle := range resp.bundles {
 			metadata := resp.metadata[j]
+			var err error
 			blobShards[metadata.blobShardIndex].Bundle, err = new(core.Bundle).Deserialize(bundle)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
