@@ -2,6 +2,7 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -22,7 +23,7 @@ const (
 // TODO: work out how to fit metrics into this
 
 // TODO: this is a replacement for the accountant, bu it will not be the replacement for the meterer.
-// this struct will need to construct payment headers, wait for the individual ledgers to be available with timeouts, etc.
+// this struct will need to construct payment headers, wait for individual ledgers with timeouts, etc.
 // the disperser and validator nodes don't need to do any of that.
 type ClientLedger struct {
 	// TODO: add logger
@@ -95,17 +96,17 @@ func (cl *ClientLedger) Debit(
 	if cl.reservationLedger != nil {
 		err := cl.reservationLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
 
-		switch err.(type) {
-		case nil:
+		var insufficientErr *InsufficientReservationCapacityError
+		if err == nil {
 			// Success - blob accounted for via reservation
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
 			if err != nil {
 				return nil, fmt.Errorf("new payment metadata: %w", err)
 			}
 			return paymentMetadata, nil
-		case *InsufficientReservationCapacityError:
+		} else if errors.As(err, &insufficientErr) {
 			// todo: add info log, then continue to on-demand
-		default:
+		} else {
 			// TODO: make this a type of error which causes the client to shut down
 			cl.status.Store(LedgerStatusDead)
 			return nil, fmt.Errorf("something unexpected happened, shut down")
@@ -114,15 +115,14 @@ func (cl *ClientLedger) Debit(
 
 	if cl.onDemandLedger != nil {
 		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, int64(blobLengthSymbols), quorums)
-		switch err.(type) {
-		case nil:
+		if err == nil {
 			// Success - blob accounted for via on-demand
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 			if err != nil {
 				return nil, fmt.Errorf("new payment metadata: %w", err)
 			}
 			return paymentMetadata, nil
-		default:
+		} else {
 			// TODO: make this a type of error which causes the client to shut down
 			cl.status.Store(LedgerStatusDead)
 			return nil, fmt.Errorf("something unexpected happened, shut down")

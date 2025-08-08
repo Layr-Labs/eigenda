@@ -192,10 +192,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if c.clientLedger != nil {
 		// TODO: set probe stages
 		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
-		switch err.(type) {
-		case nil:
-			break
-		default:
+		if err != nil {
 			// TODO: bring everything down if unexpected error happens. no sense continuing with payments broken
 		}
 
@@ -205,7 +202,10 @@ func (c *disperserClient) DisperseBlobWithProbe(
 				return
 			}
 
-			c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+			if err != nil {
+				// TODO: Log error
+			}
 		}()
 	} else {
 		probe.SetStage("acquire_accountant_lock")

@@ -51,11 +51,11 @@ func NewReservation(
 
 	if symbolsPerSecond > math.MaxInt64 {
 		return nil, fmt.Errorf("symbolsPerSecond must be < math.MaxInt64 (got %d). Technically, anything up to "+
-			"math.MaxUint64 is permitted on-chain, but practical limits are put in place to simplify implementation.",
+			"math.MaxUint64 is permitted on-chain, but practical limits are put in place to simplify implementation",
 			symbolsPerSecond)
 	}
 
-	if startTime == endTime || endTime.Before(startTime) {
+	if startTime.Equal(endTime) || endTime.Before(startTime) {
 		return nil, fmt.Errorf("start time (%v) must be before end time (%v)", startTime, endTime)
 	}
 

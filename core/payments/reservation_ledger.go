@@ -14,9 +14,6 @@ import (
 // TODO: where do we check whether a dispersal fits within the correct time? it seems like we might need to return
 // the time to put into the payment header when doing the debit function....
 
-// TODO: consider extracting leaky bucket out of here after all. As I go, there is more and more stuff that isn't related
-// to leaky bucket being added.
-
 // TODO: at what point in the process will be construct the payment header? I don't want to do it in this class,
 // since then it won't be reusable: only the client should be creating the payment header, everyone else should
 // be extracting data, and verifying that the dispersal is permitted.
@@ -76,7 +73,7 @@ func (rl *ReservationLedger) Debit(
 
 	err = rl.config.reservation.CheckTime(now)
 	if err != nil {
-		// TODO: error here
+		return fmt.Errorf("check time: %w", err)
 	}
 
 	if err := rl.lock.Acquire(ctx, 1); err != nil {
