@@ -26,7 +26,7 @@ func TestChunkLength(t *testing.T) {
 	}
 
 	for _, pair := range pairs {
-		chunkLength, err := corev2.GetChunkLength(pair.blobLength, blobParams)
+		chunkLength, err := blobParams.GetChunkLength(pair.blobLength)
 		assert.NoError(t, err)
 		assert.Equal(t, pair.chunkLength, chunkLength)
 	}
@@ -55,7 +55,7 @@ func TestInvalidChunkLength(t *testing.T) {
 	}
 
 	for _, length := range invalidLengths {
-		_, err := corev2.GetChunkLength(length, blobParams)
+		_, err := blobParams.GetChunkLength(length)
 		assert.Error(t, err)
 	}
 }

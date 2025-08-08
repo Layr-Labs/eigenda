@@ -62,7 +62,7 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 	}
 
 	// Get the chunk length
-	chunkLength, err := GetChunkLength(uint32(blob.BlobHeader.BlobCommitments.Length), blobParams)
+	chunkLength, err := blobParams.GetChunkLength(uint32(blob.BlobHeader.BlobCommitments.Length))
 	if err != nil {
 		return nil, fmt.Errorf("invalid chunk length: %w", err)
 	}

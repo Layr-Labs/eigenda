@@ -191,6 +191,6 @@ func MockCommitment(t *testing.T) encoding.BlobCommitments {
 		},
 		LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
 		LengthProof:      (*encoding.G2Commitment)(&lengthProof),
-		Length:           10,
+		Length:           16,
 	}
 }

@@ -30,15 +30,6 @@ const (
 	AppName                        = "da-node"
 )
 
-var (
-	// QuorumNames maps quorum IDs to their names.
-	// this is used for eigen metrics
-	QuorumNames = map[core.QuorumID]string{
-		0: "eth_quorum",
-		1: "eignen_quorum",
-	}
-)
-
 // Config contains all of the configuration information for a DA node.
 type Config struct {
 	Hostname                        string
@@ -182,6 +173,19 @@ type Config struct {
 	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
 	// from OOM-killing the process. Overrides the GCSafetyBufferSizeFraction value if greater than 0.
 	GCSafetyBufferSizeBytes uint64
+
+	// The maximum amount of time to wait to acquire buffer capacity to store chunks in the StoreChunks() gRPC request.
+	StoreChunksBufferTimeout time.Duration
+
+	// StoreChunksBufferSizeFraction controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, as a fraction of the total memory available to the process.
+	// Ignored if StoreChunksBufferSizeBytes is greater than 0.
+	StoreChunksBufferSizeFraction float64
+
+	// StoreChunksBufferSizeBytes controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
+	// StoreChunksBufferSizeFraction value if greater than 0.
+	StoreChunksBufferSizeBytes uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -428,5 +432,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdBurstLimitMB:     ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeBytes:       uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
 		GCSafetyBufferSizeFraction:    ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
+		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
+		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
+		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
 	}, nil
 }

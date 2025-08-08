@@ -95,7 +95,7 @@ func TestEncodeBlob(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := corev2.GetChunkLength(core.NextPowerOf2(uint32(blobLength)), blobParams)
+	chunkLength, err := blobParams.GetChunkLength(core.NextPowerOf2(uint32(blobLength)))
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}

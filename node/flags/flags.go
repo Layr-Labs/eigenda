@@ -508,6 +508,29 @@ var (
 		Value:    0.2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
 	}
+	StoreChunksBufferTimeoutFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
+		Usage: "The maximum amount of time to wait to acquire buffer capacity " +
+			"to store chunks in the StoreChunks() gRPC request",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_TIMEOUT"),
+	}
+	StoreChunksBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-gb"),
+		Usage: "The maximum memory that can be used for StoreChunks() gRPC request buffer in gigabytes. " +
+			"Overrides NODE_STORE_CHUNKS_BUFFER_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_GB"),
+	}
+	StoreChunksBufferSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-fraction"),
+		Usage:    "The fraction of total memory to use for StoreChunks() gRPC request buffer.",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -646,6 +669,9 @@ var optionalFlags = []cli.Flag{
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	LittUnsafePurgeLocksFlag,
+	StoreChunksBufferTimeoutFlag,
+	StoreChunksBufferSizeGBFlag,
+	StoreChunksBufferSizeFractionFlag,
 }
 
 func init() {
