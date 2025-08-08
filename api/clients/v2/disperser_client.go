@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	client_metrics "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -57,6 +58,7 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
+	clientMetrics      client_metrics.ClientMetricer
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -112,6 +114,9 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
 		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		if c.clientMetrics != nil {
+			c.accountant.SetMetrics(c.clientMetrics)
+		}
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
@@ -157,8 +162,10 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-
 	if len(quorums) == 0 {
+		if c.clientMetrics != nil {
+			c.clientMetrics.ReportValidationError("empty_quorums")
+		}
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
 	if c.signer == nil {
@@ -166,6 +173,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 	for _, q := range quorums {
 		if q > corev2.MaxQuorumID {
+			if c.clientMetrics != nil {
+				c.clientMetrics.ReportValidationError("invalid_quorum_id")
+			}
 			return nil, [32]byte{}, api.NewErrorInvalidArg("quorum number must be less than 256")
 		}
 	}
@@ -193,11 +203,13 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
 
+	paymentMethod := "reservation"
 	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
 		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
 		c.accountantLock.Unlock()
 	} else {
 		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+		paymentMethod = "on-demand"
 		defer c.accountantLock.Unlock()
 	}
 
@@ -206,6 +218,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
+		if c.clientMetrics != nil {
+			c.clientMetrics.ReportValidationError("invalid_field_element")
+		}
 		return nil, [32]byte{}, fmt.Errorf(
 			"encountered an error to convert a 32-bytes into a valid field element, "+
 				"please use the correct format where every 32bytes(big-endian) is less than "+
@@ -285,7 +300,15 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe.SetStage("verify_blob_key")
 
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
+		if c.clientMetrics != nil {
+			c.clientMetrics.ReportBlobKeyVerificationError()
+		}
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
+	}
+
+	// Report successful blob dispersal
+	if c.clientMetrics != nil {
+		c.clientMetrics.ReportBlobDispersal(paymentMethod, uint64(len(data)))
 	}
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
@@ -335,7 +358,12 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
-	return c.client.GetBlobStatus(ctx, request)
+
+	result, err := c.client.GetBlobStatus(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("GetBlobStatus failed: %w", err)
+	}
+	return result, nil
 }
 
 // GetPaymentState returns the payment state of the disperser client
@@ -362,7 +390,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+
+	result, err := c.client.GetPaymentState(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("GetPaymentState failed: %w", err)
+	}
+	return result, nil
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
@@ -378,7 +411,12 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
-	return c.client.GetBlobCommitment(ctx, request)
+
+	result, err := c.client.GetBlobCommitment(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("GetBlobCommitment failed: %w", err)
+	}
+	return result, nil
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
@@ -419,4 +457,8 @@ func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error 
 		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
+}
+
+func (c *disperserClient) SetClientMetrics(metrics client_metrics.ClientMetricer) {
+	c.clientMetrics = metrics
 }

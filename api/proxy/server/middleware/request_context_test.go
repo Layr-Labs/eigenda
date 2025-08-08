@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	client_metrics "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
@@ -48,6 +49,7 @@ func TestRequestContext_CertVersionCanBeReadFromMetricsMiddleware(t *testing.T) 
 // Only used to make sure that the call to recordDur(strconv.Itoa(scw.status), string(mode), certVersion)
 // in the metrics middleware contains the correct cert version.
 type MockMetricer struct {
+	client_metrics.NoopAccountantMetricer
 	recordDurCertVersion string
 }
 

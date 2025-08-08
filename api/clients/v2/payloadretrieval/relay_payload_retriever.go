@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -27,6 +28,7 @@ type RelayPayloadRetriever struct {
 	config      RelayPayloadRetrieverConfig
 	relayClient relay.RelayClient
 	g1Srs       []bn254.G1Affine
+	metrics     metrics.ClientMetricer
 }
 
 var _ clients.PayloadRetriever = &RelayPayloadRetriever{}
@@ -67,9 +69,11 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
 ) (*coretypes.Payload, error) {
-
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
 	if err != nil {
+		if pr.metrics != nil {
+			pr.metrics.ReportPayloadRetrieval("failure", "GetPayload", 0, 0)
+		}
 		return nil, err
 	}
 
@@ -79,8 +83,19 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		blobKey, keyErr := eigenDACert.ComputeBlobKey()
 		if keyErr == nil {
 			err = fmt.Errorf("blob %v: %w", blobKey.Hex(), err)
+			if pr.metrics != nil {
+				pr.metrics.ReportPayloadDecodeFailure(blobKey.Hex())
+			}
+		}
+		if pr.metrics != nil {
+			pr.metrics.ReportPayloadRetrieval("failure", "GetPayload", 0, 0)
 		}
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
+	}
+
+	if pr.metrics != nil {
+		payloadSize := uint64(len(payload.Serialize()))
+		pr.metrics.ReportPayloadRetrieval("success", "GetPayload", payloadSize, 0)
 	}
 
 	return payload, nil
@@ -97,6 +112,8 @@ func (pr *RelayPayloadRetriever) GetPayload(
 func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.EncodedPayload, error) {
+
+	var relayAttempts int
 
 	relayKeys := eigenDACert.RelayKeys()
 	blobCommitments, err := eigenDACert.Commitments()
@@ -123,7 +140,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	// iterate over relays in random order, until we are able to get the blob from someone
 	for _, val := range indices {
 		relayKey := relayKeys[val]
-
+		relayAttempts++
 		blobLengthSymbols := uint32(blobCommitments.Length)
 
 		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
@@ -146,12 +163,18 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			pr.log.Warn(
 				"generate and compare blob commitment",
 				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			if pr.metrics != nil {
+				pr.metrics.ReportCommitmentVerificationFailure(fmt.Sprintf("%d", relayKey))
+			}
 			continue
 		}
 		if !valid {
 			pr.log.Warn(
 				"discarding blob retrieved from relay due to commitment mismatch with cert.commitment",
 				"blobKey", blobKey.Hex(), "relayKey", relayKey)
+			if pr.metrics != nil {
+				pr.metrics.ReportCommitmentVerificationFailure(fmt.Sprintf("%d", relayKey))
+			}
 			continue
 		}
 
@@ -164,7 +187,18 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 				" blobKey: %s, relayKey: %v, error: %v", blobKey.Hex(), relayKey, err)
 		}
 
+		// Report successful retrieval
+		if pr.metrics != nil {
+			payloadSize := uint64(len(encodedPayload.Serialize()))
+			pr.metrics.ReportPayloadRetrieval("success", "GetEncodedPayload", payloadSize, relayAttempts)
+		}
+
 		return encodedPayload, nil
+	}
+
+	// Report failed retrieval
+	if pr.metrics != nil {
+		pr.metrics.ReportPayloadRetrieval("failure", "GetEncodedPayload", 0, relayAttempts)
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
@@ -179,18 +213,39 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	blobLengthSymbols uint32,
 ) (*coretypes.Blob, error) {
 
+	relayKeyStr := fmt.Sprintf("%d", relayKey)
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
 	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
 	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
+
 	if err != nil {
+		if pr.metrics != nil {
+			// Check if it's a timeout error
+			if ctx.Err() == context.DeadlineExceeded || timeoutCtx.Err() == context.DeadlineExceeded {
+				pr.metrics.ReportRelayTimeout(relayKeyStr)
+			} else {
+				pr.metrics.ReportRelayConnectionError(relayKeyStr)
+			}
+			pr.metrics.ReportRelayRequest(relayKeyStr, "failure")
+		}
 		return nil, fmt.Errorf("get blob from relay: %w", err)
 	}
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
 	if err != nil {
+		if pr.metrics != nil {
+			pr.metrics.ReportBlobDeserializationFailure(relayKeyStr)
+			pr.metrics.ReportRelayRequest(relayKeyStr, "failure")
+		}
 		return nil, fmt.Errorf("deserialize blob: %w", err)
+	}
+
+	// Report successful relay request
+	if pr.metrics != nil {
+		pr.metrics.ReportRelayRequest(relayKeyStr, "success")
 	}
 
 	return blob, nil
@@ -209,4 +264,8 @@ func (pr *RelayPayloadRetriever) Close() error {
 	}
 
 	return nil
+}
+
+func (pr *RelayPayloadRetriever) SetMetrics(metrics metrics.ClientMetricer) {
+	pr.metrics = metrics
 }
