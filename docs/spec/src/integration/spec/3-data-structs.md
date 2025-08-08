@@ -135,7 +135,7 @@ A `DACert` contains the four data structs needed to call [checkDACert](https://g
 
 ### AltDACommitment
 
-In order to be understood by each rollup stack’s derivation pipeline, the encoded `DACert` must be prepended with header bytes, to turn it into an [`altda-commitment`](https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#commitment-schemas) respective to each stack:
+In order to be understood by each rollup stack’s derivation pipeline, the encoded `DACert` must be prepended with header bytes, to turn it into an [`altda-commitment`](https://github.com/Layr-Labs/eigenda/tree/master/api/proxy?tab=readme-ov-file#rollup-commitment-schemas) respective to each stack:
 
 - [op](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission) prepends 3 bytes: `version_byte`, `commitment_type`, `da_layer_byte`
 - nitro prepends 1 byte: `version_byte`

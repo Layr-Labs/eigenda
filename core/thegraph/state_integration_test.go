@@ -89,6 +89,8 @@ func teardown() {
 	testConfig.StopBinaries()
 }
 
+// TODO: this test needs to be fixed, its currently broken and CI never runs it (see Makefile integration-tests-inabox target).
+// The inabox dependency fails to start for some reason that I don't understand.
 func TestIndexerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skip graph indexer integrations test in short mode")

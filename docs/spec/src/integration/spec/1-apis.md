@@ -6,7 +6,7 @@ Below we give a summary of the APIs relevant to understanding the EigenDA high-l
 
 ### Proxy
 
-See our gorilla/mux [routes](https://github.com/Layr-Labs/eigenda-proxy/blob/main/server/routing.go) for full detail, but the gist is that proxy presents a REST endpoint based off of the [op da-server spec](https://specs.optimism.io/experimental/alt-da.html#da-server) to rollup batchers:
+See our gorilla/mux [routes](https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/server/routing.go) for full detail, but the gist is that proxy presents a REST endpoint based off of the [op da-server spec](https://specs.optimism.io/experimental/alt-da.html#da-server) to rollup batchers:
 
 ```
 # OP

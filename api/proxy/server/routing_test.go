@@ -6,9 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
 	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
@@ -102,6 +104,135 @@ func TestRouting(t *testing.T) {
 			require.Equal(t, tt.expectedCode, rec.Code)
 			require.Equal(t, tt.expectedBody, rec.Body.String())
 
+		})
+	}
+}
+
+func TestParseCommitmentInclusionL1BlockNumQueryParam(t *testing.T) {
+	tests := []struct {
+		queryParam     string
+		expectedResult uint64
+		expectedError  bool
+	}{
+		{
+			queryParam:     "",
+			expectedResult: 0,
+			expectedError:  false,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=",
+			expectedResult: 0,
+			expectedError:  false,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=0",
+			expectedResult: 0,
+			expectedError:  false,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=12345",
+			expectedResult: 12345,
+			expectedError:  false,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=18446744073709551615", // max uint64
+			expectedResult: 18446744073709551615,
+			expectedError:  false,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=abc123",
+			expectedResult: 0,
+			expectedError:  true,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=-100",
+			expectedResult: 0,
+			expectedError:  true,
+		},
+		{
+			queryParam:     "l1_inclusion_block_number=18446744073709551616", // max uint64 + 1
+			expectedResult: 0,
+			expectedError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.queryParam, func(t *testing.T) {
+			// Create test request with query parameters
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/test?%s", tt.queryParam), nil)
+			result, err := parseCommitmentInclusionL1BlockNumQueryParam(req)
+
+			// Check results
+			if tt.expectedError {
+				assert.Error(t, err)
+				// Verify it's the right type of error
+				assert.ErrorAs(t, err, &proxyerrors.L1InclusionBlockNumberParsingError{})
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestParseReturnEncodedPayloadQueryParam(t *testing.T) {
+	tests := []struct {
+		queryParam     string
+		expectedResult bool
+	}{
+		{
+			queryParam:     "return_encoded_payload",
+			expectedResult: true,
+		},
+		{
+			queryParam:     "return_encoded_payload=true",
+			expectedResult: true,
+		},
+		{
+			queryParam:     "return_encoded_payload=TRUE",
+			expectedResult: true,
+		},
+		{
+			queryParam:     "return_encoded_payload=1",
+			expectedResult: true,
+		},
+		// first value takes precedence if multiple are provided
+		{
+			queryParam:     "return_encoded_payload=true&return_encoded_payload=false",
+			expectedResult: true,
+		},
+		{
+			queryParam:     "return_encoded_payload=false&return_encoded_payload=true",
+			expectedResult: false,
+		},
+		{
+			queryParam:     "",
+			expectedResult: false,
+		},
+		{
+			queryParam:     "return_encoded_payload=false",
+			expectedResult: false, // Still true because presence is all that matters
+		},
+		{
+			queryParam:     "return_encoded_payload=anything",
+			expectedResult: false,
+		},
+		{
+			queryParam:     "other_param=value",
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.queryParam, func(t *testing.T) {
+			// Create test request with query parameters
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/test?%s", tt.queryParam), nil)
+
+			// Call the function being tested
+			result := parseReturnEncodedPayloadQueryParam(req)
+
+			// Check result
+			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }

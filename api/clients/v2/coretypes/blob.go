@@ -16,7 +16,7 @@ import (
 // A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form
 type Blob struct {
 	coeffPolynomial []fr.Element
-	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the BlobCommitment
+	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the [encoding.BlobCommitments].
 	//
 	// This value must be specified, rather than computed from the length of the coeffPolynomial, due to an edge case
 	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
@@ -63,12 +63,12 @@ func (b *Blob) Serialize() []byte {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
 func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
-	encodedPayload, err := b.toEncodedPayload(payloadForm)
+	encodedPayload, err := b.ToEncodedPayload(payloadForm)
 	if err != nil {
 		return nil, fmt.Errorf("to encoded payload: %w", err)
 	}
 
-	payload, err := encodedPayload.decode()
+	payload, err := encodedPayload.Decode()
 	if err != nil {
 		return nil, fmt.Errorf("decode payload: %w", err)
 	}
@@ -86,11 +86,11 @@ func (b *Blob) BlobLengthBytes() uint32 {
 	return b.blobLengthSymbols * 32
 }
 
-// toEncodedPayload creates an encodedPayload from the blob
+// ToEncodedPayload creates an EncodedPayload from the blob
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
-func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayload, error) {
+func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) (*EncodedPayload, error) {
 	var payloadElements []fr.Element
 	var err error
 	switch payloadForm {
@@ -101,7 +101,7 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
-		payloadElements, err = b.computeEvalPoly()
+		payloadElements, err = b.toEvalPoly()
 		if err != nil {
 			return nil, fmt.Errorf("compute eval poly: %w", err)
 		}
@@ -116,18 +116,21 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 
 	encodedPayload, err := encodedPayloadFromElements(payloadElements, maxPermissiblePayloadLength)
 	if err != nil {
-		return nil, fmt.Errorf("encoded payload from elements %w", err)
+		return nil, fmt.Errorf("encoded payload from elements: %w", err)
 	}
 
 	return encodedPayload, nil
 }
 
-// computeEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
-func (b *Blob) computeEvalPoly() ([]fr.Element, error) {
+// toEvalPoly converts a blob's coeffPoly to an evalPoly, using the FFT operation
+func (b *Blob) toEvalPoly() ([]fr.Element, error) {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(b.blobLengthSymbols)
+	fftSettings, err := fft.FFTSettingsFromBlobLengthSymbols(b.blobLengthSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("create FFT settings from blob length symbols: %w", err)
+	}
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)

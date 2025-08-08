@@ -8,8 +8,8 @@ A basic REST proxy server to interact with the EigenDA network:
 - GET routes: submit a DA Certificate to retrieve its respective blob from the EigenDA network, 
   which will be decoded, validated, and returned as a response.
 
-[![per-pr-ci](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml)
-[![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
+[![per-pr-ci](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml)
+[![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
 [V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda-proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
@@ -192,7 +192,7 @@ This approach allows you to switch from V1 to V2 while the proxy is running, wit
 
 1. **Configure Both V1 and V2 Backends**
    - Use a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V1` in your configuration
       - This ensures that the proxy will continue dispersing to the V1 backend, until it's time to migrate
    - Set `EIGENDA_PROXY_API_ENABLED=admin` to expose the admin API
@@ -215,11 +215,11 @@ If you prefer a more controlled migration with explicit service updates, follow 
 
 1. **Initial Configuration (V1 Only)**
    - Start proxy with a V1-only configuration
-      - See `.env.exampleV1.holesky` for an example configuration
+      - See `.env.example` for an example configuration
 
 2. **Prepare V2 Configuration**
    - Prepare a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2`, so that the proxy started with this config will immediately
 enable V2 dispersal
 
@@ -229,10 +229,10 @@ enable V2 dispersal
 
 ### Deployment Against Real EigenDA Network
 
-We also provide network-specific example env configuration files in `.env.example.holesky` and `.env.example.mainnet` as a place to get started:
+We also provide an example env configuration file in `.env.example` as a place to get started:
 
-1. Copy example env file: `cp .env.example.holesky .env`
-2. Update env file, setting `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX`. On mainnet you will also need to set `EIGENDA_PROXY_ETH_RPC`.
+1. Copy example env file: `cp .env.example .env`
+2. Populate your `.env` file with required values.
 3. Pass into binary: `ENV_PATH=.env ./bin/eigenda-proxy --addr 127.0.0.1 --port 3100`
 
 ```bash
@@ -312,7 +312,7 @@ A normal (non-archival) Ethereum node is sufficient for running the proxy with c
 
 #### SRS Points
 
-In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/verify/cli.go#L55) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/Dockerfile#L30). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
+In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/api/proxy/store/generated_key/eigenda/verify/cli.go#L67) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/Dockerfile#L184). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
 
 #### Hardware Recommendation
 

@@ -117,12 +117,12 @@ func buildMemKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keymapPath := filepath.Join(path, keymap.KeymapDirectoryName)
+	keymapPath := filepath.Join(path, name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
@@ -145,14 +145,13 @@ func buildMemKeyDiskTable(
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.Logger = logger
 
-	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
 		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		[]string{segmentsPath},
+		[]string{path},
 		true,
 		nil)
 
@@ -168,12 +167,12 @@ func buildLevelDBKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keymapPath := filepath.Join(path, keymap.KeymapDirectoryName)
+	keymapPath := filepath.Join(path, name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
@@ -196,14 +195,13 @@ func buildLevelDBKeyDiskTable(
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.Logger = logger
 
-	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
 		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		[]string{segmentsPath},
+		[]string{path},
 		true,
 		nil)
 

@@ -37,6 +37,19 @@ func ErrIfSymlink(path string) error {
 	return nil
 }
 
+// IsDirectory checks if the given path is a directory. Returns false if the path is not a directory or does not exist.
+func IsDirectory(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Path does not exist, so it can't be a directory
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat path %s: %w", path, err)
+	}
+	return info.IsDir(), nil
+}
+
 // SanitizePath returns a sanitized version of the given path, doing things like expanding
 // "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
 func SanitizePath(path string) (string, error) {
@@ -408,6 +421,35 @@ func EnsureDirectoryExists(dirPath string, fsync bool) error {
 				return fmt.Errorf("failed to sync parent directory %s: %w", parentDir, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+// DeepDelete deletes a regular file. If the file is a symlink, the symlink and the file pointed to by the symlink
+// are both deleted. This method can delete an empty directory, but will return an error if asked to delete a
+// non-empty directory. For the sake of simplicity, this method does not traverse chain of symlinks. If the symlink
+// points to another symlink, it will only delete original symlink and the symlink that the original symlink points to.
+func DeepDelete(path string) error {
+	isSymlink, err := IsSymlink(path)
+	if err != nil {
+		return fmt.Errorf("failed to check if path %s is a symlink: %w", path, err)
+	}
+
+	if isSymlink {
+		// remove the file where the symlink points
+		actualFile, err := os.Readlink(path)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %w", path, err)
+		}
+		if err := os.Remove(actualFile); err != nil {
+			return fmt.Errorf("failed to remove actual file %s: %w", actualFile, err)
+		}
+	}
+
+	err = os.Remove(path)
+	if err != nil {
+		return fmt.Errorf("failed to remove file %s: %w", path, err)
 	}
 
 	return nil

@@ -56,6 +56,20 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
 
+	// Update Account asynchronously after successful blob storage
+	go func() {
+		accountID := blobHeader.PaymentMetadata.AccountID
+		timestamp := uint64(time.Now().Unix())
+
+		// Use a timeout context for the async database operation
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.blobMetadataStore.UpdateAccount(ctx, accountID, timestamp); err != nil {
+			s.logger.Warn("failed to update account", "accountID", accountID.Hex(), "error", err)
+		}
+	}()
+
 	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
 	return &pb.DisperseBlobReply{

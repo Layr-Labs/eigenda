@@ -186,6 +186,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
+	RelayUseSecureGRPC = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-use-secure-grpc"),
+		Usage:    "Whether to use secure GRPC connection to Relay (defaults to true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_USE_SECURE_GRPC"),
+	}
 	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
 		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
@@ -409,10 +415,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
-			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
@@ -421,13 +427,13 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
 		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		Value:    0.45,
+		Value:    0.15,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
-	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+	LittDBReadCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
-			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
@@ -444,6 +450,12 @@ var (
 		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
+	}
+	LittUnsafePurgeLocksFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
+		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -480,12 +492,21 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
 	}
-	GCSafetyBufferSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
-		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+	GCSafetyBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
+			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
+	}
+	GCSafetyBufferSizeFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-fraction"),
+		Usage: "The fraction of the total memory to use for the safety buffer for garbage collection. Is" +
+			" ignored if NODE_GC_SAFETY_BUFFER_SIZE_GB > 0.",
+		Required: false,
+		Value:    0.2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -582,6 +603,7 @@ var optionalFlags = []cli.Flag{
 	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	RelayUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,
@@ -623,6 +645,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	LittUnsafePurgeLocksFlag,
 }
 
 func init() {

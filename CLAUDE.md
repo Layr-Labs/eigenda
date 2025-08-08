@@ -32,7 +32,6 @@ helpful to provide project context, but only within reasonable limits.
 2. @go.mod describes golang dependencies
 3. @mise.toml describes external tool dependencies
 4. @.golangci.yml contains linting configuration
-5. @.claude/commands/CLAUDE.md defines what project slash commands are available to use
 
 If there are imports that are relevant only to a particular part of the project, then they should be added to a
 CLAUDE.md file *in the relevant subdirectory*.
@@ -71,37 +70,7 @@ CLAUDE.md file *in the relevant subdirectory*.
 
 ---
 
-## 4. Coding standards
-
-### 4.1. Error handling
-
-1. Return errors explicitly; don't panic except for unrecoverable errors
-   - Some exceptions can be made for test code, where returning an error adds more complexity than benefit.
-2. Use error wrapping with `fmt.Errorf("context: %w", err)` for additional context
-   - Ensure that `%w` is used for error wrapping, *not* `%v`
-
-### 4.2. Code Documentation
-
-1. Write docs for all exported functions/types in production code
-2. Write docs for unexported functions/types if they contain non-trivial logic. A good rule of thumb: if you can't
-   understand everything there is to know about a function/type by its *name*, you should write a doc.
-3. Function/type docs should NOT simply be a rephrasing of the function/type name.
-   - E.g. the doc for `computeData` should NOT be "Computes the data".
-4. Function docs should consider the following helpful information, if relevant:
-   - What are the inputs?
-   - Are there any restrictions on what the input values are permitted to be?
-   - What is returned in the standard case?
-   - What is returned in the error case(s)?
-   - What side effects does calling the function have?
-   - Are there any performance implications that users should be aware of?
-   - Are there any performance optimizations that should/could be undertaken in the future?
-5. TODO comments should be added to denote future work
-   - TODO comments should clearly describe the future work, with enough detail that an engineer lacking context
-   can understand
-   - TODO comments that must be addressed prior to merging a PR should clearly be marked, e.g.
-   `// TODO: MUST BE ADDRESSED PRIOR TO MERGE`
-
-### 4.3. Doc Files
+## 4. Doc Files
 
 1. **Humans write docs**. AI involvement in doc generation should be limited to the following tasks:
    - Proofreading.
@@ -162,13 +131,7 @@ maintainability:
 6. **Track Progress**: Use a to-do list (internally, or optionally in a `TODOS.md` file) to keep track of your
    progress on multi-step or complex tasks.
 7. **If Stuck, Re-plan**: If you get stuck or blocked, return to step 3 to re-evaluate and adjust your plan.
-8. **Check for related updates**: Once the user's request is fulfilled, look for any complementary changes that
-   need to be made:
-   - Code documentation / doc files that reference details that have been modified
-   - Variable names that need to be updated
-   - Error messages that use old terminology
-   - Related functions / structures that should be renamed to match new changes
-   - Links contained in documentation that were broken by the changes
+8. **Nitpick**: Once the user's request is fulfilled, use the `/nitpick` command to check for style mistakes.
 9. **Lint**: Make sure changes pass linting, and that they adhere to style and coding standards
 10. **Test**: Run tests related to the changes that have been made. Short tests should always be run, but ask
    permission before trying to run long tests.
@@ -176,6 +139,8 @@ maintainability:
    needed.
 12. **Session Boundaries**: If the user's request isn't directly related to the current context and can be safely
    started in a fresh session, suggest starting from scratch to avoid context confusion.
+
+---
 
 ## 8. AI Assistant User Interactions
 
