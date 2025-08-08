@@ -58,7 +58,9 @@ func NewClientLedger(
 	var onDemandLedger *OnDemandLedger
 	if onDemandLedgerConfig != nil {
 		var err error
-		onDemandLedger, err = NewOnDemandLedger(*onDemandLedgerConfig)
+		// TODO: must init with actual value the disperser
+		cumulativePaymentStore := NewEphemeralCumulativePaymentStore()
+		onDemandLedger, err = NewOnDemandLedger(*onDemandLedgerConfig, cumulativePaymentStore)
 		if err != nil {
 			return nil, fmt.Errorf("new on demand ledger: %w", err)
 		}

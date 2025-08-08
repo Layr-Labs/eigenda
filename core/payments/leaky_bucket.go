@@ -60,15 +60,29 @@ type LeakyBucket struct {
 
 // Creates a new instance of the leaky bucket algorithm
 func NewLeakyBucket(
-	// it is assumed that this config has been constructed correctly, and is perfectly valid
-	config ReservationLedgerConfig,
-	// the current time, when this constructor is being called
+	// how fast symbols leak out of the bucket
+	symbolsPerSecondLeakRate int64,
+	// the bucket capacity is the leak rate times this duration
+	bucketCapacityDuration time.Duration,
+	// whether to err on the side of permitting more or less throughput
+	biasBehavior BiasBehavior,
+	// how to handle overfilling the bucket
+	overdraftBehavior OverdraftBehavior,
+	// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
-	bucketCapacity := int64(float64(config.reservation.symbolsPerSecond) * config.bucketCapacityDuration.Seconds())
+	if symbolsPerSecondLeakRate <= 0 {
+		return nil, fmt.Errorf("symbolsPerSecondLeakRate must be > 0, got %d", symbolsPerSecondLeakRate)
+	}
+
+	if bucketCapacityDuration <= 0 {
+		return nil, fmt.Errorf("bucketCapacityDuration must be > 0, got %v", bucketCapacityDuration)
+	}
+
+	bucketCapacity := int64(float64(symbolsPerSecondLeakRate) * bucketCapacityDuration.Seconds())
 
 	var currentFillLevel int64
-	switch config.biasBehavior {
+	switch biasBehavior {
 	case BiasPermitMore:
 		// starting with a fill level of 0 means the bucket starts out with available capacity
 		currentFillLevel = 0
@@ -76,14 +90,14 @@ func NewLeakyBucket(
 		// starting with a full bucket means some time must elapse to allow leakage before the bucket can be used
 		currentFillLevel = bucketCapacity
 	default:
-		return nil, fmt.Errorf("unknown bias behavior %s", config.biasBehavior)
+		return nil, fmt.Errorf("unknown bias behavior %s", biasBehavior)
 	}
 
 	return &LeakyBucket{
-		biasBehavior:                 config.biasBehavior,
-		overdraftBehavior:            config.overdraftBehavior,
+		biasBehavior:                 biasBehavior,
+		overdraftBehavior:            overdraftBehavior,
 		bucketCapacity:               bucketCapacity,
-		symbolsPerSecondLeakRate:     config.reservation.symbolsPerSecond,
+		symbolsPerSecondLeakRate:     symbolsPerSecondLeakRate,
 		currentFillLevel:             currentFillLevel,
 		previousLeakTime:             now,
 		previousPartialSecondLeakage: 0,

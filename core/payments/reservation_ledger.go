@@ -34,7 +34,13 @@ func NewReservationLedger(
 	config ReservationLedgerConfig,
 	now time.Time,
 ) (*ReservationLedger, error) {
-	leakyBucket, err := NewLeakyBucket(config, now)
+	leakyBucket, err := NewLeakyBucket(
+		config.reservation.symbolsPerSecond,
+		config.bucketCapacityDuration,
+		config.biasBehavior,
+		config.overdraftBehavior,
+		now,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("new leaky bucket: %w", err)
 	}
