@@ -18,6 +18,10 @@ type ClientMetricer interface {
 	ReportOnDemandPayment(accountID string, amount *big.Int)
 	ReportCumulativePayment(accountID string, amount *big.Int)
 	ReportPaymentFailure(accountID string, reason string)
+	// disperser_client
+	ReportBlobDispersal(method string, blobSize uint64)
+	ReportValidationError(errorType string)
+	ReportBlobKeyVerificationError()
 }
 
 type ClientMetrics struct {
@@ -26,6 +30,15 @@ type ClientMetrics struct {
 	OnDemandPayment   *prometheus.CounterVec
 	CumulativePayment *prometheus.GaugeVec
 	PaymentFailures   *prometheus.CounterVec
+	// disperser_client
+	BlobDispersalRequests     *prometheus.CounterVec
+	BlobDispersalDuration     *prometheus.HistogramVec
+	BlobSize                  *prometheus.HistogramVec
+	GrpcRequests              *prometheus.CounterVec
+	GrpcRequestDuration       *prometheus.HistogramVec
+	ValidationErrors          *prometheus.CounterVec
+	BlobKeyVerificationErrors *prometheus.CounterVec
+	ConnectionErrors          *prometheus.CounterVec
 }
 
 func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
@@ -64,6 +77,73 @@ func NewClientMetrics(namespace string, factory metrics.Factory) ClientMetrics {
 			"account_id",
 			"reason",
 		}),
+		BlobDispersalRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "blob_dispersal_requests_total",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Total blob dispersal requests by status and method",
+		}, []string{
+			"status",
+			"method",
+		}),
+		BlobDispersalDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "blob_dispersal_duration_seconds",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Time taken for blob dispersal operations",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"method",
+		}),
+		BlobSize: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "blob_size_bytes",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Size distribution of dispersed blobs",
+			Buckets:   prometheus.ExponentialBuckets(1024, 2, 20), // 1KB to ~1GB
+		}, []string{
+			"method",
+		}),
+		GrpcRequests: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "grpc_requests_total",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Total GRPC requests by method and status",
+		}, []string{
+			"method",
+			"status",
+		}),
+		GrpcRequestDuration: factory.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "grpc_request_duration_seconds",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "GRPC request latency",
+			Buckets:   prometheus.DefBuckets,
+		}, []string{
+			"method",
+		}),
+		ValidationErrors: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "validation_errors_total",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Total validation errors by type",
+		}, []string{
+			"error_type",
+		}),
+		BlobKeyVerificationErrors: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "blob_key_verification_errors_total",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Total blob key verification failures",
+		}, []string{}),
+		ConnectionErrors: factory.NewCounterVec(prometheus.CounterOpts{
+			Name:      "connection_errors_total",
+			Namespace: namespace,
+			Subsystem: disperserSubsystem,
+			Help:      "Total connection errors by reason",
+		}, []string{
+			"reason",
+		}),
 	}
 }
 
@@ -73,19 +153,33 @@ func (m *ClientMetrics) ReportPaymentUsed(accountID string, method string, symbo
 
 // ReportOnDemandPayment records an on-demand payment amount in wei
 func (m *ClientMetrics) ReportOnDemandPayment(accountID string, amount *big.Int) {
-	// Convert big.Int to float64 for prometheus
-	weiFloat, _ := amount.Float64() // TODO(iquidus)
+	// Convert big.Int to float64 for prometheus.
+	// prometheus/client_golang expects a float64, so we lose precision.
+	weiFloat, _ := amount.Float64()
 	m.OnDemandPayment.WithLabelValues(accountID).Add(weiFloat)
 }
 
 func (m *ClientMetrics) ReportCumulativePayment(accountID string, amount *big.Int) {
 	// Convert big.Int to float64 for prometheus
-	weiFloat, _ := amount.Float64() // TODO(iquidus)
+	// prometheus/client_golang expects a float64, so we lose precision.
+	weiFloat, _ := amount.Float64()
 	m.CumulativePayment.WithLabelValues(accountID).Set(weiFloat)
 }
 
 func (m *ClientMetrics) ReportPaymentFailure(accountID string, reason string) {
 	m.PaymentFailures.WithLabelValues(accountID, reason).Inc()
+}
+
+func (m *ClientMetrics) ReportBlobDispersal(method string, blobSize uint64) {
+	m.BlobSize.WithLabelValues(method).Observe(float64(blobSize))
+}
+
+func (m *ClientMetrics) ReportValidationError(errorType string) {
+	m.ValidationErrors.WithLabelValues(errorType).Inc()
+}
+
+func (m *ClientMetrics) ReportBlobKeyVerificationError() {
+	m.BlobKeyVerificationErrors.WithLabelValues().Inc()
 }
 
 type NoopAccountantMetricer struct {
@@ -103,4 +197,13 @@ func (m *NoopAccountantMetricer) ReportCumulativePayment(_ string, _ *big.Int) {
 }
 
 func (m *NoopAccountantMetricer) ReportPaymentFailure(_ string, _ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportBlobDispersal(_ string, _ uint64) {
+}
+
+func (m *NoopAccountantMetricer) ReportValidationError(_ string) {
+}
+
+func (m *NoopAccountantMetricer) ReportBlobKeyVerificationError() {
 }

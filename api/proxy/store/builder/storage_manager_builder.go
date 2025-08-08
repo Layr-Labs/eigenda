@@ -345,7 +345,7 @@ func buildEigenDAV2Backend(
 		kzgProver,
 		certVerifier,
 		ethReader,
-		metrics, // TODO(iquidus): prometheus registry
+		metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build payload disperser: %w", err)
