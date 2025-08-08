@@ -138,7 +138,8 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.EigenDADirectory, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
+		tx, err = createTransactorFromScratch(
+			*privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
 		assert.NoError(t, err)
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
@@ -204,7 +205,12 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, eigenDADirectory string, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Writer, error) {
+func createTransactorFromScratch(
+	privateKey string,
+	operatorStateRetriever string,
+	serviceManager string,
+	logger logging.Logger,
+) (*eth.Writer, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -217,7 +223,11 @@ func createTransactorFromScratch(privateKey, eigenDADirectory string, operatorSt
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewWriter(logger, gethClient, eigenDADirectory, operatorStateRetriever, serviceManager)
+	writer, err := eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+	return writer, nil
 }
 
 func newTestServer(t *testing.T) *churner.Server {
@@ -237,7 +247,6 @@ func newTestServer(t *testing.T) *churner.Server {
 
 	operatorTransactorChurner, err := createTransactorFromScratch(
 		churnerPrivateKeyHex,
-		testConfig.EigenDA.EigenDADirectory,
 		testConfig.EigenDA.OperatorStateRetriever,
 		testConfig.EigenDA.ServiceManager,
 		logger,

@@ -71,8 +71,7 @@ var _ core.Reader = (*Reader)(nil)
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
-	eigendaDirectoryHexAddr,
-	blsOperatorStateRetrieverHexAddr,
+	blsOperatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Reader, error) {
 
 	e := &Reader{
@@ -80,28 +79,8 @@ func NewReader(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
-	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
-	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
-	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
-		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-		}
-
-		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress(&bind.CallOpts{})
-		if err != nil {
-			return nil, err
-		}
-
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	}
+	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
+	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
 
 	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 	if err != nil {

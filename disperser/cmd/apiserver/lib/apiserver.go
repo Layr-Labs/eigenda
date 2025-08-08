@@ -43,7 +43,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	transactor, err := eth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	transactor, err := eth.NewReader(
+		logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
