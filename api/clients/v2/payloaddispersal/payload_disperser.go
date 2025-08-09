@@ -79,7 +79,7 @@ func NewPayloadDisperser(
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	// payload is the raw data to be stored on eigenDA
-	payload *coretypes.Payload,
+	payload coretypes.Payload,
 ) (coretypes.EigenDACert, error) {
 
 	probe := pd.stageTimer.NewSequence()

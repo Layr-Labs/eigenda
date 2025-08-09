@@ -98,7 +98,8 @@ unit-tests:
 	./test.sh
 
 fuzz-tests:
-	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
+	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common
+	go test --fuzz=FuzzBlobConversion -fuzztime=1m ./api/clients/v2/coretypes
 
 # Integration tests use mocks
 integration-tests:

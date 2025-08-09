@@ -130,9 +130,10 @@ func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 	valsCopy := make([]fr.Element, n)
 	for i := 0; i < len(vals); i++ {
 		valsCopy[i].Set(&vals[i])
-
 	}
 	for i := uint64(len(vals)); i < n; i++ {
+		// TODO: would probably be better to pad with evaluations instead of zeros when doing the IFFT?
+		// Otherwise like this we change the commitment wrt the original polynomial.
 		valsCopy[i].SetZero()
 	}
 	out := make([]fr.Element, n)
@@ -178,9 +179,4 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 		fs._fft(vals, 0, 1, rootz, stride, out)
 		return nil
 	}
-}
-
-// IsPowerOfTwo returns true if the provided integer v is a power of 2.
-func IsPowerOfTwo(v uint64) bool {
-	return (v&(v-1) == 0) && (v != 0)
 }

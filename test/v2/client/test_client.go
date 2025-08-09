@@ -582,8 +582,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
-	payloadBytesFromRelayRetriever := payloadFromRelayRetriever.Serialize()
-	if !bytes.Equal(payload, payloadBytesFromRelayRetriever) {
+	if !bytes.Equal(payload, payloadFromRelayRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -592,8 +591,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
-	payloadBytesFromValidatorRetriever := payloadFromValidatorRetriever.Serialize()
-	if !bytes.Equal(payload, payloadBytesFromValidatorRetriever) {
+	if !bytes.Equal(payload, payloadFromValidatorRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -669,7 +667,7 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 		}
 	}()
 
-	payload := coretypes.NewPayload(payloadBytes)
+	payload := coretypes.Payload(payloadBytes)
 	cert, err = c.GetPayloadDisperser().SendPayload(ctx, payload)
 
 	if err != nil {
@@ -773,14 +771,12 @@ func (c *TestClient) ReadBlobFromRelay(
 		return fmt.Errorf("failed to deserialize blob: %w", err)
 	}
 
-	payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	payloadFromRelay, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 	if err != nil {
 		return fmt.Errorf("failed to decode blob: %w", err)
 	}
 
-	payloadBytesFromRelay := payload.Serialize()
-
-	if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
+	if !bytes.Equal(payloadFromRelay, expectedPayload) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -841,14 +837,13 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
 
-		var retrievedPayload *coretypes.Payload
+		var retrievedPayload coretypes.Payload
 		retrievedPayload, err = blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to convert blob to payload: %w", err)
 		}
 
-		payloadBytes := retrievedPayload.Serialize()
-		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
+		if !bytes.Equal(retrievedPayload, expectedPayloadBytes) {
 			return fmt.Errorf("payloads do not match")
 		}
 	} else {

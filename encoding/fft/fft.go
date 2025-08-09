@@ -27,7 +27,6 @@
 package fft
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -35,6 +34,11 @@ import (
 
 	"math/bits"
 )
+
+// IsPowerOfTwo returns true if the provided integer v is a power of 2.
+func IsPowerOfTwo(v uint64) bool {
+	return (v&(v-1) == 0) && (v != 0)
+}
 
 // if not already a power of 2, return the next power of 2
 func nextPowOf2(v uint64) uint64 {
@@ -92,11 +96,9 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 	}
 }
 
-// FFTSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings
-func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) (*FFTSettings, error) {
-	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
-		return nil, fmt.Errorf("blobLengthSymbols %d is not a power of 2", blobLengthSymbols)
-	}
-	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
-	return NewFFTSettings(maxScale), nil
+// FFTSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings.
+// blobLengthSymbols should be a power of 2, but we round it up to the next power of 2 if not.
+func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *FFTSettings {
+	maxScale := uint8(math.Log2(float64(encoding.NextPowerOf2(blobLengthSymbols))))
+	return NewFFTSettings(maxScale)
 }

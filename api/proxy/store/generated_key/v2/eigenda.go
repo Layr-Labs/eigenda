@@ -112,7 +112,7 @@ func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, retur
 			// Get decoded payload (default behavior)
 			payload, err := retriever.GetPayload(ctx, cert)
 			if err == nil {
-				return payload.Serialize(), nil
+				return payload, nil
 			}
 			e.log.Debugf("Payload retriever failed: %v", err)
 			errs = append(errs, err)
@@ -131,7 +131,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 
 	// We attempt to disperse the blob to EigenDA up to PutRetries times, unless we get a 400 error on any attempt.
 
-	payload := coretypes.NewPayload(value)
+	payload := coretypes.Payload(value)
 
 	cert, err := retry.DoWithData(
 		func() (coretypes.EigenDACert, error) {

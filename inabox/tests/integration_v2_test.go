@@ -243,12 +243,12 @@ func getSolidityFunctionSig(methodSig string) string {
 	return "0x" + hex.EncodeToString(selector)
 }
 
-func randomPayload(size int) *coretypes.Payload {
+func randomPayload(size int) coretypes.Payload {
 	data := make([]byte, size)
 	_, err := rand.Read(data)
 	if err != nil {
 		panic(err)
 	}
 
-	return coretypes.NewPayload(data)
+	return coretypes.Payload(data)
 }
