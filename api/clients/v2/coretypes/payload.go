@@ -18,13 +18,13 @@ func (p Payload) ToEncodedPayload() *EncodedPayload {
 
 	// Calculate the length of the EncodedPayload in symbols (including the header) which has to be a power of 2.
 	encodedDataLenSymbols := uint32(len(encodedData)+encoding.BYTES_PER_SYMBOL-1) / encoding.BYTES_PER_SYMBOL
-	encodedHeaderAndDataLenSymbols := codec.PayloadHeaderSizeSymbols + encodedDataLenSymbols
+	encodedHeaderAndDataLenSymbols := codec.EncodedPayloadHeaderLenSymbols + encodedDataLenSymbols
 	encodedPayloadLenSymbols := encoding.NextPowerOf2(encodedHeaderAndDataLenSymbols)
 
 	encodedPayloadBytes := make([]byte, encodedPayloadLenSymbols*encoding.BYTES_PER_SYMBOL)
 
 	// Write the header
-	encodedPayloadHeader := encodedPayloadBytes[:codec.PayloadHeaderSizeBytes]
+	encodedPayloadHeader := encodedPayloadBytes[:codec.EncodedPayloadHeaderLenBytes]
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
 	encodedPayloadHeader[1] = byte(codecs.PayloadEncodingVersion0) // encode version byte
 	// encode payload length as uint32
@@ -33,7 +33,7 @@ func (p Payload) ToEncodedPayload() *EncodedPayload {
 		uint32(len(p))) // uint32 should be more than enough to store the length (approx 4gb)
 
 	// Write the encoded data, starting after the header
-	copy(encodedPayloadBytes[codec.PayloadHeaderSizeBytes:], encodedData)
+	copy(encodedPayloadBytes[codec.EncodedPayloadHeaderLenBytes:], encodedData)
 
 	return &EncodedPayload{encodedPayloadBytes}
 }

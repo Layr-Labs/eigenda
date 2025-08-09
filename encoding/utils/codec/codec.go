@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	// PayloadHeaderSizeSymbols is the number of symbols needed for an encodedPayload header.
-	PayloadHeaderSizeSymbols = 1
-	// PayloadHeaderSizeBytes is the number of bytes needed for an encodedPayload header.
-	PayloadHeaderSizeBytes = PayloadHeaderSizeSymbols * encoding.BYTES_PER_SYMBOL
+	// EncodedPayloadHeaderLenSymbols is the number of symbols needed for an encodedPayload header.
+	EncodedPayloadHeaderLenSymbols = 1
+	// EncodedPayloadHeaderLenBytes is the number of bytes needed for an encodedPayload header.
+	EncodedPayloadHeaderLenBytes = EncodedPayloadHeaderLenSymbols * encoding.BYTES_PER_SYMBOL
 )
 
 // ConvertByPaddingEmptyByte takes bytes and insert an empty byte at the front of every 31 byte.
@@ -156,7 +156,7 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 // The blob size is the size used for determining payments and throttling by EigenDA. Two payloads of
 // differing length that have the same blob size cost the same and use the same amount of bandwidth.
 func PayloadSizeToBlobSize(payloadSize uint32) uint32 {
-	return encoding.NextPowerOf2(GetPaddedDataLength(payloadSize) + PayloadHeaderSizeBytes)
+	return encoding.NextPowerOf2(GetPaddedDataLength(payloadSize) + EncodedPayloadHeaderLenBytes)
 }
 
 // FindLegalBlobSizes finds a list of blob sizes that are legal for EigenDA. A legal blob size is
@@ -222,14 +222,14 @@ func BlobSymbolsToMaxPayloadSize(blobLengthSymbols uint32) (uint32, error) {
 	if blobLengthSymbols == 0 {
 		return 0, fmt.Errorf("input blobLengthSymbols is zero")
 	}
-	if blobLengthSymbols < PayloadHeaderSizeSymbols {
-		return 0, fmt.Errorf("blobLengthSymbols %d is less than PayloadHeaderSizeSymbols %d", blobLengthSymbols, PayloadHeaderSizeSymbols)
+	if blobLengthSymbols < EncodedPayloadHeaderLenSymbols {
+		return 0, fmt.Errorf("blobLengthSymbols %d is less than PayloadHeaderSizeSymbols %d", blobLengthSymbols, EncodedPayloadHeaderLenSymbols)
 	}
 	if !encoding.IsPowerOfTwo(uint64(blobLengthSymbols)) {
 		return 0, fmt.Errorf("blobLengthSymbols %d is not a power of two", blobLengthSymbols)
 	}
 
-	maxPayloadLength, err := GetUnpaddedDataLength((blobLengthSymbols - PayloadHeaderSizeSymbols) * encoding.BYTES_PER_SYMBOL)
+	maxPayloadLength, err := GetUnpaddedDataLength((blobLengthSymbols - EncodedPayloadHeaderLenSymbols) * encoding.BYTES_PER_SYMBOL)
 	if err != nil {
 		panic(fmt.Errorf("bug: GetUnpaddedDataLength only errors when input is not a multiple of 32 (encoding.BYTES_PER_SYMBOL), which "+
 			"we are explicitly multiplying our argument by: %w", err))
@@ -271,7 +271,7 @@ func BlobSizeToMinPayloadSize(blobSize uint32) (uint32, error) {
 		return 0, fmt.Errorf("blob size %d is not a power of 2", blobSize)
 	}
 
-	paddedLength := blobSize/2 - PayloadHeaderSizeBytes + 1
+	paddedLength := blobSize/2 - EncodedPayloadHeaderLenBytes + 1
 
 	payloadSizeAdjustment := uint32(0)
 	if paddedLength%encoding.BYTES_PER_SYMBOL != 0 {

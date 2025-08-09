@@ -12,12 +12,14 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// EncodedPayload represents a payload that has had an encoding applied to it,
-// meaning that it must be a multiple of 32 bytes in length, each such 32 bytes
-// representing a bn254 field element. Furthermore, it must have a power of 2 number
-// of such field elements; that is, [EncodedPayload.LenSymbols] must return a power of 2.
+// EncodedPayload represents a payload that has had an encoding applied to it.
 //
-// To uphold these invariants, always construct an EncodedPayload by using [Payload.ToEncodedPayload].
+// It is an intermediary state between [Payload] and [Blob]. Most users should not need to interact with it directly,
+// and should instead use [Payload.ToBlob] directly. EncodedPayloads are only exposed because secure rollup integrations
+// with EigenDA need to decode them inside a fraud proof vm, in order to be able to discard wrongly encoded payloads.
+// In such cases, a blob fetched from EigenDA can be transformed using [Blob.ToEncodedPayload] (note that this cannot error)
+// and then sent to the fraud proof vm for verification.
+// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#decode-blob-failed for more details.
 //
 // Example encoding:
 //   - [Encoded Payload header (32 bytes total)] + [Encoded Payload Data (len is multiple of 32)]
@@ -28,11 +30,25 @@ import (
 // that the EncodedPayload already represents a [Blob]. Interpreting as evaluations has the advantage that
 // point openings can be made (useful for interactive fraud proofs).
 type EncodedPayload struct {
-	// the size of these bytes is guaranteed to be a multiple of 32
+	// These bytes are kept private in order to force encapsulation, in case we decide in the future
+	// to change the EncodedPayload's representation (eg. store [fr.Element]s directly instead).
+	// Use [DeserializeEncodedPayload] to reconstruct a serialized EncodedPayload.
+	//
+	// The bytes should contain a power of 2 field elements, each 32 bytes long (see [EncodedPayload.checkLenInvariant]),
+	// meaning valid lengths are [32, 64, 128, 256, ...]
+	// The first 32 bytes represent the header (see [EncodedPayload.decodeHeader]),
+	// and the body (bytes after header) contain serialized bn254 field elements.
 	bytes []byte
 }
 
-// Serialize returns the raw bytes of the encoded payload
+// NewEncodedPayload constructs an [EncodedPayload] from bytes array.
+// Note that we do not validate the bytes here, to mimic the [Blob.ToEncodedPayload] process.
+// The length, header, and body invariants are checked when calling [EncodedPayload.Decode].
+func DeserializeEncodedPayload(bytes []byte) EncodedPayload {
+	return EncodedPayload{bytes: bytes}
+}
+
+// Serialize returns the raw bytes of the encoded payload.
 func (ep *EncodedPayload) Serialize() []byte {
 	return ep.bytes
 }
@@ -44,44 +60,30 @@ func (ep *EncodedPayload) LenSymbols() uint32 {
 
 // Decode applies the inverse of PayloadEncodingVersion0 to an EncodedPayload, and returns the decoded Payload
 func (ep *EncodedPayload) Decode() (Payload, error) {
-	if len(ep.bytes) < codec.PayloadHeaderSizeBytes {
-		return nil, fmt.Errorf("encoded payload must be at least 32 bytes long, but got %d bytes", len(ep.bytes))
-	}
-	if ep.bytes[0] != 0x00 {
-		return nil, fmt.Errorf("encoded payload header first byte must be 0x00, but got %x", ep.bytes[0])
-	}
-	if ep.bytes[1] != byte(codecs.PayloadEncodingVersion0) {
-		return nil, fmt.Errorf("encoded payload header version byte must be %x, but got %x", codecs.PayloadEncodingVersion0, ep.bytes[1])
-	}
-	claimedLength := binary.BigEndian.Uint32(ep.bytes[2:6])
-
-	// decode raw data modulo bn254
-	unpaddedData, err := codec.RemoveInternalPadding(ep.bytes[32:])
+	err := ep.checkLenInvariant()
 	if err != nil {
-		return nil, fmt.Errorf("remove internal padding: %w", err)
+		return nil, fmt.Errorf("check length invariant: %w", err)
 	}
-
-	unpaddedDataLength := uint32(len(unpaddedData))
-
-	// data length is checked when constructing an encoded payload. If this error is encountered, that means there
-	// must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
-	if unpaddedDataLength < claimedLength {
-		return nil, fmt.Errorf(
-			"length of unpadded data %d is less than length claimed in encoded payload header %d. this should never happen",
-			unpaddedDataLength, claimedLength)
+	payloadLenInHeader, err := ep.decodeHeader()
+	if err != nil {
+		return nil, fmt.Errorf("decodeHeader: %w", err)
 	}
-
-	return Payload(unpaddedData[0:claimedLength]), nil
+	payload, err := ep.decodePayload(payloadLenInHeader)
+	if err != nil {
+		return nil, fmt.Errorf("decodePayload: %w", err)
+	}
+	return payload, nil
 }
 
 // ToBlob converts the EncodedPayload into a Blob
 func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, error) {
+	if err := ep.checkLenInvariant(); err != nil {
+		return nil, fmt.Errorf("check length invariant: %w", err)
+	}
 	fieldElements, err := rs.ToFrArray(ep.bytes)
 	if err != nil {
 		return nil, fmt.Errorf("encoded payload to field elements: %w", err)
 	}
-
-	blobLengthSymbols := uint32(encoding.NextPowerOf2(len(fieldElements)))
 
 	var coeffPolynomial []fr.Element
 	switch payloadForm {
@@ -91,7 +93,7 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 		coeffPolynomial = fieldElements
 	case codecs.PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form, since blobs are in coefficient form
-		coeffPolynomial = evalToCoeffPoly(fieldElements, blobLengthSymbols)
+		coeffPolynomial = evalToCoeffPoly(fieldElements)
 	default:
 		return nil, fmt.Errorf("unknown polynomial form: %v", payloadForm)
 	}
@@ -99,14 +101,75 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 	return BlobFromCoefficients(coeffPolynomial), nil
 }
 
-// evalToCoeffPoly converts an evalPoly to a coeffPoly, using the IFFT operation
+// decodeHeader validates the header (first field element = 32 bytes) of the encoded payload,
+// and returns the claimed length of the payload if the header is valid.
+func (ep *EncodedPayload) decodeHeader() (uint32, error) {
+	if len(ep.bytes) < codec.EncodedPayloadHeaderLenBytes {
+		return 0, fmt.Errorf("encoded payload must be at least %d bytes long to contain a header, but got %d bytes", codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
+	}
+	if ep.bytes[0] != 0x00 {
+		return 0, fmt.Errorf("encoded payload header first byte must be 0x00, but got %x", ep.bytes[0])
+	}
+	var payloadLength uint32
+	switch ep.bytes[1] {
+	case byte(codecs.PayloadEncodingVersion0):
+		payloadLength = binary.BigEndian.Uint32(ep.bytes[2:6])
+	default:
+		return 0, fmt.Errorf("unknown encoded payload header version: %x", ep.bytes[1])
+	}
+	return payloadLength, nil
+}
+
+func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
+	body := ep.bytes[codec.EncodedPayloadHeaderLenBytes:]
+	// Decode the body by removing internal 0 byte padding (0x00 initial byte for every 32 byte chunk)
+	// The decodedBody should contain the payload bytes + potentially some external padding bytes.
+	decodedBody, err := codec.RemoveInternalPadding(body)
+	if err != nil {
+		return nil, fmt.Errorf("remove internal padding: %w", err)
+	}
+
+	// data length is checked when constructing an encoded payload. If this error is encountered, that means there
+	// must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
+	if uint32(len(decodedBody)) < payloadLen {
+		return nil, fmt.Errorf(
+			"length of unpadded data %d is less than length claimed in encoded payload header %d. this should never happen",
+			uint32(len(decodedBody)), payloadLen)
+	}
+
+	return Payload(decodedBody[0:payloadLen]), nil
+}
+
+// checkLenInvariant checks whether the encoded payload satisfies its length invariant.
+// EncodedPayloads must contain a power of 2 number of Field Elements, each of length 32.
+// This means the only valid encoded payloads have byte lengths of 32, 64, 128, 256, etc.
 //
-// blobLengthSymbols is required, to be able to choose the correct parameters when performing FFT
-func evalToCoeffPoly(evalPoly []fr.Element, blobLengthSymbols uint32) []fr.Element {
+// Note that this function only checks the length invariant, meaning that it doesn't check that
+// the 32 byte chunks are valid bn254 elements.
+func (ep *EncodedPayload) checkLenInvariant() error {
+	// this check is redundant since 0 is not a valid power of 32, but we keep it for clarity.
+	if len(ep.bytes) < codec.EncodedPayloadHeaderLenBytes {
+		return fmt.Errorf("encoded payload must be at least %d bytes long to contain a valid header, but got %d bytes", codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
+	}
+	if len(ep.bytes)%encoding.BYTES_PER_SYMBOL != 0 {
+		return fmt.Errorf("encoded payload must be a multiple of %d bytes (bn254 field element), but got %d bytes", encoding.BYTES_PER_SYMBOL, len(ep.bytes))
+	}
+	// We could equivalently check that len(ep.bytes) is a power of 2 given that we've already checked that it's a multiple of 32,
+	// but this invariant is closer to the representation of the encoded payload as a polynomial,
+	// and is also more meaningful given that the length in [encoding.BlobCommitments.Length] is in field elements.
+	numfieldElements := len(ep.bytes) / encoding.BYTES_PER_SYMBOL
+	if !encoding.IsPowerOfTwo(numfieldElements) {
+		return fmt.Errorf("encoded payload must be a power of 2 field elements (32 bytes chunks), but got %d field elements", numfieldElements)
+	}
+	return nil
+}
+
+// evalToCoeffPoly converts an evalPoly to a coeffPoly, using the IFFT operation
+func evalToCoeffPoly(evalPoly []fr.Element) []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(encoding.NextPowerOf2(blobLengthSymbols))
+	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(evalPoly)))
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	ifftedElements, err := fftSettings.FFT(evalPoly, true)
