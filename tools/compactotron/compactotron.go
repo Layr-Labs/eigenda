@@ -45,20 +45,23 @@ func CompactLevelDB(source string, destination string) error {
 		return fmt.Errorf("failed to sanitize destination path: %w", err)
 	}
 
+	if source == destination {
+		return fmt.Errorf("source and destination paths are both the same: %s", source)
+	}
+
 	err = util.ErrIfNotExists(source)
 	if err != nil {
 		return fmt.Errorf("source path does not exist: %w", err)
 	}
 
-	exists, err := util.Exists(destination)
+	err = util.ErrIfExists(destination)
 	if err != nil {
-		return fmt.Errorf("failed to check if destination exists: %w", err)
+		return fmt.Errorf("destination path already exists: %w", err)
 	}
-	if !exists {
-		err = os.MkdirAll(destination, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create destination directory: %w", err)
-		}
+
+	err = os.MkdirAll(destination, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	sourceDB, err := leveldb.OpenFile(source, nil)
