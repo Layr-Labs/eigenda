@@ -277,14 +277,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		t.Logf("Reusing existing SSH test Docker image: %s", imageName)
 	}
 
-	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir, t.Name())
-	require.NoError(t, err)
-
-	// Wait for SSH to be ready
-	WaitForSSH(t, sshPort, privateKeyPath)
-
-	// Set dataDir path from container's perspective and create workspace structure
+	// Create workspace structure BEFORE starting container
 	containerDataDir := ""
 	if dataDir != "" {
 		containerDataDir = "/mnt/data"
@@ -295,6 +288,13 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		err = os.MkdirAll(containerWorkspace, 0777) // Wide permissions so container can take over
 		require.NoError(t, err)
 	}
+
+	// Start container
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir, t.Name())
+	require.NoError(t, err)
+
+	// Wait for SSH to be ready
+	WaitForSSH(t, sshPort, privateKeyPath)
 
 	return &SSHTestContainer{
 		client:      cli,

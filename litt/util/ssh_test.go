@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -139,17 +140,13 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Create test files using the container workspace directory
-	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
-	searchDir := filepath.Join(workspaceDir, "search")
-	err = os.MkdirAll(searchDir, 0755)
+	// Create test files via SSH instead of host filesystem to avoid permission issues
+	// This ensures all files are created with proper container ownership
+	_, _, err = session.Exec(fmt.Sprintf("echo 'test content' > %s/test.txt", testDir))
 	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(searchDir, "test.txt"), []byte("test content"), 0644)
+	_, _, err = session.Exec(fmt.Sprintf("echo 'log content' > %s/test.log", testDir))
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(searchDir, "test.log"), []byte("log content"), 0644)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(searchDir, "other.dat"), []byte("data content"), 0644)
+	_, _, err = session.Exec(fmt.Sprintf("echo 'data content' > %s/other.dat", testDir))
 	require.NoError(t, err)
 
 	// Test finding files with specific extensions
