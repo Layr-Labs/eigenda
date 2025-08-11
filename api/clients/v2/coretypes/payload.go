@@ -17,7 +17,7 @@ func (p Payload) ToEncodedPayload() *EncodedPayload {
 	encodedData := codec.PadPayload(p)
 
 	// Calculate the length of the EncodedPayload in symbols (including the header) which has to be a power of 2.
-	encodedDataLenSymbols := uint32(len(encodedData)+encoding.BYTES_PER_SYMBOL-1) / encoding.BYTES_PER_SYMBOL
+	encodedDataLenSymbols := uint32(len(encodedData)) / encoding.BYTES_PER_SYMBOL
 	encodedHeaderAndDataLenSymbols := codec.EncodedPayloadHeaderLenSymbols + encodedDataLenSymbols
 	encodedPayloadLenSymbols := encoding.NextPowerOf2(encodedHeaderAndDataLenSymbols)
 
@@ -35,7 +35,11 @@ func (p Payload) ToEncodedPayload() *EncodedPayload {
 	// Write the encoded data, starting after the header
 	copy(encodedPayloadBytes[codec.EncodedPayloadHeaderLenBytes:], encodedData)
 
-	return &EncodedPayload{encodedPayloadBytes}
+	encodedPayload := DeserializeEncodedPayloadUnchecked(encodedPayloadBytes)
+	if err := encodedPayload.checkLenInvariant(); err != nil {
+		panic("bug converting payload to encodedPayload: broken EncodedPayload invariants:" + err.Error())
+	}
+	return encodedPayload
 }
 
 // ToBlob converts the Payload bytes into a Blob
