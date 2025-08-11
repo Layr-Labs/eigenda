@@ -2,6 +2,7 @@ package disktable
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"strconv"
@@ -136,6 +137,9 @@ func (b *BoundaryFile) deserialize(data []byte) error {
 	boundaryIndex, err := strconv.Atoi(string(data))
 	if err != nil {
 		return fmt.Errorf("failed to parse boundary index from data: %v", err)
+	}
+	if boundaryIndex < 0 || boundaryIndex > int(math.MaxUint32) {
+		return fmt.Errorf("boundary index out of uint32 range: %d", boundaryIndex)
 	}
 	b.boundaryIndex = uint32(boundaryIndex)
 	return nil
