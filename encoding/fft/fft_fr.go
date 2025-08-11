@@ -132,7 +132,6 @@ func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 		valsCopy[i].Set(&vals[i])
 	}
 	for i := uint64(len(vals)); i < n; i++ {
-		// TODO: would probably be better to pad with evaluations instead of zeros when doing the IFFT?
 		// Otherwise like this we change the commitment wrt the original polynomial.
 		valsCopy[i].SetZero()
 	}
