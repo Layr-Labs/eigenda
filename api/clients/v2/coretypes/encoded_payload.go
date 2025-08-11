@@ -33,7 +33,7 @@ import (
 type EncodedPayload struct {
 	// These bytes are kept private in order to force encapsulation, in case we decide in the future
 	// to change the EncodedPayload's representation (eg. store [fr.Element]s directly instead).
-	// Use [DeserializeEncodedPayload] to reconstruct a serialized EncodedPayload.
+	// Use [DeserializeEncodedPayloadUnchecked] to reconstruct a serialized EncodedPayload.
 	//
 	// The bytes should contain a power of 2 field elements, each 32 bytes long (see [EncodedPayload.checkLenInvariant]),
 	// meaning valid lengths are [32, 64, 128, 256, ...]
@@ -42,7 +42,7 @@ type EncodedPayload struct {
 	bytes []byte
 }
 
-// NewEncodedPayloadUnchecked constructs an [EncodedPayload] from bytes array.
+// DeserializeEncodedPayloadUnchecked constructs an [EncodedPayload] from bytes array.
 //
 // It does not validate the bytes, to mimic the [Blob.ToEncodedPayloadUnchecked] process.
 // The length, header, and body invariants are checked when calling [EncodedPayload.Decode].
