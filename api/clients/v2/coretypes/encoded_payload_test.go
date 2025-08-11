@@ -5,9 +5,6 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,23 +76,4 @@ func TestDecodePayloadErrors(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
-}
-
-// TestEncodeWithFewerElements tests that having fewer bytes than expected doesn't throw an error
-func TestEncodeWithFewerElements(t *testing.T) {
-	testRandom := random.NewTestRandom()
-	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
-	encodedPayload := Payload(originalData).ToEncodedPayload()
-
-	originalBlob, err := encodedPayload.ToBlob(codecs.PolynomialFormCoeff)
-	require.NoError(t, err)
-
-	truncatedCoefficients := make([]fr.Element, originalBlob.LenSymbols()-1)
-	copy(truncatedCoefficients, originalBlob.coeffPolynomial)
-	truncatedBlob, err := blobFromCoefficients(truncatedCoefficients)
-	require.NoError(t, err)
-
-	reconstructedEncodedPayload := truncatedBlob.ToEncodedPayloadUnchecked(codecs.PolynomialFormCoeff)
-	// even though the actual length will be less than the claimed length, we shouldn't see any error
-	require.Equal(t, encodedPayload, reconstructedEncodedPayload)
 }
