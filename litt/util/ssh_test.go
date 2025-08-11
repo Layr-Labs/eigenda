@@ -94,6 +94,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 
 	// Verify directories were created in the container workspace
 	exists, err := Exists(path.Join(dataDir, "foo", "bar", "baz"))
+	require.NoError(t, err)
 	require.True(t, exists)
 
 	// Recreating the same directory should not error.
