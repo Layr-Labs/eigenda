@@ -93,15 +93,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify directories were created in the container workspace
-	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
-	exists, err := Exists(path.Join(workspaceDir, "foo"))
-	require.NoError(t, err)
-	require.True(t, exists)
-	exists, err = Exists(path.Join(workspaceDir, "foo", "bar"))
-	require.NoError(t, err)
-	require.True(t, exists)
-	exists, err = Exists(path.Join(workspaceDir, "foo", "bar", "baz"))
-	require.NoError(t, err)
+	exists, err := Exists(path.Join(dataDir, "foo", "bar", "baz"))
 	require.True(t, exists)
 
 	// Recreating the same directory should not error.
@@ -200,8 +192,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify file was transferred via the container workspace directory
-	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
-	transferredFile := filepath.Join(workspaceDir, "remote_file.txt")
+	transferredFile := filepath.Join(dataDir, "remote_file.txt")
 	transferredContent, err := os.ReadFile(transferredFile)
 	require.NoError(t, err)
 	require.Equal(t, testContent, transferredContent)
@@ -216,8 +207,8 @@ func TestSSHSession_Rsync(t *testing.T) {
 	err = session.Rsync(localFile2, remoteFile2, 1.0) // 1MB/s throttle
 	require.NoError(t, err)
 
-	// Verify throttled file was transferred via the container workspace directory  
-	transferredFile2 := filepath.Join(workspaceDir, "throttled_file.txt")
+	// Verify throttled file was transferred via the container workspace directory
+	transferredFile2 := filepath.Join(dataDir, "throttled_file.txt")
 	transferredContent2, err := os.ReadFile(transferredFile2)
 	require.NoError(t, err)
 	require.Equal(t, throttledContent, transferredContent2)

@@ -33,6 +33,8 @@ import (
 // SSHTestPortBase is the base port used for SSH testing to avoid port collisions in CI
 const SSHTestPortBase = 22022
 
+const containerDataDir = "/mnt/data"
+
 // GetFreeSSHTestPort returns a free port starting from SSHTestPortBase
 func GetFreeSSHTestPort() (int, error) {
 	// Try ports starting from the base port
@@ -52,7 +54,7 @@ func GetFreeSSHTestPort() (int, error) {
 func GetUniqueSSHTestPort(testName string) (int, error) {
 	// Create a hash of the test name to get a deterministic port offset
 	h := fnv.New32a()
-	h.Write([]byte(testName))
+	_, _ = h.Write([]byte(testName))
 	hash := h.Sum32()
 
 	// Try multiple ports starting from the hash-based offset
@@ -84,7 +86,6 @@ type SSHTestContainer struct {
 	publicKey   string
 	user        string
 	host        string
-	dataDir     string // Path to the mounted data directory from container's perspective
 }
 
 // GetSSHPort returns the SSH port of the test container
@@ -119,18 +120,11 @@ func (c *SSHTestContainer) GetHost() string {
 
 // GetDataDir returns the path to the container-controlled workspace directory
 func (c *SSHTestContainer) GetDataDir() string {
-	if c.dataDir != "" {
-		// Return the container-controlled workspace subdirectory, not the mount root
-		return c.dataDir + "/container_workspace/work"
-	}
-	return c.dataDir
+	return containerDataDir
 }
 
-// CleanupWorkspace removes container-created files to avoid permission issues during host cleanup
-func (c *SSHTestContainer) CleanupWorkspace() error {
-	if c.dataDir == "" {
-		return nil // No data directory to clean up
-	}
+// delete the mounted data dir from within the container to avoid permission issues
+func (c *SSHTestContainer) cleanupDataDir() error {
 
 	// Create a temporary SSH session for cleanup
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -147,19 +141,16 @@ func (c *SSHTestContainer) CleanupWorkspace() error {
 		"",
 		false) // Don't log connection errors during cleanup
 	if err != nil {
-		// If we can't connect for cleanup, just log and continue
-		fmt.Printf("Warning: could not create SSH session for workspace cleanup: %v\n", err)
-		return nil
+		return fmt.Errorf("failed to create SSH session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
 
 	// Remove the entire workspace directory tree from inside the container
 	// This ensures container-owned files are removed by the container user
-	cleanupCmd := "rm -rf /mnt/data/container_workspace"
+	cleanupCmd := fmt.Sprintf("rm -rf %s", containerDataDir)
 	_, _, err = session.Exec(cleanupCmd)
 	if err != nil {
-		fmt.Printf("Warning: failed to cleanup workspace via SSH: %v\n", err)
-		// Don't return error - this is best-effort cleanup
+		return fmt.Errorf("failed to cleanup workspace: %w", err)
 	}
 
 	return nil
@@ -167,8 +158,10 @@ func (c *SSHTestContainer) CleanupWorkspace() error {
 
 // Cleanup removes the Docker container and cleans up resources
 func (c *SSHTestContainer) Cleanup() error {
-	// First, cleanup workspace files from inside the container to avoid permission issues
-	_ = c.CleanupWorkspace()
+	err := c.cleanupDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to cleanup data directory: %w", err)
+	}
 
 	// Use a context with timeout for cleanup operations
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -176,7 +169,7 @@ func (c *SSHTestContainer) Cleanup() error {
 
 	// Stop and remove container with timeout
 	stopTimeout := 10 // seconds
-	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{
+	err = c.client.ContainerStop(ctx, c.containerID, container.StopOptions{
 		Timeout: &stopTimeout,
 	})
 	if err != nil {
@@ -296,15 +289,11 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	publicKeyContent, err := os.ReadFile(publicKeyPath)
 	require.NoError(t, err)
 
-	// Create mount directory for file operations
-	mountDir := filepath.Join(tempDir, "ssh_mount")
-	err = os.MkdirAll(mountDir, 0755)
-	require.NoError(t, err)
-
 	// Build Docker image with a unique name that includes the public key hash
 	// This allows reusing images when the public key is the same
 	h := fnv.New32a()
-	h.Write(publicKeyContent)
+	_, err = h.Write(publicKeyContent)
+	require.NoError(t, err)
 	keyHash := fmt.Sprintf("%08x", h.Sum32()) // Pad to 8 characters with leading zeros
 	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
 
@@ -319,20 +308,14 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		t.Logf("Reusing existing SSH test Docker image: %s", imageName)
 	}
 
-	// Create workspace structure BEFORE starting container
-	containerDataDir := ""
 	if dataDir != "" {
-		containerDataDir = "/mnt/data"
-
-		// Create the container_workspace directory structure on host side
-		// This gives the container a place to create its own workspace
-		containerWorkspace := filepath.Join(dataDir, "container_workspace")
-		err = os.MkdirAll(containerWorkspace, 0777) // Wide permissions so container can take over
-		require.NoError(t, err)
+		// we have to grant broad permissions here because the container may have a different UID
+		err = os.Chmod(dataDir, 0777)
+		require.NoError(t, err, "failed to set permissions on data directory")
 	}
 
 	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir, t.Name())
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, dataDir, t.Name())
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
@@ -347,7 +330,6 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		publicKey:   publicKeyPath,
 		user:        "testuser",
 		host:        "localhost",
-		dataDir:     containerDataDir,
 	}
 }
 
@@ -450,7 +432,6 @@ func StartSSHContainer(
 	ctx context.Context,
 	cli *client.Client,
 	imageName string,
-	mountDir string,
 	dataDir string,
 	testName string,
 ) (string, uint64, error) {
@@ -478,13 +459,7 @@ func StartSSHContainer(
 			},
 		},
 		Mounts: func() []mount.Mount {
-			mounts := []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: mountDir,
-					Target: "/mnt/test",
-				},
-			}
+			var mounts []mount.Mount
 			if dataDir != "" {
 				mounts = append(mounts, mount.Mount{
 					Type:   mount.TypeBind,
