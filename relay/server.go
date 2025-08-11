@@ -195,7 +195,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		}
 		// nolint:wrapcheck
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching metadata for blob: %v", err))
-
 	}
 	metadata := mMap[v2.BlobKey(request.GetBlobKey())]
 	if metadata == nil {
