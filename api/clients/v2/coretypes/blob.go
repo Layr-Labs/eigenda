@@ -47,25 +47,7 @@ func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 		return nil, fmt.Errorf("bytes to field elements: %w", err)
 	}
 
-	return BlobFromCoefficients(coeffPolynomial), nil
-}
-
-// BlobFromCoefficients creates a blob from the coefficients of a polynomial.
-// A Blob must have a power of two coefficients. Thus:
-//   - If the passed coefficients are a power of 2 in length, they will be used as is.
-//   - If the coefficients are not a power of two in length, they will be copied to a new slice that is padded with zeros
-//     to the next power of two in length.
-func BlobFromCoefficients(coefficients []fr.Element) *Blob {
-	paddedCoefficients := coefficients
-	if !encoding.IsPowerOfTwo(len(coefficients)) {
-		// If the coefficients are not a power of two, we pad them to the next power of two.
-		blobLengthSymbols := uint32(encoding.NextPowerOf2(len(coefficients)))
-		paddedCoefficients = make([]fr.Element, blobLengthSymbols)
-		copy(paddedCoefficients, coefficients)
-	}
-	return &Blob{
-		coeffPolynomial: paddedCoefficients,
-	}
+	return blobFromCoefficients(coeffPolynomial)
 }
 
 // LenSymbols returns the number of coefficient symbols in the Blob.
@@ -139,4 +121,18 @@ func (b *Blob) toEvalPoly() []fr.Element {
 			"which is impossible because we already checked it above")
 	}
 	return fftedElements
+}
+
+// blobFromCoefficients creates a blob from the coefficients of a polynomial.
+// A Blob must have a power of two coefficients. Thus:
+//   - If the passed coefficients are a power of 2 in length, they will be used as is.
+//   - If the coefficients are not a power of two in length, they will be copied to a new slice that is padded with zeros
+//     to the next power of two in length.
+func blobFromCoefficients(coefficients []fr.Element) (*Blob, error) {
+	if !encoding.IsPowerOfTwo(len(coefficients)) {
+		return nil, fmt.Errorf("blob must have a power of 2 coefficients, but got %d coefficients", len(coefficients))
+	}
+	return &Blob{
+		coeffPolynomial: coefficients,
+	}, nil
 }

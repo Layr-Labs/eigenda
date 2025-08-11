@@ -99,7 +99,7 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 		return nil, fmt.Errorf("unknown polynomial form: %v", payloadForm)
 	}
 
-	return BlobFromCoefficients(coeffPolynomial), nil
+	return blobFromCoefficients(coeffPolynomial)
 }
 
 // decodeHeader validates the header (first field element = 32 bytes) of the encoded payload,
