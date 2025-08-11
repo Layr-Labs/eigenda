@@ -502,7 +502,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	payload := coretypes.NewPayload(payloadBytes)
+	payload := coretypes.Payload(payloadBytes)
 
 	// TODO (litt3): make the blob form configurable. Using PolynomialFormCoeff means that the data isn't being
 	//  FFTed/IFFTed, and it is important for both modes of operation to be tested.

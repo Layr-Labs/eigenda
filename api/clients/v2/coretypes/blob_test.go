@@ -1,10 +1,11 @@
-package coretypes
+package coretypes_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,18 +24,18 @@ func FuzzBlobConversion(f *testing.F) {
 }
 
 func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm codecs.PolynomialForm) {
-	blob, err := NewPayload(payloadBytes).ToBlob(payloadForm)
-	require.NoError(t, err)
-
-	blobDeserialized, err := DeserializeBlob(blob.Serialize(), blob.blobLengthSymbols)
+	blob, err := coretypes.Payload(payloadBytes).ToBlob(payloadForm)
 	require.NoError(t, err)
 
 	payloadFromBlob, err := blob.ToPayload(payloadForm)
 	require.NoError(t, err)
 
+	blobDeserialized, err := coretypes.DeserializeBlob(blob.Serialize(), blob.LenSymbols())
+	require.NoError(t, err)
+
 	payloadFromDeserializedBlob, err := blobDeserialized.ToPayload(payloadForm)
 	require.NoError(t, err)
 
-	require.Equal(t, payloadFromBlob.Serialize(), payloadFromDeserializedBlob.Serialize())
-	require.Equal(t, payloadBytes, payloadFromBlob.Serialize())
+	require.Equal(t, payloadFromBlob, payloadFromDeserializedBlob)
+	require.Equal(t, coretypes.Payload(payloadBytes), payloadFromBlob)
 }
