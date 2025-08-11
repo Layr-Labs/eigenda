@@ -226,7 +226,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 
 	blobSerialized := blob.Serialize()
 
-	// generateRandomCert produces valid kzg commitment
+	// generateRandomV3Cert produces valid kzg commitment
 	artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
 	if err != nil {
 		return nil, fmt.Errorf("generating random cert: %w", err)
