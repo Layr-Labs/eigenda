@@ -14,25 +14,57 @@ func TestEncodeDecodePayload(t *testing.T) {
 	// map of hex-encoded payloads (inputs) and their expected EncodedPayloads (outputs).
 	// The encoded payloads are broken into 32 byte chunks so as to make them more easily understandable.
 	// For example, the first string is always the header.
-	testCases := map[string]string{
-		// empty payload should only have a header symbol
-		"": "0000000000000000000000000000000000000000000000000000000000000000",
-		"01": "0000000000010000000000000000000000000000000000000000000000000000" + // header with len 1 payload
-			"0001000000000000000000000000000000000000000000000000000000000000", // first byte is always 0 due to bn254 encoding
-		"0102": "0000000000020000000000000000000000000000000000000000000000000000" +
-			"0001020000000000000000000000000000000000000000000000000000000000",
-		"01020304050607080910111213141516171819202122232425262728293031": "00000000001f0000000000000000000000000000000000000000000000000000" +
-			"0001020304050607080910111213141516171819202122232425262728293031",
+	testCases := []struct {
+		name                      string
+		payloadHex                string
+		expectedEncodedPayloadHex string
+	}{
+		{
+			name:       "Empty Payload -> header-only (single FE) encodedPayload",
+			payloadHex: "",
+			// Empty payload encodes to an all zero header (because version=0 and payloadlen=0)
+			expectedEncodedPayloadHex: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		// The 3 below cases are all very similar; their payload doesn't matter, we just
+		// check that they are contained in the EncodedPayload FE and that the header has the correct length.
+		{
+			name:       "1 Byte Payload -> 2 FE EncodedPayload",
+			payloadHex: "01",
+			expectedEncodedPayloadHex: "0000000000010000000000000000000000000000000000000000000000000000" + // header with len 1 payload
+				"0001000000000000000000000000000000000000000000000000000000000000", // first byte is always 0 due to bn254 encoding
+		},
+		{
+			name:       "2 Byte Payload -> 2 FE EncodedPayload",
+			payloadHex: "0102",
+			expectedEncodedPayloadHex: "0000000000020000000000000000000000000000000000000000000000000000" +
+				"0001020000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:       "31 Byte Payload -> 2 FE EncodedPayload",
+			payloadHex: "01020304050607080910111213141516171819202122232425262728293031",
+			expectedEncodedPayloadHex: "00000000001f0000000000000000000000000000000000000000000000000000" +
+				"0001020304050607080910111213141516171819202122232425262728293031",
+		},
+		{
+			// Each 31 bytes of payload get encoded into a single FE, so we need 2 FEs to contain the payload,
+			// which with the header leads to 3 FEs. Since EncodedPayload have to have a power of 2 number of FEs,
+			// the result is a 4 FE encodedPayload.
+			name:       "32 Byte Payload -> 4 FE EncodedPayload (EncodedPayload is always power of 2 FE)",
+			payloadHex: "0102030405060708091011121314151617181920212223242526272829303132",
+			expectedEncodedPayloadHex: "0000000000200000000000000000000000000000000000000000000000000000" +
+				"0001020304050607080910111213141516171819202122232425262728293031" +
+				"0032000000000000000000000000000000000000000000000000000000000000" +
+				"0000000000000000000000000000000000000000000000000000000000000000",
+		},
 	}
-
-	for payloadHex, expectedEncodedPayloadHex := range testCases {
-		t.Run("EncodePayload "+payloadHex, func(t *testing.T) {
-			payload, err := hex.DecodeString(payloadHex)
+	for _, tc := range testCases {
+		t.Run("EncodePayload "+tc.payloadHex, func(t *testing.T) {
+			payload, err := hex.DecodeString(tc.payloadHex)
 			require.NoError(t, err)
 			encodedPayload := Payload(payload).ToEncodedPayload()
 			// Run this here even though its called in Decode() in order to catch encoding bugs early.
 			require.NoError(t, encodedPayload.checkLenInvariant())
-			require.Equal(t, expectedEncodedPayloadHex, hex.EncodeToString(encodedPayload.bytes))
+			require.Equal(t, tc.expectedEncodedPayloadHex, hex.EncodeToString(encodedPayload.bytes))
 			decodedPayload, err := encodedPayload.Decode()
 			require.NoError(t, err)
 			require.Equal(t, Payload(payload), decodedPayload)
