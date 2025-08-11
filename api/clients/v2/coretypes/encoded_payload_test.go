@@ -31,6 +31,7 @@ func TestEncodeDecodePayload(t *testing.T) {
 			payload, err := hex.DecodeString(payloadHex)
 			require.NoError(t, err)
 			encodedPayload := Payload(payload).ToEncodedPayload()
+			require.NoError(t, encodedPayload.checkLenInvariant())
 			require.Equal(t, expectedEncodedPayloadHex, hex.EncodeToString(encodedPayload.bytes))
 			decodedPayload, err := encodedPayload.Decode()
 			require.NoError(t, err)
