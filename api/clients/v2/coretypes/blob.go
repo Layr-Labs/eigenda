@@ -88,7 +88,7 @@ func (b *Blob) Serialize() []byte {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
 func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (Payload, error) {
-	encodedPayload := b.ToEncodedPayload(payloadForm)
+	encodedPayload := b.ToEncodedPayloadUnchecked(payloadForm)
 
 	payload, err := encodedPayload.Decode()
 	if err != nil {
@@ -97,11 +97,16 @@ func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (Payload, error) {
 	return payload, nil
 }
 
-// ToEncodedPayload creates an EncodedPayload from the blob
+// ToEncodedPayloadUnchecked creates an EncodedPayload from the blob.
+//
+// This method does not perform any validation on the blob or the resulting EncodedPayload.
+// Most users should call [Blob.ToPayload] directly instead, but this method is exposed
+// since some secure integrations require decoding the Payload (and checking the invariants)
+// inside a fraud proof VM.
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
-func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) *EncodedPayload {
+func (b *Blob) ToEncodedPayloadUnchecked(payloadForm codecs.PolynomialForm) *EncodedPayload {
 	var encodedPayloadElements []fr.Element
 	switch payloadForm {
 	case codecs.PolynomialFormCoeff:
@@ -116,7 +121,7 @@ func (b *Blob) ToEncodedPayload(payloadForm codecs.PolynomialForm) *EncodedPaylo
 		panic(fmt.Sprintf("invalid codecs.PolynomialForm enum value: %d", payloadForm))
 	}
 
-	return &EncodedPayload{rs.SerializeFieldElements(encodedPayloadElements)}
+	return DeserializeEncodedPayloadUnchecked(rs.SerializeFieldElements(encodedPayloadElements))
 
 }
 

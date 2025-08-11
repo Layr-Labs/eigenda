@@ -133,7 +133,7 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-		return blob.ToEncodedPayload(pr.config.PayloadPolynomialForm), nil
+		return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from quorums %v", blobKey.Hex(), blobHeader.QuorumNumbers)

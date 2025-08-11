@@ -93,7 +93,7 @@ func TestEncodeWithFewerElements(t *testing.T) {
 	copy(truncatedCoefficients, originalBlob.coeffPolynomial)
 	truncatedBlob := BlobFromCoefficients(truncatedCoefficients)
 
-	reconstructedEncodedPayload := truncatedBlob.ToEncodedPayload(codecs.PolynomialFormCoeff)
+	reconstructedEncodedPayload := truncatedBlob.ToEncodedPayloadUnchecked(codecs.PolynomialFormCoeff)
 	// even though the actual length will be less than the claimed length, we shouldn't see any error
 	require.Equal(t, encodedPayload, reconstructedEncodedPayload)
 }

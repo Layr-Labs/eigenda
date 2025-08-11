@@ -17,7 +17,7 @@ import (
 // It is an intermediary state between [Payload] and [Blob]. Most users should not need to interact with it directly,
 // and should instead use [Payload.ToBlob] directly. EncodedPayloads are only exposed because secure rollup integrations
 // with EigenDA need to decode them inside a fraud proof vm, in order to be able to discard wrongly encoded payloads.
-// In such cases, a blob fetched from EigenDA can be transformed using [Blob.ToEncodedPayload] (note that this cannot error)
+// In such cases, a blob fetched from EigenDA can be transformed using [Blob.ToEncodedPayloadUnchecked] (note that this cannot error)
 // and then sent to the fraud proof vm for verification.
 // See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#decode-blob-failed for more details.
 //
@@ -41,11 +41,12 @@ type EncodedPayload struct {
 	bytes []byte
 }
 
-// NewEncodedPayload constructs an [EncodedPayload] from bytes array.
-// Note that we do not validate the bytes here, to mimic the [Blob.ToEncodedPayload] process.
+// NewEncodedPayloadUnchecked constructs an [EncodedPayload] from bytes array.
+//
+// It does not validate the bytes, to mimic the [Blob.ToEncodedPayloadUnchecked] process.
 // The length, header, and body invariants are checked when calling [EncodedPayload.Decode].
-func DeserializeEncodedPayload(bytes []byte) EncodedPayload {
-	return EncodedPayload{bytes: bytes}
+func DeserializeEncodedPayloadUnchecked(bytes []byte) *EncodedPayload {
+	return &EncodedPayload{bytes: bytes}
 }
 
 // Serialize returns the raw bytes of the encoded payload.
