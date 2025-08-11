@@ -36,7 +36,7 @@ contract EigenDAEjectionManagerTest is Test {
         accessControl = new EigenDAAccessControl(address(this));
         directory = new EigenDADirectory();
         directory.initialize(address(accessControl));
-        ejectionManager = new EigenDAEjectionManager(address(token), DEPOSIT_AMOUNT, address(directory));
+        ejectionManager = new EigenDAEjectionManager(address(token), DEPOSIT_AMOUNT, address(directory), 1);
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, address(this));
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
     }
@@ -53,6 +53,7 @@ contract EigenDAEjectionManagerTest is Test {
 
         vm.startPrank(caller);
         token.approve(address(ejectionManager), DEPOSIT_AMOUNT);
+        ejectionManager.addEjectorBalance(DEPOSIT_AMOUNT);
 
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
