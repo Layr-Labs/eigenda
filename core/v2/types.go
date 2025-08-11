@@ -170,7 +170,7 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 }
 
 func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(blobLength), blobParams)
+	length, err := blobParams.GetChunkLength(uint32(blobLength))
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}
