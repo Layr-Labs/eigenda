@@ -3,6 +3,7 @@ package coretypes
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -170,7 +171,7 @@ func evalToCoeffPoly(evalPoly []fr.Element) []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(evalPoly)))
+	fftSettings := fftSettingsFromBlobLengthSymbols(uint32(len(evalPoly)))
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	ifftedElements, err := fftSettings.FFT(evalPoly, true)
@@ -180,4 +181,14 @@ func evalToCoeffPoly(evalPoly []fr.Element) []fr.Element {
 	}
 
 	return ifftedElements
+}
+
+// fftSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings.
+// blobLengthSymbols should be a power of 2, and the function will panic if it is not.
+func fftSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *fft.FFTSettings {
+	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+		panic(fmt.Sprintf("blob length symbols %d is not a power of 2", blobLengthSymbols))
+	}
+	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
+	return fft.NewFFTSettings(maxScale)
 }

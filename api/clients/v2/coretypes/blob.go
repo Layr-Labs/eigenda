@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -112,7 +111,7 @@ func (b *Blob) toEvalPoly() []fr.Element {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(uint32(len(b.coeffPolynomial)))
+	fftSettings := fftSettingsFromBlobLengthSymbols(uint32(len(b.coeffPolynomial)))
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)
