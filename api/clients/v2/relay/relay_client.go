@@ -283,7 +283,7 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 
 	dialOptions := clients.GetGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
 
-	pool, err := common.NewGRPClientPool(
+	pool, err := common.NewGRPCClientPool(
 		c.logger,
 		relaygrpc.NewRelayClient,
 		c.config.ConnectionPoolSize,

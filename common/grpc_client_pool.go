@@ -27,7 +27,7 @@ type GRPCClientPool[T any] struct {
 }
 
 // Creates a new GRPCClientPool with the specified client builder and size.
-func NewGRPClientPool[T any](
+func NewGRPCClientPool[T any](
 	logger logging.Logger,
 	clientBuilder GRPCClientBuilder[T],
 	poolSize int,

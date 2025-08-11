@@ -309,9 +309,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-	// the blob header which was constructed locally and sent to the disperser
+// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-	// the reply received back from the disperser
+// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 
@@ -398,7 +398,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
-		c.clientPool, initErr = common.NewGRPClientPool(
+		c.clientPool, initErr = common.NewGRPCClientPool(
 			c.logger,
 			disperser_rpc.NewDisperserClient,
 			c.config.DisperserConnectionCount,
