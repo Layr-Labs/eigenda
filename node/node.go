@@ -67,7 +67,6 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
-	BlacklistStore          BlacklistStore
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
@@ -263,7 +262,6 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		BlacklistStore:          nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
