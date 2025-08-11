@@ -28,7 +28,7 @@ type ClientConfigV2 struct {
 	EigenDACertVerifierOrRouterAddress string // >= V3 cert
 
 	// Number of GRPC connections to make to each relay
-	RelayConnectionPoolSize int
+	RelayConnectionPoolSize uint
 
 	// TODO: we should create an upstream VerifyingPayloadRetrievalClient upstream
 	// that would take all of the below configs, and would verify certs before retrieving,

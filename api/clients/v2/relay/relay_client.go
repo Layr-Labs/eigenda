@@ -17,6 +17,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
+// an upper limit on the number of parallel connections open to each relay, for the sake of sanity
+const maxNumberOfConnections = 32
+
 // MessageSigner is a function that signs a message with a private BLS key.
 type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, error)
 
@@ -26,7 +29,7 @@ type RelayClientConfig struct {
 	OperatorID         *core.OperatorID
 	MessageSigner      MessageSigner
 	// The number of parallel connections open to each relay.
-	ConnectionPoolSize int // TODO make sure this is configured with flags
+	ConnectionPoolSize uint // TODO make sure this is configured with flags
 }
 
 type ChunkRequestByRange struct {
@@ -63,7 +66,7 @@ type relayClient struct {
 	// relayLockProvider provides locks that correspond to individual relay keys
 	relayLockProvider *KeyLock[corev2.RelayKey]
 	// connectionPoolSize is the number of parallel connections open to each relay.
-	connectionPoolSize int
+	connectionPoolSize uint
 	// relayInitializationStatus maps relay key to a bool `map[corev2.RelayKey]bool`
 	// the boolean value indicates whether the connection to that relay has been initialized
 	relayInitializationStatus sync.Map
@@ -95,6 +98,9 @@ func NewRelayClient(
 	connectionPoolSize := config.ConnectionPoolSize
 	if connectionPoolSize <= 0 {
 		connectionPoolSize = 1
+	}
+	if connectionPoolSize > maxNumberOfConnections {
+		connectionPoolSize = maxNumberOfConnections
 	}
 
 	logger.Info("creating relay client")

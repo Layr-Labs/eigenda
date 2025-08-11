@@ -30,7 +30,7 @@ type GRPCClientPool[T any] struct {
 func NewGRPCClientPool[T any](
 	logger logging.Logger,
 	clientBuilder GRPCClientBuilder[T],
-	poolSize int,
+	poolSize uint,
 	url string,
 	dialOptions ...grpc.DialOption,
 ) (*GRPCClientPool[T], error) {
@@ -42,7 +42,7 @@ func NewGRPCClientPool[T any](
 	// Create the clients up front.
 	connections := make([]*grpc.ClientConn, 0, poolSize)
 	clients := make([]T, 0, poolSize)
-	for i := 0; i < poolSize; i++ {
+	for i := uint(0); i < poolSize; i++ {
 		conn, err := grpc.NewClient(url, dialOptions...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC client connection to %s: %w", url, err)

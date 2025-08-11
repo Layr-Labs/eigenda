@@ -18,12 +18,14 @@ import (
 	"github.com/docker/go-units"
 )
 
+const maxNumberOfConnections = 32
+
 type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
-	// The number of grpc connections to the disperser server.
-	DisperserConnectionCount int
+	// The number of grpc connections to the disperser server. A value of 0 is treated as 1.
+	DisperserConnectionCount uint
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -53,6 +55,7 @@ type disperserClient struct {
 	logger             logging.Logger
 	config             *DisperserClientConfig
 	signer             corev2.BlobRequestSigner
+	connectionCount    uint
 	initOnceGrpc       sync.Once
 	initOnceAccountant sync.Once
 	clientPool         *common.GRPCClientPool[disperser_rpc.DisperserClient]
@@ -104,12 +107,21 @@ func NewDisperserClient(
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
+	var connectionCount uint
+	if config.DisperserConnectionCount == 0 {
+		connectionCount = 1
+	}
+	if config.DisperserConnectionCount > maxNumberOfConnections {
+		connectionCount = maxNumberOfConnections
+	}
+
 	return &disperserClient{
-		logger:     logger,
-		config:     config,
-		signer:     signer,
-		prover:     prover,
-		accountant: accountant,
+		logger:          logger,
+		config:          config,
+		signer:          signer,
+		prover:          prover,
+		accountant:      accountant,
+		connectionCount: connectionCount,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -345,7 +357,11 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
-	return c.clientPool.GetClient().GetBlobStatus(ctx, request)
+	reply, err := c.clientPool.GetClient().GetBlobStatus(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("error while calling GetBlobStatus: %w", err)
+	}
+	return reply, nil
 }
 
 // GetPaymentState returns the payment state of the disperser client
@@ -372,7 +388,11 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.clientPool.GetClient().GetPaymentState(ctx, request)
+	reply, err := c.clientPool.GetClient().GetPaymentState(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("error while calling GetPaymentState: %w", err)
+	}
+	return reply, nil
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
@@ -388,7 +408,11 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
-	return c.clientPool.GetClient().GetBlobCommitment(ctx, request)
+	reply, err := c.clientPool.GetClient().GetBlobCommitment(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("error while calling GetBlobCommitment: %w", err)
+	}
+	return reply, nil
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
@@ -401,7 +425,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 		c.clientPool, initErr = common.NewGRPCClientPool(
 			c.logger,
 			disperser_rpc.NewDisperserClient,
-			c.config.DisperserConnectionCount,
+			c.connectionCount,
 			addr,
 			dialOptions...)
 	})

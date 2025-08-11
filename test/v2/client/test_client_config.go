@@ -71,9 +71,9 @@ type TestClientConfig struct {
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
 	// The number of connections to open for each relay.
-	RelayConnectionCount int
+	RelayConnectionCount uint
 	// The number of connections to open for each disperser.
-	DisperserConnectionCount int
+	DisperserConnectionCount uint
 	// The port to use for the proxy.
 	ProxyPort int
 }
