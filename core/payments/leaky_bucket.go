@@ -50,14 +50,6 @@ type LeakyBucket struct {
 	// determining how many symbols leak in a number of nanoseconds requires making a rounding choice. Leak calculation
 	// N needs to take the partialSecondLeakage of calculation N-1 into account, so that the precisely correct number
 	// of symbols are leaked for each full second.
-	//
-	//   (pipe characters represent second boundaries)
-	//
-	//   Previous leak (N-1)                      Current Leak (N)
-	//            ↓                                      ↓
-	//       |----*----------|----------------|----------*-----|
-	//       ↑____↑
-	//    previousPartialSecond
 	previousPartialSecondLeakage uint64
 }
 
@@ -182,12 +174,6 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 //
 // - Returns a TimeMovedBackwardError if input time is before previous leak time.
 // - Returns a generic error if any of the calculations fail, which should not happen during normal usage.
-//
-//	Previous leak (N-1)                      Current Leak (N)
-//	         ↓                                      ↓
-//	    |----*----------|----------------|----------*-----|
-//	         ↑______________________________________↑
-//	   leaks the correct number of symbols for this time span
 func (lb *LeakyBucket) leak(now time.Time) error {
 	if now.Before(lb.previousLeakTime) {
 		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
@@ -197,6 +183,11 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 		lb.previousLeakTime = now
 	}()
 
+	//	 Previous leak (N-1)                      Current Leak (N)
+	//	        ↓                                      ↓
+	//	   |----*----------|----------------|----------*-----|
+	//	   ↑________________________________↑
+	//	          fullSecondLeakage
 	fullSecondLeakage, err := lb.computeFullSecondLeakage(uint64(now.Unix()))
 	if err != nil {
 		return fmt.Errorf("compute full second leakage: %w", err)
@@ -208,19 +199,35 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	// This value can be negative if the previous leak calculation was within the same second as this calculation,
 	// since in that case fullSecondLeakage would be 0.
 	//
-	// Previous leak (N-1)                    Current Leak (N)
-	//        ↓                                      ↓
-	//   |----*----------|----------------|----------*-----|
-	//        ↑___________________________↑
-	//   this is the corrected full second leakage span
+	//	 Previous leak (N-1)                      Current Leak (N)
+	//	        ↓                                      ↓
+	//	   |----*----------|----------------|----------*-----|
+	//	   ↑____↑
+	//	  previousPartialSecondLeakage
+	//
+	//	 Previous leak (N-1)                    Current Leak (N)
+	//	        ↓                                      ↓
+	//	   |----*----------|----------------|----------*-----|
+	//	        ↑___________________________↑
+	//	          correctedFullSecondLeakage
 	correctedFullSecondLeakage := fullSecondLeakage - lb.previousPartialSecondLeakage
 
+	//	 Previous leak (N-1)                      Current Leak (N)
+	//	        ↓                                      ↓
+	//	   |----*----------|----------------|----------*-----|
+	//	                                    ↑__________↑
+	//	                                partialSecondLeakage
 	partialSecondLeakage, err := lb.computePartialSecondLeakage(uint64(now.Nanosecond()))
 	if err != nil {
 		return fmt.Errorf("compute partial second leakage: %w", err)
 	}
 	lb.previousPartialSecondLeakage = partialSecondLeakage
 
+	//	Previous leak (N-1)                      Current Leak (N)
+	//	        ↓                                      ↓
+	//	   |----*----------|----------------|----------*-----|
+	//	        ↑______________________________________↑
+	//	                     actualLeakage
 	actualLeakage := correctedFullSecondLeakage + partialSecondLeakage
 
 	if lb.currentFillLevel <= actualLeakage {
@@ -239,12 +246,6 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 // for details.
 //
 // Returns an error if the leakage calculation fails, which should not happen during normal usage.
-//
-//	 Previous leak (N-1)                      Current Leak (N)
-//	        ↓                                      ↓
-//	   |----*----------|----------------|----------*-----|
-//	   ↑________________________________↑
-//	computes the correct number of symbols for this time span
 func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) (uint64, error) {
 	secondsSinceLastUpdate := epochSeconds - uint64(lb.previousLeakTime.Unix())
 	fullSecondLeakage := secondsSinceLastUpdate * lb.symbolsPerSecondLeakRate
@@ -255,12 +256,6 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) (uint64, er
 //
 // Computes the number of symbols which leak out in the given fractional second. Since this deals with integers,
 // the configured bias determines which direction we round in.
-//
-//	Previous leak (N-1)                      Current Leak (N)
-//	       ↓                                      ↓
-//	  |----*----------|----------------|----------*-----|
-//	                                   ↑__________↑
-//	            returns the correct number of symbols for this time span
 func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) (uint64, error) {
 	switch lb.biasBehavior {
 	case BiasPermitMore:
