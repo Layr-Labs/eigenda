@@ -163,10 +163,10 @@ func (ep *EncodedPayload) checkLenInvariant() error {
 	// checked that it's a multiple of 32, but this invariant is closer to the representation of
 	// the encoded payload as a polynomial, and is also more meaningful given
 	// that the length in [encoding.BlobCommitments.Length] is in field elements.
-	numfieldElements := len(ep.bytes) / encoding.BYTES_PER_SYMBOL
-	if !encoding.IsPowerOfTwo(numfieldElements) {
+	numFieldElements := len(ep.bytes) / encoding.BYTES_PER_SYMBOL
+	if !encoding.IsPowerOfTwo(numFieldElements) {
 		return fmt.Errorf("encoded payload must be a power of 2 field elements (32 bytes chunks), "+
-			"but got %d field elements", numfieldElements)
+			"but got %d field elements", numFieldElements)
 	}
 	return nil
 }
