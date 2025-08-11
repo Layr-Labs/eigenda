@@ -223,16 +223,18 @@ func BlobSymbolsToMaxPayloadSize(blobLengthSymbols uint32) (uint32, error) {
 		return 0, fmt.Errorf("input blobLengthSymbols is zero")
 	}
 	if blobLengthSymbols < EncodedPayloadHeaderLenSymbols {
-		return 0, fmt.Errorf("blobLengthSymbols %d is less than PayloadHeaderSizeSymbols %d", blobLengthSymbols, EncodedPayloadHeaderLenSymbols)
+		return 0, fmt.Errorf("blobLengthSymbols %d is less than PayloadHeaderSizeSymbols %d",
+			blobLengthSymbols, EncodedPayloadHeaderLenSymbols)
 	}
 	if !encoding.IsPowerOfTwo(uint64(blobLengthSymbols)) {
 		return 0, fmt.Errorf("blobLengthSymbols %d is not a power of two", blobLengthSymbols)
 	}
 
-	maxPayloadLength, err := GetUnpaddedDataLength((blobLengthSymbols - EncodedPayloadHeaderLenSymbols) * encoding.BYTES_PER_SYMBOL)
+	maxPayloadLength, err := GetUnpaddedDataLength(
+		(blobLengthSymbols - EncodedPayloadHeaderLenSymbols) * encoding.BYTES_PER_SYMBOL)
 	if err != nil {
-		panic(fmt.Errorf("bug: GetUnpaddedDataLength only errors when input is not a multiple of 32 (encoding.BYTES_PER_SYMBOL), which "+
-			"we are explicitly multiplying our argument by: %w", err))
+		panic(fmt.Errorf("bug: GetUnpaddedDataLength only errors when input is not a multiple of 32 "+
+			"(encoding.BYTES_PER_SYMBOL), which we are explicitly multiplying our argument by: %w", err))
 	}
 	return maxPayloadLength, nil
 }

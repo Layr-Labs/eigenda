@@ -18,9 +18,9 @@ import (
 // It is an intermediary state between [Payload] and [Blob]. Most users should not need to interact with it directly,
 // and should instead use [Payload.ToBlob] directly. EncodedPayloads are only exposed because secure rollup integrations
 // with EigenDA need to decode them inside a fraud proof vm, in order to be able to discard wrongly encoded payloads.
-// In such cases, a blob fetched from EigenDA can be transformed using [Blob.ToEncodedPayloadUnchecked] (note that this cannot error)
-// and then sent to the fraud proof vm for verification.
-// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#decode-blob-failed for more details.
+// In such cases, a blob fetched from EigenDA can be transformed using [Blob.ToEncodedPayloadUnchecked]
+// (note that this cannot error) and then sent to the fraud proof vm for verification. See
+// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#decode-blob-failed for more details.
 //
 // Example encoding:
 //   - [Encoded Payload header (32 bytes total)] + [Encoded Payload Data (len is multiple of 32)]
@@ -107,7 +107,8 @@ func (ep *EncodedPayload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, erro
 // and returns the claimed length of the payload if the header is valid.
 func (ep *EncodedPayload) decodeHeader() (uint32, error) {
 	if len(ep.bytes) < codec.EncodedPayloadHeaderLenBytes {
-		return 0, fmt.Errorf("encoded payload must be at least %d bytes long to contain a header, but got %d bytes", codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
+		return 0, fmt.Errorf("encoded payload must be at least %d bytes long to contain a header, but got %d bytes",
+			codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
 	}
 	if ep.bytes[0] != 0x00 {
 		return 0, fmt.Errorf("encoded payload header first byte must be 0x00, but got %x", ep.bytes[0])
@@ -151,17 +152,21 @@ func (ep *EncodedPayload) decodePayload(payloadLen uint32) ([]byte, error) {
 func (ep *EncodedPayload) checkLenInvariant() error {
 	// this check is redundant since 0 is not a valid power of 32, but we keep it for clarity.
 	if len(ep.bytes) < codec.EncodedPayloadHeaderLenBytes {
-		return fmt.Errorf("encoded payload must be at least %d bytes long to contain a valid header, but got %d bytes", codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
+		return fmt.Errorf("encoded payload must be at least %d bytes long to contain a valid header, "+
+			"but got %d bytes", codec.EncodedPayloadHeaderLenBytes, len(ep.bytes))
 	}
 	if len(ep.bytes)%encoding.BYTES_PER_SYMBOL != 0 {
-		return fmt.Errorf("encoded payload must be a multiple of %d bytes (bn254 field element), but got %d bytes", encoding.BYTES_PER_SYMBOL, len(ep.bytes))
+		return fmt.Errorf("encoded payload must be a multiple of %d bytes (bn254 field element), "+
+			"but got %d bytes", encoding.BYTES_PER_SYMBOL, len(ep.bytes))
 	}
-	// We could equivalently check that len(ep.bytes) is a power of 2 given that we've already checked that it's a multiple of 32,
-	// but this invariant is closer to the representation of the encoded payload as a polynomial,
-	// and is also more meaningful given that the length in [encoding.BlobCommitments.Length] is in field elements.
+	// We could equivalently check that len(ep.bytes) is a power of 2 given that we've already
+	// checked that it's a multiple of 32, but this invariant is closer to the representation of
+	// the encoded payload as a polynomial, and is also more meaningful given
+	// that the length in [encoding.BlobCommitments.Length] is in field elements.
 	numfieldElements := len(ep.bytes) / encoding.BYTES_PER_SYMBOL
 	if !encoding.IsPowerOfTwo(numfieldElements) {
-		return fmt.Errorf("encoded payload must be a power of 2 field elements (32 bytes chunks), but got %d field elements", numfieldElements)
+		return fmt.Errorf("encoded payload must be a power of 2 field elements (32 bytes chunks), "+
+			"but got %d field elements", numfieldElements)
 	}
 	return nil
 }

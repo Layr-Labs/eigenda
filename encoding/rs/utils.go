@@ -49,7 +49,8 @@ func SerializeFieldElements(fieldElements []fr.Element) []byte {
 	return outputBytes
 }
 
-// padToBytesPerSymbolMultiple accepts input bytes, and returns the bytes padded to a multiple of encoding.BYTES_PER_SYMBOL
+// padToBytesPerSymbolMultiple accepts input bytes, and returns the bytes padded to
+// a multiple of encoding.BYTES_PER_SYMBOL
 func padToBytesPerSymbolMultiple(inputBytes []byte) []byte {
 	remainder := len(inputBytes) % encoding.BYTES_PER_SYMBOL
 
