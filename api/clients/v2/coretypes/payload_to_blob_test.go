@@ -28,7 +28,8 @@ func Example_payloadToBlobConversion() {
 	encodedPayload := payload.ToEncodedPayload()
 	fmt.Printf("Encoded Payload bytes (len %d):\n%s\n", len(encodedPayload.Serialize()), hex.EncodeToString(encodedPayload.Serialize()))
 
-	// Change to [codecs.PolynomialFormCoeff] to see that blob will have the same bytes as the encoded payload.
+	// Replace [codecs.PolynomialFormEval] to [codecs.PolynomialFormCoeff] below to see the difference.
+	// The constructed blob will have the same bytes as the encoded payload.
 	blob, err := encodedPayload.ToBlob(codecs.PolynomialFormEval)
 	if err != nil {
 		panic(err)
