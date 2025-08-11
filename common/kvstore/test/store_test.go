@@ -8,8 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
-	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
-	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
@@ -18,29 +16,7 @@ import (
 // A list of builders for various stores to be tested.
 var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store[[]byte], error){
 	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-		return mapstore.NewStore(), nil
-	},
-	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		return leveldb.NewStore(logger, path, true, false, nil)
-	},
-	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-		config := tablestore.DefaultMapStoreConfig()
-		config.Schema = []string{"test"}
-		tableStore, err := tablestore.Start(logger, config)
-		if err != nil {
-			return nil, err
-		}
-		return NewTableAsAStore(tableStore)
-	},
-	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-		config := tablestore.DefaultLevelDBConfig(path)
-		config.LevelDBSyncWrites = false
-		config.Schema = []string{"test"}
-		tableStore, err := tablestore.Start(logger, config)
-		if err != nil {
-			return nil, err
-		}
-		return NewTableAsAStore(tableStore)
 	},
 }
 
