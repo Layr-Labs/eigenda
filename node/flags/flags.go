@@ -158,8 +158,8 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Address Directory",
-		Required: false,
+		Usage:    "Address of the EigenDA Contract Directory",
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
@@ -415,10 +415,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
-			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
@@ -430,10 +430,10 @@ var (
 		Value:    0.15,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
-	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+	LittDBReadCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
-			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
@@ -492,12 +492,40 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
 	}
-	GCSafetyBufferSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
-		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+	GCSafetyBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
+			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
+	}
+	GCSafetyBufferSizeFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-fraction"),
+		Usage: "The fraction of the total memory to use for the safety buffer for garbage collection. Is" +
+			" ignored if NODE_GC_SAFETY_BUFFER_SIZE_GB > 0.",
+		Required: false,
+		Value:    0.2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
+	}
+	EjectionSentinelPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-sentinel-period"),
+		Usage:    "The period at which the ejection sentinel runs to check for ejection conditions.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
+	}
+	EjectionDefenseEnabledFlag = cli.BoolTFlag{ // TODO make default false prior to merging
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
+		Usage:    "Whether to enable the ejection defense mechanism.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_DEFENSE_ENABLED"),
+	}
+	IgnoreVersionForEjectionDefenseFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ignore-version-for-ejection-defense"),
+		Usage:    "Whether to ignore the version check for ejection defense.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -637,6 +665,9 @@ var optionalFlags = []cli.Flag{
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	LittUnsafePurgeLocksFlag,
+	EjectionSentinelPeriodFlag,
+	EjectionDefenseEnabledFlag,
+	IgnoreVersionForEjectionDefenseFlag,
 }
 
 func init() {
