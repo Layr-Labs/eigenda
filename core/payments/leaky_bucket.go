@@ -107,21 +107,22 @@ func NewLeakyBucket(
 
 // Fill the bucket with a number of symbols.
 //
-// - Returns nil if the leaky bucket has enough capacity to accept the fill.
-// - Returns an InsufficientReservationCapacityError if bucket lacks capacity to permit the fill.
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
-// - Returns a generic error for all other modes of failure.
+// - Returns (true, nil) if the leaky bucket has enough capacity to accept the fill.
+// - Returns (false, nil) if bucket lacks capacity to permit the fill.
+// - Returns (false, error) for actual errors:
+//   - TimeMovedBackwardError if input time is before previous leak time.
+//   - Generic error for all other modes of failure.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed fill doesn't count against the meter.
-func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) error {
+func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 	if symbolCount == 0 {
-		return errors.New("symbolCount must be > 0")
+		return false, errors.New("symbolCount must be > 0")
 	}
 
 	err := lb.leak(now)
 	if err != nil {
-		return fmt.Errorf("leak: %w", err)
+		return false, fmt.Errorf("leak: %w", err)
 	}
 
 	// this is how full the bucket would be, if the fill were to be accepted
@@ -130,25 +131,25 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) error {
 	// if newFillLevel is <= the total bucket capacity, no further checks are required
 	if newFillLevel <= lb.bucketCapacity {
 		lb.currentFillLevel = newFillLevel
-		return nil
+		return true, nil
 	}
 
 	// this fill would result in the bucket being overfilled, so we check the overfill behavior to decide what to do
 	switch lb.overfillBehavior {
 	case OverfillNotPermitted:
-		return &InsufficientReservationCapacityError{symbolCount}
+		return false, nil
 	case OverfillOncePermitted:
 		zeroCapacityAvailable := lb.currentFillLevel >= lb.bucketCapacity
 
 		// if there is no available capacity whatsoever, dispersal is never permitted, no matter the overfill behavior
 		if zeroCapacityAvailable {
-			return &InsufficientReservationCapacityError{symbolCount}
+			return false, nil
 		}
 
 		lb.currentFillLevel = newFillLevel
-		return nil
+		return true, nil
 	default:
-		return fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
+		return false, fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
 	}
 }
 

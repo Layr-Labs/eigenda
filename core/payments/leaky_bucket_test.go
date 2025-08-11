@@ -40,19 +40,20 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		err = leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity+10))
+		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity+10))
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity+10, leakyBucket.currentFillLevel, "first overfill should succeed")
 
 		// no time elapses, so bucket is still over capacity
-		err = leakyBucket.Fill(testStartTime, 1)
-		require.Error(t, err)
-		var insufficientErr *InsufficientReservationCapacityError
-		require.True(t, errors.As(err, &insufficientErr), "overfill should fail, if bucket is already over capacity")
+		success, err = leakyBucket.Fill(testStartTime, 1)
+		require.NoError(t, err)
+		require.False(t, success, "overfill should fail, if bucket is already over capacity")
 
 		// let some time elapse, so there is a little bit of available capacity
-		err = leakyBucket.Fill(testStartTime.Add(time.Second), uint32(leakyBucket.bucketCapacity+10))
-		require.NoError(t, err, "any available capacity should permit overfill")
+		success, err = leakyBucket.Fill(testStartTime.Add(time.Second), uint32(leakyBucket.bucketCapacity+10))
+		require.NoError(t, err)
+		require.True(t, success, "any available capacity should permit overfill")
 	})
 
 	// make sure filling without overfill enabled works
@@ -61,12 +62,14 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		err = leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity-10))
+		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity-10))
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity-10, leakyBucket.currentFillLevel)
 
-		err = leakyBucket.Fill(testStartTime, 11)
-		require.Error(t, err, "if no overfill is enabled, any amount of overfill should cause an error")
+		success, err = leakyBucket.Fill(testStartTime, 11)
+		require.NoError(t, err)
+		require.False(t, success, "if no overfill is enabled, any amount of overfill should fail")
 		require.Equal(t, leakyBucket.bucketCapacity-10, leakyBucket.currentFillLevel)
 	})
 
@@ -74,8 +77,9 @@ func TestFill(t *testing.T) {
 		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
-		err = leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity))
+		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity))
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity, leakyBucket.currentFillLevel)
 	})
 
@@ -84,8 +88,9 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		err = leakyBucket.Fill(testStartTime, 0)
+		success, err := leakyBucket.Fill(testStartTime, 0)
 		require.Error(t, err, "zero fill should not be permitted")
+		require.False(t, success)
 
 		require.Equal(t, uint64(0), leakyBucket.currentFillLevel, "nothing should have been added to the bucket")
 	})
@@ -96,8 +101,9 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 
 		// wait longer than the bucket duration
-		err = leakyBucket.Fill(testStartTime.Add(15*time.Second), 50)
+		success, err := leakyBucket.Fill(testStartTime.Add(15*time.Second), 50)
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, uint64(50), leakyBucket.currentFillLevel, "bucket should leak empty, then be filled")
 	})
 }
@@ -109,8 +115,9 @@ func TestRevertFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		err = leakyBucket.Fill(testStartTime, 500)
+		success, err := leakyBucket.Fill(testStartTime, 500)
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, uint64(500), leakyBucket.currentFillLevel)
 
 		err = leakyBucket.RevertFill(testStartTime, 200)
@@ -124,8 +131,9 @@ func TestRevertFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		err = leakyBucket.Fill(testStartTime, 500)
+		success, err := leakyBucket.Fill(testStartTime, 500)
 		require.NoError(t, err)
+		require.True(t, success)
 		require.Equal(t, uint64(500), leakyBucket.currentFillLevel)
 
 		// revert fill with greater than the amount in the bucket
@@ -179,8 +187,9 @@ func leakTest(t *testing.T, bias BiasBehavior) {
 		// randomly advance between 1 nanosecond and 2 seconds for each iteration
 		workingTime = workingTime.Add(time.Duration(testRandom.Intn(2_000_000_000) + 1))
 
-		err := leakyBucket.Fill(workingTime, 1)
+		success, err := leakyBucket.Fill(workingTime, 1)
 		require.NoError(t, err)
+		require.True(t, success)
 	}
 
 	// round time off to a full second, so we can predict what the expected leak should be.
@@ -189,8 +198,9 @@ func leakTest(t *testing.T, bias BiasBehavior) {
 	require.Equal(t, 0, workingTime.Nanosecond(), "bug in test logic: workingTime should be a round second")
 
 	// do a final fill, to bring the total test time to the round second value
-	err = leakyBucket.Fill(workingTime, 1)
+	success, err := leakyBucket.Fill(workingTime, 1)
 	require.NoError(t, err)
+	require.True(t, success)
 
 	// compute how much should have leaked throughout the test duration
 	timeDelta := workingTime.Sub(testStartTime)
@@ -207,11 +217,13 @@ func TestTimeRegression(t *testing.T) {
 	leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
 	require.NoError(t, err)
 
-	err = leakyBucket.Fill(testStartTime.Add(5*time.Second), 100)
+	success, err := leakyBucket.Fill(testStartTime.Add(5*time.Second), 100)
 	require.NoError(t, err)
+	require.True(t, success)
 
-	err = leakyBucket.Fill(testStartTime.Add(3*time.Second), 50)
+	success, err = leakyBucket.Fill(testStartTime.Add(3*time.Second), 50)
 	require.Error(t, err)
+	require.False(t, success)
 	var timeErr *TimeMovedBackwardError
 	require.True(t, errors.As(err, &timeErr))
 
