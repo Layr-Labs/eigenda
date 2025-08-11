@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -31,13 +32,13 @@ type LeakyBucket struct {
 	overfillBehavior OverfillBehavior
 
 	// The total number of symbols that fit in the bucket
-	bucketCapacity int64
+	bucketCapacity uint64
 
 	// The number of symbols that leak out of the bucket each second
-	symbolsPerSecondLeakRate int64
+	symbolsPerSecondLeakRate uint64
 
 	// The number of symbols currently in the bucket
-	currentFillLevel int64
+	currentFillLevel uint64
 
 	// The time at which the previous leak calculation was made
 	previousLeakTime time.Time
@@ -57,13 +58,13 @@ type LeakyBucket struct {
 	//       |----*----------|----------------|----------*-----|
 	//       ↑____↑
 	//    previousPartialSecond
-	previousPartialSecondLeakage int64
+	previousPartialSecondLeakage uint64
 }
 
 // Creates a new instance of the leaky bucket algorithm
 func NewLeakyBucket(
 	// how fast symbols leak out of the bucket
-	symbolsPerSecondLeakRate int64,
+	symbolsPerSecondLeakRate uint64,
 	// bucketCapacityDuration * symbolsPerSecondLeakRate becomes the bucket capacity
 	bucketCapacityDuration time.Duration,
 	// whether to err on the side of permitting more or less throughput
@@ -73,18 +74,22 @@ func NewLeakyBucket(
 	// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
-	if symbolsPerSecondLeakRate <= 0 {
-		return nil, fmt.Errorf("symbolsPerSecondLeakRate must be > 0, got %d", symbolsPerSecondLeakRate)
+	if symbolsPerSecondLeakRate == 0 {
+		return nil, errors.New("symbolsPerSecondLeakRate must be > 0")
 	}
 
-	bucketCapacity := symbolsPerSecondLeakRate * bucketCapacityDuration.Nanoseconds() / 1e9
-
-	if bucketCapacity <= 0 {
-		return nil, fmt.Errorf("bucket capacity must be > 0, got %d (from leak rate %d symbols/sec * duration %s)",
-			bucketCapacity, symbolsPerSecondLeakRate, bucketCapacityDuration)
+	if bucketCapacityDuration <= 0 {
+		return nil, fmt.Errorf("bucketCapacityDuration must be > 0, got %s", bucketCapacityDuration)
 	}
 
-	var currentFillLevel int64
+	bucketCapacity := symbolsPerSecondLeakRate * uint64(bucketCapacityDuration.Nanoseconds()) / 1e9
+
+	if bucketCapacity == 0 {
+		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %d symbols/sec * duration %s)",
+			symbolsPerSecondLeakRate, bucketCapacityDuration)
+	}
+
+	var currentFillLevel uint64
 	switch biasBehavior {
 	case BiasPermitMore:
 		// starting with a fill level of 0 means the bucket starts out with available capacity
@@ -116,9 +121,9 @@ func NewLeakyBucket(
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed fill doesn't count against the meter.
-func (lb *LeakyBucket) Fill(now time.Time, symbolCount int64) error {
-	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) error {
+	if symbolCount == 0 {
+		return errors.New("symbolCount must be > 0")
 	}
 
 	err := lb.leak(now)
@@ -127,7 +132,7 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount int64) error {
 	}
 
 	// this is how full the bucket would be, if the fill were to be accepted
-	newFillLevel := lb.currentFillLevel + symbolCount
+	newFillLevel := lb.currentFillLevel + uint64(symbolCount)
 
 	// if newFillLevel is <= the total bucket capacity, no further checks are required
 	if newFillLevel <= lb.bucketCapacity {
@@ -160,9 +165,9 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount int64) error {
 // - Returns a generic error for all other modes of failure.
 //
 // The input time should be the most up-to-date time, NOT the time of the original fill.
-func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount int64) error {
-	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
+	if symbolCount == 0 {
+		return errors.New("symbolCount must be > 0")
 	}
 
 	err := lb.leak(now)
@@ -170,15 +175,12 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount int64) error {
 		return fmt.Errorf("leak: %w", err)
 	}
 
-	newFillLevel := lb.currentFillLevel - symbolCount
-
-	// don't let the bucket get emptier than "totally empty"
-	if newFillLevel < 0 {
+	if lb.currentFillLevel <= uint64(symbolCount) {
 		lb.currentFillLevel = 0
 		return nil
 	}
 
-	lb.currentFillLevel = newFillLevel
+	lb.currentFillLevel = lb.currentFillLevel - uint64(symbolCount)
 	return nil
 }
 
@@ -201,7 +203,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 		lb.previousLeakTime = now
 	}()
 
-	fullSecondLeakage, err := lb.computeFullSecondLeakage(now.Unix())
+	fullSecondLeakage, err := lb.computeFullSecondLeakage(uint64(now.Unix()))
 	if err != nil {
 		return fmt.Errorf("compute full second leakage: %w", err)
 	}
@@ -219,7 +221,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	//   this is the corrected full second leakage span
 	correctedFullSecondLeakage := fullSecondLeakage - lb.previousPartialSecondLeakage
 
-	partialSecondLeakage, err := lb.computePartialSecondLeakage(int64(now.Nanosecond()))
+	partialSecondLeakage, err := lb.computePartialSecondLeakage(uint64(now.Nanosecond()))
 	if err != nil {
 		return fmt.Errorf("compute partial second leakage: %w", err)
 	}
@@ -227,15 +229,12 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 
 	actualLeakage := correctedFullSecondLeakage + partialSecondLeakage
 
-	newFillLevel := lb.currentFillLevel - actualLeakage
-
-	// don't let the bucket get emptier than "totally empty"
-	if newFillLevel < 0 {
+	if lb.currentFillLevel <= actualLeakage {
 		lb.currentFillLevel = 0
 		return nil
 	}
 
-	lb.currentFillLevel = newFillLevel
+	lb.currentFillLevel = lb.currentFillLevel - actualLeakage
 	return nil
 }
 
@@ -252,8 +251,8 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 //	   |----*----------|----------------|----------*-----|
 //	   ↑________________________________↑
 //	computes the correct number of symbols for this time span
-func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, error) {
-	secondsSinceLastUpdate := epochSeconds - lb.previousLeakTime.Unix()
+func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) (uint64, error) {
+	secondsSinceLastUpdate := epochSeconds - uint64(lb.previousLeakTime.Unix())
 	fullSecondLeakage := secondsSinceLastUpdate * lb.symbolsPerSecondLeakRate
 	return fullSecondLeakage, nil
 }
@@ -268,7 +267,7 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds int64) (int64, erro
 //	  |----*----------|----------------|----------*-----|
 //	                                   ↑__________↑
 //	            returns the correct number of symbols for this time span
-func (lb *LeakyBucket) computePartialSecondLeakage(nanos int64) (int64, error) {
+func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) (uint64, error) {
 	switch lb.biasBehavior {
 	case BiasPermitMore:
 		// Round up, to permit more (more leakage = more capacity freed up)

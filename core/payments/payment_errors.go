@@ -11,7 +11,7 @@ import (
 // a requested dispersal.
 type InsufficientReservationCapacityError struct {
 	// The number of symbols that were requested to be dispersed
-	RequestedSymbols int64
+	RequestedSymbols uint32
 }
 
 // Implements the error interface
