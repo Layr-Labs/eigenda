@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -109,6 +110,12 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
+	blobLengthSymbols := uint32(blobCommitments.Length)
+	// TODO(samlaf): are there more properties of the Cert that should lead to [coretypes.MaliciousOperatorsError]s?
+	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
+	}
+
 	relayKeyCount := len(relayKeys)
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
@@ -123,8 +130,6 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	// iterate over relays in random order, until we are able to get the blob from someone
 	for _, val := range indices {
 		relayKey := relayKeys[val]
-
-		blobLengthSymbols := uint32(blobCommitments.Length)
 
 		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
 		// if GetBlob returned an error, try calling a different relay
@@ -170,12 +175,15 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
-// retrieveBlobWithTimeout attempts to retrieve a blob from a given relay, and times out based on config.FetchTimeout
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given relay,
+// and times out based on [RelayPayloadRetrieverConfig.RelayTimeout].
+//
+// blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
+// and MUST be a power of 2. If not, this function will panic.
 func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
 	blobKey *core.BlobKey,
-	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
 	blobLengthSymbols uint32,
 ) (*coretypes.Blob, error) {
 
@@ -189,6 +197,13 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	}
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
+	if errors.Is(err, coretypes.ErrBlobLengthSymbolsNotPowerOf2) {
+		panic(fmt.Errorf(
+			"retrieveBlobWithTimeout: blobLengthSymbols=%d is not power of 2: "+
+				"this is a major broken invariant, that should have been checked by the validators, "+
+				"and the caller (GetEncodedPayload) should already have checked this invariant "+
+				"and returned a MaliciousOperatorsError", blobLengthSymbols))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}

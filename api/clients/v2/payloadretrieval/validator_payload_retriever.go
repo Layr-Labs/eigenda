@@ -2,6 +2,7 @@ package payloadretrieval
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -9,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -99,6 +101,12 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 		return nil, fmt.Errorf("compute blob key from eigenDACert: %w", err)
 	}
 
+	blobLengthSymbols := uint32(blobHeader.BlobCommitments.Length)
+	// TODO(samlaf): are there more properties of the Cert that should lead to [coretypes.MaliciousOperatorsError]s?
+	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
+	}
+
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
 		blob, err := pr.retrieveBlobWithTimeout(
@@ -170,6 +178,13 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	}
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(header.BlobCommitments.Length))
+	if errors.Is(err, coretypes.ErrBlobLengthSymbolsNotPowerOf2) {
+		panic(fmt.Errorf(
+			"retrieveBlobWithTimeout: blobLengthSymbols=%d is not power of 2: "+
+				"this is a major broken invariant, that should have been checked by the validators, "+
+				"and the caller (GetEncodedPayload) should already have checked this invariant "+
+				"and returned a MaliciousOperatorsError", header.BlobCommitments.Length))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}
