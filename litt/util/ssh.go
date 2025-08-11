@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // SSHSession encapsulates an SSH session with a remote host.
@@ -23,17 +24,36 @@ type SSHSession struct {
 }
 
 // Create a new SSH session to a remote host.
+//
+// If the knownHosts parameter is provided, it will be used to verify the host's key. If it is absent or empty,
+// the host key verification will be skipped.
 func NewSSHSession(
 	logger logging.Logger,
 	user string,
 	host string,
 	port uint64,
 	keyPath string,
+	knownHosts string,
 	verbose bool,
 ) (*SSHSession, error) {
+
+	var err error
+
+	hostKeyCallback := ssh.InsecureIgnoreHostKey()
+	if knownHosts != "" {
+		knownHosts, err = SanitizePath(knownHosts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to normalize known hosts path: %w", err)
+		}
+		hostKeyCallback, err = knownhosts.New(knownHosts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse known hosts path: %w", err)
+		}
+	}
+
 	config := &ssh.ClientConfig{
 		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	if err := ErrIfNotExists(keyPath); err != nil {
@@ -113,7 +133,7 @@ func (s *SSHSession) FindFiles(root string, extensions []string) ([]string, erro
 
 // Mkdirs creates the specified directory on the remote machine, including any necessary parent directories.
 func (s *SSHSession) Mkdirs(path string) error {
-	_, stderr, err := s.Exec(fmt.Sprintf("mkdir -p %s", path))
+	_, stderr, err := s.Exec(fmt.Sprintf("mkdir -p '%s'", path))
 	if err != nil {
 		if strings.Contains(stderr, "File exists") {
 			// Directory already exists, no error needed

@@ -54,12 +54,12 @@ func GetUniqueSSHTestPort(testName string) (int, error) {
 	h := fnv.New32a()
 	h.Write([]byte(testName))
 	hash := h.Sum32()
-	
+
 	// Try multiple ports starting from the hash-based offset
 	for i := 0; i < 10; i++ {
 		portOffset := int((hash + uint32(i)) % 100)
 		port := SSHTestPortBase + portOffset
-		
+
 		// Check if this port is free with a short timeout
 		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
@@ -69,7 +69,7 @@ func GetUniqueSSHTestPort(testName string) (int, error) {
 		}
 		_ = conn.Close()
 	}
-	
+
 	// If no port found in the hash range, fall back to free port finder
 	return GetFreeSSHTestPort()
 }
@@ -149,7 +149,6 @@ func (c *SSHTestContainer) Cleanup() error {
 	return nil
 }
 
-
 // GenerateSSHKeyPair creates an RSA key pair for testing
 func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -218,6 +217,7 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 				"localhost",
 				sshPort,
 				privateKeyPath,
+				"",
 				false)
 			if err == nil {
 				_ = session.Close()
@@ -261,7 +261,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	h.Write(publicKeyContent)
 	keyHash := fmt.Sprintf("%08x", h.Sum32()) // Pad to 8 characters with leading zeros
 	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
-	
+
 	// Check if image already exists to avoid rebuilding
 	_, _, err = cli.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
@@ -378,7 +378,7 @@ func BuildSSHTestImage(
 	// Create a buffer to capture build output for debugging on failure
 	var buildOutput strings.Builder
 	reader := io.TeeReader(response.Body, &buildOutput)
-	
+
 	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
 		// Include build output in error for debugging

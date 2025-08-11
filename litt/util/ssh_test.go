@@ -14,7 +14,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
 	container := SetupSSHTestContainer(t, "")
-	defer func() { 
+	defer func() {
 		if err := container.Cleanup(); err != nil {
 			t.Logf("Warning: failed to cleanup container: %v", err)
 		}
@@ -30,6 +30,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	require.NotNil(t, session)
@@ -42,6 +43,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		"/nonexistent/key",
+		"",
 		false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "private key does not exist")
@@ -53,6 +55,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		false)
 	require.Error(t, err)
 }
@@ -63,7 +66,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	dataDir := t.TempDir()
 
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { 
+	defer func() {
 		if err := container.Cleanup(); err != nil {
 			t.Logf("Warning: failed to cleanup container: %v", err)
 		}
@@ -78,6 +81,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -109,7 +113,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	dataDir := t.TempDir()
 
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { 
+	defer func() {
 		if err := container.Cleanup(); err != nil {
 			t.Logf("Warning: failed to cleanup container: %v", err)
 		}
@@ -124,6 +128,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -164,7 +169,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	// Create a temporary data directory for testing
 	dataDir := t.TempDir()
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { 
+	defer func() {
 		if err := container.Cleanup(); err != nil {
 			t.Logf("Warning: failed to cleanup container: %v", err)
 		}
@@ -179,6 +184,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
