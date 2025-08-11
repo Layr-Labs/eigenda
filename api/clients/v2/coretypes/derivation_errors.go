@@ -5,10 +5,46 @@ import (
 	"fmt"
 
 	_ "github.com/Layr-Labs/eigenda/api/clients/codecs"
+	_ "github.com/Layr-Labs/eigenda/encoding"
+)
+
+// Sentinel [DerivationError] errors that set the correct StatusCode.
+// If used directly, extend them using [DerivationError.WithMessage] to add context.
+// Otherwise, see the specific constructors below for creating these errors with context.
+//
+// Note: we purposefully don't use StatusCode 0 here, to prevent default value bugs in case people
+// create a DerivationError by hand without using the constructors or sentinel errors defined here.
+var (
+	// Signifies that the input can't be parsed into a versioned cert.
+	ErrCertParsingFailedDerivationError = DerivationError{StatusCode: 1}
+	// Signifies that the cert is invalid due to a recency check failure,
+	// meaning that `cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize`.
+	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
+	ErrRecencyCheckFailedDerivationError = DerivationError{StatusCode: 2}
+	// Signifies that the CertVerifier.checkDACert eth-call returned an error status code.
+	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation
+	ErrInvalidCertDerivationError = DerivationError{StatusCode: 3}
+	// Signifies that the blob is incorrectly encoded, and cannot be decoded into a valid payload.
+	// See [codecs.PayloadEncodingVersion] for the different supported encodings.
+	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation
+	ErrBlobDecodingFailedDerivationError = DerivationError{StatusCode: 4}
+)
+
+// Sentinel [MaliciousOperatorsError] errors.
+// Extend these with
+var (
+	// [encoding.BlobCommitments.Length] needs to be a power of 2, and that is checked by the eigenda validators:
+	// https://github.com/Layr-Labs/eigenda/blob/cc392dbabef362f2e03a4b35616a407d45fad510/core/v2/assignment.go#L308
+	// Therefore, if we ever receive a cert with a blob length that is not a power of 2,
+	// it means that the eigenda validators are colluding and doing something fishy.
+	ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError = MaliciousOperatorsError{
+		Msg: "blob length in cert commitment is not a power of 2",
+	}
 )
 
 // DerivationErrorStatusCode is an enum for the different error status codes
-// that can be returned during EigenDA "derivation" of a payload from a DA cert.
+// that can be returned during EigenDA "derivation" of a payload from a DA cert,
+// and signify that the cert is invalid and should be dropped.
 // For more details, see the EigenDA spec on derivation:
 // https://github.com/Layr-Labs/eigenda/blob/f4ef5cd5/docs/spec/src/integration/spec/6-secure-integration.md#derivation-process
 //
@@ -58,28 +94,6 @@ func (e DerivationError) Validate() {
 	// but we don't enforce it.
 }
 
-// These errors can be used as sentinels to indicate specific derivation errors,
-// but they should be used with the `WithMessage` method to add context.
-// Also see the constructors below for creating these errors with context.
-//
-// Note: we purposefully don't use StatusCode 0 here, to prevent default value bugs in case people
-// create a DerivationError by hand without using the constructors or sentinel errors defined here.
-var (
-	// Signifies that the input can't be parsed into a versioned cert.
-	ErrCertParsingFailedDerivationError = DerivationError{StatusCode: 1}
-	// Signifies that the cert is invalid due to a recency check failure,
-	// meaning that `cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize`.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
-	ErrRecencyCheckFailedDerivationError = DerivationError{StatusCode: 2}
-	// Signifies that the CertVerifier.checkDACert eth-call returned an error status code.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation
-	ErrInvalidCertDerivationError = DerivationError{StatusCode: 3}
-	// Signifies that the blob is incorrectly encoded, and cannot be decoded into a valid payload.
-	// See [codecs.PayloadEncodingVersion] for the different supported encodings.
-	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation
-	ErrBlobDecodingFailedDerivationError = DerivationError{StatusCode: 4}
-)
-
 // Signifies that the cert is invalid due to a parsing failure,
 // meaning that a versioned cert could not be parsed from the serialized hex string.
 // For example a CertV3 failed to get rlp.decoded from the hex string.
@@ -99,4 +113,36 @@ func NewRBNRecencyCheckFailedError(
 			"RBN recency check failed: certL1InclusionBlockNumber (%d) > cert.RBN (%d) + RBNRecencyWindowSize (%d)",
 			certL1InclusionBlock, certRBN, rbnRecencyWindowSize,
 		))
+}
+
+// MaliciousOperatorsErrors are kept separate from [DerivationError]s because
+// they are triggered by errors that should have been validated by the EigenDA operators.
+// This means that certs that trigger these errors should never have been signed.
+//
+// Although the certs that trigger these errors could also be dropped from rollup derivation
+// pipelines the same way that DerivationErrors are, they are more serious errors and
+// signify that the eigenda validators are possibly colluding and attempting something fishy.
+// These errors should cause the software to crash, stopping the rollup and raising alarms
+// to investigate the validators or the issue.
+//
+// If a bug explaining these errors is not found, then very likely the validators
+// should get slashed.
+type MaliciousOperatorsError struct {
+	// The BlobKey can be used to retrieve the BlobStatus to reconstruct the DACert.
+	BlobKey string
+	// The Msg field contains a human-readable error message explaining the issue.
+	// We don't need a status code for these errors because there is no way to
+	// programmatically deal with them.
+	Msg string
+}
+
+func (e MaliciousOperatorsError) Error() string {
+	return fmt.Sprintf("malicious operators error: blob key %s, message: %s", e.BlobKey, e.Msg)
+}
+
+func (e MaliciousOperatorsError) WithBlobKey(blobKey string) MaliciousOperatorsError {
+	return MaliciousOperatorsError{
+		BlobKey: blobKey,
+		Msg:     e.Msg,
+	}
 }
