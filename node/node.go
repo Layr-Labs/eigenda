@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -60,6 +61,9 @@ var (
 	}
 )
 
+// TODO (cody.littley): refactor all exported fields in this struct to private fields and ensure that all interaction
+//  is mediated by methods.
+
 type Node struct {
 	Config                  *Config
 	Logger                  logging.Logger
@@ -94,6 +98,9 @@ type Node struct {
 	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
 	// QuorumCount is the number of quorums in the network.
 	QuorumCount atomic.Uint32
+
+	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
+	storeChunksSemaphore *semaphore.Weighted
 }
 
 // NewNode creates a new Node with the provided config.
@@ -261,6 +268,8 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
+	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
+
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -277,6 +286,7 @@ func NewNode(
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
+		storeChunksSemaphore:    storeChunksSemaphore,
 	}
 
 	if !config.EnableV2 {
@@ -317,11 +327,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 
-		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block number: %w", err)
 		}
-		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
@@ -384,9 +394,16 @@ func configureMemoryLimits(logger logging.Logger, config *Config) error {
 		}
 		totalAllocated += config.LittDBWriteCacheSizeBytes
 
-		// TODO (cody.littley): when the limit is set for the memory used by in-flight blobs, configure that memory
-		//  limit here. It's important to ensure that all reserved memory buckets sum to less than the maximum
-		//  available memory.
+		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"StoreChunks Buffer",
+			config.StoreChunksBufferSizeBytes,
+			config.StoreChunksBufferSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.StoreChunksBufferSizeBytes
 	}
 
 	if totalAllocated > maxMemory {

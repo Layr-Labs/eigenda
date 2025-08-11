@@ -56,6 +56,10 @@ func (n *Node) DownloadBundles(
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
 	rawBundles := make([]*RawBundle, len(batch.BlobCertificates))
 	requests := make(map[corev2.RelayKey]*relayRequest)
+
+	// Tally the number of bytes we are about to download.
+	var downloadSizeInBytes uint64
+
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
@@ -80,11 +84,16 @@ func (n *Node) DownloadBundles(
 		}
 
 		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
-
 		if err != nil {
 			n.Logger.Errorf("failed to get assignment: %v", err)
 			continue
 		}
+
+		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get chunk length: %w", err)
+		}
+		downloadSizeInBytes += uint64(assgn.NumChunks() * chunkLength)
 
 		req, ok := requests[relayKey]
 		if !ok {
@@ -104,6 +113,21 @@ func (n *Node) DownloadBundles(
 			assignment:     assgn,
 		})
 
+	}
+
+	// storeChunksSemaphore can be nil during unit tests, since there are a bunch of places where the Node struct
+	// is instantiated directly without using the constructor.
+	if n.storeChunksSemaphore != nil {
+		// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
+		// is capacity in the store chunks buffer. This is an OOM safety measure.
+
+		probe.SetStage("acquire_buffer_capacity")
+		semaphoreCtx, cancel := context.WithTimeout(ctx, n.Config.StoreChunksBufferTimeout)
+		defer cancel()
+		err := n.storeChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+		}
 	}
 
 	probe.SetStage("download")
@@ -140,7 +164,6 @@ func (n *Node) DownloadBundles(
 
 	probe.SetStage("deserialize")
 
-	var err error
 	for i := 0; i < len(requests); i++ {
 		resp := responses[i]
 		if resp.err != nil {
@@ -155,6 +178,7 @@ func (n *Node) DownloadBundles(
 
 		for j, bundle := range resp.bundles {
 			metadata := resp.metadata[j]
+			var err error
 			blobShards[metadata.blobShardIndex].Bundle, err = new(core.Bundle).Deserialize(bundle)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
