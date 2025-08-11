@@ -1,15 +1,20 @@
 #!/bin/bash
 
-# Fix permissions on mounted directories
-# The host mounts will override directory ownership, so we need to fix it at runtime
+# Create container-controlled workspace directories
+# Instead of trying to change ownership of mounted directories (which often fails),
+# we create subdirectories that the container user fully owns
 if [ -d "/mnt/data" ]; then
-    chown testuser:testuser /mnt/data
-    chmod 755 /mnt/data
+    # Create a container workspace that testuser fully owns
+    mkdir -p /mnt/data/container_workspace/work
+    chown -R testuser:testuser /mnt/data/container_workspace
+    chmod -R 755 /mnt/data/container_workspace
 fi
 
 if [ -d "/mnt/test" ]; then
-    chown testuser:testuser /mnt/test
-    chmod 755 /mnt/test
+    # Create a container workspace that testuser fully owns  
+    mkdir -p /mnt/test/container_workspace/work
+    chown -R testuser:testuser /mnt/test/container_workspace
+    chmod -R 755 /mnt/test/container_workspace
 fi
 
 # Start SSH daemon in background

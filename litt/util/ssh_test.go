@@ -91,14 +91,15 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Verify directories were created
-	exists, err := Exists(path.Join(dataDir, "foo"))
+	// Verify directories were created in the container workspace
+	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
+	exists, err := Exists(path.Join(workspaceDir, "foo"))
 	require.NoError(t, err)
 	require.True(t, exists)
-	exists, err = Exists(path.Join(dataDir, "foo", "bar"))
+	exists, err = Exists(path.Join(workspaceDir, "foo", "bar"))
 	require.NoError(t, err)
 	require.True(t, exists)
-	exists, err = Exists(path.Join(dataDir, "foo", "bar", "baz"))
+	exists, err = Exists(path.Join(workspaceDir, "foo", "bar", "baz"))
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -138,8 +139,9 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Create test files using the mounted data directory
-	searchDir := filepath.Join(dataDir, "search")
+	// Create test files using the container workspace directory
+	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
+	searchDir := filepath.Join(workspaceDir, "search")
 	err = os.MkdirAll(searchDir, 0755)
 	require.NoError(t, err)
 
@@ -200,8 +202,9 @@ func TestSSHSession_Rsync(t *testing.T) {
 	err = session.Rsync(localFile, remoteFile, 0)
 	require.NoError(t, err)
 
-	// Verify file was transferred via the mounted data directory
-	transferredFile := filepath.Join(dataDir, "remote_file.txt")
+	// Verify file was transferred via the container workspace directory
+	workspaceDir := filepath.Join(dataDir, "container_workspace", "work")
+	transferredFile := filepath.Join(workspaceDir, "remote_file.txt")
 	transferredContent, err := os.ReadFile(transferredFile)
 	require.NoError(t, err)
 	require.Equal(t, testContent, transferredContent)
@@ -216,8 +219,8 @@ func TestSSHSession_Rsync(t *testing.T) {
 	err = session.Rsync(localFile2, remoteFile2, 1.0) // 1MB/s throttle
 	require.NoError(t, err)
 
-	// Verify throttled file was transferred via the mounted data directory
-	transferredFile2 := filepath.Join(dataDir, "throttled_file.txt")
+	// Verify throttled file was transferred via the container workspace directory  
+	transferredFile2 := filepath.Join(workspaceDir, "throttled_file.txt")
 	transferredContent2, err := os.ReadFile(transferredFile2)
 	require.NoError(t, err)
 	require.Equal(t, throttledContent, transferredContent2)

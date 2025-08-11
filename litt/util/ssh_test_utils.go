@@ -117,8 +117,12 @@ func (c *SSHTestContainer) GetHost() string {
 	return c.host
 }
 
-// GetDataDir returns the path to the mounted data directory from container's perspective
+// GetDataDir returns the path to the container-controlled workspace directory
 func (c *SSHTestContainer) GetDataDir() string {
+	if c.dataDir != "" {
+		// Return the container-controlled workspace subdirectory, not the mount root
+		return c.dataDir + "/container_workspace/work"
+	}
 	return c.dataDir
 }
 
@@ -280,10 +284,16 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	// Wait for SSH to be ready
 	WaitForSSH(t, sshPort, privateKeyPath)
 
-	// Set dataDir path from container's perspective
+	// Set dataDir path from container's perspective and create workspace structure
 	containerDataDir := ""
 	if dataDir != "" {
 		containerDataDir = "/mnt/data"
+		
+		// Create the container_workspace directory structure on host side
+		// This gives the container a place to create its own workspace
+		containerWorkspace := filepath.Join(dataDir, "container_workspace")
+		err = os.MkdirAll(containerWorkspace, 0777) // Wide permissions so container can take over
+		require.NoError(t, err)
 	}
 
 	return &SSHTestContainer{
