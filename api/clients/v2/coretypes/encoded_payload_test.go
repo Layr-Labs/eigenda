@@ -11,7 +11,9 @@ import (
 // TestEncodePayload tests that the encoding of a Payload to an EncodedPayload works as expected.
 func TestEncodeDecodePayload(t *testing.T) {
 
-	// map of hex-encoded payloads (inputs) and their expected EncodedPayloads (outputs)
+	// map of hex-encoded payloads (inputs) and their expected EncodedPayloads (outputs).
+	// The encoded payloads are broken into 32 byte chunks so as to make them more easily understandable.
+	// For example, the first string is always the header.
 	testCases := map[string]string{
 		// empty payload should only have a header symbol
 		"": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -39,36 +41,38 @@ func TestEncodeDecodePayload(t *testing.T) {
 }
 
 func TestDecodePayloadErrors(t *testing.T) {
+	// The encodedHex payloads are broken into 32 byte chunks so as to make them more easily understandable.
+	// For example, the first string is always the header.
 	testCases := []struct {
-		name       string
-		encodedHex string
+		name              string
+		encodedPayloadHex string
 	}{
 		{
-			name:       "Insufficient Length Doesn't Contain Header",
-			encodedHex: "000000000000",
+			name:              "Insufficient Length Doesn't Contain Header",
+			encodedPayloadHex: "000000000000",
 		},
 		{
-			name:       "First byte must be 0x00",
-			encodedHex: "0100000000000000000000000000000000000000000000000000000000000000",
+			name:              "First byte must be 0x00",
+			encodedPayloadHex: "0100000000000000000000000000000000000000000000000000000000000000",
 		},
 		{
-			name:       "Only version 0x00 is supported",
-			encodedHex: "0001000000000000000000000000000000000000000000000000000000000000",
+			name:              "Only version 0x00 is supported",
+			encodedPayloadHex: "0001000000000000000000000000000000000000000000000000000000000000",
 		},
 		{
-			name:       "Payload length must be a multiple of 32 bytes",
-			encodedHex: "0000000000010000000000000000000000000000000000000000000000000000" + "000100",
+			name:              "Payload length must be a multiple of 32 bytes",
+			encodedPayloadHex: "0000000000010000000000000000000000000000000000000000000000000000" + "000100",
 		},
 		{
 			name: "wrong payload length: 32 bytes of data, but header says 64",
-			encodedHex: "0000000000020000000000000000000000000000000000000000000000000000" +
+			encodedPayloadHex: "0000000000020000000000000000000000000000000000000000000000000000" +
 				"0000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bytes, err := hex.DecodeString(tc.encodedHex)
+			bytes, err := hex.DecodeString(tc.encodedPayloadHex)
 			require.NoError(t, err)
 
 			encodedPayload := DeserializeEncodedPayloadUnchecked(bytes)
