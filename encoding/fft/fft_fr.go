@@ -153,7 +153,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	if n > fs.MaxWidth {
 		return fmt.Errorf("got %d values but only have %d roots of unity", n, fs.MaxWidth)
 	}
-	if !IsPowerOfTwo(n) {
+	if !isPowerOfTwo(n) {
 		return NewFFTInputNotPowerOfTwoError(n)
 	}
 	if inv {

@@ -35,8 +35,8 @@ import (
 	"math/bits"
 )
 
-// IsPowerOfTwo returns true if the provided integer v is a power of 2.
-func IsPowerOfTwo(v uint64) bool {
+// isPowerOfTwo returns true if the provided integer v is a power of 2.
+func isPowerOfTwo(v uint64) bool {
 	return (v&(v-1) == 0) && (v != 0)
 }
 
