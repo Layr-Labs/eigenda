@@ -422,10 +422,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
-			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
@@ -434,13 +434,13 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
 		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		Value:    0.45,
+		Value:    0.15,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
-	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+	LittDBReadCacheSizeGBFlag = cli.Float64Flag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
-			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
@@ -457,6 +457,12 @@ var (
 		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
+	}
+	LittUnsafePurgeLocksFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
+		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -493,12 +499,44 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
 	}
-	GCSafetyBufferSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
-		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+	GCSafetyBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
+			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
+	}
+	GCSafetyBufferSizeFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-fraction"),
+		Usage: "The fraction of the total memory to use for the safety buffer for garbage collection. Is" +
+			" ignored if NODE_GC_SAFETY_BUFFER_SIZE_GB > 0.",
+		Required: false,
+		Value:    0.2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
+	}
+	StoreChunksBufferTimeoutFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
+		Usage: "The maximum amount of time to wait to acquire buffer capacity " +
+			"to store chunks in the StoreChunks() gRPC request",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_TIMEOUT"),
+	}
+	StoreChunksBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-gb"),
+		Usage: "The maximum memory that can be used for StoreChunks() gRPC request buffer in gigabytes. " +
+			"Overrides NODE_STORE_CHUNKS_BUFFER_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_GB"),
+	}
+	StoreChunksBufferSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-fraction"),
+		Usage:    "The fraction of total memory to use for StoreChunks() gRPC request buffer.",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -638,6 +676,10 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	LittUnsafePurgeLocksFlag,
+	StoreChunksBufferTimeoutFlag,
+	StoreChunksBufferSizeGBFlag,
+	StoreChunksBufferSizeFractionFlag,
 }
 
 func init() {

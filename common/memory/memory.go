@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/shirou/gopsutil/mem"
 )
@@ -56,10 +55,7 @@ func GetMaximumAvailableMemory() (uint64, error) {
 
 // SetGCMemorySafetyBuffer tells the garbage collector to aggressively garbage collect when there is only safetyBuffer
 // bytes of memory available. Useful for preventing kubernetes from OOM-killing the process.
-func SetGCMemorySafetyBuffer(
-	logger logging.Logger,
-	safetyBuffer uint64,
-) error {
+func SetGCMemorySafetyBuffer(safetyBuffer uint64) error {
 
 	maxMemory, err := GetMaximumAvailableMemory()
 	if err != nil {
@@ -73,12 +69,6 @@ func SetGCMemorySafetyBuffer(
 	limit := maxMemory - safetyBuffer
 
 	debug.SetMemoryLimit(int64(limit))
-
-	logger.Infof("Detected %.2fGB available memory. "+
-		"Setting GC target memory limit to %.2f in order to maintain a safety buffer of %.2fGB",
-		float64(maxMemory)/float64(units.GiB),
-		float64(limit)/float64(units.GiB),
-		float64(safetyBuffer)/float64(units.GiB))
 
 	return nil
 }

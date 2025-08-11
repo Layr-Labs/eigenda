@@ -32,8 +32,6 @@ const (
 	disperserHostname          = "disperser-testnet-holesky.eigenda.xyz"
 	certVerifierRouterAddress  = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
 	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
-	// To build Eth Client
-	eigendaDirectoryAddress = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 	// These two addresses are no longer required for the Eth Client, but parameter is still being taken until we deprecate the flags
 	eigenDAServiceManagerAddress = ""
 	// blsOperatorStateRetrieverAddress is still used for CertBuilder
@@ -340,7 +338,6 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		eigendaDirectoryAddress,
 		blsOperatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
 	)

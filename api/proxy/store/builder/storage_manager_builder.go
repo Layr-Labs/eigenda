@@ -545,7 +545,6 @@ func buildEthReader(log logging.Logger,
 	ethReader, err := eth.NewReader(
 		log,
 		ethClient,
-		clientConfigV2.EigenDADirectory,
 		clientConfigV2.BLSOperatorStateRetrieverAddr,
 		clientConfigV2.EigenDAServiceManagerAddr,
 	)

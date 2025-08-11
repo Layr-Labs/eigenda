@@ -35,8 +35,9 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
 			Name:     EnabledFlagName,
-			Usage:    "Enable the metrics server",
+			Usage:    "Enable the metrics server. On by default, so use --metrics.enabled=false to disable.",
 			Category: category,
+			Value:    true,
 			EnvVars:  withEnvPrefix(envPrefix, "ENABLED"),
 		},
 		&cli.StringFlag{
