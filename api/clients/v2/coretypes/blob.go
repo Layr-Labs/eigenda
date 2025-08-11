@@ -123,10 +123,8 @@ func (b *Blob) toEvalPoly() []fr.Element {
 }
 
 // blobFromCoefficients creates a blob from the coefficients of a polynomial.
-// A Blob must have a power of two coefficients. Thus:
-//   - If the passed coefficients are a power of 2 in length, they will be used as is.
-//   - If the coefficients are not a power of 2 in length, they will be copied to a new slice that is padded with zeros
-//     to the next power of two in length.
+// The passed coefficients slice will be used as is (no copying), and should have a power of 2 len,
+// otherwise an error will be returned.
 func blobFromCoefficients(coefficients []fr.Element) (*Blob, error) {
 	if !encoding.IsPowerOfTwo(len(coefficients)) {
 		return nil, fmt.Errorf("blob must have a power of 2 coefficients, but got %d coefficients", len(coefficients))
