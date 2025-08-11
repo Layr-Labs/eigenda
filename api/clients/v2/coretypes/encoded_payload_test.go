@@ -31,6 +31,7 @@ func TestEncodeDecodePayload(t *testing.T) {
 			payload, err := hex.DecodeString(payloadHex)
 			require.NoError(t, err)
 			encodedPayload := Payload(payload).ToEncodedPayload()
+			// Run this here even though its called in Decode() in order to catch encoding bugs early.
 			require.NoError(t, encodedPayload.checkLenInvariant())
 			require.Equal(t, expectedEncodedPayloadHex, hex.EncodeToString(encodedPayload.bytes))
 			decodedPayload, err := encodedPayload.Decode()
@@ -73,7 +74,7 @@ func TestDecodePayloadErrors(t *testing.T) {
 			bytes, err := hex.DecodeString(tc.encodedHex)
 			require.NoError(t, err)
 
-			encodedPayload := &EncodedPayload{bytes: bytes}
+			encodedPayload := DeserializeEncodedPayloadUnchecked(bytes)
 			_, err = encodedPayload.Decode()
 			require.Error(t, err)
 		})
