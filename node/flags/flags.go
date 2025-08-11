@@ -158,8 +158,8 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Address Directory",
-		Required: false,
+		Usage:    "Address of the EigenDA Contract Directory",
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{

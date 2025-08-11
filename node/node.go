@@ -98,7 +98,6 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
-// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
 	ctx context.Context,
 	reg *prometheus.Registry,
@@ -109,12 +108,6 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
-	if config.EigenDADirectory == "" {
-		return nil, fmt.Errorf("EigenDADirectory must be set")
-	}
-	if !gethcommon.IsHexAddress(config.EigenDADirectory) {
-		return nil, fmt.Errorf("EigenDADirectory must be a valid hex address: %s", config.EigenDADirectory)
-	}
 	contractDirectory, err := directory.NewContractDirectory(
 		ctx, logger, client, gethcommon.HexToAddress(config.EigenDADirectory))
 	if err != nil {
@@ -226,31 +219,11 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// TODO (cody.littley): make contract directory config mandatory
-
-	// If EigenDADirectory is provided, use it to get service manager addresses
-	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
-	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
-		contractDirectory, err := directory.NewContractDirectory(
-			ctx,
-			logger,
-			client,
-			gethcommon.HexToAddress(config.EigenDADirectory))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create contract directory: %w", err)
-		}
-
-		eigenDAServiceManagerAddr, err =
-			contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
-		}
-	} else {
-		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
-			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
-			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
+	eigenDAServiceManagerAddr, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
 	}
+
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
