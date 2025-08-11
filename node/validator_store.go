@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
@@ -114,6 +113,7 @@ func NewValidatorStore(
 	littConfig.MetricsNamespace = littDBMetricsPrefix
 	littConfig.Logger = logger
 	littConfig.DoubleWriteProtection = config.LittDBDoubleWriteProtection
+	littConfig.PurgeLocks = config.LittUnsafePurgeLocks
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new litt config: %w", err)
 	}
@@ -128,46 +128,12 @@ func NewValidatorStore(
 		return nil, fmt.Errorf("failed to get chunks table: %w", err)
 	}
 
-	maxMemory, err := memory.GetMaximumAvailableMemory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get maximum available memory: %w", err)
-	}
-
-	writeCacheSize := uint64(0)
-	if config.LittDBWriteCacheSizeGB > 0 {
-		writeCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
-		logger.Infof("LittDB write cache size configured to use %.2f GB.\n", config.LittDBWriteCacheSizeGB)
-	} else {
-		writeCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
-		logger.Infof("LittDB write cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
-			config.LittDBWriteCacheSizeFraction*100.0,
-			float64(maxMemory)/float64(units.GiB),
-			float64(writeCacheSize)/float64(units.GiB))
-	}
-
-	readCacheSize := uint64(0)
-	if config.LittDBReadCacheSizeGB > 0 {
-		readCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
-		logger.Infof("LittDB read cache size configured to use %.2f GB.\n", config.LittDBReadCacheSizeGB)
-	} else {
-		readCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
-		logger.Infof("LittDB read cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
-			config.LittDBReadCacheSizeFraction*100.0,
-			float64(maxMemory)/float64(units.GiB),
-			float64(readCacheSize)/float64(units.GiB))
-	}
-
-	if writeCacheSize+readCacheSize >= maxMemory {
-		return nil, fmt.Errorf("write cache size + read cache size must be less than max memory. "+
-			"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
-	}
-
-	err = chunkTable.SetWriteCacheSize(writeCacheSize)
+	err = chunkTable.SetWriteCacheSize(config.LittDBWriteCacheSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set write cache size for chunks table: %w", err)
 	}
 
-	err = chunkTable.SetReadCacheSize(readCacheSize)
+	err = chunkTable.SetReadCacheSize(config.LittDBReadCacheSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set read cache size for chunks table: %w", err)
 	}

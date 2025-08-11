@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -103,12 +104,22 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
-
 	for _, rootPath := range config.Paths {
 		err := util.EnsureDirectoryExists(rootPath, config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("error ensuring directory %s exists: %w", rootPath, err)
 		}
+	}
+
+	if config.PurgeLocks {
+		config.Logger.Warnf("Purging LittDB locks from paths %v", config.Paths)
+		err := disktable.Unlock(config.Logger, config.Paths)
+		if err != nil {
+			return nil, fmt.Errorf("error purging locks: %w", err)
+		}
+		config.Logger.Infof("Locks purged successfully")
+	} else {
+		config.Logger.Infof("Not purging locks, continuing with existing locks")
 	}
 
 	releaseLocks, err := util.LockDirectories(config.Logger, config.Paths, util.LockfileName, config.Fsync)
