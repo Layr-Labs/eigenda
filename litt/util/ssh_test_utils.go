@@ -323,7 +323,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	containerDataDir := ""
 	if dataDir != "" {
 		containerDataDir = "/mnt/data"
-		
+
 		// Create the container_workspace directory structure on host side
 		// This gives the container a place to create its own workspace
 		containerWorkspace := filepath.Join(dataDir, "container_workspace")
