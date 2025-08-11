@@ -126,8 +126,50 @@ func (c *SSHTestContainer) GetDataDir() string {
 	return c.dataDir
 }
 
+// CleanupWorkspace removes container-created files to avoid permission issues during host cleanup
+func (c *SSHTestContainer) CleanupWorkspace() error {
+	if c.dataDir == "" {
+		return nil // No data directory to clean up
+	}
+
+	// Create a temporary SSH session for cleanup
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger for cleanup: %w", err)
+	}
+
+	session, err := NewSSHSession(
+		logger,
+		c.user,
+		c.host,
+		c.sshPort,
+		c.privateKey,
+		"",
+		false) // Don't log connection errors during cleanup
+	if err != nil {
+		// If we can't connect for cleanup, just log and continue
+		fmt.Printf("Warning: could not create SSH session for workspace cleanup: %v\n", err)
+		return nil
+	}
+	defer func() { _ = session.Close() }()
+
+	// Remove the entire workspace directory tree from inside the container
+	// This ensures container-owned files are removed by the container user
+	cleanupCmd := "rm -rf /mnt/data/container_workspace"
+	_, _, err = session.Exec(cleanupCmd)
+	if err != nil {
+		fmt.Printf("Warning: failed to cleanup workspace via SSH: %v\n", err)
+		// Don't return error - this is best-effort cleanup
+	}
+
+	return nil
+}
+
 // Cleanup removes the Docker container and cleans up resources
 func (c *SSHTestContainer) Cleanup() error {
+	// First, cleanup workspace files from inside the container to avoid permission issues
+	_ = c.CleanupWorkspace()
+
 	// Use a context with timeout for cleanup operations
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
