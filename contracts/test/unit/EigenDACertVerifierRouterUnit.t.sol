@@ -21,7 +21,11 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         quorumNumbersRequired = hex"00";
         _deployDA();
         eigenDACertVerifierRouter = new EigenDACertVerifierRouter();
-        eigenDACertVerifierRouter.initialize(address(this), address(0)); // adding a default cert verifier that should fail.
+        uint32[] memory rbns = new uint32[](1);
+        rbns[0] = 0;
+        address[] memory certVerifiers = new address[](1);
+        certVerifiers[0] = address(0);
+        eigenDACertVerifierRouter.initialize(address(this), rbns, certVerifiers); // adding a default cert verifier that should fail.
     }
 
     function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
@@ -34,6 +38,55 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         return EigenDACertTypes.EigenDACertV3(
             signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
         );
+    }
+
+    function test_initializeMultiple(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10;
+        initABNs[1] = initABNs[0] + seed % 10 + 1;
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](3);
+        initCertVerifiers[0] = address(1);
+        initCertVerifiers[1] = address(2);
+        initCertVerifiers[2] = address(3);
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
+
+        for (uint256 i = 0; i < initABNs.length; i++) {
+            assertEq(testRouter.certVerifiers(initABNs[i]), initCertVerifiers[i]);
+            assertEq(testRouter.certVerifierABNs(i), initABNs[i]);
+        }
+    }
+
+    function test_cannotInitializeWithMismatchedLengths(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10;
+        initABNs[1] = initABNs[0] + seed % 10 + 1;
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](2); // Mismatched length
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        vm.expectRevert(EigenDACertVerifierRouter.LengthMismatch.selector);
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
+    }
+
+    function test_cannotInitializeWithBadABNOrder(uint32 seed) public {
+        uint32[] memory initABNs = new uint32[](3);
+        initABNs[0] = seed % 10 + 1;
+        initABNs[1] = initABNs[0] - 1; // Invalid order
+        initABNs[2] = initABNs[1] + seed % 10 + 1;
+
+        address[] memory initCertVerifiers = new address[](3);
+        initCertVerifiers[0] = address(1);
+        initCertVerifiers[1] = address(2);
+        initCertVerifiers[2] = address(3);
+
+        EigenDACertVerifierRouter testRouter = new EigenDACertVerifierRouter();
+        vm.expectRevert(abi.encodeWithSelector(EigenDACertVerifierRouter.ABNNotGreaterThanLast.selector, initABNs[1]));
+        testRouter.initialize(address(this), initABNs, initCertVerifiers);
     }
 
     function test_verifyDACert(uint256 seed1, uint256 seed2, uint256 seed3) public {
