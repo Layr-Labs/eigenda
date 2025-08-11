@@ -25,18 +25,16 @@ type ContractName string
 type ContractDirectory struct {
 	logger logging.Logger
 
+	// Type: ContractName -> gethcommon.Address
 	// Only look up each address once. Most of our code only looks this stuff up at startup, so there isn't much
 	// point in checking a particular contract address multiple times.
-	addressCache map[ContractName]gethcommon.Address
+	addressCache sync.Map
 
 	// a handle for calling the EigenDA directory contract.
 	caller *contractIEigenDADirectory.ContractIEigenDADirectoryCaller
 
 	// A set of all known contract addresses. Used to prevent magic strings from sneaking into the codebase.
 	legalContractSet map[ContractName]struct{}
-
-	// Used to make this utility thread safe.
-	lock sync.Mutex
 }
 
 // Create a new ContractDirectory instance.
@@ -59,7 +57,7 @@ func NewContractDirectory(
 
 	d := &ContractDirectory{
 		logger:           logger,
-		addressCache:     make(map[ContractName]gethcommon.Address),
+		addressCache:     sync.Map{},
 		caller:           caller,
 		legalContractSet: legalContractSet,
 	}
@@ -82,12 +80,9 @@ func (d *ContractDirectory) GetContractAddress(
 		return gethcommon.Address{}, fmt.Errorf("contract name cannot be empty")
 	}
 
-	// This is not very granular. But since this is unlikely to be a performance hotspot, we can do the simple thing.
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	address, ok := d.addressCache[contractName]
+	untypedAddress, ok := d.addressCache.Load(contractName)
 	if ok {
+		address := untypedAddress.(gethcommon.Address)
 		return address, nil
 	}
 
@@ -105,7 +100,7 @@ func (d *ContractDirectory) GetContractAddress(
 		return gethcommon.Address{}, fmt.Errorf("contract %s is not registered onchain", contractName)
 	}
 
-	d.addressCache[contractName] = address
+	d.addressCache.Store(contractName, address)
 
 	d.logger.Debugf("fetched address for contract %s: %s", contractName, address.Hex())
 	return address, nil
@@ -119,8 +114,6 @@ func (d *ContractDirectory) verifyContractList(ctx context.Context) error {
 		return fmt.Errorf("GetAllNames: %w", err)
 	}
 
-	complete := true
-
 	registeredContractSet := make(map[string]struct{}, len(registeredContracts))
 	for _, name := range registeredContracts {
 		registeredContractSet[name] = struct{}{}
@@ -132,14 +125,7 @@ func (d *ContractDirectory) verifyContractList(ctx context.Context) error {
 			d.logger.Errorf(
 				"Contract %s is known to offchain code but not registered in the "+
 					"onchain EigenDA contract directory", contractName)
-			complete = false
 		}
-	}
-
-	if complete {
-		d.logger.Infof("Onchain contract list matches offchain contract list")
-	} else {
-		d.logger.Warnf("Onchain contract list does not match offchain contract list")
 	}
 
 	return nil
