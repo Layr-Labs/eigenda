@@ -81,7 +81,7 @@ func New(
 }
 
 // generateRandomCert ... generates a pseudo random EigenDA V3 certificate
-func (e *MemStore) generateRandomV3Cert(blobContents []byte) (coretypes.EigenDACert, error) {
+func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDACertV3, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
 	// preimage key is computed within the VM from hashing a recomputation of the data
@@ -226,15 +226,15 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 
 	blobSerialized := blob.Serialize()
 
-	// generateRandomV3Cert produces valid kzg commitment
+	// generateRandomV3Cert produces valid blob commitment on G1
 	artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
 	if err != nil {
 		return nil, fmt.Errorf("generating random cert: %w", err)
 	}
 
-	certBytes, err := rlp.EncodeToBytes(artificialV3Cert)
+	certBytes, err := artificialV3Cert.Serialize(coretypes.CertSerializationRLP)
 	if err != nil {
-		return nil, fmt.Errorf("rlp decode v2 cert: %w", err)
+		return nil, fmt.Errorf("rlp decode v3 cert: %w", err)
 	}
 
 	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), blobSerialized)
