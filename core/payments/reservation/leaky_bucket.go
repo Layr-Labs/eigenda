@@ -188,10 +188,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	//	   |----*----------|----------------|----------*-----|
 	//	   ↑________________________________↑
 	//	          fullSecondLeakage
-	fullSecondLeakage, err := lb.computeFullSecondLeakage(uint64(now.Unix()))
-	if err != nil {
-		return fmt.Errorf("compute full second leakage: %w", err)
-	}
+	fullSecondLeakage := lb.computeFullSecondLeakage(uint64(now.Unix()))
 
 	// We need to correct the full-second leakage value: the previous leak calculation already let some symbols from a
 	// partial second period leak out, and those symbols shouldn't leak twice
@@ -244,12 +241,10 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 //
 // Since this method only takes full seconds into consideration, the returned value must be used carefully. See leak()
 // for details.
-//
-// Returns an error if the leakage calculation fails, which should not happen during normal usage.
-func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) (uint64, error) {
+func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) uint64 {
 	secondsSinceLastUpdate := epochSeconds - uint64(lb.previousLeakTime.Unix())
 	fullSecondLeakage := secondsSinceLastUpdate * lb.symbolsPerSecondLeakRate
-	return fullSecondLeakage, nil
+	return fullSecondLeakage
 }
 
 // Accepts a number of nanoseconds, which represent a fraction of a single second.
