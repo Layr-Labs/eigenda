@@ -72,6 +72,7 @@ func CreateTestSuite(
 		metrics,
 		appConfig.StoreBuilderConfig,
 		appConfig.SecretConfig,
+		nil,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("build storage manager: %v", err.Error()))

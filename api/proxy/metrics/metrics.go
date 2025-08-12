@@ -57,12 +57,14 @@ type Metrics struct {
 
 var _ Metricer = (*Metrics)(nil)
 
-func NewMetrics(subsystem string) *Metrics {
+func NewMetrics(registry *prometheus.Registry, subsystem string) *Metrics {
+	if registry == nil {
+		return nil
+	}
 	if subsystem == "" {
 		subsystem = "default"
 	}
 
-	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
 	factory := metrics.With(registry)

@@ -38,7 +38,7 @@ func main() {
 	app.Commands = []*cli.Command{
 		{
 			Name:        "doc",
-			Subcommands: doc.NewSubcommands(metrics.NewMetrics("default")),
+			Subcommands: doc.NewSubcommands(metrics.NewMetrics(nil, "default")),
 		},
 	}
 
