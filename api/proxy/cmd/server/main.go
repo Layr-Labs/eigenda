@@ -33,6 +33,10 @@ func main() {
 	app.Usage = "EigenDA Proxy Sidecar Service"
 	app.Description = "Service for more trustless and secure interactions with EigenDA"
 	app.Action = StartProxySvr
+	// TODO(iquidus): Add new `doc metrics` command to display all supported metrics.
+	// The `doc metrics` command was removed as it only displayed metrics created by
+	// the op-service/metrics factory. The new command should display all metrics
+	// created via promauto or registered directly with the prometheus registry.
 
 	// load env file (if applicable)
 	if p := os.Getenv("ENV_PATH"); p != "" {
