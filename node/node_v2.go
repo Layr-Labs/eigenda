@@ -33,20 +33,17 @@ type RawBundle struct {
 	Bundle          []byte
 }
 
-// Determines where to find the chunks we need to download for a given batch.
+// Determines where to find the chunks we need to download for a given batch. For each chunk in a batch, there will
+// be one or more relays that are responsible for serving that chunk. This function determines which relays to contact
+// for each chunk, and sorts the requests by relayID to support batching. Additionally, this method also calculates
+// the size of the chunk data that will be downloaded, in bytes.
 func (n *Node) DetermineChunkLocations(
 	batch *corev2.Batch,
 	operatorState *core.OperatorState,
 	probe *common.SequenceProbe,
 ) (downloadSizeInBytes uint64, relayRequests map[corev2.RelayKey]*relayRequest, err error) {
 
-	probe.SetStage("prepare_to_download")
-
-	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
-
-	if !ok || relayClient == nil {
-		return 0, nil, fmt.Errorf("relay client is not set")
-	}
+	probe.SetStage("determine_chunk_locations")
 
 	blobVersionParams := n.BlobVersionParams.Load()
 	if blobVersionParams == nil {
@@ -107,6 +104,8 @@ func (n *Node) DetermineChunkLocations(
 	return downloadSizeInBytes, relayRequests, nil
 }
 
+// This method takes a "download plan" from DetermineChunkLocations() and downloads the chunks from the relays.
+// It also deserializes the responses from the relays into BlobShards and RawBundles.
 func (n *Node) DownloadChunksFromRelays(
 	ctx context.Context,
 	batch *corev2.Batch,
