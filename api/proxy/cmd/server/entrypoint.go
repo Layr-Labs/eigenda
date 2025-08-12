@@ -86,7 +86,8 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	if cfg.MetricsServerConfig.Enabled {
 		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
-		svr, err := metrics.StartServer(cfg.MetricsServerConfig.Host, cfg.MetricsServerConfig.Port)
+		svr := proxy_metrics.NewServer(registry, cfg.MetricsServerConfig)
+		err := svr.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)
 		}
