@@ -14,21 +14,25 @@ var testStartTime = time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 // Tests the NewLeakyBucket constructor
 func TestNewLeakyBucket(t *testing.T) {
 	t.Run("create with valid parameters", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(10, 100, BiasPermitLess, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(10, 10*time.Second, BiasPermitLess, OverfillNotPermitted, testStartTime)
 		require.NotNil(t, leakyBucket)
 		require.NoError(t, err)
 	})
 
 	t.Run("create with invalid leak rate", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(0, 100, BiasPermitLess, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(0, 10*time.Second, BiasPermitLess, OverfillNotPermitted, testStartTime)
 		require.Nil(t, leakyBucket)
 		require.Error(t, err, "zero leak rate should cause error")
 	})
 
-	t.Run("create with invalid bucket capacity", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(10, 0, BiasPermitLess, OverfillNotPermitted, testStartTime)
+	t.Run("create with invalid bucket size duration", func(t *testing.T) {
+		leakyBucket, err := NewLeakyBucket(10, -10*time.Second, BiasPermitLess, OverfillNotPermitted, testStartTime)
 		require.Nil(t, leakyBucket)
-		require.Error(t, err, "zero bucket capacity should cause error")
+		require.Error(t, err, "negative bucket duration should cause error")
+
+		leakyBucket, err = NewLeakyBucket(10, 0, BiasPermitLess, OverfillNotPermitted, testStartTime)
+		require.Nil(t, leakyBucket)
+		require.Error(t, err, "zero bucket duration should cause error")
 	})
 }
 
@@ -36,7 +40,7 @@ func TestNewLeakyBucket(t *testing.T) {
 func TestFill(t *testing.T) {
 	// verify logic with overfill enabled
 	t.Run("test overfill", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(11, 110, BiasPermitMore, OverfillOncePermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(11, 10*time.Second, BiasPermitMore, OverfillOncePermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -58,7 +62,7 @@ func TestFill(t *testing.T) {
 
 	// make sure filling without overfill enabled works
 	t.Run("non-overfill", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -74,7 +78,7 @@ func TestFill(t *testing.T) {
 	})
 
 	t.Run("fill to exact capacity", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
 		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity))
@@ -84,7 +88,7 @@ func TestFill(t *testing.T) {
 	})
 
 	t.Run("fill with invalid symbol count", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -97,7 +101,7 @@ func TestFill(t *testing.T) {
 
 	// tests that waiting a really long time leaks the bucket empty, and that filling after that behaves as expected
 	t.Run("large idle leakage to empty", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitLess, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitLess, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
 		// wait longer than the bucket duration
@@ -111,7 +115,7 @@ func TestFill(t *testing.T) {
 // Tests that revert fill works
 func TestRevertFill(t *testing.T) {
 	t.Run("valid revert fill", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -127,7 +131,7 @@ func TestRevertFill(t *testing.T) {
 	})
 
 	t.Run("revert fill resulting in 0 capacity", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -144,7 +148,7 @@ func TestRevertFill(t *testing.T) {
 	})
 
 	t.Run("revert fill with invalid symbol count", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
@@ -171,7 +175,7 @@ func leakTest(t *testing.T, bias BiasBehavior) {
 
 	// This test uses a large capacity, to make sure that none of the fills or leaks are bumping up against the
 	// limits of the bucket
-	leakyBucket, err := NewLeakyBucket(leakRate, 200000, bias, OverfillNotPermitted, testStartTime)
+	leakyBucket, err := NewLeakyBucket(leakRate, 10*time.Hour, bias, OverfillNotPermitted, testStartTime)
 	require.NotNil(t, leakyBucket)
 	require.NoError(t, err)
 
@@ -214,7 +218,7 @@ func leakTest(t *testing.T, bias BiasBehavior) {
 
 // Tests that time going backwards throws the right error
 func TestTimeRegression(t *testing.T) {
-	leakyBucket, err := NewLeakyBucket(100, 1000, BiasPermitMore, OverfillNotPermitted, testStartTime)
+	leakyBucket, err := NewLeakyBucket(100, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 	require.NoError(t, err)
 
 	success, err := leakyBucket.Fill(testStartTime.Add(5*time.Second), 100)
@@ -236,7 +240,7 @@ func TestTimeRegression(t *testing.T) {
 // configured bias
 func TestPartialSecondRoundingDifference(t *testing.T) {
 	t.Run("BiasPermitMore rounds up", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(7, 70, BiasPermitMore, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(7, 10*time.Second, BiasPermitMore, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		leakyBucket.currentFillLevel = 100
 
@@ -247,7 +251,7 @@ func TestPartialSecondRoundingDifference(t *testing.T) {
 	})
 
 	t.Run("BiasPermitLess rounds down", func(t *testing.T) {
-		leakyBucket, err := NewLeakyBucket(7, 70, BiasPermitLess, OverfillNotPermitted, testStartTime)
+		leakyBucket, err := NewLeakyBucket(7, 10*time.Second, BiasPermitLess, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 		leakyBucket.currentFillLevel = 100
 
