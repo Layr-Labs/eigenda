@@ -1,4 +1,4 @@
-package payments
+package reservation
 
 // In the leaky bucket implementation, there are different points where we need to decide whether we should err on the
 // side of permitting *more* or *less* throughput.

@@ -1,4 +1,4 @@
-package payments
+package reservation
 
 // OverfillBehavior describes how leaky bucket overfills are handled
 type OverfillBehavior string
