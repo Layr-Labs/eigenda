@@ -15,6 +15,7 @@ import (
 
 const (
 	namespace           = "eigenda_proxy"
+	subsystem           = "default"
 	httpServerSubsystem = "http_server"
 	secondarySubsystem  = "secondary"
 )
@@ -57,12 +58,9 @@ type Metrics struct {
 
 var _ Metricer = (*Metrics)(nil)
 
-func NewMetrics(registry *prometheus.Registry, subsystem string) *Metrics {
+func NewMetrics(registry *prometheus.Registry) *Metrics {
 	if registry == nil {
 		return nil
-	}
-	if subsystem == "" {
-		subsystem = "default"
 	}
 
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

@@ -36,7 +36,7 @@ func NewProxyWrapper(
 	}
 
 	registry := prometheus.NewRegistry()
-	proxyMetrics := proxymetrics.NewMetrics(registry, "default")
+	proxyMetrics := proxymetrics.NewMetrics(registry)
 
 	storeManager, err := builder.BuildStoreManager(
 		ctx,

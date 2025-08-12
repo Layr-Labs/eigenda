@@ -46,7 +46,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	log.Infof("Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v", configString)
 
 	registry := prometheus.NewRegistry()
-	metrics := proxy_metrics.NewMetrics(registry, "default")
+	metrics := proxy_metrics.NewMetrics(registry)
 
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
