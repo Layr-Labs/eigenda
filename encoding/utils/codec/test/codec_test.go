@@ -28,15 +28,15 @@ var defaultPayloadForm = clients.GetDefaultPayloadClientConfig().PayloadPolynomi
 func deriveRealBlobSize(t *testing.T, payloadSize uint32) uint32 {
 
 	rawBytes := make([]byte, payloadSize)
-	payload := coretypes.NewPayload(rawBytes)
+	payload := coretypes.Payload(rawBytes)
 	blob, err := payload.ToBlob(defaultPayloadForm)
 	require.NoError(t, err)
 
 	// We should get the same answer when we use the equation to calculate the blob size.
 	calculatedBlobSize := codec.PayloadSizeToBlobSize(payloadSize)
-	require.Equal(t, blob.BlobLengthBytes(), calculatedBlobSize)
+	require.Equal(t, blob.LenBytes(), calculatedBlobSize)
 
-	return blob.BlobLengthBytes()
+	return blob.LenBytes()
 }
 
 // This function generates a table containing optimum blob sizes. It is intended to be run manually.

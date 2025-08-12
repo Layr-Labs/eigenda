@@ -97,7 +97,7 @@ func padPoly(out []fr.Element, poly []fr.Element) {
 // The input polynomials must not be empty, and sum to no larger than the output.
 func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [][]fr.Element) ([]fr.Element, error) {
 	n := uint64(len(dst))
-	if !IsPowerOfTwo(n) {
+	if !isPowerOfTwo(n) {
 		return nil, fmt.Errorf("destination must be a power of two, got %d", n)
 	}
 	if len(ps) == 0 {
@@ -162,7 +162,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	if length > fs.MaxWidth {
 		return nil, nil, fmt.Errorf("domain too small for requested length: %d > %d", length, fs.MaxWidth)
 	}
-	if !IsPowerOfTwo(length) {
+	if !isPowerOfTwo(length) {
 		return nil, nil, fmt.Errorf("length not a power of two: %d", length)
 	}
 	domainStride := fs.MaxWidth / length
