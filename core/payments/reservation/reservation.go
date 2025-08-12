@@ -3,14 +3,10 @@ package reservation
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
-
-// TODO: write docs somewhere about implications of adding a new reservation, or an old reservation expiring, while
-// a client is running. I think the correct thing would be to just restart the client if a new reservation is made...
 
 // Represents a reservation for a single user.
 //
@@ -20,13 +16,7 @@ import (
 // system.
 type Reservation struct {
 	// The number of symbols / second that the holder of this reservation is entitled to disperse
-	//
-	// The leak rate is a uint64 on-chain, so that's what we accept in the constructor. But it's converted to an int64
-	// under the hood to match other int types in reservation tracking, making syntax less verbose.
-	//
-	// The assumption that symbolsPerSecondLeakRate fits in an int64 should be fine, as long as we are careful not to
-	// give out any reservations that exceed ~590 exabytes/second.
-	symbolsPerSecond int64
+	symbolsPerSecond uint64
 
 	// The time at which the reservation becomes active
 	startTime time.Time
@@ -38,7 +28,7 @@ type Reservation struct {
 	permittedQuorumIDs map[core.QuorumID]bool
 }
 
-// TODO doc
+// Create a representation of a single account Reservation.
 func NewReservation(
 	symbolsPerSecond uint64,
 	startTime time.Time,
@@ -47,12 +37,6 @@ func NewReservation(
 ) (*Reservation, error) {
 	if symbolsPerSecond <= 0 {
 		return nil, fmt.Errorf("reservation must have >0 symbols per second, got %d", symbolsPerSecond)
-	}
-
-	if symbolsPerSecond > math.MaxInt64 {
-		return nil, fmt.Errorf("symbolsPerSecond must be < math.MaxInt64 (got %d). Technically, anything up to "+
-			"math.MaxUint64 is permitted on-chain, but practical limits are put in place to simplify implementation",
-			symbolsPerSecond)
 	}
 
 	if startTime.Equal(endTime) || endTime.Before(startTime) {
@@ -70,7 +54,7 @@ func NewReservation(
 	}
 
 	return &Reservation{
-		symbolsPerSecond:   int64(symbolsPerSecond),
+		symbolsPerSecond:   symbolsPerSecond,
 		startTime:          startTime,
 		endTime:            endTime,
 		permittedQuorumIDs: permittedQuorumIDSet,
@@ -79,27 +63,33 @@ func NewReservation(
 
 // Checks whether an input list of quorums are all permitted by the reservation.
 //
-// Returns nil if all input quorums are permitted, otherwise an error.
+// Returns nil if all input quorums are permitted, otherwise returns ErrQuorumNotPermitted.
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
 		if !r.permittedQuorumIDs[quorum] {
-			return fmt.Errorf("quorum %v not permitted", quorum)
+			// Extract permittedQuorums quorums for error message
+			permittedQuorums := make([]core.QuorumID, 0, len(r.permittedQuorumIDs))
+			for quorumID := range r.permittedQuorumIDs {
+				permittedQuorums = append(permittedQuorums, quorumID)
+			}
+			return fmt.Errorf("%w: quorum %d not in permitted set %v (requested: %v)",
+				ErrQuorumNotPermitted, quorum, permittedQuorums, quorums)
 		}
 	}
 
 	return nil
 }
 
-// TODO doc
+// CheckTime verifies that the given time falls within the reservation's valid time range.
+//
+// Returns ErrTimeOutOfRange if the time is outside the valid range.
 func (r *Reservation) CheckTime(timeToCheck time.Time) error {
-	if timeToCheck.Before(r.startTime) {
-		return fmt.Errorf("timeToCheck %s is before reservation start time %s",
-			timeToCheck.Format(time.RFC3339), r.startTime.Format(time.RFC3339))
-	}
-
-	if timeToCheck.After(r.endTime) {
-		return fmt.Errorf("timeToCheck %s is after reservation end time %s",
-			timeToCheck.Format(time.RFC3339), r.endTime.Format(time.RFC3339))
+	if timeToCheck.Before(r.startTime) || timeToCheck.After(r.endTime) {
+		return fmt.Errorf("%w: dispersal time %s is outside range [%s, %s]",
+			ErrTimeOutOfRange,
+			timeToCheck.Format(time.RFC3339),
+			r.startTime.Format(time.RFC3339),
+			r.endTime.Format(time.RFC3339))
 	}
 
 	return nil

@@ -11,13 +11,6 @@ import (
 
 // TODO: write unit tests
 
-// TODO: where do we check whether a dispersal fits within the correct time? it seems like we might need to return
-// the time to put into the payment header when doing the debit function....
-
-// TODO: at what point in the process will be construct the payment header? I don't want to do it in this class,
-// since then it won't be reusable: only the client should be creating the payment header, everyone else should
-// be extracting data, and verifying that the dispersal is permitted.
-
 // Keeps track of the state of a given reservation
 //
 // This is a goroutine safe wrapper around the LeakyBucket algorithm.
@@ -60,49 +53,52 @@ func NewReservationLedger(
 //
 // Algorithmically, that means adding a number of symbols to the leaky bucket.
 //
-// Returns nil if the leaky bucket has enough capacity to accept the fill. Returns an
-// InsufficientReservationCapacityError if bucket lacks capacity to permit the fill.
-
-// - Returns nil if the reservation has enough capacity to perform the debit.
-// - Returns an InsufficientReservationCapacityError if bucket lacks capacity to perform the debit
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
-// - Returns a generic error for all other modes of failure.
+// Returns (true, nil) if the reservation has enough capacity to perform the debit.
+// Returns (false, nil) if the bucket lacks capacity to permit the fill.
+// Returns (false, error) if an error occurs. Possible errors include:
+//   - ErrQuorumNotPermitted: requested quorums are not permitted by the reservation
+//   - ErrTimeOutOfRange: dispersal time is outside the reservation's valid time range
+//   - ErrLockAcquisition: failed to acquire the internal reservation lock
+//   - ErrTimeMovedBackward: current time is before a previously observed time
+//   - Generic errors for all other unexpected behavior
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
 func (rl *ReservationLedger) Debit(
 	ctx context.Context,
 	now time.Time,
-	symbolCount int64,
+	symbolCount uint32,
 	quorums []core.QuorumID,
-) error {
+) (bool, error) {
 	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
-		return fmt.Errorf("check quorums permitted: %w", err)
+		// error wraps ErrQuorumNotPermitted
+		return false, err
 	}
 
 	err = rl.config.reservation.CheckTime(now)
 	if err != nil {
-		return fmt.Errorf("check time: %w", err)
+		// error wraps ErrTimeOutOfRange
+		return false, err
 	}
 
 	if err := rl.lock.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("acquire lock: %w", err)
+		return false, fmt.Errorf("%w for debit operation: %w", ErrLockAcquisition, err)
 	}
 	defer rl.lock.Release(1)
 
-	err = rl.leakyBucket.Fill(now, symbolCount)
+	success, err := rl.leakyBucket.Fill(now, symbolCount)
 	if err != nil {
-		return fmt.Errorf("fill leaky bucket: %w", err)
+		return false, fmt.Errorf("fill: %w", err)
 	}
 
-	return nil
+	return success, nil
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
-func (rl *ReservationLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount int64) error {
+func (rl *ReservationLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount uint32) error {
 	if err := rl.lock.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("acquire lock: %w", err)
+		return fmt.Errorf("%w for revert debit operation: %w", ErrLockAcquisition, err)
 	}
 	defer rl.lock.Release(1)
 

@@ -1,25 +1,21 @@
 package reservation
 
 import (
-	"fmt"
-	"time"
+	"errors"
 )
 
-// TimeMovedBackwardError is returned when a timestamp is observed that is before a previously observed timestamp.
-//
-// This should not normally happen, but with clock drift and NTP adjustments, system clocks can occasionally jump
-// backward. This error allows the system to handle such cases gracefully rather than fatally erroring.
-type TimeMovedBackwardError struct {
-	// The current time that was provided
-	CurrentTime time.Time
-	// The previously observed time that is after CurrentTime
-	PreviousTime time.Time
-}
+// Sentinel errors for reservation operations
+var (
+	// ErrQuorumNotPermitted indicates that one or more requested quorums are not permitted by the reservation.
+	ErrQuorumNotPermitted = errors.New("quorum not permitted")
 
-// Implements the error interface
-func (e *TimeMovedBackwardError) Error() string {
-	return fmt.Sprintf("time moved backward: current time %s is before previous time %s (delta: %v)",
-		e.CurrentTime.Format(time.RFC3339Nano),
-		e.PreviousTime.Format(time.RFC3339Nano),
-		e.PreviousTime.Sub(e.CurrentTime))
-}
+	// ErrTimeOutOfRange indicates the dispersal time is outside the reservation's valid time range.
+	ErrTimeOutOfRange = errors.New("time outside reservation range")
+
+	// ErrLockAcquisition indicates failure to acquire the internal reservation lock.
+	ErrLockAcquisition = errors.New("acquire reservation lock")
+
+	// ErrTimeMovedBackward indicates a timestamp was observed that is before a previously observed timestamp.
+	// This is unlikely to happen in practice, but could be the result of clock drift and NTP adjustments.
+	ErrTimeMovedBackward = errors.New("time moved backward")
+)

@@ -228,12 +228,11 @@ func TestTimeRegression(t *testing.T) {
 	success, err = leakyBucket.Fill(testStartTime.Add(3*time.Second), 50)
 	require.Error(t, err)
 	require.False(t, success)
-	var timeErr *TimeMovedBackwardError
-	require.True(t, errors.As(err, &timeErr))
+	require.True(t, errors.Is(err, ErrTimeMovedBackward))
 
 	err = leakyBucket.RevertFill(testStartTime.Add(2*time.Second), 50)
 	require.Error(t, err)
-	require.True(t, errors.As(err, &timeErr))
+	require.True(t, errors.Is(err, ErrTimeMovedBackward))
 }
 
 // Directly meddles with the leak function, to do a sanity check that rounding is happening as expected, based on the

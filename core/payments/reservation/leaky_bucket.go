@@ -113,7 +113,7 @@ func NewLeakyBucket(
 // - Returns (true, nil) if the leaky bucket has enough capacity to accept the fill.
 // - Returns (false, nil) if bucket lacks capacity to permit the fill.
 // - Returns (false, error) for actual errors:
-//   - TimeMovedBackwardError if input time is before previous leak time.
+//   - ErrTimeMovedBackward if input time is before previous leak time.
 //   - Generic error for all other modes of failure.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
@@ -158,7 +158,7 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 
 // Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
 //
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
+// - Returns ErrTimeMovedBackward if input time is before previous leak time.
 // - Returns a generic error for all other modes of failure.
 //
 // The input time should be the most up-to-date time, NOT the time of the original fill.
@@ -183,11 +183,15 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 
 // Lets the correct number of symbols leak out of the bucket, based on when we last leaked
 //
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
+// - Returns ErrTimeMovedBackward if input time is before previous leak time.
 // - Returns a generic error if any of the calculations fail, which should not happen during normal usage.
 func (lb *LeakyBucket) leak(now time.Time) error {
 	if now.Before(lb.previousLeakTime) {
-		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
+		return fmt.Errorf("%w: current time %s is before previous time %s (delta: %v)",
+			ErrTimeMovedBackward,
+			now.Format(time.RFC3339Nano),
+			lb.previousLeakTime.Format(time.RFC3339Nano),
+			lb.previousLeakTime.Sub(now))
 	}
 
 	defer func() {
