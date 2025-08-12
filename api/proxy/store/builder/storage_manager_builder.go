@@ -31,6 +31,7 @@ import (
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
+	"github.com/prometheus/client_golang/prometheus"
 
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -54,6 +55,7 @@ func BuildStoreManager(
 	metrics metrics.Metricer,
 	config Config,
 	secrets common.SecretConfigV2,
+	registry *prometheus.Registry,
 ) (*store.Manager, error) {
 	var err error
 	var s3Store *s3.Store
@@ -115,7 +117,7 @@ func BuildStoreManager(
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier)
+		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
 		if err != nil {
 			return nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -210,6 +212,7 @@ func buildEigenDAV2Backend(
 	config Config,
 	secrets common.SecretConfigV2,
 	kzgVerifier *kzgverifier.Verifier,
+	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
@@ -344,6 +347,7 @@ func buildEigenDAV2Backend(
 		kzgProver,
 		certVerifier,
 		ethReader,
+		registry,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build payload disperser: %w", err)
@@ -563,6 +567,7 @@ func buildPayloadDisperser(
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
 	ethReader *eth.Reader,
+	registry *prometheus.Registry,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
 	if err != nil {
@@ -607,7 +612,7 @@ func buildPayloadDisperser(
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
-		nil)
+		registry)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
 	}

@@ -1,30 +1,17 @@
 package metrics
 
 import (
-	"fmt"
-	"net"
-	"strconv"
-
-	ophttp "github.com/ethereum-optimism/optimism/op-service/httputil"
-
-	"github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
 	namespace           = "eigenda_proxy"
+	subsystem           = "default"
 	httpServerSubsystem = "http_server"
 	secondarySubsystem  = "secondary"
 )
-
-// Config ... Metrics server configuration
-type Config struct {
-	Host    string
-	Port    int
-	Enabled bool
-}
 
 // Metricer ... Interface for metrics
 type Metricer interface {
@@ -33,8 +20,6 @@ type Metricer interface {
 
 	RecordRPCServerRequest(method string) func(status string, mode string, ver string)
 	RecordSecondaryRequest(bt string, method string) func(status string)
-
-	Document() []metrics.DocumentedMetric
 }
 
 // Metrics ... Metrics struct
@@ -52,29 +37,26 @@ type Metrics struct {
 	SecondaryRequestDurationSec *prometheus.HistogramVec
 
 	registry *prometheus.Registry
-	factory  metrics.Factory
 }
 
 var _ Metricer = (*Metrics)(nil)
 
-func NewMetrics(subsystem string) *Metrics {
-	if subsystem == "" {
-		subsystem = "default"
+func NewMetrics(registry *prometheus.Registry) Metricer {
+	if registry == nil {
+		return NoopMetrics
 	}
 
-	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
-	factory := metrics.With(registry)
 
 	return &Metrics{
-		Up: factory.NewGauge(prometheus.GaugeOpts{
+		Up: promauto.With(registry).NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if the proxy server has finished starting up",
 		}),
-		Info: factory.NewGaugeVec(prometheus.GaugeOpts{
+		Info: promauto.With(registry).NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "info",
@@ -82,7 +64,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"version",
 		}),
-		HTTPServerRequestsTotal: factory.NewCounterVec(prometheus.CounterOpts{
+		HTTPServerRequestsTotal: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "requests_total",
@@ -90,7 +72,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"method", "status", "commitment_mode", "cert_version",
 		}),
-		HTTPServerBadRequestHeader: factory.NewCounterVec(prometheus.CounterOpts{
+		HTTPServerBadRequestHeader: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "requests_bad_header_total",
@@ -98,7 +80,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"method", "error_type",
 		}),
-		HTTPServerRequestDurationSeconds: factory.NewHistogramVec(prometheus.HistogramOpts{
+		HTTPServerRequestDurationSeconds: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "request_duration_seconds",
@@ -110,7 +92,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"method", // no status on histograms because those are very expensive
 		}),
-		SecondaryRequestsTotal: factory.NewCounterVec(prometheus.CounterOpts{
+		SecondaryRequestsTotal: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: secondarySubsystem,
 			Name:      "requests_total",
@@ -118,7 +100,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"backend_type", "method", "status",
 		}),
-		SecondaryRequestDurationSec: factory.NewHistogramVec(prometheus.HistogramOpts{
+		SecondaryRequestDurationSec: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: secondarySubsystem,
 			Name:      "request_duration_seconds",
@@ -128,7 +110,6 @@ func NewMetrics(subsystem string) *Metrics {
 			"backend_type",
 		}),
 		registry: registry,
-		factory:  factory,
 	}
 }
 
@@ -167,35 +148,10 @@ func (m *Metrics) RecordSecondaryRequest(bt string, method string) func(status s
 	}
 }
 
-// StartServer starts the metrics server on the given hostname and port.
-// If port is 0, it automatically assigns an available port and returns the actual port.
-func (m *Metrics) StartServer(hostname string, port int) (*ophttp.HTTPServer, error) {
-	address := net.JoinHostPort(hostname, strconv.Itoa(port))
-
-	h := promhttp.InstrumentMetricHandler(
-		m.registry, promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{}),
-	)
-
-	server, err := ophttp.StartHTTPServer(address, h)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start HTTP server: %w", err)
-	}
-
-	return server, nil
-}
-
-func (m *Metrics) Document() []metrics.DocumentedMetric {
-	return m.factory.Document()
-}
-
 type noopMetricer struct {
 }
 
 var NoopMetrics Metricer = new(noopMetricer)
-
-func (n *noopMetricer) Document() []metrics.DocumentedMetric {
-	return nil
-}
 
 func (n *noopMetricer) RecordInfo(_ string) {
 }

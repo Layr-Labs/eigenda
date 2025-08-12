@@ -66,7 +66,7 @@ func NewRelayPayloadRetriever(
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
-) (*coretypes.Payload, error) {
+) (coretypes.Payload, error) {
 
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
 	if err != nil {
@@ -155,16 +155,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
-		if err != nil {
-			// TODO(samlaf): ToEncodedPayload is doing too much decoding. It shouldn't read and validate the payload header.
-			// That needs to be left to the rollup's derivation pipeline, such that a failed decoding can be skipped safely.
-			// A lot of the logic in blob->encodedPayload prob needs to happen in encodedPayload->payload instead.
-			return nil, fmt.Errorf("convert blob to encoded payload failed."+
-				" blobKey: %s, relayKey: %v, error: %v", blobKey.Hex(), relayKey, err)
-		}
-
-		return encodedPayload, nil
+		return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
