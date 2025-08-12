@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -33,6 +34,9 @@ type Accountant struct {
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
+
+	// metrics
+	metrics metrics.AccountantMetricer
 }
 
 // PeriodRecord contains the index of the reservation period and the usage of the period
@@ -57,6 +61,7 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
+		metrics:           metrics.NoopAccountantMetrics,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -115,6 +120,7 @@ func (a *Accountant) blobPaymentInfo(
 			return big.NewInt(0), err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
+		a.metrics.RecordCumulativePayment(a.accountID.Hex(), a.cumulativePayment)
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
@@ -254,6 +260,10 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 	a.periodRecords = periodRecords
 	return nil
+}
+
+func (a *Accountant) SetMetrics(metrics metrics.AccountantMetricer) {
+	a.metrics = metrics
 }
 
 // QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers

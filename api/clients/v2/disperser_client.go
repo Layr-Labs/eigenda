@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -57,6 +58,7 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
+	accountantMetrics  metrics.AccountantMetricer
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -96,10 +98,11 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 
 	return &disperserClient{
-		config:     config,
-		signer:     signer,
-		prover:     prover,
-		accountant: accountant,
+		config:            config,
+		signer:            signer,
+		prover:            prover,
+		accountant:        accountant,
+		accountantMetrics: metrics.NoopAccountantMetrics,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -112,6 +115,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
 		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		c.accountant.SetMetrics(c.accountantMetrics)
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
@@ -419,4 +423,8 @@ func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error 
 		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
+}
+
+func (c *disperserClient) SetAccountantMetrics(metrics metrics.AccountantMetricer) {
+	c.accountantMetrics = metrics
 }
