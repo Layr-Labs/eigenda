@@ -1,4 +1,4 @@
-package payments
+package reservation
 
 import (
 	"context"
@@ -18,11 +18,18 @@ import (
 // since then it won't be reusable: only the client should be creating the payment header, everyone else should
 // be extracting data, and verifying that the dispersal is permitted.
 
-
+// Keeps track of the state of a given reservation
+//
+// This is a goroutine safe wrapper around the LeakyBucket algorithm.
 type ReservationLedger struct {
 	config ReservationLedgerConfig
 
-	lock        *semaphore.Weighted
+	// synchronizes access to the underlying leaky bucket algorithm
+	// this is a semaphore instead of a lock, for the sake of fairness: goroutines should acquire the lock in the
+	// order that requests arrive
+	lock *semaphore.Weighted
+
+	// an instance of the algorithm which tracks reservation usage
 	leakyBucket *LeakyBucket
 }
 
@@ -49,14 +56,17 @@ func NewReservationLedger(
 	}, nil
 }
 
-// TODO: consider whether the concept of a debit slip makes sense
-
 // Debit the reservation with a number of symbols.
 //
 // Algorithmically, that means adding a number of symbols to the leaky bucket.
 //
 // Returns nil if the leaky bucket has enough capacity to accept the fill. Returns an
 // InsufficientReservationCapacityError if bucket lacks capacity to permit the fill.
+
+// - Returns nil if the reservation has enough capacity to perform the debit.
+// - Returns an InsufficientReservationCapacityError if bucket lacks capacity to perform the debit
+// - Returns a TimeMovedBackwardError if input time is before previous leak time.
+// - Returns a generic error for all other modes of failure.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
