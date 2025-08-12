@@ -24,9 +24,9 @@ type AccountantMetrics struct {
 	CumulativePayment *prometheus.GaugeVec
 }
 
-func NewAccountantMetrics(registry *prometheus.Registry) *AccountantMetrics {
+func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 	if registry == nil {
-		return nil
+		return &noopAccountantMetricer{}
 	}
 
 	return &AccountantMetrics{
