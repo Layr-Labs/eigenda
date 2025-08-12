@@ -44,9 +44,9 @@ type Metrics struct {
 
 var _ Metricer = (*Metrics)(nil)
 
-func NewMetrics(registry *prometheus.Registry) *Metrics {
+func NewMetrics(registry *prometheus.Registry) Metricer {
 	if registry == nil {
-		return nil
+		return NoopMetrics
 	}
 
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
