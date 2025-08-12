@@ -59,8 +59,8 @@ type LeakyBucket struct {
 func NewLeakyBucket(
 	// how fast symbols leak out of the bucket
 	symbolsPerSecondLeakRate uint64,
-	// the total number of symbols that fit in the bucket
-	bucketCapacity uint64,
+	// bucketCapacityDuration * symbolsPerSecondLeakRate becomes the bucket capacity
+	bucketCapacityDuration time.Duration,
 	// whether to err on the side of permitting more or less throughput
 	biasBehavior BiasBehavior,
 	// how to handle overfilling the bucket
@@ -72,8 +72,17 @@ func NewLeakyBucket(
 		return nil, errors.New("symbolsPerSecondLeakRate must be > 0")
 	}
 
+	if bucketCapacityDuration <= 0 {
+		return nil, fmt.Errorf("bucketCapacityDuration must be > 0, got %s", bucketCapacityDuration)
+	}
+
+	// 1e9
+	nanosecondsPerSecond := uint64(time.Second)
+	bucketCapacity := symbolsPerSecondLeakRate * uint64(bucketCapacityDuration.Nanoseconds()) / nanosecondsPerSecond
+
 	if bucketCapacity == 0 {
-		return nil, errors.New("bucketCapacity must be > 0")
+		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %d symbols/sec * duration %s)",
+			symbolsPerSecondLeakRate, bucketCapacityDuration)
 	}
 
 	var currentFillLevel uint64
