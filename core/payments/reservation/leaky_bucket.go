@@ -34,7 +34,7 @@ type LeakyBucket struct {
 	// The total number of symbols that fit in the bucket
 	bucketCapacity uint64
 
-	// The number of symbols that leak out of the bucket each second
+	// The number of symbols that leak out of the bucket each second, as determined by the reservation.
 	symbolsPerSecondLeakRate uint64
 
 	// The number of symbols currently in the bucket
