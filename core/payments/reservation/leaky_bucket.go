@@ -45,6 +45,8 @@ type LeakyBucket struct {
 
 	// The number of symbols which leaked in the "partial second" of the previous leak calculation.
 	//
+	// To understand the logic of how this value is used, see the inline documentation of the `leak()` method.
+	//
 	// Since the leaky bucket uses integers instead of floats, leak math isn't straight forward. It's easy to calculate
 	// the number of symbols that leak in a full second, since leak rate is defined in terms of symbols / second. But
 	// determining how many symbols leak in a number of nanoseconds requires making a rounding choice. Leak calculation
