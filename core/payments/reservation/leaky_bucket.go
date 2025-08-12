@@ -254,14 +254,17 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) uint64 {
 // Computes the number of symbols which leak out in the given fractional second. Since this deals with integers,
 // the configured bias determines which direction we round in.
 func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) (uint64, error) {
+	// 1e9
+	nanosecondsPerSecond := uint64(time.Second)
+
 	switch lb.biasBehavior {
 	case BiasPermitMore:
 		// Round up, to permit more (more leakage = more capacity freed up)
 		// Add (1e9 - 1) before dividing to round up
-		return (nanos*lb.symbolsPerSecondLeakRate + uint64(time.Second) - 1) / uint64(time.Second), nil
+		return (nanos*lb.symbolsPerSecondLeakRate + nanosecondsPerSecond - 1) / nanosecondsPerSecond, nil
 	case BiasPermitLess:
 		// Round down, to permit less (less leakage = less capacity freed up)
-		return nanos * lb.symbolsPerSecondLeakRate / uint64(time.Second), nil
+		return nanos * lb.symbolsPerSecondLeakRate / nanosecondsPerSecond, nil
 	default:
 		return 0, fmt.Errorf("unknown bias: %s", lb.biasBehavior)
 	}
