@@ -72,14 +72,12 @@ func (rl *ReservationLedger) Debit(
 ) (bool, error) {
 	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
-		// error wraps ErrQuorumNotPermitted
-		return false, err
+		return false, fmt.Errorf("check quorums permitted: %w", err)
 	}
 
 	err = rl.config.reservation.CheckTime(now)
 	if err != nil {
-		// error wraps ErrTimeOutOfRange
-		return false, err
+		return false, fmt.Errorf("check time: %w", err)
 	}
 
 	if err := rl.lock.Acquire(ctx, 1); err != nil {
