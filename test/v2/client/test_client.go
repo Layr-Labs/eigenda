@@ -143,12 +143,13 @@ func NewTestClient(
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
-		Hostname:          config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag: true,
+		Hostname:                 config.DisperserHostname,
+		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		UseSecureGrpcFlag:        true,
+		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserConfig, signer, kzgProver, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
@@ -251,6 +252,7 @@ func NewTestClient(
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
+		ConnectionPoolSize: config.RelayConnectionCount,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())

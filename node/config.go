@@ -72,10 +72,12 @@ type Config struct {
 	ChurnerUseSecureGrpc            bool
 	RelayUseSecureGrpc              bool
 	RelayMaxMessageSize             uint
-	ReachabilityPollIntervalSec     uint64
-	DisableNodeInfoResources        bool
-	StoreChunksRequestMaxPastAge    time.Duration
-	StoreChunksRequestMaxFutureAge  time.Duration
+	// The number of connections to establish with each relay node.
+	RelayConnectionPoolSize        uint
+	ReachabilityPollIntervalSec    uint64
+	DisableNodeInfoResources       bool
+	StoreChunksRequestMaxPastAge   time.Duration
+	StoreChunksRequestMaxFutureAge time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -392,6 +394,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
+		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
