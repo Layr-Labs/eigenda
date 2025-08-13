@@ -1,7 +1,6 @@
 package payments
 
 import (
-	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -79,11 +78,8 @@ func NewClientLedger(
 	return clientLedger, nil
 }
 
-// TODO: consider timeouts
-
 // TODO: doc, also better method name
 func (cl *ClientLedger) Debit(
-	ctx context.Context,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
@@ -101,7 +97,7 @@ func (cl *ClientLedger) Debit(
 			cl.status.Store(LedgerStatusDead)
 			return nil, fmt.Errorf("reservation debit error: %w", err)
 		}
-		
+
 		if success {
 			// Success - blob accounted for via reservation
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
@@ -115,7 +111,7 @@ func (cl *ClientLedger) Debit(
 	}
 
 	if cl.onDemandLedger != nil {
-		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, int64(blobLengthSymbols), quorums)
+		cumulativePayment, err := cl.onDemandLedger.Debit(blobLengthSymbols, quorums)
 		if err == nil {
 			// Success - blob accounted for via on-demand
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
@@ -135,7 +131,6 @@ func (cl *ClientLedger) Debit(
 
 // TODO: doc
 func (cl *ClientLedger) RevertDebit(
-	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
@@ -149,7 +144,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
 		}
 
-		err := cl.onDemandLedger.RevertDebit(ctx, int64(blobSymbolCount))
+		err := cl.onDemandLedger.RevertDebit(blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert debit: %w", err)
 		}

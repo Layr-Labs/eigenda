@@ -6,6 +6,6 @@ import (
 
 type OnDemandLedgerConfig struct {
 	totalDeposits  *big.Int
-	pricePerSymbol uint64
-	minNumSymbols  uint64
+	pricePerSymbol *big.Int
+	minNumSymbols  *big.Int
 }

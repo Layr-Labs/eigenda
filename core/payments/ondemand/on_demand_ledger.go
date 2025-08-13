@@ -1,12 +1,12 @@
 package ondemand
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"golang.org/x/sync/semaphore"
 )
 
 // TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
@@ -15,9 +15,10 @@ import (
 // which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
 
 type OnDemandLedger struct {
-	config                   OnDemandLedgerConfig
-	lock                     *semaphore.Weighted
-	cumulativePaymentStore   CumulativePaymentStore
+	config OnDemandLedgerConfig
+	// synchronizes access to the cumulative payment store
+	lock                   sync.Mutex
+	cumulativePaymentStore CumulativePaymentStore
 }
 
 func NewOnDemandLedger(
@@ -25,20 +26,17 @@ func NewOnDemandLedger(
 	cumulativePaymentStore CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
 	return &OnDemandLedger{
-		config:                   config,
-		lock:                     semaphore.NewWeighted(1), // Binary semaphore acts as a mutex
-		cumulativePaymentStore:   cumulativePaymentStore,
+		config:                 config,
+		cumulativePaymentStore: cumulativePaymentStore,
 	}, nil
 }
 
-// TODO: reconsider int64
 func (odl *OnDemandLedger) Debit(
-	ctx context.Context,
-	symbolCount int64,
+	symbolCount uint32,
 	quorums []core.QuorumID,
 ) (*big.Int, error) {
-	if symbolCount <= 0 {
-		return nil, fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+	if symbolCount == 0 {
+		return nil, errors.New("symbolCount must be > 0")
 	}
 
 	err := checkForOnDemandSupport(quorums)
@@ -46,22 +44,17 @@ func (odl *OnDemandLedger) Debit(
 		return nil, fmt.Errorf("check for on demand support: %w", err)
 	}
 
-	blobCost, err := odl.computeBlobCost(symbolCount)
-	if err != nil {
-		return nil, fmt.Errorf("compute blob cost: %w", err)
-	}
+	blobCost := odl.computeBlobCost(symbolCount)
 
-	if err := odl.lock.Acquire(ctx, 1); err != nil {
-		return nil, fmt.Errorf("acquire lock: %w", err)
-	}
-	defer odl.lock.Release(1)
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
 
 	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
 	if err != nil {
 		return nil, fmt.Errorf("get cumulative payment: %w", err)
 	}
 
-	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, big.NewInt(blobCost))
+	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
 
 	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
 		// TODO: make a specific error type with this, with appropriate fields
@@ -76,28 +69,22 @@ func (odl *OnDemandLedger) Debit(
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
-func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount int64) error {
-	if symbolCount <= 0 {
-		return fmt.Errorf("symbolCount must be > 0, got %d", symbolCount)
+func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
+	if symbolCount == 0 {
+		return errors.New("symbolCount must be > 0")
 	}
 
-	blobCost, err := odl.computeBlobCost(symbolCount)
-	if err != nil {
-		return fmt.Errorf("compute blob cost: %w", err)
-	}
+	blobCost := odl.computeBlobCost(symbolCount)
 
-	// Acquire the semaphore with context timeout
-	if err := odl.lock.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("acquire lock: %w", err)
-	}
-	defer odl.lock.Release(1)
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
 
 	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
 	if err != nil {
 		return fmt.Errorf("get cumulative payment: %w", err)
 	}
 
-	newCumulativePayment := new(big.Int).Sub(currentCumulativePayment, big.NewInt(blobCost))
+	newCumulativePayment := new(big.Int).Sub(currentCumulativePayment, blobCost)
 
 	if newCumulativePayment.Sign() < 0 {
 		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
@@ -116,21 +103,19 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 			continue
 		}
 
-		return fmt.Errorf("only quorums 0 and 1 are supported for on demand payments, got %d", quorum)
+		return fmt.Errorf("%w: quorum %d not in supported set [0, 1]", ErrQuorumNotSupported, quorum)
 	}
 
 	return nil
 }
 
-func (odl *OnDemandLedger) computeBlobCost(symbolCount int64) (int64, error) {
-	if symbolCount <= 0 {
-		return 0, fmt.Errorf("symbol count must be > 0, got %d", symbolCount)
+func (odl *OnDemandLedger) computeBlobCost(symbolCount uint32) *big.Int {
+	symbolCountBig := big.NewInt(int64(symbolCount))
+
+	billableSymbols := symbolCountBig
+	if symbolCountBig.Cmp(odl.config.minNumSymbols) < 0 {
+		billableSymbols = odl.config.minNumSymbols
 	}
 
-	billableSymbols := symbolCount
-	if symbolCount < int64(odl.config.minNumSymbols) {
-		billableSymbols = int64(odl.config.minNumSymbols)
-	}
-
-	return billableSymbols * int64(odl.config.pricePerSymbol), nil
+	return new(big.Int).Mul(billableSymbols, odl.config.pricePerSymbol)
 }
