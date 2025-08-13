@@ -451,11 +451,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
-	LittUnsafePurgeLocksFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
-		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+	LitRespectLocksFlag = cli.BoolTFlag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-respect-locks"),
+		Usage: "If set, LittDB will refuse to start if it can't acquire locks on the storage paths. " +
+			"Ideally this would always be enabled, but PID reuse in platforms like Kubernetes/Docker can make " +
+			"lock files practically impossible to manage.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_RESPECT_LOCKS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -668,7 +670,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
-	LittUnsafePurgeLocksFlag,
+	LitRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
