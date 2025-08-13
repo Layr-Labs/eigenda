@@ -18,6 +18,11 @@ const (
 	LedgerStatusDead  LedgerStatus = "dead"
 )
 
+// TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
+// value. The client ledger will need to check whether the on demand ledger is available before trying to debit,
+// and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
+// which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
+
 // TODO: write unit tests
 
 // TODO: work out how to fit metrics into this

@@ -9,18 +9,31 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
-// value. The client ledger will need to check whether the on demand ledger is available before trying to debit,
-// and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
-// which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
-
+// Keeps track of the cumulative payment state for on-demand dispersals for a single account.
+//
+// On-demand payments use a cumulative payment system where, each time a dispersal is made, we keep track of the total
+// amount paid by the account for that and all previous dispersals. The cumulative payment is chosen by the dispersing
+// client based on the state of its local accounting, and the chosen value can be verified by all other parties by
+// checking:
+// 1. that the claimed value is <= the total deposits belonging to the account in the PaymentVault contract
+// 2. that the value has increased by at least the cost of the dispersal from the previously observed value
+//
+// The cost of each dispersal is calculated by multiplying the number of symbols (with a minimum of minNumSymbols) by
+// the pricePerSymbol.
+//
+// On-demand payments are currently limited to quorums 0 (ETH) and 1 (EIGEN) and can only be used when dispersing
+// through the EigenDA disperser.
+//
+// This is a goroutine safe struct.
 type OnDemandLedger struct {
 	config OnDemandLedgerConfig
 	// synchronizes access to the cumulative payment store
-	lock                   sync.Mutex
+	lock sync.Mutex
+	// stores the cumulative payment for this ledger in wei
 	cumulativePaymentStore CumulativePaymentStore
 }
 
+// Constructs a new OnDemandLedger, backed by the input CumulativePaymentStore
 func NewOnDemandLedger(
 	config OnDemandLedgerConfig,
 	cumulativePaymentStore CumulativePaymentStore,
@@ -31,6 +44,18 @@ func NewOnDemandLedger(
 	}, nil
 }
 
+// Debit the on-demand account with the cost of a dispersal, based on the number of symbols.
+//
+// Returns (cumulativePayment, nil) if the account has sufficient funds to perform the debit.
+// The returned cumulativePayment represents the new total amount spent from this account.
+//
+// Returns (nil, error) if an error occurs. Possible errors include:
+//   - ErrQuorumNotSupported: requested quorums are not supported for on-demand payments
+//   - ErrInsufficientFunds: the debit would exceed the total deposits available
+//   - Generic errors for all other unexpected behavior
+//
+// If the account doesn't have sufficient funds to accommodate the debit, the cumulative payment
+// IS NOT updated, i.e. a failed debit doesn't modify the payment state.
 func (odl *OnDemandLedger) Debit(
 	symbolCount uint32,
 	quorums []core.QuorumID,
@@ -41,10 +66,10 @@ func (odl *OnDemandLedger) Debit(
 
 	err := checkForOnDemandSupport(quorums)
 	if err != nil {
-		return nil, fmt.Errorf("check for on demand support: %w", err)
+		return nil, fmt.Errorf("%w: %s", ErrQuorumNotSupported, err.Error())
 	}
 
-	blobCost := odl.computeBlobCost(symbolCount)
+	blobCost := odl.computeCost(symbolCount)
 
 	odl.lock.Lock()
 	defer odl.lock.Unlock()
@@ -57,8 +82,12 @@ func (odl *OnDemandLedger) Debit(
 	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
 
 	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
-		// TODO: make a specific error type with this, with appropriate fields
-		return nil, fmt.Errorf("insufficient on-demand funds")
+		return nil, fmt.Errorf(
+			"%w: current cumulative payment: %s wei, total deposits: %s wei, blob cost: %s wei",
+			ErrInsufficientFunds,
+			currentCumulativePayment.String(),
+			odl.config.totalDeposits.String(),
+			blobCost.String())
 	}
 
 	if err := odl.cumulativePaymentStore.SetCumulativePayment(newCumulativePayment); err != nil {
@@ -74,7 +103,7 @@ func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
 		return errors.New("symbolCount must be > 0")
 	}
 
-	blobCost := odl.computeBlobCost(symbolCount)
+	blobCost := odl.computeCost(symbolCount)
 
 	odl.lock.Lock()
 	defer odl.lock.Unlock()
@@ -97,19 +126,23 @@ func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
 	return nil
 }
 
+// Checks whether all input quorum IDs are supported for on demand payments
+//
+// Returns an error if any input quorum isn't supported, otherwise nil
 func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	for _, quorum := range quorumsToCheck {
 		if quorum == 0 || quorum == 1 {
 			continue
 		}
 
-		return fmt.Errorf("%w: quorum %d not in supported set [0, 1]", ErrQuorumNotSupported, quorum)
+		return fmt.Errorf("quorum %d not in supported set [0, 1]", quorum)
 	}
 
 	return nil
 }
 
-func (odl *OnDemandLedger) computeBlobCost(symbolCount uint32) *big.Int {
+// Computes the on demand cost of a number of symbols
+func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
 	symbolCountBig := big.NewInt(int64(symbolCount))
 
 	billableSymbols := symbolCountBig
