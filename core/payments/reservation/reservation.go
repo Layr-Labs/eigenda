@@ -35,8 +35,8 @@ func NewReservation(
 	endTime time.Time,
 	permittedQuorumIDs []core.QuorumID,
 ) (*Reservation, error) {
-	if symbolsPerSecond <= 0 {
-		return nil, fmt.Errorf("reservation must have >0 symbols per second, got %d", symbolsPerSecond)
+	if symbolsPerSecond == 0 {
+		return nil, errors.New("reservation must have >0 symbols per second")
 	}
 
 	if startTime.Equal(endTime) || endTime.Before(startTime) {
@@ -67,20 +67,18 @@ func NewReservation(
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
 		if !r.permittedQuorumIDs[quorum] {
-			// Extract permittedQuorums quorums for error message
 			permittedQuorums := make([]core.QuorumID, 0, len(r.permittedQuorumIDs))
 			for quorumID := range r.permittedQuorumIDs {
 				permittedQuorums = append(permittedQuorums, quorumID)
 			}
-			return fmt.Errorf("%w: quorum %d not in permitted set %v (requested: %v)",
-				ErrQuorumNotPermitted, quorum, permittedQuorums, quorums)
+			return fmt.Errorf("%w: quorum %d not in permitted set %v", ErrQuorumNotPermitted, quorum, permittedQuorums)
 		}
 	}
 
 	return nil
 }
 
-// CheckTime verifies that the given time falls within the reservation's valid time range.
+// Verifies that the given time falls within the reservation's valid time range.
 //
 // Returns ErrTimeOutOfRange if the time is outside the valid range.
 func (r *Reservation) CheckTime(timeToCheck time.Time) error {

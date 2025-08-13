@@ -1,12 +1,11 @@
 package reservation
 
 import (
-	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"golang.org/x/sync/semaphore"
 )
 
 // TODO: write unit tests
@@ -18,9 +17,7 @@ type ReservationLedger struct {
 	config ReservationLedgerConfig
 
 	// synchronizes access to the underlying leaky bucket algorithm
-	// this is a semaphore instead of a lock, for the sake of fairness: goroutines should acquire the lock in the
-	// order that requests arrive
-	lock *semaphore.Weighted
+	lock sync.Mutex
 
 	// an instance of the algorithm which tracks reservation usage
 	leakyBucket *LeakyBucket
@@ -44,7 +41,6 @@ func NewReservationLedger(
 
 	return &ReservationLedger{
 		config:      config,
-		lock:        semaphore.NewWeighted(1),
 		leakyBucket: leakyBucket,
 	}, nil
 }
@@ -65,7 +61,6 @@ func NewReservationLedger(
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
 func (rl *ReservationLedger) Debit(
-	ctx context.Context,
 	now time.Time,
 	symbolCount uint32,
 	quorums []core.QuorumID,
@@ -80,10 +75,8 @@ func (rl *ReservationLedger) Debit(
 		return false, fmt.Errorf("check time: %w", err)
 	}
 
-	if err := rl.lock.Acquire(ctx, 1); err != nil {
-		return false, fmt.Errorf("%w for debit operation: %w", ErrLockAcquisition, err)
-	}
-	defer rl.lock.Release(1)
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
 
 	success, err := rl.leakyBucket.Fill(now, symbolCount)
 	if err != nil {
@@ -94,11 +87,9 @@ func (rl *ReservationLedger) Debit(
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
-func (rl *ReservationLedger) RevertDebit(ctx context.Context, now time.Time, symbolCount uint32) error {
-	if err := rl.lock.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("%w for revert debit operation: %w", ErrLockAcquisition, err)
-	}
-	defer rl.lock.Release(1)
+func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) error {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
 
 	err := rl.leakyBucket.RevertFill(now, symbolCount)
 	if err != nil {
