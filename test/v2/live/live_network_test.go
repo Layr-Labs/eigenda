@@ -499,7 +499,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		UseSecureGrpcFlag: true,
 	}
 
-	accountant := clients.NewAccountant(accountId, nil, nil, 0, 0, 0, 0, metrics.NoopAccountantMetrics)
+	accountant := clients.NewUnpopulatedAccountant(accountId, metrics.NoopAccountantMetrics)
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, accountant)
 	require.NoError(t, err)
 

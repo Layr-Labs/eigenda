@@ -583,7 +583,7 @@ func buildPayloadDisperser(
 
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	// The accountant is populated lazily by disperserClient.PopulateAccountant
-	accountant := clients_v2.NewAccountant(accountId, nil, nil, 0, 0, 0, 0, accountantMetrics)
+	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 
 	disperserClient, err := clients_v2.NewDisperserClient(
 		&clientConfigV2.DisperserClientCfg,

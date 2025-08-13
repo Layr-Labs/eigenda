@@ -47,6 +47,10 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
+func NewUnpopulatedAccountant(accountID gethcommon.Address, metrics metrics.AccountantMetricer) *Accountant {
+	return NewAccountant(accountID, nil, nil, 0, 0, 0, 0, metrics)
+}
+
 func NewAccountant(
 	accountID gethcommon.Address,
 	reservation *core.ReservedPayment,
