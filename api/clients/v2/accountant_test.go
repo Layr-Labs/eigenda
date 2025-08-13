@@ -62,7 +62,16 @@ func TestNewAccountant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			accountant := NewAccountant(tt.accountId, tt.reservation, tt.onDemand, tt.reservationWindow, tt.pricePerSymbol, tt.minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+			accountant := NewAccountant(
+				tt.accountId,
+				tt.reservation,
+				tt.onDemand,
+				tt.reservationWindow,
+				tt.pricePerSymbol,
+				tt.minNumSymbols,
+				numBins,
+				metrics.NoopAccountantMetrics,
+			)
 
 			assert.NotNil(t, accountant)
 			assert.Equal(t, tt.reservation, accountant.reservation)
@@ -101,7 +110,16 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -191,7 +209,16 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -250,7 +277,16 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -305,7 +341,16 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -407,7 +452,16 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -500,7 +554,16 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 
@@ -565,7 +628,16 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -656,7 +728,16 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -756,7 +837,16 @@ func TestAccountBlob_ReservationOverflowWithWindow(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, metrics.NoopAccountantMetrics)
+	accountant := NewAccountant(
+		accountId,
+		reservation,
+		onDemand,
+		reservationWindow,
+		pricePerSymbol,
+		minNumSymbols,
+		numBins,
+		metrics.NoopAccountantMetrics,
+	)
 
 	quorums := []uint8{0, 1}
 
@@ -1093,7 +1183,16 @@ func TestSetPaymentState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			accountant := NewAccountant(accountId, emptyReservation, emptyOnDemand, 0, 0, 0, numBins, metrics.NoopAccountantMetrics)
+			accountant := NewAccountant(
+				accountId,
+				emptyReservation,
+				emptyOnDemand,
+				0,
+				0,
+				0,
+				numBins,
+				metrics.NoopAccountantMetrics,
+			)
 			err := accountant.SetPaymentState(tt.state)
 
 			if tt.expectError {

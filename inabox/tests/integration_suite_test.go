@@ -250,10 +250,19 @@ func setupPayloadDisperserWithRouter() error {
 
 	accountId, err := signer.GetAccountID()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting account ID: %w", err)
 	}
 
-	accountant := clientsv2.NewAccountant(accountId, nil, nil, 0, 0, 0, 0, metrics.NoopAccountantMetrics)
+	accountant := clientsv2.NewAccountant(
+		accountId,
+		nil,
+		nil,
+		0,
+		0,
+		0,
+		0,
+		metrics.NoopAccountantMetrics,
+	)
 	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, accountant)
 	if err != nil {
 		return err
