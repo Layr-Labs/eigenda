@@ -451,7 +451,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
-	LitRespectLocksFlag = cli.BoolTFlag{
+	LitRespectLocksFlag = cli.BoolFlag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-respect-locks"),
 		Usage: "If set, LittDB will refuse to start if it can't acquire locks on the storage paths. " +
 			"Ideally this would always be enabled, but PID reuse in platforms like Kubernetes/Docker can make " +
