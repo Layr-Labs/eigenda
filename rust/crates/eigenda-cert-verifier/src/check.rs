@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use alloy_primitives::{Address, B256, Bytes};
+use alloy_primitives::{Address, B256, Bytes, aliases::U96};
 use eigenda_cert::G1Point;
 use hashbrown::HashMap;
 
@@ -11,7 +11,7 @@ use crate::{
     types::{
         BlockNumber, NonSigner, Quorum, QuorumNumber, RelayKey, Version,
         history::History,
-        solidity::{RelayInfo, SecurityThresholds, VersionedBlobParams},
+        solidity::{SecurityThresholds, VersionedBlobParams},
     },
 };
 
@@ -42,11 +42,11 @@ pub fn non_signers_strictly_sorted_by_hash(
 pub fn quorums_last_updated_after_most_recent_stale_block(
     signed_quorums: &[QuorumNumber],
     reference_block: BlockNumber,
-    last_updated_at_block_by_quorum: HashMap<u8, BlockNumber>,
+    quorum_update_block_number: HashMap<u8, BlockNumber>,
     window: u32,
 ) -> Result<(), CertVerificationError> {
     signed_quorums.iter().try_for_each(|signed_quorum| {
-        let last_updated_at_block = *last_updated_at_block_by_quorum
+        let last_updated_at_block = *quorum_update_block_number
             .get(signed_quorum)
             .ok_or(MissingQuorumEntry)?;
 
@@ -61,7 +61,7 @@ pub fn cert_apks_equal_storage_apks(
     reference_block: BlockNumber,
     apk_for_each_quorum: &[G1Point],
     apk_index_for_each_quorum: Vec<BlockNumber>,
-    apk_trunc_hash_history_by_quorum: HashMap<QuorumNumber, History<TruncatedB256>>,
+    apk_history: HashMap<QuorumNumber, History<TruncatedB256>>,
 ) -> Result<(), CertVerificationError> {
     signed_quorums
         .iter()
@@ -71,7 +71,7 @@ pub fn cert_apks_equal_storage_apks(
             let cert_apk_hash = convert::point_to_hash(cert_apk);
             let cert_apk_trunc_hash = &cert_apk_hash[..24];
 
-            let storage_apk_trunc_hash = apk_trunc_hash_history_by_quorum
+            let storage_apk_trunc_hash = apk_history
                 .get(signed_quorum)
                 .ok_or(MissingQuorumEntry)?
                 .try_get_at(apk_index)?
@@ -85,14 +85,14 @@ pub fn cert_apks_equal_storage_apks(
 
 pub fn relay_keys_are_set(
     relay_keys: &[RelayKey],
-    relay_key_to_relay_info: &HashMap<RelayKey, RelayInfo>,
+    relay_key_to_relay_address: &HashMap<RelayKey, Address>,
 ) -> Result<(), CertVerificationError> {
     relay_keys.iter().try_for_each(|relay_key| {
-        let relay_info = relay_key_to_relay_info
+        let relay_address = relay_key_to_relay_address
             .get(relay_key)
             .ok_or(MissingRelayKeyEntry)?;
 
-        (relay_info.relayAddress != Address::default())
+        (relay_address != &Address::default())
             .then_some(())
             .ok_or(RelayKeyNotSet)
     })
@@ -100,7 +100,7 @@ pub fn relay_keys_are_set(
 
 pub fn security_assumptions_are_met(
     version: Version,
-    version_to_versioned_blob_params: &HashMap<Version, VersionedBlobParams>,
+    versioned_blob_params: &HashMap<Version, VersionedBlobParams>,
     security_thresholds: &SecurityThresholds,
 ) -> Result<(), CertVerificationError> {
     let SecurityThresholds {
@@ -112,7 +112,7 @@ pub fn security_assumptions_are_met(
         maxNumOperators,
         numChunks,
         codingRate,
-    } = version_to_versioned_blob_params
+    } = versioned_blob_params
         .get(&version)
         .ok_or(MissingVersionEntry)?;
 
@@ -177,11 +177,11 @@ pub fn confirmed_quorums_contain_blob_quorums(
         } = *quorum;
 
         let left = signed_stake
-            .checked_mul(THRESHOLD_DENOMINATOR)
+            .checked_mul(U96::from(THRESHOLD_DENOMINATOR))
             .ok_or(Overflow)?;
 
         let right = total_stake
-            .checked_mul(confirmation_threshold as u128)
+            .checked_mul(U96::from(confirmation_threshold))
             .ok_or(Overflow)?;
 
         confirmed_quorums.set(number as usize, left >= right);
@@ -343,7 +343,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let most_recent_stale_block = reference_block - window;
 
         let signed_quorums = [0];
-        let last_updated_at_block_by_quorum = signed_quorums
+        let quorum_update_block_number = signed_quorums
             .into_iter()
             .map(|signed_quorum| (signed_quorum, most_recent_stale_block + 1))
             .collect();
@@ -351,7 +351,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let result = check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorums,
             reference_block,
-            last_updated_at_block_by_quorum,
+            quorum_update_block_number,
             window,
         );
 
@@ -365,7 +365,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let most_recent_stale_block = reference_block - window;
 
         let signed_quorums = [0];
-        let last_updated_at_block_by_quorum = signed_quorums
+        let quorum_update_block_number = signed_quorums
             .into_iter()
             .map(|signed_quorum| (signed_quorum, most_recent_stale_block - 1))
             .collect();
@@ -373,7 +373,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let err = check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorums,
             reference_block,
-            last_updated_at_block_by_quorum,
+            quorum_update_block_number,
             window,
         )
         .unwrap_err();
@@ -388,7 +388,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let most_recent_stale_block = reference_block - window;
 
         let signed_quorums = [0];
-        let last_updated_at_block_by_quorum = signed_quorums
+        let quorum_update_block_number = signed_quorums
             .into_iter()
             .map(|signed_quorum| (signed_quorum, most_recent_stale_block))
             .collect();
@@ -396,7 +396,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let err = check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorums,
             reference_block,
-            last_updated_at_block_by_quorum,
+            quorum_update_block_number,
             window,
         )
         .unwrap_err();
@@ -426,7 +426,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let reference_block = 42;
         let window = 43;
         let signed_quorums = [0];
-        let last_updated_at_block_by_quorum = signed_quorums
+        let quorum_update_block_number = signed_quorums
             .into_iter()
             .map(|signed_quorum| (signed_quorum, Default::default()))
             .collect();
@@ -434,7 +434,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         let err = check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorums,
             reference_block,
-            last_updated_at_block_by_quorum,
+            quorum_update_block_number,
             window,
         )
         .unwrap_err();
@@ -475,14 +475,14 @@ mod test_cert_apks_equal_storage_apks {
         let update = Update::new(42, 43, apk_trunc_hash.clone()).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
-        let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
+        let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
 
         let result = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
             apk_index_for_each_quorum,
-            apk_trunc_hash_history_by_quorum,
+            apk_history,
         );
 
         assert_eq!(result, Ok(()));
@@ -503,14 +503,14 @@ mod test_cert_apks_equal_storage_apks {
         let update = Update::new(42, 43, storage_apk_trunc_hash.clone()).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
-        let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
+        let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
 
         let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
             apk_index_for_each_quorum,
-            apk_trunc_hash_history_by_quorum,
+            apk_history,
         )
         .unwrap_err();
 
@@ -549,14 +549,14 @@ mod test_cert_apks_equal_storage_apks {
         let apk_index_for_each_quorum = vec![0];
 
         let apk_trunc_hash_history = History(Default::default());
-        let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
+        let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
 
         let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             reference_block,
             &apk_for_each_quorum,
             apk_index_for_each_quorum,
-            apk_trunc_hash_history_by_quorum,
+            apk_history,
         )
         .unwrap_err();
 
@@ -575,14 +575,14 @@ mod test_cert_apks_equal_storage_apks {
         let update = Update::new(42, 43, Default::default()).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
-        let apk_trunc_hash_history_by_quorum = HashMap::from([(0, apk_trunc_hash_history)]);
+        let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
 
         let err = check::cert_apks_equal_storage_apks(
             &signed_quorums,
             STALE_REFERENCE_BLOCK,
             &apk_for_each_quorum,
             apk_index_for_each_quorum,
-            apk_trunc_hash_history_by_quorum,
+            apk_history,
         )
         .unwrap_err();
 
@@ -596,21 +596,15 @@ mod test_relay_keys_are_set {
     use alloy_primitives::Address;
     use hashbrown::HashMap;
 
-    use crate::{check, error::CertVerificationError::*, types::solidity::RelayInfo};
+    use crate::{check, error::CertVerificationError::*};
 
     #[test]
     fn success_when_all_relay_keys_are_set() {
         let relay_keys = vec![0];
 
-        let relay_key_to_relay_info = HashMap::from([(
-            0,
-            RelayInfo {
-                relayAddress: [42u8; 20].into(),
-                relayURL: Default::default(),
-            },
-        )]);
+        let relay_key_to_relay_address = HashMap::from([(0, [42u8; 20].into())]);
 
-        let result = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_info);
+        let result = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address);
 
         assert_eq!(result, Ok(()));
     }
@@ -619,15 +613,9 @@ mod test_relay_keys_are_set {
     fn relay_keys_are_set_fails_with_missing_relay_key() {
         let relay_keys = vec![99]; // 99 not found on storage
 
-        let relay_key_to_relay_info = HashMap::from([(
-            42,
-            RelayInfo {
-                relayAddress: [42u8; 20].into(),
-                relayURL: Default::default(),
-            },
-        )]);
+        let relay_key_to_relay_address = HashMap::from([(42, [42u8; 20].into())]);
 
-        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_info).unwrap_err();
+        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
 
         assert_eq!(err, MissingRelayKeyEntry);
     }
@@ -636,15 +624,9 @@ mod test_relay_keys_are_set {
     fn relay_keys_are_set_fails_when_corresponding_address_is_not_set() {
         let relay_keys = vec![42];
 
-        let relay_key_to_relay_info = HashMap::from([(
-            42,
-            RelayInfo {
-                relayAddress: Address::default().into(),
-                relayURL: Default::default(),
-            },
-        )]);
+        let relay_key_to_relay_address = HashMap::from([(42, Address::default().into())]);
 
-        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_info).unwrap_err();
+        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
 
         assert_eq!(err, RelayKeyNotSet);
     }
@@ -665,11 +647,11 @@ mod test_security_assumptions_are_met {
 
     #[test]
     fn success_when_security_assumptions_are_met() {
-        let (version, version_to_versioned_blob_params, security_thresholds) = success_inputs();
+        let (version, versioned_blob_params, security_thresholds) = success_inputs();
 
         let result = check::security_assumptions_are_met(
             version,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         );
 
@@ -678,11 +660,11 @@ mod test_security_assumptions_are_met {
 
     #[test]
     fn security_assumptions_are_met_fails_with_missing_version_entry() {
-        let (_version, version_to_versioned_blob_params, security_thresholds) = success_inputs();
+        let (_version, versioned_blob_params, security_thresholds) = success_inputs();
 
         let err = check::security_assumptions_are_met(
             Version::MAX,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         )
         .unwrap_err();
@@ -692,13 +674,13 @@ mod test_security_assumptions_are_met {
 
     #[test]
     fn security_assumptions_are_met_fails_when_confirmation_threshold_equals_adversary_threshold() {
-        let (version, version_to_versioned_blob_params, mut security_thresholds) = success_inputs();
+        let (version, versioned_blob_params, mut security_thresholds) = success_inputs();
 
         security_thresholds.confirmationThreshold = security_thresholds.adversaryThreshold;
 
         let err = check::security_assumptions_are_met(
             version,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         )
         .unwrap_err();
@@ -709,13 +691,13 @@ mod test_security_assumptions_are_met {
     #[test]
     fn security_assumptions_are_met_fails_when_confirmation_threshold_less_than_adversary_threshold()
      {
-        let (version, version_to_versioned_blob_params, mut security_thresholds) = success_inputs();
+        let (version, versioned_blob_params, mut security_thresholds) = success_inputs();
 
         security_thresholds.confirmationThreshold = security_thresholds.adversaryThreshold - 1;
 
         let err = check::security_assumptions_are_met(
             version,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         )
         .unwrap_err();
@@ -725,20 +707,19 @@ mod test_security_assumptions_are_met {
 
     #[test]
     fn security_assumptions_are_met_fails_with_underflow() {
-        let (version, mut version_to_versioned_blob_params, mut security_thresholds) =
-            success_inputs();
+        let (version, mut versioned_blob_params, mut security_thresholds) = success_inputs();
 
         // to trigger overflow (gamma * codingRate) < 100
         // where gamma = confirmation_threshold - adversary_threshold
         security_thresholds.confirmationThreshold = 101;
         security_thresholds.adversaryThreshold = 100;
         // gamma = 101 - 100 = 1
-        let params = version_to_versioned_blob_params.get_mut(&version).unwrap();
+        let params = versioned_blob_params.get_mut(&version).unwrap();
         params.codingRate = 99;
 
         let err = check::security_assumptions_are_met(
             version,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         )
         .unwrap_err();
@@ -748,7 +729,7 @@ mod test_security_assumptions_are_met {
 
     #[test]
     fn security_assumptions_are_met_fails_with_unmet_security_assumptions() {
-        let (version, version_to_versioned_blob_params, mut security_thresholds) = success_inputs();
+        let (version, versioned_blob_params, mut security_thresholds) = success_inputs();
 
         // from success_inputs:
         // gamma = confirmation_threshold - adversary_threshold = 101 - 1 = 100
@@ -758,7 +739,7 @@ mod test_security_assumptions_are_met {
 
         let err = check::security_assumptions_are_met(
             version,
-            &version_to_versioned_blob_params,
+            &versioned_blob_params,
             &security_thresholds,
         )
         .unwrap_err();
@@ -772,7 +753,7 @@ mod test_security_assumptions_are_met {
         SecurityThresholds,
     ) {
         let version = 42u16;
-        let version_to_versioned_blob_params = HashMap::from([(
+        let versioned_blob_params = HashMap::from([(
             version,
             VersionedBlobParams {
                 maxNumOperators: 99,
@@ -791,17 +772,14 @@ mod test_security_assumptions_are_met {
         // maxNumOperators * 10_000 = 99 * 10_000 = 990_000
         // 990_000 >= 990_000
 
-        (
-            version,
-            version_to_versioned_blob_params,
-            security_thresholds,
-        )
+        (version, versioned_blob_params, security_thresholds)
     }
 }
 
 #[cfg(test)]
 mod test_confirmed_quorums_contains_blob_quorums {
     use crate::{check, error::CertVerificationError::*, types::Quorum};
+    use alloy_primitives::aliases::U96;
     use ark_bn254::G1Affine;
 
     #[test]
@@ -814,21 +792,21 @@ mod test_confirmed_quorums_contains_blob_quorums {
         let quorums = [
             Quorum {
                 number: 0,
-                total_stake: 42,
-                signed_stake: 43,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(43),
                 ..Default::default()
             },
             Quorum {
                 number: 1,
                 apk: G1Affine::default(),
-                total_stake: 42,
-                signed_stake: 42,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(42),
                 ..Default::default()
             },
             Quorum {
                 number: 2,
-                total_stake: 42,
-                signed_stake: 41,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(41),
                 ..Default::default()
             },
         ];
@@ -852,21 +830,21 @@ mod test_confirmed_quorums_contains_blob_quorums {
         let quorums = [
             Quorum {
                 number: 0,
-                total_stake: 42,
-                signed_stake: 43,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(43),
                 ..Default::default()
             },
             Quorum {
                 number: 1,
                 apk: G1Affine::default(),
-                total_stake: 42,
-                signed_stake: 42,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(42),
                 ..Default::default()
             },
             Quorum {
                 number: 2,
-                total_stake: 42,
-                signed_stake: 41,
+                total_stake: U96::from(42),
+                signed_stake: U96::from(41),
                 ..Default::default()
             },
         ];
@@ -890,8 +868,8 @@ mod test_confirmed_quorums_contains_blob_quorums {
 
         let quorums = [Quorum {
             number: 0,
-            total_stake: 42,
-            signed_stake: u128::MAX, // Will overflow when multiplied by THRESHOLD_DENOMINATOR
+            total_stake: U96::from(42),
+            signed_stake: U96::MAX, // Will overflow when multiplied by THRESHOLD_DENOMINATOR
             ..Default::default()
         }];
 
@@ -913,8 +891,8 @@ mod test_confirmed_quorums_contains_blob_quorums {
 
         let quorums = [Quorum {
             number: 0,
-            total_stake: u128::MAX,
-            signed_stake: 43,
+            total_stake: U96::MAX,
+            signed_stake: U96::from(43),
             ..Default::default()
         }];
 
@@ -935,8 +913,8 @@ mod test_confirmed_quorums_contains_blob_quorums {
         let confirmation_threshold = 100;
         let quorums = [Quorum {
             number: 0,
-            total_stake: 42,
-            signed_stake: 43,
+            total_stake: U96::from(42),
+            signed_stake: U96::from(43),
             ..Default::default()
         }];
 

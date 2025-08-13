@@ -4,11 +4,11 @@
 #![no_std]
 extern crate alloc;
 
-mod bitmap;
+pub mod bitmap;
 mod check;
 pub mod convert;
 pub mod error;
-mod hash;
+pub mod hash;
 mod signature;
 pub mod types;
 pub mod verification;

@@ -26,17 +26,17 @@ pub fn verify(
     storage: Storage,
 ) -> Result<(), CertVerificationError> {
     let Storage {
-        initialized_quorums_count,
+        quorum_count,
         current_block,
-        reject_staleness,
+        stale_stakes_forbidden,
         min_withdrawal_delay_blocks,
-        quorum_membership_history_by_signer,
-        stake_history_by_signer_and_quorum,
-        total_stake_history_by_quorum,
-        apk_trunc_hash_history_by_quorum,
-        last_updated_at_block_by_quorum,
-        relay_key_to_relay_info,
-        version_to_versioned_blob_params,
+        quorum_bitmap_history,
+        operator_stake_history,
+        total_stake_history,
+        apk_history,
+        quorum_update_block_number,
+        relay_key_to_relay_address,
+        versioned_blob_params,
     } = storage;
 
     let blob_certificate = blob_inclusion_info.blob_certificate.hash_ext();
@@ -72,11 +72,11 @@ pub fn verify(
     ];
     check::non_zero_equal_lengths(&lengths)?;
 
-    if reject_staleness {
+    if stale_stakes_forbidden {
         check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorum_numbers,
             batch_header.reference_block_number,
-            last_updated_at_block_by_quorum,
+            quorum_update_block_number,
             min_withdrawal_delay_blocks,
         )?;
     }
@@ -86,7 +86,7 @@ pub fn verify(
         batch_header.reference_block_number,
         &non_signer_stakes_and_signature.quorum_apks,
         non_signer_stakes_and_signature.quorum_apk_indices,
-        apk_trunc_hash_history_by_quorum,
+        apk_history,
     )?;
 
     // assumption: collection_a[i] corresponds to collection_b[i] for all i
@@ -98,20 +98,20 @@ pub fn verify(
                 .non_signer_quorum_bitmap_indices
                 .into_iter(),
         )
-        .map(|(pk, quorum_membership_index)| {
+        .map(|(pk, quorum_bitmap_history_index)| {
             let pk_hash = convert::point_to_hash(&pk);
 
-            let quorum_membership = quorum_membership_history_by_signer
+            let quorum_bitmap_history = quorum_bitmap_history
                 .get(&pk_hash)
                 .ok_or(MissingSignerEntry)?
-                .try_get_at(quorum_membership_index)?
+                .try_get_at(quorum_bitmap_history_index)?
                 .try_get_against(batch_header.reference_block_number)?;
 
             let pk: G1Affine = pk.into_ext();
             let non_signer = NonSigner {
                 pk,
                 pk_hash,
-                quorum_membership,
+                quorum_bitmap_history: quorum_bitmap_history,
             };
             Ok(non_signer)
         })
@@ -138,7 +138,7 @@ pub fn verify(
                 ((signed_quorum, apk), total_stake_index),
                 stake_index_for_each_required_non_signer,
             )| {
-                let total_stake = total_stake_history_by_quorum
+                let total_stake = total_stake_history
                     .get(&signed_quorum)
                     .ok_or(MissingQuorumEntry)?
                     .try_get_at(total_stake_index)?
@@ -148,13 +148,14 @@ pub fn verify(
                 let unsigned_stake = non_signers
                     .iter()
                     .filter(|non_signer| {
-                        let was_required_to_sign_this_quorum = non_signer.quorum_membership[bit];
+                        let was_required_to_sign_this_quorum =
+                            non_signer.quorum_bitmap_history[bit];
                         was_required_to_sign_this_quorum
                     })
                     // assumption: collection_a[i] corresponds to collection_b[i] for all i
                     .zip(stake_index_for_each_required_non_signer.into_iter())
                     .map(|(required_non_signer, stake_index)| {
-                        stake_history_by_signer_and_quorum
+                        operator_stake_history
                             .get(&required_non_signer.pk_hash)
                             .ok_or(MissingSignerEntry)?
                             .get(&signed_quorum)
@@ -179,8 +180,7 @@ pub fn verify(
         )
         .collect::<Result<Vec<_>, _>>()?;
 
-    let signers_apk =
-        signature::aggregation::aggregate(initialized_quorums_count, &non_signers, &quorums)?;
+    let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
 
     let msg_hash = batch_header.hash_ext();
     let apk_g2: G2Affine = non_signer_stakes_and_signature.apk_g2.into_ext();
@@ -199,15 +199,11 @@ pub fn verify(
 
     check::relay_keys_are_set(
         &blob_inclusion_info.blob_certificate.relay_keys,
-        &relay_key_to_relay_info,
+        &relay_key_to_relay_address,
     )?;
 
     let version = blob_inclusion_info.blob_certificate.blob_header.version;
-    check::security_assumptions_are_met(
-        version,
-        &version_to_versioned_blob_params,
-        &security_thresholds,
-    )?;
+    check::security_assumptions_are_met(version, &versioned_blob_params, &security_thresholds)?;
 
     let blob_quorums = blob_inclusion_info
         .blob_certificate
@@ -231,7 +227,7 @@ mod tests {
 
     use alloc::vec;
     use alloc::vec::Vec;
-    use alloy_primitives::{B256, Bytes};
+    use alloy_primitives::{B256, Bytes, aliases::U96};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
@@ -250,7 +246,7 @@ mod tests {
             Storage,
             conversions::{DefaultExt, IntoExt},
             history::{History, Update},
-            solidity::{RelayInfo, SecurityThresholds, VersionedBlobParams},
+            solidity::{SecurityThresholds, VersionedBlobParams},
         },
         verification,
     };
@@ -423,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn reject_staleness() {
+    fn stale_stakes_forbidden() {
         let (
             batch_header,
             blob_inclusion_info,
@@ -434,8 +430,8 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage.reject_staleness = true;
-        storage.last_updated_at_block_by_quorum.insert(0, 41);
+        storage.stale_stakes_forbidden = true;
+        storage.quorum_update_block_number.insert(0, 41);
 
         let err = verification::verify(
             batch_header,
@@ -483,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn quorum_membership_history_missing_signer_entry() {
+    fn quorum_bitmap_history_history_missing_signer_entry() {
         let (
             batch_header,
             blob_inclusion_info,
@@ -494,7 +490,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage.quorum_membership_history_by_signer.clear();
+        storage.quorum_bitmap_history.clear();
 
         let err = verification::verify(
             batch_header,
@@ -511,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    fn quorum_membership_history_missing_history_entry() {
+    fn quorum_bitmap_history_history_missing_history_entry() {
         let (
             batch_header,
             blob_inclusion_info,
@@ -539,7 +535,7 @@ mod tests {
     }
 
     #[test]
-    fn quorum_membership_history_reference_block_not_in_interval() {
+    fn quorum_bitmap_history_history_reference_block_not_in_interval() {
         let (
             batch_header,
             blob_inclusion_info,
@@ -550,12 +546,9 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage
-            .quorum_membership_history_by_signer
-            .iter_mut()
-            .for_each(|(_, v)| {
-                v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
-            });
+        storage.quorum_bitmap_history.iter_mut().for_each(|(_, v)| {
+            v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
+        });
 
         let err = verification::verify(
             batch_header,
@@ -611,7 +604,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage.total_stake_history_by_quorum.clear();
+        storage.total_stake_history.clear();
 
         let err = verification::verify(
             batch_header,
@@ -639,9 +632,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage
-            .total_stake_history_by_quorum
-            .insert(0, Default::default());
+        storage.total_stake_history.insert(0, Default::default());
 
         let err = verification::verify(
             batch_header,
@@ -669,12 +660,9 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage
-            .total_stake_history_by_quorum
-            .iter_mut()
-            .for_each(|(_, v)| {
-                v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
-            });
+        storage.total_stake_history.iter_mut().for_each(|(_, v)| {
+            v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
+        });
 
         let err = verification::verify(
             batch_header,
@@ -702,7 +690,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage.stake_history_by_signer_and_quorum.clear();
+        storage.operator_stake_history.clear();
 
         let err = verification::verify(
             batch_header,
@@ -731,7 +719,7 @@ mod tests {
         ) = success_inputs();
 
         storage
-            .stake_history_by_signer_and_quorum
+            .operator_stake_history
             .iter_mut()
             .for_each(|(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.clear();
@@ -764,7 +752,7 @@ mod tests {
         ) = success_inputs();
 
         storage
-            .stake_history_by_signer_and_quorum
+            .operator_stake_history
             .iter_mut()
             .for_each(|(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.insert(0, Default::default());
@@ -797,7 +785,7 @@ mod tests {
         ) = success_inputs();
 
         storage
-            .stake_history_by_signer_and_quorum
+            .operator_stake_history
             .iter_mut()
             .for_each(|(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.iter_mut().for_each(|(_, v)| {
@@ -831,12 +819,9 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage
-            .total_stake_history_by_quorum
-            .iter_mut()
-            .for_each(|(_, v)| {
-                v.0.insert(0, Update::new(41, 43, 29).unwrap());
-            });
+        storage.total_stake_history.iter_mut().for_each(|(_, v)| {
+            v.0.insert(0, Update::new(41, 43, U96::from(29)).unwrap());
+        });
 
         let err = verification::verify(
             batch_header,
@@ -864,7 +849,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        storage.initialized_quorums_count = 1;
+        storage.quorum_count = 1;
 
         let err = verification::verify(
             batch_header,
@@ -920,8 +905,8 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        let relay_info = storage.relay_key_to_relay_info.get_mut(&42).unwrap();
-        relay_info.relayAddress = Default::default();
+        let relay_address = storage.relay_key_to_relay_address.get_mut(&42).unwrap();
+        *relay_address = Default::default();
 
         let err = verification::verify(
             batch_header,
@@ -949,10 +934,7 @@ mod tests {
             mut storage,
         ) = success_inputs();
 
-        let params = storage
-            .version_to_versioned_blob_params
-            .get_mut(&42)
-            .unwrap();
+        let params = storage.versioned_blob_params.get_mut(&42).unwrap();
         params.numChunks = 43;
 
         let err = verification::verify(
@@ -982,7 +964,7 @@ mod tests {
         ) = success_inputs();
 
         storage
-            .version_to_versioned_blob_params
+            .versioned_blob_params
             .iter_mut()
             .for_each(|(_, versioned_blob_params)| {
                 versioned_blob_params.maxNumOperators = 0;
@@ -1155,8 +1137,8 @@ mod tests {
             optional_non_signer5_pk_hash,
         ];
 
-        let quorum_membership_history_by_signer = {
-            let quorum_memberships = vec![
+        let quorum_bitmap_history = {
+            let quorum_bitmap_historys = vec![
                 Bitmap::new([5, 0, 0, 0]), // 1 0 1
                 Bitmap::new([6, 0, 0, 0]), // 1 1 0
                 Bitmap::new([7, 0, 0, 0]), // 1 1 1
@@ -1167,23 +1149,23 @@ mod tests {
 
             pk_hashes
                 .into_iter()
-                .zip(quorum_memberships.into_iter())
-                .map(|(pk_hash, quorum_membership)| {
-                    let update = Update::new(41, 43, quorum_membership).unwrap();
+                .zip(quorum_bitmap_historys.into_iter())
+                .map(|(pk_hash, quorum_bitmap_history)| {
+                    let update = Update::new(41, 43, quorum_bitmap_history).unwrap();
                     let history = HashMap::from([(0, update)]);
                     (pk_hash, History(history))
                 })
                 .collect()
         };
 
-        let stake_history_by_signer_and_quorum = pk_hashes
+        let operator_stake_history = pk_hashes
             .into_iter()
             .map(|pk_hash| {
                 let stake_history_by_quorum = signed_quorum_numbers
                     .clone()
                     .into_iter()
                     .map(|quorum| {
-                        let update = Update::new(41, 43, 10).unwrap();
+                        let update = Update::new(41, 43, U96::from(10)).unwrap();
                         let history = HashMap::from([(0, update)]);
                         (quorum, History(history))
                     })
@@ -1192,17 +1174,17 @@ mod tests {
             })
             .collect::<HashMap<B256, _>>();
 
-        let total_stake_history_by_quorum = signed_quorum_numbers
+        let total_stake_history = signed_quorum_numbers
             .clone()
             .into_iter()
             .map(|quorum| {
-                let update = Update::new(41, 43, 100).unwrap();
+                let update = Update::new(41, 43, U96::from(100)).unwrap();
                 let history = HashMap::from([(0, update)]);
                 (quorum, History(history))
             })
             .collect();
 
-        let apk_trunc_hash_history_by_quorum = signed_quorum_numbers
+        let apk_history = signed_quorum_numbers
             .clone()
             .into_iter()
             .zip(apk_for_each_quorum)
@@ -1215,21 +1197,15 @@ mod tests {
             })
             .collect();
 
-        let last_updated_at_block_by_quorum = signed_quorum_numbers
+        let quorum_update_block_number = signed_quorum_numbers
             .clone()
             .into_iter()
             .map(|quorum| (quorum, 42))
             .collect();
 
-        let relay_key_to_relay_info = HashMap::from([(
-            42,
-            RelayInfo {
-                relayAddress: [42u8; 20].into(),
-                relayURL: Default::default(),
-            },
-        )]);
+        let relay_key_to_relay_address = HashMap::from([(42, [42u8; 20].into())]);
 
-        let version_to_versioned_blob_params = HashMap::from([(
+        let versioned_blob_params = HashMap::from([(
             42,
             VersionedBlobParams {
                 maxNumOperators: 42,
@@ -1239,17 +1215,17 @@ mod tests {
         )]);
 
         let storage = Storage {
-            initialized_quorums_count: u8::MAX,
+            quorum_count: u8::MAX,
             current_block: 43,
-            reject_staleness: false,
+            stale_stakes_forbidden: false,
             min_withdrawal_delay_blocks: 1,
-            quorum_membership_history_by_signer,
-            stake_history_by_signer_and_quorum,
-            total_stake_history_by_quorum,
-            apk_trunc_hash_history_by_quorum,
-            last_updated_at_block_by_quorum,
-            relay_key_to_relay_info,
-            version_to_versioned_blob_params,
+            quorum_bitmap_history,
+            operator_stake_history,
+            total_stake_history,
+            apk_history,
+            quorum_update_block_number,
+            relay_key_to_relay_address,
+            versioned_blob_params,
         };
 
         let required_quorum_numbers: Bytes = [0, 2].into();

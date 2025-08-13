@@ -15,8 +15,23 @@ sol! {
     }
 
     #[derive(Default, Debug)]
-    struct RelayInfo {
-        address relayAddress;
-        string relayURL;
+    struct QuorumBitmapUpdate {
+        uint32 updateBlockNumber;
+        uint32 nextUpdateBlockNumber;
+        uint192 quorumBitmap;
+    }
+
+    #[derive(Default, Debug)]
+    struct ApkUpdate {
+        bytes24 apkHash;
+        uint32 updateBlockNumber;
+        uint32 nextUpdateBlockNumber;
+    }
+
+    #[derive(Default, Debug)]
+    struct StakeUpdate {
+        uint32 updateBlockNumber;
+        uint32 nextUpdateBlockNumber;
+        uint96 stake;
     }
 }

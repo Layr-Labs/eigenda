@@ -152,7 +152,7 @@ use crate::{
 // After cancelling out terms, the resulting `signers` APK is PK3 + PK4 as expected
 // since those were the only signers that were both expected to sign and did sign
 pub fn aggregate(
-    initialized_quorums_count: u8,
+    quorum_count: u8,
     non_signers: &[NonSigner],
     quorums: &[Quorum],
 ) -> Result<G1Affine, CertVerificationError> {
@@ -166,13 +166,12 @@ pub fn aggregate(
         .map(|quorum| quorum.number)
         .collect::<Vec<_>>();
 
-    let signed_quorums =
-        bit_indices_to_bitmap(&bit_indices.into(), Some(initialized_quorums_count))?;
+    let signed_quorums = bit_indices_to_bitmap(&bit_indices.into(), Some(quorum_count))?;
 
     let non_signers_apk = non_signers
         .iter()
         .map(|non_signer| {
-            let missing_signatures = non_signer.quorum_membership & signed_quorums;
+            let missing_signatures = non_signer.quorum_bitmap_history & signed_quorums;
             let missing_signatures = missing_signatures.count_ones();
             let missing_signatures = Fr::from(missing_signatures as u64);
             // TODO: benchmark then consider implementing `scalar_mul_tiny`
@@ -209,10 +208,9 @@ mod tests {
 
     #[test]
     fn compute_signers_apk_for_3_quorums_and_6_signers() {
-        let (initialized_quorums_count, non_signers, quorums) =
-            inputs_for_3_quorums_and_6_signers();
+        let (quorum_count, non_signers, quorums) = inputs_for_3_quorums_and_6_signers();
 
-        let actual = aggregate(initialized_quorums_count, &non_signers, &quorums).unwrap();
+        let actual = aggregate(quorum_count, &non_signers, &quorums).unwrap();
 
         let expected = (ppk(3) + ppk(4)).into_affine();
 
@@ -221,11 +219,11 @@ mod tests {
 
     fn inputs_for_3_quorums_and_6_signers() -> (u8, Vec<NonSigner>, Vec<Quorum>) {
         let signed_quorums = vec![0, 2];
-        let initialized_quorums_count = u8::MAX;
+        let quorum_count = u8::MAX;
 
         let non_signer_pks = vec![pk(0), pk(1), pk(2)];
 
-        let non_signer_quorum_memberships = vec![
+        let non_signer_quorum_bitmap_history = vec![
             BitArray::new([5, 0, 0, 0]), // 1 0 1
             BitArray::new([6, 0, 0, 0]), // 1 1 0
             BitArray::new([7, 0, 0, 0]), // 1 1 1
@@ -236,11 +234,11 @@ mod tests {
 
         let non_signers = non_signer_pks
             .into_iter()
-            .zip(non_signer_quorum_memberships.into_iter())
-            .map(|(pk, quorum_membership)| NonSigner {
+            .zip(non_signer_quorum_bitmap_historys.into_iter())
+            .map(|(pk, quorum_bitmap_history)| NonSigner {
                 pk,
                 pk_hash: convert::point_to_hash(&pk.into_ext()),
-                quorum_membership,
+                quorum_bitmap_history,
             })
             .collect();
 
@@ -259,7 +257,7 @@ mod tests {
             })
             .collect();
 
-        (initialized_quorums_count, non_signers, quorums)
+        (quorum_count, non_signers, quorums)
     }
 
     fn pk(n: u64) -> G1Affine {
