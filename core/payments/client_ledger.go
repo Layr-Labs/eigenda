@@ -2,12 +2,13 @@ package payments
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -32,9 +33,9 @@ type ClientLedger struct {
 
 	getNow func() time.Time
 
-	reservationLedger *ReservationLedger
+	reservationLedger *reservation.ReservationLedger
 
-	onDemandLedger *OnDemandLedger
+	onDemandLedger *ondemand.OnDemandLedger
 
 	status atomic.Value
 }
@@ -42,26 +43,26 @@ type ClientLedger struct {
 func NewClientLedger(
 	accountID gethcommon.Address,
 	// TODO: may be nil if no reservation exists
-	reservationLedgerConfig *ReservationLedgerConfig,
+	reservationLedgerConfig *reservation.ReservationLedgerConfig,
 	// TODO: may be nil if no on demand payments are enabled
-	onDemandLedgerConfig *OnDemandLedgerConfig,
+	onDemandLedgerConfig *ondemand.OnDemandLedgerConfig,
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
-	var reservationLedger *ReservationLedger
+	var reservationLedger *reservation.ReservationLedger
 	if reservationLedgerConfig != nil {
 		var err error
-		reservationLedger, err = NewReservationLedger(*reservationLedgerConfig, getNow())
+		reservationLedger, err = reservation.NewReservationLedger(*reservationLedgerConfig, getNow())
 		if err != nil {
 			return nil, fmt.Errorf("new reservation ledger: %w", err)
 		}
 	}
 
-	var onDemandLedger *OnDemandLedger
+	var onDemandLedger *ondemand.OnDemandLedger
 	if onDemandLedgerConfig != nil {
 		var err error
 		// TODO: must init with actual value the disperser
-		cumulativePaymentStore := NewEphemeralCumulativePaymentStore()
-		onDemandLedger, err = NewOnDemandLedger(*onDemandLedgerConfig, cumulativePaymentStore)
+		cumulativePaymentStore := ondemand.NewEphemeralCumulativePaymentStore()
+		onDemandLedger, err = ondemand.NewOnDemandLedger(*onDemandLedgerConfig, cumulativePaymentStore)
 		if err != nil {
 			return nil, fmt.Errorf("new on demand ledger: %w", err)
 		}
@@ -94,23 +95,23 @@ func (cl *ClientLedger) Debit(
 	now := cl.getNow()
 
 	if cl.reservationLedger != nil {
-		err := cl.reservationLedger.Debit(ctx, now, int64(blobLengthSymbols), quorums)
-
-		var insufficientErr *InsufficientReservationCapacityError
-		if err == nil {
+		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols, quorums)
+		if err != nil {
+			// TODO: make this a type of error which causes the client to shut down
+			cl.status.Store(LedgerStatusDead)
+			return nil, fmt.Errorf("reservation debit error: %w", err)
+		}
+		
+		if success {
 			// Success - blob accounted for via reservation
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
 			if err != nil {
 				return nil, fmt.Errorf("new payment metadata: %w", err)
 			}
 			return paymentMetadata, nil
-		} else if errors.As(err, &insufficientErr) {
-			// todo: add info log, then continue to on-demand
-		} else {
-			// TODO: make this a type of error which causes the client to shut down
-			cl.status.Store(LedgerStatusDead)
-			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
+		// If not successful, continue to on-demand
+		// todo: add info log
 	}
 
 	if cl.onDemandLedger != nil {
@@ -157,7 +158,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("unable to revert reservation payment with nil reservationLedger")
 		}
 
-		err := cl.reservationLedger.RevertDebit(ctx, cl.getNow(), int64(blobSymbolCount))
+		err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
