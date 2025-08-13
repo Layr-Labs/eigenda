@@ -97,7 +97,7 @@ func NewLeakyBucket(
 		// starting with a full bucket means some time must elapse to allow leakage before the bucket can be used
 		currentFillLevel = bucketCapacity
 	default:
-		return nil, fmt.Errorf("unknown bias behavior %s", biasBehavior)
+		panic(fmt.Sprintf("unknown bias behavior %s", biasBehavior))
 	}
 
 	return &LeakyBucket{
@@ -155,7 +155,7 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 		lb.currentFillLevel = newFillLevel
 		return true, nil
 	default:
-		return false, fmt.Errorf("unknown overfill behavior %s", lb.overfillBehavior)
+		panic(fmt.Sprintf("unknown overfill behavior %s", lb.overfillBehavior))
 	}
 }
 
@@ -186,8 +186,7 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 
 // Lets the correct number of symbols leak out of the bucket, based on when we last leaked
 //
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
-// - Returns a generic error if any of the calculations fail, which should not happen during normal usage.
+// Returns a TimeMovedBackwardError if input time is before previous leak time.
 func (lb *LeakyBucket) leak(now time.Time) error {
 	if now.Before(lb.previousLeakTime) {
 		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
@@ -228,10 +227,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	//	   |----*----------|----------------|----------*-----|
 	//	                                    ↑__________↑
 	//	                                partialSecondLeakage
-	partialSecondLeakage, err := lb.computePartialSecondLeakage(uint64(now.Nanosecond()))
-	if err != nil {
-		return fmt.Errorf("compute partial second leakage: %w", err)
-	}
+	partialSecondLeakage := lb.computePartialSecondLeakage(uint64(now.Nanosecond()))
 	lb.previousPartialSecondLeakage = partialSecondLeakage
 
 	//	Previous leak (N-1)                      Current Leak (N)
@@ -265,7 +261,7 @@ func (lb *LeakyBucket) computeFullSecondLeakage(epochSeconds uint64) uint64 {
 //
 // Computes the number of symbols which leak out in the given fractional second. Since this deals with integers,
 // the configured bias determines which direction we round in.
-func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) (uint64, error) {
+func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) uint64 {
 	// 1e9
 	nanosecondsPerSecond := uint64(time.Second)
 
@@ -273,11 +269,11 @@ func (lb *LeakyBucket) computePartialSecondLeakage(nanos uint64) (uint64, error)
 	case BiasPermitMore:
 		// Round up, to permit more (more leakage = more capacity freed up)
 		// Add (1e9 - 1) before dividing to round up
-		return (nanos*lb.symbolsPerSecondLeakRate + nanosecondsPerSecond - 1) / nanosecondsPerSecond, nil
+		return (nanos*lb.symbolsPerSecondLeakRate + nanosecondsPerSecond - 1) / nanosecondsPerSecond
 	case BiasPermitLess:
 		// Round down, to permit less (less leakage = less capacity freed up)
-		return nanos * lb.symbolsPerSecondLeakRate / nanosecondsPerSecond, nil
+		return nanos * lb.symbolsPerSecondLeakRate / nanosecondsPerSecond
 	default:
-		return 0, fmt.Errorf("unknown bias: %s", lb.biasBehavior)
+		panic(fmt.Sprintf("unknown bias: %s", lb.biasBehavior))
 	}
 }
