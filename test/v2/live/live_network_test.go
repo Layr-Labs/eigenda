@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -497,7 +498,9 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
+
+	accountant := clients.NewUnpopulatedAccountant(accountId, metrics.NoopAccountantMetrics)
+	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, accountant)
 	require.NoError(t, err)
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
