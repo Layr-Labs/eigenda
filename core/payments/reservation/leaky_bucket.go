@@ -26,6 +26,9 @@ import (
 // is using it at a time.
 type LeakyBucket struct {
 	// Defines whether we should err on the side of permitting more or less throughput
+	//
+	// Practically, this value is used to determine whether the bucket is initialized to full or empty, as well as
+	// rounding direction when leaking.
 	biasBehavior BiasBehavior
 
 	// Defines different ways that overfilling the bucket should be handled
