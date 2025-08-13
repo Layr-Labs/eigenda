@@ -11,6 +11,7 @@ import (
 
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	metricsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -148,7 +149,8 @@ func NewTestClient(
 		UseSecureGrpcFlag: true,
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	accountant := clientsv2.NewAccountant(accountId, nil, nil, 0, 0, 0, 0, metricsv2.NoopAccountantMetrics)
+	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, accountant)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}

@@ -47,7 +47,16 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
+func NewAccountant(
+	accountID gethcommon.Address,
+	reservation *core.ReservedPayment,
+	onDemand *core.OnDemandPayment,
+	reservationWindow uint64,
+	pricePerSymbol uint64,
+	minNumSymbols uint64,
+	numBins uint32,
+	metrics metrics.AccountantMetricer,
+) *Accountant {
 	periodRecords := make([]PeriodRecord, max(numBins, uint32(meterer.MinNumBins)))
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
@@ -61,7 +70,7 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
-		metrics:           metrics.NoopAccountantMetrics,
+		metrics:           metrics,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -260,10 +269,6 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 	a.periodRecords = periodRecords
 	return nil
-}
-
-func (a *Accountant) SetMetrics(metrics metrics.AccountantMetricer) {
-	a.metrics = metrics
 }
 
 // QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers

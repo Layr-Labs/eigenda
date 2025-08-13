@@ -576,18 +576,24 @@ func buildPayloadDisperser(
 		return nil, fmt.Errorf("build local signer: %w", err)
 	}
 
+	accountId, err := signer.GetAccountID()
+	if err != nil {
+		return nil, fmt.Errorf("error getting account ID: %w", err)
+	}
+
+	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
+	// The accountant is populated lazily by disperserClient.PopulateAccountant
+	accountant := clients_v2.NewAccountant(accountId, nil, nil, 0, 0, 0, 0, accountantMetrics)
+
 	disperserClient, err := clients_v2.NewDisperserClient(
 		&clientConfigV2.DisperserClientCfg,
 		signer,
 		kzgProver,
-		nil,
+		accountant,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
 	}
-
-	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
-	disperserClient.SetAccountantMetrics(accountantMetrics)
 
 	blockNumMonitor, err := verification.NewBlockNumberMonitor(
 		log,
