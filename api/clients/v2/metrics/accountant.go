@@ -13,7 +13,7 @@ const (
 )
 
 var (
-	gweiFactor = big.NewInt(1000000000)
+	gweiFactor = 1e9 // gweiFactor is used when converting wei to gwei
 )
 
 type AccountantMetricer interface {
@@ -42,10 +42,13 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 }
 
 func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.Int) {
-	// Convert wei to gwei
-	gwei := new(big.Int).Div(wei, gweiFactor)
-	gweiFloat, _ := gwei.Float64()
-	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat)
+	// The prometheus.GaugeVec uses a float64. To minimize precision loss when
+	// converting from wei, the cumulative payment value is first converted
+	// to gwei before reporting the metric. Users can perform transformations
+	// on the value via dashboard functions to change denomination.
+	gwei := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(gweiFactor))
+	gweiFloat64, _ := gwei.Float64()
+	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
 type noopAccountantMetricer struct {
