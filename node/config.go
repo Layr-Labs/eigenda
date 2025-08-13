@@ -412,7 +412,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBReadCacheSizeBytes:      uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
 		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
 		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
-		LittRespectLocks:              ctx.GlobalBool(flags.LitRespectLocksFlag.Name),
+		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
 		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
