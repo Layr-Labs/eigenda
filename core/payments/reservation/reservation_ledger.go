@@ -8,8 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// TODO: write unit tests
-
 // Keeps track of the state of a given reservation
 //
 // This is a goroutine safe wrapper around the LeakyBucket algorithm.
