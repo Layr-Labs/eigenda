@@ -173,17 +173,10 @@ func pruneTable(
 
 	if isSnapshot {
 		// This is a snapshot. Write a lower bound file to tell the DB not to re-snapshot files than have been pruned.
-		if len(deletedSegments) > 1 {
-			lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
-			if err != nil {
-				return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
-					tableName, sources[0], err)
-			}
-			err = lowerBoundFile.Update(deletedSegments[len(deletedSegments)-1].SegmentIndex())
-			if err != nil {
-				return 0, fmt.Errorf("failed to update lower bound file for table %s at path %s: %w",
-					tableName, sources[0], err)
-			}
+		err = writeLowerBoundFile(sources[0], tableName, deletedSegments)
+		if err != nil {
+			return 0, fmt.Errorf("failed to write lower bound file for table %s at path %s: %w",
+				tableName, sources[0], err)
 		}
 	} else {
 		// If we are doing GC on a table that isn't a snapshot, then we need to delete the snapshots/keymap
@@ -196,6 +189,26 @@ func pruneTable(
 	}
 
 	return bytesDeleted, nil
+}
+
+// Updates the lower bound file after segments have been deleted.
+func writeLowerBoundFile(snapshotRoot string, tableName string, deletedSegments []*segment.Segment) error {
+	if len(deletedSegments) == 0 {
+		// No segments were deleted, no need to write a lower bound file.
+		return nil
+	}
+	lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(snapshotRoot, tableName))
+	if err != nil {
+		return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
+			tableName, snapshotRoot, err)
+	}
+	err = lowerBoundFile.Update(deletedSegments[len(deletedSegments)-1].SegmentIndex())
+	if err != nil {
+		return fmt.Errorf("failed to update lower bound file for table %s at path %s: %w",
+			tableName, snapshotRoot, err)
+	}
+
+	return nil
 }
 
 // deletes the snapshot directories in all sources for the given table
