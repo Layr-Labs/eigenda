@@ -5,11 +5,11 @@ import (
 	"time"
 )
 
-// Configuration for a ReservationLedger, which manages the reservation of a single account
+// Configuration for a [ReservationLedger], which manages the reservation of a single account
 type ReservationLedgerConfig struct {
-	// Contains the parameters of the reservation that the ReservationLedger is responsible for
+	// Contains the parameters of the reservation that the [ReservationLedger] is responsible for
 	reservation Reservation
-	// Whether the underlying reservation LeakyBucket should start full or empty.
+	// Whether the underlying reservation [LeakyBucket] should start full or empty.
 	// This asymmetric approach is necessary to handle restart scenarios correctly for different entities.
 	//
 	// Validators and Dispersers should start empty:
@@ -27,16 +27,16 @@ type ReservationLedgerConfig struct {
 	// - Without this protection, clients with recurring problems that restart rapidly could over-utilize
 	//   their reservation so severely that validators would begin rejecting dispersals
 	startFull bool
-	// Controls how the LeakyBucket handles dispersals that would exceed bucket capacity.
+	// Controls how the [LeakyBucket] handles dispersals that would exceed bucket capacity.
 	//
 	// Background: Small reservations may have bucket capacities smaller than the maximum blob size.
 	// Without overfill support, users with small reservations would be unable to disperse large blobs,
 	// even though their average rate permits it over time.
 	//
 	// This configuration parameter exists just in case we want to limit the cases that overfill is permitted in the
-	// future, but the current intention is for all entities to run with OverfillBehavior == OverfillOncePermitted
+	// future, but the current intention is for all entities to run with [OverfillBehavior] == [OverfillOncePermitted]
 	overfillBehavior OverfillBehavior
-	// Determines the maximum burst capacity of the LeakyBucket.
+	// Determines the maximum burst capacity of the [LeakyBucket].
 	//
 	// The actual bucket capacity in symbols = symbolsPerSecond * bucketCapacityDuration
 	//

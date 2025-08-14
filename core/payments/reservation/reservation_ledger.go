@@ -21,7 +21,7 @@ type ReservationLedger struct {
 	leakyBucket *LeakyBucket
 }
 
-// Creates a new reservation ledger, which represents the reservation of a single user with a leaky bucket
+// Creates a new reservation ledger, which represents the reservation of a single user with a [LeakyBucket]
 func NewReservationLedger(
 	config ReservationLedgerConfig,
 	// now should be from a source that includes monotonic timestamp for best results
@@ -46,14 +46,14 @@ func NewReservationLedger(
 
 // Debit the reservation with a number of symbols.
 //
-// CheckInvariants should be called prior to calling Debit, to make sure the dispersal is permitted under the
-// parameters of the reservation. If CheckInvariants succeeds, then Debit is called to make sure the dispersal doesn't
-// exceed reservation capacity.
+// [ReservationLedger.CheckInvariants] should be called prior to calling [ReservationLedger.Debit], to make sure the
+// dispersal is permitted under the parameters of the reservation. If [ReservationLedger.CheckInvariants] succeeds,
+// then [ReservationLedger.Debit] is called to make sure the dispersal doesn't exceed reservation capacity.
 //
 // Returns (true, nil) if the reservation has enough capacity to perform the debit.
 // Returns (false, nil) if the bucket lacks capacity to permit the fill.
 // Returns (false, error) if an error occurs. Possible errors include:
-//   - ErrTimeMovedBackward: current time is before a previously observed time (only possible if input time instances
+//   - [ErrTimeMovedBackward]: current time is before a previously observed time (only possible if input time instances
 //     don't included monotonic timestamps)
 //   - Generic errors for all other unexpected behavior
 //
@@ -98,10 +98,10 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) erro
 
 // Checks whether a dispersal with given properties is permitted under the parameters of the reservation.
 //
-// This check should be called prior to calling Debit.
+// This check should be called prior to calling [ReservationLedger.Debit].
 //
-// Returns ErrQuorumNotPermitted if requested quorums are not permitted by the reservation
-// Returns ErrTimeOutOfRange if dispersal time is outside the reservation's valid time range
+// Returns [ErrQuorumNotPermitted] if requested quorums are not permitted by the reservation
+// Returns [ErrTimeOutOfRange] if dispersal time is outside the reservation's valid time range
 func (rl *ReservationLedger) CheckInvariants(
 	// the quorums listed in the BlobHeader
 	quorums []core.QuorumID,

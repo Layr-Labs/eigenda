@@ -10,9 +10,9 @@ import (
 
 // Represents a reservation for a single account.
 //
-// TODO(litt3): I opted to duplicate the preexisting `ReservedPayment` struct, rather than using the old one. There
+// TODO(litt3): I opted to duplicate the preexisting [ReservedPayment] struct, rather than using the old one. There
 // are nontrivial changes I wanted to make, and making those changes in a way that's compatible with the preexisting
-// usages was going to be messy. Instead, `ReservedPayment` can just be removed, when we remove the deprecated payment
+// usages was going to be messy. Instead, [ReservedPayment] can just be removed, when we remove the deprecated payment
 // system.
 type Reservation struct {
 	// The number of symbols / second that the holder of this reservation is entitled to disperse
@@ -28,7 +28,7 @@ type Reservation struct {
 	permittedQuorumIDs map[core.QuorumID]struct{}
 }
 
-// Create a representation of a single account Reservation.
+// Create a representation of a single account [Reservation].
 func NewReservation(
 	symbolsPerSecond uint64,
 	startTime time.Time,
@@ -63,7 +63,7 @@ func NewReservation(
 
 // Checks whether an input list of quorums are all permitted by the reservation.
 //
-// Returns nil if all input quorums are permitted, otherwise returns ErrQuorumNotPermitted.
+// Returns nil if all input quorums are permitted, otherwise returns [ErrQuorumNotPermitted].
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
 		if _, ok := r.permittedQuorumIDs[quorum]; ok {
@@ -82,7 +82,7 @@ func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 
 // Verifies that the given time falls within the reservation's valid time range.
 //
-// Returns ErrTimeOutOfRange if the time is outside the valid range.
+// Returns [ErrTimeOutOfRange] if the time is outside the valid range.
 func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 	if timeToCheck.Before(r.startTime) || timeToCheck.After(r.endTime) {
 		return fmt.Errorf("%w: dispersal time %s is outside range [%s, %s]",
