@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// Represents a reservation for a single user.
+// Represents a reservation for a single account.
 //
 // TODO(litt3): I opted to duplicate the preexisting `ReservedPayment` struct, rather than using the old one. There
 // are nontrivial changes I wanted to make, and making those changes in a way that's compatible with the preexisting
@@ -39,7 +39,7 @@ func NewReservation(
 		return nil, errors.New("reservation must have >0 symbols per second")
 	}
 
-	if startTime.Equal(endTime) || endTime.Before(startTime) {
+	if !startTime.Before(endTime) {
 		return nil, fmt.Errorf("start time (%v) must be before end time (%v)", startTime, endTime)
 	}
 
@@ -66,13 +66,15 @@ func NewReservation(
 // Returns nil if all input quorums are permitted, otherwise returns ErrQuorumNotPermitted.
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
-		if !r.permittedQuorumIDs[quorum] {
-			permittedQuorums := make([]core.QuorumID, 0, len(r.permittedQuorumIDs))
-			for quorumID := range r.permittedQuorumIDs {
-				permittedQuorums = append(permittedQuorums, quorumID)
-			}
-			return fmt.Errorf("%w: quorum %d not in permitted set %v", ErrQuorumNotPermitted, quorum, permittedQuorums)
+		if r.permittedQuorumIDs[quorum] {
+			continue
 		}
+
+		permittedQuorums := make([]core.QuorumID, 0, len(r.permittedQuorumIDs))
+		for quorumID := range r.permittedQuorumIDs {
+			permittedQuorums = append(permittedQuorums, quorumID)
+		}
+		return fmt.Errorf("%w: quorum %d not in permitted set %v", ErrQuorumNotPermitted, quorum, permittedQuorums)
 	}
 
 	return nil
