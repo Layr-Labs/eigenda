@@ -1,6 +1,7 @@
 package ondemand
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -57,6 +58,7 @@ func NewOnDemandLedger(
 // If the account doesn't have sufficient funds to accommodate the debit, the cumulative payment
 // IS NOT updated, i.e. a failed debit doesn't modify the payment state.
 func (odl *OnDemandLedger) Debit(
+	ctx context.Context,
 	symbolCount uint32,
 	quorums []core.QuorumID,
 ) (*big.Int, error) {
@@ -74,7 +76,7 @@ func (odl *OnDemandLedger) Debit(
 	odl.lock.Lock()
 	defer odl.lock.Unlock()
 
-	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get cumulative payment: %w", err)
 	}
@@ -90,7 +92,7 @@ func (odl *OnDemandLedger) Debit(
 			blobCost.String())
 	}
 
-	if err := odl.cumulativePaymentStore.SetCumulativePayment(newCumulativePayment); err != nil {
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
 		return nil, fmt.Errorf("set cumulative payment: %w", err)
 	}
 
@@ -98,7 +100,7 @@ func (odl *OnDemandLedger) Debit(
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
-func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
 	if symbolCount == 0 {
 		return errors.New("symbolCount must be > 0")
 	}
@@ -108,7 +110,7 @@ func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
 	odl.lock.Lock()
 	defer odl.lock.Unlock()
 
-	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment()
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
 	if err != nil {
 		return fmt.Errorf("get cumulative payment: %w", err)
 	}
@@ -119,7 +121,7 @@ func (odl *OnDemandLedger) RevertDebit(symbolCount uint32) error {
 		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
 	}
 
-	if err := odl.cumulativePaymentStore.SetCumulativePayment(newCumulativePayment); err != nil {
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
 		return fmt.Errorf("set cumulative payment: %w", err)
 	}
 

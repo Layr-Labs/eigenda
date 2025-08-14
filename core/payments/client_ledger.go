@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -85,6 +86,7 @@ func NewClientLedger(
 
 // TODO: doc, also better method name
 func (cl *ClientLedger) Debit(
+	ctx context.Context,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
@@ -116,7 +118,7 @@ func (cl *ClientLedger) Debit(
 	}
 
 	if cl.onDemandLedger != nil {
-		cumulativePayment, err := cl.onDemandLedger.Debit(blobLengthSymbols, quorums)
+		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
 		if err == nil {
 			// Success - blob accounted for via on-demand
 			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
@@ -136,6 +138,7 @@ func (cl *ClientLedger) Debit(
 
 // TODO: doc
 func (cl *ClientLedger) RevertDebit(
+	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
@@ -149,7 +152,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
 		}
 
-		err := cl.onDemandLedger.RevertDebit(blobSymbolCount)
+		err := cl.onDemandLedger.RevertDebit(ctx, blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert debit: %w", err)
 		}

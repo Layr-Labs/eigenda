@@ -191,7 +191,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	successfulDispersal := false
 	if c.clientLedger != nil {
 		// TODO: set probe stages
-		paymentMetadata, err = c.clientLedger.Debit(uint32(symbolLength), quorums)
+		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
 		if err != nil {
 			// TODO: bring everything down if unexpected error happens. no sense continuing with payments broken
 		}
@@ -202,7 +202,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 				return
 			}
 
-			err := c.clientLedger.RevertDebit(paymentMetadata, uint32(symbolLength))
+			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
 			if err != nil {
 				// TODO: Log error
 			}

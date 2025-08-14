@@ -1,6 +1,7 @@
 package ondemand
 
 import (
+	"context"
 	"math/big"
 )
 
@@ -22,12 +23,12 @@ func NewEphemeralCumulativePaymentStore() *EphemeralCumulativePaymentStore {
 }
 
 // Gets the stored cumulative payment in wei
-func (e *EphemeralCumulativePaymentStore) GetCumulativePayment() (*big.Int, error) {
+func (e *EphemeralCumulativePaymentStore) GetCumulativePayment(_ context.Context) (*big.Int, error) {
 	return new(big.Int).Set(e.cumulativePayment), nil
 }
 
 // Sets the cumulative payment in wei, overwriting the previous value
-func (e *EphemeralCumulativePaymentStore) SetCumulativePayment(newCumulativePayment *big.Int) error {
+func (e *EphemeralCumulativePaymentStore) SetCumulativePayment(_ context.Context, newCumulativePayment *big.Int) error {
 	e.cumulativePayment.Set(newCumulativePayment)
 	return nil
 }
