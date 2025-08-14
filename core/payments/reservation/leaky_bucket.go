@@ -154,13 +154,13 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 
 // Lets the correct number of symbols leak out of the bucket, based on when we last leaked
 //
-// Returns a TimeMovedBackwardError if input time is before previous leak time.
+// Returns ErrTimeMovedBackward if input time is before previous leak time.
 func (lb *LeakyBucket) leak(now time.Time) error {
 	elapsed := now.Sub(lb.previousLeakTime)
 
 	if elapsed < 0 {
 		// This can only happen if the user passes in time instances without monotonic timestamps
-		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
+		return fmt.Errorf("%w: previous=%v, current=%v", ErrTimeMovedBackward, lb.previousLeakTime, now)
 	}
 
 	if elapsed == 0 {

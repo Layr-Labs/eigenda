@@ -10,7 +10,7 @@ import (
 
 type ReservationLedgerConfig struct {
 	reservation       Reservation
-	biasBehavior      BiasBehavior
+	startFull         bool
 	overfillBehavior OverfillBehavior
 	// bucketCapacity is how much time worth of reservations should the capacity be
 	bucketCapacityDuration time.Duration
@@ -18,7 +18,7 @@ type ReservationLedgerConfig struct {
 
 func NewReservationLedgerConfig(
 	reservation Reservation,
-	biasBehavior BiasBehavior,
+	startFull bool,
 	overfillBehavior OverfillBehavior,
 	bucketCapacityDuration time.Duration,
 ) (*ReservationLedgerConfig, error) {
@@ -28,7 +28,7 @@ func NewReservationLedgerConfig(
 
 	return &ReservationLedgerConfig{
 		reservation:            reservation,
-		biasBehavior:           biasBehavior,
+		startFull:              startFull,
 		overfillBehavior:       overfillBehavior,
 		bucketCapacityDuration: bucketCapacityDuration,
 	}, nil

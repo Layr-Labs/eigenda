@@ -1,7 +1,6 @@
 package reservation
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -201,10 +200,9 @@ func TestTimeRegression(t *testing.T) {
 	success, err = leakyBucket.Fill(testStartTime.Add(3*time.Second), 50)
 	require.Error(t, err)
 	require.False(t, success)
-	var timeErr *TimeMovedBackwardError
-	require.True(t, errors.As(err, &timeErr))
+	require.ErrorIs(t, err, ErrTimeMovedBackward)
 
 	err = leakyBucket.RevertFill(testStartTime.Add(2*time.Second), 50)
 	require.Error(t, err)
-	require.True(t, errors.As(err, &timeErr))
+	require.ErrorIs(t, err, ErrTimeMovedBackward)
 }

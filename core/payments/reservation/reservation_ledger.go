@@ -29,7 +29,7 @@ func NewReservationLedger(
 	leakyBucket, err := NewLeakyBucket(
 		config.reservation.symbolsPerSecond,
 		config.bucketCapacityDuration,
-		config.biasBehavior,
+		config.startFull,
 		config.overfillBehavior,
 		now,
 	)
