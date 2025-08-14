@@ -25,7 +25,7 @@ type Reservation struct {
 	endTime time.Time
 
 	// The quorums that the holder of this reservation is entitled to disperse to
-	permittedQuorumIDs map[core.QuorumID]bool
+	permittedQuorumIDs map[core.QuorumID]struct{}
 }
 
 // Create a representation of a single account Reservation.
@@ -48,9 +48,9 @@ func NewReservation(
 		return nil, errors.New("reservation must permit at least one quorum")
 	}
 
-	permittedQuorumIDSet := make(map[core.QuorumID]bool, permittedQuorumIDsLen)
+	permittedQuorumIDSet := make(map[core.QuorumID]struct{}, permittedQuorumIDsLen)
 	for _, quorumID := range permittedQuorumIDs {
-		permittedQuorumIDSet[quorumID] = true
+		permittedQuorumIDSet[quorumID] = struct{}{}
 	}
 
 	return &Reservation{
@@ -66,7 +66,7 @@ func NewReservation(
 // Returns nil if all input quorums are permitted, otherwise returns ErrQuorumNotPermitted.
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
-		if r.permittedQuorumIDs[quorum] {
+		if _, ok := r.permittedQuorumIDs[quorum]; ok {
 			continue
 		}
 
