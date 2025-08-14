@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ProxyWrapper starts an instance of the proxy in background goroutines, and then facilitates communication with it.
@@ -34,7 +35,8 @@ func NewProxyWrapper(
 		return nil, fmt.Errorf("check proxy config: %w", err)
 	}
 
-	proxyMetrics := proxymetrics.NewMetrics("default")
+	registry := prometheus.NewRegistry()
+	proxyMetrics := proxymetrics.NewMetrics(registry)
 
 	storeManager, err := builder.BuildStoreManager(
 		ctx,
@@ -42,6 +44,7 @@ func NewProxyWrapper(
 		proxyMetrics,
 		proxyConfig.StoreBuilderConfig,
 		proxyConfig.SecretConfig,
+		registry,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build store manager: %w", err)

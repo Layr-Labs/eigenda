@@ -128,24 +128,12 @@ type Config struct {
 	// Directories do not need to be on the same filesystem.
 	LittDBStoragePaths []string
 
-	// If true, then purge LittDB locks on startup. Potentially useful to get rid of zombie lock files,
-	// but also dangerous (multiple LittDB processes operating on the same files can lead to data corruption).
+	// If true, then LittDB will refuse to start if it can't acquire locks on the database file structure.
 	//
-	// When LittDB starts up, it attempts to create lock files. When a validator is forcefully shut down, lock files
-	// may be left behind. At startup time, if LittDB observes existing lock files, it first checks to see
-	// if the process that created the lock files is still running. The lock files contain the creator's PID, and so
-	// LittDB checks to see if there is any process with that PID still running.
-	//
-	// Although it should be rare, it's possible that another process may be started with the same PID as the
-	// PID used to create the lock files. When this happens, LittDB will be prevented from starting up out of
-	// fear of another process trying to access the same files, even though the original process that created the
-	// lock files is no longer running. If that happens, this flag is a safe way to force LittDB to start up
-	// without being blocked by those lock files. BE VERY CERTAIN THAT THE OTHER PROCESS IS ACTUALLY DEAD!
-	// If two instances of LittDB are running on the same files, it WILL lead to data corruption.
-	//
-	// An alternate way to clear the LittDB lock files is via the LittDB CLI with the "litt unlock" command.
-	// Run "litt unlock --help" for more information.
-	LittUnsafePurgeLocks bool
+	// Ideally, this would always be enabled. But PID reuse in common platforms such as Docker/Kubernetes can lead to
+	// a breakdown in lock files being able to detect unsafe concurrent access to the database. Since many (if not most)
+	// users of this software will be running in such an environment, this is disabled by default.
+	LittRespectLocks bool
 
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
@@ -424,7 +412,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBReadCacheSizeBytes:      uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
 		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
 		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
-		LittUnsafePurgeLocks:          ctx.GlobalBool(flags.LittUnsafePurgeLocksFlag.Name),
+		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
 		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),

@@ -182,9 +182,33 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
+	downloadSizeInBytes, relayRequests, err :=
+		s.node.DetermineChunkLocations(batch, operatorState, probe)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to determine chunk locations: %v", err))
+	}
+
+	// storeChunksSemaphore can be nil during unit tests, since there are a bunch of places where the Node struct
+	// is instantiated directly without using the constructor.
+	if s.node.StoreChunksSemaphore != nil {
+		// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
+		// is capacity in the store chunks buffer. This is an OOM safety measure.
+
+		probe.SetStage("acquire_buffer_capacity")
+		semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
+		defer cancel()
+		err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+		}
+		defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
+	}
+
+	blobShards, rawBundles, err := s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))
 	}
 
 	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
