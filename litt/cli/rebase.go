@@ -589,5 +589,3 @@ func determineDestination(source string, destinations []string) (string, error) 
 
 	return destinations[hasher.Sum64()%uint64(len(destinations))], nil
 }
-
-// TODO make sure rebase works if the source contains symlinks
