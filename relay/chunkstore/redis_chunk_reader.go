@@ -22,10 +22,11 @@ type redisChunkReader struct {
 func NewRedisChunkReader(host string, username string, password string) (ChunkReader, error) {
 
 	opts := valkey.ClientOption{
-		InitAddress: []string{host},
-		Username:    username,
-		Password:    password,
-		TLSConfig:   &tls.Config{MinVersion: tls.VersionTLS12},
+		InitAddress:  []string{host},
+		Username:     username,
+		Password:     password,
+		TLSConfig:    &tls.Config{MinVersion: tls.VersionTLS12},
+		DisableCache: true,
 	}
 	client, err := valkey.NewClient(opts)
 	if err != nil {

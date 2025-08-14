@@ -31,10 +31,11 @@ type redisChunkWriter struct {
 func NewRedisChunkWriter(host string, username string, password string) (ChunkWriter, error) {
 
 	opts := valkey.ClientOption{
-		InitAddress: []string{host},
-		Username:    username,
-		Password:    password,
-		TLSConfig:   &tls.Config{MinVersion: tls.VersionTLS12},
+		InitAddress:  []string{host},
+		Username:     username,
+		Password:     password,
+		TLSConfig:    &tls.Config{MinVersion: tls.VersionTLS12},
+		DisableCache: true,
 	}
 	client, err := valkey.NewClient(opts)
 	if err != nil {
