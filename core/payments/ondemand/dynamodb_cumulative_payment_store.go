@@ -8,6 +8,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -18,6 +20,10 @@ const (
 )
 
 // DynamoDBCumulativePaymentStore implements the CumulativePaymentStore interface using DynamoDB
+//
+// This struct does NOT support decrementing cumulative payments. It is designed to exist on the disperser, where
+// it doesn't make sense for cumulative payment to ever decrease. Therefore, for extra safety, decreasing cumulative
+// payment is forbidden.
 //
 // This implementation stores cumulative payment values in a DynamoDB table, providing
 // persistent storage for on-demand payment tracking. The table uses AccountID as the
@@ -64,12 +70,16 @@ func NewDynamoDBCumulativePaymentStore(
 // If no payment record exists for the account, returns 0.
 // Returns an error if there's a failure accessing DynamoDB or parsing the stored value.
 func (s *DynamoDBCumulativePaymentStore) GetCumulativePayment(ctx context.Context) (*big.Int, error) {
-	// Create the key for the GetItem request
-	key := map[string]types.AttributeValue{
-		attributeAccountID: &types.AttributeValueMemberS{Value: s.accountID.Hex()},
+	input := &awsdynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			attributeAccountID: &types.AttributeValueMemberS{Value: s.accountID.Hex()},
+		},
+		// Use strongly consistent read to ensure we get the latest value
+		ConsistentRead: aws.Bool(true),
 	}
 
-	result, err := s.dynamoClient.GetItem(ctx, s.tableName, key)
+	result, err := s.dynamoClient.GetItemWithInput(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment for account %s: %w", s.accountID.Hex(), err)
 	}
@@ -122,14 +132,17 @@ func (s *DynamoDBCumulativePaymentStore) SetCumulativePayment(ctx context.Contex
 		attributeCumulativePayment: &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
 	}
 
+	exprValueNewPayment := ":newPayment"
+
 	// Use conditional expression to ensure:
 	// 1. If no record exists, accept the payment (first payment for this account)
 	// 2. If record exists, only accept if new payment is greater than existing
 	// This ensures cumulative payments only increase, preventing concurrent update issues
-	conditionExpression := "attribute_not_exists(" + attributeCumulativePayment + ") OR " + attributeCumulativePayment + " < :newPayment"
+	conditionExpression := "attribute_not_exists(" + attributeCumulativePayment + ") OR " +
+		attributeCumulativePayment + " < " + exprValueNewPayment
 
 	expressionValues := map[string]types.AttributeValue{
-		":newPayment": &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
+		exprValueNewPayment: &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
 	}
 
 	err := s.dynamoClient.PutItemWithCondition(

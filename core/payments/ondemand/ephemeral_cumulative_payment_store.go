@@ -7,6 +7,8 @@ import (
 
 // Implements the CumulativePaymentStore interface, by storing values in memory
 //
+// This struct supports decrementing cumulative payments.
+//
 // NOTE: This struct doesn't do any synchronization! The caller is responsible for making sure that only one goroutine
 // is using it at a time.
 type EphemeralCumulativePaymentStore struct {

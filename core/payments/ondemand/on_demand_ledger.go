@@ -100,6 +100,9 @@ func (odl *OnDemandLedger) Debit(
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
+//
+// Note: this method will only succeed if the underlying CumulativePaymentStore supports decrementing the
+// cumulative payment.
 func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
 	if symbolCount == 0 {
 		return errors.New("symbolCount must be > 0")
