@@ -4,15 +4,23 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"unsafe"
 
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/valkey-io/valkey-go"
 )
 
 var _ ChunkWriter = (*redisChunkWriter)(nil)
+
+// TODO this doesn't belong here, but it won't compile if we try to import it
+func UnsafeBytesToString(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(&b[0], len(b))
+}
 
 // A redis based ChunkWriter.
 type redisChunkWriter struct {
@@ -64,7 +72,7 @@ func (r *redisChunkWriter) PutFrameProofs(
 	result := r.client.Do(ctx,
 		r.client.B().Set().
 			Key(key).
-			Value(util.UnsafeBytesToString(value)).
+			Value(UnsafeBytesToString(value)).
 			ExSeconds(600). // TODO make this configurable
 			Build())
 
@@ -91,7 +99,7 @@ func (r *redisChunkWriter) PutFrameCoefficients(
 	result := r.client.Do(ctx,
 		r.client.B().Set().
 			Key(key).
-			Value(util.UnsafeBytesToString(value)).
+			Value(UnsafeBytesToString(value)).
 			ExSeconds(600). // TODO make this configurable
 			Build())
 
