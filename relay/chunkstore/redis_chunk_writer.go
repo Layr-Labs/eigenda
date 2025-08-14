@@ -61,7 +61,12 @@ func (r *redisChunkWriter) PutFrameProofs(
 		return fmt.Errorf("failed to encode proofs: %w", err)
 	}
 
-	result := r.client.Do(ctx, r.client.B().Set().Key(key).Value(util.UnsafeBytesToString(value)).Build())
+	result := r.client.Do(ctx,
+		r.client.B().Set().
+			Key(key).
+			Value(util.UnsafeBytesToString(value)).
+			ExSeconds(600). // TODO make this configurable
+			Build())
 
 	if result.Error() != nil {
 		return fmt.Errorf("failed to put frame proofs: %w", result.Error())
@@ -83,7 +88,12 @@ func (r *redisChunkWriter) PutFrameCoefficients(
 		return nil, fmt.Errorf("failed to encode frames: %w", err)
 	}
 
-	result := r.client.Do(ctx, r.client.B().Set().Key(key).Value(util.UnsafeBytesToString(value)).Build())
+	result := r.client.Do(ctx,
+		r.client.B().Set().
+			Key(key).
+			Value(util.UnsafeBytesToString(value)).
+			ExSeconds(600). // TODO make this configurable
+			Build())
 
 	if result.Error() != nil {
 		return nil, fmt.Errorf("failed to put frame coefficients: %w", result.Error())
