@@ -79,6 +79,11 @@ func (rl *ReservationLedger) Debit(
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
+//
+// Note that this method doesn't reset the state of the ledger to be the same as when the debit was made: it just
+// "refunds" the amount of symbols that were originally debited. Since the leaky bucket backing the reservation can't
+// get emptier than "empty", it may be the case that only a portion of the debit is reverted, with the final capacity
+// being clamped to 0.
 func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) error {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
