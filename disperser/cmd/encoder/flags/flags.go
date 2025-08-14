@@ -107,6 +107,25 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
 	}
+
+	RedisUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "redis-url"),
+		Usage:    "URL of the Redis server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REDIS_URL"),
+	}
+	RedisUserFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "redis-user"),
+		Usage:    "Username for the Redis server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REDIS_USER"),
+	}
+	RedisPasswordFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "redis-password"),
+		Usage:    "Password for the Redis server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REDIS_PASSWORD"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -127,6 +146,9 @@ var optionalFlags = []cli.Flag{
 	PreventReencodingFlag,
 	PprofHttpPort,
 	EnablePprof,
+	RedisUrlFlag,
+	RedisUserFlag,
+	RedisPasswordFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

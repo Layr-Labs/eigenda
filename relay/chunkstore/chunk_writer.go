@@ -2,6 +2,7 @@ package chunkstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -21,10 +22,10 @@ type ChunkWriter interface {
 		blobKey corev2.BlobKey,
 		frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error)
 	// ProofExists checks if the proofs for the blob key exist in the chunk store.
-	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
+	ProofExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error)
 	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
 	// Returns a bool indicating if the coefficients exist and fragment info.
-	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo)
+	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo, error)
 }
 
 var _ ChunkWriter = (*chunkWriter)(nil)
@@ -95,31 +96,46 @@ func (c *chunkWriter) PutFrameCoefficients(
 	}, nil
 }
 
-func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool {
+func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
 	size, err := c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey))
-	if err == nil && size != nil && *size > 0 {
-		return true
+
+	if err != nil {
+		if errors.Is(err, s3.ErrObjectNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check if proofs exist for blob %s: %w", blobKey.Hex(), err)
 	}
 
-	return false
+	if size != nil && *size > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
-func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo) {
+func (c *chunkWriter) CoefficientsExists(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+) (bool, *encoding.FragmentInfo, error) {
 	// TODO(ian-shim): check latency
 	objs, err := c.s3Client.ListObjects(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
 	if err != nil {
-		return false, nil
+		if errors.Is(err, s3.ErrObjectNotFound) {
+			return false, nil, nil
+		}
+
+		return false, nil, fmt.Errorf("failed to list objects for blob %s: %w", blobKey.Hex(), err)
 	}
 
 	keys := make([]string, len(objs))
 	totalSize := int64(0)
 	for i, obj := range objs {
 		keys[i] = obj.Key
-		totalSize += int64(obj.Size)
+		totalSize += obj.Size
 	}
 
 	return s3.SortAndCheckAllFragmentsExist(keys), &encoding.FragmentInfo{
 		TotalChunkSizeBytes: uint32(totalSize),
 		FragmentSizeBytes:   uint32(c.fragmentSize),
-	}
+	}, nil
 }
