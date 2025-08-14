@@ -26,7 +26,7 @@ type TableInfo struct {
 	IsSnapshot bool
 	// The time when the oldest segment was sealed.
 	OldestSegmentSealTime time.Time
-	// The time when the newest segment was sealed. This is used to determine the age of the oldest segment.
+	// The time when the newest segment was sealed.
 	NewestSegmentSealTime time.Time
 	// The index of the oldest segment in the table.
 	LowestSegmentIndex uint32
@@ -46,7 +46,7 @@ func tableInfoCommand(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	tableName := ctx.Args().Get(0)
@@ -65,7 +65,7 @@ func tableInfoCommand(ctx *cli.Context) error {
 
 	info, err := tableInfo(logger, tableName, sources, true)
 	if err != nil {
-		return fmt.Errorf("failed to get table info for table %s at paths %v: %v", tableName, sources, err)
+		return fmt.Errorf("failed to get table info for table %s at paths %v: %w", tableName, sources, err)
 	}
 
 	oldestSegmentAge := uint64(time.Since(info.OldestSegmentSealTime).Nanoseconds())
@@ -100,14 +100,14 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 	// Forbid touching tables in active use.
 	releaseLocks, err := util.LockDirectories(logger, paths, util.LockfileName, fsync)
 	if err != nil {
-		return nil, fmt.Errorf("failed to acquire locks on paths %v: %v", paths, err)
+		return nil, fmt.Errorf("failed to acquire locks on paths %v: %w", paths, err)
 	}
 	defer releaseLocks()
 
 	segmentPaths, err := segment.BuildSegmentPaths(paths, "", tableName)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to build segment paths for table %s at paths %v: %v", tableName, paths, err)
+			"failed to build segment paths for table %s at paths %v: %w", tableName, paths, err)
 	}
 
 	for _, segmentPath := range segmentPaths {
@@ -125,16 +125,16 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 		false,
 		time.Now(),
 		false,
-		true)
+		fsync)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather segment files for table %s at paths %v: %v",
+		return nil, fmt.Errorf("failed to gather segment files for table %s at paths %v: %w",
 			tableName, paths, err)
 	}
 	if ok, err := errorMonitor.IsOk(); !ok {
 		// This should be impossible since we aren't doing anything on background threads that report to the
 		// error monitor, but it doesn't hurt to check.
-		return nil, fmt.Errorf("error monitor reports errors: %v", err)
+		return nil, fmt.Errorf("error monitor reports errors: %w", err)
 	}
 
 	if len(segments) == 0 {
@@ -143,7 +143,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 
 	isSnapshot, err := segments[lowestSegmentIndex].IsSnapshot()
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
+		return nil, fmt.Errorf("failed to check if segment %d is a snapshot: %w", lowestSegmentIndex, err)
 	}
 
 	if isSnapshot {
@@ -152,9 +152,9 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 				tableName, paths)
 		}
 
-		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(paths[0], tableName))
+		upperBoundFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(paths[0], tableName))
 		if err != nil {
-			return nil, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+			return nil, fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, paths[0], err)
 		}
 
@@ -177,7 +177,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 
 	_, _, keymapTypeFile, err := littbuilder.FindKeymapLocation(paths, tableName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find keymap location for table %s at paths %v: %v",
+		return nil, fmt.Errorf("failed to find keymap location for table %s at paths %v: %w",
 			tableName, paths, err)
 	}
 

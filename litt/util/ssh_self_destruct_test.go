@@ -42,7 +42,7 @@ func TestSSHContainerSelfDestruct(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, "")
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, t.Name())
 	require.NoError(t, err)
 
 	// Verify container is running

@@ -9,10 +9,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"hash/fnv"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +30,52 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SSHTestPortBase is the base port used for SSH testing to avoid port collisions in CI
+const SSHTestPortBase = 22022
+
+const containerDataDir = "/mnt/data"
+
+// GetFreeSSHTestPort returns a free port starting from SSHTestPortBase
+func GetFreeSSHTestPort() (int, error) {
+	// Try ports starting from the base port
+	for port := SSHTestPortBase; port < SSHTestPortBase+100; port++ {
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			continue // Port is in use, try next one
+		}
+		_ = listener.Close()
+		return port, nil
+	}
+	return 0, fmt.Errorf("no free port found in range %d-%d", SSHTestPortBase, SSHTestPortBase+100)
+}
+
+// GetUniqueSSHTestPort returns a unique port based on test name hash to avoid collisions
+func GetUniqueSSHTestPort(testName string) (int, error) {
+	// Create a hash of the test name to get a deterministic port offset
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(testName))
+	hash := h.Sum32()
+
+	// Try multiple ports starting from the hash-based offset
+	for i := 0; i < 10; i++ {
+		portOffset := int((hash + uint32(i)) % 100)
+		port := SSHTestPortBase + portOffset
+
+		// Check if this port is free with a short timeout
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if err != nil {
+			// Port is free (connection failed)
+			return port, nil
+		}
+		_ = conn.Close()
+	}
+
+	// If no port found in the hash range, fall back to free port finder
+	return GetFreeSSHTestPort()
+}
+
 // SSHTestContainer manages a Docker container with SSH server for testing
 type SSHTestContainer struct {
 	client      *client.Client
@@ -37,7 +86,6 @@ type SSHTestContainer struct {
 	publicKey   string
 	user        string
 	host        string
-	dataDir     string // Path to the mounted data directory from container's perspective
 }
 
 // GetSSHPort returns the SSH port of the test container
@@ -70,34 +118,74 @@ func (c *SSHTestContainer) GetHost() string {
 	return c.host
 }
 
-// GetDataDir returns the path to the mounted data directory from container's perspective
+// GetDataDir returns the path to the container-controlled workspace directory
 func (c *SSHTestContainer) GetDataDir() string {
-	return c.dataDir
+	return containerDataDir
 }
 
-// Cleanup removes the Docker container and cleans up resources
-func (c *SSHTestContainer) Cleanup() error {
-	ctx := context.Background()
+// delete the mounted data dir from within the container to avoid permission issues
+func (c *SSHTestContainer) cleanupDataDir() error {
 
-	// Stop and remove container
-	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{})
+	// Create a temporary SSH session for cleanup
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
+		return fmt.Errorf("failed to create logger for cleanup: %w", err)
 	}
 
-	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{})
+	session, err := NewSSHSession(
+		logger,
+		c.user,
+		c.host,
+		c.sshPort,
+		c.privateKey,
+		"",
+		false) // Don't log connection errors during cleanup
 	if err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
+		return fmt.Errorf("failed to create SSH session: %w", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	// Remove the entire workspace directory tree from inside the container
+	// This ensures container-owned files are removed by the container user
+	cleanupCmd := fmt.Sprintf("rm -rf %s", containerDataDir)
+	_, _, err = session.Exec(cleanupCmd)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup workspace: %w", err)
 	}
 
 	return nil
 }
 
-// ParsePort converts string port to uint64
-func ParsePort(port string) uint64 {
-	var p uint64
-	_, _ = fmt.Sscanf(port, "%d", &p)
-	return p
+// Cleanup removes the Docker container and cleans up resources
+func (c *SSHTestContainer) Cleanup() error {
+	err := c.cleanupDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to cleanup data directory: %w", err)
+	}
+
+	// Use a context with timeout for cleanup operations
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Stop and remove container with timeout
+	stopTimeout := 10 // seconds
+	err = c.client.ContainerStop(ctx, c.containerID, container.StopOptions{
+		Timeout: &stopTimeout,
+	})
+	if err != nil {
+		// Log the error but continue with removal
+		fmt.Printf("Warning: failed to stop container %s: %v\n", c.containerID, err)
+	}
+
+	// Remove container even if stop failed
+	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{
+		Force: true, // Force removal even if container is still running
+	})
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	return nil
 }
 
 // GenerateSSHKeyPair creates an RSA key pair for testing
@@ -149,29 +237,42 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
-	// Try to connect multiple times with backoff
-	for i := 0; i < 100; i++ {
-		session, err := NewSSHSession(
-			logger,
-			"testuser",
-			"localhost",
-			sshPort,
-			privateKeyPath,
-			false)
-		if err == nil {
-			_ = session.Close()
-			return
-		}
-		time.Sleep(1 * time.Second)
-	}
+	// Use a context with timeout to prevent indefinite hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	require.Fail(t, "SSH server did not become ready in time")
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			require.Fail(t, "SSH server did not become ready within 30 seconds")
+			return
+		case <-ticker.C:
+			session, err := NewSSHSession(
+				logger,
+				"testuser",
+				"localhost",
+				sshPort,
+				privateKeyPath,
+				"",
+				false)
+			if err == nil {
+				_ = session.Close()
+				return
+			}
+			// Continue trying on error
+		}
+	}
 }
 
 // SetupSSHTestContainer creates and starts a Docker container with SSH server
 // If dataDir is not empty, it will be mounted in the container at /mnt/data
 func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
-	ctx := context.Background()
+	// Use a longer timeout for the entire setup process to handle slow CI environments
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -188,28 +289,37 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	publicKeyContent, err := os.ReadFile(publicKeyPath)
 	require.NoError(t, err)
 
-	// Create mount directory for file operations
-	mountDir := filepath.Join(tempDir, "ssh_mount")
-	err = os.MkdirAll(mountDir, 0755)
+	// Build Docker image with a unique name that includes the public key hash
+	// This allows reusing images when the public key is the same
+	h := fnv.New32a()
+	_, err = h.Write(publicKeyContent)
 	require.NoError(t, err)
+	keyHash := fmt.Sprintf("%08x", h.Sum32()) // Pad to 8 characters with leading zeros
+	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
 
-	// Build Docker image
-	imageName := "ssh-test:latest"
-	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
-	require.NoError(t, err)
+	// Check if image already exists to avoid rebuilding
+	_, _, err = cli.ImageInspectWithRaw(ctx, imageName)
+	if err != nil {
+		// Image doesn't exist, build it
+		t.Logf("Building SSH test Docker image: %s", imageName)
+		err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
+		require.NoError(t, err)
+	} else {
+		t.Logf("Reusing existing SSH test Docker image: %s", imageName)
+	}
+
+	if dataDir != "" {
+		// we have to grant broad permissions here because the container may have a different UID
+		err = os.Chmod(dataDir, 0777)
+		require.NoError(t, err, "failed to set permissions on data directory")
+	}
 
 	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir)
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, dataDir, t.Name())
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
 	WaitForSSH(t, sshPort, privateKeyPath)
-
-	// Set dataDir path from container's perspective
-	containerDataDir := ""
-	if dataDir != "" {
-		containerDataDir = "/mnt/data"
-	}
 
 	return &SSHTestContainer{
 		client:      cli,
@@ -220,7 +330,6 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		publicKey:   publicKeyPath,
 		user:        "testuser",
 		host:        "localhost",
-		dataDir:     containerDataDir,
 	}
 }
 
@@ -284,12 +393,13 @@ func BuildSSHTestImage(
 	}
 	defer func() { _ = buildCtx.Close() }()
 
-	// Build the image
+	// Build the image with optimized settings for CI
 	buildOptions := types.ImageBuildOptions{
 		Tags:        []string{imageName},
 		Dockerfile:  "Dockerfile",
 		Remove:      true,
 		ForceRemove: true,
+		NoCache:     false, // Allow caching to speed up builds
 	}
 
 	response, err := cli.ImageBuild(ctx, buildCtx, buildOptions)
@@ -298,10 +408,19 @@ func BuildSSHTestImage(
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	// Read build output (helpful for debugging)
-	_, err = io.Copy(io.Discard, response.Body)
+	// Read build output with proper error handling for timeouts
+	// Create a buffer to capture build output for debugging on failure
+	var buildOutput strings.Builder
+	reader := io.TeeReader(response.Body, &buildOutput)
+
+	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
-		return fmt.Errorf("failed to read build response: %w", err)
+		// Include build output in error for debugging
+		buildOutputStr := buildOutput.String()
+		if len(buildOutputStr) > 1000 {
+			buildOutputStr = buildOutputStr[:1000] + "... (truncated)"
+		}
+		return fmt.Errorf("failed to read build response: %w\nBuild output: %s", err, buildOutputStr)
 	}
 
 	return nil
@@ -313,9 +432,15 @@ func StartSSHContainer(
 	ctx context.Context,
 	cli *client.Client,
 	imageName string,
-	mountDir string,
 	dataDir string,
+	testName string,
 ) (string, uint64, error) {
+
+	// Get a unique port for this test based on test name hash
+	sshPort, err := GetUniqueSSHTestPort(testName)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get unique SSH port: %w", err)
+	}
 
 	containerConfig := &container.Config{
 		Image: imageName,
@@ -329,18 +454,12 @@ func StartSSHContainer(
 			"22/tcp": []nat.PortBinding{
 				{
 					HostIP:   "127.0.0.1",
-					HostPort: "0", // Let Docker assign a random port
+					HostPort: strconv.Itoa(sshPort), // Use custom port to avoid collisions in CI
 				},
 			},
 		},
 		Mounts: func() []mount.Mount {
-			mounts := []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: mountDir,
-					Target: "/mnt/test",
-				},
-			}
+			var mounts []mount.Mount
 			if dataDir != "" {
 				mounts = append(mounts, mount.Mount{
 					Type:   mount.TypeBind,
@@ -368,15 +487,8 @@ func StartSSHContainer(
 		return "", 0, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	// Get the assigned SSH port
-	containerInfo, err := cli.ContainerInspect(ctx, resp.ID)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to inspect container: %w", err)
-	}
-
-	sshPort := ParsePort(containerInfo.NetworkSettings.Ports["22/tcp"][0].HostPort)
-
-	return resp.ID, sshPort, nil
+	// Use the custom SSH port (convert to uint64 for compatibility)
+	return resp.ID, uint64(sshPort), nil
 }
 
 // ArchiveDirectory creates a tar.gz archive of a directory for Docker build context
@@ -399,7 +511,7 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			relPath, err := filepath.Rel(srcDir, path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get relative path: %w", err)
 			}
 
 			// Skip the root directory itself
@@ -409,12 +521,12 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			header, err := tar.FileInfoHeader(info, "")
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create tar header: %w", err)
 			}
 			header.Name = relPath
 
 			if err := tw.WriteHeader(header); err != nil {
-				return err
+				return fmt.Errorf("failed to write tar header for %s: %w", relPath, err)
 			}
 
 			if info.IsDir() {
@@ -423,12 +535,15 @@ func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 
 			file, err := os.Open(path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open file %s: %w", path, err)
 			}
 			defer func() { _ = file.Close() }()
 
 			_, err = io.Copy(tw, file)
-			return err
+			if err != nil {
+				return fmt.Errorf("failed to copy file %s to tar: %w", path, err)
+			}
+			return nil
 		})
 	}()
 

@@ -21,7 +21,7 @@ func pruneCommand(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
@@ -53,7 +53,7 @@ func prune(logger logging.Logger, sources []string, allowedTables []string, maxA
 	// Forbid touching tables in active use.
 	releaseLocks, err := util.LockDirectories(logger, sources, util.LockfileName, fsync)
 	if err != nil {
-		return fmt.Errorf("failed to acquire locks on paths %v: %v", sources, err)
+		return fmt.Errorf("failed to acquire locks on paths %v: %w", sources, err)
 	}
 	defer releaseLocks()
 
@@ -61,7 +61,7 @@ func prune(logger logging.Logger, sources []string, allowedTables []string, maxA
 	var tables []string
 	foundTables, err := lsPaths(logger, sources, false, fsync)
 	if err != nil {
-		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
+		return fmt.Errorf("failed to list tables in paths %v: %w", sources, err)
 	}
 	if len(allowedTables) == 0 {
 		tables = foundTables
@@ -77,7 +77,7 @@ func prune(logger logging.Logger, sources []string, allowedTables []string, maxA
 	for _, table := range tables {
 		bytesDeleted, err := pruneTable(logger, sources, table, maxAgeSeconds, fsync)
 		if err != nil {
-			return fmt.Errorf("failed to prune table %s in paths %v: %v", table, sources, err)
+			return fmt.Errorf("failed to prune table %s in paths %v: %w", table, sources, err)
 		}
 
 		logger.Infof("Deleted %s from table '%s'.", common.PrettyPrintBytes(bytesDeleted), table)
@@ -98,7 +98,7 @@ func pruneTable(
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)
 	if err != nil {
-		return 0, fmt.Errorf("failed to build segment paths for table %s at paths %v: %v",
+		return 0, fmt.Errorf("failed to build segment paths for table %s at paths %v: %w",
 			tableName, sources, err)
 	}
 
@@ -108,10 +108,10 @@ func pruneTable(
 		segmentPaths,
 		false,
 		time.Now(),
-		false,
+		true,
 		fsync)
 	if err != nil {
-		return 0, fmt.Errorf("failed to gather segment files for table %s at paths %v: %v",
+		return 0, fmt.Errorf("failed to gather segment files for table %s at paths %v: %w",
 			tableName, sources, err)
 	}
 
@@ -122,7 +122,7 @@ func pruneTable(
 	// Determine if we are working on the snapshot directory (i.e. the directory with symlinks to the segments).
 	isSnapshot, err := segments[lowestSegmentIndex].IsSnapshot()
 	if err != nil {
-		return 0, fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
+		return 0, fmt.Errorf("failed to check if segment %d is a snapshot: %w", lowestSegmentIndex, err)
 	}
 
 	if isSnapshot {
@@ -131,9 +131,9 @@ func pruneTable(
 			return 0, fmt.Errorf("this is a symlinked snapshot directory, " +
 				"snapshot directory cannot be spread across multiple sources")
 		}
-		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
+		upperBoundFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(sources[0], tableName))
 		if err != nil {
-			return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+			return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, sources[0], err)
 		}
 		if upperBoundFile.IsDefined() {
@@ -162,59 +162,82 @@ func pruneTable(
 	for _, seg := range deletedSegments {
 		err = seg.BlockUntilFullyDeleted()
 		if err != nil {
-			return 0, fmt.Errorf("failed to block until segment %d is fully deleted: %v",
+			return 0, fmt.Errorf("failed to block until segment %d is fully deleted: %w",
 				seg.SegmentIndex(), err)
 		}
 	}
 
 	if ok, err := errorMonitor.IsOk(); !ok {
-		return 0, fmt.Errorf("error monitor reports errors: %v", err)
+		return 0, fmt.Errorf("error monitor reports errors: %w", err)
 	}
 
 	if isSnapshot {
 		// This is a snapshot. Write a lower bound file to tell the DB not to re-snapshot files than have been pruned.
-		if len(deletedSegments) > 1 {
-			lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
-			if err != nil {
-				return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
-					tableName, sources[0], err)
-			}
-			err = lowerBoundFile.Update(deletedSegments[len(deletedSegments)-1].SegmentIndex())
-			if err != nil {
-				return 0, fmt.Errorf("failed to update lower bound file for table %s at path %s: %v",
-					tableName, sources[0], err)
-			}
+		err = writeLowerBoundFile(sources[0], tableName, deletedSegments)
+		if err != nil {
+			return 0, fmt.Errorf("failed to write lower bound file for table %s at path %s: %w",
+				tableName, sources[0], err)
 		}
 	} else {
 		// If we are doing GC on a table that isn't a snapshot, then we need to delete the snapshots/keymap
 		// for the table. The DB will automatically rebuild the snapshots directory & keymap on the next startup.
-
-		for _, source := range sources {
-			snapshotsPath := path.Join(source, tableName, segment.HardLinkDirectory)
-			exists, err := util.Exists(snapshotsPath)
-			if err != nil {
-				return 0, fmt.Errorf("failed to check if snapshots path %s exists: %v", snapshotsPath, err)
-			}
-			if exists {
-				err = os.RemoveAll(snapshotsPath)
-				if err != nil {
-					return 0, fmt.Errorf("failed to remove snapshots path %s: %v", snapshotsPath, err)
-				}
-			}
-
-			keymapPath := path.Join(source, tableName, keymap.KeymapDirectoryName)
-			exists, err = util.Exists(keymapPath)
-			if err != nil {
-				return 0, fmt.Errorf("failed to check if keymap path %s exists: %v", keymapPath, err)
-			}
-			if exists {
-				err = os.RemoveAll(keymapPath)
-				if err != nil {
-					return 0, fmt.Errorf("failed to remove keymap path %s: %v", keymapPath, err)
-				}
-			}
+		err = deleteSnapshots(sources, tableName)
+		if err != nil {
+			return 0, fmt.Errorf("failed to delete snapshots/keymap for table %s at paths %v: %w",
+				tableName, sources, err)
 		}
 	}
 
 	return bytesDeleted, nil
+}
+
+// Updates the lower bound file after segments have been deleted.
+func writeLowerBoundFile(snapshotRoot string, tableName string, deletedSegments []*segment.Segment) error {
+	if len(deletedSegments) == 0 {
+		// No segments were deleted, no need to write a lower bound file.
+		return nil
+	}
+	lowerBoundFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(snapshotRoot, tableName))
+	if err != nil {
+		return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
+			tableName, snapshotRoot, err)
+	}
+	err = lowerBoundFile.Update(deletedSegments[len(deletedSegments)-1].SegmentIndex())
+	if err != nil {
+		return fmt.Errorf("failed to update lower bound file for table %s at path %s: %w",
+			tableName, snapshotRoot, err)
+	}
+
+	return nil
+}
+
+// deletes the snapshot directories in all sources for the given table
+func deleteSnapshots(sources []string, tableName string) error {
+	for _, source := range sources {
+		snapshotsPath := path.Join(source, tableName, segment.HardLinkDirectory)
+		exists, err := util.Exists(snapshotsPath)
+		if err != nil {
+			return fmt.Errorf("failed to check if snapshots path %s exists: %w", snapshotsPath, err)
+		}
+		if exists {
+			err = os.RemoveAll(snapshotsPath)
+			if err != nil {
+				return fmt.Errorf("failed to remove snapshots path %s: %w", snapshotsPath, err)
+			}
+		}
+
+		keymapPath := path.Join(source, tableName, keymap.KeymapDirectoryName)
+		exists, err = util.Exists(keymapPath)
+		if err != nil {
+			return fmt.Errorf("failed to check if keymap path %s exists: %w", keymapPath, err)
+		}
+		if exists {
+			err = os.RemoveAll(keymapPath)
+			if err != nil {
+				return fmt.Errorf("failed to remove keymap path %s: %w", keymapPath, err)
+			}
+		}
+	}
+
+	return nil
 }

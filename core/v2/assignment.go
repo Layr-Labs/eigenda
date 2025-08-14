@@ -292,26 +292,3 @@ func GetAssignmentForBlob(
 
 	return assignment, nil
 }
-
-// GetChunkLength calculates the chunk length based on blob length and parameters
-func GetChunkLength(blobLength uint32, blobParams *core.BlobVersionParameters) (uint32, error) {
-	if blobLength == 0 {
-		return 0, fmt.Errorf("blob length must be greater than 0")
-	}
-
-	if blobParams == nil {
-		return 0, fmt.Errorf("blob params cannot be nil")
-	}
-
-	// Check that the blob length is a power of 2 using bit manipulation
-	if blobLength&(blobLength-1) != 0 {
-		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLength)
-	}
-
-	chunkLength := blobLength * blobParams.CodingRate / blobParams.NumChunks
-	if chunkLength == 0 {
-		chunkLength = 1
-	}
-
-	return chunkLength, nil
-}

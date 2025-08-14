@@ -103,6 +103,7 @@ func TestPrune(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)
@@ -267,6 +268,7 @@ func TestPruneSubset(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)

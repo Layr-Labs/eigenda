@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,7 +15,11 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
 	container := SetupSSHTestContainer(t, "")
-	defer func() { _ = container.Cleanup() }()
+	defer func() {
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -26,6 +31,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	require.NotNil(t, session)
@@ -38,6 +44,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		"/nonexistent/key",
+		"",
 		false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "private key does not exist")
@@ -49,6 +56,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		false)
 	require.Error(t, err)
 }
@@ -59,7 +67,11 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	dataDir := t.TempDir()
 
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { _ = container.Cleanup() }()
+	defer func() {
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -70,6 +82,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -79,14 +92,8 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Verify directories were created
-	exists, err := Exists(path.Join(dataDir, "foo"))
-	require.NoError(t, err)
-	require.True(t, exists)
-	exists, err = Exists(path.Join(dataDir, "foo", "bar"))
-	require.NoError(t, err)
-	require.True(t, exists)
-	exists, err = Exists(path.Join(dataDir, "foo", "bar", "baz"))
+	// Verify directories were created in the container workspace
+	exists, err := Exists(path.Join(dataDir, "foo", "bar", "baz"))
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -98,8 +105,14 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 func TestSSHSession_FindFiles(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t, "")
-	defer func() { _ = container.Cleanup() }()
+	dataDir := t.TempDir()
+
+	container := SetupSSHTestContainer(t, dataDir)
+	defer func() {
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -110,32 +123,31 @@ func TestSSHSession_FindFiles(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
 
-	// Create test directory structure
-	err = session.Mkdirs("/mnt/test/search")
+	// Create a test subdirectory in the container's data directory
+	testDir := path.Join(container.GetDataDir(), "search")
+	err = session.Mkdirs(testDir)
 	require.NoError(t, err)
 
-	// Create test files using the mounted directory
-	mountDir := filepath.Join(container.GetTempDir(), "ssh_mount", "search")
-	err = os.MkdirAll(mountDir, 0755)
+	// Create test files via SSH instead of host filesystem to avoid permission issues
+	// This ensures all files are created with proper container ownership
+	_, _, err = session.Exec(fmt.Sprintf("echo 'test content' > %s/test.txt", testDir))
 	require.NoError(t, err)
-
-	err = os.WriteFile(filepath.Join(mountDir, "test.txt"), []byte("test content"), 0644)
+	_, _, err = session.Exec(fmt.Sprintf("echo 'log content' > %s/test.log", testDir))
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(mountDir, "test.log"), []byte("log content"), 0644)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(mountDir, "other.dat"), []byte("data content"), 0644)
+	_, _, err = session.Exec(fmt.Sprintf("echo 'data content' > %s/other.dat", testDir))
 	require.NoError(t, err)
 
 	// Test finding files with specific extensions
-	files, err := session.FindFiles("/mnt/test/search", []string{".txt", ".log"})
+	files, err := session.FindFiles(testDir, []string{".txt", ".log"})
 	require.NoError(t, err)
 	require.Len(t, files, 2)
-	require.Contains(t, files, "/mnt/test/search/test.txt")
-	require.Contains(t, files, "/mnt/test/search/test.log")
+	require.Contains(t, files, path.Join(testDir, "test.txt"))
+	require.Contains(t, files, path.Join(testDir, "test.log"))
 
 	// Test with non-existent directory
 	files, err = session.FindFiles("/nonexistent", []string{".txt"})
@@ -149,7 +161,11 @@ func TestSSHSession_Rsync(t *testing.T) {
 	// Create a temporary data directory for testing
 	dataDir := t.TempDir()
 	container := SetupSSHTestContainer(t, dataDir)
-	defer func() { _ = container.Cleanup() }()
+	defer func() {
+		if err := container.Cleanup(); err != nil {
+			t.Logf("Warning: failed to cleanup container: %v", err)
+		}
+	}()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -160,6 +176,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 		container.GetHost(),
 		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
+		"",
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -175,7 +192,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	err = session.Rsync(localFile, remoteFile, 0)
 	require.NoError(t, err)
 
-	// Verify file was transferred via the mounted data directory
+	// Verify file was transferred via the container workspace directory
 	transferredFile := filepath.Join(dataDir, "remote_file.txt")
 	transferredContent, err := os.ReadFile(transferredFile)
 	require.NoError(t, err)
@@ -191,7 +208,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	err = session.Rsync(localFile2, remoteFile2, 1.0) // 1MB/s throttle
 	require.NoError(t, err)
 
-	// Verify throttled file was transferred via the mounted data directory
+	// Verify throttled file was transferred via the container workspace directory
 	transferredFile2 := filepath.Join(dataDir, "throttled_file.txt")
 	transferredContent2, err := os.ReadFile(transferredFile2)
 	require.NoError(t, err)

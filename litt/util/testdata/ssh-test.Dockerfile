@@ -21,6 +21,10 @@ RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd
 RUN chown -R testuser:testuser /home/testuser/.ssh
 RUN chmod 700 /home/testuser/.ssh
 
+# Create mount directories and set ownership
+RUN mkdir -p /mnt/data /mnt/test
+RUN chown testuser:testuser /mnt/data /mnt/test
+
 # Copy startup script with self-destruct mechanism
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
