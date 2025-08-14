@@ -401,6 +401,6 @@ never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.
 The eigenda proxy was originally in its [own repo](https://github.com/Layr-Labs/eigenda-proxy), but was migrated into the eigenda monorepo in [PR 1611](https://github.com/Layr-Labs/eigenda/pull/1611).
 
 [Releases](https://github.com/Layr-Labs/eigenda-proxy/releases) up until 1.8.2 are available in the eigenda-proxy repo.
-The following release [2.1.0](https://github.com/Layr-Labs/eigenda/releases/tag/v2.1.0) broke away from semver for proxy to join the same release cadence as the rest of the monorepo. Future releases will also be made in unison with the rest of the eigenda services. 
+The following release [2.1.0](https://github.com/Layr-Labs/eigenda/releases/tag/v2.1.0) was made from the monorepo, with proxy joining the same release cadence as the rest of the services. Future releases will also follow this pattern.
 
 Only the proxy [clients](./clients/go.mod) are still packaged as a separate module that is also released independently. It is kept separate from the monorepo because the monorepo go.mod requires go1.24, which would have broken some proxy clients. The client releases are made from `api/proxy/clients/vX.Y.Z` tags. Note that previous releases in the eigenda-proxy repo were made under [clients/vX.Y.Z](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0) tags.
