@@ -488,6 +488,7 @@ func TestPushSnapshot(t *testing.T) {
 			logger,
 			errorMonitor,
 			segmentPaths,
+			false,
 			time.Now(),
 			false,
 			false)

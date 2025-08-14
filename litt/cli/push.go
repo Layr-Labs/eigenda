@@ -116,7 +116,7 @@ func push(
 	defer releaseSourceLocks()
 
 	// Create an SSH session to the remote host.
-	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, verbose)
+	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, "TODO fix before merge", verbose)
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %v", user, host, port, err)
 	}

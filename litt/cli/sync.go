@@ -224,6 +224,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
+		"TODO fix before merge",
 		s.verbose)
 	if err != nil {
 		s.logger.Errorf("Failed to create SSH session to %s@%s port %d: %v", s.user, s.host, s.port, err)
