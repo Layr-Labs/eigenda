@@ -75,10 +75,12 @@ func NewLeakyBucket(
 
 // Fill the bucket with a number of symbols.
 //
+// Use a time source that includes monotonic time for best results.
+//
 // - Returns (true, nil) if the leaky bucket has enough capacity to accept the fill.
 // - Returns (false, nil) if bucket lacks capacity to permit the fill.
 // - Returns (false, error) for actual errors:
-//   - TimeMovedBackwardError if input time is before previous leak time.
+//   - TimeMovedBackwardError if input time is before previous leak time (only possible if monotonic time isn't used).
 //   - Generic error for all other modes of failure.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
@@ -123,7 +125,10 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 
 // Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
 //
-// - Returns a TimeMovedBackwardError if input time is before previous leak time.
+// Use a time source that includes monotonic time for best results.
+//
+// - Returns a TimeMovedBackwardError if input time is before previous leak time (only possible if monotonic time
+// isn't used).
 // - Returns a generic error for all other modes of failure.
 //
 // The input time should be the most up-to-date time, NOT the time of the original fill.
