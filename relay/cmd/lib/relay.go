@@ -49,7 +49,15 @@ func RunRelay(ctx *cli.Context) error {
 		Backend:     blobstore.BackendDynamoDB,
 	})
 	blobStore := blobstore.NewBlobStore(config.BucketName, s3Client, logger)
-	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
+
+	// TODO: make this togglable via config
+	// chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
+
+	chunkReader, err := chunkstore.NewRedisChunkReader(config.RedisUrl, config.RedisUser, config.RedisPassword)
+	if err != nil {
+		return fmt.Errorf("failed to create chunk reader: %w", err)
+	}
+
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create eth client: %w", err)

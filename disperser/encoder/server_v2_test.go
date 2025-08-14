@@ -160,7 +160,10 @@ func TestEncodeBlob(t *testing.T) {
 	// Verify chunk store data
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
 		// Check proofs
-		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
+
+		proofExists, err := c.chunkStoreWriter.ProofExists(ctx, blobKey)
+		require.NoError(t, err, "Failed to check if proofs exist")
+		assert.True(t, proofExists)
 		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
 		require.NoError(t, err, "Failed to get chunk proofs")
 		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
@@ -168,7 +171,8 @@ func TestEncodeBlob(t *testing.T) {
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
 		// Check coefficients
-		coefExist, fetchedFragmentInfo := c.chunkStoreWriter.CoefficientsExists(ctx, blobKey)
+		coefExist, fetchedFragmentInfo, err := c.chunkStoreWriter.CoefficientsExists(ctx, blobKey)
+		require.NoError(t, err, "Failed to check if coefficients exist")
 		assert.True(t, coefExist, "Coefficients should exist")
 		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
 

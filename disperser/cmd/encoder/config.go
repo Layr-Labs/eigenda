@@ -29,6 +29,15 @@ type Config struct {
 	LoggerConfig     common.LoggerConfig
 	ServerConfig     *encoder.ServerConfig
 	MetricsConfig    *encoder.MetricsConfig
+
+	// The URL where the Redis server is running.
+	RedisUrl string
+
+	// The username to use for the Redis server.
+	RedisUser string
+
+	// The password to use for the Redis server.
+	RedisPassword string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -68,6 +77,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
+		RedisUrl:      ctx.GlobalString(flags.RedisUrlFlag.Name),
+		RedisUser:     ctx.GlobalString(flags.RedisUserFlag.Name),
+		RedisPassword: ctx.GlobalString(flags.RedisPasswordFlag.Name),
 	}
 	return config, nil
 }

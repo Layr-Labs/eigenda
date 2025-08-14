@@ -151,19 +151,31 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*pb.EncodeBlobReply, error) {
 	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
+	// TODO I don't understand this check...
 	// Check if the blob has already been encoded
-	if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
-		coefExist, fragmentInfo := s.chunkWriter.CoefficientsExists(ctx, blobKey)
-		if coefExist {
-			s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
-			return &pb.EncodeBlobReply{
-				FragmentInfo: &pb.FragmentInfo{
-					TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
-					FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
-				},
-			}, nil
-		}
-	}
+	//if s.config.PreventReencoding {
+	//	proofExists, err := s.chunkWriter.ProofExists(ctx, blobKey)
+	//	if err != nil {
+	//		return nil, status.Errorf(codes.Internal, "failed to check if proofs exist: %v", err)
+	//	}
+	//
+	//	if !proofExists {
+	//		coefExist, fragmentInfo, err := s.chunkWriter.CoefficientsExists(ctx, blobKey)
+	//		if err != nil {
+	//			return nil, status.Errorf(codes.Internal, "failed to check if coefficients exist: %v", err)
+	//		}
+	//
+	//		if coefExist {
+	//			s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
+	//			return &pb.EncodeBlobReply{
+	//				FragmentInfo: &pb.FragmentInfo{
+	//					TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+	//					FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+	//				},
+	//			}, nil
+	//		}
+	//	}
+	//}
 
 	// Fetch blob data
 	fetchStart := time.Now()
