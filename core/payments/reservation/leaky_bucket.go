@@ -159,7 +159,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	elapsed := now.Sub(lb.previousLeakTime)
 
 	if elapsed < 0 {
-		// This shouldn't happen since we're using monotonic time. But just in case...
+		// This can only happen if the user passes in time instances without monotonic timestamps
 		return &TimeMovedBackwardError{PreviousTime: lb.previousLeakTime, CurrentTime: now}
 	}
 
