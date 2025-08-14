@@ -23,7 +23,7 @@ import (
 func rebaseCommand(ctx *cli.Context) error {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
