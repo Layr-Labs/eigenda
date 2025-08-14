@@ -234,7 +234,7 @@ mod tests {
 
         let non_signers = non_signer_pks
             .into_iter()
-            .zip(non_signer_quorum_bitmap_historys.into_iter())
+            .zip(non_signer_quorum_bitmap_history.into_iter())
             .map(|(pk, quorum_bitmap_history)| NonSigner {
                 pk,
                 pk_hash: convert::point_to_hash(&pk.into_ext()),
