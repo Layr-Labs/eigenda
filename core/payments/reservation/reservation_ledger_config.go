@@ -52,7 +52,7 @@ func NewReservationLedgerConfig(
 	bucketCapacityDuration time.Duration,
 ) (*ReservationLedgerConfig, error) {
 	if bucketCapacityDuration <= 0 {
-		return nil, fmt.Errorf("bucket capacity duration must be > 0, got %d", bucketCapacityDuration)
+		return nil, fmt.Errorf("bucket capacity duration must be > 0, got %v", bucketCapacityDuration)
 	}
 
 	return &ReservationLedgerConfig{
