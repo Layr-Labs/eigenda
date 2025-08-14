@@ -148,7 +148,7 @@ func (s *SSHSession) Mkdirs(path string) error {
 // Rsync transfers files from the local machine to the remote machine using rsync. The throttle is ignored
 // if less than or equal to 0.
 func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float64) error {
-	sshCmd := fmt.Sprintf("ssh -i %s -p %d -o StrictHostKeyChecking=no", s.keyPath, s.port)
+	sshCmd := fmt.Sprintf("ssh -i %s -p %d", s.keyPath, s.port)
 	target := fmt.Sprintf("%s@%s:%s", s.user, s.host, destFile)
 
 	// If the source file is a symlink, we actually want to send the thing the symlink points to.
