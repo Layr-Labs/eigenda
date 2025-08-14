@@ -100,7 +100,7 @@ func (fs *FFTSettings) FFTG1(vals []bn254.G1Affine, inv bool) ([]bn254.G1Affine,
 		return nil, fmt.Errorf("got %d values but only have %d roots of unity", n, fs.MaxWidth)
 	}
 
-	if !IsPowerOfTwo(n) {
+	if !isPowerOfTwo(n) {
 		return nil, fmt.Errorf("got %d values but not a power of two", n)
 	}
 	// We make a copy so we can mutate it during the work.

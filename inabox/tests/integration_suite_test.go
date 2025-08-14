@@ -14,6 +14,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -247,7 +248,22 @@ func setupPayloadDisperserWithRouter() error {
 		Port:     "32005",
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, nil, nil)
+	accountId, err := signer.GetAccountID()
+	if err != nil {
+		return fmt.Errorf("error getting account ID: %w", err)
+	}
+
+	accountant := clientsv2.NewAccountant(
+		accountId,
+		nil,
+		nil,
+		0,
+		0,
+		0,
+		0,
+		metrics.NoopAccountantMetrics,
+	)
+	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, accountant, nil)
 	if err != nil {
 		return err
 	}
@@ -307,7 +323,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 			log.Fatalln("could not start tcp listener", err)
 		}
 	}
-	tx, err := eth.NewWriter(logger, ethClient, testConfig.EigenDA.EigenDADirectory, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(
+		logger, ethClient, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return err
 	}
@@ -343,7 +360,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	chainReader, err = eth.NewReader(
 		logger,
 		ethClient,
-		testConfig.EigenDA.EigenDADirectory,
 		testConfig.EigenDA.OperatorStateRetriever,
 		testConfig.EigenDA.ServiceManager,
 	)

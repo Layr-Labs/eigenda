@@ -152,7 +152,7 @@ func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bo
 				tableName, paths)
 		}
 
-		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(paths[0], tableName))
+		upperBoundFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(paths[0], tableName))
 		if err != nil {
 			return nil, fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, paths[0], err)

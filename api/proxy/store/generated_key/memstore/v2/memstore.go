@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
@@ -61,7 +61,8 @@ type MemStore struct {
 	log logging.Logger
 
 	g1SRS []bn254.G1Affine
-	codec codecs.BlobCodec
+
+	polyForm codecs.PolynomialForm
 }
 
 var _ common.EigenDAV2Store = (*MemStore)(nil)
@@ -75,12 +76,12 @@ func New(
 		ephemeraldb.New(ctx, config, log),
 		log,
 		g1SRS,
-		codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
+		codecs.PolynomialFormEval,
 	}, nil
 }
 
-// generateRandomCert ... generates a pseudo random EigenDA V2 certificate
-func (e *MemStore) generateRandomCert(blobContents []byte) (coretypes.EigenDACert, error) {
+// generateRandomCert ... generates a pseudo random EigenDA V3 certificate
+func (e *MemStore) generateRandomV3Cert(blobContents []byte) (*coretypes.EigenDACertV3, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
 	// preimage key is computed within the VM from hashing a recomputation of the data
@@ -180,16 +181,35 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (coretypes.EigenDACer
 func (e *MemStore) Get(
 	_ context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool,
 ) ([]byte, error) {
-	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
+	blobSerialized, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("fetching entry via v2 memstore: %w", err)
+		return nil, fmt.Errorf("fetching entry via memstore: %w", err)
+	}
+
+	var v3cert coretypes.EigenDACertV3
+	err = rlp.DecodeBytes(versionedCert.SerializedCert, &v3cert)
+	if err != nil {
+		return nil, coretypes.ErrCertParsingFailedDerivationError
+	}
+
+	blob, err := coretypes.DeserializeBlob(
+		blobSerialized,
+		v3cert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}
 
 	if returnEncodedPayload {
-		return encodedBlob, nil
+		encodedPayload := blob.ToEncodedPayloadUnchecked(e.polyForm)
+		return encodedPayload.Serialize(), nil
 	}
 
-	return e.codec.DecodeBlob(encodedBlob)
+	payload, err := blob.ToPayload(e.polyForm)
+	if err != nil {
+		return nil, fmt.Errorf("convert blob to payload: %w", err)
+	}
+	return payload, nil
 }
 
 // Put inserts a value into the store.
@@ -197,22 +217,27 @@ func (e *MemStore) Get(
 // this is done to verify that a rollup must be able to provide
 // the same certificate used in dispersal for retrieval
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
-	encodedVal, err := e.codec.EncodeBlob(value)
+	payload := coretypes.Payload(value)
+
+	blob, err := payload.ToBlob(e.polyForm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generating blob: %w", err)
 	}
 
-	artificialV2Cert, err := e.generateRandomCert(encodedVal)
+	blobSerialized := blob.Serialize()
+
+	// generateRandomV3Cert produces valid blob commitment on G1
+	artificialV3Cert, err := e.generateRandomV3Cert(blobSerialized)
 	if err != nil {
 		return nil, fmt.Errorf("generating random cert: %w", err)
 	}
 
-	certBytes, err := rlp.EncodeToBytes(artificialV2Cert)
+	certBytes, err := artificialV3Cert.Serialize(coretypes.CertSerializationRLP)
 	if err != nil {
-		return nil, fmt.Errorf("rlp decode v2 cert: %w", err)
+		return nil, fmt.Errorf("rlp decode v3 cert: %w", err)
 	}
 
-	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), encodedVal)
+	err = e.InsertEntry(crypto.Keccak256Hash(certBytes).Bytes(), blobSerialized)
 	if err != nil { // don't wrap here so api.ErrorFailover{} isn't modified
 		return nil, err
 	}
