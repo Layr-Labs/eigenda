@@ -14,13 +14,14 @@ import (
 
 // SSHSession encapsulates an SSH session with a remote host.
 type SSHSession struct {
-	logger  logging.Logger
-	client  *ssh.Client
-	user    string
-	host    string
-	port    uint64
-	keyPath string
-	verbose bool
+	logger         logging.Logger
+	client         *ssh.Client
+	user           string
+	host           string
+	port           uint64
+	keyPath        string
+	knownHostsPath string
+	verbose        bool
 }
 
 // Create a new SSH session to a remote host.
@@ -79,13 +80,14 @@ func NewSSHSession(
 	}
 
 	return &SSHSession{
-		logger:  logger,
-		client:  client,
-		user:    user,
-		host:    host,
-		port:    port,
-		keyPath: keyPath,
-		verbose: verbose,
+		logger:         logger,
+		client:         client,
+		user:           user,
+		host:           host,
+		port:           port,
+		keyPath:        keyPath,
+		knownHostsPath: knownHosts,
+		verbose:        verbose,
 	}, nil
 }
 
@@ -148,7 +150,15 @@ func (s *SSHSession) Mkdirs(path string) error {
 // Rsync transfers files from the local machine to the remote machine using rsync. The throttle is ignored
 // if less than or equal to 0.
 func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float64) error {
-	sshCmd := fmt.Sprintf("ssh -i %s -p %d", s.keyPath, s.port)
+
+	knownHostsFlag := ""
+	if s.knownHostsPath == "" {
+		knownHostsFlag = "-o StrictHostKeyChecking=no"
+	} else {
+		knownHostsFlag = fmt.Sprintf("-o UserKnownHostsFile=%s", s.knownHostsPath)
+	}
+
+	sshCmd := fmt.Sprintf("ssh -i %s -p %d %s", s.keyPath, s.port, knownHostsFlag)
 	target := fmt.Sprintf("%s@%s:%s", s.user, s.host, destFile)
 
 	// If the source file is a symlink, we actually want to send the thing the symlink points to.
