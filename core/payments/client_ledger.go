@@ -12,13 +12,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-type LedgerStatus string
-
-const (
-	LedgerStatusAlive LedgerStatus = "alive"
-	LedgerStatusDead  LedgerStatus = "dead"
-)
-
 // TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
 // value. The client ledger will need to check whether the on demand ledger is available before trying to debit,
 // and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
@@ -27,10 +20,6 @@ const (
 // TODO: write unit tests
 
 // TODO: work out how to fit metrics into this
-
-// TODO: this is a replacement for the accountant, bu it will not be the replacement for the meterer.
-// this struct will need to construct payment headers, wait for individual ledgers with timeouts, etc.
-// the disperser and validator nodes don't need to do any of that.
 type ClientLedger struct {
 	// TODO: add logger
 
@@ -42,7 +31,7 @@ type ClientLedger struct {
 
 	onDemandLedger *ondemand.OnDemandLedger
 
-	status atomic.Value
+	alive atomic.Bool
 }
 
 func NewClientLedger(
@@ -60,18 +49,17 @@ func NewClientLedger(
 		reservationLedger: reservationLedger,
 		onDemandLedger:    onDemandLedger,
 	}
-	clientLedger.status.Store(LedgerStatusAlive)
+	clientLedger.alive.Store(true)
 
 	return clientLedger, nil
 }
 
-// TODO: doc, also better method name
 func (cl *ClientLedger) Debit(
 	ctx context.Context,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	if cl.status.Load().(LedgerStatus) != LedgerStatusAlive {
+	if !cl.alive.Load() {
 		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return nil, fmt.Errorf("ledger is not alive")
 	}
@@ -87,7 +75,7 @@ func (cl *ClientLedger) Debit(
 		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols)
 		if err != nil {
 			// TODO: make this a type of error which causes the client to shut down
-			cl.status.Store(LedgerStatusDead)
+			cl.alive.Store(false)
 			return nil, fmt.Errorf("reservation debit error: %w", err)
 		}
 
@@ -114,7 +102,7 @@ func (cl *ClientLedger) Debit(
 			return paymentMetadata, nil
 		} else {
 			// TODO: make this a type of error which causes the client to shut down
-			cl.status.Store(LedgerStatusDead)
+			cl.alive.Store(false)
 			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
 	}
@@ -128,7 +116,7 @@ func (cl *ClientLedger) RevertDebit(
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
-	if cl.status.Load().(LedgerStatus) != LedgerStatusAlive {
+	if !cl.alive.Load() {
 		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
 		return fmt.Errorf("ledger is not alive")
 	}
