@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -29,10 +28,9 @@ type NodeClient interface {
 
 type nodeClient struct {
 	config        *NodeClientConfig
-	initOnce      sync.Once
-	conn          *grpc.ClientConn
 	requestSigner DispersalRequestSigner
 
+	conn            *grpc.ClientConn
 	dispersalClient nodegrpc.DispersalClient
 }
 
@@ -42,19 +40,23 @@ func NewNodeClient(config *NodeClientConfig, requestSigner DispersalRequestSigne
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
+	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
+	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+	conn, err := grpc.NewClient(addr, dialOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("new grpc client: %w", err)
+	}
 	return &nodeClient{
-		config:        config,
-		requestSigner: requestSigner,
+		config:          config,
+		requestSigner:   requestSigner,
+		conn:            conn,
+		dispersalClient: nodegrpc.NewDispersalClient(conn),
 	}, nil
 }
 
 func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
 	if len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("no blob certificates in the batch")
-	}
-
-	if err := c.initOnceGrpcConnection(); err != nil {
-		return nil, err
 	}
 
 	blobCerts := make([]*commonpb.BlobCertificate, len(batch.BlobCertificates))
@@ -116,20 +118,4 @@ func (c *nodeClient) Close() error {
 		return err
 	}
 	return nil
-}
-
-func (c *nodeClient) initOnceGrpcConnection() error {
-	var initErr error
-	c.initOnce.Do(func() {
-		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
-		conn, err := grpc.NewClient(addr, dialOptions...)
-		if err != nil {
-			initErr = err
-			return
-		}
-		c.conn = conn
-		c.dispersalClient = nodegrpc.NewDispersalClient(conn)
-	})
-	return initErr
 }

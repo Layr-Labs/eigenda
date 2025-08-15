@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -62,10 +61,6 @@ type DisperserClient interface {
 type disperserClient struct {
 	config *Config
 	signer core.BlobRequestSigner
-	// conn and client are not initialized in the constructor, but are initialized lazily
-	// whenever a method is called, using initOnce to make sure initialization happens only once
-	// and is thread-safe
-	initOnce sync.Once
 	// We use a single grpc connection, which allows a max number of concurrent open streams (from DisperseBlobAuthenticated).
 	// This should be fine in most cases, as each such request should take <1sec per 1MB blob.
 	// The MaxConcurrentStreams parameter is set by the server. If not set, then it defaults to the stdlib's
@@ -106,10 +101,17 @@ func NewDisperserClient(config *Config, signer core.BlobRequestSigner) (*dispers
 	if err := checkConfigAndSetDefaults(config); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
+	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
+	dialOptions := getGrpcDialOptions(config.UseSecureGrpcFlag)
+	conn, err := grpc.NewClient(addr, dialOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("new grpc client: %w", err)
+	}
 	return &disperserClient{
 		config: config,
 		signer: signer,
-		// conn and client are initialized lazily
+		conn:   conn,
+		client: disperser_rpc.NewDisperserClient(conn),
 	}, nil
 }
 
@@ -147,11 +149,6 @@ func (c *disperserClient) Close() error {
 }
 
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, nil, api.NewErrorFailover(err)
-	}
-
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
 	defer cancel()
 
@@ -161,7 +158,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	}
 
 	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
+	_, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
@@ -184,11 +181,6 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, nil, api.NewErrorFailover(err)
-	}
-
 	if c.signer == nil {
 		return nil, nil, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
@@ -290,11 +282,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 }
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
-	}
-
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
@@ -305,11 +292,6 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (
 }
 
 func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
-	}
-
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 	reply, err := c.client.RetrieveBlob(ctxTimeout,
@@ -322,27 +304,6 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 		return nil, err
 	}
 	return reply.GetData(), nil
-}
-
-// initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
-// If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *disperserClient) initOnceGrpcConnection() error {
-	var initErr error
-	c.initOnce.Do(func() {
-		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
-		conn, err := grpc.NewClient(addr, dialOptions...)
-		if err != nil {
-			initErr = err
-			return
-		}
-		c.conn = conn
-		c.client = disperser_rpc.NewDisperserClient(conn)
-	})
-	if initErr != nil {
-		return fmt.Errorf("initializing grpc connection: %w", initErr)
-	}
-	return nil
 }
 
 func getGrpcDialOptions(useSecureGrpcFlag bool) []grpc.DialOption {

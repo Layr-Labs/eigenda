@@ -48,15 +48,15 @@ type DisperserClient interface {
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
 type disperserClient struct {
-	config             *DisperserClientConfig
-	signer             corev2.BlobRequestSigner
-	initOnceGrpc       sync.Once
-	initOnceAccountant sync.Once
-	conn               *grpc.ClientConn
-	client             disperser_rpc.DisperserClient
-	prover             encoding.Prover
-	accountant         *Accountant
-	accountantLock     sync.Mutex
+	config                  *DisperserClientConfig
+	signer                  corev2.BlobRequestSigner
+	conn                    *grpc.ClientConn
+	client                  disperser_rpc.DisperserClient
+	prover                  encoding.Prover
+	accountant              *Accountant
+	accountantLock          sync.Mutex
+	initOnceAccountant      sync.Once
+	initOnceAccountantError error
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -95,12 +95,21 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
+	addr := fmt.Sprintf("%v:%v", config.Hostname, config.Port)
+	dialOptions := GetGrpcDialOptions(config.UseSecureGrpcFlag, 4*units.MiB)
+	conn, err := grpc.NewClient(addr, dialOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("new grpc client: %w", err)
+	}
+	client := disperser_rpc.NewDisperserClient(conn)
+
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
 		prover:     prover,
 		accountant: accountant,
-		// conn and client are initialized lazily
+		conn:       conn,
+		client:     client,
 	}, nil
 }
 
@@ -166,17 +175,12 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		}
 	}
 
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-
 	probe.SetStage("acquire_accountant_lock")
 	c.accountantLock.Lock()
 
 	probe.SetStage("accountant")
 
-	err = c.initOncePopulateAccountant(ctx)
+	err := c.initOncePopulateAccountant(ctx)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, api.NewErrorFailover(err)
@@ -323,11 +327,6 @@ func verifyReceivedBlobKey(
 
 // GetBlobStatus returns the status of a blob with the given blob key.
 func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
-	}
-
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
@@ -336,11 +335,6 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 
 // GetPaymentState returns the payment state of the disperser client
 func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
-	}
-
 	accountID, err := c.signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
@@ -366,51 +360,24 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 // be loaded. For service that does not have access to SRS points, this method can be
 // used to calculate the blob commitment in blob header, which is required for dispersal.
 func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
-	}
-
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
 	return c.client.GetBlobCommitment(ctx, request)
 }
 
-// initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
-// If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *disperserClient) initOnceGrpcConnection() error {
-	var initErr error
-	c.initOnceGrpc.Do(func() {
-		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
-		conn, err := grpc.NewClient(addr, dialOptions...)
-		if err != nil {
-			initErr = err
-			return
-		}
-		c.conn = conn
-		c.client = disperser_rpc.NewDisperserClient(conn)
-	})
-	if initErr != nil {
-		return fmt.Errorf("initializing grpc connection: %w", initErr)
-	}
-	return nil
-}
-
 // initOncePopulateAccountant initializes the accountant if it is not already initialized.
 // If initialization fails, it caches the error and will return it on every subsequent call.
 func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
-	var initErr error
 	c.initOnceAccountant.Do(func() {
 		err := c.PopulateAccountant(ctx)
 		if err != nil {
-			initErr = err
+			c.initOnceAccountantError = err
 			return
 		}
 	})
-	if initErr != nil {
-		return fmt.Errorf("populating accountant: %w", initErr)
+	if c.initOnceAccountantError != nil {
+		return fmt.Errorf("populating accountant: %w", c.initOnceAccountantError)
 	}
 	return nil
 }
