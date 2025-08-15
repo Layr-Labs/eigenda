@@ -20,11 +20,11 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: false,
 			Hidden:   true,
-			Action: func(c *cli.Context, s string) error {
+			Action: func(c *cli.Context, _ string) error {
 				return fmt.Errorf("--%s is deprecated. Contract addresses shall now be read from the "+
 					"EigenDA Directory contract (via the --%s flag) instead. "+
 					"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for more details",
-					s, EigenDADirectoryFlagName)
+					deprecatedServiceManagerAddrFlagName, EigenDADirectoryFlagName)
 			},
 		},
 		&cli.StringFlag{
@@ -34,11 +34,11 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: false,
 			Hidden:   true,
-			Action: func(c *cli.Context, s string) error {
+			Action: func(c *cli.Context, _ string) error {
 				return fmt.Errorf("--%s is deprecated. Contract addresses shall now be read from the "+
 					"EigenDA Directory contract (via the --%s flag) instead. "+
 					"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for more details",
-					s, EigenDADirectoryFlagName)
+					deprecatedBLSOperatorStateRetrieverFlagName, EigenDADirectoryFlagName)
 			},
 		},
 	}
