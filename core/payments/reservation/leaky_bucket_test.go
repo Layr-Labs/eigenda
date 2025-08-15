@@ -197,12 +197,14 @@ func TestTimeRegression(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, success)
 
+	var timeMovedBackwardError *TimeMovedBackwardError
+
 	success, err = leakyBucket.Fill(testStartTime.Add(3*time.Second), 50)
 	require.Error(t, err)
 	require.False(t, success)
-	require.ErrorIs(t, err, ErrTimeMovedBackward)
+	require.ErrorAs(t, err, &timeMovedBackwardError)
 
 	err = leakyBucket.RevertFill(testStartTime.Add(2*time.Second), 50)
 	require.Error(t, err)
-	require.ErrorIs(t, err, ErrTimeMovedBackward)
+	require.ErrorAs(t, err, &timeMovedBackwardError)
 }

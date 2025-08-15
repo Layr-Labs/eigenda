@@ -63,7 +63,7 @@ func NewReservation(
 
 // Checks whether an input list of quorums are all permitted by the reservation.
 //
-// Returns nil if all input quorums are permitted, otherwise returns [ErrQuorumNotPermitted].
+// Returns nil if all input quorums are permitted, otherwise returns [QuorumNotPermittedError].
 func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 	for _, quorum := range quorums {
 		if _, ok := r.permittedQuorumIDs[quorum]; ok {
@@ -74,7 +74,10 @@ func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 		for quorumID := range r.permittedQuorumIDs {
 			permittedQuorums = append(permittedQuorums, quorumID)
 		}
-		return fmt.Errorf("%w: quorum %d not in permitted set %v", ErrQuorumNotPermitted, quorum, permittedQuorums)
+		return &QuorumNotPermittedError{
+			Quorum:           quorum,
+			PermittedQuorums: permittedQuorums,
+		}
 	}
 
 	return nil
@@ -82,14 +85,14 @@ func (r *Reservation) CheckQuorumsPermitted(quorums []core.QuorumID) error {
 
 // Verifies that the given time falls within the reservation's valid time range.
 //
-// Returns [ErrTimeOutOfRange] if the time is outside the valid range.
+// Returns [TimeOutOfRangeError] if the time is outside the valid range.
 func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 	if timeToCheck.Before(r.startTime) || timeToCheck.After(r.endTime) {
-		return fmt.Errorf("%w: dispersal time %s is outside range [%s, %s]",
-			ErrTimeOutOfRange,
-			timeToCheck.Format(time.RFC3339),
-			r.startTime.Format(time.RFC3339),
-			r.endTime.Format(time.RFC3339))
+		return &TimeOutOfRangeError{
+			DispersalTime:        timeToCheck,
+			ReservationStartTime: r.startTime,
+			ReservationEndTime:   r.endTime,
+		}
 	}
 
 	return nil

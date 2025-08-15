@@ -80,7 +80,7 @@ func NewLeakyBucket(
 // - Returns (true, nil) if the leaky bucket has enough capacity to accept the fill.
 // - Returns (false, nil) if bucket lacks capacity to permit the fill.
 // - Returns (false, error) for actual errors:
-//   - [ErrTimeMovedBackward] if input time is before previous leak time (only possible if monotonic time isn't used).
+//   - [TimeMovedBackwardError] if input time is before previous leak time (only possible if monotonic time isn't used).
 //   - Generic error for all other modes of failure.
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
@@ -127,7 +127,7 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 //
 // Use a time source that includes monotonic time for best results.
 //
-// - Returns [ErrTimeMovedBackward] if input time is before previous leak time (only possible if monotonic time
+// - Returns [TimeMovedBackwardError] if input time is before previous leak time (only possible if monotonic time
 // isn't used).
 // - Returns a generic error for all other modes of failure.
 //
@@ -154,13 +154,16 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 
 // Lets the correct number of symbols leak out of the bucket, based on when we last leaked
 //
-// Returns [ErrTimeMovedBackward] if input time is before previous leak time.
+// Returns [TimeMovedBackwardError] if input time is before previous leak time.
 func (lb *LeakyBucket) leak(now time.Time) error {
 	elapsed := now.Sub(lb.previousLeakTime)
 
 	if elapsed < 0 {
 		// This can only happen if the user passes in time instances without monotonic timestamps
-		return fmt.Errorf("%w: previous=%v, current=%v", ErrTimeMovedBackward, lb.previousLeakTime, now)
+		return &TimeMovedBackwardError{
+			PreviousTime: lb.previousLeakTime,
+			CurrentTime:  now,
+		}
 	}
 
 	if elapsed == 0 {

@@ -53,8 +53,8 @@ func NewReservationLedger(
 // Returns (true, nil) if the reservation has enough capacity to perform the debit.
 // Returns (false, nil) if the bucket lacks capacity to permit the fill.
 // Returns (false, error) if an error occurs. Possible errors include:
-//   - [ErrTimeMovedBackward]: current time is before a previously observed time (only possible if input time instances
-//     don't included monotonic timestamps)
+//   - [TimeMovedBackwardError]: current time is before a previously observed time (only possible if input time
+//     instances don't included monotonic timestamps)
 //   - Generic errors for all other unexpected behavior
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
@@ -100,8 +100,8 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) erro
 //
 // This check should be called prior to calling [ReservationLedger.Debit].
 //
-// Returns [ErrQuorumNotPermitted] if requested quorums are not permitted by the reservation
-// Returns [ErrTimeOutOfRange] if dispersal time is outside the reservation's valid time range
+// Returns [QuorumNotPermittedError] if requested quorums are not permitted by the reservation
+// Returns [TimeOutOfRangeError] if dispersal time is outside the reservation's valid time range
 func (rl *ReservationLedger) CheckInvariants(
 	// the quorums listed in the BlobHeader
 	quorums []core.QuorumID,
