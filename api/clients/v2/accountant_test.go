@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -70,7 +69,7 @@ func TestNewAccountant(t *testing.T) {
 				tt.pricePerSymbol,
 				tt.minNumSymbols,
 				numBins,
-				metrics.NoopAccountantMetrics,
+				nil,
 			)
 
 			assert.NotNil(t, accountant)
@@ -118,7 +117,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -217,7 +216,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -285,7 +284,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -349,7 +348,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -460,7 +459,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -562,7 +561,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -636,7 +635,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -736,7 +735,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -845,7 +844,7 @@ func TestAccountBlob_ReservationOverflowWithWindow(t *testing.T) {
 		pricePerSymbol,
 		minNumSymbols,
 		numBins,
-		metrics.NoopAccountantMetrics,
+		nil,
 	)
 
 	quorums := []uint8{0, 1}
@@ -1191,7 +1190,7 @@ func TestSetPaymentState(t *testing.T) {
 				0,
 				0,
 				numBins,
-				metrics.NoopAccountantMetrics,
+				nil,
 			)
 			err := accountant.SetPaymentState(tt.state)
 

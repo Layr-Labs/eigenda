@@ -26,7 +26,7 @@ type AccountantMetrics struct {
 
 func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 	if registry == nil {
-		return &noopAccountantMetricer{}
+		return NoopAccountantMetrics
 	}
 
 	return &AccountantMetrics{

@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ErrZeroSymbols is returned when the requested number of symbols is zero.
@@ -47,8 +48,8 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewUnpopulatedAccountant(accountID gethcommon.Address, metrics metrics.AccountantMetricer) *Accountant {
-	return NewAccountant(accountID, nil, nil, 0, 0, 0, 0, metrics)
+func NewUnpopulatedAccountant(accountID gethcommon.Address, registry *prometheus.Registry) *Accountant {
+	return NewAccountant(accountID, nil, nil, 0, 0, 0, 0, registry)
 }
 
 func NewAccountant(
@@ -59,12 +60,14 @@ func NewAccountant(
 	pricePerSymbol uint64,
 	minNumSymbols uint64,
 	numBins uint32,
-	metrics metrics.AccountantMetricer,
+	registry *prometheus.Registry,
 ) *Accountant {
 	periodRecords := make([]PeriodRecord, max(numBins, uint32(meterer.MinNumBins)))
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
 	}
+
+	metrics := metrics.NewAccountantMetrics(registry)
 	a := Accountant{
 		accountID:         accountID,
 		reservation:       reservation,
