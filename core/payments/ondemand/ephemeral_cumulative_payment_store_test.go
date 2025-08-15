@@ -56,3 +56,20 @@ func TestSetAndGet(t *testing.T) {
 		assert.Equal(t, big.NewInt(300), value2)
 	})
 }
+
+func TestSetCumulativePaymentErrorCases(t *testing.T) {
+	store := NewEphemeralCumulativePaymentStore()
+	ctx := context.Background()
+
+	err := store.SetCumulativePayment(ctx, nil)
+	require.Error(t, err)
+
+	err = store.SetCumulativePayment(ctx, big.NewInt(-100))
+	require.Error(t, err)
+
+	err = store.SetCumulativePayment(ctx, big.NewInt(0))
+	require.NoError(t, err, "setting 0 should work")
+
+	err = store.SetCumulativePayment(ctx, big.NewInt(1000))
+	require.NoError(t, err, "invalid sets shouldn't break anything")
+}
