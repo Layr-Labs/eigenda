@@ -77,7 +77,7 @@ type Dispatcher struct {
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
-	batchMetadataManager *metadata.BatchMetadataManager
+	batchMetadataManager metadata.BatchMetadataManager
 }
 
 type batchData struct {

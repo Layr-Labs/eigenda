@@ -14,10 +14,18 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// TODO future Cody: add a mock instance and get the unit tests passing
+
+type BatchMetadataManager interface {
+	GetMetadata() *BatchMetadata
+}
+
+var _ BatchMetadataManager = (*batchMetadataManager)(nil)
+
 // The BatchMetadataManager responsible for providing BatchMetadata for use in the creation of new batches.
 // This utility periodically downloads recent onchain date, so that new batches are created with recent
 // batch metadata.
-type BatchMetadataManager struct {
+type batchMetadataManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -55,14 +63,14 @@ func NewBatchMetadataManager(
 	registryCoordinatorAddress gethcommon.Address,
 	updatePeriod time.Duration,
 	referenceBlockOffset uint64,
-) (*BatchMetadataManager, error) {
+) (BatchMetadataManager, error) {
 
 	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddress, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create registry coordinator client: %w", err)
 	}
 
-	manager := &BatchMetadataManager{
+	manager := &batchMetadataManager{
 		ctx:                  ctx,
 		logger:               logger,
 		ethClient:            ethClient,
@@ -85,12 +93,12 @@ func NewBatchMetadataManager(
 }
 
 // GetMetadata returns the most recent batch metadata. This method is thread safe.
-func (m *BatchMetadataManager) GetMetadata() *BatchMetadata {
+func (m *batchMetadataManager) GetMetadata() *BatchMetadata {
 	return m.metadata.Load()
 }
 
 // Fetch the next reference block number (RBN) to use.
-func (m *BatchMetadataManager) getNextReferenceBlockNumber() (uint64, error) {
+func (m *batchMetadataManager) getNextReferenceBlockNumber() (uint64, error) {
 	// Get the latest block header to determine the current reference block number.
 	latestHeader, err := m.ethClient.HeaderByNumber(m.ctx, nil)
 	if err != nil {
@@ -107,7 +115,7 @@ func (m *BatchMetadataManager) getNextReferenceBlockNumber() (uint64, error) {
 }
 
 // get a list of all quorums that are registered for a particular reference block number.
-func (m *BatchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.QuorumID, error) {
+func (m *batchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.QuorumID, error) {
 
 	// Quorums are assigned starting at 0, and then sequentially without gaps. If we
 	// know the number of quorums, we can generate a list of quorum IDs.
@@ -130,7 +138,7 @@ func (m *BatchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.Q
 
 // updateMetadata fetches the latest batch metadata from the blockchain and updates m.operatorState.
 // This method is called periodically to ensure that metadata reflects a recent(ish) reference block.
-func (m *BatchMetadataManager) updateMetadata() error {
+func (m *batchMetadataManager) updateMetadata() error {
 	referenceBlockNumber, err := m.getNextReferenceBlockNumber()
 	if err != nil {
 		return fmt.Errorf("failed to get next reference block number: %w", err)
@@ -160,7 +168,7 @@ func (m *BatchMetadataManager) updateMetadata() error {
 }
 
 // periodically updates the batch metadata.
-func (m *BatchMetadataManager) updateLoop() {
+func (m *batchMetadataManager) updateLoop() {
 	ticker := time.NewTicker(m.updatePeriod)
 	defer ticker.Stop()
 
