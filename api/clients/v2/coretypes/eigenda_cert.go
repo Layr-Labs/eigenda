@@ -175,7 +175,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (coreV2.BlobKey, error) {
 		return coreV2.BlobKey{}, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err := coreV2.ComputeBlobKey(
+	blobKey, err := coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -183,10 +183,6 @@ func (c *EigenDACertV3) ComputeBlobKey() (coreV2.BlobKey, error) {
 	)
 	if err != nil {
 		return coreV2.BlobKey{}, fmt.Errorf("compute blob key: %w", err)
-	}
-	blobKey, err := coreV2.BytesToBlobKey(blobKeyBytes[:])
-	if err != nil {
-		return coreV2.BlobKey{}, fmt.Errorf("bytes to blob key: %w", err)
 	}
 	return blobKey, nil
 }
@@ -367,7 +363,7 @@ func (c *EigenDACertV2) ComputeBlobKey() (coreV2.BlobKey, error) {
 		return coreV2.BlobKey{}, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err := coreV2.ComputeBlobKey(
+	blobKey, err := coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -376,12 +372,6 @@ func (c *EigenDACertV2) ComputeBlobKey() (coreV2.BlobKey, error) {
 	if err != nil {
 		return coreV2.BlobKey{}, fmt.Errorf("compute blob key: %w", err)
 	}
-
-	blobKey, err := coreV2.BytesToBlobKey(blobKeyBytes[:])
-	if err != nil {
-		return coreV2.BlobKey{}, fmt.Errorf("bytes to blob key: %w", err)
-	}
-
 	return blobKey, nil
 }
 
