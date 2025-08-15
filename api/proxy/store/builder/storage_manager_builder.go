@@ -322,6 +322,10 @@ func buildEigenDAV2Backend(
 	if err != nil {
 		return nil, fmt.Errorf("get blsOperatorStateRetrieverAddr: %w", err)
 	}
+	registryCoordinator, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("get registryCoordinator: %w", err)
+	}
 
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range config.ClientConfigV2.RetrieversToEnable {
@@ -363,7 +367,7 @@ func buildEigenDAV2Backend(
 		kzgProver,
 		certVerifier,
 		blsOperatorStateRetrieverAddr,
-		eigenDAServiceManagerAddr,
+		registryCoordinator,
 		registry,
 	)
 	if err != nil {
