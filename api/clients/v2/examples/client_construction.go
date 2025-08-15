@@ -213,6 +213,7 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 		disperserClientConfig,
 		signer,
 		kzgProver,
+		nil,
 		nil)
 }
 

@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	namespace           = "eigenda"
 	accountantSubsystem = "accountant"
 )
 
