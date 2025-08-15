@@ -93,6 +93,7 @@ func NewReader(
 // TODO: update to use address directory contract once all contracts are written into the directory
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
+	t.logger.Info("eigendaServiceManagerAddr", "addr", eigenDAServiceManagerAddr.Hex())
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
 		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
