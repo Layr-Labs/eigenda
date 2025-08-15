@@ -51,8 +51,8 @@ func NewOnDemandLedger(
 // The returned cumulativePayment represents the new total amount spent from this account.
 //
 // Returns (nil, error) if an error occurs. Possible errors include:
-//   - ErrQuorumNotSupported: requested quorums are not supported for on-demand payments
-//   - ErrInsufficientFunds: the debit would exceed the total deposits available
+//   - [QuorumNotSupportedError]: requested quorums are not supported for on-demand payments
+//   - [InsufficientFundsError]: the debit would exceed the total deposits available
 //   - Generic errors for all other unexpected behavior
 //
 // If the account doesn't have sufficient funds to accommodate the debit, the cumulative payment
@@ -68,7 +68,7 @@ func (odl *OnDemandLedger) Debit(
 
 	err := checkForOnDemandSupport(quorums)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrQuorumNotSupported, err.Error())
+		return nil, err
 	}
 
 	blobCost := odl.computeCost(symbolCount)
@@ -84,12 +84,11 @@ func (odl *OnDemandLedger) Debit(
 	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
 
 	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
-		return nil, fmt.Errorf(
-			"%w: current cumulative payment: %s wei, total deposits: %s wei, blob cost: %s wei",
-			ErrInsufficientFunds,
-			currentCumulativePayment.String(),
-			odl.config.totalDeposits.String(),
-			blobCost.String())
+		return nil, &InsufficientFundsError{
+			CurrentCumulativePayment: currentCumulativePayment,
+			TotalDeposits:            odl.config.totalDeposits,
+			BlobCost:                 blobCost,
+		}
 	}
 
 	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
@@ -140,7 +139,10 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 			continue
 		}
 
-		return fmt.Errorf("quorum %d not in supported set [0, 1]", quorum)
+		return &QuorumNotSupportedError{
+			RequestedQuorum:  quorum,
+			SupportedQuorums: []core.QuorumID{0, 1},
+		}
 	}
 
 	return nil
