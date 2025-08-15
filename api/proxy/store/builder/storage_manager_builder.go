@@ -333,7 +333,8 @@ func buildEigenDAV2Backend(
 		case common.RelayRetrieverType:
 			log.Info("Initializing relay payload retriever")
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
+				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1,
+				geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
