@@ -39,17 +39,17 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 
 	return &DispersalMetrics{
 		BlobSize: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "blob_size",
+			Name:      "blob_size_bytes",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
 			Buckets:   sizeBuckets,
 		}, []string{}),
 		SymbolLength: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "symbol_length",
+			Name:      "blob_size_symbols",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
-			Help:      "Size of payloads being dispersed in bytes",
+			Help:      "Size of blobs created from payloads in symbols",
 			Buckets:   sizeBuckets,
 		}, []string{}),
 	}
