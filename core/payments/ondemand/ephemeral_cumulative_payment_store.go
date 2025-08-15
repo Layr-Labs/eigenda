@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 )
 
@@ -31,6 +32,12 @@ func (e *EphemeralCumulativePaymentStore) GetCumulativePayment(_ context.Context
 
 // Sets the cumulative payment in wei, overwriting the previous value
 func (e *EphemeralCumulativePaymentStore) SetCumulativePayment(_ context.Context, newCumulativePayment *big.Int) error {
+	if newCumulativePayment == nil {
+		return fmt.Errorf("newCumulativePayment cannot be nil")
+	}
+	if newCumulativePayment.Sign() < 0 {
+		return fmt.Errorf("newCumulativePayment cannot be negative: %s", newCumulativePayment.String())
+	}
 	e.cumulativePayment.Set(newCumulativePayment)
 	return nil
 }

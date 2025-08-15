@@ -98,7 +98,12 @@ func (cl *ClientLedger) Debit(
 	now := cl.getNow()
 
 	if cl.reservationLedger != nil {
-		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols, quorums)
+		err := cl.reservationLedger.CheckInvariants(quorums, now)
+		if err != nil {
+			return nil, fmt.Errorf("") // TODO make this a good error. make sure this causes client to shut down
+		}
+
+		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols)
 		if err != nil {
 			// TODO: make this a type of error which causes the client to shut down
 			cl.status.Store(LedgerStatusDead)

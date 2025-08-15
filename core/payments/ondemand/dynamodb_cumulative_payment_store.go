@@ -7,8 +7,8 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -25,11 +25,13 @@ const (
 // it doesn't make sense for cumulative payment to ever decrease. Therefore, for extra safety, decreasing cumulative
 // payment is forbidden.
 //
-// This implementation stores cumulative payment values in a DynamoDB table, providing
-// persistent storage for on-demand payment tracking. The table uses AccountID as the
+// This implementation provides persistent storage for on-demand payment tracking. The table uses AccountID as the
 // partition key and stores the CumulativePayment value as a number.
+//
+// This store represents a subset of the logic implemented in [meterer.DynamoDBMeteringStore]. It maintains the same
+// table structure for the sake of backwards compatibility, but otherwise is intended to replace the old class, as
+// part of the ongoing payments refactor.
 type DynamoDBCumulativePaymentStore struct {
-	logger       logging.Logger
 	dynamoClient dynamodb.Client
 	tableName    string
 	accountID    gethcommon.Address
@@ -39,7 +41,6 @@ var _ CumulativePaymentStore = (*DynamoDBCumulativePaymentStore)(nil)
 
 // Creates a new DynamoDB-backed cumulative payment store
 func NewDynamoDBCumulativePaymentStore(
-	logger logging.Logger,
 	// The DynamoDB client to use for storage operations
 	dynamoClient dynamodb.Client,
 	// The name of the DynamoDB table to store payments in
@@ -58,7 +59,6 @@ func NewDynamoDBCumulativePaymentStore(
 	}
 
 	return &DynamoDBCumulativePaymentStore{
-		logger:       logger,
 		dynamoClient: dynamoClient,
 		tableName:    tableName,
 		accountID:    accountID,
@@ -86,14 +86,12 @@ func (s *DynamoDBCumulativePaymentStore) GetCumulativePayment(ctx context.Contex
 
 	// If no item found, return zero (new account)
 	if len(result) == 0 {
-		s.logger.Debug("No payment record found for account, returning 0", "accountID", s.accountID.Hex())
 		return big.NewInt(0), nil
 	}
 
 	// Extract CumulativePayment attribute
 	paymentAttr, ok := result[attributeCumulativePayment]
 	if !ok {
-		s.logger.Debugf("%s attribute not found, returning 0 for accountID %s", attributeCumulativePayment, s.accountID.Hex())
 		return big.NewInt(0), nil
 	}
 
@@ -109,61 +107,61 @@ func (s *DynamoDBCumulativePaymentStore) GetCumulativePayment(ctx context.Contex
 		return nil, fmt.Errorf("parse payment value: %s", paymentNumber.Value)
 	}
 
-	s.logger.Debug("Retrieved cumulative payment",
-		"accountID", s.accountID.Hex(),
-		"payment", payment.String())
-
 	return payment, nil
 }
 
 // SetCumulativePayment stores the new cumulative payment value in DynamoDB
 //
+// The operation is idempotent.
+//
 // Returns an error if:
-// - The new payment is not greater than the existing payment
+// - The new payment is less than the existing payment (decrements are not allowed)
 // - There's a failure writing to DynamoDB
-func (s *DynamoDBCumulativePaymentStore) SetCumulativePayment(ctx context.Context, newCumulativePayment *big.Int) error {
+func (s *DynamoDBCumulativePaymentStore) SetCumulativePayment(
+	ctx context.Context,
+	newCumulativePayment *big.Int,
+) error {
 	if newCumulativePayment == nil {
 		return fmt.Errorf("newCumulativePayment cannot be nil")
 	}
+	if newCumulativePayment.Sign() < 0 {
+		return fmt.Errorf("newCumulativePayment cannot be negative: %s", newCumulativePayment.String())
+	}
 
-	// Create the item to store
+	key := dynamodb.Key{
+		attributeAccountID: &types.AttributeValueMemberS{Value: s.accountID.Hex()},
+	}
+
 	item := dynamodb.Item{
-		attributeAccountID:         &types.AttributeValueMemberS{Value: s.accountID.Hex()},
 		attributeCumulativePayment: &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
 	}
 
-	exprValueNewPayment := ":newPayment"
-
-	// Use conditional expression to ensure:
 	// 1. If no record exists, accept the payment (first payment for this account)
-	// 2. If record exists, only accept if new payment is greater than existing
-	// This ensures cumulative payments only increase, preventing concurrent update issues
-	conditionExpression := "attribute_not_exists(" + attributeCumulativePayment + ") OR " +
-		attributeCumulativePayment + " < " + exprValueNewPayment
+	// 2. If record exists, only accept if new payment is greater than or equal to existing
+	//    (allowing idempotent retries with the same value)
+	conditionBuilder := expression.Or(
+		expression.AttributeNotExists(expression.Name(attributeCumulativePayment)),
+		expression.LessThanEqual(
+			expression.Name(attributeCumulativePayment),
+			expression.Value(&types.AttributeValueMemberN{Value: newCumulativePayment.String()}),
+		),
+	)
 
-	expressionValues := map[string]types.AttributeValue{
-		exprValueNewPayment: &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
-	}
-
-	err := s.dynamoClient.PutItemWithCondition(
+	_, err := s.dynamoClient.UpdateItemWithCondition(
 		ctx,
 		s.tableName,
+		key,
 		item,
-		conditionExpression,
-		nil, // No expression attribute names needed
-		expressionValues,
+		conditionBuilder,
 	)
 
 	if err != nil {
 		if errors.Is(err, dynamodb.ErrConditionFailed) {
-			return fmt.Errorf("new value (%s) must be greater than existing value", newCumulativePayment.String())
+			return fmt.Errorf(
+				"new value (%s) must be greater than or equal to existing value", newCumulativePayment.String())
 		}
 		return fmt.Errorf("set payment for account %s: %w", s.accountID.Hex(), err)
 	}
-
-	s.logger.Debug("Set cumulative payment",
-		"accountID", s.accountID.Hex(),
-		"payment", newCumulativePayment.String())
 
 	return nil
 }
