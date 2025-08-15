@@ -364,7 +364,7 @@ For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](
 | 0x01                   | 0x00          | 0x01         | eigenda_cert_v2   |
 | 0x01                   | 0x00          | 0x02         | eigenda_cert_v3   |
 
-`keccak256` (commitment_type 0x00) uses an S3 storage backend with where a simple keccak hash commitment of the `DA Cert` is used as the lookup key.
+`keccak256` (commitment_type 0x00) uses an S3 storage backend where a simple keccak hash commitment of the `DA Cert` is used as the lookup key.
 
 For `generic` commitments, only `da_layer_byte` 0x00` is supported, which represents EigenDA. This byte is not currently processed by OP Stack chains and serves solely as an evolvability placeholder.
 .
