@@ -47,31 +47,12 @@ type ClientLedger struct {
 
 func NewClientLedger(
 	accountID gethcommon.Address,
-	// TODO: may be nil if no reservation exists
-	reservationLedgerConfig *reservation.ReservationLedgerConfig,
-	// TODO: may be nil if no on demand payments are enabled
-	onDemandLedgerConfig *ondemand.OnDemandLedgerConfig,
+	// may be nil if no reservation exists
+	reservationLedger *reservation.ReservationLedger,
+	// may be nil if no on demand payments are enabled
+	onDemandLedger *ondemand.OnDemandLedger,
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
-	var reservationLedger *reservation.ReservationLedger
-	if reservationLedgerConfig != nil {
-		var err error
-		reservationLedger, err = reservation.NewReservationLedger(*reservationLedgerConfig, getNow())
-		if err != nil {
-			return nil, fmt.Errorf("new reservation ledger: %w", err)
-		}
-	}
-
-	var onDemandLedger *ondemand.OnDemandLedger
-	if onDemandLedgerConfig != nil {
-		var err error
-		// TODO: must init with actual value the disperser
-		cumulativePaymentStore := ondemand.NewEphemeralCumulativePaymentStore()
-		onDemandLedger, err = ondemand.NewOnDemandLedger(*onDemandLedgerConfig, cumulativePaymentStore)
-		if err != nil {
-			return nil, fmt.Errorf("new on demand ledger: %w", err)
-		}
-	}
 
 	clientLedger := &ClientLedger{
 		accountID:         accountID,

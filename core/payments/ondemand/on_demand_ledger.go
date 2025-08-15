@@ -27,7 +27,12 @@ import (
 //
 // This is a goroutine safe struct.
 type OnDemandLedger struct {
-	config OnDemandLedgerConfig
+	// total deposits available for the account in wei
+	totalDeposits *big.Int
+	// price per symbol in wei
+	pricePerSymbol *big.Int
+	// minimum number of symbols to bill
+	minNumSymbols *big.Int
 	// synchronizes access to the cumulative payment store
 	lock sync.Mutex
 	// stores the cumulative payment for this ledger in wei
@@ -36,11 +41,15 @@ type OnDemandLedger struct {
 
 // Constructs a new OnDemandLedger, backed by the input CumulativePaymentStore
 func NewOnDemandLedger(
-	config OnDemandLedgerConfig,
+	totalDeposits *big.Int,
+	pricePerSymbol *big.Int,
+	minNumSymbols *big.Int,
 	cumulativePaymentStore CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
 	return &OnDemandLedger{
-		config:                 config,
+		totalDeposits:          totalDeposits,
+		pricePerSymbol:         pricePerSymbol,
+		minNumSymbols:          minNumSymbols,
 		cumulativePaymentStore: cumulativePaymentStore,
 	}, nil
 }
@@ -83,10 +92,10 @@ func (odl *OnDemandLedger) Debit(
 
 	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
 
-	if newCumulativePayment.Cmp(odl.config.totalDeposits) > 0 {
+	if newCumulativePayment.Cmp(odl.totalDeposits) > 0 {
 		return nil, &InsufficientFundsError{
 			CurrentCumulativePayment: currentCumulativePayment,
-			TotalDeposits:            odl.config.totalDeposits,
+			TotalDeposits:            odl.totalDeposits,
 			BlobCost:                 blobCost,
 		}
 	}
@@ -153,9 +162,9 @@ func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
 	symbolCountBig := big.NewInt(int64(symbolCount))
 
 	billableSymbols := symbolCountBig
-	if symbolCountBig.Cmp(odl.config.minNumSymbols) < 0 {
-		billableSymbols = odl.config.minNumSymbols
+	if symbolCountBig.Cmp(odl.minNumSymbols) < 0 {
+		billableSymbols = odl.minNumSymbols
 	}
 
-	return new(big.Int).Mul(billableSymbols, odl.config.pricePerSymbol)
+	return new(big.Int).Mul(billableSymbols, odl.pricePerSymbol)
 }
