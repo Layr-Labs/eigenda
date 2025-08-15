@@ -66,9 +66,11 @@ func TestCheckQuorumsPermitted(t *testing.T) {
 		require.NotNil(t, reservation)
 		require.NoError(t, err)
 
+		var quorumNotPermittedError *QuorumNotPermittedError
+
 		err = reservation.CheckQuorumsPermitted([]core.QuorumID{0, 1, 3})
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrQuorumNotPermitted))
+		require.True(t, errors.As(err, &quorumNotPermittedError))
 	})
 }
 
@@ -95,9 +97,11 @@ func TestCheckTime(t *testing.T) {
 		require.NotNil(t, reservation)
 		require.NoError(t, err)
 
+		var timeOutOfRangeError *TimeOutOfRangeError
+
 		err = reservation.CheckTime(startTime.Add(-time.Minute))
 		require.Error(t, err, "time before start time should fail")
-		require.True(t, errors.Is(err, ErrTimeOutOfRange))
+		require.True(t, errors.As(err, &timeOutOfRangeError))
 	})
 
 	t.Run("late time", func(t *testing.T) {
@@ -109,8 +113,10 @@ func TestCheckTime(t *testing.T) {
 		require.NotNil(t, reservation)
 		require.NoError(t, err)
 
+		var timeOutOfRangeError *TimeOutOfRangeError
+
 		err = reservation.CheckTime(endTime.Add(time.Minute))
 		require.Error(t, err, "time after end time should fail")
-		require.True(t, errors.Is(err, ErrTimeOutOfRange))
+		require.True(t, errors.As(err, &timeOutOfRangeError))
 	})
 }

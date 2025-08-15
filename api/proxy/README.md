@@ -398,10 +398,9 @@ never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.
 
 ## Repo Structure and Releases
 
-This repo is a fairly standard Go [workspace](https://go.dev/ref/mod#workspaces), which consists of 2 separate modules:
-1. [eigenda-proxy](./go.mod) - the main module, which contains the proxy server and all the business logic
-2. [clients](./clients/go.mod) - a module containing client implementations for interacting with the proxy server
+The eigenda proxy was originally in its [own repo](https://github.com/Layr-Labs/eigenda-proxy), but was migrated into the eigenda monorepo in [PR 1611](https://github.com/Layr-Labs/eigenda/pull/1611).
 
-Both modules follow their own independent [release](https://go.dev/doc/modules/release-workflow) cadence, with independent semantic versioning:
-1. `eigenda-proxy` releases are made from `vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/v1.6.5).
-2. `clients` releases are made from `clients/vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0)
+[Releases](https://github.com/Layr-Labs/eigenda-proxy/releases) up until 1.8.2 are available in the eigenda-proxy repo.
+The following release [2.1.0](https://github.com/Layr-Labs/eigenda/releases/tag/v2.1.0) was made from the monorepo, with proxy joining the same release cadence as the rest of the services. Future releases will also follow this pattern.
+
+Only the proxy [clients](./clients/go.mod) are still packaged as a separate module that is also released independently. It is kept separate from the monorepo because the monorepo go.mod requires go1.24, which would have broken some proxy clients. The client releases are made from `api/proxy/clients/vX.Y.Z` tags. Note that previous releases in the eigenda-proxy repo were made under [clients/vX.Y.Z](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0) tags.

@@ -661,9 +661,9 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 
 // ReservedPayment contains information the onchain state about a reserved payment
 //
-// TODO(litt3): this structure is used in the bin-based payment system, which is in the process of being deprecated.
-// It should be deleted when the old payment system is removed. The counterpart to this struct in the new payment
-// system is payments.Reservation
+// TODO(litt3): this struct is in the process of being deprecated. It is used by the old accounting logic, but will
+// be replaced by the [reservation.Reservation] struct once the new accounting logic has superseded the old. At that
+// time, this struct should be deleted.
 type ReservedPayment struct {
 	// reserve number of symbols per second
 	SymbolsPerSecond uint64
