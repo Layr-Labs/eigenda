@@ -10,12 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"golang.org/x/sync/semaphore"
 )
-
-// TODO: we need to keep track of how many in flight dispersals there are, and not let that number exceed a certain
-// value. The client ledger will need to check whether the on demand ledger is available before trying to debit,
-// and do a wait if it isn't. We also need to consider how to "time out" an old request that was made to the disperser
-// which was never responded to. We can't wait forever, eventually we need to declare a dispersal "failed", and move on
 
 // TODO: write unit tests
 
@@ -32,6 +28,8 @@ type ClientLedger struct {
 	onDemandLedger *ondemand.OnDemandLedger
 
 	alive atomic.Bool
+
+	inflightOnDemandDispersals *semaphore.Weighted
 }
 
 func NewClientLedger(
@@ -44,10 +42,11 @@ func NewClientLedger(
 ) (*ClientLedger, error) {
 
 	clientLedger := &ClientLedger{
-		accountID:         accountID,
-		getNow:            getNow,
-		reservationLedger: reservationLedger,
-		onDemandLedger:    onDemandLedger,
+		accountID:                  accountID,
+		getNow:                     getNow,
+		reservationLedger:          reservationLedger,
+		onDemandLedger:             onDemandLedger,
+		inflightOnDemandDispersals: semaphore.NewWeighted(1),
 	}
 	clientLedger.alive.Store(true)
 
@@ -92,6 +91,10 @@ func (cl *ClientLedger) Debit(
 	}
 
 	if cl.onDemandLedger != nil {
+		if err := cl.inflightOnDemandDispersals.Acquire(ctx, 1); err != nil {
+			return nil, fmt.Errorf("acquire inflight dispersal slot: %w", err)
+		}
+
 		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
 		if err == nil {
 			// Success - blob accounted for via on-demand
@@ -102,6 +105,7 @@ func (cl *ClientLedger) Debit(
 			return paymentMetadata, nil
 		} else {
 			// TODO: make this a type of error which causes the client to shut down
+			// actually, not all errors.... failure to acquire semaphore shouldn't do that
 			cl.alive.Store(false)
 			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
@@ -111,7 +115,7 @@ func (cl *ClientLedger) Debit(
 }
 
 // TODO: doc
-func (cl *ClientLedger) RevertDebit(
+func (cl *ClientLedger) revertDebit(
 	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
@@ -139,6 +143,30 @@ func (cl *ClientLedger) RevertDebit(
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (cl *ClientLedger) DispersalSent(
+	ctx context.Context,
+	paymentMetadata *core.PaymentMetadata,
+	symbolCount uint32,
+	success bool,
+) error {
+	if paymentMetadata.IsOnDemand() {
+		cl.inflightOnDemandDispersals.Release(1)
+	}
+
+	if success {
+		return nil
+	}
+
+	// If the dispersal wasn't a success, that means that the disperser didn't charge the client for it, so the local
+	// ledger should "refund" itself the cost of the dispersal
+	err := cl.revertDebit(ctx, paymentMetadata, symbolCount)
+	if err != nil {
+		return fmt.Errorf("revert debit: %w", err)
 	}
 
 	return nil

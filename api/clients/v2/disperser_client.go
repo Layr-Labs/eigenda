@@ -192,13 +192,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 			// TODO: bring everything down if unexpected error happens. no sense continuing with payments broken
 		}
 
-		// if there is a problem with the dispersal, revert the payment debit in the local ledger to recover the balance
 		defer func() {
-			if successfulDispersal {
-				return
-			}
-
-			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+			err := c.clientLedger.DispersalSent(ctx, paymentMetadata, uint32(symbolLength), successfulDispersal)
 			if err != nil {
 				// TODO: Log error
 			}
