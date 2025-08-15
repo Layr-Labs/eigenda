@@ -18,7 +18,9 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,13 +65,19 @@ type Dispatcher struct {
 	metrics           *dispatcherMetrics
 
 	cursor *blobstore.StatusIndexCursor
+
 	// beforeDispatch function is called before dispatching a blob
 	beforeDispatch BlobCallback
+
 	// blobSet keeps track of blobs that are being dispatched
 	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
 	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet                BlobSet
+	blobSet BlobSet
+
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
+
+	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
+	batchMetadataManager *metadata.BatchMetadataManager
 }
 
 type batchData struct {
@@ -81,10 +89,13 @@ type batchData struct {
 }
 
 func NewDispatcher(
+	ctx context.Context,
 	config *DispatcherConfig,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
+	ethClient bind.ContractBackend,
+	registryCoordinatorAddress gethcommon.Address,
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
@@ -119,6 +130,19 @@ func NewDispatcher(
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
 
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
+		ctx,
+		logger,
+		ethClient,
+		chainState,
+		registryCoordinatorAddress,
+		time.Minute, // TODO config
+		config.FinalizationBlockDelay,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
 	return &Dispatcher{
 		DispatcherConfig: config,
 
@@ -134,6 +158,7 @@ func NewDispatcher(
 		beforeDispatch:         beforeDispatch,
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
+		batchMetadataManager:   batchMetadataManager,
 	}, nil
 }
 
@@ -189,16 +214,9 @@ func (d *Dispatcher) HandleBatch(
 	// Signal Liveness to indicate no stall
 	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
 
-	batchProbe.SetStage("get_reference_block")
-	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
-	}
-	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
-
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, referenceBlockNumber, batchProbe)
+	batchData, err := d.NewBatch(ctx, batchProbe)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -559,9 +577,12 @@ func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
 // Warning: This function is not thread-safe
 func (d *Dispatcher) NewBatch(
 	ctx context.Context,
-	referenceBlockNumber uint64,
 	probe *common.SequenceProbe,
 ) (*batchData, error) {
+
+	batchMetadata := d.batchMetadataManager.GetMetadata()
+	referenceBlockNumber := batchMetadata.ReferenceBlockNumber()
+	operatorState := batchMetadata.OperatorState()
 
 	probe.SetStage("get_blob_metadata")
 	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(
@@ -582,12 +603,6 @@ func (d *Dispatcher) NewBatch(
 	d.logger.Debug("got new metadatas to make batch",
 		"numBlobs", len(blobMetadatas),
 		"referenceBlockNumber", referenceBlockNumber)
-
-	probe.SetStage("get_operator_state")
-	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get operator state at block %d: %w", referenceBlockNumber, err)
-	}
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
@@ -724,7 +739,7 @@ func (d *Dispatcher) NewBatch(
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
-		OperatorState:   state,
+		OperatorState:   operatorState,
 	}, nil
 }
 

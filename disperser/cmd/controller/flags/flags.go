@@ -23,23 +23,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMODB_TABLE_NAME"),
 	}
-	EigenDADirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses. This is the only contract entrypoint needed offchain.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
-	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	EigenDAContractDirectoryAddressFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "eigenda-contract-directory-address"),
+		Usage: "Address of the EigenDA contract directory contract, which points to all other EigenDA " +
+			"contract addresses.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CONTRACT_DIRECTORY_ADDRESS"), // TODO update devops config
 	}
 	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
@@ -274,9 +263,7 @@ var optionalFlags = []cli.Flag{
 	ControllerHealthProbePathFlag,
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
-	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
+	EigenDAContractDirectoryAddressFlag,
 }
 
 var Flags []cli.Flag

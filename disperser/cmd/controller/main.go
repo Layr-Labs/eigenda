@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -82,8 +83,37 @@ func RunController(ctx *cli.Context) error {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
+
+	contractDirectory, err := directory.NewContractDirectory(
+		context.Background(),
+		logger,
+		gethClient,
+		gethcommon.HexToAddress(config.EigenDAContractDirectoryAddress))
+	if err != nil {
+		return fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
+	}
+	serviceManagerAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ServiceManager address: %w", err)
+	}
+	registryCoordinatorAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
+	if err != nil {
+		return fmt.Errorf("failed to get registry coordinator address: %w", err)
+	}
+
 	chainReader, err := eth.NewReader(
-		logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+		logger,
+		gethClient,
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
 	if err != nil {
 		return err
 	}
@@ -160,7 +190,7 @@ func RunController(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			gethClient,
 			rpcClient,
-			config.EigenDADirectory,
+			serviceManagerAddress.Hex(),
 			logger,
 		)
 		if err != nil {
@@ -195,11 +225,15 @@ func RunController(ctx *cli.Context) error {
 		return nil
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
+
 	dispatcher, err := controller.NewDispatcher(
+		context.Background(),
 		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,
+		gethClient,
+		registryCoordinatorAddress,
 		sigAgg,
 		nodeClientManager,
 		logger,
