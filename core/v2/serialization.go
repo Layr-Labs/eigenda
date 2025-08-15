@@ -44,7 +44,7 @@ func ComputeBlobKey(
 	blobCommitments encoding.BlobCommitments,
 	quorumNumbers []core.QuorumID,
 	paymentMetadataHash [32]byte,
-) ([32]byte, error) {
+) (BlobKey, error) {
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err

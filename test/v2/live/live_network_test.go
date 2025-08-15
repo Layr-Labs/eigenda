@@ -458,7 +458,7 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 
 	chunkRequests := make([]*relay.ChunkRequestByRange, 1)
 	chunkRequests[0] = &relay.ChunkRequestByRange{
-		BlobKey: *blobKey,
+		BlobKey: blobKey,
 		Start:   0,
 		End:     1,
 	}

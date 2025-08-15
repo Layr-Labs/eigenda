@@ -227,7 +227,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 
 // Submits a single blob to the network using the GRPC clients.
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
-	blobKey *corev2.BlobKey,
+	blobKey corev2.BlobKey,
 	payload []byte,
 	eigenDACert coretypes.EigenDACert,
 	err error) {
@@ -241,20 +241,20 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
-		return nil, nil, nil, err
+		return corev2.BlobKey{}, nil, nil, fmt.Errorf("failed to disperse blob: %w", err)
 	}
 
 	// Ensure the eigenDACert is of type EigenDACertV3
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
 		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
-		return nil, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
+		return corev2.BlobKey{}, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
 	}
 
 	blobKey, err = eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
-		return nil, nil, nil, err
+		return corev2.BlobKey{}, nil, nil, fmt.Errorf("failed to compute blob key: %w", err)
 	}
 
 	return blobKey, payload, eigenDACert, nil
@@ -337,7 +337,7 @@ func (l *LoadGenerator) doReadsWithProxy(
 // readBlobFromRelays reads a blob from the relays using the GRPC clients.
 func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
-	blobKey *corev2.BlobKey,
+	blobKey corev2.BlobKey,
 	payload []byte,
 	eigenDACert *coretypes.EigenDACertV3,
 ) {
@@ -364,7 +364,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 	for i := 0; i < relayReadCount; i++ {
 		err := l.client.ReadBlobFromRelay(
 			ctx,
-			*blobKey,
+			blobKey,
 			relayKeys[(int(readStartIndex)+i)%len(relayKeys)],
 			payload,
 			blobLengthSymbols,

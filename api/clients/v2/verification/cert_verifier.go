@@ -62,10 +62,7 @@ func (cv *CertVerifier) CheckDACert(
 	case *coretypes.EigenDACertV2:
 		// EigenDACertV3 is the only version that is supported by the CheckDACert function
 		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
-		certV3, err = cert.ToV3()
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
-		}
+		certV3 = cert.ToV3()
 	default:
 		// If golang had enums the world would be a better place.
 		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
