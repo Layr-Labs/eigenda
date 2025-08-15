@@ -1,0 +1,182 @@
+package ondemand
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/big"
+	"sync"
+
+	"github.com/Layr-Labs/eigenda/core"
+)
+
+// Keeps track of the cumulative payment state for on-demand dispersals for a single account.
+//
+// On-demand payments use a cumulative payment system where, each time a dispersal is made, we keep track of the total
+// amount paid by the account for that and all previous dispersals. The cumulative payment is chosen by the client
+// based on the state of its local accounting, and the chosen value can be verified by all other parties by checking:
+// 1. that the claimed value is <= the total deposits belonging to the account in the PaymentVault contract
+// 2. that the value has increased by at least the cost of the dispersal from the previously observed value
+//
+// The cost of each dispersal is calculated by multiplying the number of symbols (with a minimum of minNumSymbols) by
+// the pricePerSymbol.
+//
+// On-demand payments are currently limited to quorums 0 (ETH) and 1 (EIGEN) and can only be used when dispersing
+// through the EigenDA disperser.
+//
+// This is a goroutine safe struct, with some caveats. While the data structures themselves can be accessed
+// concurrently, there are some practical concurrency limits based on the logic behind on-demand payments:
+// 1. Dispersals must be accounted for *in order*, since cumulative payment may only increase. Example:
+// - Assume there are two dispersals, N and N+1
+// - N+1 necessarily has a greater cumulative payment
+// - If N+1 is accounted for first, then the subsequent accounting for dispersal N will fail, since cumulative payment
+// would decrease
+// 2. Debit reversion is only possible for a dispersal if no subsequent dispersals have been accounted for. Example:
+// - Assume there are two dispersals, N and N+1
+// - If N is accounted for, the debit for N can be reverted *only if* N+1 has not yet been accounted for
+// - If this is not respected, the entity doing the accounting will diverge from the correct ledger state
+//
+// TODO(litt3): There are some improvements that may be made to the on-demand logic in the future, to permit a larger
+// number of concurrent on-demand dispersals.
+type OnDemandLedger struct {
+	// total deposits available for the account in wei
+	totalDeposits *big.Int
+	// price per symbol in wei
+	pricePerSymbol *big.Int
+	// minimum number of symbols to bill
+	minNumSymbols *big.Int
+	// synchronizes access to the cumulative payment store
+	lock sync.Mutex
+	// stores the cumulative payment for this ledger in wei
+	cumulativePaymentStore CumulativePaymentStore
+}
+
+// Constructs a new OnDemandLedger, backed by the input CumulativePaymentStore
+func NewOnDemandLedger(
+	totalDeposits *big.Int,
+	pricePerSymbol *big.Int,
+	minNumSymbols *big.Int,
+	cumulativePaymentStore CumulativePaymentStore,
+) (*OnDemandLedger, error) {
+	return &OnDemandLedger{
+		totalDeposits:          totalDeposits,
+		pricePerSymbol:         pricePerSymbol,
+		minNumSymbols:          minNumSymbols,
+		cumulativePaymentStore: cumulativePaymentStore,
+	}, nil
+}
+
+// Debit the on-demand account with the cost of a dispersal, based on the number of symbols.
+//
+// Returns (cumulativePayment, nil) if the account has sufficient funds to perform the debit.
+// The returned cumulativePayment represents the new total amount spent from this account, including this blob.
+//
+// Returns (nil, error) if an error occurs. Possible errors include:
+//   - [QuorumNotSupportedError]: requested quorums are not supported for on-demand payments
+//   - [InsufficientFundsError]: the debit would exceed the total deposits available
+//   - Generic errors for all other unexpected behavior
+//
+// If the account doesn't have sufficient funds to accommodate the debit, the cumulative payment
+// IS NOT updated, i.e. a failed debit doesn't modify the payment state.
+func (odl *OnDemandLedger) Debit(
+	ctx context.Context,
+	symbolCount uint32,
+	quorums []core.QuorumID,
+) (*big.Int, error) {
+	if symbolCount == 0 {
+		return nil, errors.New("symbolCount must be > 0")
+	}
+
+	err := checkForOnDemandSupport(quorums)
+	if err != nil {
+		return nil, err
+	}
+
+	blobCost := odl.computeCost(symbolCount)
+
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get cumulative payment: %w", err)
+	}
+
+	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
+
+	if newCumulativePayment.Cmp(odl.totalDeposits) > 0 {
+		return nil, &InsufficientFundsError{
+			CurrentCumulativePayment: currentCumulativePayment,
+			TotalDeposits:            odl.totalDeposits,
+			BlobCost:                 blobCost,
+		}
+	}
+
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
+		return nil, fmt.Errorf("set cumulative payment: %w", err)
+	}
+
+	return newCumulativePayment, nil
+}
+
+// RevertDebit reverts a previous debit operation, following a failed dispersal.
+//
+// Note: this method will only succeed if the underlying CumulativePaymentStore supports decrementing the
+// cumulative payment.
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
+	if symbolCount == 0 {
+		return errors.New("symbolCount must be > 0")
+	}
+
+	blobCost := odl.computeCost(symbolCount)
+
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
+	if err != nil {
+		return fmt.Errorf("get cumulative payment: %w", err)
+	}
+
+	newCumulativePayment := new(big.Int).Sub(currentCumulativePayment, blobCost)
+
+	if newCumulativePayment.Sign() < 0 {
+		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
+	}
+
+	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
+		return fmt.Errorf("set cumulative payment: %w", err)
+	}
+
+	return nil
+}
+
+// Checks whether all input quorum IDs are supported for on demand payments
+//
+// Returns an error if any input quorum isn't supported, otherwise nil
+func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
+	for _, quorum := range quorumsToCheck {
+		if quorum == 0 || quorum == 1 {
+			continue
+		}
+
+		return &QuorumNotSupportedError{
+			RequestedQuorum:  quorum,
+			SupportedQuorums: []core.QuorumID{0, 1},
+		}
+	}
+
+	return nil
+}
+
+// Computes the on demand cost of a number of symbols
+func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
+	symbolCountBig := big.NewInt(int64(symbolCount))
+
+	billableSymbols := symbolCountBig
+	if symbolCountBig.Cmp(odl.minNumSymbols) < 0 {
+		billableSymbols = odl.minNumSymbols
+	}
+
+	return new(big.Int).Mul(billableSymbols, odl.pricePerSymbol)
+}
