@@ -24,8 +24,8 @@ import (
 // On-demand payments are currently limited to quorums 0 (ETH) and 1 (EIGEN) and can only be used when dispersing
 // through the EigenDA disperser.
 //
-// This is a goroutine safe struct, with some caveats. While the data structures themselves can be accessed
-// concurrently, there are some practical concurrency limits based on the logic behind on-demand payments:
+// This is a goroutine safe struct, with some caveats. While the methods themselves can be called concurrently, there
+// are some practical concurrency limits based on the logic behind on-demand payments:
 // 1. Dispersals must be accounted for *in order*, since cumulative payment may only increase. Example:
 // - Assume there are two dispersals, N and N+1
 // - N+1 necessarily has a greater cumulative payment
