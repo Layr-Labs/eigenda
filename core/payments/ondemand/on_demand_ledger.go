@@ -58,6 +58,31 @@ func NewOnDemandLedger(
 	minNumSymbols *big.Int,
 	cumulativePaymentStore CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
+	if totalDeposits == nil {
+		return nil, errors.New("totalDeposits cannot be nil")
+	}
+	if totalDeposits.Sign() < 0 {
+		return nil, errors.New("totalDeposits cannot be negative")
+	}
+
+	if pricePerSymbol == nil {
+		return nil, errors.New("pricePerSymbol cannot be nil")
+	}
+	if pricePerSymbol.Sign() < 0 {
+		return nil, errors.New("pricePerSymbol cannot be negative")
+	}
+
+	if minNumSymbols == nil {
+		return nil, errors.New("minNumSymbols cannot be nil")
+	}
+	if minNumSymbols.Sign() < 0 {
+		return nil, errors.New("minNumSymbols cannot be negative")
+	}
+
+	if cumulativePaymentStore == nil {
+		return nil, errors.New("cumulativePaymentStore cannot be nil")
+	}
+
 	return &OnDemandLedger{
 		totalDeposits:          totalDeposits,
 		pricePerSymbol:         pricePerSymbol,
