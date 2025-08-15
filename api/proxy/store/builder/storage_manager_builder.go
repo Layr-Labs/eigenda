@@ -332,9 +332,12 @@ func buildEigenDAV2Backend(
 		switch retrieverType {
 		case common.RelayRetrieverType:
 			log.Info("Initializing relay payload retriever")
+			relayRegistryAddr, err := contractDirectory.GetContractAddress(ctx, directory.RelayRegistry)
+			if err != nil {
+				return nil, fmt.Errorf("get relay registry address: %w", err)
+			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1,
-				geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
+				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -482,16 +485,8 @@ func buildRelayPayloadRetriever(
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
-	eigenDADirectoryAddr geth_common.Address,
+	relayRegistryAddr geth_common.Address,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
-	contractDirectory, err := directory.NewContractDirectory(ctx, log, ethClient, eigenDADirectoryAddr)
-	if err != nil {
-		return nil, fmt.Errorf("new contract directory: %w", err)
-	}
-	relayRegistryAddr, err := contractDirectory.GetContractAddress(ctx, directory.RelayRegistry)
-	if err != nil {
-		return nil, fmt.Errorf("get relay registry address: %w", err)
-	}
 	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddr)
 	if err != nil {
 		return nil, fmt.Errorf("build relay client: %w", err)
