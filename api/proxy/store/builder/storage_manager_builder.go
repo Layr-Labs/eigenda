@@ -44,8 +44,6 @@ import (
 	geth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 )
 
 // BuildStoreManager is the main builder for proxy's store.
@@ -578,12 +576,11 @@ func buildPayloadDisperser(
 
 	accountId, err := signer.GetAccountID()
 	if err != nil {
-		return nil, fmt.Errorf("error getting account ID: %w", err)
+		return nil, fmt.Errorf("get account ID: %w", err)
 	}
 
-	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	// The accountant is populated lazily by disperserClient.PopulateAccountant
-	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+	accountant := clients_v2.NewUnpopulatedAccountant(accountId, registry)
 
 	disperserClient, err := clients_v2.NewDisperserClient(
 		&clientConfigV2.DisperserClientCfg,

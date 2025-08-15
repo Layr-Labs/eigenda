@@ -209,11 +209,18 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 		UseSecureGrpcFlag: true,
 	}
 
+	accountID, err := signer.GetAccountID()
+	if err != nil {
+		return nil, fmt.Errorf("get account ID: %w", err)
+	}
+
+	accountant := clients.NewUnpopulatedAccountant(accountID, nil)
+
 	return clients.NewDisperserClient(
 		disperserClientConfig,
 		signer,
 		kzgProver,
-		nil)
+		accountant)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
