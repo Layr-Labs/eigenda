@@ -111,10 +111,7 @@ func discoverAddresses(ctx *cli.Context) error {
 
 	directoryAddr := ctx.String(discoverAddressFlag.Name)
 	if directoryAddr == "" {
-		directoryAddr, err = network.GetEigenDADirectory()
-		if err != nil {
-			return fmt.Errorf("GetEigenDADirectory: %w", err)
-		}
+		directoryAddr = network.GetEigenDADirectory()
 		logger.Printf("No explicit directory address provided, auto-detected EigenDADirectory address %s for network %s", directoryAddr, network)
 	}
 
