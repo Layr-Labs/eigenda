@@ -590,6 +590,7 @@ func buildPayloadDisperser(
 		signer,
 		kzgProver,
 		accountant,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
