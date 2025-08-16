@@ -68,6 +68,6 @@ interface IEigenDAEjectionManager {
     /// @notice Returns the delay for ejection processes.
     function ejectionDelay() external view returns (uint64);
 
-    /// @notice Returns the cooldown for ejection processes.
+    /// @notice Returns the cooldown for ejection initiations per operator.
     function ejectionCooldown() external view returns (uint64);
 }

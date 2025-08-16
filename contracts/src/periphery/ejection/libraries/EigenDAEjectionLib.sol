@@ -67,6 +67,7 @@ library EigenDAEjectionLib {
     }
 
     /// @notice Helper function to clear an ejection.
+    /// @dev The lastProceedingInitiated field is not cleared to allow cooldown enforcement.
     function deleteEjection(address operator) internal {
         EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
         operatorParams.ejector = address(0);
