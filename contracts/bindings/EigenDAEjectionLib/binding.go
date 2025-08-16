@@ -31,7 +31,7 @@ var (
 
 // ContractEigenDAEjectionLibMetaData contains all meta data concerning the ContractEigenDAEjectionLib contract.
 var ContractEigenDAEjectionLibMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"event\",\"name\":\"CooldownSet\",\"inputs\":[{\"name\":\"cooldown\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DelaySet\",\"inputs\":[{\"name\":\"delay\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionCancelled\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionCompleted\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionStarted\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"timestampStarted\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"ejectionTime\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false}]",
+	ABI: "[{\"type\":\"event\",\"name\":\"CooldownSet\",\"inputs\":[{\"name\":\"cooldown\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DelaySet\",\"inputs\":[{\"name\":\"delay\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionCancelled\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionCompleted\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectionStarted\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"ejector\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"quorums\",\"type\":\"bytes\",\"indexed\":false,\"internalType\":\"bytes\"},{\"name\":\"timestampStarted\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"ejectionTime\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false}]",
 }
 
 // ContractEigenDAEjectionLibABI is the input ABI used to generate the binding from.
@@ -787,15 +787,16 @@ func (it *ContractEigenDAEjectionLibEjectionStartedIterator) Close() error {
 // ContractEigenDAEjectionLibEjectionStarted represents a EjectionStarted event raised by the ContractEigenDAEjectionLib contract.
 type ContractEigenDAEjectionLibEjectionStarted struct {
 	Operator         common.Address
+	Ejector          common.Address
 	Quorums          []byte
 	TimestampStarted uint64
 	EjectionTime     uint64
 	Raw              types.Log // Blockchain specific contextual infos
 }
 
-// FilterEjectionStarted is a free log retrieval operation binding the contract event 0xca0b1f475104769e928fe6cb95b114ff6aded77892f03b9c9201f8e18c6510de.
+// FilterEjectionStarted is a free log retrieval operation binding the contract event 0xf81744f456468442cad62491a80bc967658850c1c91d4623d4c68e3df6b8721d.
 //
-// Solidity: event EjectionStarted(address operator, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
+// Solidity: event EjectionStarted(address operator, address ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
 func (_ContractEigenDAEjectionLib *ContractEigenDAEjectionLibFilterer) FilterEjectionStarted(opts *bind.FilterOpts) (*ContractEigenDAEjectionLibEjectionStartedIterator, error) {
 
 	logs, sub, err := _ContractEigenDAEjectionLib.contract.FilterLogs(opts, "EjectionStarted")
@@ -805,9 +806,9 @@ func (_ContractEigenDAEjectionLib *ContractEigenDAEjectionLibFilterer) FilterEje
 	return &ContractEigenDAEjectionLibEjectionStartedIterator{contract: _ContractEigenDAEjectionLib.contract, event: "EjectionStarted", logs: logs, sub: sub}, nil
 }
 
-// WatchEjectionStarted is a free log subscription operation binding the contract event 0xca0b1f475104769e928fe6cb95b114ff6aded77892f03b9c9201f8e18c6510de.
+// WatchEjectionStarted is a free log subscription operation binding the contract event 0xf81744f456468442cad62491a80bc967658850c1c91d4623d4c68e3df6b8721d.
 //
-// Solidity: event EjectionStarted(address operator, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
+// Solidity: event EjectionStarted(address operator, address ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
 func (_ContractEigenDAEjectionLib *ContractEigenDAEjectionLibFilterer) WatchEjectionStarted(opts *bind.WatchOpts, sink chan<- *ContractEigenDAEjectionLibEjectionStarted) (event.Subscription, error) {
 
 	logs, sub, err := _ContractEigenDAEjectionLib.contract.WatchLogs(opts, "EjectionStarted")
@@ -842,9 +843,9 @@ func (_ContractEigenDAEjectionLib *ContractEigenDAEjectionLibFilterer) WatchEjec
 	}), nil
 }
 
-// ParseEjectionStarted is a log parse operation binding the contract event 0xca0b1f475104769e928fe6cb95b114ff6aded77892f03b9c9201f8e18c6510de.
+// ParseEjectionStarted is a log parse operation binding the contract event 0xf81744f456468442cad62491a80bc967658850c1c91d4623d4c68e3df6b8721d.
 //
-// Solidity: event EjectionStarted(address operator, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
+// Solidity: event EjectionStarted(address operator, address ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime)
 func (_ContractEigenDAEjectionLib *ContractEigenDAEjectionLibFilterer) ParseEjectionStarted(log types.Log) (*ContractEigenDAEjectionLibEjectionStarted, error) {
 	event := new(ContractEigenDAEjectionLibEjectionStarted)
 	if err := _ContractEigenDAEjectionLib.contract.UnpackLog(event, "EjectionStarted", log); err != nil {

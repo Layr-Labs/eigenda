@@ -51,7 +51,7 @@ contracts="PaymentVault \
   IEigenDARelayRegistry \
   EigenDADisperserRegistry \
   IEigenDADirectory \
-  EigenDAEjectionManager \
+  IEigenDAEjectionManager \
   EigenDAEjectionLib"
 
 for contract in $contracts; do

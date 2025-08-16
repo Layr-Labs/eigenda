@@ -58,6 +58,7 @@ contract EigenDAEjectionManagerTest is Test {
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
             ejectee,
+            caller,
             "0x", // quorums (empty for this test)
             uint64(block.timestamp),
             uint64(block.timestamp + ejectionManager.ejectionDelay())
@@ -65,7 +66,7 @@ contract EigenDAEjectionManagerTest is Test {
 
         ejectionManager.startEjection(ejectee, "0x");
         vm.stopPrank();
-        assertTrue(ejectionManager.ejectionInitiated(ejectee));
+        assertEq(ejectionManager.getEjector(ejectee), caller);
         assertEq(ejectionManager.ejectionTime(ejectee), block.timestamp + ejectionManager.ejectionDelay());
         assertEq(ejectionManager.lastEjectionInitiated(ejectee), block.timestamp);
     }

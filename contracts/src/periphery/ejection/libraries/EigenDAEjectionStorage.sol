@@ -10,6 +10,7 @@ library EigenDAEjectionStorage {
 
     struct Layout {
         mapping(address => EigenDAEjectionTypes.EjectionParams) ejectionParams;
+        mapping(address => uint256) ejectorBalance;
         uint64 delay;
         uint64 cooldown;
     }
