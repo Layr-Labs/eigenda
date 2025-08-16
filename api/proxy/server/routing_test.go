@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -22,7 +23,7 @@ func TestRouting(t *testing.T) {
 	defer ctrl.Finish()
 	mockRouter := mocks.NewMockIManager(ctrl)
 
-	m := metrics.NewMetrics("default")
+	m := metrics.NewMetrics(prometheus.NewRegistry())
 	server := NewServer(testCfg, mockRouter, testLogger, m)
 	r := mux.NewRouter()
 	err := server.Start(r)

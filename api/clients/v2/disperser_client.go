@@ -107,11 +107,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	if c.accountant == nil {
-		accountId, err := c.signer.GetAccountID()
-		if err != nil {
-			return fmt.Errorf("error getting account ID: %w", err)
-		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		return fmt.Errorf("accountant is nil")
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
@@ -407,12 +403,10 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
 	var initErr error
 	c.initOnceAccountant.Do(func() {
-		if c.accountant == nil {
-			err := c.PopulateAccountant(ctx)
-			if err != nil {
-				initErr = err
-				return
-			}
+		err := c.PopulateAccountant(ctx)
+		if err != nil {
+			initErr = err
+			return
 		}
 	})
 	if initErr != nil {
