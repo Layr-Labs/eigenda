@@ -6,7 +6,7 @@ Sequencer rollup node component responsible for constructing and submitting to t
 
 ## Rollup Nodes
 
-Refers to any rollup node (e,g, validator, verifier) which syncs current chain state through an onchain sequencer inbox.
+Refers to any rollup node (e,g, validator, verifier) which syncs current chain state through an on-chain sequencer inbox.
 
 ## EigenDA Proxy
 
