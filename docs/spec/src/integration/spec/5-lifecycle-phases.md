@@ -29,7 +29,7 @@ Secure interaction between a rollup and EigenDA is composed of three distinct sy
 
 6. Once confirmation thresholds are fulfilled, *[EigenDA Client](../../glossary.md#eigenda-client)* calls the `verifier`'s `certVersion()` method to get the `cert_version` and casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use. ([ref](#blobstatusreply-→-cert))
 
-7. *[EigenDA Client](../../glossary.md#eigenda-client)* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
+7. *[EigenDA Client](../../glossary.md#eigenda-client)* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs on-chain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
 
 8. Using the `verification_status_code`, *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
 
