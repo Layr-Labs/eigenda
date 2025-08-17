@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -149,10 +150,14 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(
+	gs := grpc.NewServer(opt, keepAliveConfig,
 		grpc.ChainUnaryInterceptor(
 			s.metrics.grpcMetrics.UnaryServerInterceptor(),
-		), opt, keepAliveConfig)
+			// Recovery handler will recover from panics and return a grpc INTERNAL error to the client.
+			// Should be kept last in the chain (meaning installed as inner most middleware) so that
+			// other middlewares (e.g. logging) can operate on the recovered state instead of being skipped.
+			grpc_recovery.UnaryServerInterceptor(),
+		))
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 

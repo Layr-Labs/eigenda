@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	retrieverv2 "github.com/Layr-Labs/eigenda/retriever/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -63,9 +64,14 @@ func RetrieverMain(ctx *cli.Context) error {
 	gs := grpc.NewServer(
 		opt,
 		grpc.ChainUnaryInterceptor(
-		// TODO(ian-shim): Add interceptors
-		// correlation.UnaryServerInterceptor(),
-		// logger.UnaryServerInterceptor(*s.logger.Logger),
+			// TODO(ian-shim): Add interceptors
+			// correlation.UnaryServerInterceptor(),
+			// logger.UnaryServerInterceptor(*s.logger.Logger),
+
+			// Recovery handler will recover from panics and return a grpc INTERNAL error to the client.
+			// Should be kept last in the chain (meaning installed as inner most middleware) so that
+			// other middlewares (e.g. logging) can operate on the recovered state instead of being skipped.
+			grpc_recovery.UnaryServerInterceptor(),
 		),
 	)
 

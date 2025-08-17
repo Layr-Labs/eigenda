@@ -20,9 +20,9 @@ import (
 const namespace = "eigenda_relay"
 
 type RelayMetrics struct {
-	logger           logging.Logger
-	grpcServerOption grpc.ServerOption
-	server           *http.Server
+	logger      logging.Logger
+	grpcMetrics *grpcprom.ServerMetrics
+	server      *http.Server
 
 	// Cache metrics
 	MetadataCacheMetrics *cache.CacheAccessorMetrics
@@ -71,9 +71,6 @@ func NewRelayMetrics(registry *prometheus.Registry, logger logging.Logger, port 
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
-	grpcServerOption := grpc.UnaryInterceptor(
-		grpcMetrics.UnaryServerInterceptor(),
-	)
 
 	metadataCacheMetrics := cache.NewCacheAccessorMetrics(registry, "metadata")
 	chunkCacheMetrics := cache.NewCacheAccessorMetrics(registry, "chunk")
@@ -225,7 +222,7 @@ func NewRelayMetrics(registry *prometheus.Registry, logger logging.Logger, port 
 
 	return &RelayMetrics{
 		logger:                         logger,
-		grpcServerOption:               grpcServerOption,
+		grpcMetrics:                    grpcMetrics,
 		server:                         server,
 		MetadataCacheMetrics:           metadataCacheMetrics,
 		ChunkCacheMetrics:              chunkCacheMetrics,
@@ -263,9 +260,9 @@ func (m *RelayMetrics) Stop() error {
 	return m.server.Close()
 }
 
-// GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
-func (m *RelayMetrics) GetGRPCServerOption() grpc.ServerOption {
-	return m.grpcServerOption
+// GetGRPCServerInterceptor returns the gRPC server interceptor that enables automatic GRPC metrics collection.
+func (m *RelayMetrics) GetGRPCServerInterceptor() grpc.UnaryServerInterceptor {
+	return m.grpcMetrics.UnaryServerInterceptor()
 }
 
 func (m *RelayMetrics) ReportChunkLatency(duration time.Duration) {

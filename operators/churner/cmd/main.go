@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/operators/churner/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -55,7 +56,12 @@ func run(ctx *cli.Context) error {
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300)
 	gs := grpc.NewServer(
 		opt,
-		grpc.ChainUnaryInterceptor(),
+		grpc.ChainUnaryInterceptor(
+			// Recovery handler will recover from panics and return a grpc INTERNAL error to the client.
+			// Should be kept last in the chain (meaning installed as inner most middleware) so that
+			// other middlewares (e.g. logging) can operate on the recovered state instead of being skipped.
+			grpc_recovery.UnaryServerInterceptor(),
+		),
 	)
 
 	config, err := churner.NewConfig(ctx)
