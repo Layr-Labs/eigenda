@@ -32,7 +32,7 @@ Both parts compile into a single MIPS‑ELF. Cannon runs it whenever a challenge
 | Execution step     | Logic              | The MIPS instructions are implemented in the smart contract to re-execute any processing logic (e.g., any incorrect execution when converting an encoded payload to a rollup payload)|
 | Preimage lookup   | Data               | Requires correct key–value pair on L1 Preimage Oracle contract|
 
-When the disputed instruction is a preimage lookup, the player must first submit the correct key-value pair to preimage oracle contract, and then resolve the final instruction. The Preimage Oracle will disregard any submitted value if the required key-value pair relation does not hold. If a party fails to provide a valid preimage before its timer expires, that party forfeits the game.
+When the disputed instruction is a preimage lookup, the player must first submit the correct key-value pair to the preimage oracle contract, and then resolve the final instruction. The Preimage Oracle will disregard any submitted value if the required key-value pair relation does not hold. If a party fails to provide a valid preimage before its timer expires, that party forfeits the game.
 
 ---
 
