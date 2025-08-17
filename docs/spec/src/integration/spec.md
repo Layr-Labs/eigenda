@@ -10,7 +10,7 @@ The [EigenDA V2](https://docs.eigenda.xyz/releases/v2) release documentation des
 
 # Diagrams
 
-We will refer to the below diagrams throughout the spec.
+We will refer to the diagrams below throughout the spec.
 
 ### High Level Diagram
 
