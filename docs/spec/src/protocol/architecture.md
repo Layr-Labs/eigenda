@@ -11,7 +11,7 @@
 
 ## Essential flows
 
-**Dispersal**. The is the flow by which data is made available and consists of the following steps:
+**Dispersal**. This is the flow by which data is made available and consists of the following steps:
 1. The Disperser receives a collection of blobs, [encodes them], constructs a batch of encoded blobs and headers, and sends the sharded batch to the DA nodes.
 2. The DA nodes validate their shares of the batch, and return an attestation consisting of a BLS signature of the batch header. 
 3. The disperser collects the attestations from the DA nodes and aggregates them into a single aggregate attestation. 
