@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -17,10 +16,14 @@ var (
 
 type AccountantMetricer interface {
 	RecordCumulativePayment(accountID string, wei *big.Int)
+
+	Document() []DocumentedMetric
 }
 
 type AccountantMetrics struct {
 	CumulativePayment *prometheus.GaugeVec
+
+	factory Factory
 }
 
 func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
@@ -28,8 +31,10 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 		return &noopAccountantMetricer{}
 	}
 
+	factory := With(registry)
+
 	return &AccountantMetrics{
-		CumulativePayment: promauto.With(registry).NewGaugeVec(prometheus.GaugeOpts{
+		CumulativePayment: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "cumulative_payment",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
@@ -37,6 +42,7 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 		}, []string{
 			"account_id",
 		}),
+		factory: factory,
 	}
 }
 
@@ -50,10 +56,18 @@ func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.I
 	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
+func (m *AccountantMetrics) Document() []DocumentedMetric {
+	return m.factory.Document()
+}
+
 type noopAccountantMetricer struct {
 }
 
 var NoopAccountantMetrics AccountantMetricer = new(noopAccountantMetricer)
 
 func (n *noopAccountantMetricer) RecordCumulativePayment(_ string, _ *big.Int) {
+}
+
+func (n *noopAccountantMetricer) Document() []DocumentedMetric {
+	return []DocumentedMetric{}
 }

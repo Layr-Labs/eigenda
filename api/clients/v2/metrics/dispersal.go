@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -12,11 +11,15 @@ const (
 type DispersalMetricer interface {
 	RecordBlobSize(size uint)
 	RecordSymbolLength(length uint)
+
+	Document() []DocumentedMetric
 }
 
 type DispersalMetrics struct {
 	BlobSize     *prometheus.HistogramVec
 	SymbolLength *prometheus.HistogramVec
+
+	factory Factory
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
@@ -24,6 +27,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 		return NoopDispersalMetrics
 	}
 
+	factory := With(registry)
 	// Define size buckets for payload and blob size measurements
 	// Starting from 1KB up to 16MB with exponential growth
 	sizeBuckets := []float64{
@@ -38,20 +42,21 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 
 	return &DispersalMetrics{
-		BlobSize: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
+		BlobSize: factory.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "blob_size_bytes",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
 			Buckets:   sizeBuckets,
 		}, []string{}),
-		SymbolLength: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
+		SymbolLength: factory.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "blob_size_symbols",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in symbols",
 			Buckets:   sizeBuckets,
 		}, []string{}),
+		factory: factory,
 	}
 }
 
@@ -63,6 +68,10 @@ func (m *DispersalMetrics) RecordSymbolLength(length uint) {
 	m.SymbolLength.WithLabelValues().Observe(float64(length))
 }
 
+func (m *DispersalMetrics) Document() []DocumentedMetric {
+	return m.factory.Document()
+}
+
 type noopDispersalMetricer struct {
 }
 
@@ -72,4 +81,8 @@ func (n *noopDispersalMetricer) RecordBlobSize(_ uint) {
 }
 
 func (n *noopDispersalMetricer) RecordSymbolLength(_ uint) {
+}
+
+func (n *noopDispersalMetricer) Document() []DocumentedMetric {
+	return []DocumentedMetric{}
 }
