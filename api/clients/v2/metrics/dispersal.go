@@ -25,21 +25,22 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 
 	// Define size buckets for payload and blob size measurements
-	// Starting from 1KB up to 16MB with exponential growth
+	// Starting from 0 up to 16MiB
 	sizeBuckets := []float64{
-		1024,     // 1KB
-		4096,     // 4KB
-		16384,    // 16KB
-		65536,    // 64KB
-		262144,   // 256KB
-		1048576,  // 1MB
-		4194304,  // 4MB
-		16777216, // 16MB
+		0,
+		131072,   // 128KiB
+		262144,   // 256KiB
+		524288,   // 512KiB
+		1048576,  // 1MiB
+		2097152,  // 2MiB
+		4194304,  // 4MiB
+		8388608,  // 8MiB
+		16777216, // 16MiB
 	}
 
 	return &DispersalMetrics{
 		BlobSize: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "blob_size_bytes",
+			Name:      "blob_size",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
