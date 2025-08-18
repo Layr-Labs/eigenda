@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )

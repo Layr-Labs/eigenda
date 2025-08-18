@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"

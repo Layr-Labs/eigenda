@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -12,14 +13,14 @@ type DispersalMetricer interface {
 	RecordBlobSize(size uint)
 	RecordSymbolLength(length uint)
 
-	Document() []DocumentedMetric
+	Document() []metrics.DocumentedMetric
 }
 
 type DispersalMetrics struct {
 	BlobSize     *prometheus.HistogramVec
 	SymbolLength *prometheus.HistogramVec
 
-	factory *Documentor
+	factory *metrics.Documentor
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
@@ -27,7 +28,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 		return NoopDispersalMetrics
 	}
 
-	factory := With(registry)
+	factory := metrics.With(registry)
 	// Define size buckets for payload and blob size measurements
 	// Starting from 1KB up to 16MB with exponential growth
 	sizeBuckets := []float64{
@@ -68,7 +69,7 @@ func (m *DispersalMetrics) RecordSymbolLength(length uint) {
 	m.SymbolLength.WithLabelValues().Observe(float64(length))
 }
 
-func (m *DispersalMetrics) Document() []DocumentedMetric {
+func (m *DispersalMetrics) Document() []metrics.DocumentedMetric {
 	return m.factory.Document()
 }
 
@@ -83,6 +84,6 @@ func (n *noopDispersalMetricer) RecordBlobSize(_ uint) {
 func (n *noopDispersalMetricer) RecordSymbolLength(_ uint) {
 }
 
-func (n *noopDispersalMetricer) Document() []DocumentedMetric {
-	return []DocumentedMetric{}
+func (n *noopDispersalMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }
