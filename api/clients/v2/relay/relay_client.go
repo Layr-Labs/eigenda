@@ -29,7 +29,7 @@ type RelayClientConfig struct {
 	OperatorID         *core.OperatorID
 	MessageSigner      MessageSigner
 	// The number of parallel connections open to each relay.
-	ConnectionPoolSize uint // TODO make sure this is configured with flags
+	ConnectionPoolSize uint
 }
 
 type ChunkRequestByRange struct {

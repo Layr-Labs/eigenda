@@ -100,7 +100,7 @@ type Node struct {
 	QuorumCount atomic.Uint32
 
 	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
-	storeChunksSemaphore *semaphore.Weighted
+	StoreChunksSemaphore *semaphore.Weighted
 }
 
 // NewNode creates a new Node with the provided config.
@@ -286,7 +286,7 @@ func NewNode(
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
-		storeChunksSemaphore:    storeChunksSemaphore,
+		StoreChunksSemaphore:    storeChunksSemaphore,
 	}
 
 	if !config.EnableV2 {

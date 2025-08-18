@@ -79,7 +79,7 @@ func NewPayloadDisperser(
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	// payload is the raw data to be stored on eigenDA
-	payload *coretypes.Payload,
+	payload coretypes.Payload,
 ) (coretypes.EigenDACert, error) {
 
 	probe := pd.stageTimer.NewSequence()
@@ -100,7 +100,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	// NOTE: there is a synchronization edge case where the disperser accredits a RBN that correlates
 	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in
-	//       in potentially a few failed dispersals until the RBN advances; guaranteeing eventually consistency.
+	//       potentially a few failed dispersals until the RBN advances; guaranteeing eventual consistency.
 	//       This is a known issue and will be addressed with future enhancements.
 	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
 	if err != nil {

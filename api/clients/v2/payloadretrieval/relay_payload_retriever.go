@@ -66,7 +66,7 @@ func NewRelayPayloadRetriever(
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert coretypes.RetrievableEigenDACert,
-) (*coretypes.Payload, error) {
+) (coretypes.Payload, error) {
 
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
 	if err != nil {
@@ -155,16 +155,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 			continue
 		}
 
-		encodedPayload, err := blob.ToEncodedPayload(pr.config.PayloadPolynomialForm)
-		if err != nil {
-			// TODO(samlaf): ToEncodedPayload is doing too much decoding. It shouldn't read and validate the payload header.
-			// That needs to be left to the rollup's derivation pipeline, such that a failed decoding can be skipped safely.
-			// A lot of the logic in blob->encodedPayload prob needs to happen in encodedPayload->payload instead.
-			return nil, fmt.Errorf("convert blob to encoded payload failed."+
-				" blobKey: %s, relayKey: %v, error: %v", blobKey.Hex(), relayKey, err)
-		}
-
-		return encodedPayload, nil
+		return blob.ToEncodedPayloadUnchecked(pr.config.PayloadPolynomialForm), nil
 	}
 
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
@@ -174,7 +165,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
-	blobKey *core.BlobKey,
+	blobKey core.BlobKey,
 	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
 	blobLengthSymbols uint32,
 ) (*coretypes.Blob, error) {
@@ -183,7 +174,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	defer cancel()
 
 	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
-	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
+	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 	if err != nil {
 		return nil, fmt.Errorf("get blob from relay: %w", err)
 	}

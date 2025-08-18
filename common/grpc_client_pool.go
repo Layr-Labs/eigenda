@@ -8,8 +8,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// TODO unit test this
-
 // A function that builds a gRPC client of type T.
 type GRPCClientBuilder[T any] func(grpc.ClientConnInterface) T
 
