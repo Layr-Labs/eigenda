@@ -159,7 +159,7 @@ func (m *batchMetadataManager) updateMetadata() error {
 	}
 
 	previousMetadata := m.metadata.Load()
-	if previousMetadata == nil || referenceBlockNumber < previousMetadata.referenceBlockNumber {
+	if previousMetadata != nil && referenceBlockNumber < previousMetadata.referenceBlockNumber {
 		// Only update if the new RBN is greater than the most recent one.
 		return nil
 	}
