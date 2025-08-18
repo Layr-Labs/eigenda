@@ -26,17 +26,25 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     address internal immutable _depositToken;
     uint256 internal immutable _depositAmount;
     address internal immutable _addressDirectory;
-    uint256 internal immutable _estimatedGasUsed;
+    uint256 internal immutable _estimatedGasUsedWithoutSig;
+    uint256 internal immutable _estimatedGasUsedWithSig;
 
     bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
         "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
     );
 
-    constructor(address depositToken_, uint256 depositAmount_, address addressDirectory_, uint256 estimatedGasUsed_) {
+    constructor(
+        address depositToken_,
+        uint256 depositAmount_,
+        address addressDirectory_,
+        uint256 estimatedGasUsedWithoutSig_,
+        uint256 estimatedGasUsedWithSig_
+    ) {
         _depositToken = depositToken_;
         _depositAmount = depositAmount_;
         _addressDirectory = addressDirectory_;
-        _estimatedGasUsed = estimatedGasUsed_;
+        _estimatedGasUsedWithoutSig = estimatedGasUsedWithoutSig_;
+        _estimatedGasUsedWithSig = estimatedGasUsedWithSig_;
     }
 
     modifier onlyOwner(address sender) {
@@ -110,13 +118,13 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
-        _refundGas(recipient);
+        _refundGas(recipient, _estimatedGasUsedWithSig);
     }
 
     /// @inheritdoc IEigenDAEjectionManager
     function cancelEjection() external {
         msg.sender.cancelEjection();
-        _refundGas(msg.sender);
+        _refundGas(msg.sender, _estimatedGasUsedWithoutSig);
     }
 
     /// GETTERS
@@ -176,7 +184,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         uint96[] memory weights1 = _getOperatorWeights(operator1, quorumNumbers);
         uint96[] memory weights2 = _getOperatorWeights(operator2, quorumNumbers);
 
-        for (uint256 i = 0; i < weights1.length; i++) {
+        for (uint256 i; i < weights1.length; i++) {
             if (weights1[i] <= weights2[i]) {
                 return false;
             }
@@ -199,8 +207,8 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         }
     }
 
-    function _refundGas(address receiver) internal virtual {
-        uint256 estimatedRefund = _estimatedGasUsed * block.basefee;
+    function _refundGas(address receiver, uint256 estimatedGasUsed) internal virtual {
+        uint256 estimatedRefund = estimatedGasUsed * block.basefee;
         IERC20(_depositToken).safeTransfer(
             receiver, estimatedRefund > _depositAmount ? _depositAmount : estimatedRefund
         );
