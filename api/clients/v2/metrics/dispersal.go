@@ -10,13 +10,11 @@ const (
 )
 
 type DispersalMetricer interface {
-	RecordBlobSize(size uint)
-	RecordSymbolLength(length uint)
+	RecordBlobSizeBytes(size uint)
 }
 
 type DispersalMetrics struct {
-	BlobSize     *prometheus.HistogramVec
-	SymbolLength *prometheus.HistogramVec
+	BlobSize *prometheus.HistogramVec
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
@@ -40,28 +38,17 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 
 	return &DispersalMetrics{
 		BlobSize: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "blob_size",
+			Name:      "blob_size_bytes",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
 			Buckets:   sizeBuckets,
 		}, []string{}),
-		SymbolLength: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "blob_size_symbols",
-			Namespace: namespace,
-			Subsystem: dispersalSubsystem,
-			Help:      "Size of blobs created from payloads in symbols",
-			Buckets:   sizeBuckets,
-		}, []string{}),
 	}
 }
 
-func (m *DispersalMetrics) RecordBlobSize(size uint) {
+func (m *DispersalMetrics) RecordBlobSizeBytes(size uint) {
 	m.BlobSize.WithLabelValues().Observe(float64(size))
-}
-
-func (m *DispersalMetrics) RecordSymbolLength(length uint) {
-	m.SymbolLength.WithLabelValues().Observe(float64(length))
 }
 
 type noopDispersalMetricer struct {
@@ -69,8 +56,5 @@ type noopDispersalMetricer struct {
 
 var NoopDispersalMetrics DispersalMetricer = new(noopDispersalMetricer)
 
-func (n *noopDispersalMetricer) RecordBlobSize(_ uint) {
-}
-
-func (n *noopDispersalMetricer) RecordSymbolLength(_ uint) {
+func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ uint) {
 }
