@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -45,8 +44,6 @@ type OnDemandLedger struct {
 	pricePerSymbol *big.Int
 	// minimum number of symbols to bill
 	minNumSymbols *big.Int
-	// synchronizes access to the cumulative payment store
-	lock sync.Mutex
 	// stores the cumulative payment for this ledger in wei
 	cumulativePaymentStore CumulativePaymentStore
 }
@@ -119,26 +116,9 @@ func (odl *OnDemandLedger) Debit(
 
 	blobCost := odl.computeCost(symbolCount)
 
-	odl.lock.Lock()
-	defer odl.lock.Unlock()
-
-	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
+	newCumulativePayment, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
 	if err != nil {
-		return nil, fmt.Errorf("get cumulative payment: %w", err)
-	}
-
-	newCumulativePayment := new(big.Int).Add(currentCumulativePayment, blobCost)
-
-	if newCumulativePayment.Cmp(odl.totalDeposits) > 0 {
-		return nil, &InsufficientFundsError{
-			CurrentCumulativePayment: currentCumulativePayment,
-			TotalDeposits:            odl.totalDeposits,
-			BlobCost:                 blobCost,
-		}
-	}
-
-	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
-		return nil, fmt.Errorf("set cumulative payment: %w", err)
+		return nil, fmt.Errorf("add cumulative payment: %w", err)
 	}
 
 	return newCumulativePayment, nil
@@ -146,31 +126,20 @@ func (odl *OnDemandLedger) Debit(
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
 //
-// Note: this method will only succeed if the underlying CumulativePaymentStore supports decrementing the
+// Note: this method will only succeed if the underlying CumulativePaymentStore supports subtracting from the
 // cumulative payment.
 func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
 	if symbolCount == 0 {
 		return errors.New("symbolCount must be > 0")
 	}
 
+	// Use AddCumulativePayment with a negative value
 	blobCost := odl.computeCost(symbolCount)
+	blobCost.Neg(blobCost)
 
-	odl.lock.Lock()
-	defer odl.lock.Unlock()
-
-	currentCumulativePayment, err := odl.cumulativePaymentStore.GetCumulativePayment(ctx)
+	_, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
 	if err != nil {
-		return fmt.Errorf("get cumulative payment: %w", err)
-	}
-
-	newCumulativePayment := new(big.Int).Sub(currentCumulativePayment, blobCost)
-
-	if newCumulativePayment.Sign() < 0 {
-		return fmt.Errorf("cannot revert debit: would result in negative cumulative payment")
-	}
-
-	if err := odl.cumulativePaymentStore.SetCumulativePayment(ctx, newCumulativePayment); err != nil {
-		return fmt.Errorf("set cumulative payment: %w", err)
+		return fmt.Errorf("add cumulative payment: %w", err)
 	}
 
 	return nil

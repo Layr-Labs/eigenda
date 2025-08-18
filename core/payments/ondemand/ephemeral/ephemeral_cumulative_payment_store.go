@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 )
@@ -12,10 +13,10 @@ import (
 //
 // This struct supports decrementing cumulative payments.
 //
-// NOTE: This struct doesn't do any synchronization! The caller is responsible for making sure that only one goroutine
-// is using it at a time.
+// As specified by the interface contract, this struct is goroutine safe
 type EphemeralCumulativePaymentStore struct {
 	cumulativePayment *big.Int
+	lock              sync.Mutex
 }
 
 var _ ondemand.CumulativePaymentStore = (*EphemeralCumulativePaymentStore)(nil)
@@ -27,19 +28,42 @@ func NewEphemeralCumulativePaymentStore() *EphemeralCumulativePaymentStore {
 	}
 }
 
-// Gets the stored cumulative payment in wei
-func (e *EphemeralCumulativePaymentStore) GetCumulativePayment(_ context.Context) (*big.Int, error) {
-	return new(big.Int).Set(e.cumulativePayment), nil
-}
+// Atomically increments the cumulative payment by the given amount.
+func (e *EphemeralCumulativePaymentStore) AddCumulativePayment(
+	_ context.Context,
+	amount *big.Int,
+	maxCumulativePayment *big.Int,
+) (*big.Int, error) {
+	if amount == nil {
+		panic("amount cannot be nil")
+	}
+	if maxCumulativePayment == nil {
+		panic("maxCumulativePayment cannot be nil")
+	}
+	if maxCumulativePayment.Sign() < 0 {
+		panic(fmt.Sprintf("maxCumulativePayment cannot be negative: received %s", maxCumulativePayment.String()))
+	}
 
-// Sets the cumulative payment in wei, overwriting the previous value
-func (e *EphemeralCumulativePaymentStore) SetCumulativePayment(_ context.Context, newCumulativePayment *big.Int) error {
-	if newCumulativePayment == nil {
-		return fmt.Errorf("newCumulativePayment cannot be nil")
-	}
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	newCumulativePayment := new(big.Int).Add(e.cumulativePayment, amount)
+
 	if newCumulativePayment.Sign() < 0 {
-		return fmt.Errorf("newCumulativePayment cannot be negative: %s", newCumulativePayment.String())
+		panic(fmt.Sprintf("operation would result in negative cumulative payment: current=%s, amount=%s",
+			e.cumulativePayment.String(), amount.String()))
 	}
+
+	if newCumulativePayment.Cmp(maxCumulativePayment) > 0 {
+		return nil, &ondemand.InsufficientFundsError{
+			CurrentCumulativePayment: e.cumulativePayment,
+			TotalDeposits:            maxCumulativePayment,
+			BlobCost:                 amount,
+		}
+	}
+
 	e.cumulativePayment.Set(newCumulativePayment)
-	return nil
+
+	// Return the copy we made, so the caller can't modify the internal cumulativePayment value
+	return newCumulativePayment, nil
 }

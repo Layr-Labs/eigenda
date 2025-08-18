@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,63 +14,105 @@ func TestNewStore(t *testing.T) {
 	store := NewEphemeralCumulativePaymentStore()
 	require.NotNil(t, store)
 	require.NotNil(t, store.cumulativePayment)
-	assert.Equal(t, big.NewInt(0), store.cumulativePayment)
+	require.Equal(t, big.NewInt(0), store.cumulativePayment)
 }
 
-func TestSetAndGet(t *testing.T) {
-	t.Run("basic", func(t *testing.T) {
+func TestAddCumulativePayment(t *testing.T) {
+	t.Run("addition", func(t *testing.T) {
 		store := NewEphemeralCumulativePaymentStore()
-
 		ctx := context.Background()
-		setValue := big.NewInt(500)
-		err := store.SetCumulativePayment(ctx, setValue)
-		require.NoError(t, err)
-		value, err := store.GetCumulativePayment(ctx)
-		require.NoError(t, err)
-		assert.Equal(t, setValue, value)
+		maxCumulativePayment := big.NewInt(1000)
 
-		setValue = big.NewInt(2000)
-		err = store.SetCumulativePayment(ctx, setValue)
+		newValue, err := store.AddCumulativePayment(ctx, big.NewInt(500), maxCumulativePayment)
 		require.NoError(t, err)
-		value, err = store.GetCumulativePayment(ctx)
+		require.Equal(t, big.NewInt(500), newValue)
+		require.Equal(t, big.NewInt(500), store.cumulativePayment)
+
+		newValue, err = store.AddCumulativePayment(ctx, big.NewInt(300), maxCumulativePayment)
 		require.NoError(t, err)
-		assert.Equal(t, setValue, value)
+		require.Equal(t, big.NewInt(800), newValue)
+		require.Equal(t, big.NewInt(800), store.cumulativePayment)
 	})
 
-	t.Run("make sure values are copies", func(t *testing.T) {
+	t.Run("subtraction", func(t *testing.T) {
 		store := NewEphemeralCumulativePaymentStore()
 		ctx := context.Background()
+		maxPayment := big.NewInt(1000)
 
-		original := big.NewInt(300)
-		err := store.SetCumulativePayment(ctx, original)
+		newValue, err := store.AddCumulativePayment(ctx, big.NewInt(500), maxPayment)
 		require.NoError(t, err)
+		require.Equal(t, big.NewInt(500), newValue)
 
-		original.Add(original, big.NewInt(100))
-
-		value, err := store.GetCumulativePayment(ctx)
+		newValue, err = store.AddCumulativePayment(ctx, big.NewInt(-200), maxPayment)
 		require.NoError(t, err)
-		assert.Equal(t, big.NewInt(300), value)
+		require.Equal(t, big.NewInt(300), newValue)
+		require.Equal(t, big.NewInt(300), store.cumulativePayment)
+	})
 
-		value.Add(value, big.NewInt(50))
-		value2, err := store.GetCumulativePayment(ctx)
+	t.Run("values are copies", func(t *testing.T) {
+		store := NewEphemeralCumulativePaymentStore()
+		ctx := context.Background()
+		maxCumulativePayment := big.NewInt(1000)
+
+		amount := big.NewInt(300)
+		newValue, err := store.AddCumulativePayment(ctx, amount, maxCumulativePayment)
 		require.NoError(t, err)
-		assert.Equal(t, big.NewInt(300), value2)
+		require.Equal(t, big.NewInt(300), newValue)
+
+		amount.Add(amount, big.NewInt(100))
+		require.Equal(t, big.NewInt(300), store.cumulativePayment)
+
+		newValue.Add(newValue, big.NewInt(50))
+		require.Equal(t, big.NewInt(300), store.cumulativePayment)
 	})
 }
 
-func TestSetCumulativePaymentErrorCases(t *testing.T) {
-	store := NewEphemeralCumulativePaymentStore()
-	ctx := context.Background()
+func TestAddCumulativePaymentErrorCases(t *testing.T) {
+	t.Run("input validation panics", func(t *testing.T) {
+		store := NewEphemeralCumulativePaymentStore()
+		ctx := context.Background()
 
-	err := store.SetCumulativePayment(ctx, nil)
-	require.Error(t, err)
+		assert.Panics(t, func() {
+			_, _ = store.AddCumulativePayment(ctx, nil, big.NewInt(1000))
+		})
 
-	err = store.SetCumulativePayment(ctx, big.NewInt(-100))
-	require.Error(t, err)
+		assert.Panics(t, func() {
+			_, _ = store.AddCumulativePayment(ctx, big.NewInt(100), nil)
+		})
 
-	err = store.SetCumulativePayment(ctx, big.NewInt(0))
-	require.NoError(t, err, "setting 0 should work")
+		assert.Panics(t, func() {
+			_, _ = store.AddCumulativePayment(ctx, big.NewInt(100), big.NewInt(-1000))
+		})
+	})
 
-	err = store.SetCumulativePayment(ctx, big.NewInt(1000))
-	require.NoError(t, err, "invalid sets shouldn't break anything")
+	t.Run("decrement below zero panics", func(t *testing.T) {
+		store := NewEphemeralCumulativePaymentStore()
+		ctx := context.Background()
+		maxPayment := big.NewInt(1000)
+
+		_, err := store.AddCumulativePayment(ctx, big.NewInt(500), maxPayment)
+		require.NoError(t, err)
+
+		assert.Panics(t, func() {
+			_, _ = store.AddCumulativePayment(ctx, big.NewInt(-600), maxPayment)
+		})
+	})
+
+	t.Run("exceeds max returns InsufficientFundsError", func(t *testing.T) {
+		store := NewEphemeralCumulativePaymentStore()
+		ctx := context.Background()
+		maxPayment := big.NewInt(400)
+
+		newValue, err := store.AddCumulativePayment(ctx, big.NewInt(500), maxPayment)
+		require.Error(t, err)
+		require.Nil(t, newValue)
+
+		var insufficientFundsErr *ondemand.InsufficientFundsError
+		require.ErrorAs(t, err, &insufficientFundsErr)
+		require.Equal(t, big.NewInt(0), insufficientFundsErr.CurrentCumulativePayment)
+		require.Equal(t, big.NewInt(400), insufficientFundsErr.TotalDeposits)
+		require.Equal(t, big.NewInt(500), insufficientFundsErr.BlobCost)
+
+		require.Equal(t, big.NewInt(0), store.cumulativePayment, "cumulative payment should not change on error")
+	})
 }
