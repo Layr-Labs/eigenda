@@ -163,6 +163,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
+			nil, // TODO: Add controller client initialization
 		)
 		if err != nil {
 			return err

@@ -138,6 +138,22 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
+	// TODO: Future migration - move payment authorization to controller
+	// This will enable centralized payment management across disperser instances
+	if false { // Enable when controller authorization is ready
+		if s.controllerClient != nil {
+			_, err := s.controllerClient.AuthorizePayment(ctx, &pb.AuthorizePaymentRequest{
+				BlobHeader: req.GetBlobHeader(),
+				Signature:  req.GetSignature(),
+			})
+			if err != nil {
+				return api.NewErrorResourceExhausted(fmt.Sprintf("payment authorization failed: %v", err))
+			}
+			return nil
+		}
+	}
+
+	// Existing payment meter logic remains unchanged
 	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())

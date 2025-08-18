@@ -63,6 +63,9 @@ type DispersalServerV2 struct {
 	// ReservedOnly mode doesn't support on-demand payments
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
+
+	// controllerClient is optional - used for payment authorization
+	controllerClient ControllerClient
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -80,6 +83,7 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
+	controllerClient ControllerClient, // Optional - pass nil if not using controller
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -108,6 +112,10 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
+	if controllerClient != nil {
+		logger.Info("Controller client provided, will use for payment authorization")
+	}
+
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
 		blobStore:         blobStore,
@@ -125,7 +133,8 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ReservedOnly: ReservedOnly,
+		ReservedOnly:     ReservedOnly,
+		controllerClient: controllerClient,
 	}, nil
 }
 

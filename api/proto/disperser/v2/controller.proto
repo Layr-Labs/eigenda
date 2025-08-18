@@ -1,0 +1,30 @@
+syntax = "proto3";
+package disperser.v2;
+
+import "common/v2/common_v2.proto";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
+
+// Controller defines the internal APIs for the disperser controller.
+service Controller {
+  // AuthorizePayment handles payment authorization for blob dispersal
+  rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentReply) {}
+}
+
+message AuthorizePaymentRequest {
+  // The header contains metadata about the blob including payment information
+  common.v2.BlobHeader blob_header = 1;
+  
+  // Signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id
+  // This is the same as the signature field in DisperseBlobRequest and BlobCertificate
+  bytes signature = 2;
+}
+
+message AuthorizePaymentReply {
+  // No fields needed - success is indicated by absence of error
+  // Errors are returned via gRPC's standard error mechanism
+  // Common error codes:
+  // - INVALID_ARGUMENT: Invalid request parameters (bad signature, invalid account, etc)
+  // - RESOURCE_EXHAUSTED: Payment insufficient or rate limit exceeded
+  // - INTERNAL: Internal server error
+}
