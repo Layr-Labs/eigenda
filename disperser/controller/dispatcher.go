@@ -20,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
@@ -89,13 +88,11 @@ type batchData struct {
 }
 
 func NewDispatcher(
-	ctx context.Context,
 	config *DispatcherConfig,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
-	ethClient bind.ContractBackend,
-	registryCoordinatorAddress gethcommon.Address,
+	batchMetadataManager metadata.BatchMetadataManager,
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
@@ -128,19 +125,6 @@ func NewDispatcher(
 	metrics, err := newDispatcherMetrics(registry, significantThresholds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
-	}
-
-	batchMetadataManager, err := metadata.NewBatchMetadataManager(
-		ctx,
-		logger,
-		ethClient,
-		chainState,
-		registryCoordinatorAddress,
-		time.Minute, // TODO config
-		config.FinalizationBlockDelay,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
 	return &Dispatcher{

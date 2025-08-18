@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -226,14 +227,25 @@ func RunController(ctx *cli.Context) error {
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
 
-	dispatcher, err := controller.NewDispatcher(
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
 		context.Background(),
+		logger,
+		gethClient,
+		ics,
+		registryCoordinatorAddress,
+		time.Minute, // TODO config
+		config.DispatcherConfig.FinalizationBlockDelay,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
+	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,
-		gethClient,
-		registryCoordinatorAddress,
+		batchMetadataManager,
 		sigAgg,
 		nodeClientManager,
 		logger,

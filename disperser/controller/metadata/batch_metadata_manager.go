@@ -14,17 +14,23 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// TODO future Cody: add a mock instance and get the unit tests passing
-
+// An object responsible for acquiring and providing batch metadata (i.e. operator state and reference block number)
+// for the creation of new batches.
 type BatchMetadataManager interface {
+
+	// GetMetadata returns the metadata required to create a new batch. Although the data will be updated periodically,
+	// this utility makes no guarantees about the freshness of the data returned by this method. Keeping up to date
+	// with the most recent onchain data is done on a best effort basis.
 	GetMetadata() *BatchMetadata
+
+	// Release resources associated with this manager.
+	Close()
 }
 
 var _ BatchMetadataManager = (*batchMetadataManager)(nil)
 
-// The BatchMetadataManager responsible for providing BatchMetadata for use in the creation of new batches.
-// This utility periodically downloads recent onchain date, so that new batches are created with recent
-// batch metadata.
+// A standard implementation of the BatchMetadataManager interface. Does all metadata fetching in a background\
+// goroutine, guaranteeing that GetMetadata() never blocks.
 type batchMetadataManager struct {
 	ctx    context.Context
 	logger logging.Logger
@@ -49,6 +55,8 @@ type batchMetadataManager struct {
 
 	// The most recent batch metadata.
 	metadata atomic.Pointer[BatchMetadata]
+
+	alive atomic.Bool
 }
 
 // Create a new BatchMetadataManager with the specified quorums.
@@ -80,6 +88,7 @@ func NewBatchMetadataManager(
 		referenceBlockOffset: referenceBlockOffset,
 		updatePeriod:         updatePeriod,
 	}
+	manager.alive.Store(true)
 
 	// Make sure we have valid metadata before the constructor returns.
 	err = manager.updateMetadata()
@@ -95,6 +104,11 @@ func NewBatchMetadataManager(
 // GetMetadata returns the most recent batch metadata. This method is thread safe.
 func (m *batchMetadataManager) GetMetadata() *BatchMetadata {
 	return m.metadata.Load()
+}
+
+// Close releases resources associated with this manager.
+func (m *batchMetadataManager) Close() {
+	m.alive.Store(false)
 }
 
 // Fetch the next reference block number (RBN) to use.
@@ -172,7 +186,7 @@ func (m *batchMetadataManager) updateLoop() {
 	ticker := time.NewTicker(m.updatePeriod)
 	defer ticker.Stop()
 
-	for m.ctx.Err() == nil {
+	for m.ctx.Err() == nil && m.alive.Load() {
 		<-ticker.C
 
 		err := m.updateMetadata()

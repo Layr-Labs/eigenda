@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -47,14 +48,15 @@ var (
 )
 
 type dispatcherComponents struct {
-	Dispatcher        *controller.Dispatcher
-	BlobMetadataStore *blobstore.BlobMetadataStore
-	Pool              common.WorkerPool
-	ChainReader       *coremock.MockWriter
-	ChainState        *coremock.ChainDataMock
-	SigAggregator     *core.StdSignatureAggregator
-	NodeClientManager *controller.MockClientManager
-	BeforeDispatch    controller.BlobCallback
+	Dispatcher           *controller.Dispatcher
+	BatchMetadataManager *metadata.MockBatchMetadataManager
+	BlobMetadataStore    *blobstore.BlobMetadataStore
+	Pool                 common.WorkerPool
+	ChainReader          *coremock.MockWriter
+	ChainState           *coremock.ChainDataMock
+	SigAggregator        *core.StdSignatureAggregator
+	NodeClientManager    *controller.MockClientManager
+	BeforeDispatch       controller.BlobCallback
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
 	CallbackBlobSet *controller.MockBlobSet
 	BlobSet         *controller.MockBlobSet
@@ -63,6 +65,8 @@ type dispatcherComponents struct {
 
 func TestDispatcherHandleBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -174,6 +178,8 @@ func TestDispatcherHandleBatch(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -283,6 +289,8 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -382,6 +390,8 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 func TestDispatcherMaxBatchSize(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -413,6 +423,8 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 
 func TestDispatcherNewBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -441,7 +453,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Equal(t, bhh, hash)
 
 	// Test that the batch header is correct
-	require.Equal(t, blockNumber, batch.BatchHeader.ReferenceBlockNumber)
+	require.Equal(t, blockNumber-finalizationBlockDelay, batch.BatchHeader.ReferenceBlockNumber)
 	require.NotNil(t, batch.BatchHeader.BatchRoot)
 
 	// Test that the batch header is written
@@ -480,6 +492,8 @@ func TestDispatcherNewBatch(t *testing.T) {
 
 func TestDispatcherNewBatchFailure(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	numBlobs := int(maxBatchSize + 1)
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
@@ -538,6 +552,8 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 
 func TestDispatcherDedupBlobs(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -687,8 +703,17 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
-	d, err := controller.NewDispatcher(
+	referenceBlockNumber := blockNumber - finalizationBlockDelay
+	operatorState, err := mockChainState.GetIndexedOperatorState(
 		t.Context(),
+		uint(referenceBlockNumber),
+		[]core.QuorumID{0, 1})
+	require.NoError(t, err)
+
+	metadataManager := metadata.NewMockBatchMetadataManager(
+		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
+
+	d, err := controller.NewDispatcher(
 		&controller.DispatcherConfig{
 			PullInterval:            1 * time.Second,
 			FinalizationBlockDelay:  finalizationBlockDelay,
@@ -700,8 +725,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		}, blobMetadataStore,
 		pool,
 		mockChainState,
-		nil,                  // TODO
-		gethcommon.Address{}, // TODO
+		metadataManager,
 		agg,
 		nodeClientManager,
 		logger,
@@ -711,16 +735,17 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		livenessChan)
 	require.NoError(t, err)
 	return &dispatcherComponents{
-		Dispatcher:        d,
-		BlobMetadataStore: blobMetadataStore,
-		Pool:              pool,
-		ChainReader:       chainReader,
-		ChainState:        mockChainState,
-		SigAggregator:     agg,
-		NodeClientManager: nodeClientManager,
-		BeforeDispatch:    beforeDispatch,
-		CallbackBlobSet:   callBackBlobSet,
-		BlobSet:           blobSet,
-		LivenessChan:      livenessChan,
+		Dispatcher:           d,
+		BatchMetadataManager: metadataManager,
+		BlobMetadataStore:    blobMetadataStore,
+		Pool:                 pool,
+		ChainReader:          chainReader,
+		ChainState:           mockChainState,
+		SigAggregator:        agg,
+		NodeClientManager:    nodeClientManager,
+		BeforeDispatch:       beforeDispatch,
+		CallbackBlobSet:      callBackBlobSet,
+		BlobSet:              blobSet,
+		LivenessChan:         livenessChan,
 	}
 }
