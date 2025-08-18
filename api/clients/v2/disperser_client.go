@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/docker/go-units"
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 )
 
@@ -89,7 +88,7 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
-	registry *prometheus.Registry,
+	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
@@ -103,8 +102,9 @@ func NewDisperserClient(
 	if signer == nil {
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
-
-	metrics := metrics.NewDispersalMetrics(registry)
+	if metrics == nil {
+		return nil, api.NewErrorInvalidArg("metrics must be provided")
+	}
 
 	return &disperserClient{
 		config:     config,
