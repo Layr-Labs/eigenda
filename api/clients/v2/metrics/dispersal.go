@@ -19,7 +19,7 @@ type DispersalMetrics struct {
 	BlobSize     *prometheus.HistogramVec
 	SymbolLength *prometheus.HistogramVec
 
-	factory Factory
+	factory *Documentor
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {

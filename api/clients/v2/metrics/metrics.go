@@ -9,19 +9,6 @@ const (
 	namespace = "eigenda"
 )
 
-type Factory interface {
-	NewCounter(opts prometheus.CounterOpts) prometheus.Counter
-	NewCounterVec(opts prometheus.CounterOpts, labelNames []string) *prometheus.CounterVec
-	NewGauge(opts prometheus.GaugeOpts) prometheus.Gauge
-	NewGaugeFunc(opts prometheus.GaugeOpts, function func() float64) prometheus.GaugeFunc
-	NewGaugeVec(opts prometheus.GaugeOpts, labelNames []string) *prometheus.GaugeVec
-	NewHistogram(opts prometheus.HistogramOpts) prometheus.Histogram
-	NewHistogramVec(opts prometheus.HistogramOpts, labelNames []string) *prometheus.HistogramVec
-	NewSummary(opts prometheus.SummaryOpts) prometheus.Summary
-	NewSummaryVec(opts prometheus.SummaryOpts, labelNames []string) *prometheus.SummaryVec
-	Document() []DocumentedMetric
-}
-
 type DocumentedMetric struct {
 	Type   string   `json:"type"`
 	Name   string   `json:"name"`
@@ -29,18 +16,18 @@ type DocumentedMetric struct {
 	Labels []string `json:"labels"`
 }
 
-type documentor struct {
+type Documentor struct {
 	metrics []DocumentedMetric
 	factory promauto.Factory
 }
 
-func With(registry *prometheus.Registry) Factory {
-	return &documentor{
+func With(registry *prometheus.Registry) *Documentor {
+	return &Documentor{
 		factory: promauto.With(registry),
 	}
 }
 
-func (d *documentor) NewCounter(opts prometheus.CounterOpts) prometheus.Counter {
+func (d *Documentor) NewCounter(opts prometheus.CounterOpts) prometheus.Counter {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type: "counter",
 		Name: fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -49,7 +36,7 @@ func (d *documentor) NewCounter(opts prometheus.CounterOpts) prometheus.Counter 
 	return d.factory.NewCounter(opts)
 }
 
-func (d *documentor) NewCounterVec(opts prometheus.CounterOpts, labelNames []string) *prometheus.CounterVec {
+func (d *Documentor) NewCounterVec(opts prometheus.CounterOpts, labelNames []string) *prometheus.CounterVec {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type:   "counter",
 		Name:   fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -59,7 +46,7 @@ func (d *documentor) NewCounterVec(opts prometheus.CounterOpts, labelNames []str
 	return d.factory.NewCounterVec(opts, labelNames)
 }
 
-func (d *documentor) NewGauge(opts prometheus.GaugeOpts) prometheus.Gauge {
+func (d *Documentor) NewGauge(opts prometheus.GaugeOpts) prometheus.Gauge {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type: "gauge",
 		Name: fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -68,7 +55,7 @@ func (d *documentor) NewGauge(opts prometheus.GaugeOpts) prometheus.Gauge {
 	return d.factory.NewGauge(opts)
 }
 
-func (d *documentor) NewGaugeFunc(opts prometheus.GaugeOpts, function func() float64) prometheus.GaugeFunc {
+func (d *Documentor) NewGaugeFunc(opts prometheus.GaugeOpts, function func() float64) prometheus.GaugeFunc {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type: "gauge",
 		Name: fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -77,7 +64,7 @@ func (d *documentor) NewGaugeFunc(opts prometheus.GaugeOpts, function func() flo
 	return d.factory.NewGaugeFunc(opts, function)
 }
 
-func (d *documentor) NewGaugeVec(opts prometheus.GaugeOpts, labelNames []string) *prometheus.GaugeVec {
+func (d *Documentor) NewGaugeVec(opts prometheus.GaugeOpts, labelNames []string) *prometheus.GaugeVec {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type:   "gauge",
 		Name:   fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -87,7 +74,7 @@ func (d *documentor) NewGaugeVec(opts prometheus.GaugeOpts, labelNames []string)
 	return d.factory.NewGaugeVec(opts, labelNames)
 }
 
-func (d *documentor) NewHistogram(opts prometheus.HistogramOpts) prometheus.Histogram {
+func (d *Documentor) NewHistogram(opts prometheus.HistogramOpts) prometheus.Histogram {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type: "histogram",
 		Name: fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -96,7 +83,7 @@ func (d *documentor) NewHistogram(opts prometheus.HistogramOpts) prometheus.Hist
 	return d.factory.NewHistogram(opts)
 }
 
-func (d *documentor) NewHistogramVec(opts prometheus.HistogramOpts, labelNames []string) *prometheus.HistogramVec {
+func (d *Documentor) NewHistogramVec(opts prometheus.HistogramOpts, labelNames []string) *prometheus.HistogramVec {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type:   "histogram",
 		Name:   fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -106,7 +93,7 @@ func (d *documentor) NewHistogramVec(opts prometheus.HistogramOpts, labelNames [
 	return d.factory.NewHistogramVec(opts, labelNames)
 }
 
-func (d *documentor) NewSummary(opts prometheus.SummaryOpts) prometheus.Summary {
+func (d *Documentor) NewSummary(opts prometheus.SummaryOpts) prometheus.Summary {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type: "summary",
 		Name: fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -115,7 +102,7 @@ func (d *documentor) NewSummary(opts prometheus.SummaryOpts) prometheus.Summary 
 	return d.factory.NewSummary(opts)
 }
 
-func (d *documentor) NewSummaryVec(opts prometheus.SummaryOpts, labelNames []string) *prometheus.SummaryVec {
+func (d *Documentor) NewSummaryVec(opts prometheus.SummaryOpts, labelNames []string) *prometheus.SummaryVec {
 	d.metrics = append(d.metrics, DocumentedMetric{
 		Type:   "summary",
 		Name:   fullName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -125,7 +112,7 @@ func (d *documentor) NewSummaryVec(opts prometheus.SummaryOpts, labelNames []str
 	return d.factory.NewSummaryVec(opts, labelNames)
 }
 
-func (d *documentor) Document() []DocumentedMetric {
+func (d *Documentor) Document() []DocumentedMetric {
 	return d.metrics
 }
 

@@ -23,7 +23,7 @@ type AccountantMetricer interface {
 type AccountantMetrics struct {
 	CumulativePayment *prometheus.GaugeVec
 
-	factory Factory
+	factory *Documentor
 }
 
 func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {

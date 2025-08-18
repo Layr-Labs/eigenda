@@ -38,7 +38,7 @@ type Metrics struct {
 	SecondaryRequestsTotal      *prometheus.CounterVec
 	SecondaryRequestDurationSec *prometheus.HistogramVec
 
-	factory metrics.Factory
+	factory *metrics.Documentor
 }
 
 var _ Metricer = (*Metrics)(nil)
