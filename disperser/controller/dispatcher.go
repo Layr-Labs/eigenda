@@ -32,21 +32,36 @@ type BlobCallback func(blobKey corev2.BlobKey) error
 type DispatcherConfig struct {
 	PullInterval time.Duration
 
+	// The number of blocks to wait before using operator state. A hedge against forking.
 	FinalizationBlockDelay uint64
+
+	// The time in between attempts to update the batch metadata (i.e. the reference block number and operator state).
+	// Since this can change at most once per eth block, it's pointless to make this period shorter than 10 seconds.
+	// In practice, it is completely ok to only check for new batch metadata every several minutes.
+	BatchMetadataUpdatePeriod time.Duration
+
 	// The maximum time permitted to wait for a node to provide a signature for a batch.
 	AttestationTimeout time.Duration
+
 	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
 	BatchAttestationTimeout time.Duration
+
 	// SignatureTickInterval is the interval at which Attestations will be updated in the blobMetadataStore,
 	// as signature gathering progresses.
 	SignatureTickInterval time.Duration
-	NumRequestRetries     int
+
+	// The number of times to retry a batch. The current implementation has major performance issues, so for the
+	// time being we should not attempt to retry batches.
+	NumRequestRetries int
+
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
+
 	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
 	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
 	// the threshold is disabled.
 	SignificantSigningThresholdPercentage uint8
+
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string

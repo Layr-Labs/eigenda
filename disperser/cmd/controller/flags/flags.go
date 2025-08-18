@@ -128,6 +128,13 @@ var (
 		Value:    45 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
 	}
+	BatchMetadataUpdatePeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "batch-metadata-update-period"),
+		Usage:    "Period at which to update batch metadata",
+		Required: false,
+		Value:    time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_METADATA_UPDATE_PERIOD"),
+	}
 	BatchAttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "batch-attestation-timeout"),
 		Usage:    "Timeout for batch attestation requests",
@@ -249,7 +256,6 @@ var optionalFlags = []cli.Flag{
 	NumConcurrentEncodingRequestsFlag,
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
-
 	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
@@ -264,6 +270,7 @@ var optionalFlags = []cli.Flag{
 	SignificantSigningThresholdPercentageFlag,
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
+	BatchMetadataUpdatePeriodFlag,
 }
 
 var Flags []cli.Flag
