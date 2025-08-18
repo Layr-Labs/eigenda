@@ -6,11 +6,11 @@ Links:
 - [Our OP Fork](https://github.com/Layr-Labs/optimism)
 - [Fork Diff](https://layr-labs.github.io/optimism/)
 
-## Arbitrum Nitro
+## Arbitrum Orbit
 
-Our up-to-date Nitro docs are available at [docs.eigenda.xyz](https://docs.eigenda.xyz/integrations-guides/rollup-guides/orbit/overview).
+Our up-to-date Arbitrum Orbit docs for EigenDA V1 are available at [docs.eigenda.xyz](https://docs.eigenda.xyz/integrations-guides/rollup-guides/orbit/overview). EigenDA V2 support is currently work-in-progress; technical design updates can be found [here](./rollup-stacks/4-arbitrum-secure-integration.md).
 
-We maintain fork diffs for the different nitro repos that we fork:
+We maintain fork diffs for the different arbitrum orbit repos that we fork:
 - [nitro](https://layr-labs.github.io/nitro/)
 - [nitro-contracts](https://layr-labs.github.io/nitro-contracts/)
 - [nitro-testnode](https://layr-labs.github.io/nitro-testnode/)
