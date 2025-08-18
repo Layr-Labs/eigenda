@@ -28,7 +28,7 @@ var (
 		Usage: "Address of the EigenDA contract directory contract, which points to all other EigenDA " +
 			"contract addresses.",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CONTRACT_DIRECTORY_ADDRESS"), // TODO update devops config
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_CONTRACT_DIRECTORY_ADDRESS"),
 	}
 	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
