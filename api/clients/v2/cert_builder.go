@@ -133,7 +133,6 @@ func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	}
 	checkSigIndices, err := cb.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(rbn))},
 		cb.registryCoordinatorAddr, uint32(rbn), quorumNumbers, nonSignerOperatorIDs)
-
 	if err != nil {
 		// We log the call parameters for debugging purposes: input them into tenderly to simulate the call and get more context.
 		cb.logger.Error("eth-call failed",

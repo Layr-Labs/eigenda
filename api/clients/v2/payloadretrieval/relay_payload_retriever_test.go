@@ -154,7 +154,7 @@ func buildCertFromBlobBytes(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	return *blobKey, eigenDACert
+	return blobKey, eigenDACert
 }
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
