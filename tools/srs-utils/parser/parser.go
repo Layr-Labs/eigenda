@@ -5,6 +5,8 @@ import (
 	"math"
 	"os"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 type Config struct {
@@ -34,12 +36,12 @@ func ParsePtauChallenge(config Config) {
 	if err != nil {
 		panic(err)
 	}
-	g1f.Close()
+	defer core.CloseLogOnError(g1f, g1f.Name(), nil)
 	g2f, err := os.Create("g2.point")
 	if err != nil {
 		panic(err)
 	}
-	g2f.Close()
+	defer core.CloseLogOnError(g2f, g2f.Name(), nil)
 
 	begin := time.Now()
 	for i := uint64(0); i < numBatch; i++ {

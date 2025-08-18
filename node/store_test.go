@@ -10,7 +10,6 @@ import (
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -216,11 +215,18 @@ func createStore(t *testing.T) *node.Store {
 	logger := testutils.GetLogger()
 	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	tx := &coremock.MockWriter{}
-	dat, _ := mock.MakeChainDataMock(map[uint8]int{
+	dat, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 6,
 		1: 3,
 	})
-	s, _ := node.NewLevelDBStore(t.TempDir(), logger, node.NewMetrics(noopMetrics, reg, logger, ":9090", operatorId, -1, tx, dat), staleMeasure, storeDuration)
+	s, _ := node.NewLevelDBStore(
+		t.TempDir(),
+		logger,
+		node.NewMetrics(noopMetrics, reg, logger, ":9090", operatorId, -1, tx, dat),
+		staleMeasure,
+		true,
+		false,
+		storeDuration)
 	return s
 }
 
@@ -322,11 +328,11 @@ func TestStoreBatchSuccess(t *testing.T) {
 	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, 0, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
-	assert.Equal(t, chunks, blobsProto[0].Bundles[0].Chunks)
+	assert.Equal(t, chunks, blobsProto[0].GetBundles()[0].GetChunks())
 	chunks, format, err = s.GetChunks(ctx, batchHeaderHash, 1, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, format)
-	assert.Equal(t, chunks, blobsProto[1].Bundles[0].Chunks)
+	assert.Equal(t, chunks, blobsProto[1].GetBundles()[0].GetChunks())
 
 	// Store the batch again it should be no-op.
 	_, err = s.StoreBatch(ctx, batchHeader, blobs, blobsProto)

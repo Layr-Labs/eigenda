@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -21,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
@@ -45,6 +48,11 @@ var (
 	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 
 	mockCommitment = encoding.BlobCommitments{}
+
+	heartbeatChan      = make(chan time.Time, 10) // Stores last 10 heartbeats
+	heartbeatsReceived []time.Time
+	mu                 sync.Mutex
+	doneListening      = make(chan struct{})
 )
 
 func TestMain(m *testing.M) {
@@ -56,7 +64,7 @@ func TestMain(m *testing.M) {
 
 func setup(m *testing.M) {
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -66,7 +74,7 @@ func setup(m *testing.M) {
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container")
+			panic("failed to start localstack container: " + err.Error())
 		}
 	}
 
@@ -149,6 +157,21 @@ func setup(m *testing.M) {
 }
 
 func teardown() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(heartbeatsReceived) == 0 {
+		logger.Error("Expected heartbeats, but none were received")
+	}
+
+	close(heartbeatChan) // Ensure the goroutine exits properly
+
+	select {
+	case <-doneListening:
+	default:
+		close(doneListening)
+	}
+
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
@@ -158,7 +181,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(256))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))

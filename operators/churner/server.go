@@ -130,25 +130,25 @@ func (s *Server) checkShouldBeRateLimited(now time.Time, request ChurnRequest) e
 
 func (s *Server) validateChurnRequest(ctx context.Context, req *pb.ChurnRequest) error {
 
-	if len(req.OperatorRequestSignature) != 64 {
+	if len(req.GetOperatorRequestSignature()) != 64 {
 		return errors.New("invalid signature length")
 	}
 
-	if len(req.OperatorToRegisterPubkeyG1) != 64 {
+	if len(req.GetOperatorToRegisterPubkeyG1()) != 64 {
 		return errors.New("invalid operatorToRegisterPubkeyG1 length")
 	}
 
-	if len(req.OperatorToRegisterPubkeyG2) != 128 {
+	if len(req.GetOperatorToRegisterPubkeyG2()) != 128 {
 		return errors.New("invalid operatorToRegisterPubkeyG2 length")
 	}
 
-	if len(req.Salt) != 32 {
+	if len(req.GetSalt()) != 32 {
 		return errors.New("invalid salt length")
 	}
 
 	// TODO: ensure that all quorumIDs are valid
-	if len(req.QuorumIds) == 0 || len(req.QuorumIds) > 255 {
-		return fmt.Errorf("invalid quorumIds length %d", len(req.QuorumIds))
+	if len(req.GetQuorumIds()) == 0 || len(req.GetQuorumIds()) > 255 {
+		return fmt.Errorf("invalid quorumIds length %d", len(req.GetQuorumIds()))
 	}
 
 	seenQuorums := make(map[int]struct{})
@@ -188,8 +188,8 @@ func createChurnRequest(req *pb.ChurnRequest) (*ChurnRequest, error) {
 	salt := [32]byte{}
 	copy(salt[:], req.GetSalt())
 
-	quorumIDs := make([]core.QuorumID, len(req.QuorumIds))
-	for i, id := range req.QuorumIds {
+	quorumIDs := make([]core.QuorumID, len(req.GetQuorumIds()))
+	for i, id := range req.GetQuorumIds() {
 		quorumIDs[i] = core.QuorumID(id)
 	}
 

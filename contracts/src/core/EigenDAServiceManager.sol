@@ -1,20 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {Pausable} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
-import {IPauserRegistry} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-
-import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager} from "../../lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
-import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
-import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "../../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
+import {Pausable} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {IPauserRegistry} from
+    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {
+    ServiceManagerBase,
+    IAVSDirectory,
+    IRewardsCoordinator,
+    IServiceManager
+} from "lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
-import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
-import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -25,9 +30,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * - freezing operators as the result of various "challenges"
  */
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
-
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
@@ -48,7 +50,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
-        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry, __eigenDARelayRegistry, __paymentVault, __eigenDADisperserRegistry)
+        EigenDAServiceManagerStorage(
+            __eigenDAThresholdRegistry,
+            __eigenDARelayRegistry,
+            __paymentVault,
+            __eigenDADisperserRegistry
+        )
     {
         _disableInitializers();
     }
@@ -59,34 +66,29 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         address _initialOwner,
         address[] memory _batchConfirmers,
         address _rewardsInitiator
-    )
-        public
-        initializer
-    {
+    ) public initializer {
         _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
         _setRewardsInitiator(_rewardsInitiator);
-        for (uint i = 0; i < _batchConfirmers.length; ++i) {
+        for (uint256 i = 0; i < _batchConfirmers.length; ++i) {
             _setBatchConfirmer(_batchConfirmers[i]);
         }
     }
 
     /**
      * @notice This function is used for
-     * - submitting data availabilty certificates,
+     * - submitting data availabilty certificates for EigenDA V1,
      * - check that the aggregate signature is valid,
      * - and check whether quorum has been achieved or not.
      */
     function confirmBatch(
-        BatchHeader calldata batchHeader,
+        DATypesV1.BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
+    ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
         require(tx.origin == msg.sender, "header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
-        require(
-            batchHeader.referenceBlockNumber < block.number, "specified referenceBlockNumber is in future"
-        );
+        require(batchHeader.referenceBlockNumber < block.number, "specified referenceBlockNumber is in future");
 
         require(
             (batchHeader.referenceBlockNumber + BLOCK_STALE_MEASURE) >= uint32(block.number),
@@ -100,34 +102,39 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
-        bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+        bytes32 reducedBatchHeaderHash = keccak256(
+            abi.encode(
+                DATypesV1.ReducedBatchHeader({
+                    blobHeadersRoot: batchHeader.blobHeadersRoot,
+                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                })
+            )
+        );
 
         // check the signature
-        (
-            QuorumStakeTotals memory quorumStakeTotals,
-            bytes32 signatoryRecordHash
-        ) = checkSignatures(
-            reducedBatchHeaderHash, 
+        (QuorumStakeTotals memory quorumStakeTotals, bytes32 signatoryRecordHash) = checkSignatures(
+            reducedBatchHeaderHash,
             batchHeader.quorumNumbers, // use list of uint8s instead of uint256 bitmap to not iterate 256 times
-            batchHeader.referenceBlockNumber, 
+            batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
 
         // check that signatories own at least a threshold percentage of each quourm
-        for (uint i = 0; i < batchHeader.signedStakeForQuorums.length; i++) {
-            // we don't check that the signedStakeForQuorums are not >100 because a greater value would trivially fail the check, implying 
+        for (uint256 i = 0; i < batchHeader.signedStakeForQuorums.length; i++) {
+            // we don't check that the signedStakeForQuorums are not >100 because a greater value would trivially fail the check, implying
             // signed stake > total stake
             require(
-                quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
-                quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
+                quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
+                    >= quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
                 "signatories do not own threshold percentage of a quorum"
             );
         }
 
         // store the metadata hash
         uint32 batchIdMemory = batchId;
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHash[batchIdMemory] = EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
+        bytes32 batchHeaderHash = keccak256(abi.encode(batchHeader));
+        batchIdToBatchMetadataHash[batchIdMemory] =
+            keccak256(abi.encodePacked(batchHeaderHash, signatoryRecordHash, uint32(block.number)));
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 
@@ -136,7 +143,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice This function is used for changing the batch confirmer
-    function setBatchConfirmer(address _batchConfirmer) external onlyOwner() {
+    function setBatchConfirmer(address _batchConfirmer) external onlyOwner {
         _setBatchConfirmer(_batchConfirmer);
     }
 
@@ -152,7 +159,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice Given a reference block number, returns the block until which operators must serve.
-    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external pure returns (uint32) {
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
@@ -171,28 +178,22 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return eigenDAThresholdRegistry.quorumNumbersRequired();
     }
 
-    function getQuorumAdversaryThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8){
+    function getQuorumAdversaryThresholdPercentage(uint8 quorumNumber) external view returns (uint8) {
         return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
     }
 
     /// @notice Gets the confirmation threshold percentage for a quorum
-    function getQuorumConfirmationThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8){
+    function getQuorumConfirmationThresholdPercentage(uint8 quorumNumber) external view returns (uint8) {
         return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
     }
 
     /// @notice Checks if a quorum is required
-    function getIsQuorumRequired(
-        uint8 quorumNumber
-    ) external view returns (bool){
+    function getIsQuorumRequired(uint8 quorumNumber) external view returns (bool) {
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+    function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }
 }

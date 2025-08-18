@@ -3,13 +3,15 @@ package grpc_test
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"net"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -157,20 +159,28 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	}
 
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
-	store, err := node.NewLevelDBStore(config.DbPath, logger, metrics, 1e9, 1e9)
+	store, err := node.NewLevelDBStore(
+		config.DbPath,
+		logger,
+		metrics,
+		1e9,
+		true,
+		false,
+		1e9)
 	if err != nil {
 		panic("failed to create a new levelDB store")
 	}
 
 	node := &node.Node{
-		Config:     config,
-		Logger:     logger,
-		KeyPair:    keyPair,
-		BLSSigner:  signer,
-		Metrics:    metrics,
-		Store:      store,
-		ChainState: chainState,
-		Validator:  val,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		Store:          store,
+		ChainState:     chainState,
+		Validator:      val,
+		ValidationPool: workerpool.New(1),
 	}
 	return grpc.NewServer(config, node, logger, ratelimiter)
 }
@@ -337,7 +347,7 @@ func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool)
 func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
-	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, resp.GetSemver() == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
@@ -414,7 +424,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -427,7 +437,7 @@ func TestRetrieveChunks(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -451,7 +461,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GNARK, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).DeserializeGnark(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).DeserializeGnark(gnarkEncodedChunk)
@@ -464,7 +474,7 @@ func TestGnarkBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 
@@ -486,7 +496,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
 	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
 	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
@@ -499,7 +509,7 @@ func TestMixedBundleEncoding(t *testing.T) {
 		QuorumId:        1,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.ChunkEncodingFormat)
+	assert.Equal(t, pb.ChunkEncodingFormat_UNKNOWN, retrievalReply.GetChunkEncodingFormat())
 	assert.Empty(t, retrievalReply.GetChunks())
 }
 

@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 func setup(m *testing.M) {
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -73,7 +73,7 @@ func setup(m *testing.M) {
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container")
+			panic("failed to start localstack container: " + err.Error())
 		}
 
 	}

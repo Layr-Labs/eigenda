@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
+	"github.com/docker/go-units"
 
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 
@@ -29,56 +30,52 @@ const (
 	AppName                        = "da-node"
 )
 
-var (
-	// QuorumNames maps quorum IDs to their names.
-	// this is used for eigen metrics
-	QuorumNames = map[core.QuorumID]string{
-		0: "eth_quorum",
-		1: "eignen_quorum",
-	}
-	SemVer    = "0.0.0"
-	GitCommit = ""
-	GitDate   = ""
-)
-
 // Config contains all of the configuration information for a DA node.
 type Config struct {
-	Hostname                       string
-	RetrievalPort                  string
-	DispersalPort                  string
-	InternalRetrievalPort          string
-	InternalDispersalPort          string
-	V2DispersalPort                string
-	V2RetrievalPort                string
-	EnableNodeApi                  bool
-	NodeApiPort                    string
-	EnableMetrics                  bool
-	MetricsPort                    int
-	OnchainMetricsInterval         int64
-	Timeout                        time.Duration
-	RegisterNodeAtStart            bool
-	ExpirationPollIntervalSec      uint64
-	EnableTestMode                 bool
-	OverrideBlockStaleMeasure      uint64
-	OverrideStoreDurationBlocks    uint64
-	QuorumIDList                   []core.QuorumID
-	DbPath                         string
-	LogPath                        string
-	ID                             core.OperatorID
-	BLSOperatorStateRetrieverAddr  string
-	EigenDAServiceManagerAddr      string
-	PubIPProviders                 []string
-	PubIPCheckInterval             time.Duration
-	ChurnerUrl                     string
-	DataApiUrl                     string
-	NumBatchValidators             int
-	NumBatchDeserializationWorkers int
-	EnableGnarkBundleEncoding      bool
-	ClientIPHeader                 string
-	UseSecureGrpc                  bool
-	RelayMaxMessageSize            uint
-	ReachabilityPollIntervalSec    uint64
-	DisableNodeInfoResources       bool
+	Hostname                        string
+	RetrievalPort                   string
+	DispersalPort                   string
+	InternalRetrievalPort           string
+	InternalDispersalPort           string
+	V2DispersalPort                 string
+	V2RetrievalPort                 string
+	InternalV2DispersalPort         string
+	InternalV2RetrievalPort         string
+	EnableNodeApi                   bool
+	NodeApiPort                     string
+	EnableMetrics                   bool
+	MetricsPort                     int
+	OnchainMetricsInterval          int64
+	Timeout                         time.Duration
+	RegisterNodeAtStart             bool
+	ExpirationPollIntervalSec       uint64
+	LevelDBDisableSeeksCompactionV1 bool
+	LevelDBSyncWritesV1             bool
+	EnableTestMode                  bool
+	OverrideBlockStaleMeasure       uint64
+	OverrideStoreDurationBlocks     uint64
+	QuorumIDList                    []core.QuorumID
+	DbPath                          string
+	LogPath                         string
+	ID                              core.OperatorID
+	EigenDADirectory                string
+	BLSOperatorStateRetrieverAddr   string
+	EigenDAServiceManagerAddr       string
+	PubIPProviders                  []string
+	PubIPCheckInterval              time.Duration
+	ChurnerUrl                      string
+	DataApiUrl                      string
+	NumBatchValidators              int
+	NumBatchDeserializationWorkers  int
+	EnableGnarkBundleEncoding       bool
+	ClientIPHeader                  string
+	ChurnerUseSecureGrpc            bool
+	RelayUseSecureGrpc              bool
+	RelayMaxMessageSize             uint
+	ReachabilityPollIntervalSec     uint64
+	DisableNodeInfoResources        bool
+	StoreChunksRequestMaxPastAge    time.Duration
+	StoreChunksRequestMaxFutureAge  time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -102,11 +99,81 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
-	// the timeout for disperser authentication (set to 0 to disable), if enabled then a successful authentication
-	// of a StoreChunks request causes the node to skip validation for requests coming from the same IP address
-	// for this duration. Adds risk of disruptive behavior if an attacker is able to send requests from the same IP
-	// address as a legitimate disperser, but reduces performance overhead of StoreChunks validation.
-	DispersalAuthenticationTimeout time.Duration
+
+	// The size of the pool where chunks are downloaded from the relay network.
+	DownloadPoolSize int
+
+	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
+	LittDBDoubleWriteProtection bool
+
+	// The percentage of the total memory to use for the write cache in littDB as a fraction of 1.0, where 1.0
+	// means that all available memory will be used for the write cache (don't actually use 1.0, that leaves no buffer
+	// for other stuff). Ignored if LittDBWriteCacheSizeGB is set.
+	LittDBWriteCacheSizeFraction float64
+
+	// The size of the cache for storing recently written chunks in littDB. Ignored if 0. If set,
+	// this config value overrides the LittDBWriteCacheSizeFraction value.
+	LittDBWriteCacheSizeBytes uint64
+
+	// The percentage of the total memory to use for the read cache in littDB as a fraction of 1.0, where 1.0
+	// means that all available memory will be used for the read cache (don't actually use 1.0, that leaves no buffer
+	// for other stuff). Ignored if LittDBReadCacheSizeGB is set.
+	LittDBReadCacheSizeFraction float64
+
+	// The size of the cache for storing recently read chunks in littDB. Ignored if 0. If set,
+	// this config value overrides the LittDBReadCacheSizeFraction value.
+	LittDBReadCacheSizeBytes uint64
+
+	// The list of paths to the littDB storage directories. Data is spread across these directories.
+	// Directories do not need to be on the same filesystem.
+	LittDBStoragePaths []string
+
+	// If true, then LittDB will refuse to start if it can't acquire locks on the database file structure.
+	//
+	// Ideally, this would always be enabled. But PID reuse in common platforms such as Docker/Kubernetes can lead to
+	// a breakdown in lock files being able to detect unsafe concurrent access to the database. Since many (if not most)
+	// users of this software will be running in such an environment, this is disabled by default.
+	LittRespectLocks bool
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes per second.
+	GetChunksHotCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes.
+	GetChunksHotBurstLimitMB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes per second.
+	GetChunksColdCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes.
+	GetChunksColdBurstLimitMB float64
+
+	// GCSafetyBufferSizeFraction is the fraction of the total memory to use as a safety buffer for the garbage
+	// collector. If non-zero, the garbage collector will be instructed to aggressively garbage collect so as to
+	// keep this amount of memory free. Useful for preventing kubernetes from OOM-killing the process. Ignored if
+	// GCSafetyBufferSizeGB is greater than 0.
+	GCSafetyBufferSizeFraction float64
+
+	// Defines a safety buffer for the garbage collector. If non-zero, the garbage collector will be instructed
+	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
+	// from OOM-killing the process. Overrides the GCSafetyBufferSizeFraction value if greater than 0.
+	GCSafetyBufferSizeBytes uint64
+
+	// The maximum amount of time to wait to acquire buffer capacity to store chunks in the StoreChunks() gRPC request.
+	StoreChunksBufferTimeout time.Duration
+
+	// StoreChunksBufferSizeFraction controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, as a fraction of the total memory available to the process.
+	// Ignored if StoreChunksBufferSizeBytes is greater than 0.
+	StoreChunksBufferSizeFraction float64
+
+	// StoreChunksBufferSizeBytes controls the maximum memory that can be used to store chunks in the
+	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
+	// StoreChunksBufferSizeFraction value if greater than 0.
+	StoreChunksBufferSizeBytes uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -260,6 +327,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
 	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
+	internalV2DispersalPort := ctx.GlobalString(flags.InternalV2DispersalPortFlag.Name)
+	internalV2RetrievalPort := ctx.GlobalString(flags.InternalV2RetrievalPortFlag.Name)
+	if internalV2DispersalPort == "" {
+		internalV2DispersalPort = v2DispersalPort
+	}
+	if internalV2RetrievalPort == "" {
+		internalV2RetrievalPort = v2RetrievalPort
+	}
+
 	if v2Enabled {
 		if v2DispersalPort == "" {
 			return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
@@ -281,6 +357,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		InternalRetrievalPort:               internalRetrievalFlag,
 		V2DispersalPort:                     v2DispersalPort,
 		V2RetrievalPort:                     v2RetrievalPort,
+		InternalV2DispersalPort:             internalV2DispersalPort,
+		InternalV2RetrievalPort:             internalV2RetrievalPort,
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
@@ -292,12 +370,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ReachabilityPollIntervalSec:         reachabilityPollIntervalSec,
 		EnableTestMode:                      testMode,
 		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
+		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
+		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
+		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
@@ -308,7 +389,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		NumBatchDeserializationWorkers:      ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
 		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
-		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
@@ -322,6 +404,24 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
-		DispersalAuthenticationTimeout:      ctx.GlobalDuration(flags.DispersalAuthenticationTimeoutFlag.Name),
+		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
+		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
+			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
+		LittDBWriteCacheSizeFraction:  ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
+		LittDBReadCacheSizeBytes:      uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
+		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
+		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
+		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
+		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB: ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:     ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
+		GCSafetyBufferSizeBytes:       uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
+		GCSafetyBufferSizeFraction:    ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
+		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
+		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
+		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
 	}, nil
 }

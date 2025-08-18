@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EigenDA Resource Calculator</title>
+    <style>
+        :root {
+            /* Light mode colors (for reference) */
+            --light-bg-color: #f4f4f4; /* Off-white background that's easier on the eyes */
+            --light-text-color: #333333;
+            --light-calculator-bg: #e2e2e2; /* Darker calculator background to maintain contrast with off-white */
+            --light-header-bg: #e9f7ef;
+            --light-divider-color: #ddd;
+            --light-input-border: #999; /* Darker input border for better contrast in light mode */
+            --light-modified-bg: #f0f8ff;
+            --light-hover-bg: #d9e9ff;
+            --light-accent-color: #2c7873;
+            --light-tooltip-bg: #555;
+            --light-tooltip-text: #fff;
+            --light-button-bg: #2c7873;
+            --light-button-text: #ffffff;
+            --light-table-border: #cccccc; /* Darker table borders for better definition */
+            --light-reset-button-bg: #888;
+            --light-zebra-stripe-color: #d0d0d0; /* Even darker zebra stripe for better contrast in light mode */
+            --light-result-color: #2c7873; /* Original teal color for results in light mode */
+            
+            /* Dark mode colors (default) */
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --calculator-bg: #1e1e1e;
+            --header-bg: #2a3b36;
+            --divider-color: #444;
+            --input-border: #777; /* Lighter input border for better contrast in dark mode */
+            --modified-bg: #1a2a3f;
+            --hover-bg: #2a4a7a;
+            --accent-color: #4fb3ab;
+            --tooltip-bg: #333;
+            --tooltip-text: #e0e0e0;
+            --button-bg: #2c7873;
+            --button-text: #ffffff;
+            --table-border: #333;
+            --reset-button-bg: #555;
+            --zebra-stripe-color: #262626; /* Subtle zebra stripe for dark mode */
+            --result-color: #5cedc2; /* Bright mint green color for results in dark mode - high contrast */
+            
+            /* Active theme (defaults to dark) */
+            --theme-bg-color: var(--bg-color);
+            --theme-text-color: var(--text-color);
+            --theme-calculator-bg: var(--calculator-bg);
+            --theme-header-bg: var(--header-bg);
+            --theme-divider-color: var(--divider-color);
+            --theme-input-border: var(--input-border);
+            --theme-modified-bg: var(--modified-bg);
+            --theme-hover-bg: var(--hover-bg);
+            --theme-accent-color: var(--accent-color);
+            --theme-tooltip-bg: var(--tooltip-bg);
+            --theme-tooltip-text: var(--tooltip-text);
+            --theme-button-bg: var(--button-bg);
+            --theme-button-text: var(--button-text);
+            --theme-table-border: var(--table-border);
+            --theme-reset-button-bg: var(--reset-button-bg);
+            --theme-zebra-stripe-color: var(--zebra-stripe-color);
+            --theme-result-color: var(--result-color);
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: var(--theme-bg-color);
+            color: var(--theme-text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        h1 {
+            color: var(--theme-text-color);
+            text-align: center;
+        }
+        .calculator {
+            background-color: var(--theme-calculator-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+        
+        /* Theme toggle switch */
+        .theme-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: var(--theme-calculator-bg);
+            border-radius: 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
+        }
+        .theme-switch-label {
+            color: var(--theme-text-color);
+            margin: 0 10px; /* Equal margins on both sides */
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--theme-accent-color);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--theme-accent-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        /* Icons removed as requested */
+        /* Common table-like structure for both inputs and results */
+        .calculator-table {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        /* Add subtle borders between rows for better visual separation */
+        .calculator-table tr:not(.divider-row) {
+            border-bottom: 1px solid var(--theme-table-border);
+            transition: border-color 0.3s ease;
+        }
+        /* Row styles */
+        .calculator-row, .input-row {
+            display: table-row;
+        }
+        .input-row {
+            transition: background-color 0.3s ease;
+        }
+        /* Hover effect with a more noticeable color for all rows */
+        .calculator-table tbody tr td {
+            transition: background-color 0.15s ease;
+        }
+        .calculator-table tbody tr:hover td {
+            background-color: var(--theme-hover-bg) !important;
+        }
+        
+        /* Special highlighting for header rows to preserve their styling */
+        .calculator-table tbody tr.header-row:hover td {
+            background-color: var(--theme-header-bg) !important;
+        }
+        
+        /* Special highlighting for divider rows */
+        .calculator-table tbody tr.divider-row:hover td {
+            background-color: var(--theme-divider-color) !important;
+        }
+
+        /* Row highlighting for modified values - these styles highlight rows where values differ from defaults */
+        /* For table layout, we need to target all cells in the row */
+        .calculator-table tr.input-modified td {
+            background-color: var(--theme-modified-bg);
+        }
+        /* Modified rows should have a slightly different hover color */
+        .calculator-table tr.input-modified:hover td {
+            background-color: var(--theme-hover-bg) !important;
+        }
+        /* Add left border only to the first cell of modified rows */
+        .calculator-table tr.input-modified td.label-column {
+            border-left: 3px solid var(--theme-accent-color);
+            padding-left: 5px; /* Add padding to account for border */
+        }
+        /* Column styles */
+        .label-column, .input-column, .unit-column, .help-column, .value-column {
+            display: table-cell;
+            padding: 12px 8px;
+            vertical-align: middle;
+        }
+        
+        /* Add zebra striping for better row distinction */
+        .calculator-table tr:nth-child(even):not(.input-modified):not(.header-row):not(.divider-row) td {
+            background-color: var(--theme-zebra-stripe-color);
+            transition: background-color 0.3s ease;
+        }
+        .label-column {
+            font-weight: bold;
+            width: 250px;
+        }
+        .result-label {
+            font-weight: normal;
+        }
+        .input-column, .value-column {
+            width: 120px;
+        }
+        .value-column {
+            font-weight: bold;
+            color: var(--theme-result-color);
+            text-align: right;
+        }
+        .unit-column {
+            width: 60px;
+            font-weight: normal;
+        }
+        .help-column {
+            width: 20px;
+        }
+        .divider-row {
+            display: table-row;
+            height: 30px;
+        }
+        .divider-row > td {
+            display: table-cell;
+            padding: 15px 0;
+            border-bottom: 2px solid var(--theme-divider-color);
+            border-top: 1px solid var(--theme-divider-color);
+            background-color: var(--theme-calculator-bg);
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+        .result-section {
+            margin-top: 10px;
+        }
+        /* Section header */
+        .section-header {
+            display: table-cell;
+            background-color: var(--theme-header-bg);
+            padding: 12px 10px;
+            font-weight: bold;
+            text-align: left;
+            border-bottom: 2px solid var(--theme-accent-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        /* Adding a class to section header rows for better browser compatibility */
+        .header-row {
+            background-color: var(--theme-header-bg);
+            transition: background-color 0.3s ease;
+        }
+        /* Form element styles */
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid var(--theme-input-border); /* Increased border width from 1px to 2px */
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: var(--theme-calculator-bg);
+            color: var(--theme-text-color);
+            transition: all 0.3s ease;
+            outline: none; /* Remove default focus outline */
+        }
+        
+        /* Add focus effect with the accent color */
+        input:focus {
+            border-color: var(--theme-accent-color);
+            box-shadow: 0 0 0 1px var(--theme-accent-color);
+        }
+        
+        /* Remove up/down arrows from number inputs */
+        /* Chrome, Safari, Edge, Opera */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        /* Firefox */
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .reset-field {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            color: var(--theme-accent-color);
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .reset-field:hover {
+            color: var(--theme-calculator-bg);
+            background-color: var(--theme-accent-color);
+            border-radius: 50%;
+        }
+        .reset-field-tooltip {
+            visibility: hidden;
+            background-color: var(--theme-tooltip-bg);
+            color: var(--theme-tooltip-text);
+            text-align: center;
+            border-radius: 4px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: all 0.3s;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .reset-field:hover .reset-field-tooltip {
+            visibility: visible;
+            opacity: 0.95;
+        }
+        /* Hover-based tooltip system */
+        .tooltip {
+            position: static; /* This makes the tooltip not respect table cell boundaries */
+            display: inline-flex;
+            cursor: help;
+        }
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background-color: var(--theme-accent-color);
+            color: var(--theme-calculator-bg);
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .tooltip-icon:hover {
+            transform: scale(1.1);
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 250px;
+            background-color: var(--theme-tooltip-bg);
+            color: var(--theme-tooltip-text);
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px 12px;
+            position: fixed; /* Changed to fixed position to break out of table container */
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+            font-weight: normal;
+            font-size: 14px;
+            line-height: 1.5;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-right: 3px solid var(--theme-accent-color); /* Changed to right border */
+            pointer-events: none; /* Prevents the tooltip from interfering with mouse events */
+        }
+        /* Arrow pointing to the help icon */
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 15px;
+            left: -10px; /* Arrow on left side */
+            border-width: 5px 10px 5px 0; /* Changed border direction */
+            border-style: solid;
+            border-color: transparent var(--theme-tooltip-bg) transparent transparent; /* Changed arrow direction */
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        button {
+            background-color: var(--theme-button-bg);
+            color: var(--theme-button-text);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: var(--theme-accent-color);
+            filter: brightness(90%);
+        }
+        .reset {
+            background-color: var(--theme-reset-button-bg);
+            margin-left: 10px;
+        }
+        .reset:hover {
+            background-color: var(--theme-reset-button-bg);
+            filter: brightness(90%);
+        }
+        
+        /* Do Not Click button styling */
+        .do-not-click {
+            background-color: var(--theme-reset-button-bg);
+            color: var(--theme-button-text);
+        }
+        .do-not-click:hover {
+            background-color: var(--theme-reset-button-bg);
+            filter: brightness(90%);
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-switch">
+        <span class="theme-switch-label">Light</span>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle" checked>
+            <span class="slider"></span>
+        </label>
+        <span class="theme-switch-label">Dark</span>
+    </div>
+    
+    <!-- No overlay needed for hover tooltips -->
+    
+    <h1>EigenDA Resource Calculator</h1>
+    
+    <div class="calculator">
+        <!-- Unified table structure for both inputs and results -->
+        <table class="calculator-table">
+            <tbody>
+            <!-- Inputs section -->
+            <tr class="calculator-row header-row">
+                <td class="section-header" colspan="4">Input Parameters</td>
+            </tr>
+
+            <!-- Max Throughput -->
+            <tr class="input-row" id="maxThroughput-row">
+                <td class="label-column">Max Throughput (MB/s):</td>
+                <td class="input-column">
+                    <input type="number" id="maxThroughput" value="50" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="maxThroughput">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 50</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The maximum throughput supported by EigenDA.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Sum of Stake -->
+            <tr class="input-row" id="sumOfStake-row">
+                <td class="label-column">Sum of Stake Across All Quorums:</td>
+                <td class="input-column">
+                    <input type="number" id="sumOfStake" value="0.125" step="0.001" min="0" max="1">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="sumOfStake">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 0.125</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The sum of an operator's stake across all quorums. 1.0 means 100% stake for one quorum, 2.0 means 100% stake across two quorums. For example, if an operator has 10% stake in 3 quorums, the sum of stake across all quorums is 30%, and so you'd use 0.3 for field.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Encoding Rate -->
+            <tr class="input-row" id="encodingRate-row">
+                <td class="label-column">Encoding Rate:</td>
+                <td class="input-column">
+                    <input type="number" id="encodingRate" value="8.0" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="encodingRate">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 8.0</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The kzg encoding rate.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Download Pessimism -->
+            <tr class="input-row" id="downloadPessimism-row">
+                <td class="label-column">Download Pessimism:</td>
+                <td class="input-column">
+                    <input type="number" id="downloadPessimism" value="2.0" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="downloadPessimism">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 2.0</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Controls the extra amount of chunk data validator clients download in case some validators do not return data in a timely manner.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Read Amplification -->
+            <tr class="input-row" id="readAmplification-row">
+                <td class="label-column">Read Amplification:</td>
+                <td class="input-column">
+                    <input type="number" id="readAmplification" value="20.0" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="readAmplification">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 20.0</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The number of times each blob is read after it is written.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Data Retention -->
+            <tr class="input-row" id="dataRetention-row">
+                <td class="label-column">Data Retention Period (days):</td>
+                <td class="input-column">
+                    <input type="number" id="dataRetention" value="14" step="1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="dataRetention">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 14</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The length of time that validator nodes retain chunk data.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Disk Safety Margin -->
+            <tr class="input-row" id="diskSafetyMargin-row">
+                <td class="label-column">Disk Safety Margin:</td>
+                <td class="input-column">
+                    <input type="number" id="diskSafetyMargin" value="1.2" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="diskSafetyMargin">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Adds a safety buffer to the disk space needed.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Download Safety Margin -->
+            <tr class="input-row" id="downloadSafetyMargin-row">
+                <td class="label-column">Download Safety Margin:</td>
+                <td class="input-column">
+                    <input type="number" id="downloadSafetyMargin" value="1.2" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="downloadSafetyMargin">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Adds a safety buffer to the download bandwidth.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Upload Safety Margin -->
+            <tr class="input-row" id="uploadSafetyMargin-row">
+                <td class="label-column">Upload Safety Margin:</td>
+                <td class="input-column">
+                    <input type="number" id="uploadSafetyMargin" value="1.2" step="0.1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="uploadSafetyMargin">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Adds a safety buffer to the upload bandwidth.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Write Cache Size -->
+            <tr class="input-row" id="writeCacheSize-row">
+                <td class="label-column">Write Cache Size (GB):</td>
+                <td class="input-column">
+                    <input type="number" id="writeCacheSize" value="16" step="1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="writeCacheSize">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 16</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The size of the write cache, in GB.</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Divider -->
+            <tr class="divider-row">
+                <td colspan="4"></td>
+            </tr>
+            
+            <!-- Results section header -->
+            <tr class="calculator-row header-row">
+                <td class="section-header" colspan="4">Results</td>
+            </tr>
+            
+            <!-- Storage Space Result -->
+            <tr class="calculator-row">
+                <td class="label-column result-label">Storage Space Needed:</td>
+                <td class="value-column" id="storageSpace">0</td>
+                <td class="unit-column">TB</td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The amount of disk space required to store the data for the specified retention period.
+
+Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Download Bandwidth Result -->
+            <tr class="calculator-row">
+                <td class="label-column result-label">Download Bandwidth:</td>
+                <td class="value-column" id="downloadBandwidth">0</td>
+                <td class="unit-column">MB/s</td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The required download bandwidth for retrieving data from the network.
+
+Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Upload Bandwidth Result -->
+            <tr class="calculator-row">
+                <td class="label-column result-label">Upload Bandwidth:</td>
+                <td class="value-column" id="uploadBandwidth">0</td>
+                <td class="unit-column">MB/s</td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The required upload bandwidth for serving data to clients, accounting for multiple reads and safety margins.
+
+Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Hot Period Result -->
+            <tr class="calculator-row">
+                <td class="label-column result-label">Hot Period:</td>
+                <td class="value-column" id="hotPeriod">0</td>
+                <td class="unit-column">seconds</td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The time it takes to fill the write cache at the current throughput rate, indicating how long data remains in the cache.
+
+Formula: (Write Cache Size in GB) ÷ ((Max Throughput) × (Encoding Rate) × (Sum of Stake))<br>Unit: Seconds</span>
+                    </div>
+                </td>
+            </tr>
+            
+            </tbody>
+        </table>
+        
+        <!-- Buttons below table -->
+        <div style="margin-top: 20px; width: 100%;">
+            <div style="float: left;">
+                <button id="reset" class="reset">Reset to Defaults</button>
+            </div>
+            <div style="float: right;">
+                <button id="do-not-click" class="do-not-click">Do Not Click</button>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Theme switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const root = document.documentElement;
+            
+            // Set initial theme from localStorage or use default (dark)
+            const savedTheme = localStorage.getItem('eigenDACalculatorTheme');
+            if (savedTheme === 'light') {
+                setLightTheme();
+                themeToggle.checked = false;
+            } else {
+                setDarkTheme();
+                themeToggle.checked = true;
+            }
+            
+            // Handle theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    setDarkTheme();
+                    localStorage.setItem('eigenDACalculatorTheme', 'dark');
+                } else {
+                    setLightTheme();
+                    localStorage.setItem('eigenDACalculatorTheme', 'light');
+                }
+            });
+            
+            function setDarkTheme() {
+                root.style.setProperty('--theme-bg-color', 'var(--bg-color)');
+                root.style.setProperty('--theme-text-color', 'var(--text-color)');
+                root.style.setProperty('--theme-calculator-bg', 'var(--calculator-bg)');
+                root.style.setProperty('--theme-header-bg', 'var(--header-bg)');
+                root.style.setProperty('--theme-divider-color', 'var(--divider-color)');
+                root.style.setProperty('--theme-input-border', 'var(--input-border)');
+                root.style.setProperty('--theme-modified-bg', 'var(--modified-bg)');
+                root.style.setProperty('--theme-hover-bg', 'var(--hover-bg)');
+                root.style.setProperty('--theme-accent-color', 'var(--accent-color)');
+                root.style.setProperty('--theme-tooltip-bg', 'var(--tooltip-bg)');
+                root.style.setProperty('--theme-tooltip-text', 'var(--tooltip-text)');
+                root.style.setProperty('--theme-button-bg', 'var(--button-bg)');
+                root.style.setProperty('--theme-button-text', 'var(--button-text)');
+                root.style.setProperty('--theme-table-border', 'var(--table-border)');
+                root.style.setProperty('--theme-reset-button-bg', 'var(--reset-button-bg)');
+                root.style.setProperty('--theme-zebra-stripe-color', 'var(--zebra-stripe-color)');
+                root.style.setProperty('--theme-result-color', 'var(--result-color)');
+            }
+            
+            function setLightTheme() {
+                root.style.setProperty('--theme-bg-color', 'var(--light-bg-color)');
+                root.style.setProperty('--theme-text-color', 'var(--light-text-color)');
+                root.style.setProperty('--theme-calculator-bg', 'var(--light-calculator-bg)');
+                root.style.setProperty('--theme-header-bg', 'var(--light-header-bg)');
+                root.style.setProperty('--theme-divider-color', 'var(--light-divider-color)');
+                root.style.setProperty('--theme-input-border', 'var(--light-input-border)');
+                root.style.setProperty('--theme-modified-bg', 'var(--light-modified-bg)');
+                root.style.setProperty('--theme-hover-bg', 'var(--light-hover-bg)');
+                root.style.setProperty('--theme-accent-color', 'var(--light-accent-color)');
+                root.style.setProperty('--theme-tooltip-bg', 'var(--light-tooltip-bg)');
+                root.style.setProperty('--theme-tooltip-text', 'var(--light-tooltip-text)');
+                root.style.setProperty('--theme-button-bg', 'var(--light-button-bg)');
+                root.style.setProperty('--theme-button-text', 'var(--light-button-text)');
+                root.style.setProperty('--theme-table-border', 'var(--light-table-border)');
+                root.style.setProperty('--theme-reset-button-bg', 'var(--light-reset-button-bg)');
+                root.style.setProperty('--theme-zebra-stripe-color', 'var(--light-zebra-stripe-color)');
+                root.style.setProperty('--theme-result-color', 'var(--light-result-color)');
+            }
+        });
+        
+        // Confetti function for the easter egg
+        function createConfetti() {
+            const confettiContainer = document.createElement('div');
+            confettiContainer.style.position = 'fixed';
+            confettiContainer.style.top = '0';
+            confettiContainer.style.left = '0';
+            confettiContainer.style.width = '100%';
+            confettiContainer.style.height = '100%';
+            confettiContainer.style.pointerEvents = 'none';
+            confettiContainer.style.zIndex = '1000';
+            document.body.appendChild(confettiContainer);
+            
+            // Create 150 confetti particles
+            for (let i = 0; i < 150; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    
+                    // Random confetti style
+                    const size = Math.random() * 10 + 5;
+                    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+                    
+                    confetti.style.position = 'absolute';
+                    confetti.style.width = `${size}px`;
+                    confetti.style.height = `${size}px`;
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    confetti.style.left = `${Math.random() * 100}%`;
+                    confetti.style.top = '-20px';
+                    confetti.style.opacity = Math.random() * 0.7 + 0.3;
+                    confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+                    
+                    // Append confetti to container
+                    confettiContainer.appendChild(confetti);
+                    
+                    // Animate falling
+                    const animationDuration = Math.random() * 3 + 2;
+                    const horizontalMovement = (Math.random() - 0.5) * 15;
+                    
+                    confetti.animate([
+                        { transform: `translate(0, 0) rotate(0deg)` },
+                        { transform: `translate(${horizontalMovement}vw, 100vh) rotate(${Math.random() * 720}deg)` }
+                    ], {
+                        duration: animationDuration * 1000,
+                        easing: 'cubic-bezier(0.37, 0, 0.63, 1)'
+                    });
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, animationDuration * 1000);
+                }, Math.random() * 2000); // Stagger confetti generation
+            }
+            
+            // Remove container after all confetti are done
+            setTimeout(() => {
+                confettiContainer.remove();
+            }, 6000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get DOM elements
+            const maxThroughputInput = document.getElementById('maxThroughput');
+            const sumOfStakeInput = document.getElementById('sumOfStake');
+            const encodingRateInput = document.getElementById('encodingRate');
+            const downloadPessimismInput = document.getElementById('downloadPessimism');
+            const readAmplificationInput = document.getElementById('readAmplification');
+            const dataRetentionInput = document.getElementById('dataRetention');
+            
+            const resetButton = document.getElementById('reset');
+            
+            // Default values
+            const defaults = {
+                maxThroughput: 50,
+                sumOfStake: 0.125, // 1/8
+                encodingRate: 8.0,
+                downloadPessimism: 2.0,
+                readAmplification: 20.0,
+                dataRetention: 14,
+                diskSafetyMargin: 1.2,
+                downloadSafetyMargin: 1.2,
+                uploadSafetyMargin: 1.2,
+                writeCacheSize: 16
+            };
+            
+            // Track if confetti has been shown for this session
+            let confettiShown = false;
+            
+            // Calculate function
+            function calculate() {
+                // Get input values
+                const maxThroughput = parseFloat(maxThroughputInput.value);
+                const sumOfStake = parseFloat(sumOfStakeInput.value);
+                const encodingRate = parseFloat(encodingRateInput.value);
+                const downloadPessimism = parseFloat(downloadPessimismInput.value);
+                const readAmplification = parseFloat(readAmplificationInput.value);
+                const dataRetention = parseFloat(dataRetentionInput.value);
+                const diskSafetyMargin = parseFloat(document.getElementById('diskSafetyMargin').value);
+                const downloadSafetyMargin = parseFloat(document.getElementById('downloadSafetyMargin').value);
+                const uploadSafetyMargin = parseFloat(document.getElementById('uploadSafetyMargin').value);
+                
+                // Easter egg: Show confetti when Max Throughput reaches 100 MB/s or higher
+                // Only trigger if we haven't shown confetti in this calculate session to avoid spamming
+                if (maxThroughput >= 100 && !confettiShown) {
+                    createConfetti();
+                    confettiShown = true;
+                    
+                    // Reset confetti shown flag after a few seconds to allow triggering again
+                    setTimeout(() => {
+                        confettiShown = false;
+                    }, 8000);
+                }
+                
+                // Calculate storage space in terabytes
+                // storage space needed = (max throughput) * (data retention period) * (encoding rate) * (sum of stake across all quorums) * (disk safety margin)
+                // Convert MB/s to TB/day: MB/s * (86400 seconds/day) / (1024*1024) MB/TB
+                const secondsPerDay = 86400;
+                const mbPerTb = 1024 * 1024;
+                
+                const storageSpace = maxThroughput * dataRetention * encodingRate * sumOfStake * diskSafetyMargin * secondsPerDay / mbPerTb;
+                
+                // Calculate download bandwidth in MB/s
+                // download bandwidth = (max throughput) * (encoding rate) * (sum of stake across all quorums) * (download safety margin)
+                const downloadBandwidth = maxThroughput * encodingRate * sumOfStake * downloadSafetyMargin;
+                
+                // Calculate upload bandwidth in MB/s
+                // upload bandwidth = (max throughput) * (sum of stake across all quorums) * (read amplification) * (download pessimism) * (upload safety margin)
+                const uploadBandwidth = maxThroughput * sumOfStake * readAmplification * downloadPessimism * uploadSafetyMargin;
+                
+                // Calculate hot period in seconds
+                // hot period = (write cache size in GB) / ((max throughput in MB/s) * (encoding rate) * (sum of stake across all quorums))
+                // Using binary representation: 1 GiB = 2^10 MiB = 1024 MiB
+                const writeCacheSizeMB = parseFloat(document.getElementById('writeCacheSize').value) * 1024;
+                const hotPeriod = writeCacheSizeMB / (maxThroughput * encodingRate * sumOfStake);
+                
+                // Update results
+                document.getElementById('storageSpace').textContent = storageSpace.toFixed(2);
+                document.getElementById('downloadBandwidth').textContent = downloadBandwidth.toFixed(2);
+                document.getElementById('uploadBandwidth').textContent = uploadBandwidth.toFixed(2);
+                document.getElementById('hotPeriod').textContent = hotPeriod.toFixed(0);
+                
+                // Update URL with current values for sharing/bookmarking
+                updateUrl();
+            }
+            
+            // Reset function
+            function reset() {
+                maxThroughputInput.value = defaults.maxThroughput;
+                sumOfStakeInput.value = defaults.sumOfStake;
+                encodingRateInput.value = defaults.encodingRate;
+                downloadPessimismInput.value = defaults.downloadPessimism;
+                readAmplificationInput.value = defaults.readAmplification;
+                dataRetentionInput.value = defaults.dataRetention;
+                document.getElementById('diskSafetyMargin').value = defaults.diskSafetyMargin;
+                document.getElementById('downloadSafetyMargin').value = defaults.downloadSafetyMargin;
+                document.getElementById('uploadSafetyMargin').value = defaults.uploadSafetyMargin;
+                
+                calculate(); // This will also update the URL to remove parameters
+                updateAllModifiedStatuses(); // Update highlighting
+                
+                // Clear the URL parameters completely (replace with clean URL)
+                window.history.pushState({}, '', window.location.pathname);
+            }
+            
+            // Add event listener for main reset button
+            resetButton.addEventListener('click', reset);
+            
+            // Add event listener for "Do Not Click" button - Rickroll
+            document.getElementById('do-not-click').addEventListener('click', function() {
+                window.open('https://www.youtube.com/watch?v=xm3YgoEiEDc', '_blank');
+            });
+            
+            // Add event listeners for individual field reset buttons
+            const resetFieldButtons = document.querySelectorAll('.reset-field');
+            resetFieldButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const fieldName = this.getAttribute('data-field');
+                    const inputElement = document.getElementById(fieldName);
+                    
+                    // Reset the specific field to its default value
+                    inputElement.value = defaults[fieldName];
+                    
+                    // Recalculate after reset
+                    calculate();
+                    
+                    // Update highlighting for this input
+                    checkModifiedStatus(inputElement);
+                });
+            });
+            
+            // Load values from URL parameters if available, otherwise use defaults
+            loadFromUrl();
+            
+            // Calculate initially
+            calculate();
+            
+            // JavaScript for positioning hover tooltips properly
+            function setupTooltips() {
+                const tooltips = document.querySelectorAll('.tooltip');
+                
+                tooltips.forEach(tooltip => {
+                    const tooltipIcon = tooltip.querySelector('.tooltip-icon');
+                    const tooltipText = tooltip.querySelector('.tooltip-text');
+                    
+                    tooltip.addEventListener('mouseenter', function() {
+                        // Get the position of the icon
+                        const rect = tooltipIcon.getBoundingClientRect();
+                        
+                        // Position the tooltip to the right of the icon
+                        tooltipText.style.top = `${rect.top - 15}px`;
+                        tooltipText.style.left = `${rect.right + 15}px`;
+                    });
+                });
+            }
+            
+            // Initialize tooltips
+            setupTooltips();
+            
+            // URL parameter handling functions
+            function loadFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                // For each parameter in the URL, set the corresponding input value
+                for (const [key, value] of urlParams.entries()) {
+                    const input = document.getElementById(key);
+                    if (input && !isNaN(parseFloat(value))) {
+                        input.value = parseFloat(value);
+                        checkModifiedStatus(input); // Update modified status
+                    }
+                }
+            }
+            
+            function updateUrl() {
+                const urlParams = new URLSearchParams();
+                
+                // Add all non-default values to URL
+                for (const key in defaults) {
+                    const input = document.getElementById(key);
+                    const currentValue = parseFloat(input.value);
+                    
+                    // Only add to URL if value differs from default
+                    if (currentValue !== defaults[key]) {
+                        urlParams.set(key, currentValue);
+                    }
+                }
+                
+                // Update URL without reloading the page
+                const newUrl = window.location.pathname + 
+                    (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.pushState({}, '', newUrl);
+            }
+            
+            // Check if a field is modified from default and update row highlighting accordingly
+            function checkModifiedStatus(input) {
+                const fieldName = input.id;
+                const defaultValue = defaults[fieldName];
+                const currentValue = parseFloat(input.value);
+                const inputRow = document.getElementById(fieldName + '-row');
+                
+                if (!inputRow) {
+                    console.warn(`Row element not found for ${fieldName}-row`);
+                    return;
+                }
+                
+                if (currentValue !== defaultValue) {
+                    inputRow.classList.add('input-modified');
+                } else {
+                    inputRow.classList.remove('input-modified');
+                }
+            }
+            
+            // Update all input statuses
+            function updateAllModifiedStatuses() {
+                inputs.forEach(input => {
+                    checkModifiedStatus(input);
+                });
+            }
+            
+            // Add input event listeners for real-time updates
+            const inputs = [
+                maxThroughputInput, 
+                sumOfStakeInput, 
+                encodingRateInput,
+                downloadPessimismInput,
+                readAmplificationInput,
+                dataRetentionInput,
+                document.getElementById('diskSafetyMargin'),
+                document.getElementById('downloadSafetyMargin'),
+                document.getElementById('uploadSafetyMargin'),
+                document.getElementById('writeCacheSize')
+            ];
+            
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    calculate();
+                    checkModifiedStatus(this);
+                });
+            });
+            
+            // Initial check for modified fields
+            updateAllModifiedStatuses();
+        });
+    </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
+# This Dockerfile has been tested on Ubuntu 24.04
+# Note: Will fail on macOS with "gcc: error: unrecognized command-line option '-m64'" during cgo compilation, which is expected because cuda is not available.
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
-# Install Go
-ENV GOLANG_VERSION=1.21.13
-ENV GOLANG_SHA256=502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7
+# Install Go 1.24.4 to match go.mod requirements
+ENV GOLANG_VERSION=1.24.4
+ENV GOLANG_SHA256=77e5da33bb72aeaef1ba4418b6fe511bc4d041873cbf82e5aa6318740df98717
 
 ADD https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz /tmp/go.tar.gz
 RUN echo "${GOLANG_SHA256} /tmp/go.tar.gz" | sha256sum -c - && \
@@ -16,10 +18,13 @@ WORKDIR /app
 # Copy go.mod and go.sum first to leverage Docker cache
 COPY go.mod go.sum ./
 
+# Copy api/proxy/clients for the replace directive
+COPY api/proxy/clients ./api/proxy/clients
+
 # Download dependencies
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY ./disperser /app/disperser
 COPY common /app/common
 COPY contracts /app/contracts

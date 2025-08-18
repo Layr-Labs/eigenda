@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -18,6 +19,103 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 )
+
+// FetchOperatorDispersalFeed godoc
+//
+//	@Summary	Fetch batches dispersed to an operator in a time window by specific direction
+//	@Tags		Operators
+//	@Produce	json
+//	@Param		operator_id	path		string	true	"The operator ID to fetch batch feed for"
+//	@Param		direction	query		string	false	"Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
+//	@Param		before		query		string	false	"Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		after		query		string	false	"Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]"
+//	@Param		limit		query		int		false	"Maximum number of batches to return; if limit <= 0 or >1000, it's treated as 1000 [default: 20; max: 1000]"
+//	@Success	200			{object}	OperatorDispersalFeedResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/{operator_id}/dispersals [get]
+func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
+	handlerStart := time.Now()
+	var err error
+
+	params, err := ParseFeedParams(c, s.metrics, "FetchOperatorDispersalFeed")
+	if err != nil {
+		invalidParamsErrorResponse(c, err)
+		return
+	}
+
+	operatorId, err := core.OperatorIDFromHex(c.Param("operator_id"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorDispersalFeed")
+		errorResponse(c, errors.New("invalid operator id"))
+		return
+	}
+
+	var dispersals []*corev2.DispersalResponse
+
+	if params.direction == "forward" {
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
+			c.Request.Context(),
+			operatorId,
+			uint64(params.afterTime.UnixNano()),
+			uint64(params.beforeTime.UnixNano()),
+			params.limit,
+			true, // ascending=true
+		)
+	} else {
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
+			c.Request.Context(),
+			operatorId,
+			uint64(params.afterTime.UnixNano()),
+			uint64(params.beforeTime.UnixNano()),
+			params.limit,
+			false, // ascending=false
+		)
+	}
+
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorDispersalFeed")
+		errorResponse(c, fmt.Errorf("failed to fetch dispersals from blob metadata store: %w", err))
+		return
+	}
+
+	batches := make([]*OperatorDispersal, len(dispersals))
+	for i, d := range dispersals {
+		batchHeaderHash, err := d.BatchHeader.Hash()
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorDispersalFeed")
+			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
+			return
+		}
+		var sig string
+		if d.Signature != [32]byte{} {
+			sig = hex.EncodeToString(d.Signature[:])
+		}
+		batches[i] = &OperatorDispersal{
+			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
+			BatchHeader:     createBatchHeader(&d.BatchHeader),
+			DispersedAt:     d.DispersedAt,
+			Signature:       sig,
+		}
+	}
+
+	response := &OperatorDispersalFeedResponse{
+		OperatorIdentity: OperatorIdentity{
+			OperatorId: operatorId.Hex(),
+		},
+		Dispersals: batches,
+	}
+	if len(batches) > 0 {
+		response.OperatorSocket = dispersals[0].Socket
+		response.OperatorIdentity.OperatorAddress = dispersals[0].OperatorAddress.Hex()
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorDispersalFeed")
+	s.metrics.ObserveLatency("FetchOperatorDispersalFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDispersalFeedAge))
+	c.JSON(http.StatusOK, response)
+}
 
 // FetchOperatorSigningInfo godoc
 //
@@ -114,8 +212,8 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		startTime = oldestTime
 	}
 
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAtForward(
-		c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1,
+	attestations, err := s.batchFeedCache.Get(
+		c.Request.Context(), startTime.Add(time.Nanosecond), endTime, Ascending, -1,
 	)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
@@ -140,6 +238,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorSigningInfo")
 	s.metrics.ObserveLatency("FetchOperatorSigningInfo", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxSigningInfoAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -227,7 +326,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	handlerStart := time.Now()
 
-	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
+	report, err := s.operatorHandler.ScanOperatorsHostInfoV2(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNodeInfo")
@@ -240,61 +339,49 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
-// FetchOperatorsResponses godoc
+// FetchOperatorDispersalResponse godoc
 //
 //	@Summary	Fetch operator attestation response for a batch
 //	@Tags		Operators
 //	@Produce	json
+//	@Param		operator_id			path		string	true	"The operator ID to fetch batch feed for"
 //	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
-//	@Param		operator_id			query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
-//	@Success	200					{object}	OperatorDispersalResponses
+//	@Success	200					{object}	OperatorDispersalResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/{batch_header_hash} [get]
-func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
+//	@Router		/operators/{operator_id}/dispersals/{batch_header_hash}/response [get]
+func (s *ServerV2) FetchOperatorDispersalResponse(c *gin.Context) {
 	handlerStart := time.Now()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorDispersalResponse")
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	operatorIdStr := c.DefaultQuery("operator_id", "")
 
-	operatorResponses := make([]*corev2.DispersalResponse, 0)
-	if operatorIdStr == "" {
-		res, err := s.blobMetadataStore.GetDispersalResponses(c.Request.Context(), batchHeaderHash)
-		if err != nil {
-			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
-			errorResponse(c, err)
-			return
-		}
-		operatorResponses = append(operatorResponses, res...)
-	} else {
-		operatorId, err := core.OperatorIDFromHex(operatorIdStr)
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
-			errorResponse(c, errors.New("invalid operatorId"))
-			return
-		}
+	operatorIdHex := c.Param("operator_id")
+	operatorId, err := core.OperatorIDFromHex(operatorIdHex)
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorDispersalResponse")
+		errorResponse(c, errors.New("invalid operatorId"))
+		return
+	}
 
-		res, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
-		if err != nil {
-			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
-			errorResponse(c, err)
-			return
-		}
-		operatorResponses = append(operatorResponses, res)
+	res, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorDispersalResponse")
+		errorResponse(c, err)
+		return
 	}
-	response := &OperatorDispersalResponses{
-		Responses: operatorResponses,
+	response := &OperatorDispersalResponse{
+		Response: res,
 	}
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsResponses")
-	s.metrics.ObserveLatency("FetchOperatorsResponses", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorDispersalResponse")
+	s.metrics.ObserveLatency("FetchOperatorDispersalResponse", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorDispersalResponseAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -314,7 +401,7 @@ func (s *ServerV2) CheckOperatorsLiveness(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.ProbeV2OperatorPorts(c.Request.Context(), operatorId)
+	result, err := s.operatorHandler.ProbeV2OperatorsLiveness(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -328,10 +415,26 @@ func (s *ServerV2) CheckOperatorsLiveness(c *gin.Context) {
 		return
 	}
 
+	operators := make([]*OperatorLiveness, len(result))
+	for i := 0; i < len(result); i++ {
+		operators[i] = &OperatorLiveness{
+			OperatorId:      result[i].OperatorId,
+			DispersalSocket: result[i].DispersalSocket,
+			DispersalOnline: result[i].DispersalOnline,
+			DispersalStatus: result[i].DispersalStatus,
+			RetrievalSocket: result[i].RetrievalSocket,
+			RetrievalOnline: result[i].RetrievalOnline,
+			RetrievalStatus: result[i].RetrievalStatus,
+		}
+	}
+	response := OperatorLivenessResponse{
+		Operators: operators,
+	}
+
 	s.metrics.IncrementSuccessfulRequestNum("CheckOperatorsLiveness")
 	s.metrics.ObserveLatency("CheckOperatorsLiveness", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
-	c.JSON(http.StatusOK, portCheckResponse)
+	c.JSON(http.StatusOK, response)
 }
 
 func (s *ServerV2) computeOperatorsSigningInfo(

@@ -45,6 +45,10 @@ func TestSerDeserGnark(t *testing.T) {
 	for i := 0; i < len(f.Coeffs); i++ {
 		assert.True(t, f.Coeffs[i].Equal(&c.Coeffs[i]))
 	}
+
+	// invalid length should return error
+	_, err = new(encoding.Frame).DeserializeGnark([]byte{1, 2, 3})
+	assert.ErrorContains(t, err, "chunk length must be at least")
 }
 
 func createFrames(b *testing.B, numFrames int) []encoding.Frame {

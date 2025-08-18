@@ -1,0 +1,49 @@
+[tools]
+
+# The exact version here doesn't matter because the `go` command is forward compatible,
+# meaning that it will automatically download a golang version (as a module) to match the
+# go and toolchain versions specified in the go.mod file.
+# See https://go.dev/blog/toolchain for more details.
+# We still want *some* go version here so that the `go` command is available though.
+go = "1.24"
+
+# Tooling Dependencies
+golangci-lint = "2.1.6"
+# abigen v2 was release in v1.15.6: https://github.com/ethereum/go-ethereum/releases/tag/v1.15.6
+# So we need to keep this version below 1.15.6 until we're ready to upgrade and fix whatever breaks.
+"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.15.0"
+# Believe yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
+# TODO: document exactly why these are needed.
+node = "20.18.1"
+yarn = "1.22.22"
+"npm:@graphprotocol/graph-cli" = "0.97.1"
+
+# Used by the subgraph ABI update script
+yq = "latest"
+
+# Used by the /preprocess-logs claude code slash command
+ripgrep = "latest"
+
+# Protocol buffer compiler
+protoc = "23.4"
+protoc-gen-go = "v1.28.1"
+protoc-gen-go-grpc = "v1.3.0"
+
+# api/proxy dependencies
+# TODO: we should use these for the rest of test suites in the monorepo.
+"go:go.uber.org/mock/mockgen" = "0.5.0"
+"go:gotest.tools/gotestsum" = "1.12.0"
+"go:github.com/segmentio/golines" = "0.12.0"
+
+# Forge Dependencies
+forge = "v1.0.0"
+cast = "v1.0.0"
+anvil = "v1.0.0"
+
+[alias]
+forge = "ubi:foundry-rs/foundry[exe=forge]"
+cast = "ubi:foundry-rs/foundry[exe=cast]"
+anvil = "ubi:foundry-rs/foundry[exe=anvil]"
+yarn = "https://github.com/mise-plugins/mise-yarn"
+protoc-gen-go = "go:google.golang.org/protobuf/cmd/protoc-gen-go"
+protoc-gen-go-grpc = "go:google.golang.org/grpc/cmd/protoc-gen-go-grpc"

@@ -1,0 +1,67 @@
+name: eigenda releaser
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the release'
+        required: true
+        type: string
+
+# Only allow this workflow to run on master branch
+# This is enforced by checking the branch in the workflow
+
+permissions:
+  contents: write
+
+jobs:
+  wait-for-approval:
+    runs-on: ubuntu-latest
+    environment:
+      name: eigenda-release-environment
+
+    steps:
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e #2.0.6
+        with:
+          app-id: ${{ secrets.EIGENDA_RELEASER_ID }}
+          private-key: ${{ secrets.EIGENDA_RELEASER_KEY }}
+          
+      - name: Checkout default branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Validate branch is master
+        run: |
+          if [[ "${{ github.ref_name }}" != "master" ]]; then
+            echo "Error: This workflow can only be run from the master branch"
+            exit 1
+          fi
+          echo "Branch validation passed: running on master"
+
+      - name: Validate version format
+        run: |
+          version="${{ github.event.inputs.version }}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Version must be in format x.y.z (e.g., 1.2.3)"
+            exit 1
+          fi
+          echo "Version format is valid: $version"
+
+      - name: Check if release branch already exists
+        run: |
+          version="${{ github.event.inputs.version }}"
+          if git branch -r | grep -q "origin/release/$version$"; then
+            echo "Error: Release branch release/$version already exists"
+            exit 1
+          fi
+          echo "Release branch for version $version is available"
+
+      - name: Create and push release branch
+        run: |
+          version="${{ github.event.inputs.version }}"
+          git config --global user.name "releaser-bot"
+          git checkout -b "release/$version"
+          git push origin "release/$version"

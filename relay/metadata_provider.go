@@ -7,6 +7,7 @@ import (
 
 	"time"
 
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -33,7 +34,7 @@ type metadataProvider struct {
 	logger logging.Logger
 
 	// metadataStore can be used to read blob metadata from dynamoDB.
-	metadataStore *blobstore.BlobMetadataStore
+	metadataStore blobstore.MetadataStore
 
 	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
 	// assigned to this server will not be in the cache.
@@ -54,7 +55,7 @@ type metadataProvider struct {
 func newMetadataProvider(
 	ctx context.Context,
 	logger logging.Logger,
-	metadataStore *blobstore.BlobMetadataStore,
+	metadataStore blobstore.MetadataStore,
 	metadataCacheSize int,
 	maxIOConcurrency int,
 	relayKeys []v2.RelayKey,
@@ -77,7 +78,7 @@ func newMetadataProvider(
 	server.blobParamsMap.Store(blobParamsMap)
 
 	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
-		cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil),
+		cache2.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil, nil),
 		maxIOConcurrency,
 		server.fetchMetadata,
 		metrics)

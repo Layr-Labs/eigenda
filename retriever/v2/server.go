@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -21,8 +21,8 @@ type Server struct {
 	pb.UnimplementedRetrieverServer
 
 	config          *Config
-	retrievalClient clients.RetrievalClient
-	indexedState    core.IndexedChainState
+	retrievalClient validator.ValidatorClient
+	chainState      core.ChainState
 	logger          logging.Logger
 	metrics         *retriever.Metrics
 }
@@ -30,23 +30,22 @@ type Server struct {
 func NewServer(
 	config *Config,
 	logger logging.Logger,
-	retrievalClient clients.RetrievalClient,
-	indexedState core.IndexedChainState,
+	retrievalClient validator.ValidatorClient,
+	chainState core.ChainState,
 ) *Server {
 	metrics := retriever.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	return &Server{
 		config:          config,
 		retrievalClient: retrievalClient,
-		indexedState:    indexedState,
+		chainState:      chainState,
 		logger:          logger.With("component", "RetrieverServer"),
 		metrics:         metrics,
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) {
 	s.metrics.Start(ctx)
-	return s.indexedState.Start(ctx)
 }
 
 func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.BlobReply, error) {
@@ -73,13 +72,15 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, s.config.Timeout)
 	defer cancel()
 
+	blobHeaderWithHashedPayment, err := blobHeader.GetBlobHeaderWithHashedPayment()
+	if err != nil {
+		return nil, err
+	}
+
 	data, err := s.retrievalClient.GetBlob(
 		ctxWithTimeout,
-		blobKey,
-		blobHeader.BlobVersion,
-		blobHeader.BlobCommitments,
-		uint64(req.GetReferenceBlockNumber()),
-		core.QuorumID(req.GetQuorumId()))
+		blobHeaderWithHashedPayment,
+		uint64(req.GetReferenceBlockNumber()))
 	if err != nil {
 		return nil, err
 	}

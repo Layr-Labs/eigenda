@@ -79,12 +79,12 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 	retrievalClient = &clientsmock.MockRetrievalClient{}
 	chainClient = mock.NewMockChainClient()
-	return retriever.NewServer(config, logger, retrievalClient, indexedChainState, chainClient)
+	return retriever.NewServer(config, logger, retrievalClient, chainClient)
 }
 
 func TestRetrieveBlob(t *testing.T) {
 	server := newTestServer(t)
-	chainClient.On("FetchBatchHeader").Return(&binding.BatchHeader{
+	chainClient.On("FetchBatchHeader").Return(&binding.EigenDATypesV1BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         []byte{0},
 		SignedStakeForQuorums: []byte{90},
@@ -100,5 +100,5 @@ func TestRetrieveBlob(t *testing.T) {
 		QuorumId:             0,
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, gettysburgAddressBytes, retrievalReply.Data)
+	assert.Equal(t, gettysburgAddressBytes, retrievalReply.GetData())
 }

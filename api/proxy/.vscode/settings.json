@@ -1,0 +1,10 @@
+{
+  "go.testEnvFile": "${workspaceFolder}/.env",
+  "go.testFlags": ["-v", "-test.parallel", "4", "-timeout", "5m"],
+  "go.loadEnvFile": true,
+  "go.useCodeLens": true,
+  "go.enableCodeLens": {
+    "references": true,
+    "runtest": true
+  },
+}

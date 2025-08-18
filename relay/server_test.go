@@ -3,22 +3,22 @@ package relay
 import (
 	"context"
 	"encoding/binary"
-	"github.com/docker/go-units"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/relay/auth"
-	"github.com/Layr-Labs/eigenda/relay/mock"
-
-	"github.com/Layr-Labs/eigenda/relay/limiter"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/relay/auth"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/docker/go-units"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,17 +26,19 @@ import (
 
 func defaultConfig() *Config {
 	return &Config{
-		GRPCPort:                   50051,
-		MaxGRPCMessageSize:         units.MB,
-		MetadataCacheSize:          1024 * 1024,
-		MetadataMaxConcurrency:     32,
-		BlobCacheBytes:             1024 * 1024,
-		BlobMaxConcurrency:         32,
-		ChunkCacheBytes:            1024 * 1024,
-		ChunkMaxConcurrency:        32,
-		MaxKeysPerGetChunksRequest: 1024,
-		AuthenticationKeyCacheSize: 1024,
-		AuthenticationDisabled:     false,
+		GRPCPort:                     50051,
+		MaxGRPCMessageSize:           units.MB,
+		MetadataCacheSize:            1024 * 1024,
+		MetadataMaxConcurrency:       32,
+		BlobCacheBytes:               1024 * 1024,
+		BlobMaxConcurrency:           32,
+		ChunkCacheBytes:              1024 * 1024,
+		ChunkMaxConcurrency:          32,
+		MaxKeysPerGetChunksRequest:   1024,
+		AuthenticationKeyCacheSize:   1024,
+		AuthenticationDisabled:       false,
+		GetChunksRequestMaxPastAge:   5 * time.Minute,
+		GetChunksRequestMaxFutureAge: 5 * time.Minute,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
@@ -93,7 +95,8 @@ func getChunks(
 	operatorIDBytes := make([]byte, 32)
 	binary.BigEndian.PutUint32(operatorIDBytes[24:], operatorID)
 	request.OperatorId = operatorIDBytes
-	signature := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	signature, err := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	require.NoError(t, err)
 	request.OperatorSignature = signature
 
 	var opts []grpc.DialOption
@@ -125,7 +128,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 	chainReader := newMockChainReader()
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -135,6 +138,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -184,7 +188,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
-		require.Equal(t, data, response.Blob)
+		require.Equal(t, data, response.GetBlob())
 	}
 
 	// Read the blobs back again to test caching.
@@ -196,7 +200,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
-		require.Equal(t, data, response.Blob)
+		require.Equal(t, data, response.GetBlob())
 	}
 }
 
@@ -213,7 +217,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -224,6 +228,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -276,7 +281,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -288,6 +293,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -355,7 +361,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
-			require.Equal(t, data, response.Blob)
+			require.Equal(t, data, response.GetBlob())
 		} else {
 			require.Error(t, err)
 			require.Nil(t, response)
@@ -381,7 +387,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
-			require.Equal(t, data, response.Blob)
+			require.Equal(t, data, response.GetBlob())
 		} else {
 			require.Error(t, err)
 			require.Nil(t, response)
@@ -418,7 +424,7 @@ func TestReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -432,6 +438,7 @@ func TestReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -494,14 +501,15 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i, frame := range bundle {
@@ -528,14 +536,15 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i, frame := range bundle {
@@ -561,14 +570,15 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i := startIndex; i < endIndex; i++ {
@@ -597,14 +607,15 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(response.Data))
+		require.Equal(t, 1, len(response.GetData()))
 
-		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 		require.NoError(t, err)
 
 		for i := 0; i < len(indices); i++ {
@@ -644,7 +655,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -654,6 +665,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -661,6 +673,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		chunkReader,
 		chainReader,
 		ics)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
 	go func() {
@@ -731,17 +744,18 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
-		require.Equal(t, keyCount, len(response.Data))
+		require.Equal(t, keyCount, len(response.GetData()))
 
 		for keyIndex, key := range keys {
 			data := expectedData[key]
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyIndex])
 			require.NoError(t, err)
 
 			for frameIndex, frame := range bundle {
@@ -791,7 +805,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -806,6 +820,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -875,6 +890,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -891,9 +907,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i, frame := range bundle {
@@ -924,6 +940,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -939,9 +956,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i, frame := range bundle {
@@ -972,6 +989,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -987,9 +1005,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i := startIndex; i < endIndex; i++ {
@@ -1019,6 +1037,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -1034,9 +1053,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(response.Data))
+			require.Equal(t, 1, len(response.GetData()))
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[0])
 			require.NoError(t, err)
 
 			for i := 0; i < len(indices); i++ {
@@ -1092,7 +1111,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -1107,6 +1126,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -1115,6 +1135,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		chainReader,
 		ics)
 	require.NoError(t, err)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
 	go func() {
 		err = server.Start(context.Background())
@@ -1202,6 +1223,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		allInCorrectShard := true
@@ -1224,12 +1246,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		if allInCorrectShard {
 			require.NoError(t, err)
 
-			require.Equal(t, keyCount+1, len(response.Data))
+			require.Equal(t, keyCount+1, len(response.GetData()))
 
 			for keyIndex, key := range keys {
 				data := expectedData[key]
 
-				bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+				bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyIndex])
 				require.NoError(t, err)
 
 				for frameIndex, frame := range bundle {
@@ -1241,7 +1263,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 			key := keys[0]
 			data := expectedData[key][len(expectedData[key])/2:]
 
-			bundle, err := core.Bundle{}.Deserialize(response.Data[keyCount])
+			bundle, err := core.Bundle{}.Deserialize(response.GetData()[keyCount])
 			require.NoError(t, err)
 
 			for frameIndex, frame := range bundle {

@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -21,7 +22,7 @@ type AccountID = string
 
 // Security and Quorum Parameters
 
-// QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
+// QuorumID is a unique identifier for a quorum; initially EigenDA will support up to 256 quorums
 type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
@@ -306,7 +307,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(RoundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*PercentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -496,7 +497,7 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
-	AccountID string `json:"account_id"`
+	AccountID gethcommon.Address `json:"account_id"`
 
 	// Timestamp represents the nanosecond of the dispersal request creation
 	Timestamp int64 `json:"timestamp"`
@@ -533,7 +534,17 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		},
 	}
 
-	bytes, err := arguments.Pack(pm)
+	s := struct {
+		AccountID         string
+		Timestamp         int64
+		CumulativePayment *big.Int
+	}{
+		AccountID:         pm.AccountID.Hex(),
+		Timestamp:         pm.Timestamp,
+		CumulativePayment: pm.CumulativePayment,
+	}
+
+	bytes, err := arguments.Pack(s)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -553,7 +564,7 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
-			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID.Hex()},
 			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
@@ -571,7 +582,7 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
 	}
-	pm.AccountID = accountID.Value
+	pm.AccountID = gethcommon.HexToAddress(accountID.Value)
 	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
@@ -594,26 +605,34 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 		return nil
 	}
 	return &commonpbv2.PaymentHeader{
-		AccountId:         pm.AccountID,
+		AccountId:         pm.AccountID.Hex(),
 		Timestamp:         pm.Timestamp,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
 	}
 }
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, error) {
 	if ph == nil {
-		return nil
+		return nil, nil
+	}
+
+	if !gethcommon.IsHexAddress(ph.GetAccountId()) {
+		return nil, fmt.Errorf("invalid account ID: %s", ph.GetAccountId())
 	}
 
 	return &PaymentMetadata{
-		AccountID:         ph.AccountId,
-		Timestamp:         ph.Timestamp,
-		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
-	}
+		AccountID:         gethcommon.HexToAddress(ph.GetAccountId()),
+		Timestamp:         ph.GetTimestamp(),
+		CumulativePayment: new(big.Int).SetBytes(ph.GetCumulativePayment()),
+	}, nil
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment
+//
+// TODO(litt3): this struct is in the process of being deprecated. It is used by the old accounting logic, but will
+// be replaced by the `reservation.Reservation` struct once the new accounting logic has superseded the old. At that
+// time, this struct should be deleted.
 type ReservedPayment struct {
 	// reserve number of symbols per second
 	SymbolsPerSecond uint64
@@ -634,9 +653,42 @@ type OnDemandPayment struct {
 }
 
 type BlobVersionParameters struct {
-	CodingRate      uint32
+	// CodingRate specifies the amount of redundancy that will be added when encoding the blob
+	// (Note that for the purposes of integer representation, this is the inverse of the standard
+	// coding rate used in coding theory). CodingRate must be a power of 2.
+	CodingRate uint32
+	// MaxNumOperators is the maximum number of operators that can be registered for each quorum for a given blob version.
+	// This limit is needed in order to ensure that the blob can satisfy a fixed reconstruction threshold. See the
+	// GetReconstructionThreshold method for more details.
 	MaxNumOperators uint32
-	NumChunks       uint32
+	// NumChunks is the number of individual encoded chunks of data that will be generated for each blob.
+	// NumChunks must be a power of 2.
+	NumChunks uint32
+}
+
+// Get the length of a chunk in bytes for a blob with these parameters and a given blob length in symbols.
+func (bvp *BlobVersionParameters) GetChunkLength(blobLengthSymbols uint32) (uint32, error) {
+	if blobLengthSymbols == 0 {
+		return 0, fmt.Errorf("blob length must be greater than 0")
+	}
+
+	// Check that the blob length is a power of 2 using bit manipulation
+	if blobLengthSymbols&(blobLengthSymbols-1) != 0 {
+		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLengthSymbols)
+	}
+
+	chunkLength := blobLengthSymbols * bvp.CodingRate / bvp.NumChunks
+	if chunkLength == 0 {
+		chunkLength = 1
+	}
+
+	return chunkLength, nil
+}
+
+// GetReconstructionThreshold returns the minimum difference between the ConfirmationThreshold
+// and AdversaryThreshold that is valid for a given BlobVersionParameters.
+func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
+	return RoundUpDivide(bvp.NumChunks*10000, (bvp.NumChunks-bvp.MaxNumOperators)*bvp.CodingRate)
 }
 
 // IsActive returns true if the reservation is active at the given timestamp

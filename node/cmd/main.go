@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
-
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/urfave/cli"
@@ -48,13 +47,16 @@ func main() {
 }
 
 func NodeMain(ctx *cli.Context) error {
+
+	// TODO (cody.littley): pull all business logic in this function into the NewNode() constructor.
+
 	log.Println("Initializing Node")
 	config, err := node.NewConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
 	}
@@ -83,16 +85,13 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	reader, err := coreeth.NewReader(
-		logger,
-		client,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}
 
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
+	node, err := node.NewNode(context.Background(), reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}

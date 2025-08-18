@@ -50,7 +50,7 @@ func (g *ParametrizedEncoder) MakeFrames(
 	indices := make([]uint32, 0)
 	frames := make([]FrameCoeffs, g.NumChunks)
 
-	numWorker := uint64(g.Config.NumWorker)
+	numWorker := uint64(g.NumWorker)
 	if numWorker > g.NumChunks {
 		numWorker = g.NumChunks
 	}

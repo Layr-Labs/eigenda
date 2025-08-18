@@ -67,6 +67,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
+	InternalV2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-dispersal-port"),
+		Usage:    "Port at which node listens for v2 dispersal calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_DISPERSAL_PORT"),
+	}
+	InternalV2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-retrieval-port"),
+		Usage:    "Port at which node listens for v2 retrieval calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_RETRIEVAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -114,7 +126,7 @@ var (
 	}
 	DbPathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "db-path"),
-		Usage:    "Path for level db",
+		Usage:    "Path for level db. This is only used for V1, and will eventually be removed.",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
 	}
@@ -144,16 +156,22 @@ var (
 		Usage:    "Password to decrypt ecdsa private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ECDSA_KEY_PASSWORD"),
 	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
+	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
@@ -167,6 +185,12 @@ var (
 		Usage:    "Whether to use secure GRPC connection to Churner",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
+	}
+	RelayUseSecureGRPC = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-use-secure-grpc"),
+		Usage:    "Whether to use secure GRPC connection to Relay (defaults to true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_USE_SECURE_GRPC"),
 	}
 	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
@@ -365,6 +389,150 @@ var (
 		Value:    ModeV1AndV2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
 	}
+	StoreChunksRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-request-max-past-age"),
+		Usage:    "The maximum age of a StoreChunks request in the past that the node will accept.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_PAST_AGE"),
+	}
+	StoreChunksRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-request-max-future-age"),
+		Usage:    "The maximum age of a StoreChunks request in the future that the node will accept.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
+	}
+	LevelDBDisableSeeksCompactionV1Flag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v1"),
+		Usage:    "Disable seeks compaction for LevelDB for v1",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V1"),
+	}
+	LevelDBEnableSyncWritesV1Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-sync-writes-v1"),
+		Usage:    "Enable sync writes for LevelDB for v1",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
+	}
+	LittDBWriteCacheSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
+		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
+			"NODE_LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
+	}
+	LittDBWriteCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
+		Required: false,
+		Value:    0.15,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
+	}
+	LittDBReadCacheSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
+		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
+			"NODE_LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
+	}
+	LittDBReadCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB read cache.",
+		Required: false,
+		Value:    0.05,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_FRACTION"),
+	}
+	LittDBStoragePathsFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-storage-paths"),
+		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
+	}
+	LittRespectLocksFlag = cli.BoolFlag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-respect-locks"),
+		Usage: "If set, LittDB will refuse to start if it can't acquire locks on the storage paths. " +
+			"Ideally this would always be enabled, but PID reuse in platforms like Kubernetes/Docker can make " +
+			"lock files practically impossible to manage.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_RESPECT_LOCKS"),
+	}
+	DownloadPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
+		Usage:    "The size of the download pool. The default value is 16.",
+		Required: false,
+		Value:    16,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
+	}
+	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that hit the cache, unit is MB/s.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksHotBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-burst-limit-mb"),
+		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_BURST_LIMIT_MB"),
+	}
+	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
+		Required: false,
+		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
+		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
+		Required: false,
+		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
+	}
+	GCSafetyBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage: "The size of the safety buffer for garbage collection in gigabytes. If zero, is ignored and " +
+			"NODE_GC_SAFETY_BUFFER_SIZE_FRACTION will be used instead.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
+	}
+	GCSafetyBufferSizeFractionFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-fraction"),
+		Usage: "The fraction of the total memory to use for the safety buffer for garbage collection. Is" +
+			" ignored if NODE_GC_SAFETY_BUFFER_SIZE_GB > 0.",
+		Required: false,
+		Value:    0.2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
+	}
+	StoreChunksBufferTimeoutFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
+		Usage: "The maximum amount of time to wait to acquire buffer capacity " +
+			"to store chunks in the StoreChunks() gRPC request",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_TIMEOUT"),
+	}
+	StoreChunksBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-gb"),
+		Usage: "The maximum memory that can be used for StoreChunks() gRPC request buffer in gigabytes. " +
+			"Overrides NODE_STORE_CHUNKS_BUFFER_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_GB"),
+	}
+	StoreChunksBufferSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-fraction"),
+		Usage:    "The fraction of total memory to use for StoreChunks() gRPC request buffer.",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -439,8 +607,6 @@ var requiredFlags = []cli.Flag{
 	DbPathFlag,
 	BlsKeyFileFlag,
 	BlsKeyPasswordFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	PubIPProviderFlag,
 	PubIPCheckIntervalFlag,
 	ChurnerUrlFlag,
@@ -458,8 +624,11 @@ var optionalFlags = []cli.Flag{
 	NumBatchDeserializationWorkersFlag,
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
+	InternalV2DispersalPortFlag,
+	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
+	RelayUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
 	DataApiUrlFlag,
@@ -483,6 +652,28 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
 	RuntimeModeFlag,
+	StoreChunksRequestMaxPastAgeFlag,
+	StoreChunksRequestMaxFutureAgeFlag,
+	LevelDBDisableSeeksCompactionV1Flag,
+	LevelDBEnableSyncWritesV1Flag,
+	DownloadPoolSizeFlag,
+	LittDBWriteCacheSizeGBFlag,
+	LittDBReadCacheSizeGBFlag,
+	LittDBWriteCacheSizeFractionFlag,
+	LittDBReadCacheSizeFractionFlag,
+	LittDBStoragePathsFlag,
+	GetChunksHotCacheReadLimitMBFlag,
+	GetChunksHotBurstLimitMBFlag,
+	GetChunksColdCacheReadLimitMBFlag,
+	GetChunksColdBurstLimitMBFlag,
+	GCSafetyBufferSizeGBFlag,
+	EigenDADirectoryFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
+	LittRespectLocksFlag,
+	StoreChunksBufferTimeoutFlag,
+	StoreChunksBufferSizeGBFlag,
+	StoreChunksBufferSizeFractionFlag,
 }
 
 func init() {

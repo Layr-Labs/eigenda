@@ -8,18 +8,103 @@ import (
 	"strconv"
 	"time"
 
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/gin-gonic/gin"
 )
 
+// FeedParams holds common query parameters for feed-related endpoints
+type FeedParams struct {
+	direction  string
+	beforeTime time.Time
+	afterTime  time.Time
+	limit      int
+}
+
+// ParseFeedParams parses and validates common feed query parameters
+func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName string) (*FeedParams, error) {
+	now := time.Now()
+	oldestTime := now.Add(-maxBlobAge)
+	params := &FeedParams{}
+
+	// Parse direction
+	params.direction = "forward"
+	if dirStr := c.Query("direction"); dirStr != "" {
+		if dirStr != "forward" && dirStr != "backward" {
+			metrics.IncrementInvalidArgRequestNum(handlerName)
+			return nil, fmt.Errorf("`direction` must be either \"forward\" or \"backward\", found: %q", dirStr)
+		}
+		params.direction = dirStr
+	}
+
+	// Parse before parameter
+	params.beforeTime = now
+	if c.Query("before") != "" {
+		beforeTime, err := parseQueryParamTime(c.Query("before"))
+		if err != nil {
+			metrics.IncrementInvalidArgRequestNum(handlerName)
+			return nil, fmt.Errorf("failed to parse `before` param: %w", err)
+		}
+		if beforeTime.Before(oldestTime) {
+			metrics.IncrementInvalidArgRequestNum(handlerName)
+			return nil, fmt.Errorf("`before` time cannot be more than 14 days in the past, found: `%s`", c.Query("before"))
+		}
+		if now.Before(beforeTime) {
+			beforeTime = now
+		}
+		params.beforeTime = beforeTime
+	}
+
+	// Parse after parameter
+	params.afterTime = params.beforeTime.Add(-time.Hour)
+	if c.Query("after") != "" {
+		afterTime, err := parseQueryParamTime(c.Query("after"))
+		if err != nil {
+			metrics.IncrementInvalidArgRequestNum(handlerName)
+			return nil, fmt.Errorf("failed to parse `after` param: %w", err)
+		}
+		if now.Before(afterTime) {
+			metrics.IncrementInvalidArgRequestNum(handlerName)
+			return nil, fmt.Errorf("`after` must be before current time, found: `%s`", c.Query("after"))
+		}
+		if afterTime.Before(oldestTime) {
+			afterTime = oldestTime
+		}
+		params.afterTime = afterTime
+	}
+
+	// Validate time range
+	if !params.afterTime.Before(params.beforeTime) {
+		metrics.IncrementInvalidArgRequestNum(handlerName)
+		return nil, fmt.Errorf("`after` timestamp (%s) must be earlier than `before` timestamp (%s)",
+			params.afterTime.Format(time.RFC3339), params.beforeTime.Format(time.RFC3339))
+	}
+
+	// Parse limit parameter
+	limitStr := c.DefaultQuery("limit", "20")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		metrics.IncrementInvalidArgRequestNum(handlerName)
+		return nil, fmt.Errorf("failed to parse `limit` param: %w", err)
+	}
+
+	if limit <= 0 || limit > maxNumBatchesPerBatchFeedResponse {
+		limit = maxNumBatchesPerBatchFeedResponse
+	}
+	params.limit = limit
+
+	return params, nil
+}
+
 // FetchBatchFeed godoc
 //
-//	@Summary	Fetch batch feed
+//	@Summary	Fetch batch feed in specified direction
 //	@Tags		Batches
 //	@Produce	json
-//	@Param		end			query		string	false	"Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval	query		int		false	"Fetch batches starting from an interval (in seconds) before the end time [default: 3600]"
-//	@Param		limit		query		int		false	"The maximum number of batches to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
+//	@Param		direction	query		string	false	"Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
+//	@Param		before		query		string	false	"Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		after		query		string	false	"Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]"
+//	@Param		limit		query		int		false	"Maximum number of batches to return; if limit <= 0 or >1000, it's treated as 1000 [default: 20; max: 1000]"
 //	@Success	200			{object}	BatchFeedResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -29,51 +114,32 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
 
-	now := handlerStart
-	oldestTime := now.Add(-maxBlobAge)
-
-	endTime := now
-	if c.Query("end") != "" {
-		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
-			return
-		}
-		if endTime.Before(oldestTime) {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days in the past, found: %s", c.Query("end")))
-			return
-		}
-	}
-
-	interval := 3600
-	if c.Query("interval") != "" {
-		interval, err = strconv.Atoi(c.Query("interval"))
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
-			return
-		}
-		if interval <= 0 {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("interval must be greater than 0, found: %d", interval))
-			return
-		}
-	}
-
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	params, err := ParseFeedParams(c, s.metrics, "FetchBatchFeed")
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeed")
-		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		invalidParamsErrorResponse(c, err)
 		return
 	}
-	if limit <= 0 || limit > maxNumBatchesPerBatchFeedResponse {
-		limit = maxNumBatchesPerBatchFeedResponse
+
+	var attestations []*corev2.Attestation
+
+	if params.direction == "forward" {
+		attestations, err = s.batchFeedCache.Get(
+			c.Request.Context(),
+			params.afterTime.Add(time.Nanosecond), // +1ns to make it inclusive
+			params.beforeTime,
+			Ascending,
+			params.limit,
+		)
+	} else {
+		attestations, err = s.batchFeedCache.Get(
+			c.Request.Context(),
+			params.afterTime.Add(time.Nanosecond), // +1ns to make it inclusive
+			params.beforeTime,
+			Descending,
+			params.limit,
+		)
 	}
 
-	startTime := endTime.Add(-time.Duration(interval) * time.Second)
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAtForward(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), limit)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBatchFeed")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
@@ -88,21 +154,23 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
 			return
 		}
-
 		batches[i] = &BatchInfo{
 			BatchHeaderHash:         hex.EncodeToString(batchHeaderHash[:]),
-			BatchHeader:             at.BatchHeader,
+			BatchHeader:             createBatchHeader(at.BatchHeader),
 			AttestedAt:              at.AttestedAt,
 			AggregatedSignature:     at.Sigma,
 			QuorumNumbers:           at.QuorumNumbers,
 			QuorumSignedPercentages: at.QuorumResults,
 		}
 	}
+
 	response := &BatchFeedResponse{
 		Batches: batches,
 	}
+
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatchFeed")
-	s.metrics.ObserveLatency("FetchBatchFeed", time.Since(now))
+	s.metrics.ObserveLatency("FetchBatchFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchFeedAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -119,6 +187,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 //	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatch(c *gin.Context) {
 	handlerStart := time.Now()
+	ctx := c.Request.Context()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
@@ -127,22 +196,67 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBatch")
-		errorResponse(c, err)
-		return
+	batchResponse, found := s.batchResponseCache.Get(batchHeaderHashHex)
+	if !found {
+		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+
+		quorums := make(map[uint8]struct{}, 0)
+		for _, q := range attestation.QuorumNumbers {
+			quorums[q] = struct{}{}
+		}
+		signers, nonsigners, err := s.getSignersAndNonSigners(ctx, quorums, attestation)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+
+		signedBatch := &SignedBatch{
+			BatchHeader: createBatchHeader(batchHeader),
+			AttestationInfo: &AttestationInfo{
+				Attestation: attestation,
+				Signers:     signers,
+				Nonsigners:  nonsigners,
+			},
+		}
+
+		batchInfo, err := s.blobMetadataStore.GetBatch(ctx, batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+		blobKeys := make([]string, len(batchInfo.BlobCertificates))
+		for i := 0; i < len(blobKeys); i++ {
+			bk, err := batchInfo.BlobCertificates[i].BlobHeader.BlobKey()
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBatch")
+				errorResponse(c, err)
+				return
+			}
+			blobKeys[i] = bk.Hex()
+		}
+
+		// TODO: Add blob inclusion info for each comprising blob if needed
+
+		batchResponse = &BatchResponse{
+			BatchHeaderHash:  batchHeaderHashHex,
+			BlobKeys:         blobKeys,
+			SignedBatch:      signedBatch,
+			BlobCertificates: batchInfo.BlobCertificates,
+		}
+		s.batchResponseCache.Add(batchHeaderHashHex, batchResponse)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBatch")
 	}
-	// TODO: support fetch of blob inclusion info
-	batchResponse := &BatchResponse{
-		BatchHeaderHash: batchHeaderHashHex,
-		SignedBatch: &SignedBatch{
-			BatchHeader: batchHeader,
-			Attestation: attestation,
-		},
-	}
+
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
 	s.metrics.ObserveLatency("FetchBatch", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchDataAge))
 	c.JSON(http.StatusOK, batchResponse)
 }

@@ -49,13 +49,14 @@ type Config struct {
 	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
 	AuthenticationKeyCacheSize int
 
-	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
-	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
-	// will be authenticated independently, regardless of timing.
-	AuthenticationTimeout time.Duration
-
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
+
+	// GetChunksRequestMaxPastAge is the maximum age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxPastAge time.Duration
+
+	// GetChunksRequestMaxFutureAge is the maximum future age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxFutureAge time.Duration
 
 	// Timeouts contains configuration for relay timeouts.
 	Timeouts TimeoutConfig
@@ -74,4 +75,15 @@ type Config struct {
 
 	// PprofHttpPort is the port that the pprof HTTP server listens on
 	PprofHttpPort int
+
+	// The maximum permissible age of a GRPC connection before it is closed. If zero, then the server will not close
+	// connections based on age.
+	MaxConnectionAge time.Duration
+
+	// When the server closes a connection due to MaxConnectionAgeSeconds, it will wait for this grace period before
+	// forcibly closing the connection. This allows in-flight requests to complete.
+	MaxConnectionAgeGrace time.Duration
+
+	// MaxIdleConnectionAge is the maximum time a connection can be idle before it is closed.
+	MaxIdleConnectionAge time.Duration
 }

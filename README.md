@@ -12,7 +12,7 @@ EigenDA is a secure, high-throughput, and decentralized data availability (DA) s
 
 To understand more about how EigenDA works and how it transforms the modern landscape of data availability, continue reading [EigenDA introduction](https://www.blog.eigenlayer.xyz/intro-to-eigenda-hyperscale-data-availability-for-rollups/).
 
-To dive deep into the technical details, continue reading [EigenDA protocol spec](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md).
+To dive deep into the technical details, continue reading [EigenDA protocol spec](https://layr-labs.github.io/eigenda/) in mdBook.
 
 If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA Partner Registration](https://docs.google.com/forms/d/e/1FAIpQLSdXvfxgRfIHWYu90FqN-2yyhgrYm9oExr0jSy7ERzbMUimJew/viewform).
 
@@ -32,6 +32,12 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - Improving our product or contribution documentation
 - Voting on [open issues](https://github.com/Layr-Labs/eigenda/issues) or
   contributing use cases to a feature request
+
+### Dependency Management
+
+We use [mise](https://mise.jdx.dev/) to manage dependencies in EigenDA. This is still a work in progress, as it currently only manages go and golangci-lint dependencies.
+The goal is to eventually get exact parity and reproducibility between our CI and local environments, so that we can reproduce and debug failing CI issues locally.
+To install dependencies using mise, first [install and activate mise](https://mise.jdx.dev/getting-started.html), and then run `mise install` in the root of the repository.
 
 ## Contact
 

@@ -29,7 +29,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		return nil, err
 	}
 	if len(operatorState.Operators) != int(quorumCount) {
-		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
+		return nil, fmt.Errorf("requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
 	}
 	totalStakePerQuorum := map[core.QuorumID]*big.Int{}
 	for quorumID, opInfoByID := range operatorState.Operators {

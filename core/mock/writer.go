@@ -95,6 +95,15 @@ func (t *MockWriter) GetOperatorStakesForQuorums(ctx context.Context, quorums []
 	return result.(core.OperatorStakes), args.Error(1)
 }
 
+func (t *MockWriter) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakesWithSocket, error) {
+	args := t.Called()
+	result := args.Get(0)
+	if fn, ok := result.(func([]core.QuorumID, uint32) core.OperatorStakesWithSocket); ok {
+		return fn(quorums, blockNumber), args.Error(1)
+	}
+	return result.(core.OperatorStakesWithSocket), args.Error(1)
+}
+
 func (t *MockWriter) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
 	args := t.Called(ctx, batchHeader, quorums, signatureAggregation)
 	result := args.Get(0)

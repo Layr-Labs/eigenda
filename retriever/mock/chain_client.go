@@ -20,7 +20,7 @@ func NewMockChainClient() *MockChainClient {
 	return &MockChainClient{}
 }
 
-func (c *MockChainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.BatchHeader, error) {
+func (c *MockChainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.EigenDATypesV1BatchHeader, error) {
 	args := c.Called()
-	return args.Get(0).(*binding.BatchHeader), args.Error(1)
+	return args.Get(0).(*binding.EigenDATypesV1BatchHeader), args.Error(1)
 }

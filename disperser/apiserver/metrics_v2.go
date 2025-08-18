@@ -14,14 +14,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"google.golang.org/grpc"
 )
 
 const namespace = "eigenda_disperser_api"
 
 // metricsV2 encapsulates the metrics for the v2 API server.
 type metricsV2 struct {
-	grpcServerOption grpc.ServerOption
+	grpcMetrics *grpcprom.ServerMetrics
 
 	getBlobCommitmentLatency        *prometheus.SummaryVec
 	getPaymentStateLatency          *prometheus.SummaryVec
@@ -43,10 +42,6 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 	registry.MustRegister(grpcMetrics)
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
-
-	grpcServerOption := grpc.UnaryInterceptor(
-		grpcMetrics.UnaryServerInterceptor(),
-	)
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
@@ -129,7 +124,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 	)
 
 	return &metricsV2{
-		grpcServerOption:                grpcServerOption,
+		grpcMetrics:                     grpcMetrics,
 		getBlobCommitmentLatency:        getBlobCommitmentLatency,
 		getPaymentStateLatency:          getPaymentStateLatency,
 		disperseBlobLatency:             disperseBlobLatency,

@@ -1,8 +1,9 @@
 syntax = "proto3";
+package retriever.v2;
 
 import "common/v2/common_v2.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2";
-package retriever.v2;
 
 // The Retriever is a service for retrieving chunks corresponding to a blob from
 // the EigenDA operator nodes and reconstructing the original blob from the chunks.
@@ -18,24 +19,24 @@ package retriever.v2;
 // (the 2nd approach here) removes the need to trust the relay, with the downside of
 // worse cost and performance.
 service Retriever {
-	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
-	// reconstructed original blob in response.
-	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
+  // This fans out request to EigenDA Nodes to retrieve the chunks and returns the
+  // reconstructed original blob in response.
+  rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
 }
 
 // A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().
 message BlobRequest {
-	// header of the blob to be retrieved
-	common.v2.BlobHeader blob_header = 1;
-	// The Ethereum block number at which the batch for this blob was constructed.
-	uint32 reference_block_number = 2;
-	// Which quorum of the blob this is requesting for (note a blob can participate in
-	// multiple quorums).
-	uint32 quorum_id = 3;
+  // header of the blob to be retrieved
+  common.v2.BlobHeader blob_header = 1;
+  // The Ethereum block number at which the batch for this blob was constructed.
+  uint32 reference_block_number = 2;
+  // Which quorum of the blob this is requesting for (note a blob can participate in
+  // multiple quorums).
+  uint32 quorum_id = 3;
 }
 
 // A reply to a RetrieveBlob() request.
 message BlobReply {
-	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
-	bytes data = 1;
+  // The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
+  bytes data = 1;
 }

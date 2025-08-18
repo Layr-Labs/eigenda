@@ -3,6 +3,9 @@ package client
 import (
 	"fmt"
 	"path"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/docker/go-units"
 )
 
 // TestClientConfig is the configuration for the test client.
@@ -30,6 +33,11 @@ type TestClientConfig struct {
 	//
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
+	// The contract address for the EigenDA address directory, where all contract addresses are stored
+	//
+	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
+	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
+	EigenDADirectory string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
@@ -56,13 +64,36 @@ type TestClientConfig struct {
 	MaxBlobSize uint64
 	// The port to use for metrics (if metrics are being collected)
 	MetricsPort int
+	// If true, do not start the metrics server.
+	DisableMetrics bool
+	// The size of the thread pool for read operations on the relay.
+	ValidatorReadConnectionPoolSize int
+	// The size of the thread pool for CPU heavy operations.
+	ValidatorReadComputePoolSize int
+	// The port to use for the proxy.
+	ProxyPort int
+}
+
+// DefaultTestClientConfig returns a default configuration for the test client. Sets default values for fields
+// where default values make sense.
+func DefaultTestClientConfig() *TestClientConfig {
+	return &TestClientConfig{
+		DisperserPort:                   443,
+		MaxBlobSize:                     16 * units.MiB,
+		SRSOrder:                        268435456,
+		MetricsPort:                     9101,
+		ValidatorReadConnectionPoolSize: 100,
+		ValidatorReadComputePoolSize:    20,
+		ProxyPort:                       1234,
+		EigenDADirectory:                "placeholder",
+	}
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
-	root, err := ResolveTildeInPath(c.SRSPath)
+	root, err := util.SanitizePath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return "", fmt.Errorf("failed to sanitize path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }

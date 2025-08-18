@@ -3,11 +3,13 @@ package relay
 import (
 	"context"
 	"fmt"
+	"time"
+
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"time"
 )
 
 // blobProvider encapsulates logic for fetching blobs. Utilized by the relay Server.
@@ -44,7 +46,7 @@ func newBlobProvider(
 	}
 
 	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](
-		cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight),
+		cache2.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight, nil),
 		maxIOConcurrency,
 		server.fetchBlob,
 		metrics)
@@ -68,10 +70,7 @@ func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte,
 	data, err := s.blobCache.Get(ctx, blobKey)
 
 	if err != nil {
-		// It should not be possible for external users to force an error here since we won't
-		// even call this method if the blob key is invalid (so it's ok to have a noisy log here).
-		s.logger.Errorf("Failed to fetch blob: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error calling blobCache.Get: %v", err)
 	}
 
 	return data, nil
@@ -84,8 +83,7 @@ func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 
 	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
-		s.logger.Errorf("Failed to fetch blob: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error calling blobStore.GetBlob: %v", err)
 	}
 
 	return data, nil

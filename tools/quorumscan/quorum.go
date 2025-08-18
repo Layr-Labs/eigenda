@@ -11,6 +11,8 @@ type QuorumMetrics struct {
 	Operators        []string           `json:"operators"`
 	OperatorStake    map[string]float64 `json:"operator_stake"`
 	OperatorStakePct map[string]float64 `json:"operator_stake_pct"`
+	OperatorSocket   map[string]string  `json:"operator_socket"`
+	BlockNumber      uint               `json:"block_number"`
 }
 
 func QuorumScan(operators map[core.OperatorID]*core.IndexedOperatorInfo, operatorState *core.OperatorState, logger logging.Logger) map[uint8]*QuorumMetrics {
@@ -24,6 +26,8 @@ func QuorumScan(operators map[core.OperatorID]*core.IndexedOperatorInfo, operato
 					Operators:        []string{},
 					OperatorStakePct: make(map[string]float64),
 					OperatorStake:    make(map[string]float64),
+					OperatorSocket:   make(map[string]string),
+					BlockNumber:      operatorState.BlockNumber,
 				}
 			}
 			stakePercentage := float64(0)
@@ -35,6 +39,7 @@ func QuorumScan(operators map[core.OperatorID]*core.IndexedOperatorInfo, operato
 				metrics[quorum].Operators = append(metrics[quorum].Operators, operatorId.Hex())
 				metrics[quorum].OperatorStake[operatorId.Hex()] = stakeValue
 				metrics[quorum].OperatorStakePct[operatorId.Hex()] = stakePercentage
+				metrics[quorum].OperatorSocket[operatorId.Hex()] = operators[operatorId].Socket
 			}
 		}
 	}

@@ -1,7 +1,9 @@
 syntax = "proto3";
 package disperser.v2;
+
 import "common/common.proto";
 import "common/v2/common_v2.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
 // Disperser defines the public APIs for dispersing blobs.
@@ -16,9 +18,21 @@ service Disperser {
   rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
   // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+  // It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+  // and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
-  // GetPaymentState is a utility method to get the payment state of a given account.
+  // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+  // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+  // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
@@ -29,8 +43,8 @@ message DisperseBlobRequest {
   // The blob to be dispersed.
   //
   // The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-  // While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the 
-  // payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract 
+  // While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the
+  // payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract
   // (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
   //
   // Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
@@ -79,7 +93,7 @@ message BlobStatusReply {
   // signed_batch and blob_inclusion_info are only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
   // When blob is in GATHERING_SIGNATURES status, the attestation object in signed_batch contains attestation information
   // at the point in time. As it gathers more signatures, attestation object will be updated according to the latest attestation status.
-  // The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
+  // The client can use this intermediate attestation to verify a blob if it has gathered enough signatures.
   // Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
   // When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
   // If the final attestation does not meet the client's requirement, the client should try a new dispersal.
@@ -108,6 +122,9 @@ message GetPaymentStateRequest {
   string account_id = 1;
   // Signature over the account ID
   bytes signature = 2;
+  // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
+  // request may be rejected.
+  uint64 timestamp = 3;
 }
 
 // GetPaymentStateReply contains the payment state of an account.

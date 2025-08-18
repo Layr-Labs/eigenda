@@ -1,0 +1,38 @@
+{
+  "devnet": {
+    "PaymentVault": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    }
+  },
+  "preprod-holesky": {
+    "PaymentVault": {
+      "address": "0x46E024ca6e5E1172100930c28DCCcF49BE5462C9",
+      "startBlock": 2924243
+    }
+  },
+  "holesky": {
+    "PaymentVault": {
+      "address": "0x4a7Fff191BCDa5806f1Bc8689afc1417c08C61AB",
+      "startBlock": 3379610
+    }
+  },
+  "sepolia": {
+    "PaymentVault": {
+      "address": "0x2E1BDB221E7D6bD9B7b2365208d41A5FD70b24Ed",
+      "startBlock": 8207849
+    }
+  },
+  "mainnet": {
+    "PaymentVault": {
+      "address": "0xb2e7ef419a2A399472ae22ef5cFcCb8bE97A4B05",
+      "startBlock": 22276885
+    }
+  },
+  "mainnet-beta": {
+    "PaymentVault": {
+      "address": "0x4d2C6a77f96760363D1c0FD47fe269952A94f713",
+      "startBlock": 22740045
+    }
+  }
+}

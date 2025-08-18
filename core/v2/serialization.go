@@ -36,12 +36,15 @@ type abiBlobCommitments struct {
 // This function exists so that the BlobKey can be computed without first constructing a BlobHeader object. Since
 // the BlobHeader contains the full payment metadata, and payment metadata isn't stored on chain, it isn't always
 // possible to reconstruct from the data available.
+//
+// The hashing structure here must ALWAYS match the hashing structure that we perform onchain:
+// https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/libraries/EigenDAHasher.sol#L119
 func ComputeBlobKey(
 	blobVersion BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorumNumbers []core.QuorumID,
 	paymentMetadataHash [32]byte,
-) ([32]byte, error) {
+) (BlobKey, error) {
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err
@@ -209,16 +212,34 @@ func ComputeBlobKey(
 //
 // A BlobKey simply the hash of the BlobHeader
 func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	BlobHeaderWithHashedPayment, err := b.GetBlobHeaderWithHashedPayment()
 	if err != nil {
-		return [32]byte{}, fmt.Errorf("hash payment metadata: %w", err)
+		return BlobKey{}, fmt.Errorf("get blob header without payment: %w", err)
 	}
 
+	return BlobHeaderWithHashedPayment.BlobKey()
+}
+
+func (b *BlobHeader) GetBlobHeaderWithHashedPayment() (*BlobHeaderWithHashedPayment, error) {
+	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("hash payment metadata: %w", err)
+	}
+
+	return &BlobHeaderWithHashedPayment{
+		BlobVersion:         b.BlobVersion,
+		BlobCommitments:     b.BlobCommitments,
+		QuorumNumbers:       b.QuorumNumbers,
+		PaymentMetadataHash: paymentMetadataHash,
+	}, nil
+}
+
+func (b *BlobHeaderWithHashedPayment) BlobKey() (BlobKey, error) {
 	return ComputeBlobKey(
 		b.BlobVersion,
 		b.BlobCommitments,
 		b.QuorumNumbers,
-		paymentMetadataHash,
+		b.PaymentMetadataHash,
 	)
 }
 

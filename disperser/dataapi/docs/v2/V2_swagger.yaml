@@ -8,17 +8,25 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   core.G2Point:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
     properties:
       account_id:
         description: AccountID is the ETH account address for the payer
-        type: string
+        items:
+          type: integer
+        type: array
       cumulative_payment:
         allOf:
         - $ref: '#/definitions/big.Int'
@@ -35,12 +43,18 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.BlobCommitments:
     properties:
       commitment:
         $ref: '#/definitions/encoding.G1Commitment'
       length:
+        description: this is the length in SYMBOLS (32 byte field elements) of the
+          blob. it must be a power of 2
         type: integer
       length_commitment:
         $ref: '#/definitions/encoding.G2Commitment'
@@ -53,15 +67,23 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -111,19 +133,6 @@ definitions:
         - $ref: '#/definitions/core.Signature'
         description: Sigma is the aggregate signature of all signers
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BatchHeader:
-    properties:
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
-        type: integer
-    type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobCertificate:
     properties:
       blobHeader:
@@ -157,53 +166,53 @@ definitions:
           type: integer
         type: array
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader:
     properties:
-      BlobKey:
-        items:
-          type: integer
-        type: array
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      blobIndex:
-        type: integer
-      inclusionProof:
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
+      batch_root:
+        type: string
+      reference_block_number:
         type: integer
     type: object
-  github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus:
-    enum:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    type: integer
-    x-enum-varnames:
-    - Queued
-    - Encoded
-    - GatheringSignatures
-    - Complete
-    - Failed
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo:
+    properties:
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
+      blob_index:
+        type: integer
+      blob_key:
+        type: string
+      inclusion_proof:
+        type: string
+    type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata:
+    properties:
+      blob_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
+      blob_size_bytes:
+        type: integer
+      blob_status:
+        type: string
+      expiry_unix_sec:
+        type: integer
+      requested_at:
+        type: integer
+      signature:
+        type: string
+    type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
-      attestation:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      attestation_info:
+        $ref: '#/definitions/v2.AttestationInfo'
       batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
     type: object
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
+        items:
+          type: integer
+        type: array
+      a1:
         items:
           type: integer
         type: array
@@ -222,6 +231,30 @@ definitions:
         additionalProperties:
           type: number
         type: object
+    type: object
+  v2.AccountBlobFeedResponse:
+    properties:
+      account_id:
+        type: string
+      blobs:
+        items:
+          $ref: '#/definitions/v2.BlobInfo'
+        type: array
+    type: object
+  v2.AccountFeedResponse:
+    properties:
+      accounts:
+        items:
+          $ref: '#/definitions/v2.AccountResponse'
+        type: array
+    type: object
+  v2.AccountResponse:
+    properties:
+      address:
+        type: string
+      dispersed_at:
+        description: RFC3339 format
+        type: string
     type: object
   v2.AttestationInfo:
     properties:
@@ -254,7 +287,7 @@ definitions:
       attested_at:
         type: integer
       batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
       batch_header_hash:
         type: string
       quorum_numbers:
@@ -270,9 +303,17 @@ definitions:
     properties:
       batch_header_hash:
         type: string
+      blob_certificates:
+        items:
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate'
+        type: array
       blob_inclusion_infos:
         items:
-          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo'
+        type: array
+      blob_key:
+        items:
+          type: string
         type: array
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
@@ -284,7 +325,7 @@ definitions:
       batch_header_hash:
         type: string
       blob_inclusion_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo'
       blob_key:
         type: string
     type: object
@@ -307,45 +348,7 @@ definitions:
       blob_key:
         type: string
       blob_metadata:
-        $ref: '#/definitions/v2.BlobMetadata'
-    type: object
-  v2.BlobMetadata:
-    properties:
-      blobHeader:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      blobSize:
-        description: BlobSize is the size of the blob in bytes
-        type: integer
-      blobStatus:
-        allOf:
-        - $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus'
-        description: BlobStatus indicates the current status of the blob
-      expiry:
-        description: Expiry is Unix timestamp of the blob expiry in seconds from epoch
-        type: integer
-      fragmentSizeBytes:
-        description: FragmentSizeBytes is the maximum fragment size used to store
-          the chunk coefficients.
-        type: integer
-      numRetries:
-        description: NumRetries is the number of times the blob has been retried
-        type: integer
-      requestedAt:
-        description: RequestedAt is the Unix timestamp of when the blob was requested
-          in nanoseconds
-        type: integer
-      signature:
-        items:
-          type: integer
-        type: array
-      totalChunkSizeBytes:
-        description: TotalChunkSizeBytes is the total size of the file containing
-          all chunk coefficients for the blob.
-        type: integer
-      updatedAt:
-        description: UpdatedAt is the Unix timestamp of when the blob was last updated
-          in _nanoseconds_
-        type: integer
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata'
     type: object
   v2.BlobResponse:
     properties:
@@ -400,17 +403,50 @@ definitions:
       error:
         type: string
     type: object
-  v2.Metric:
+  v2.MetricSummary:
     properties:
-      throughput:
+      average_bytes_per_second:
         type: number
+      end_timestamp_sec:
+        type: integer
+      start_timestamp_sec:
+        type: integer
+      total_bytes_posted:
+        type: integer
     type: object
-  v2.OperatorDispersalResponses:
+  v2.NetworkSigningRateResponse:
     properties:
-      operator_dispersal_responses:
+      quorum_signing_rates:
         items:
-          $ref: '#/definitions/v2.DispersalResponse'
+          $ref: '#/definitions/v2.QuorumSigningRateData'
         type: array
+    type: object
+  v2.OperatorDispersal:
+    properties:
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader'
+      batch_header_hash:
+        type: string
+      dispersed_at:
+        type: integer
+      signature:
+        type: string
+    type: object
+  v2.OperatorDispersalFeedResponse:
+    properties:
+      dispersals:
+        items:
+          $ref: '#/definitions/v2.OperatorDispersal'
+        type: array
+      operator_identity:
+        $ref: '#/definitions/v2.OperatorIdentity'
+      operator_socket:
+        type: string
+    type: object
+  v2.OperatorDispersalResponse:
+    properties:
+      operator_dispersal_response:
+        $ref: '#/definitions/v2.DispersalResponse'
     type: object
   v2.OperatorIdentity:
     properties:
@@ -419,7 +455,7 @@ definitions:
       operator_id:
         type: string
     type: object
-  v2.OperatorLivenessResponse:
+  v2.OperatorLiveness:
     properties:
       dispersal_online:
         type: boolean
@@ -435,6 +471,13 @@ definitions:
         type: string
       retrieval_status:
         type: string
+    type: object
+  v2.OperatorLivenessResponse:
+    properties:
+      operators:
+        items:
+          $ref: '#/definitions/v2.OperatorLiveness'
+        type: array
     type: object
   v2.OperatorSigningInfo:
     properties:
@@ -465,6 +508,8 @@ definitions:
         type: string
       rank:
         type: integer
+      stake_amount:
+        type: number
       stake_percentage:
         type: number
     type: object
@@ -494,12 +539,28 @@ definitions:
           type: array
         type: object
     type: object
+  v2.QuorumSigningRateData:
+    properties:
+      data_points:
+        items:
+          $ref: '#/definitions/v2.SigningRateDataPoint'
+        type: array
+      quorum_id:
+        type: string
+    type: object
   v2.SemverReportResponse:
     properties:
       semver:
         additionalProperties:
           $ref: '#/definitions/semver.SemverMetrics'
         type: object
+    type: object
+  v2.SigningRateDataPoint:
+    properties:
+      signing_rate:
+        type: number
+      timestamp:
+        type: integer
     type: object
   v2.Throughput:
     properties:
@@ -514,6 +575,82 @@ info:
   title: EigenDA Data Access API V2
   version: "2.0"
 paths:
+  /accounts:
+    get:
+      parameters:
+      - description: 'Number of hours to look back [default: 24; max: 24000 (1000
+          days)]'
+        in: query
+        name: lookback_hours
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.AccountFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch accounts within a time window (sorted by latest timestamp)
+      tags:
+      - Accounts
+  /accounts/{account_id}/blobs:
+    get:
+      parameters:
+      - description: The account ID to fetch blob feed for
+        in: path
+        name: account_id
+        required: true
+        type: string
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
+        in: query
+        name: direction
+        type: string
+      - description: 'Fetch blobs before this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: before
+        type: string
+      - description: 'Fetch blobs after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Maximum number of blobs to return; if limit <= 0 or >1000, it''s
+          treated as 1000 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.AccountBlobFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blobs posted by an account in a time window by specific direction
+      tags:
+      - Accounts
   /batches/{batch_header_hash}:
     get:
       parameters:
@@ -547,18 +684,23 @@ paths:
   /batches/feed:
     get:
       parameters:
-      - description: 'Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
-          [default: now]'
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
         in: query
-        name: end
+        name: direction
         type: string
-      - description: 'Fetch batches starting from an interval (in seconds) before
-          the end time [default: 3600]'
+      - description: 'Fetch batches before this time, exclusive (ISO 8601 format,
+          example: 2006-01-02T15:04:05Z) [default: now]'
         in: query
-        name: interval
-        type: integer
-      - description: 'The maximum number of batches to fetch. System max (1000) if
-          limit <= 0 [default: 20; max: 1000]'
+        name: before
+        type: string
+      - description: 'Fetch batches after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Maximum number of batches to return; if limit <= 0 or >1000,
+          it''s treated as 1000 [default: 20; max: 1000]'
         in: query
         name: limit
         type: integer
@@ -581,7 +723,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch batch feed
+      summary: Fetch batch feed in specified direction
       tags:
       - Batches
   /blobs/{blob_key}:
@@ -671,7 +813,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob certificate by blob key v2
+      summary: Fetch blob certificate by blob key
       tags:
       - Blobs
   /blobs/feed:
@@ -743,7 +885,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.Metric'
+            $ref: '#/definitions/v2.MetricSummary'
         "400":
           description: 'error: Bad request'
           schema:
@@ -757,6 +899,46 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch metrics summary
+      tags:
+      - Metrics
+  /metrics/timeseries/network-signing-rate:
+    get:
+      parameters:
+      - description: 'Fetch network signing rate up to the end time (ISO 8601 format:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch network signing rate starting from an interval (in seconds)
+          before the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Comma-separated list of quorum IDs to filter (e.g., 0,1) [default:
+          0,1]'
+        in: query
+        name: quorums
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.NetworkSigningRateResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch network signing rate time series in the specified time range
       tags:
       - Metrics
   /metrics/timeseries/throughput:
@@ -794,17 +976,69 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
-  /operators/{batch_header_hash}:
+  /operators/{operator_id}/dispersals:
     get:
       parameters:
+      - description: The operator ID to fetch batch feed for
+        in: path
+        name: operator_id
+        required: true
+        type: string
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
+        in: query
+        name: direction
+        type: string
+      - description: 'Fetch batches before this time, exclusive (ISO 8601 format,
+          example: 2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: before
+        type: string
+      - description: 'Fetch batches after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Maximum number of batches to return; if limit <= 0 or >1000,
+          it''s treated as 1000 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorDispersalFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch batches dispersed to an operator in a time window by specific
+        direction
+      tags:
+      - Operators
+  /operators/{operator_id}/dispersals/{batch_header_hash}/response:
+    get:
+      parameters:
+      - description: The operator ID to fetch batch feed for
+        in: path
+        name: operator_id
+        required: true
+        type: string
       - description: Batch header hash in hex string
         in: path
         name: batch_header_hash
         required: true
-        type: string
-      - description: 'Operator ID in hex string [default: all operators if unspecified]'
-        in: query
-        name: operator_id
         type: string
       produces:
       - application/json
@@ -812,7 +1046,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.OperatorDispersalResponses'
+            $ref: '#/definitions/v2.OperatorDispersalResponse'
         "400":
           description: 'error: Bad request'
           schema:

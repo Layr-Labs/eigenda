@@ -38,15 +38,21 @@ var (
 	}
 	BlsOperatorStateRetrieverFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "Address of the BLS Operator State Retriever",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
 	EigenDAServiceManagerFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "Address of the EigenDA Service Manager",
-		Required: true,
+		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
+	}
+	EigenDADirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
+		Usage:    "Address of the EigenDA Address Directory",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_DIRECTORY"),
 	}
 	EncoderSocket = cli.StringFlag{
 		Name:     "encoder-socket",
@@ -99,6 +105,13 @@ var (
 		Required: false,
 		Value:    20 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
+	}
+	BatchAttestationTimeoutFlag = cli.DurationFlag{
+		Name:     "batch-attestation-timeout",
+		Usage:    "connection timeout from grpc call to DA nodes for batch attestation",
+		Required: false,
+		Value:    25 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
 	ChainReadTimeoutFlag = cli.DurationFlag{
 		Name:     "chain-read-timeout",
@@ -219,8 +232,6 @@ var requiredFlags = []cli.Flag{
 	S3BucketNameFlag,
 	DynamoDBTableNameFlag,
 	PullIntervalFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,
@@ -233,6 +244,7 @@ var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
 	EncodingTimeoutFlag,
 	AttestationTimeoutFlag,
+	BatchAttestationTimeoutFlag,
 	ChainReadTimeoutFlag,
 	ChainWriteTimeoutFlag,
 	ChainStateTimeoutFlag,
@@ -248,6 +260,9 @@ var optionalFlags = []cli.Flag{
 	MaxNodeConnectionsFlag,
 	MaxNumRetriesPerDispersalFlag,
 	EnableGnarkBundleEncodingFlag,
+	BlsOperatorStateRetrieverFlag,
+	EigenDAServiceManagerFlag,
+	EigenDADirectoryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

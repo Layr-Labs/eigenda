@@ -32,33 +32,11 @@ var (
 // ContractBN254MetaData contains all meta data concerning the ContractBN254 contract.
 var ContractBN254MetaData = &bind.MetaData{
 	ABI: "[]",
-	Bin: "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220dd49be1d160edb5660209a22ee6105587e0282c0605413662a4006e22f51e6cb64736f6c634300080c0033",
 }
 
 // ContractBN254ABI is the input ABI used to generate the binding from.
 // Deprecated: Use ContractBN254MetaData.ABI instead.
 var ContractBN254ABI = ContractBN254MetaData.ABI
-
-// ContractBN254Bin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use ContractBN254MetaData.Bin instead.
-var ContractBN254Bin = ContractBN254MetaData.Bin
-
-// DeployContractBN254 deploys a new Ethereum contract, binding an instance of ContractBN254 to it.
-func DeployContractBN254(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ContractBN254, error) {
-	parsed, err := ContractBN254MetaData.GetAbi()
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ContractBN254Bin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &ContractBN254{ContractBN254Caller: ContractBN254Caller{contract: contract}, ContractBN254Transactor: ContractBN254Transactor{contract: contract}, ContractBN254Filterer: ContractBN254Filterer{contract: contract}}, nil
-}
 
 // ContractBN254 is an auto generated Go binding around an Ethereum contract.
 type ContractBN254 struct {

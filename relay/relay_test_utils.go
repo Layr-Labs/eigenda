@@ -30,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
@@ -51,7 +52,7 @@ const (
 )
 
 func setup(t *testing.T) {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	_, b, _, _ := runtime.Caller(0)
 	rootPath := filepath.Join(filepath.Dir(b), "..")
@@ -94,7 +95,7 @@ func changeDirectory(path string) {
 }
 
 func teardown() {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
@@ -186,7 +187,7 @@ func mockBlobParamsMap() map[v2.BlobVersion]*core.BlobVersionParameters {
 	blobParams := &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
-		MaxNumOperators: 3537,
+		MaxNumOperators: 2048,
 	}
 
 	return map[v2.BlobVersion]*core.BlobVersionParameters{
@@ -210,7 +211,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         tu.RandomString(10),
+			AccountId:         gethcommon.BytesToAddress(tu.RandomBytes(20)).Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},

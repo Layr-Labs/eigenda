@@ -97,7 +97,7 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 }
 
 // Function to get operator ejection over last N days
-// Returns list of Ejections with operatorId, quorum, block number, txn and timestemp if ejection
+// Returns list of Ejections with operatorId, quorum, block number, txn and timestamp if ejection
 func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
 	startTime := time.Now()
 
@@ -222,7 +222,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	operatorOnlineStatusresultsChan <- metadata
 }
 
-// Check that the socketString is not private/unspecified
+// Check that the socketString is invalid or unspecified (private IPs are allowed)
 func ValidOperatorIP(address string, logger logging.Logger) bool {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
@@ -239,7 +239,7 @@ func ValidOperatorIP(address string, logger logging.Logger) bool {
 		logger.Error("IP address is nil", "host", host, "ips", ips)
 		return false
 	}
-	isValid := !ipAddr.IsPrivate() && !ipAddr.IsUnspecified()
+	isValid := !ipAddr.IsUnspecified()
 	logger.Debug("Operator IP validation", "address", address, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
 
 	return isValid
@@ -257,6 +257,6 @@ func checkIsOperatorPortOpen(socket string, timeoutSecs int, logger logging.Logg
 		logger.Warn("port check timeout", "socket", socket, "timeout", timeoutSecs, "error", err)
 		return false
 	}
-	defer conn.Close() // Close the connection after checking
+	core.CloseLogOnError(conn, "checkIsOperatorPortOpen connection", nil) // close connection after checking
 	return true
 }

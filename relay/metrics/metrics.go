@@ -2,6 +2,10 @@ package metrics
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -11,9 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"net/http"
-	"strings"
-	"time"
 )
 
 const namespace = "eigenda_relay"
@@ -49,9 +50,10 @@ type RelayMetrics struct {
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
-func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
-
-	registry := prometheus.NewRegistry()
+func NewRelayMetrics(registry *prometheus.Registry, logger logging.Logger, port int) *RelayMetrics {
+	if registry == nil {
+		registry = prometheus.NewRegistry()
+	}
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
 

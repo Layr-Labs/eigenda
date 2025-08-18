@@ -19,19 +19,29 @@ type BlobVersion = uint16
 
 // Assignment contains information about the set of chunks that a specific node will receive
 type Assignment struct {
-	StartIndex uint32
-	NumChunks  uint32
+	Indices []uint32
 }
 
 // GetIndices generates the list of ChunkIndices associated with a given assignment
-func (c *Assignment) GetIndices() []uint32 {
-	indices := make([]uint32, c.NumChunks)
-	for ind := range indices {
-		indices[ind] = c.StartIndex + uint32(ind)
-	}
-	return indices
+func (c Assignment) GetIndices() []uint32 {
+	return c.Indices
 }
 
+func (c Assignment) NumChunks() uint32 {
+	return uint32(len(c.Indices))
+}
+
+// BlobKey is the unique identifier for a blob dispersal.
+//
+// It is computed as the Keccak256 hash of some serialization of the blob header
+// where the PaymentHeader has been replaced with Hash(PaymentHeader), in order
+// to be easily verifiable onchain. See the BlobKey method of BlobHeader for more
+// details.
+//
+// It can be used to retrieve a blob from relays.
+//
+// Note that two blobs can have the same content but different headers,
+// so they are allowed to both exist in the system.
 type BlobKey [32]byte
 
 func (b BlobKey) Hex() string {
@@ -72,6 +82,17 @@ type BlobHeader struct {
 	PaymentMetadata core.PaymentMetadata
 }
 
+type BlobHeaderWithHashedPayment struct {
+	BlobVersion BlobVersion
+
+	BlobCommitments encoding.BlobCommitments
+
+	// QuorumNumbers contains the quorums the blob is dispersed to
+	QuorumNumbers []core.QuorumID
+
+	PaymentMetadataHash [32]byte
+}
+
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
 	if err != nil {
@@ -98,7 +119,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		return nil, errors.New("lengthProof is not in the subgroup")
 	}
 
-	quorumNumbers := make([]core.QuorumID, len(proto.QuorumNumbers))
+	quorumNumbers := make([]core.QuorumID, len(proto.GetQuorumNumbers()))
 	for i, q := range proto.GetQuorumNumbers() {
 		if q > MaxQuorumID {
 			return nil, errors.New("quorum number exceeds maximum allowed")
@@ -107,7 +128,11 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	}
 	slices.Sort(quorumNumbers)
 
-	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	paymentMetadata, err := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payment metadata: %v", err)
+	}
+
 	if paymentMetadata == nil {
 		return nil, errors.New("payment metadata is nil")
 	}
@@ -145,7 +170,7 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 }
 
 func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(blobLength), blobParams)
+	length, err := blobParams.GetChunkLength(uint32(blobLength))
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}

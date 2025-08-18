@@ -23,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -35,6 +34,7 @@ import (
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -68,7 +68,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -91,8 +91,8 @@ func TestV2DisperseBlob(t *testing.T) {
 
 	blobKey, err := blobHeader.BlobKey()
 	assert.NoError(t, err)
-	assert.Equal(t, pbv2.BlobStatus_QUEUED, reply.Result)
-	assert.Equal(t, blobKey[:], reply.BlobKey)
+	assert.Equal(t, pbv2.BlobStatus_QUEUED, reply.GetResult())
+	assert.Equal(t, blobKey[:], reply.GetBlobKey())
 
 	// Check if the blob is stored
 	storedData, err := c.BlobStore.GetBlob(ctx, blobKey)
@@ -110,15 +110,70 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
 
-	// Try dispersing the same blob; if payment is different, blob will be considered as a differernt blob
-	// payment will cause failure before commitment check
+	// Try dispersing the same blob; blob key check will fail if the blob is already stored
 	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: blobHeaderProto,
 	})
 	assert.Nil(t, reply)
-	assert.ErrorContains(t, err, "payment already exists")
+	assert.ErrorContains(t, err, "blob already exists")
+
+	data2 := make([]byte, 50)
+	_, err = rand.Read(data)
+	assert.NoError(t, err)
+
+	data2 = codec.ConvertByPaddingEmptyByte(data2)
+	commitments, err = prover.GetCommitmentsForPaddedLength(data2)
+	assert.NoError(t, err)
+	commitmentProto, err = commitments.ToProtobuf()
+	assert.NoError(t, err)
+	blobHeaderProto2 := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID.Hex(),
+			Timestamp:         5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader2, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto2)
+	assert.NoError(t, err)
+	sig2, err := signer.SignBlobRequest(blobHeader2)
+	assert.NoError(t, err)
+
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Blob:       data2,
+		Signature:  sig2,
+		BlobHeader: blobHeaderProto2,
+	})
+	assert.Nil(t, reply)
+	assert.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
+
+	// request with on-demand payments in reserved only mode
+	c.DispersalServerV2.ReservedOnly = true
+	ondemandReqProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID.Hex(),
+			Timestamp:         0,
+			CumulativePayment: big.NewInt(500).Bytes(),
+		},
+	}
+	blobHeader, err = corev2.BlobHeaderFromProtobuf(ondemandReqProto)
+	assert.NoError(t, err)
+	sig, err = signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Blob:       data,
+		Signature:  sig,
+		BlobHeader: ondemandReqProto,
+	})
+	assert.ErrorContains(t, err, "on-demand payments are not supported by reserved-only mode disperser")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -138,7 +193,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -158,7 +213,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1, 2, 3},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -176,7 +231,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{2, 54},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -194,7 +249,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -211,7 +266,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -230,7 +285,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(0).Bytes(),
 		},
@@ -249,13 +304,13 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 
 	// request with invalid commitment
 	invalidCommitment := commitmentProto
-	invalidCommitment.Length = commitmentProto.Length - 1
+	invalidCommitment.Length = commitmentProto.GetLength() - 1
 	invalidReqProto = &pbcommonv2.BlobHeader{
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    invalidCommitment,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -285,7 +340,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -300,6 +355,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: validHeader,
 	})
 	assert.ErrorContains(t, err, "blob size too big")
+
 }
 
 func TestV2GetBlobStatus(t *testing.T) {
@@ -311,7 +367,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobCommitments: mockCommitment,
 		QuorumNumbers:   []core.QuorumID{0},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x1234",
+			AccountID:         gethcommon.HexToAddress("0x1234"),
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},
@@ -340,16 +396,20 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_QUEUED, status.Status)
+	require.Equal(t, pbv2.BlobStatus_QUEUED, status.GetStatus())
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Encoded)
 	require.NoError(t, err)
 	status, err = c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
+	require.Equal(t, pbv2.BlobStatus_ENCODED, status.GetStatus())
 
-	// Complete blob status
+	// First transition to GatheringSignatures state
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
+	require.NoError(t, err)
+
+	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
@@ -396,11 +456,11 @@ func TestV2GetBlobStatus(t *testing.T) {
 	blobCertProto, err := blobCert.ToProtobuf()
 	require.NoError(t, err)
 	require.Equal(t, blobHeaderProto, reply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader())
-	require.Equal(t, blobCertProto.RelayKeys, reply.GetBlobInclusionInfo().GetBlobCertificate().GetRelayKeys())
+	require.Equal(t, blobCertProto.GetRelayKeys(), reply.GetBlobInclusionInfo().GetBlobCertificate().GetRelayKeys())
 	require.Equal(t, inclusionInfo0.BlobIndex, reply.GetBlobInclusionInfo().GetBlobIndex())
 	require.Equal(t, inclusionInfo0.InclusionProof, reply.GetBlobInclusionInfo().GetInclusionProof())
-	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().BatchRoot)
-	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().ReferenceBlockNumber)
+	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().GetBatchRoot())
+	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	attestationProto, err := attestation.ToProtobuf()
 	require.NoError(t, err)
 	require.Equal(t, attestationProto, reply.GetSignedBatch().GetAttestation())
@@ -419,16 +479,16 @@ func TestV2GetBlobCommitment(t *testing.T) {
 		Blob: data,
 	})
 	require.NoError(t, err)
-	commitment, err := new(encoding.G1Commitment).Deserialize(reply.BlobCommitment.Commitment)
+	commitment, err := new(encoding.G1Commitment).Deserialize(reply.GetBlobCommitment().GetCommitment())
 	require.NoError(t, err)
 	assert.Equal(t, commit.Commitment, commitment)
-	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthCommitment)
+	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.GetBlobCommitment().GetLengthCommitment())
 	require.NoError(t, err)
 	assert.Equal(t, commit.LengthCommitment, lengthCommitment)
-	lengthProof, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthProof)
+	lengthProof, err := new(encoding.G2Commitment).Deserialize(reply.GetBlobCommitment().GetLengthProof())
 	require.NoError(t, err)
 	assert.Equal(t, commit.LengthProof, lengthProof)
-	assert.Equal(t, uint32(commit.Length), reply.BlobCommitment.Length)
+	assert.Equal(t, uint32(commit.Length), reply.GetBlobCommitment().GetLength())
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
@@ -486,7 +546,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		awsConfig,
 		table_names[0],
 		table_names[1],
@@ -495,7 +555,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 
@@ -504,11 +564,11 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 	chainReader.On("GetBlockStaleMeasure", tmock.Anything).Return(uint32(10), nil)
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
-	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,
-			MaxNumOperators: 3537,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
 
@@ -521,7 +581,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		blobMetadataStore,
 		chainReader,
 		meterer,
-		auth.NewAuthenticator(),
+		auth.NewBlobRequestAuthenticator(),
 		prover,
 		10,
 		time.Hour,
@@ -531,6 +591,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
+		// reserved only mode
+		false,
 	)
 	assert.NoError(t, err)
 
@@ -581,7 +643,7 @@ func TestInvalidLength(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -632,7 +694,7 @@ func TestTooShortCommitment(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},

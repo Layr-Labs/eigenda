@@ -155,7 +155,10 @@ func WriteG2PointsForEigenDA(points []bn254.G2Affine, from uint64, to uint64) er
 		log.Println("Cannot flush points", err)
 		return err
 	}
-	g2f.Close()
+	err = g2f.Close()
+	if err != nil {
+		fmt.Println("Cannot close file", err)
+	}
 	return nil
 
 }

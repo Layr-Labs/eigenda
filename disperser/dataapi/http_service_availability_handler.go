@@ -3,6 +3,8 @@ package dataapi
 import (
 	"context"
 	"net/http"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 // Simple struct with a Service Name and its HealthEndPt.
@@ -40,7 +42,7 @@ func (sa *HttpServiceAvailability) CheckHealth(endpt string) (string, error) {
 	if err != nil {
 		return "UNKNOWN", err
 	}
-	defer resp.Body.Close()
+	defer core.CloseLogOnError(resp.Body, "httpServiceAvailability response body", nil)
 
 	if resp.StatusCode == http.StatusOK {
 		return "SERVING", nil

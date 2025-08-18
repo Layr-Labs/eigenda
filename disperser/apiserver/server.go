@@ -131,7 +131,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 	blob, err := s.validateRequestAndGetBlob(ctx, request.DisperseRequest)
 	if err != nil {
-		for _, quorumID := range request.DisperseRequest.CustomQuorumNumbers {
+		for _, quorumID := range request.DisperseRequest.GetCustomQuorumNumbers() {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlobAuthenticated")
 		}
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
@@ -244,7 +244,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
-		for _, quorumID := range req.CustomQuorumNumbers {
+		for _, quorumID := range req.GetCustomQuorumNumbers() {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlob")
@@ -741,7 +741,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		}
 	}
 	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration", time.Since(stageTimer).String())
-	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex)
+	s.logger.Info("received a new blob retrieval request", "batchHeaderHash", req.GetBatchHeaderHash(), "blobIndex", req.GetBlobIndex())
 
 	batchHeaderHash := req.GetBatchHeaderHash()
 	// Convert to [32]byte
@@ -771,7 +771,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
 	}
 
-	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration", time.Since(stageTimer).String())
+	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.GetBatchHeaderHash(), "blobIndex", req.GetBlobIndex(), "duration", time.Since(stageTimer).String())
 
 	stageTimer = time.Now()
 	// Check throughout rate limit
@@ -815,7 +815,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
 	s.metrics.BlobLatency.WithLabelValues("RetrieveBlob", dispcommon.BlobSizeBucket(len(data))).Set(float64(time.Since(retrievalStart).Milliseconds()))
 
-	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "data size (bytes)", len(data), "duration", time.Since(stageTimer).String())
+	s.logger.Debug("fetched blob content", "batchHeaderHash", req.GetBatchHeaderHash(), "blobIndex", req.GetBlobIndex(), "data size (bytes)", len(data), "duration", time.Since(stageTimer).String())
 
 	return &pb.RetrieveBlobReply{
 		Data: data,
@@ -1056,7 +1056,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 
 	header := core.BlobRequestHeader{
 		BlobAuthHeader: core.BlobAuthHeader{
-			AccountID: req.AccountId,
+			AccountID: req.GetAccountId(),
 		},
 		SecurityParams: params,
 	}

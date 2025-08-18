@@ -2,7 +2,6 @@ package blobstore
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -24,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -32,6 +31,8 @@ const (
 	OperatorResponseIndexName  = "OperatorResponseIndex"
 	RequestedAtIndexName       = "RequestedAtIndex"
 	AttestedAtIndexName        = "AttestedAtAIndex"
+	AccountBlobIndexName       = "AccountBlobIndex"
+	AccountUpdatedAtIndexName  = "AccountUpdatedAtIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -41,7 +42,11 @@ const (
 	dispersalRequestSKPrefix  = "DispersalRequest#"
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
+	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
+
+	accountPK      = "Account"
+	accountIndexPK = "AccountIndex"
 
 	// The number of nanoseconds for a requestedAt bucket (1h).
 	// The rationales are:
@@ -63,94 +68,12 @@ var (
 		v2.Queued:              {},
 		v2.Encoded:             {v2.Queued},
 		v2.GatheringSignatures: {v2.Encoded},
-		// TODO: when GatheringSignatures is fully supported, remove v2.Encoded from below
-		v2.Complete: {v2.Encoded, v2.GatheringSignatures},
-		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
+		v2.Complete:            {v2.GatheringSignatures},
+		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
-	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
 
-type StatusIndexCursor struct {
-	BlobKey   *corev2.BlobKey
-	UpdatedAt uint64
-}
-
-// BlobFeedCursor represents a position in the blob feed, which contains all blobs
-// accepted by Disperser, ordered by (requestedAt, blobKey).
-type BlobFeedCursor struct {
-	RequestedAt uint64
-
-	// The BlobKey can be nil, and a nil BlobKey is treated as equal to another nil BlobKey
-	BlobKey *corev2.BlobKey
-}
-
-// Equal returns true if the cursor is equal to the given <requestedAt, blobKey>
-func (cursor *BlobFeedCursor) Equal(requestedAt uint64, blobKey *corev2.BlobKey) bool {
-	if cursor.RequestedAt != requestedAt {
-		return false
-	}
-
-	// Both nil
-	if cursor.BlobKey == nil && blobKey == nil {
-		return true
-	}
-
-	// One nil
-	if cursor.BlobKey == nil || blobKey == nil {
-		return false
-	}
-
-	return cursor.BlobKey.Hex() == blobKey.Hex()
-}
-
-// LessThan returns true if the current cursor is less than the other cursor
-// in the ordering defined by (requestedAt, blobKey).
-func (cursor *BlobFeedCursor) LessThan(other *BlobFeedCursor) bool {
-	if other == nil {
-		return false
-	}
-
-	// First, compare the RequestedAt timestamps
-	if cursor.RequestedAt != other.RequestedAt {
-		return cursor.RequestedAt < other.RequestedAt
-	}
-
-	// If RequestedAt is the same, compare BlobKey
-	if cursor.BlobKey != nil && other.BlobKey != nil {
-		return cursor.BlobKey.Hex() < other.BlobKey.Hex()
-	}
-
-	// Handle cases where BlobKey might be nil
-	if cursor.BlobKey == nil && other.BlobKey != nil {
-		return true // cursor.BlobKey is nil, so it comes first
-	}
-	if cursor.BlobKey != nil && other.BlobKey == nil {
-		return false // other.BlobKey is nil, so "other" comes first
-	}
-
-	// If both RequestedAt and BlobKey are equal, return false (because they are equal)
-	return false
-}
-
-// ToCursorKey encodes the cursor into a string that preserves ordering.
-// For any two cursors A and B:
-// - A < B if and only if A.ToCursorKey() < B.ToCursorKey()
-// - A == B if and only if A.ToCursorKey() == B.ToCursorKey()
-func (cursor *BlobFeedCursor) ToCursorKey() string {
-	return encodeBlobFeedCursorKey(cursor.RequestedAt, cursor.BlobKey)
-}
-
-// FromCursorKey decodes the cursor key string back to the cursor.
-func (cursor *BlobFeedCursor) FromCursorKey(encoded string) (*BlobFeedCursor, error) {
-	requestedAt, blobKey, err := decodeBlobFeedCursorKey(encoded)
-	if err != nil {
-		return nil, err
-	}
-	return &BlobFeedCursor{
-		RequestedAt: requestedAt,
-		BlobKey:     blobKey,
-	}, nil
-}
+var _ MetadataStore = (*BlobMetadataStore)(nil)
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
 type BlobMetadataStore struct {
@@ -177,7 +100,7 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -217,7 +140,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 		}
 
 		if blob.BlobStatus == status {
-			return fmt.Errorf("%w: blob already in status %s", common.ErrAlreadyExists, status.String())
+			return fmt.Errorf("%w: blob already in status %s", ErrAlreadyExists, status.String())
 		}
 
 		return fmt.Errorf("%w: invalid status transition from %s to %s", ErrInvalidStateTransition, blob.BlobStatus.String(), status.String())
@@ -250,7 +173,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 	})
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: metadata not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: metadata not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	if err != nil {
@@ -263,6 +186,30 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 	}
 
 	return metadata, nil
+}
+
+// CheckBlobExists checks if a blob exists without fetching the entire metadata.
+func (s *BlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: blobKeyPrefix + blobKey.Hex(),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: blobMetadataSK,
+			},
+		},
+		ProjectionExpression: aws.String("PK"), // Only fetch the PK attribute
+	}
+
+	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
+	if err != nil {
+		return false, fmt.Errorf("failed to check blob existence: %w", err)
+	}
+
+	// If the item is not nil, the blob exists
+	return item != nil, nil
 }
 
 // GetBlobMetadataByStatus returns all the metadata with the given status that were updated after lastUpdatedAt
@@ -310,13 +257,9 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 ) ([]*v2.BlobMetadata, error) {
 	var lastEvaledKey map[string]types.AttributeValue
 	for {
-		start := startKey
-		if lastEvaledKey != nil {
-			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
-			if err != nil {
-				return result, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
-			}
-			start = requestedAtBlobkey
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
 		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
@@ -325,10 +268,10 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 			"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
 				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-				":start": &types.AttributeValueMemberS{Value: start},
+				":start": &types.AttributeValueMemberS{Value: startKey},
 				":end":   &types.AttributeValueMemberS{Value: endKey},
 			},
-			0, // no limit within a bucket
+			int32(remaining),
 			lastEvaledKey,
 			ascending,
 		)
@@ -460,6 +403,143 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 	return result, lastProcessedCursor, nil
 }
 
+// GetBlobMetadataByAccountID returns blobs (as BlobMetadata) within time range (start, end)
+// (in ns, both exclusive), retrieved and ordered by RequestedAt timestamp in specified order, for
+// a given account.
+//
+// If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
+// to the newest (`end`); otherwise retrieve by the opposite direction.
+//
+// If limit > 0, returns at most that many blobs. If limit <= 0, returns all results
+// in the time range.
+func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
+	ctx context.Context,
+	accountId gethcommon.Address,
+	start uint64,
+	end uint64,
+	limit int,
+	ascending bool,
+) ([]*v2.BlobMetadata, error) {
+	if start+1 > end-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
+	}
+
+	blobs := make([]*v2.BlobMetadata, 0)
+	var lastEvaledKey map[string]types.AttributeValue
+	adjustedStart, adjustedEnd := start+1, end-1
+
+	// Iteratively fetch results until we get desired number of items or exhaust the
+	// available data.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(blobs)
+		}
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			AccountBlobIndexName,
+			"AccountID = :pk AND RequestedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: accountId.Hex()},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
+			},
+			int32(remaining),
+			lastEvaledKey,
+			ascending,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for accountId %s with time range (%d, %d): %w", accountId.Hex(), adjustedStart, adjustedEnd, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			it, err := UnmarshalBlobMetadata(item)
+			if err != nil {
+				return blobs, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+			}
+			blobs = append(blobs, it)
+
+			// Desired number of items collected
+			if limit > 0 && len(blobs) >= limit {
+				return blobs, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
+	}
+
+	return blobs, nil
+}
+
+// UpdateAccount updates the Account partition to track account activity.
+// This method performs an upsert operation, creating or updating an entry for the given account
+// with the current timestamp.
+func (s *BlobMetadataStore) UpdateAccount(ctx context.Context, accountID gethcommon.Address, timestamp uint64) error {
+	s.logger.Debug("updating account", "accountID", accountID.Hex(), "timestamp", timestamp)
+
+	item := commondynamodb.Item{
+		"PK":           &types.AttributeValueMemberS{Value: accountPK},
+		"SK":           &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"UpdatedAt":    &types.AttributeValueMemberN{Value: strconv.FormatUint(timestamp, 10)},
+		"AccountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
+	}
+
+	err := s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	if err != nil {
+		return fmt.Errorf("failed to update account for accountID %s: %w", accountID.Hex(), err)
+	}
+
+	return nil
+}
+
+// GetAccounts returns accounts within the specified lookback period (newest first)
+func (s *BlobMetadataStore) GetAccounts(ctx context.Context, lookbackSeconds uint64) ([]*v2.Account, error) {
+	s.logger.Debug("querying accounts", "lookbackSeconds", lookbackSeconds)
+
+	// Calculate the cutoff timestamp
+	now := uint64(time.Now().Unix())
+	cutoffTime := now - lookbackSeconds
+
+	// Query the AccountUpdatedAtIndex GSI with time filter
+	// All account records have AccountIndex = "AccountIndex" which allows us to query
+	// all accounts after the cutoff time efficiently
+	items, err := s.dynamoDBClient.QueryIndex(
+		ctx,
+		s.tableName,
+		AccountUpdatedAtIndexName,
+		"AccountIndex = :accountIndex AND UpdatedAt > :cutoff",
+		commondynamodb.ExpressionValues{
+			":accountIndex": &types.AttributeValueMemberS{Value: accountIndexPK},
+			":cutoff":       &types.AttributeValueMemberN{Value: strconv.FormatUint(cutoffTime, 10)},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query accounts: %w", err)
+	}
+
+	// Convert to Account structs
+	accounts := make([]*v2.Account, 0, len(items))
+	for _, item := range items {
+		account, err := UnmarshalAccount(item)
+		if err != nil {
+			s.logger.Warn("failed to unmarshal account", "error", err)
+			continue
+		}
+		accounts = append(accounts, account)
+	}
+
+	return accounts, nil
+}
+
 // queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
 // ascending order.
 //
@@ -479,14 +559,6 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 	// This needs to be processed in a loop because DynamoDb has a limit on the response
 	// size of a query (1MB) and we may have more data than that.
 	for {
-		startTime := start
-		if lastEvaledKey != nil {
-			at, err := UnmarshalAttestedAt(lastEvaledKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse the AttestedAt from the LastEvaluatedKey: %w", err)
-			}
-			startTime = at
-		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -494,10 +566,10 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 			"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
 				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTime), 10)},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(start), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
 			},
-			0, // no limit within a bucket
+			int32(numToReturn),
 			lastEvaledKey,
 			ascending,
 		)
@@ -735,7 +807,7 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -769,7 +841,7 @@ func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core
 	}
 
 	if item == nil {
-		return nil, nil, fmt.Errorf("%w: certificate not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, nil, fmt.Errorf("%w: certificate not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	cert, fragmentInfo, err := UnmarshalBlobCertificate(item)
@@ -822,7 +894,7 @@ func (s *BlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -843,7 +915,7 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: dispersal request not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+		return nil, fmt.Errorf("%w: dispersal request not found for batch header hash %x and operator %s", ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
 	}
 
 	req, err := UnmarshalDispersalRequest(item)
@@ -854,6 +926,83 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	return req, nil
 }
 
+// GetDispersalsByRespondedAt returns dispersals (in DispersalResponse, which has joined
+// request and response together) to the given operator, within time range (start, end)
+// (both exclusive), retrieved and ordered by RespondedAt timestamp in the specified order.
+//
+// If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
+// to the newest (`end`); otherwise retrieve by the opposite direction.
+//
+// If limit > 0, returns at most that many dispersals. If limit <= 0, returns all results
+// in the time range.
+func (s *BlobMetadataStore) GetDispersalsByRespondedAt(
+	ctx context.Context,
+	operatorId core.OperatorID,
+	start uint64,
+	end uint64,
+	limit int,
+	ascending bool,
+) ([]*corev2.DispersalResponse, error) {
+	if start+1 > end-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
+	}
+
+	dispersals := make([]*corev2.DispersalResponse, 0)
+	var lastEvaledKey map[string]types.AttributeValue
+	adjustedStart, adjustedEnd := start+1, end-1
+
+	// Iteratively fetch results until we get desired number of items or exhaust the
+	// available data.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(dispersals)
+		}
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			OperatorResponseIndexName,
+			"OperatorID = :pk AND RespondedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: dispersalResponseSKPrefix + operatorId.Hex()},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
+			},
+			int32(remaining),
+			lastEvaledKey,
+			ascending,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for operatorId %s with time range (%d, %d): %w", operatorId.Hex(), adjustedStart, adjustedEnd, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			it, err := UnmarshalDispersalResponse(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal DispersalResponse: %w", err)
+			}
+			dispersals = append(dispersals, it)
+
+			// Desired number of items collected
+			if limit > 0 && len(dispersals) >= limit {
+				return dispersals, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
+	}
+
+	return dispersals, nil
+}
+
 func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev2.DispersalResponse) error {
 	item, err := MarshalDispersalResponse(res)
 	if err != nil {
@@ -862,7 +1011,7 @@ func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -883,7 +1032,7 @@ func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeade
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: dispersal response not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+		return nil, fmt.Errorf("%w: dispersal response not found for batch header hash %x and operator %s", ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
 	}
 
 	res, err := UnmarshalDispersalResponse(item)
@@ -909,7 +1058,7 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: dispersal responses not found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: dispersal responses not found for batch header hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	responses := make([]*corev2.DispersalResponse, len(items))
@@ -923,6 +1072,46 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	return responses, nil
 }
 
+func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
+	item, err := MarshalBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: batch info not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	batch, err := UnmarshalBatch(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return batch, nil
+}
+
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {
@@ -931,7 +1120,7 @@ func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *cor
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -965,7 +1154,7 @@ func (s *BlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash 
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: batch header not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	header, err := UnmarshalBatchHeader(item)
@@ -988,21 +1177,26 @@ func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *cor
 }
 
 func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
-		"PK": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: attestationSK,
+			},
 		},
-		"SK": &types.AttributeValueMemberS{
-			Value: attestationSK,
-		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: attestation not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	attestation, err := UnmarshalAttestation(item)
@@ -1021,7 +1215,7 @@ func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionI
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -1074,7 +1268,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey co
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	info, err := UnmarshalBlobInclusionInfo(item)
@@ -1138,7 +1332,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	responses := make([]*corev2.BlobInclusionInfo, len(items))
@@ -1153,18 +1347,24 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 }
 
 func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
-	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk", commondynamodb.ExpressionValues{
-		":pk": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		KeyConditionExpression: aws.String("PK = :pk"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
 		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	items, err := s.dynamoDBClient.QueryWithInput(ctx, input)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if len(items) == 0 {
-		return nil, nil, fmt.Errorf("%w: no records found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: no records found for batch header hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	var header *corev2.BatchHeader
@@ -1188,11 +1388,11 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	}
 
 	if header == nil {
-		return nil, nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: batch header not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	if attestation == nil {
-		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", ErrAttestationNotFound, batchHeaderHash)
 	}
 
 	return header, attestation, nil
@@ -1232,6 +1432,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
+				AttributeName: aws.String("AccountID"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("RequestedAt"),
+				AttributeType: types.ScalarAttributeTypeN,
+			},
+			{
 				AttributeName: aws.String("RequestedAtBucket"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
@@ -1246,6 +1454,10 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 			{
 				AttributeName: aws.String("AttestedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
+			},
+			{
+				AttributeName: aws.String("AccountIndex"),
+				AttributeType: types.ScalarAttributeTypeS,
 			},
 		},
 		KeySchema: []types.KeySchemaElement{
@@ -1321,6 +1533,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				},
 			},
 			{
+				IndexName: aws.String(AccountBlobIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AccountID"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
 				IndexName: aws.String(RequestedAtIndexName),
 				KeySchema: []types.KeySchemaElement{
 					{
@@ -1360,6 +1592,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
 				},
 			},
+			{
+				IndexName: aws.String(AccountUpdatedAtIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AccountIndex"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("UpdatedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(readCapacityUnits),
@@ -1383,6 +1635,8 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
 	fields["RequestedAtBucket"] = &types.AttributeValueMemberS{Value: computeRequestedAtBucket(metadata.RequestedAt)}
 	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeBlobFeedCursorKey(metadata.RequestedAt, &blobKey)}
+	fields["AccountID"] = &types.AttributeValueMemberS{Value: metadata.BlobHeader.PaymentMetadata.AccountID.Hex()}
+
 	return fields, nil
 }
 
@@ -1504,7 +1758,15 @@ func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
 		return nil, err
 	}
 
-	operatorID, err := core.OperatorIDFromHex(obj.OperatorID)
+	// Remove prefix if it exists
+	operatorIDStr := obj.OperatorID
+	if strings.HasPrefix(operatorIDStr, dispersalRequestSKPrefix) {
+		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalRequestSKPrefix)
+	} else {
+		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalResponseSKPrefix)
+	}
+
+	operatorID, err := core.OperatorIDFromHex(operatorIDStr)
 	if err != nil {
 		return nil, err
 	}
@@ -1526,7 +1788,7 @@ func MarshalDispersalRequest(req *corev2.DispersalRequest) (commondynamodb.Item,
 
 	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
 	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, req.OperatorID.Hex())}
-	fields["OperatorID"] = &types.AttributeValueMemberS{Value: req.OperatorID.Hex()}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, req.OperatorID.Hex())}
 
 	return fields, nil
 }
@@ -1561,7 +1823,7 @@ func MarshalDispersalResponse(res *corev2.DispersalResponse) (commondynamodb.Ite
 
 	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
 	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, res.OperatorID.Hex())}
-	fields["OperatorID"] = &types.AttributeValueMemberS{Value: res.OperatorID.Hex()}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, res.OperatorID.Hex())}
 
 	return fields, nil
 }
@@ -1608,6 +1870,34 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	}
 
 	return &header, nil
+}
+
+func MarshalBatch(batch *corev2.Batch) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch: %w", err)
+	}
+
+	hash, err := batch.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchSK}
+
+	return fields, nil
+}
+
+func UnmarshalBatch(item commondynamodb.Item) (*corev2.Batch, error) {
+	batch := corev2.Batch{}
+	err := attributevalue.UnmarshalMap(item, &batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
+	}
+
+	return &batch, nil
 }
 
 func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {
@@ -1666,114 +1956,32 @@ func UnmarshalAttestation(item commondynamodb.Item) (*corev2.Attestation, error)
 	return &attestation, nil
 }
 
-func hexToHash(h string) ([32]byte, error) {
-	s := strings.TrimPrefix(h, "0x")
-	s = strings.TrimPrefix(s, "0X")
-	b, err := hex.DecodeString(s)
+func UnmarshalAccount(item commondynamodb.Item) (*v2.Account, error) {
+	// Extract the address from SK
+	skVal, ok := item["SK"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid SK field")
+	}
+
+	// SK is now directly the address
+	address := skVal.Value
+	if !gethcommon.IsHexAddress(address) {
+		return nil, fmt.Errorf("invalid address format: %s", address)
+	}
+
+	// Extract UpdatedAt timestamp
+	updatedAtVal, ok := item["UpdatedAt"].(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid UpdatedAt field")
+	}
+
+	updatedAt, err := strconv.ParseUint(updatedAtVal.Value, 10, 64)
 	if err != nil {
-		return [32]byte{}, err
-	}
-	return [32]byte(b), nil
-}
-
-// computeBucketID maps a given timestamp to a time bucket.
-// Note each bucket represents a time range [start, end) (i.e. inclusive start, exclusive end).
-func computeBucketID(timestamp, bucketSizeNano uint64) uint64 {
-	return timestamp / bucketSizeNano
-}
-
-func computeRequestedAtBucket(requestedAt uint64) string {
-	id := computeBucketID(requestedAt, requestedAtBucketSizeNano)
-	return fmt.Sprintf("%d", id)
-}
-
-func computeAttestedAtBucket(attestedAt uint64) string {
-	id := computeBucketID(attestedAt, attestedAtBucketSizeNano)
-	return fmt.Sprintf("%d", id)
-}
-
-// GetRequestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
-// the allowed time range for blobs.
-func GetRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
-	now := uint64(time.Now().UnixNano())
-	oldestAllowed := now - maxBlobAgeInNano
-
-	startBucket := computeBucketID(startTime, requestedAtBucketSizeNano)
-	if startTime < oldestAllowed {
-		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeNano)
+		return nil, fmt.Errorf("failed to parse UpdatedAt: %w", err)
 	}
 
-	endBucket := computeBucketID(endTime, requestedAtBucketSizeNano)
-	if endTime > now {
-		endBucket = computeBucketID(now, requestedAtBucketSizeNano)
-	}
-
-	return startBucket, endBucket
-}
-
-// GetAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
-// the allowed time range for blobs.
-func GetAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
-	now := uint64(time.Now().UnixNano())
-	oldestAllowed := now - maxBlobAgeInNano
-
-	startBucket := computeBucketID(startTime, attestedAtBucketSizeNano)
-	if startTime < oldestAllowed {
-		startBucket = computeBucketID(oldestAllowed, attestedAtBucketSizeNano)
-	}
-
-	endBucket := computeBucketID(endTime, attestedAtBucketSizeNano)
-	if endTime > now {
-		endBucket = computeBucketID(now, attestedAtBucketSizeNano)
-	}
-
-	return startBucket, endBucket
-}
-
-// encodeBlobFeedCursorKey encodes <requestedAt, blobKey> into string which
-// preserves the order.
-func encodeBlobFeedCursorKey(requestedAt uint64, blobKey *corev2.BlobKey) string {
-	result := make([]byte, 40) // 8 bytes for timestamp + 32 bytes for blobKey
-
-	// Write timestamp
-	binary.BigEndian.PutUint64(result[:8], requestedAt)
-
-	if blobKey != nil {
-		copy(result[8:], blobKey[:])
-	}
-	// Use hex encoding to preserve byte ordering
-	return hex.EncodeToString(result)
-}
-
-// decodeBlobFeedCursorKey decodes the cursor key back to <requestedAt, blobKey>.
-func decodeBlobFeedCursorKey(encoded string) (uint64, *corev2.BlobKey, error) {
-	// Decode hex string
-	bytes, err := hex.DecodeString(encoded)
-	if err != nil {
-		return 0, nil, fmt.Errorf("invalid hex encoding: %w", err)
-	}
-
-	// Check length
-	if len(bytes) != 40 { // 8 bytes timestamp + 32 bytes blobKey
-		return 0, nil, fmt.Errorf("invalid length: expected 40 bytes, got %d", len(bytes))
-	}
-
-	// Get timestamp
-	requestedAt := binary.BigEndian.Uint64(bytes[:8])
-
-	// Check if the remaining bytes are all zeros
-	allZeros := true
-	for i := 8; i < len(bytes); i++ {
-		if bytes[i] != 0 {
-			allZeros = false
-			break
-		}
-	}
-
-	if allZeros {
-		return requestedAt, nil, nil
-	}
-	var bk corev2.BlobKey
-	copy(bk[:], bytes[8:])
-	return requestedAt, &bk, nil
+	return &v2.Account{
+		Address:   gethcommon.HexToAddress(address),
+		UpdatedAt: updatedAt,
+	}, nil
 }

@@ -1,6 +1,13 @@
+# Important to add all directories/files that are not needed to build any of our services,
+# because our main shared Dockerfile uses a `COPY . .` in the base-builder stage.
 node_modules
 testdata
 data
 bin
 ./contracts/out
 ./contracts/cache
+**/*.md
+.dockerignore
+**/Dockerfile
+**/*.pdf
+**/*.png

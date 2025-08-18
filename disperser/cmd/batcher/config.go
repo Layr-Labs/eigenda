@@ -31,6 +31,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 
 	EnableGnarkBundleEncoding bool
 }
@@ -45,6 +46,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if !kmsConfig.Disable {
 		ethClientConfig = geth.ReadEthClientConfigRPCOnly(ctx)
 	}
+
 	config := Config{
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -69,12 +71,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			FinalizationBlockDelay:   ctx.GlobalUint(flags.FinalizationBlockDelayFlag.Name),
 		},
 		TimeoutConfig: batcher.TimeoutConfig{
-			EncodingTimeout:     ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
-			AttestationTimeout:  ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
-			ChainReadTimeout:    ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
-			ChainWriteTimeout:   ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
-			ChainStateTimeout:   ctx.GlobalDuration(flags.ChainStateTimeoutFlag.Name),
-			TxnBroadcastTimeout: ctx.GlobalDuration(flags.TransactionBroadcastTimeoutFlag.Name),
+			EncodingTimeout:         ctx.GlobalDuration(flags.EncodingTimeoutFlag.Name),
+			AttestationTimeout:      ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchAttestationTimeout: ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			ChainReadTimeout:        ctx.GlobalDuration(flags.ChainReadTimeoutFlag.Name),
+			ChainWriteTimeout:       ctx.GlobalDuration(flags.ChainWriteTimeoutFlag.Name),
+			ChainStateTimeout:       ctx.GlobalDuration(flags.ChainStateTimeoutFlag.Name),
+			TxnBroadcastTimeout:     ctx.GlobalDuration(flags.TransactionBroadcastTimeoutFlag.Name),
 		},
 		MetricsConfig: batcher.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
@@ -82,6 +85,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),

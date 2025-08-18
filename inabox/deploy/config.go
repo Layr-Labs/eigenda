@@ -139,7 +139,8 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 		CHURNER_LOG_FORMAT:                  "text",
 		CHURNER_HOSTNAME:                    "",
 		CHURNER_GRPC_PORT:                   grpcPort,
-		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
+		CHURNER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
+		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		CHURNER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 
 		CHURNER_CHAIN_RPC:   "",
@@ -187,7 +188,8 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
-		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
+		DISPERSER_SERVER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
+		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 	}
 
@@ -225,11 +227,13 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
-		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
+		DISPERSER_SERVER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
+		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
 
 		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
+		DISPERSER_SERVER_RESERVED_ONLY:           "false",
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
@@ -249,7 +253,8 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
 		BATCHER_PULL_INTERVAL:                 "5s",
-		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetreiver,
+		BATCHER_EIGENDA_DIRECTORY:             env.EigenDA.EigenDADirectory,
+		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
 		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
 		BATCHER_SRS_ORDER:                     "300000",
 		BATCHER_CHAIN_RPC:                     "",
@@ -334,26 +339,29 @@ func (env *Config) generateControllerVars(
 	graphUrl string) ControllerVars {
 
 	v := ControllerVars{
-		CONTROLLER_LOG_FORMAT:                              "text",
-		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
-		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:             env.EigenDA.OperatorStateRetreiver,
-		CONTROLLER_EIGENDA_SERVICE_MANAGER:                 env.EigenDA.ServiceManager,
-		CONTROLLER_USE_GRAPH:                               "true",
-		CONTROLLER_GRAPH_URL:                               graphUrl,
-		CONTROLLER_ENCODING_PULL_INTERVAL:                  "1s",
-		CONTROLLER_AVAILABLE_RELAYS:                        "0,1,2,3",
-		CONTROLLER_DISPATCHER_PULL_INTERVAL:                "3s",
-		CONTROLLER_NODE_REQUEST_TIMEOUT:                    "5s",
-		CONTROLLER_CHAIN_RPC:                               "",
-		CONTROLLER_PRIVATE_KEY:                             "123",
-		CONTROLLER_NUM_CONFIRMATIONS:                       "0",
-		CONTROLLER_INDEXER_PULL_INTERVAL:                   "1s",
-		CONTROLLER_AWS_REGION:                              "",
-		CONTROLLER_AWS_ACCESS_KEY_ID:                       "",
-		CONTROLLER_AWS_SECRET_ACCESS_KEY:                   "",
-		CONTROLLER_AWS_ENDPOINT_URL:                        "",
-		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
-		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
+		CONTROLLER_LOG_FORMAT:                  "text",
+		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
+		CONTROLLER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
+		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
+		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
+		CONTROLLER_USE_GRAPH:                   "true",
+		CONTROLLER_GRAPH_URL:                   graphUrl,
+		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
+		CONTROLLER_AVAILABLE_RELAYS:            "0,1,2,3",
+		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "3s",
+		CONTROLLER_ATTESTATION_TIMEOUT:         "5s",
+		CONTROLLER_BATCH_ATTESTATION_TIMEOUT:   "6s",
+		CONTROLLER_CHAIN_RPC:                   "",
+		CONTROLLER_PRIVATE_KEY:                 "123",
+		CONTROLLER_NUM_CONFIRMATIONS:           "0",
+		CONTROLLER_INDEXER_PULL_INTERVAL:       "1s",
+		CONTROLLER_AWS_REGION:                  "",
+		CONTROLLER_AWS_ACCESS_KEY_ID:           "",
+		CONTROLLER_AWS_SECRET_ACCESS_KEY:       "",
+		CONTROLLER_AWS_ENDPOINT_URL:            "",
+		CONTROLLER_ENCODER_ADDRESS:             "0.0.0.0:34001",
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:    "5", // set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
+		// disperser chooses rbn = latest_block_number - finalization_block_delay
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
@@ -369,7 +377,8 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
 		RELAY_RELAY_KEYS:                            fmt.Sprint(ind),
-		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetreiver,
+		RELAY_EIGENDA_DIRECTORY:                     env.EigenDA.EigenDADirectory,
+		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetriever,
 		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
 		RELAY_PRIVATE_KEY:                           "123",
 		RELAY_GRAPH_URL:                             graphUrl,
@@ -420,17 +429,20 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_TIMEOUT:                          "10s",
 		NODE_QUORUM_ID_LIST:                   "0,1",
 		NODE_DB_PATH:                          dbPath,
+		NODE_LITT_DB_STORAGE_PATHS:            dbPath,
 		NODE_ENABLE_TEST_MODE:                 "false", // using encrypted key in inabox
 		NODE_TEST_PRIVATE_BLS:                 blsKey,
 		NODE_BLS_KEY_FILE:                     blsKeyFile,
 		NODE_ECDSA_KEY_FILE:                   ecdsaKeyFile,
 		NODE_BLS_KEY_PASSWORD:                 blsPassword,
 		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
-		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetreiver,
+		NODE_EIGENDA_DIRECTORY:                env.EigenDA.EigenDADirectory,
+		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetriever,
 		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
 		NODE_REGISTER_AT_NODE_START:           "true",
 		NODE_CHURNER_URL:                      churnerUrl,
 		NODE_CHURNER_USE_SECURE_GRPC:          "false",
+		NODE_RELAY_USE_SECURE_GRPC:            "false",
 		NODE_EXPIRATION_POLL_INTERVAL:         "10",
 		NODE_G1_PATH:                          "",
 		NODE_G2_PATH:                          "",
@@ -460,13 +472,13 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 // Generates retriever .env
 func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath, grpcPort string) RetrieverVars {
 	v := RetrieverVars{
-		RETRIEVER_LOG_FORMAT:                  "text",
-		RETRIEVER_HOSTNAME:                    "",
-		RETRIEVER_GRPC_PORT:                   grpcPort,
-		RETRIEVER_TIMEOUT:                     "10s",
-		RETRIEVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		RETRIEVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		RETRIEVER_NUM_CONNECTIONS:             "10",
+		RETRIEVER_LOG_FORMAT:              "text",
+		RETRIEVER_HOSTNAME:                "",
+		RETRIEVER_GRPC_PORT:               grpcPort,
+		RETRIEVER_TIMEOUT:                 "10s",
+		RETRIEVER_EIGENDA_DIRECTORY:       env.EigenDA.EigenDADirectory,
+		RETRIEVER_EIGENDA_SERVICE_MANAGER: env.EigenDA.ServiceManager,
+		RETRIEVER_NUM_CONNECTIONS:         "10",
 
 		RETRIEVER_CHAIN_RPC:   "",
 		RETRIEVER_PRIVATE_KEY: key[2:],
@@ -480,9 +492,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
-		RETRIEVER_GRAPH_URL:           graphUrl,
-		RETRIEVER_GRAPH_BACKOFF:       "1s",
-		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
 	}
 
 	v.RETRIEVER_G2_PATH = ""
@@ -768,6 +777,7 @@ func (env *Config) GenerateAllVariables() {
 		if err != nil {
 			log.Panicf("Error: %s", err.Error())
 		}
+
 		writeFile(composeFile, composeYaml)
 	}
 }

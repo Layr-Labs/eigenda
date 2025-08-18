@@ -3,6 +3,7 @@ package apiserver_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math"
@@ -270,8 +271,8 @@ func TestGetBlobStatus(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
-	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().X
-	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().Y
+	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().GetX()
+	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().GetY()
 	assert.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
 	assert.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
 	assert.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
@@ -357,7 +358,7 @@ func TestRetrieveBlob(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
-		fmt.Println("requestID", requestID)
+		fmt.Println("requestID", hex.EncodeToString(requestID))
 
 		// Simulate blob confirmation so that we can retrieve the blob
 		securityParams := []*core.SecurityParam{
@@ -615,7 +616,7 @@ func setup() {
 		panic("failed to create allowlist file")
 	}
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -624,7 +625,7 @@ func setup() {
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container")
+			panic("failed to start localstack container: " + err.Error())
 		}
 
 	}
@@ -786,7 +787,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		awsConfig,
 		table_names[0],
 		table_names[1],
@@ -795,7 +796,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())

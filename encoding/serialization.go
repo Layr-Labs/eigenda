@@ -35,6 +35,9 @@ func (c *Frame) SerializeGnark() ([]byte, error) {
 }
 
 func (c *Frame) DeserializeGnark(data []byte) (*Frame, error) {
+	if len(data) <= bn254.SizeOfG1AffineCompressed {
+		return nil, fmt.Errorf("chunk length must be at least %d: %d given", bn254.SizeOfG1AffineCompressed, len(data))
+	}
 	var f Frame
 	buf := data
 	err := f.Proof.Unmarshal(buf[:bn254.SizeOfG1AffineCompressed])

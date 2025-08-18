@@ -24,6 +24,7 @@
 package fft
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -105,7 +106,7 @@ func TestInvFFT(t *testing.T) {
 func TestIsPowerOfTwo(t *testing.T) {
 	var i uint64
 	for i = 0; i <= 1024; i++ {
-		result := IsPowerOfTwo(i)
+		result := isPowerOfTwo(i)
 
 		var expectedResult bool
 		if i == 0 {
@@ -120,4 +121,9 @@ func TestIsPowerOfTwo(t *testing.T) {
 
 		assert.Equal(t, expectedResult, result, "IsPowerOfTwo(%d) returned unexpected result '%t'.", i, result)
 	}
+}
+
+func TestSentinelErrors(t *testing.T) {
+	err := &InputNotPowerOfTwoError{inputLen: 44}
+	assert.True(t, errors.Is(err, ErrNotPowerOfTwo))
 }

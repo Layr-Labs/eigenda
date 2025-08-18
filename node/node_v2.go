@@ -8,18 +8,18 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/gammazero/workerpool"
 )
 
 type requestMetadata struct {
 	blobShardIndex int
-	quorum         core.QuorumID
+	assignment     corev2.Assignment
 }
 type relayRequest struct {
-	chunkRequests []*clients.ChunkRequestByRange
+	chunkRequests []*relay.ChunkRequestByIndex
 	metadata      []*requestMetadata
 }
 type response struct {
@@ -28,92 +28,117 @@ type response struct {
 	err      error
 }
 
-type RawBundles struct {
+type RawBundle struct {
 	BlobCertificate *corev2.BlobCertificate
-	Bundles         map[core.QuorumID][]byte
+	Bundle          []byte
 }
 
-func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
-	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
+// Determines where to find the chunks we need to download for a given batch. For each chunk in a batch, there will
+// be one or more relays that are responsible for serving that chunk. This function determines which relays to contact
+// for each chunk, and sorts the requests by relayID to support batching. Additionally, this method also calculates
+// the size of the chunk data that will be downloaded, in bytes.
+func (n *Node) DetermineChunkLocations(
+	batch *corev2.Batch,
+	operatorState *core.OperatorState,
+	probe *common.SequenceProbe,
+) (downloadSizeInBytes uint64, relayRequests map[corev2.RelayKey]*relayRequest, err error) {
+
+	probe.SetStage("determine_chunk_locations")
+
+	blobVersionParams := n.BlobVersionParams.Load()
+	if blobVersionParams == nil {
+		return 0, nil, fmt.Errorf("blob version params is nil")
+	}
+
+	relayRequests = make(map[corev2.RelayKey]*relayRequest)
+
+	for i, cert := range batch.BlobCertificates {
+		blobKey, err := cert.BlobHeader.BlobKey()
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to get blob key: %w", err)
+		}
+
+		if len(cert.RelayKeys) == 0 {
+			return 0, nil, fmt.Errorf("no relay keys in the certificate")
+		}
+		relayIndex := rand.Intn(len(cert.RelayKeys))
+		relayKey := cert.RelayKeys[relayIndex]
+
+		blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
+		if !ok {
+			return 0, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
+		}
+
+		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
+		if err != nil {
+			n.Logger.Errorf("failed to get assignment: %v", err)
+			continue
+		}
+
+		chunkLength, err := blobParams.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length))
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to get chunk length: %w", err)
+		}
+		downloadSizeInBytes += uint64(assgn.NumChunks() * chunkLength)
+
+		req, ok := relayRequests[relayKey]
+		if !ok {
+			req = &relayRequest{
+				chunkRequests: make([]*relay.ChunkRequestByIndex, 0),
+				metadata:      make([]*requestMetadata, 0),
+			}
+			relayRequests[relayKey] = req
+		}
+		// Chunks from one blob are requested to the same relay
+		req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByIndex{
+			BlobKey: blobKey,
+			Indices: assgn.Indices,
+		})
+		req.metadata = append(req.metadata, &requestMetadata{
+			blobShardIndex: i,
+			assignment:     assgn,
+		})
+
+	}
+
+	return downloadSizeInBytes, relayRequests, nil
+}
+
+// This method takes a "download plan" from DetermineChunkLocations() and downloads the chunks from the relays.
+// It also deserializes the responses from the relays into BlobShards and RawBundles.
+func (n *Node) DownloadChunksFromRelays(
+	ctx context.Context,
+	batch *corev2.Batch,
+	relayRequests map[corev2.RelayKey]*relayRequest,
+	probe *common.SequenceProbe,
+) (blobShards []*corev2.BlobShard, rawBundles []*RawBundle, err error) {
+
+	blobShards = make([]*corev2.BlobShard, len(batch.BlobCertificates))
+	rawBundles = make([]*RawBundle, len(batch.BlobCertificates))
+	for i, cert := range batch.BlobCertificates {
+		blobShards[i] = &corev2.BlobShard{
+			BlobCertificate: cert,
+		}
+		rawBundles[i] = &RawBundle{
+			BlobCertificate: cert,
+		}
+	}
+
+	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
 	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
 	}
 
-	blobVersionParams := n.BlobVersionParams.Load()
-	if blobVersionParams == nil {
-		return nil, nil, fmt.Errorf("blob version params is nil")
-	}
+	probe.SetStage("download")
 
-	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
-	rawBundles := make([]*RawBundles, len(batch.BlobCertificates))
-	requests := make(map[corev2.RelayKey]*relayRequest)
-	for i, cert := range batch.BlobCertificates {
-		blobKey, err := cert.BlobHeader.BlobKey()
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get blob key: %v", err)
-		}
-
-		if len(cert.RelayKeys) == 0 {
-			return nil, nil, fmt.Errorf("no relay keys in the certificate")
-		}
-		blobShards[i] = &corev2.BlobShard{
-			BlobCertificate: cert,
-			Bundles:         make(map[core.QuorumID]core.Bundle),
-		}
-		rawBundles[i] = &RawBundles{
-			BlobCertificate: cert,
-			Bundles:         make(map[core.QuorumID][]byte),
-		}
-		relayIndex := rand.Intn(len(cert.RelayKeys))
-		relayKey := cert.RelayKeys[relayIndex]
-		for _, quorum := range cert.BlobHeader.QuorumNumbers {
-			blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
-			if !ok {
-				return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
-			}
-
-			if _, ok := operatorState.Operators[quorum]; !ok {
-				// operator is not part of the quorum or the quorum is not valid
-				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid", "quorum", quorum)
-				continue
-			}
-
-			assgn, err := corev2.GetAssignment(operatorState, blobParams, quorum, n.Config.ID)
-			if err != nil {
-				n.Logger.Errorf("failed to get assignment: %v", err)
-				continue
-			}
-
-			req, ok := requests[relayKey]
-			if !ok {
-				req = &relayRequest{
-					chunkRequests: make([]*clients.ChunkRequestByRange, 0),
-					metadata:      make([]*requestMetadata, 0),
-				}
-				requests[relayKey] = req
-			}
-			// Chunks from one blob are requested to the same relay
-			req.chunkRequests = append(req.chunkRequests, &clients.ChunkRequestByRange{
-				BlobKey: blobKey,
-				Start:   assgn.StartIndex,
-				End:     assgn.StartIndex + assgn.NumChunks,
-			})
-			req.metadata = append(req.metadata, &requestMetadata{
-				blobShardIndex: i,
-				quorum:         quorum,
-			})
-		}
-	}
-
-	pool := workerpool.New(len(requests))
-	bundleChan := make(chan response, len(requests))
-	for relayKey := range requests {
+	bundleChan := make(chan response, len(relayRequests))
+	for relayKey := range relayRequests {
 		relayKey := relayKey
-		req := requests[relayKey]
-		pool.Submit(func() {
+		req := relayRequests[relayKey]
+		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
-			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
+			bundles, err := relayClient.GetChunksByIndex(ctxTimeout, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -130,21 +155,36 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 			}
 		})
 	}
-	pool.StopWait()
 
-	var err error
-	for i := 0; i < len(requests); i++ {
-		resp := <-bundleChan
+	responses := make([]response, len(relayRequests))
+	for i := 0; i < len(relayRequests); i++ {
+		responses[i] = <-bundleChan
+	}
+
+	probe.SetStage("deserialize")
+
+	for i := 0; i < len(relayRequests); i++ {
+		resp := responses[i]
 		if resp.err != nil {
+			// TODO (cody-littley) this is flaky, and will fail if any relay fails. We should retry failures
 			return nil, nil, fmt.Errorf("failed to get chunks from relays: %v", resp.err)
 		}
-		for i, bundle := range resp.bundles {
-			metadata := resp.metadata[i]
-			blobShards[metadata.blobShardIndex].Bundles[metadata.quorum], err = new(core.Bundle).Deserialize(bundle)
+
+		if len(resp.bundles) != len(resp.metadata) {
+			return nil, nil,
+				fmt.Errorf("number of bundles and metadata do not match (%d != %d)",
+					len(resp.bundles), len(resp.metadata))
+		}
+
+		for j, bundle := range resp.bundles {
+			metadata := resp.metadata[j]
+			var err error
+			blobShards[metadata.blobShardIndex].Bundle, err = new(core.Bundle).Deserialize(bundle)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
-			rawBundles[metadata.blobShardIndex].Bundles[metadata.quorum] = bundle
+			rawBundles[metadata.blobShardIndex].Bundle = bundle
+
 		}
 	}
 
@@ -164,7 +204,6 @@ func (n *Node) ValidateBatchV2(
 	if err := n.ValidatorV2.ValidateBatchHeader(ctx, batch.BatchHeader, batch.BlobCertificates); err != nil {
 		return fmt.Errorf("failed to validate batch header: %v", err)
 	}
-	pool := workerpool.New(n.Config.NumBatchValidators)
 	blobVersionParams := n.BlobVersionParams.Load()
-	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, pool, operatorState)
+	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, n.ValidationPool, operatorState)
 }

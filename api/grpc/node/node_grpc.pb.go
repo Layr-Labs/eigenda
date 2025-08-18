@@ -36,7 +36,7 @@ type DispersalClient interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
-	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+	// StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
 	// DEPRECATED: StoreBlobs method is not used
@@ -104,7 +104,7 @@ type DispersalServer interface {
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
-	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+	// StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
 	// DEPRECATED: StoreBlobs method is not used

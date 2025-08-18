@@ -4,10 +4,9 @@ pragma solidity =0.8.12;
 import "../MockEigenDADeployer.sol";
 
 contract EigenDARelayRegistryUnit is MockEigenDADeployer {
-
     event RelayAdded(address indexed relay, uint32 indexed key, string relayURL);
 
-    function setUp() virtual public {
+    function setUp() public virtual {
         _deployDA();
     }
 
@@ -18,7 +17,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addRelayInfo() public {
-        RelayInfo memory relayInfo = RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });
@@ -28,12 +27,14 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
         vm.prank(registryCoordinatorOwner);
         eigenDARelayRegistry.addRelayInfo(relayInfo);
 
-        assertEq(eigenDARelayRegistry.relayKeyToAddress(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayAddress);
+        assertEq(
+            eigenDARelayRegistry.relayKeyToAddress(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayAddress
+        );
         assertEq(eigenDARelayRegistry.relayKeyToUrl(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayURL);
     }
 
     function test_addRelayInfo_revert_notOwner() public {
-        RelayInfo memory relayInfo = RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });

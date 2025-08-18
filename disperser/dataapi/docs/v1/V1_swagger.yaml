@@ -134,21 +134,19 @@ definitions:
         type: string
       retrieval_status:
         type: string
-      v2_dispersal_online:
-        type: boolean
-      v2_dispersal_socket:
-        type: string
-      v2_dispersal_status:
-        type: string
     type: object
   dataapi.OperatorStake:
     properties:
+      operator_address:
+        type: string
       operator_id:
         type: string
       quorum_id:
         type: string
       rank:
         type: integer
+      stake_amount:
+        type: number
       stake_percentage:
         type: number
     type: object
@@ -163,6 +161,8 @@ definitions:
     type: object
   dataapi.OperatorsStakeResponse:
     properties:
+      current_block:
+        type: integer
       stake_ranked_operators:
         additionalProperties:
           items:
@@ -251,6 +251,8 @@ definitions:
       commitment:
         $ref: '#/definitions/encoding.G1Commitment'
       length:
+        description: this is the length in SYMBOLS (32 byte field elements) of the
+          blob. it must be a power of 2
         type: integer
       length_commitment:
         $ref: '#/definitions/encoding.G2Commitment'
@@ -764,7 +766,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Operator node reachability port check
+      summary: Operator v1 node reachability port check
       tags:
       - OperatorsInfo
   /operators-info/registered-operators:

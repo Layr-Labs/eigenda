@@ -15,8 +15,8 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
 contract Deployer_EjectionManager is Script, Test {
-    
-    string public existingDeploymentInfoPath  = string(bytes("./script/deploy/mainnet/output/mainnet_deployment_data.json"));
+    string public existingDeploymentInfoPath =
+        string(bytes("./script/deploy/mainnet/output/mainnet_deployment_data.json"));
     string public deployConfigPath = string(bytes("./script/deploy/mainnet/config/ejector.config.json"));
 
     address ejectorOwner;
@@ -34,15 +34,10 @@ contract Deployer_EjectionManager is Script, Test {
     function run() external {
         string memory existingDeploymentData = vm.readFile(existingDeploymentInfoPath);
 
-        eigenDAProxyAdmin = ProxyAdmin(
-            stdJson.readAddress(existingDeploymentData, ".addresses.eigenDAProxyAdmin")
-        );
-        registryCoordinator = RegistryCoordinator(
-            stdJson.readAddress(existingDeploymentData, ".addresses.registryCoordinator")
-        );
-        stakeRegistry = StakeRegistry(
-            stdJson.readAddress(existingDeploymentData, ".addresses.stakeRegistry")
-        );
+        eigenDAProxyAdmin = ProxyAdmin(stdJson.readAddress(existingDeploymentData, ".addresses.eigenDAProxyAdmin"));
+        registryCoordinator =
+            RegistryCoordinator(stdJson.readAddress(existingDeploymentData, ".addresses.registryCoordinator"));
+        stakeRegistry = StakeRegistry(stdJson.readAddress(existingDeploymentData, ".addresses.stakeRegistry"));
 
         string memory config_data = vm.readFile(deployConfigPath);
 
@@ -59,27 +54,18 @@ contract Deployer_EjectionManager is Script, Test {
 
         vm.startBroadcast();
 
-        ejectionManager = EjectionManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(deployer), ""))
-        );
+        ejectionManager =
+            EjectionManager(address(new TransparentUpgradeableProxy(address(emptyContract), address(deployer), "")));
 
-        ejectionManagerImplementation = new EjectionManager(
-            registryCoordinator,
-            stakeRegistry
-        );
+        ejectionManagerImplementation = new EjectionManager(registryCoordinator, stakeRegistry);
 
         IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
-        address[] memory ejectors = new address[](1);   
+        address[] memory ejectors = new address[](1);
         ejectors[0] = ejector;
 
         TransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
             address(ejectionManagerImplementation),
-            abi.encodeWithSelector(
-                EjectionManager.initialize.selector,
-                ejectorOwner,
-                ejectors,
-                quorumEjectionParams
-            )
+            abi.encodeWithSelector(EjectionManager.initialize.selector, ejectorOwner, ejectors, quorumEjectionParams)
         );
 
         TransparentUpgradeableProxy(payable(address(ejectionManager))).changeAdmin(address(eigenDAProxyAdmin));
@@ -89,25 +75,34 @@ contract Deployer_EjectionManager is Script, Test {
         console.log("EjectionManager deployed at: ", address(ejectionManager));
         console.log("EjectionManagerImplementation deployed at: ", address(ejectionManagerImplementation));
 
-        _sanityCheck(
-            ejectionManager,
-            ejectionManagerImplementation,
-            config_data
-        );
+        _sanityCheck(ejectionManager, ejectionManagerImplementation, config_data);
     }
 
     function _sanityCheck(
         EjectionManager _ejectionManager,
         EjectionManager _ejectionManagerImplementation,
         string memory config_data
-    ) internal {
-        require(address(_ejectionManager.registryCoordinator()) == address(registryCoordinator), "ejectionManager.registryCoordinator() != registryCoordinator");
-        require(address(_ejectionManager.stakeRegistry()) == address(stakeRegistry), "ejectionManager.stakeRegistry() != stakeRegistry");
-        require(address(_ejectionManagerImplementation.registryCoordinator()) == address(registryCoordinator), "ejectionManagerImplementation.registryCoordinator() != registryCoordinator");
-        require(address(_ejectionManagerImplementation.stakeRegistry()) == address(stakeRegistry), "ejectionManagerImplementation.stakeRegistry() != stakeRegistry");
+    ) internal view {
+        require(
+            address(_ejectionManager.registryCoordinator()) == address(registryCoordinator),
+            "ejectionManager.registryCoordinator() != registryCoordinator"
+        );
+        require(
+            address(_ejectionManager.stakeRegistry()) == address(stakeRegistry),
+            "ejectionManager.stakeRegistry() != stakeRegistry"
+        );
+        require(
+            address(_ejectionManagerImplementation.registryCoordinator()) == address(registryCoordinator),
+            "ejectionManagerImplementation.registryCoordinator() != registryCoordinator"
+        );
+        require(
+            address(_ejectionManagerImplementation.stakeRegistry()) == address(stakeRegistry),
+            "ejectionManagerImplementation.stakeRegistry() != stakeRegistry"
+        );
 
-        require(eigenDAProxyAdmin.getProxyImplementation(
-            TransparentUpgradeableProxy(payable(address(_ejectionManager)))) == address(_ejectionManagerImplementation),
+        require(
+            eigenDAProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(_ejectionManager))))
+                == address(_ejectionManagerImplementation),
             "ejectionManager: implementation set incorrectly"
         );
 
@@ -117,10 +112,8 @@ contract Deployer_EjectionManager is Script, Test {
         IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
         for (uint8 i = 0; i < quorumEjectionParams.length; ++i) {
             (uint32 rateLimitWindow, uint16 ejectableStakePercent) = _ejectionManager.quorumEjectionParams(i);
-            IEjectionManager.QuorumEjectionParams memory params = IEjectionManager.QuorumEjectionParams(
-                rateLimitWindow,
-                ejectableStakePercent
-            );
+            IEjectionManager.QuorumEjectionParams memory params =
+                IEjectionManager.QuorumEjectionParams(rateLimitWindow, ejectableStakePercent);
             require(
                 keccak256(abi.encode(params)) == keccak256(abi.encode(quorumEjectionParams[i])),
                 "ejectionManager.quorumEjectionParams != quorumEjectionParams"
@@ -128,7 +121,11 @@ contract Deployer_EjectionManager is Script, Test {
         }
     }
 
-    function _parseQuorumEjectionParams(string memory config_data) internal returns (IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams) {
+    function _parseQuorumEjectionParams(string memory config_data)
+        internal
+        pure
+        returns (IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams)
+    {
         bytes memory quorumEjectionParamsRaw = stdJson.parseRaw(config_data, ".quorumEjectionParams");
         quorumEjectionParams = abi.decode(quorumEjectionParamsRaw, (IEjectionManager.QuorumEjectionParams[]));
     }

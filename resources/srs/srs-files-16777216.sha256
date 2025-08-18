@@ -1,0 +1,7 @@
+# SRS files hashes for blob size 16777216 bytes
+# Generated on 2025-04-15 19:21:06 UTC
+# Format: SHA256 (filename)
+
+8f18b9c04ed4bddcdb73001fb693703197328cecabdfa9025f647410b0c50d7f  g1.point
+a6942684aa751b4ec7873e2edb4660ac5c4516adb3b310441802cc0d489f645a  g2.point
+78fad17d74d28cecdb7f826fdd72dee08bdbe1e8ad66f2b24fcf2fc140176788  g2.trailing.point

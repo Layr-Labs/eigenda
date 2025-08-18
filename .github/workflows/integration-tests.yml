@@ -4,8 +4,10 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
+  merge_group:
+
+env:
+  MISE_VERSION: 2024.12.14
 
 jobs:
   integration-tests:
@@ -26,39 +28,18 @@ jobs:
           aws configure --profile test-profile set region us-east-1
           aws configure --profile test-profile set source_profile default
 
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
-        with:
-          go-version: "1.21" # The Go version to download (if necessary) and use.
-      - run: go version
-
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
-
-      - name: Update Submodule Commits
-        run: |
-          git submodule update --init --recursive
-
-      # TODO: add back geth if we need it in tests
-      # - name: Install geth
-      #   run: |
-      #     sudo add-apt-repository -y ppa:ethereum/ethereum
-      #     sudo apt-get update
-      #     sudo apt-get -y install ethereum
-
-      # - name: Get geth version
-      #   run: geth version
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
+          submodules: recursive
 
-      - name: Install graph cli
-        run: |
-          yarn global add @graphprotocol/graph-cli@0.51.0
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
 
-      - name: Get Forge version
-        run: forge --version
+      - run: go version
+      - run: forge --version
 
       - name: Build contract dependencies
         run: |
@@ -68,28 +49,13 @@ jobs:
         run: |
           cd contracts && forge build
 
-      # TODO: add back DA contracts if we will need them in tests.
-      # - name: Compile contracts
-      #   run: |
-      #     make compile-contracts
+      - run: make integration-tests
 
-      - name: Churner
-        run: go test -v ./operators/churner/tests
+      - run: make fuzz-tests
 
-      - name: Indexer
-        run: go test -v ./core/indexer
+      - run: make integration-tests-inabox
 
-      - name: Node Plugin
-        run: go test -v ./node/plugin/tests
-
-      # TODO(ian-shim): re-enable these tests once testnet is functional
-      # - name: eigenda-client
-      #   run: go test -v ./api/clients --testnet-integration
-
-      - name: Inabox E2E
-        run: make build && cd inabox && make run-e2e
-
-      - name: Save logs
+      - name: Save inabox logs
         if: always()
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
         with:
@@ -98,7 +64,7 @@ jobs:
             inabox/testdata/*/logs/
             inabox/testdata/*/deploy.log
 
-      - name: Send GitHub Action trigger data to Slack workflow
+      - name: Send GitHub Action trigger data to Slack eigenda-pr channel
         if: ${{ failure() }}
         id: slack
         uses: slackapi/slack-github-action@v1.24.0

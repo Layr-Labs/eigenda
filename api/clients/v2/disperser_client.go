@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
 
@@ -24,13 +24,29 @@ type DisperserClientConfig struct {
 	UseSecureGrpcFlag bool
 }
 
+// DisperserClient manages communication with the disperser server.
 type DisperserClient interface {
+	// Close closes the grpc connection to the disperser server.
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// DisperseBlob disperses a blob with the given data, blob version, and quorums.
+	DisperseBlob(
+		ctx context.Context,
+		data []byte,
+		blobVersion corev2.BlobVersion,
+		quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// DisperseBlobWithProbe is similar to DisperseBlob, but also takes a SequenceProbe to capture metrics.
+	// If the probe is nil, no metrics are captured.
+	DisperseBlobWithProbe(
+		ctx context.Context,
+		data []byte,
+		blobVersion corev2.BlobVersion,
+		quorums []core.QuorumID,
+		probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// GetBlobStatus returns the status of a blob with the given blob key.
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
+	// GetBlobCommitment returns the blob commitment for a given blob payload.
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
-
 type disperserClient struct {
 	config             *DisperserClientConfig
 	signer             corev2.BlobRequestSigner
@@ -40,6 +56,7 @@ type disperserClient struct {
 	client             disperser_rpc.DisperserClient
 	prover             encoding.Prover
 	accountant         *Accountant
+	accountantLock     sync.Mutex
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -90,11 +107,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	if c.accountant == nil {
-		accountId, err := c.signer.GetAccountID()
-		if err != nil {
-			return fmt.Errorf("error getting account ID: %w", err)
-		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		return fmt.Errorf("accountant is nil")
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
@@ -128,40 +141,74 @@ func (c *disperserClient) DisperseBlob(
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-	err = c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
+	return c.DisperseBlobWithProbe(ctx, data, blobVersion, quorums, nil)
+}
 
-	if c.signer == nil {
-		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
-	}
-
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
+// DisperseBlobWithProbe disperses a blob with the given data, blob version, and quorums. If sequenceProbe is not nil,
+// the probe is used to capture metrics during the dispersal process.
+func (c *disperserClient) DisperseBlobWithProbe(
+	ctx context.Context,
+	data []byte,
+	blobVersion corev2.BlobVersion,
+	quorums []core.QuorumID,
+	probe *common.SequenceProbe,
+) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
-
+	if c.signer == nil {
+		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+	}
 	for _, q := range quorums {
 		if q > corev2.MaxQuorumID {
 			return nil, [32]byte{}, api.NewErrorInvalidArg("quorum number must be less than 256")
 		}
 	}
 
+	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+
+	probe.SetStage("acquire_accountant_lock")
+	c.accountantLock.Lock()
+
+	probe.SetStage("accountant")
+
+	err = c.initOncePopulateAccountant(ctx)
+	if err != nil {
+		c.accountantLock.Unlock()
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
+	if err != nil {
+		c.accountantLock.Unlock()
+		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+	}
+
+	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
+		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+		c.accountantLock.Unlock()
+	} else {
+		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+		defer c.accountantLock.Unlock()
+	}
+
+	probe.SetStage("verify_field_element")
+
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
+		return nil, [32]byte{}, fmt.Errorf(
+			"encountered an error to convert a 32-bytes into a valid field element, "+
+				"please use the correct format where every 32bytes(big-endian) is less than "+
+				"21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
+
+	probe.SetStage("get_commitments")
 
 	var blobCommitments encoding.BlobCommitments
 	if c.prover == nil {
@@ -203,6 +250,8 @@ func (c *disperserClient) DisperseBlob(
 		PaymentMetadata: *payment,
 	}
 
+	probe.SetStage("sign_blob_request")
+
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
@@ -217,6 +266,8 @@ func (c *disperserClient) DisperseBlob(
 		BlobHeader: blobHeaderProto,
 	}
 
+	probe.SetStage("send_to_disperser")
+
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
@@ -226,6 +277,8 @@ func (c *disperserClient) DisperseBlob(
 	if err != nil {
 		return nil, [32]byte{}, err
 	}
+
+	probe.SetStage("verify_blob_key")
 
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
@@ -293,14 +346,17 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	signature, err := c.signer.SignPaymentStateRequest()
+	timestamp := uint64(time.Now().UnixNano())
+
+	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
 	request := &disperser_rpc.GetPaymentStateRequest{
-		AccountId: accountID,
+		AccountId: accountID.Hex(),
 		Signature: signature,
+		Timestamp: timestamp,
 	}
 	return c.client.GetPaymentState(ctx, request)
 }
@@ -327,7 +383,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
+		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err
@@ -347,12 +403,10 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
 	var initErr error
 	c.initOnceAccountant.Do(func() {
-		if c.accountant == nil {
-			err := c.PopulateAccountant(ctx)
-			if err != nil {
-				initErr = err
-				return
-			}
+		err := c.PopulateAccountant(ctx)
+		if err != nil {
+			initErr = err
+			return
 		}
 	})
 	if initErr != nil {

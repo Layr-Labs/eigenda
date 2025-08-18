@@ -12,6 +12,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 )
 
 func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatusRequest) (*pb.BlobStatusReply, error) {
@@ -80,6 +81,11 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 		}
 		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)
 		if err != nil {
+			if errors.Is(err, blobstore.ErrAttestationNotFound) {
+				// attestation may not exist yet if the blob has not been processed by the dispatcher
+				s.logger.Info("attestation not found for signed batch", "err", err, "blobKey", blobKey.Hex())
+				continue
+			}
 			s.logger.Error("failed to get signed batch", "err", err, "blobKey", blobKey.Hex())
 			continue
 		}

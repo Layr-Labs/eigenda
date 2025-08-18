@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -148,11 +148,11 @@ func (s *EncoderServer) popRequest() {
 func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	begin := time.Now()
 
-	if len(req.Data) == 0 {
+	if len(req.GetData()) == 0 {
 		return nil, errors.New("handleEncoding: missing data")
 	}
 
-	if req.EncodingParams == nil {
+	if req.GetEncodingParams() == nil {
 		return nil, errors.New("handleEncoding: missing encoding parameters")
 	}
 

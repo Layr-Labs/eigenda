@@ -402,7 +402,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 			start := time.Now()
 			commits, chunks, err := e.encoderClient.EncodeBlob(encodingCtx, blob.Data, res.EncodingParams)
 			if err != nil {
-				encoderChan <- EncodingResultOrStatus{Err: err, EncodingResult: EncodingResult{
+				encoderChan <- EncodingResultOrStatus{Err: fmt.Errorf("encoderClient.EncodeBlob: %w", err), EncodingResult: EncodingResult{
 					BlobMetadata:   metadata,
 					BlobQuorumInfo: res.BlobQuorumInfo,
 				}}

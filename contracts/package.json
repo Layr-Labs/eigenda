@@ -1,6 +1,6 @@
 {
   "name": "@eigenda/contracts",
-  "version": "0.1.0-rc-2",
+  "version": "0.1.0",
   "description": "EigenDA core contracts",
   "main": "index.js",
   "directories": {
@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "test": "forge test -v",
-    "build": "forge build"
+    "build": "yarn && forge build"
   },
   "repository": {
     "type": "git",

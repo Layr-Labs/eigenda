@@ -46,7 +46,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 		return nil
 	}
 
-	logger.Info("Quorums to register for", "quorums", fmt.Sprint(quorumsToRegister))
+	logger.Info("Quorums to register for", "quorums", fmt.Sprint(quorumsToRegister)) //nolint:staticcheck // printing byte slices is fine here
 
 	// register for quorums
 	shouldCallChurner := false

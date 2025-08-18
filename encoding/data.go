@@ -23,13 +23,13 @@ type Proof = bn254.G1Affine
 // Symbol is a symbol in the field used for polynomial commitments
 type Symbol = fr.Element
 
-// BlomCommitments contains the blob's commitment, degree proof, and the actual degree.
+// BlobCommitments contains the blob's commitment, degree proof, and the actual degree.
 type BlobCommitments struct {
 	Commitment       *G1Commitment `json:"commitment"`
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
-	Length           uint          `json:"length"`
+	Length uint `json:"length"`
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format
@@ -103,17 +103,17 @@ func (c *BlobCommitments) Equal(c1 *BlobCommitments) bool {
 }
 
 func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {
-	commitment, err := new(G1Commitment).Deserialize(c.Commitment)
+	commitment, err := new(G1Commitment).Deserialize(c.GetCommitment())
 	if err != nil {
 		return nil, err
 	}
 
-	lengthCommitment, err := new(G2Commitment).Deserialize(c.LengthCommitment)
+	lengthCommitment, err := new(G2Commitment).Deserialize(c.GetLengthCommitment())
 	if err != nil {
 		return nil, err
 	}
 
-	lengthProof, err := new(G2Commitment).Deserialize(c.LengthProof)
+	lengthProof, err := new(G2Commitment).Deserialize(c.GetLengthProof())
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
-		Length:           uint(c.Length),
+		Length:           uint(c.GetLength()),
 	}, nil
 }
 

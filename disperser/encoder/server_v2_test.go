@@ -2,16 +2,17 @@ package encoder_test
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"math/big"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/rs"
+
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -19,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +31,7 @@ import (
 var blobParams = &core.BlobVersionParameters{
 	NumChunks:       8192,
 	CodingRate:      8,
-	MaxNumOperators: 3537,
+	MaxNumOperators: 2048,
 }
 
 type testComponents struct {
@@ -93,7 +95,7 @@ func TestEncodeBlob(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := corev2.GetChunkLength(core.NextPowerOf2(uint32(blobLength)), blobParams)
+	chunkLength, err := blobParams.GetChunkLength(core.NextPowerOf2(uint32(blobLength)))
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}
@@ -146,13 +148,13 @@ func TestEncodeBlob(t *testing.T) {
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
 		assert.NotNil(t, resp, "Response should not be nil")
-		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
+		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
+		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
 	})
 
 	expectedFragmentInfo := &encoding.FragmentInfo{
-		TotalChunkSizeBytes: resp.FragmentInfo.TotalChunkSizeBytes,
-		FragmentSizeBytes:   resp.FragmentInfo.FragmentSizeBytes,
+		TotalChunkSizeBytes: resp.GetFragmentInfo().GetTotalChunkSizeBytes(),
+		FragmentSizeBytes:   resp.GetFragmentInfo().GetFragmentSizeBytes(),
 	}
 
 	// Verify chunk store data
@@ -189,8 +191,8 @@ func TestEncodeBlob(t *testing.T) {
 			return
 		}
 
-		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
-		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
+		assert.Equal(t, uint32(262148), resp.GetFragmentInfo().GetTotalChunkSizeBytes(), "Unexpected total chunk size")
+		assert.Equal(t, uint32(512*1024), resp.GetFragmentInfo().GetFragmentSizeBytes(), "Unexpected fragment size")
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
 		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	})
@@ -204,7 +206,7 @@ func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x1234",
+			AccountID:         gethcommon.Address{1},
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},

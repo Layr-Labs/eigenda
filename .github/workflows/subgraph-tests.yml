@@ -1,0 +1,48 @@
+name: subgraph-tests
+on:
+  push:
+    branches:
+      - master
+    # TODO: these tests can't be required to pass in order to merge,
+    # because they only run on these paths so would block PRs that don't change subgraphs.
+    # Do we want to change this and always run this workflow and mark is as required?
+    paths:
+      - 'subgraphs/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'subgraphs/**'
+  merge_group:
+
+jobs:
+  test-subgraphs:
+    name: Test ${{ matrix.subgraph }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        subgraph: [eigenda-operator-state, eigenda-batch-metadata, eigenda-payments]
+      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+          
+      - name: Output Graph version
+        run: |
+          graph --version
+
+      - name: Test ${{ matrix.subgraph }} subgraph
+        working-directory: subgraphs/${{ matrix.subgraph }}
+        run: |
+          # Copy template files
+          cp ./templates/subgraph.yaml .
+          cp ./templates/networks.json .
+          
+          yarn install
+          yarn codegen
+          yarn test 

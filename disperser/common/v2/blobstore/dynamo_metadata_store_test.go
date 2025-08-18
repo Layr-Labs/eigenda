@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -12,10 +13,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -32,20 +31,71 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
-func checkAttestationsOrdered(t *testing.T, at []*corev2.Attestation) {
-	if len(at) > 1 {
-		for i := 1; i < len(at); i++ {
-			assert.True(t, at[i-1].AttestedAt < at[i].AttestedAt)
+func checkAttestationsAsc(t *testing.T, items []*corev2.Attestation) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(t,
+				items[i-1].AttestedAt, // previous should be less
+				items[i].AttestedAt,   // than current
+				"attestations should be in ascending order",
+			)
 		}
 	}
 }
 
-func checkAttestationsOrderedDesc(t *testing.T, attestations []*corev2.Attestation) {
-	for i := 1; i < len(attestations); i++ {
+func checkAttestationsDesc(t *testing.T, items []*corev2.Attestation) {
+	for i := 1; i < len(items); i++ {
 		assert.Greater(t,
-			attestations[i-1].AttestedAt, // previous should be greater
-			attestations[i].AttestedAt,   // than current
+			items[i-1].AttestedAt, // previous should be greater
+			items[i].AttestedAt,   // than current
 			"attestations should be in descending order",
+		)
+	}
+}
+
+func checkDispersalsAsc(t *testing.T, items []*corev2.DispersalResponse) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(
+				t,
+				items[i-1].RespondedAt, // previous should be less
+				items[i].RespondedAt,   // than current
+				"DispersalRequests should be in ascending order",
+			)
+
+		}
+	}
+}
+
+func checkDispersalsDesc(t *testing.T, items []*corev2.DispersalResponse) {
+	for i := 1; i < len(items); i++ {
+		assert.Greater(
+			t,
+			items[i-1].RespondedAt, // previous should be greater
+			items[i].RespondedAt,   // than current
+			"DispersalRequests should be in descending order",
+		)
+	}
+}
+
+func checkBlobsAsc(t *testing.T, items []*v2.BlobMetadata) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(t,
+				items[i-1].RequestedAt, // previous should be less
+				items[i].RequestedAt,   // than current
+				"blobs should be in ascending order",
+			)
+		}
+	}
+}
+
+func checkBlobsDesc(t *testing.T, items []*v2.BlobMetadata) {
+	for i := 1; i < len(items); i++ {
+		assert.Greater(t,
+			items[i-1].RequestedAt, // previous should be greater
+			items[i].RequestedAt,   // than current
+			"blobs should be in descending order",
 		)
 	}
 }
@@ -249,9 +299,9 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 
 	// attempt to put metadata with the same key should fail
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey1.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
@@ -268,7 +318,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 	now := uint64(time.Now().UnixNano())
 	firstBlobTime := now - uint64(time.Hour.Nanoseconds())
 	numBlobs := 5
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 
 	// Create blobs: first 3 blobs have the same requestedAt, and last 2 blobs have the same requestedAt
 	for i := 0; i < numBlobs; i++ {
@@ -289,7 +339,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -397,7 +447,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithDynamoPaginatio
 	// size of DyanamoDB) so it will have to use DynamoDB's pagination to get all desired
 	// results.
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -413,7 +463,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithDynamoPaginatio
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -445,7 +495,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 
 	// Create blobs for testing
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -462,7 +512,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -624,7 +674,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 
 	// Create blobs for testing
 	keys := make([]corev2.BlobKey, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
 		now := time.Now()
@@ -641,7 +691,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -803,6 +853,171 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
+	ctx := context.Background()
+
+	// Make all blobs happen in 12s
+	numBlobs := 120
+	nanoSecsPerBlob := uint64(1e8) // 10 blobs per second
+
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(10*time.Minute.Nanoseconds())
+
+	accountId := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 5))
+
+	// Create blobs for testing
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAt := make([]uint64, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		_, blobHeader := newBlob(t)
+		blobHeader.PaymentMetadata.AccountID = accountId
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		dynamoKeys[i] = dynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 1, 1, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 1, 2, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
+
+		// Test empty range
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, now, now+1024, 0, true)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(blobs))
+	})
+
+	// Test full range query
+	t.Run("ascending full range", func(t *testing.T) {
+		// Test without limit
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+
+		// Test with limit
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 10, true)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(blobs))
+		checkBlobsAsc(t, blobs)
+
+		// Test min/max timestamp range
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 0, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, math.MaxInt64, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+	})
+
+	// Test full range query
+	t.Run("descending full range", func(t *testing.T) {
+		// Test without limit
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+
+		// Test with limit
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 10, false)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(blobs))
+		checkBlobsDesc(t, blobs)
+
+		// Test min/max timestamp range
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 0, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, math.MaxInt64, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+	})
+
+	// Test range boundaries
+	t.Run("ascending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs-1, len(blobs))
+		assert.Equal(t, requestedAt[1], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[numBlobs-1], blobs[numBlobs-2].RequestedAt)
+		checkBlobsAsc(t, blobs)
+
+		// Test exclusive end
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, requestedAt[4], 0, true)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(blobs))
+		assert.Equal(t, requestedAt[0], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[3], blobs[3].RequestedAt)
+		checkBlobsAsc(t, blobs)
+	})
+
+	// Test range boundaries
+	t.Run("descending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs-1, len(blobs))
+		assert.Equal(t, requestedAt[numBlobs-1], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[1], blobs[numBlobs-2].RequestedAt)
+		checkBlobsDesc(t, blobs)
+
+		// Test exclusive end
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, requestedAt[4], 0, false)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(blobs))
+		assert.Equal(t, requestedAt[3], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[0], blobs[3].RequestedAt)
+		checkBlobsDesc(t, blobs)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numBlobs; i++ {
+			blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, requestedAt[i-1], requestedAt[i]+1, 0, true)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(blobs))
+			assert.Equal(t, requestedAt[i], blobs[0].RequestedAt)
+		}
+
+		for i := 1; i < numBlobs; i++ {
+			blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, requestedAt[i-1], requestedAt[i]+1, 0, false)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(blobs))
+			assert.Equal(t, requestedAt[i], blobs[0].RequestedAt)
+		}
+	})
+}
+
 func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 	ctx := context.Background()
 	numBatches := 72
@@ -813,7 +1028,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -848,7 +1063,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -878,23 +1093,23 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 
 		// Test with limit
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now, 10)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 
 		// Test min/max timestamp range
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 0, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, math.MaxInt64, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 
 	// Test range boundaries
@@ -903,7 +1118,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now+1, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches-1, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		assert.Equal(t, attestedAt[1], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[1].BatchRoot, attestations[0].BatchRoot)
 		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
@@ -913,7 +1128,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, attestedAt[4], 0)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
 		assert.Equal(t, attestedAt[3], attestations[3].AttestedAt)
@@ -942,7 +1157,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -977,7 +1192,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1015,7 +1230,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 
 		// Test with limit
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
@@ -1026,7 +1241,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(attestations))
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 	})
 
 	t.Run("range boundaries", func(t *testing.T) {
@@ -1043,7 +1258,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		assert.Equal(t, attestedAt[numBatches-2], attestations[0].AttestedAt)
 		// The last one returned is the second batch (as "after" is exclusive)
 		assert.Equal(t, attestedAt[1], attestations[numBatches-3].AttestedAt)
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 
 		// Test exclusive after - should not include the oldest item
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
@@ -1056,7 +1271,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		require.Equal(t, 4, len(attestations))
 		assert.Equal(t, attestedAt[4], attestations[0].AttestedAt)
 		assert.Equal(t, attestedAt[1], attestations[3].AttestedAt)
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 	})
 
 	t.Run("pagination", func(t *testing.T) {
@@ -1095,7 +1310,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1132,7 +1347,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		assert.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1150,7 +1365,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 
 	// Test the query returns after getting desired num of attestations in a bucket
@@ -1158,7 +1373,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 125)
 		require.NoError(t, err)
 		require.Equal(t, 125, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 }
 
@@ -1169,7 +1384,7 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 	keys := make([]corev2.BlobKey, numBlobs)
 	headers := make([]*corev2.BlobHeader, numBlobs)
 	metadataList := make([]*v2.BlobMetadata, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	expectedCursors := make([]*blobstore.StatusIndexCursor, 0)
 	for i := 0; i < numBlobs; i++ {
 		blobKey, blobHeader := newBlob(t)
@@ -1186,7 +1401,7 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 		require.NoError(t, err)
 		keys[i] = blobKey
 		headers[i] = blobHeader
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -1270,7 +1485,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		RelayKeys:  []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// get multiple certs
 	numCerts := 100
@@ -1282,7 +1497,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				QuorumNumbers:   []core.QuorumID{0},
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
-					AccountID:         "0x123",
+					AccountID:         gethcommon.HexToAddress("0x123"),
 					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
@@ -1311,7 +1526,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		assert.Contains(t, timestamps, int64(i))
 	}
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobCertificate"},
@@ -1345,7 +1560,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 
 	// Update the blob status to same status
 	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Encoded)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
@@ -1360,7 +1575,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedMetadata.BlobStatus, v2.Failed)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
@@ -1395,7 +1610,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 
 	// attempt to put dispersal request with the same key should fail
 	err = blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	dispersalResponse := &corev2.DispersalResponse{
 		DispersalRequest: dispersalRequest,
@@ -1413,7 +1628,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 
 	// attempt to put dispersal response with the same key should fail
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// the other operator's response for the same batch
 	opID2 := core.OperatorID{2, 3}
@@ -1444,7 +1659,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	assert.Equal(t, dispersalResponse, responses[0])
 	assert.Equal(t, dispersalResponse2, responses[1])
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
@@ -1462,6 +1677,199 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID2.Hex()},
 		},
 	})
+}
+
+func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
+	ctx := context.Background()
+
+	numRequests := 60
+	opID := core.OperatorID{16, 32}
+	now := uint64(time.Now().UnixNano())
+	firstRequestTs := now - uint64(int64(numRequests)*time.Second.Nanoseconds())
+	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
+
+	respondedAt := make([]uint64, numRequests)
+	dynamoKeys := make([]dynamodb.Key, numRequests)
+	for i := 0; i < numRequests; i++ {
+		respondedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
+		dispersalRequest := &corev2.DispersalRequest{
+			OperatorID:      opID,
+			OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+			Socket:          "socket",
+			DispersedAt:     respondedAt[i] - 10,
+			BatchHeader: corev2.BatchHeader{
+				BatchRoot:            [32]byte{1, 2, 3},
+				ReferenceBlockNumber: uint64(i + 100),
+			},
+		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      respondedAt[i],
+			Signature:        [32]byte{1, 1, 1},
+			Error:            "error",
+		}
+
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+		require.NoError(t, err)
+
+		bhh, err := dispersalRequest.BatchHeader.Hash()
+		require.NoError(t, err)
+		dynamoKeys[i] = dynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 1, 1, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 1, 2, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
+
+		// Test empty range
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, now, now+1024, 0, true)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(dispersals))
+	})
+
+	// Test full range query
+	t.Run("ascending full range", func(t *testing.T) {
+		// Test without limit
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+
+		// Test with limit
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 10, true)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+
+		// Test min/max timestamp range
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 0, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+	})
+
+	// Test full range query
+	t.Run("descending full range", func(t *testing.T) {
+		// Test without limit
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+
+		// Test with limit
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 10, false)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+
+		// Test min/max timestamp range
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 0, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+	})
+
+	// Test range boundaries
+	t.Run("ascending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests-1, len(dispersals))
+		assert.Equal(t, respondedAt[1], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[numRequests-1], dispersals[numRequests-2].RespondedAt)
+		checkDispersalsAsc(t, dispersals)
+
+		// Test exclusive end
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, respondedAt[4], 0, true)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(dispersals))
+		assert.Equal(t, respondedAt[0], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[3], dispersals[3].RespondedAt)
+		checkDispersalsAsc(t, dispersals)
+	})
+
+	// Test range boundaries
+	t.Run("descending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests-1, len(dispersals))
+		assert.Equal(t, respondedAt[numRequests-1], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[1], dispersals[numRequests-2].RespondedAt)
+		checkDispersalsDesc(t, dispersals)
+
+		// Test exclusive end
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, respondedAt[4], 0, false)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(dispersals))
+		assert.Equal(t, respondedAt[3], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[0], dispersals[3].RespondedAt)
+		checkDispersalsDesc(t, dispersals)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numRequests; i++ {
+			dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, respondedAt[i-1], respondedAt[i]+1, 0, true)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dispersals))
+			assert.Equal(t, respondedAt[i], dispersals[0].RespondedAt)
+		}
+
+		for i := 1; i < numRequests; i++ {
+			dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, respondedAt[i-1], respondedAt[i]+1, 0, false)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dispersals))
+			assert.Equal(t, respondedAt[i], dispersals[0].RespondedAt)
+		}
+	})
+}
+
+func TestBlobMetadataStoreBatch(t *testing.T) {
+	ctx := context.Background()
+	_, blobHeader := newBlob(t)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 1024,
+	}
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(ctx, batch)
+	require.NoError(t, err)
+
+	b, err := blobMetadataStore.GetBatch(ctx, bhh)
+	require.NoError(t, err)
+	assert.Equal(t, batch, b)
 }
 
 func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
@@ -1523,7 +1931,7 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	assert.Equal(t, inclusionInfo, blobAttestationInfo.InclusionInfo)
 	assert.Equal(t, attestation, blobAttestationInfo.Attestation)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1564,7 +1972,7 @@ func TestBlobMetadataStoreInclusionInfo(t *testing.T) {
 
 	// attempt to put inclusion info with the same key should fail
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// put multiple inclusion infos
 	blobKey1 := corev2.BlobKey{2, 2, 2}
@@ -1629,7 +2037,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 
 	// attempt to put batch header with the same key should fail
 	err = blobMetadataStore.PutBatchHeader(ctx, h)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -1703,7 +2111,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	assert.Equal(t, h, fetchedHeader)
 	assert.Equal(t, updatedAttestation, fetchedAttestation)
 
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1715,7 +2123,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	})
 }
 
-func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+func deleteItems(t *testing.T, keys []dynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)
@@ -1725,7 +2133,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp := time.Now().UnixNano()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
@@ -1745,4 +2153,93 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	bk, err := bh.BlobKey()
 	require.NoError(t, err)
 	return bk, bh
+}
+
+func TestCheckBlobExists(t *testing.T) {
+	ctx := context.Background()
+	// Create a test blob
+	blobKey, blobHeader := newBlob(t)
+
+	// Check that the blob does not exist initially
+	exists, err := blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Blob should not exist before being added")
+
+	// Create blob metadata
+	blobMetadata := &v2.BlobMetadata{
+		BlobHeader:  blobHeader,
+		Signature:   []byte("test-signature"),
+		BlobStatus:  v2.Queued,
+		Expiry:      uint64(time.Now().Add(time.Hour).Unix()),
+		NumRetries:  0,
+		BlobSize:    1024,
+		RequestedAt: uint64(time.Now().UnixNano()),
+		UpdatedAt:   uint64(time.Now().UnixNano()),
+	}
+
+	// Store the blob metadata
+	err = blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
+	require.NoError(t, err)
+
+	// Check that the blob now exists
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.True(t, exists, "Blob should exist after being added")
+
+	// Delete the blob metadata
+	err = blobMetadataStore.DeleteBlobMetadata(ctx, blobKey)
+	require.NoError(t, err)
+
+	// Check that the blob no longer exists
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Blob should not exist after being deleted")
+
+	// Test with non-existent blob key
+	randomKey := corev2.BlobKey{}
+	_, err = rand.Read(randomKey[:])
+	require.NoError(t, err)
+
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, randomKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Random blob key should not exist")
+}
+
+func TestBlobMetadataStoreUpdateAccount(t *testing.T) {
+	ctx := context.Background()
+
+	// Test account
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	timestamp := uint64(time.Now().Unix())
+
+	// Test updating account - should not return an error
+	err := blobMetadataStore.UpdateAccount(ctx, accountID, timestamp)
+	require.NoError(t, err)
+
+	// Test updating the same account with a new timestamp - should not return an error
+	newTimestamp := timestamp + 100
+	err = blobMetadataStore.UpdateAccount(ctx, accountID, newTimestamp)
+	require.NoError(t, err)
+
+	// Test with different account
+	accountID2 := gethcommon.HexToAddress("0x9876543210987654321098765432109876543210")
+	err = blobMetadataStore.UpdateAccount(ctx, accountID2, timestamp)
+	require.NoError(t, err)
+}
+
+func TestBlobMetadataStoreGetAccounts(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with 1-hour lookback
+	lookbackSeconds := uint64(3600) // 1 hour
+
+	// Should not return an error even if no results
+	accounts, err := blobMetadataStore.GetAccounts(ctx, lookbackSeconds)
+	require.NoError(t, err)
+	assert.NotNil(t, accounts)
+
+	// Test with different lookback periods
+	accounts24h, err := blobMetadataStore.GetAccounts(ctx, 24*3600) // 24 hours
+	require.NoError(t, err)
+	assert.NotNil(t, accounts24h)
 }

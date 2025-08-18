@@ -57,7 +57,10 @@ func teardown() {
 	log.Println("Tearing down suite")
 
 	// Some test may want to create a new SRS table so this should clean it up.
-	os.RemoveAll("./data")
+	err := os.RemoveAll("./data")
+	if err != nil {
+		log.Printf("Error removing data directory ./data: %v", err)
+	}
 }
 
 func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {

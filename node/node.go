@@ -18,17 +18,18 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -55,10 +56,13 @@ const (
 var (
 	// eigenDAUIMap is a mapping for ChainID to the EigenDA UI url.
 	eigenDAUIMap = map[string]string{
-		"17000": "https://holesky.eigenlayer.xyz/avs/eigenda",
-		"1":     "https://app.eigenlayer.xyz/avs/eigenda",
+		"1":     "https://app.eigenlayer.xyz/avs/0x870679e138bcdf293b7ff14dd44b70fc97e12fc0",
+		"17000": "https://holesky.eigenlayer.xyz/avs/0xd4a7e1bd8015057293f0d0a557088c286942e84b/operator-set/4294967295",
 	}
 )
+
+// TODO (cody.littley): refactor all exported fields in this struct to private fields and ensure that all interaction
+//  is mediated by methods.
 
 type Node struct {
 	Config                  *Config
@@ -67,7 +71,7 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
-	StoreV2                 StoreV2
+	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
 	ValidatorV2             corev2.ShardValidator
@@ -75,6 +79,10 @@ type Node struct {
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
+	// a worker pool used to download chunk data from the relays
+	DownloadPool *workerpool.WorkerPool
+	// a worker pool used to validate batches
+	ValidationPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -86,33 +94,42 @@ type Node struct {
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
+	// QuorumCount is the number of quorums in the network.
+	QuorumCount atomic.Uint32
+
+	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
+	StoreChunksSemaphore *semaphore.Weighted
 }
 
 // NewNode creates a new Node with the provided config.
+// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
+	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
 ) (*Node, error) {
-	// Setup metrics
-	// sdkClients, err := buildSdkClients(config, logger)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	nodeLogger := logger.With("component", "Node")
 
-	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
-
-	// Make sure config folder exists.
-	err := os.MkdirAll(config.DbPath, os.ModePerm)
+	err := configureMemoryLimits(nodeLogger, config)
 	if err != nil {
-		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
+		return nil, fmt.Errorf("failed to configure memory limits: %w", err)
 	}
 
-	chainID, err := client.ChainID(context.Background())
+	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
+	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
+
+	// Make sure config folder exists.
+	err = os.MkdirAll(config.DbPath, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
+	}
+
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
@@ -120,7 +137,7 @@ func NewNode(
 	// Create Transactor
 	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
 
 	// Create ChainState Client
@@ -142,13 +159,13 @@ func NewNode(
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
-	metrics := NewMetrics(eigenMetrics, reg, logger, fmt.Sprintf(":%d", config.MetricsPort), config.ID, config.OnchainMetricsInterval, tx, cst)
+	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
 	config.EncoderConfig.LoadG2Points = false
 	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
@@ -160,7 +177,7 @@ func NewNode(
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
 		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
-		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
+		staleMeasure, err := tx.GetBlockStaleMeasure(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
 		}
@@ -170,28 +187,88 @@ func NewNode(
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
 		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
-		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
+		storeDuration, err := tx.GetStoreDurationBlocks(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 		}
 		storeDurationBlocks = storeDuration
 	}
-	// Create new store
-	store, err := NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, blockStaleMeasure, storeDurationBlocks)
+	// Create new chunk store
+	store, err := NewLevelDBStore(
+		config.DbPath+"/chunk",
+		logger,
+		metrics,
+		blockStaleMeasure,
+		config.LevelDBDisableSeeksCompactionV1,
+		config.LevelDBSyncWritesV1,
+		storeDurationBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
+	// TODO (cody.littley): make contract directory config mandatory
+
+	// If EigenDADirectory is provided, use it to get service manager addresses
+	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
+	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
+		contractDirectory, err := directory.NewContractDirectory(
+			ctx,
+			logger,
+			client,
+			gethcommon.HexToAddress(config.EigenDADirectory))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create contract directory: %w", err)
+		}
+
+		eigenDAServiceManagerAddr, err =
+			contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
+		}
+	} else {
+		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
+			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
+			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
+	}
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
 
-	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
-		"dispersalPort", config.DispersalPort, "v2DispersalPort", config.V2DispersalPort, "retrievalPort", config.RetrievalPort, "v2RetrievalPort", config.V2RetrievalPort, "churnerUrl", config.ChurnerUrl,
-		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
+	nodeLogger.Info("Creating node",
+		"chainID", chainID.String(),
+		"operatorID", config.ID.Hex(),
+		"dispersalPort", config.DispersalPort,
+		"internalDispersalPort", config.InternalDispersalPort,
+		"v2DispersalPort", config.V2DispersalPort,
+		"internalV2DispersalPort", config.InternalV2DispersalPort,
+		"retrievalPort", config.RetrievalPort,
+		"internalRetrievalPort", config.InternalRetrievalPort,
+		"v2RetrievalPort", config.V2RetrievalPort,
+		"internalV2RetrievalPort", config.InternalV2RetrievalPort,
+		"churnerUrl", config.ChurnerUrl,
+		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
+		"registerNodeAtStart", config.RegisterNodeAtStart,
+		"pubIPCheckInterval", config.PubIPCheckInterval,
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
+		"blockStaleMeasure", blockStaleMeasure,
+		"storeDurationBlocks", storeDurationBlocks,
+		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
+
+	downloadPoolSize := config.DownloadPoolSize
+	if downloadPoolSize < 1 {
+		downloadPoolSize = 1
+	}
+	downloadPool := workerpool.New(downloadPoolSize)
+
+	validationPoolSize := config.NumBatchValidators
+	if validationPoolSize < 1 {
+		validationPoolSize = 1
+	}
+	validationPool := workerpool.New(validationPoolSize)
+
+	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
 
 	n := &Node{
 		Config:                  config,
@@ -207,38 +284,32 @@ func NewNode(
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
+		DownloadPool:            downloadPool,
+		ValidationPool:          validationPool,
+		StoreChunksSemaphore:    storeChunksSemaphore,
 	}
 
 	if !config.EnableV2 {
 		return n, nil
 	}
 
-	var storeV2 StoreV2
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		v2Path := config.DbPath + "/chunk_v2"
-		dbV2, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                       tablestore.LevelDB,
-			Path:                       &v2Path,
-			GarbageCollectionEnabled:   true,
-			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize: 1024,
-			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-		})
+		// 12s per block
+		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
+		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
-		timeToExpire := (blockStaleMeasure + storeDurationBlocks) * 12 // 12s per block
-		storeV2 = NewLevelDBStoreV2(dbV2, logger, time.Duration(timeToExpire)*time.Second)
 
-		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		relayClientConfig := &clients.RelayClientConfig{
-			UseSecureGrpcFlag:  config.UseSecureGrpc,
+		relayClientConfig := &relay.RelayClientConfig{
+			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
@@ -249,17 +320,127 @@ func NewNode(
 			return nil, fmt.Errorf("create relay url provider: %w", err)
 		}
 
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}
 
 		n.RelayClient.Store(relayClient)
+
+		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get block number: %w", err)
+		}
+		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get quorum count: %w", err)
+		}
+		n.QuorumCount.Store(uint32(quorumCount))
 	}
 
-	n.StoreV2 = storeV2
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
+}
+
+// configureMemoryLimits configures the memory limits for the Node. Updates derived values in the Config struct,
+// and also modifies the GC safety buffer size.
+//
+// All memory limits used by the validator should be configured within this function. This enables us to validate that
+// the total allocated memory does not exceed the maximum available memory.
+func configureMemoryLimits(logger logging.Logger, config *Config) error {
+
+	maxMemory, err := memory.GetMaximumAvailableMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get maximum available memory: %w", err)
+	}
+
+	totalAllocated := uint64(0)
+
+	config.GCSafetyBufferSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"GC Safety Buffer",
+		config.GCSafetyBufferSizeBytes,
+		config.GCSafetyBufferSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
+	}
+	err = memory.SetGCMemorySafetyBuffer(config.GCSafetyBufferSizeBytes)
+	if err != nil {
+		return fmt.Errorf("failed to set GC memory safety buffer: %w", err)
+	}
+	totalAllocated += config.GCSafetyBufferSizeBytes
+
+	if config.EnableV2 {
+		config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB read cache",
+			config.LittDBReadCacheSizeBytes,
+			config.LittDBReadCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBReadCacheSizeBytes
+
+		config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB write cache",
+			config.LittDBWriteCacheSizeBytes,
+			config.LittDBWriteCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBWriteCacheSizeBytes
+
+		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"StoreChunks Buffer",
+			config.StoreChunksBufferSizeBytes,
+			config.StoreChunksBufferSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.StoreChunksBufferSizeBytes
+	}
+
+	if totalAllocated > maxMemory {
+		return fmt.Errorf("total memory allocated (%d bytes) "+
+			"exceeds maximum available memory (%d bytes)", totalAllocated, maxMemory)
+	}
+
+	bytesRemaining := maxMemory - totalAllocated
+	logger.Infof("Total unallocated memory: %s", common.PrettyPrintBytes(bytesRemaining))
+
+	return nil
+}
+
+// Compute the size of a memory pool.
+func computeMemoryPoolSize(
+	logger logging.Logger,
+	poolName string,
+	constantSizeInBytes uint64,
+	fraction float64,
+	maxMemory uint64) (uint64, error) {
+
+	if constantSizeInBytes > 0 {
+		logger.Infof("%s is configured to use %s memory",
+			poolName, common.PrettyPrintBytes(constantSizeInBytes))
+		return constantSizeInBytes, nil
+	}
+
+	// If the constant size is not set, calculate the size based on the fraction of the maximum memory.
+	if fraction < 0.0 || fraction > 1.0 {
+		return 0, fmt.Errorf("fraction for %s must be between 0.0 and 1.0, got: %f", poolName, fraction)
+	}
+
+	poolSize := uint64(fraction * float64(maxMemory))
+	logger.Infof("%s is configured to use %0.2f%% of %s available memory (%s).",
+		poolName, fraction*100.0, common.PrettyPrintBytes(maxMemory), common.PrettyPrintBytes(poolSize))
+
+	return poolSize, nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just
@@ -292,12 +473,23 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort))
+	socket := string(core.MakeOperatorSocket(
+		n.Config.Hostname,
+		n.Config.DispersalPort,
+		n.Config.RetrievalPort,
+		n.Config.V2DispersalPort,
+		n.Config.V2RetrievalPort))
 	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
-		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
-			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort, "v2DispersalPort", n.Config.V2DispersalPort,
-			"retrievalPort", n.Config.RetrievalPort, "v2RetrievalPort", n.Config.V2RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
+		n.Logger.Info("Registering node on chain with the following parameters:",
+			"operatorId", n.Config.ID.Hex(),
+			"hostname", n.Config.Hostname,
+			"dispersalPort", n.Config.DispersalPort,
+			"v2DispersalPort", n.Config.V2DispersalPort,
+			"retrievalPort", n.Config.RetrievalPort,
+			"v2RetrievalPort", n.Config.V2RetrievalPort,
+			"churnerUrl", n.Config.ChurnerUrl,
+			"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
@@ -312,7 +504,7 @@ func (n *Node) Start(ctx context.Context) error {
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
 		}
-		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.UseSecureGrpc, n.Config.Timeout, n.Logger)
+		churnerClient := NewChurnerClient(n.Config.ChurnerUrl, n.Config.ChurnerUseSecureGrpc, n.Config.Timeout, n.Logger)
 		err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
 		if err != nil {
 			return fmt.Errorf("failed to register the operator: %w", err)
@@ -329,9 +521,11 @@ func (n *Node) Start(ctx context.Context) error {
 
 		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
 		if ok {
-			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
+			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, "+
+				"then please follow the EigenDA operator guide section in https://docs.eigencloud.xyz/products/eigenda/operator-guides/run-a-node/registration to register", eigenDAUrl)
 		} else {
-			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet", n.ChainID.String())
+			n.Logger.Infof("The node has started but the network with chainID %s is not supported yet",
+				n.ChainID.String())
 		}
 	}
 
@@ -341,7 +535,8 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to get operator ID: %w", err)
 		}
 		if operatorID != operator.OperatorId {
-			return fmt.Errorf("operator ID mismatch: expected %s, got %s", operator.OperatorId.Hex(), operatorID.Hex())
+			return fmt.Errorf("operator ID mismatch: expected %s, got %s",
+				operator.OperatorId.Hex(), operatorID.Hex())
 		}
 	}
 
@@ -370,13 +565,20 @@ func (n *Node) expireLoop() {
 		// The heuristic is to cap the GC time to a percentage of the poll interval, but at
 		// least have 1 second.
 		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
-		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted, "num expired mappings found and removed", numMappingsDeleted, "num expired blobs found and removed", numBlobsDeleted)
+		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(
+			time.Now().Unix(), timeLimitSec)
+		n.Logger.Info("Complete an expiration cycle to remove expired batches",
+			"num expired batches found and removed", numBatchesDeleted,
+			"num expired mappings found and removed", numMappingsDeleted,
+			"num expired blobs found and removed", numBlobsDeleted)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired batches need to be removed, which will continue in next cycle", "time limit (sec)", timeLimitSec)
+				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired "+
+					"batches need to be removed, which will continue in next cycle", "time limit (sec)",
+					timeLimitSec)
 			} else {
-				n.Logger.Error("Expiration cycle encountered error when removing expired batches, which will be retried in next cycle", "err", err)
+				n.Logger.Error("Expiration cycle encountered error when removing expired batches, "+
+					"which will be retried in next cycle", "err", err)
 			}
 		}
 	}
@@ -406,13 +608,25 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
 			}
+			blockNumber, err := n.Transactor.GetCurrentBlockNumber(ctx)
+			if err == nil {
+				quorumCount, err := n.Transactor.GetQuorumCount(ctx, blockNumber)
+				if err == nil {
+					n.QuorumCount.Store(uint32(quorumCount))
+				} else {
+					n.Logger.Error("error fetching quorum count", "err", err)
+				}
+			} else {
+				n.Logger.Error("error fetching block number", "err", err)
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a signature for the entire batch.
+// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a
+// signature for the entire batch.
 //
 // The batch will be itemized into batch header, header and chunks of each blob in the batch. These items will
 // be stored atomically to the database.
@@ -421,7 +635,13 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 //   - If the batch is stored already, it's no-op to store it more than once
 //   - If the batch is stored, but the processing fails after that, these data items will not be rollback
 //   - These data items will be garbage collected eventually when they become stale.
-func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage, rawBlobs []*node.Blob) (*core.Signature, error) {
+func (n *Node) ProcessBatch(
+	ctx context.Context,
+	header *core.BatchHeader,
+	blobs []*core.BlobMessage,
+	rawBlobs []*node.Blob,
+) (*core.Signature, error) {
+
 	start := time.Now()
 	log := n.Logger
 
@@ -449,7 +669,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	n.Metrics.AcceptBatches("received", batchSize)
 
 	batchHeaderHashHex := hex.EncodeToString(batchHeaderHash[:])
-	log.Debug("Start processing a batch", "batchHeaderHash", batchHeaderHashHex, "batchSize (in bytes)", batchSize, "num of blobs", len(blobs), "referenceBlockNumber", header.ReferenceBlockNumber)
+	log.Debug("Start processing a batch",
+		"batchHeaderHash", batchHeaderHashHex,
+		"batchSize (in bytes)", batchSize,
+		"num of blobs", len(blobs),
+		"referenceBlockNumber", header.ReferenceBlockNumber)
 
 	// Store the batch.
 	// Run this in a goroutine so we can parallelize the batch storing and batch
@@ -478,7 +702,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 			if errors.Is(err, ErrBatchAlreadyExist) {
 				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
 			} else {
-				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
+				storeChan <- storeResult{
+					err:     fmt.Errorf("failed to store batch: %w", err),
+					keys:    nil,
+					latency: 0,
+				}
 			}
 			return
 		}
@@ -493,9 +721,13 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 		// revert all the keys for that batch.
 		result := <-storeChan
 		if result.keys != nil {
-			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "batchHeaderHash", batchHeaderHashHex)
+			log.Debug("Batch validation failed, rolling back the key/value entries stored in database",
+				"number of entries", len(*result.keys),
+				"batchHeaderHash", batchHeaderHashHex)
 			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
-				log.Error("Failed to delete the invalid batch that should be rolled back", "batchHeaderHash", batchHeaderHashHex, "err", deleteKeysErr)
+				log.Error("Failed to delete the invalid batch that should be rolled back",
+					"batchHeaderHash", batchHeaderHashHex,
+					"err", deleteKeysErr)
 			}
 		}
 		return nil, err
@@ -511,9 +743,12 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	}
 	if result.keys != nil {
 		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
-		n.Logger.Debug("Store batch succeeded", "batchHeaderHash", batchHeaderHashHex, "duration:", result.latency)
+		n.Logger.Debug("Store batch succeeded",
+			"batchHeaderHash", batchHeaderHashHex,
+			"duration:", result.latency)
 	} else {
-		n.Logger.Warn("Store batch skipped because the batch already exists in the store", "batchHeaderHash", batchHeaderHashHex)
+		n.Logger.Warn("Store batch skipped because the batch already exists in the store",
+			"batchHeaderHash", batchHeaderHashHex)
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
@@ -524,7 +759,9 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	}
 
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", n.BLSSigner.GetPublicKeyG1(), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded",
+		"pubkey", n.BLSSigner.GetPublicKeyG1(),
+		"duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
 	return signature, nil
@@ -553,8 +790,7 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 	}
 	getStateDuration := time.Since(start)
 
-	pool := workerpool.New(n.Config.NumBatchValidators)
-	err = n.Validator.ValidateBatch(header, blobs, operatorState, pool)
+	err = n.Validator.ValidateBatch(header, blobs, operatorState, n.ValidationPool)
 	if err != nil {
 		h, hashErr := operatorState.Hash()
 		if hashErr != nil {
@@ -565,9 +801,12 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 		for q, hash := range h {
 			hStr = append(hStr, fmt.Sprintf("%d: %x", q, hash))
 		}
-		return fmt.Errorf("failed to validate batch with operator state %x: %w", strings.Join(hStr, ","), err)
+		return fmt.Errorf("failed to validate batch with operator state %x: %w",
+			strings.Join(hStr, ","), err)
 	}
-	n.Logger.Debug("ValidateBatch completed", "get operator state duration", getStateDuration, "total duration", time.Since(start))
+	n.Logger.Debug("ValidateBatch completed",
+		"get operator state duration", getStateDuration,
+		"total duration", time.Since(start))
 	return nil
 }
 
@@ -589,7 +828,8 @@ func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
 }
 
 func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
-	n.Logger.Info("Start checkRegisteredNodeIpOnChain goroutine in background to subscribe the operator socket change events onchain")
+	n.Logger.Info("Start checkRegisteredNodeIpOnChain goroutine in background to subscribe the " +
+		"operator socket change events onchain")
 
 	socketChan, err := n.OperatorSocketsFilterer.WatchOperatorSocketUpdate(ctx, n.Config.ID)
 	if err != nil {
@@ -603,7 +843,11 @@ func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
 		case socket := <-socketChan:
 			n.mu.Lock()
 			if socket != n.CurrentSocket {
-				n.Logger.Info("Detected socket registered onchain which is different than the socket kept at the DA Node", "socket kept at DA Node", n.CurrentSocket, "socket registered onchain", socket, "the action taken", "update the socket kept at DA Node")
+				n.Logger.Info(
+					"Detected socket registered onchain which is different than the socket kept at the DA Node",
+					"socket kept at DA Node", n.CurrentSocket,
+					"socket registered onchain", socket,
+					"the action taken", "update the socket kept at DA Node")
 				n.CurrentSocket = socket
 			}
 			n.mu.Unlock()
@@ -612,7 +856,8 @@ func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
 }
 
 func (n *Node) checkCurrentNodeIp(ctx context.Context) {
-	n.Logger.Info("Start checkCurrentNodeIp goroutine in background to detect the current public IP of the operator node")
+	n.Logger.Info(
+		"Start checkCurrentNodeIp goroutine in background to detect the current public IP of the operator node")
 
 	t := time.NewTimer(n.Config.PubIPCheckInterval)
 	for {
@@ -620,7 +865,13 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort)
+			newSocketAddr, err := SocketAddress(
+				ctx,
+				n.PubIPProvider,
+				n.Config.DispersalPort,
+				n.Config.RetrievalPort,
+				n.Config.V2DispersalPort,
+				n.Config.V2RetrievalPort)
 			if err != nil {
 				n.Logger.Error("failed to get socket address", "err", err)
 				continue
@@ -631,6 +882,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 }
 
 // OperatorReachabilityResponse is the response object for the reachability check
+// For v1 endpoints
 type OperatorReachabilityResponse struct {
 	OperatorID      string `json:"operator_id"`
 	DispersalSocket string `json:"dispersal_socket"`
@@ -639,6 +891,11 @@ type OperatorReachabilityResponse struct {
 	RetrievalOnline bool   `json:"retrieval_online"`
 	DispersalStatus string `json:"dispersal_status"`
 	RetrievalStatus string `json:"retrieval_status"`
+}
+
+// OperatorV2ReachabilityResponse is the response object for the v2 reachability check
+type OperatorV2ReachabilityResponse struct {
+	Operators []OperatorReachabilityResponse `json:"operators"`
 }
 
 func (n *Node) checkNodeReachability(checkPath string) {
@@ -663,7 +920,8 @@ func (n *Node) checkNodeReachability(checkPath string) {
 		return
 	}
 
-	n.Logger.Info("Start nodeReachabilityCheck goroutine in background to check the reachability of the operator node")
+	n.Logger.Info(
+		"Start nodeReachabilityCheck goroutine in background to check the reachability of the operator node")
 	ticker := time.NewTicker(time.Duration(n.Config.ReachabilityPollIntervalSec) * time.Second)
 	defer ticker.Stop()
 
@@ -681,11 +939,14 @@ func (n *Node) checkNodeReachability(checkPath string) {
 			if string(body) == "404 page not found" {
 				n.Logger.Error("Invalid reachability check url", "checkUrl", checkURL)
 			} else {
-				n.Logger.Warn("Reachability check operator id not found", "status", resp.StatusCode, "operator_id", n.Config.ID.Hex())
+				n.Logger.Warn("Reachability check operator id not found",
+					"status", resp.StatusCode,
+					"operator_id", n.Config.ID.Hex())
 			}
 			continue
 		} else if resp.StatusCode != 200 {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), "status", resp.StatusCode)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version),
+				"status", resp.StatusCode)
 			continue
 		}
 
@@ -695,27 +956,56 @@ func (n *Node) checkNodeReachability(checkPath string) {
 			continue
 		}
 
-		var responseObject OperatorReachabilityResponse
-		err = json.Unmarshal(data, &responseObject)
-		if err != nil {
-			n.Logger.Error("Reachability check failed to unmarshal json response", err)
-			continue
-		}
+		if version == "v1" {
+			var responseObject OperatorReachabilityResponse
+			err = json.Unmarshal(data, &responseObject)
+			if err != nil {
+				n.Logger.Error("Reachability check failed to unmarshal json response", err)
+				continue
+			}
 
-		if responseObject.DispersalOnline {
-			n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
+			n.processReachabilityResponse(version, responseObject)
 		} else {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
+			var v2ResponseObject OperatorV2ReachabilityResponse
+			err = json.Unmarshal(data, &v2ResponseObject)
+			if err != nil {
+				n.Logger.Error("Reachability check v2 failed to unmarshal json response", err)
+				continue
+			}
+
+			if len(v2ResponseObject.Operators) > 0 {
+				// Process the first operator from the array
+				n.processReachabilityResponse(version, v2ResponseObject.Operators[0])
+			} else {
+				n.Logger.Error("Reachability check v2 returned empty operators array")
+			}
 		}
-		if responseObject.RetrievalOnline {
-			n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
-		} else {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
-		}
+	}
+}
+
+// processReachabilityResponse handles the response for a single operator
+func (n *Node) processReachabilityResponse(version string, responseObject OperatorReachabilityResponse) {
+	if responseObject.DispersalOnline {
+		n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version),
+			"status", responseObject.DispersalStatus,
+			"socket", responseObject.DispersalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
+	} else {
+		n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version),
+			"status", responseObject.DispersalStatus,
+			"socket", responseObject.DispersalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
+	}
+	if responseObject.RetrievalOnline {
+		n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version),
+			"status", responseObject.RetrievalStatus,
+			"socket", responseObject.RetrievalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
+	} else {
+		n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version),
+			"status", responseObject.RetrievalStatus,
+			"socket", responseObject.RetrievalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
 	}
 }
 

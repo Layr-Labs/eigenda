@@ -117,7 +117,7 @@ func (c *churnerClient) Churn(
 		c.logger.Error("Node cannot connect to churner", "err", err)
 		return nil, err
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "churner connection", c.logger)
 
 	gc := churnerpb.NewChurnerClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)

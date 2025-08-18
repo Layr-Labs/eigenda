@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
@@ -74,7 +73,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("failed to parse the command line flags: %v", err)
 	}
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		log.Fatalf("failed to create logger: %v", err)
 	}
@@ -95,26 +94,22 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
+
 	cs := eth.NewChainState(tx, gethClient)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
-
 	if config.EigenDAVersion == 1 {
 		agn := &core.StdAssignmentCoordinator{}
-		retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
+		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, config.NumConnections)
 		if err != nil {
 			log.Fatalln("could not start tcp listener", err)
 		}
 
 		chainClient := retrivereth.NewChainClient(gethClient, logger)
-		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
-		if err = retrieverServiceServer.Start(context.Background()); err != nil {
-			log.Fatalln("failed to start retriever service server", err)
-		}
+		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, chainClient)
+		retrieverServiceServer.Start(context.Background())
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -131,11 +126,12 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, ics, v, config.NumConnections)
-		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, ics)
-		if err = retrieverServiceServer.Start(context.Background()); err != nil {
-			log.Fatalln("failed to start retriever service server", err)
-		}
+		clientConfig := clientsv2.DefaultClientConfig()
+		clientConfig.ConnectionPoolSize = config.NumConnections
+
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig, nil)
+		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
+		retrieverServiceServer.Start(context.Background())
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work

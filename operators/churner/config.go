@@ -18,6 +18,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDADirectory              string
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -28,10 +29,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Config{
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		LoggerConfig:                  *loggerConfig,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),

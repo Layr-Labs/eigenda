@@ -10,6 +10,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
+			AccountID:         gethcommon.Address{0},
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
@@ -30,7 +31,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x456",
+			AccountID:         gethcommon.Address{1},
 			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
@@ -40,7 +41,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{1, 2},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x789",
+			AccountID:         gethcommon.Address{2},
 			Timestamp:         7,
 			CumulativePayment: big.NewInt(300),
 		},
@@ -79,8 +80,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{5, 6, 7, 8},
 				},
 			},
-		},
-		1: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(3), big.NewInt(4)).G1Affine),
 				Coeffs: []fr.Element{
@@ -113,8 +112,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{37, 38, 39, 40},
 				},
 			},
-		},
-		1: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(11), big.NewInt(12)).G1Affine),
 				Coeffs: []fr.Element{
@@ -125,7 +122,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		},
 	}
 	bundles2 := map[core.QuorumID]core.Bundle{
-		1: {
+		0: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(13), big.NewInt(14)).G1Affine),
 				Coeffs: []fr.Element{
@@ -140,8 +137,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{61, 62, 63, 64},
 				},
 			},
-		},
-		2: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(17), big.NewInt(18)).G1Affine),
 				Coeffs: []fr.Element{
@@ -196,6 +191,6 @@ func MockCommitment(t *testing.T) encoding.BlobCommitments {
 		},
 		LengthCommitment: (*encoding.G2Commitment)(&lengthCommitment),
 		LengthProof:      (*encoding.G2Commitment)(&lengthProof),
-		Length:           10,
+		Length:           16,
 	}
 }

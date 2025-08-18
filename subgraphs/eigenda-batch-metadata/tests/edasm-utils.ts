@@ -6,7 +6,7 @@ import { BatchHeader } from "../generated/schema"
 export function createNewConfimBatchCall(
   blobHeadersRoot: Bytes,
   quorumNumbers: Bytes,
-  quorumThresholdPercentages: Bytes,
+  signedStakeForQuorums: Bytes,
   referenceBlockNumber: BigInt,
   nonSignerPubkeysBigInts: Array<Array<BigInt>>,
 ): ConfirmBatchCall {
@@ -17,7 +17,7 @@ export function createNewConfimBatchCall(
   let batchHeader = new ConfirmBatchCallBatchHeaderStruct(4)
   batchHeader[0] = ethereum.Value.fromBytes(blobHeadersRoot)
   batchHeader[1] = ethereum.Value.fromBytes(quorumNumbers)
-  batchHeader[2] = ethereum.Value.fromBytes(quorumThresholdPercentages)
+  batchHeader[2] = ethereum.Value.fromBytes(signedStakeForQuorums)
   batchHeader[3] = ethereum.Value.fromUnsignedBigInt(referenceBlockNumber)
 
   let nonSignerPubkeys: ethereum.Tuple[] = []

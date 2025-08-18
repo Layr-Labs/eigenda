@@ -14,9 +14,9 @@ import (
 // ToFrArray accept a byte array as an input, and converts it to an array of field elements
 //
 // TODO (litt3): it would be nice to rename this to "DeserializeFieldElements", as the counterpart to "SerializeFieldElements",
-//  but doing so would be a very large diff. I'm leaving this comment as a potential future cleanup.
+// but doing so would be a very large diff. I'm leaving this comment as a potential future cleanup.
 func ToFrArray(inputData []byte) ([]fr.Element, error) {
-	bytes := padToBytesPerSymbol(inputData)
+	bytes := padToBytesPerSymbolMultiple(inputData)
 
 	elementCount := len(bytes) / encoding.BYTES_PER_SYMBOL
 	outputElements := make([]fr.Element, elementCount)
@@ -49,8 +49,9 @@ func SerializeFieldElements(fieldElements []fr.Element) []byte {
 	return outputBytes
 }
 
-// padToBytesPerSymbol accepts input bytes, and returns the bytes padded to a multiple of encoding.BYTES_PER_SYMBOL
-func padToBytesPerSymbol(inputBytes []byte) []byte {
+// padToBytesPerSymbolMultiple accepts input bytes, and returns the bytes padded to
+// a multiple of encoding.BYTES_PER_SYMBOL
+func padToBytesPerSymbolMultiple(inputBytes []byte) []byte {
 	remainder := len(inputBytes) % encoding.BYTES_PER_SYMBOL
 
 	if remainder == 0 {
@@ -62,7 +63,9 @@ func padToBytesPerSymbol(inputBytes []byte) []byte {
 	}
 }
 
-// ToByteArray converts a list of Fr to a byte array
+// ToByteArray serializes a slice of fields elements to a slice of bytes.
+// The byte array is created by serializing each Fr element in big-endian format.
+// Note that this function is not quite the reverse of ToFrArray, because it doesn't remove padding.
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(

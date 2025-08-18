@@ -21,14 +21,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -45,6 +43,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
@@ -55,11 +54,11 @@ import (
 )
 
 var (
-	//go:embed testdata/prometheus-response-sample.json
-	mockPrometheusResponse string
-
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
+
+	//go:embed testdata/prometheus-response-network-signing-rate.json
+	mockPrometheusResponseNetworkSigningRate string
 
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -103,45 +102,11 @@ var (
 		1: 10,
 		2: 10,
 	})
-
-	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:32005;32006",
-			},
-		},
-	}
-
-	operatorInfoV2 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:31005;31006;32005;32006",
-			},
-		},
-	}
 )
+
+// TODO: we need to make sure that this is always aligned with the timeFormat that
+// the dataapi server uses to parse timestamps from the request.
+const timeFormat = time.RFC3339Nano
 
 type MockSubgraphClient struct {
 	mock.Mock
@@ -189,7 +154,7 @@ func teardown() {
 
 func setup(m *testing.M) {
 	// Start localstack
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -198,7 +163,7 @@ func setup(m *testing.M) {
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container")
+			panic("failed to start localstack container: " + err.Error())
 		}
 	}
 
@@ -222,7 +187,16 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
+	metrics := dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), blobMetadataStore, "9001", mockLogger)
+	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, metrics)
+	if err != nil {
+		teardown()
+		panic("failed to create v2 server: " + err.Error())
+	}
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
@@ -259,10 +233,10 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
-	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
-	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
+	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
 	_, err = rand.Read(sig)
@@ -293,7 +267,7 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	body := w.Result().Body
-	defer body.Close()
+	defer core.CloseLogOnError(body, "response body", mockLogger)
 	data, err := io.ReadAll(body)
 	require.NoError(t, err)
 
@@ -324,7 +298,7 @@ func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
-func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+func deleteItems(t *testing.T, keys []dynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)
@@ -359,6 +333,251 @@ func TestFetchBlob(t *testing.T) {
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
 	assert.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
+}
+
+func TestFetchOperatorDispersalFeed(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	numRequests := 60
+	opID := core.OperatorID{16, 32}
+	now := uint64(time.Now().UnixNano())
+	firstRequestTs := now - uint64(int64(numRequests)*time.Minute.Nanoseconds())
+	nanoSecsPerRequest := uint64(time.Minute.Nanoseconds()) // 1 batch/min
+
+	dispersedAt := make([]uint64, numRequests)
+	batchHeaders := make([]*corev2.BatchHeader, numRequests)
+	signatures := make([][32]byte, numRequests)
+	dynamoKeys := make([]dynamodb.Key, numRequests)
+	for i := 0; i < numRequests; i++ {
+		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, 3},
+			ReferenceBlockNumber: uint64(i + 100),
+		}
+		dispersalRequest := &corev2.DispersalRequest{
+			OperatorID:      opID,
+			OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+			Socket:          "socket",
+			DispersedAt:     dispersedAt[i],
+			BatchHeader:     *batchHeaders[i],
+		}
+		signatures[i] = [32]byte{}
+		if i%2 == 0 {
+			signatures[i] = [32]byte{1, 1, uint8(i)}
+		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      dispersedAt[i],
+			Signature:        signatures[i],
+			Error:            "",
+		}
+
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+		require.NoError(t, err)
+
+		bhh, err := dispersalRequest.BatchHeader.Hash() // go:nolint QF1008
+		require.NoError(t, err)
+		dynamoKeys[i] = dynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	r.GET("/v2/operators/:operator_id/dispersals", testDataApiServerV2.FetchOperatorDispersalFeed)
+	baseUrl := fmt.Sprintf("/v2/operators/%s/dispersals", opID.Hex())
+
+	t.Run("invalid params", func(t *testing.T) {
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "`direction` must be either \"forward\" or \"backward\", found: \"abc\"",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "`after` must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  serverv2.FormatQueryParamTime(now.Add(-time.Minute)),
+					"before": serverv2.FormatQueryParamTime(now.Add(-time.Hour)),
+				},
+				wantError: "must be earlier than `before` timestamp",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "`before` time cannot be more than 14 days in the past",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse `limit` param",
+			},
+		}
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+
+			url := fmt.Sprintf("%s?%s", baseUrl, params.Encode())
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
+		}
+	})
+
+	t.Run("nonexistent operatorid", func(t *testing.T) {
+		otherID := core.OperatorID{4, 16}
+		url := fmt.Sprintf("/v2/operators/%s/dispersals", otherID.Hex())
+		w := executeRequest(t, r, http.MethodGet, url)
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 0, len(response.Dispersals))
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of dispersals include all of dispersals[1] through dispersals[59]
+		// - Limited to 20 results (the default "limit")
+		// - Result will first 20 dispersals
+		w := executeRequest(t, r, http.MethodGet, baseUrl)
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Dispersals))
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			if (1+i)%2 == 0 {
+				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+			} else {
+				assert.Equal(t, "", response.Dispersals[i].Signature)
+			}
+		}
+	})
+
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves dispersals[1] through batch[59] (59 batches)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Dispersals))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 2: 2-hour window captures all test batches
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Dispersals))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, dispersedAt[i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+
+		// Teste 3: custom end time
+		afterTime = time.Unix(0, int64(dispersedAt[20])).UTC().Format(time.RFC3339Nano)
+		beforeTime := time.Unix(0, int64(dispersedAt[50])).UTC().Format(time.RFC3339Nano)
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Dispersals))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, dispersedAt[21+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[21+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves dispersals[59] through batch[1] (59 batches)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Dispersals))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 2: 2-hour window captures all test batches
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Dispersals))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+
+		// Teste 3: custom end time
+		afterTime = serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[20])))
+		beforeTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[50])))
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Dispersals))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, dispersedAt[49-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[49-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+		}
+	})
+
 }
 
 func TestFetchBlobCertificate(t *testing.T) {
@@ -409,7 +628,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobKey, err := blobHeader.BlobKey()
@@ -423,10 +642,10 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 
 		now := time.Now()
-		metadata := &v2.BlobMetadata{
+		metadata := &commonv2.BlobMetadata{
 			BlobHeader:  blobHeader,
 			Signature:   []byte{0, 1, 2, 3, 4},
-			BlobStatus:  v2.Encoded,
+			BlobStatus:  commonv2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
 			UpdatedAt:   uint64(now.UnixNano()),
@@ -434,7 +653,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -459,65 +678,65 @@ func TestFetchBlobFeed(t *testing.T) {
 			{
 				name:        "invalid direction",
 				queryParams: map[string]string{"direction": "abc"},
-				wantError:   "direction must be either 'forward' or 'backward', found: abc",
+				wantError:   "`direction` must be either \"forward\" or \"backward\", found: \"abc\"",
 			},
 
 			// Invalid time formats
 			{
 				name:        "invalid before format",
 				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
-				wantError:   "failed to parse before param",
+				wantError:   "failed to parse `before` param",
 			},
 			{
 				name:        "invalid before value",
 				queryParams: map[string]string{"before": "abc"},
-				wantError:   "failed to parse before param",
+				wantError:   "failed to parse `before` param",
 			},
 			{
 				name:        "invalid after format",
 				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
-				wantError:   "failed to parse after param",
+				wantError:   "failed to parse `after` param",
 			},
 			{
 				name:        "invalid after value",
 				queryParams: map[string]string{"after": "abc"},
-				wantError:   "failed to parse after param",
+				wantError:   "failed to parse `after` param",
 			},
 			{
 				name:        "after in future",
 				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
-				wantError:   "'after' must be before current time",
+				wantError:   "`after` must be before current time",
 			},
 
 			// Invalid time ranges
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
 				},
-				wantError: "after time must be before before time",
+				wantError: "must be earlier than `before` timestamp",
 			},
 			{
 				name: "before too old",
 				queryParams: map[string]string{
 					"before": "2020-01-02T15:04:05Z",
 				},
-				wantError: "before time cannot be more than 14 days in the past",
+				wantError: "`before` time cannot be more than 14 days in the past",
 			},
 
 			// Invalid cursor
 			{
 				name:        "invalid cursor format",
 				queryParams: map[string]string{"cursor": "not-a-valid-cursor"},
-				wantError:   "failed to parse the cursor",
+				wantError:   "failed to parse the `cursor`",
 			},
 
 			// Invalid limit
 			{
 				name:        "invalid limit format",
 				queryParams: map[string]string{"limit": "abc"},
-				wantError:   "failed to parse limit param",
+				wantError:   "failed to parse `limit` param",
 			},
 		}
 
@@ -571,7 +790,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -590,7 +809,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -618,7 +837,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -637,7 +856,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[100] through keys[41]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -657,8 +876,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling
-		tm := time.Unix(0, time.Now().UnixNano()).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, time.Now().UnixNano()))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -690,8 +908,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling (cursor is exclusive)
-		tm := time.Unix(0, int64(requestedAt[80])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[80])))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -721,8 +938,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
 		// - These are followed by sequential blobs: keys[3,4] with different timestamps
 		// - End time is set to requestedAt[5]
-		tm := time.Unix(0, int64(requestedAt[5])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[5])))
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
@@ -905,7 +1121,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 		assert.Equal(t, blobKey.Hex(), response.BlobKey)
 		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
-		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, hex.EncodeToString(inclusionInfo.InclusionProof[:]), response.InclusionInfo.InclusionProof)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
 		signers := map[uint8][]serverv2.OperatorIdentity{
@@ -958,7 +1174,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 	mockTx.ExpectedCalls = nil
 	mockTx.Calls = nil
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -981,10 +1197,27 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 func TestFetchBatch(t *testing.T) {
 	r := setUpRouter()
 
+	operatorPubKeys := []*core.G1Point{
+		core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
+		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
-		BatchRoot:            [32]byte{1, 0, 2, 4},
-		ReferenceBlockNumber: 1024,
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 10,
 	}
 	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
 	require.NoError(t, err)
@@ -992,31 +1225,103 @@ func TestFetchBatch(t *testing.T) {
 	require.NoError(t, err)
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
+	// Set up batch in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte{0, 1, 2, 3, 4},
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	require.NoError(t, err)
+
 	// Set up attestation in metadata store
-	commitment := makeCommitment(t)
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(0)),
-			core.NewG1Point(big.NewInt(2), big.NewInt(4)),
-		},
-		APKG2: &core.G2Point{
-			G2Affine: &bn254.G2Affine{
-				X: commitment.LengthCommitment.X,
-				Y: commitment.LengthCommitment.Y,
-			},
+		BatchHeader:      batchHeader,
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nonsignerPubKeys,
+		APKG2:            apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
 		},
 		Sigma: &core.Signature{
-			G1Point: core.NewG1Point(big.NewInt(2), big.NewInt(0)),
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
 		},
 	}
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
-	dk := commondynamodb.Key{
-		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
-		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		10: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[1].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(3),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[3].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
 	}
-	defer deleteItems(t, []commondynamodb.Key{dk})
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatch)
 
@@ -1024,10 +1329,78 @@ func TestFetchBatch(t *testing.T) {
 	response := decodeResponseBody[serverv2.BatchResponse](t, w)
 
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
-	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
+	assert.Equal(t, hex.EncodeToString(batchHeader.BatchRoot[:]), response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
-	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
-	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
+	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+	assert.Equal(t, 1, len(response.BlobKeys))
+	assert.Equal(t, blobKey.Hex(), response.BlobKeys[0])
+	assert.Equal(t, 1, len(response.BlobCertificates))
+	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
+
+	signers := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[3].Hex(),
+			},
+		},
+	}
+	nonsigners := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[1].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+		},
+	}
+	for key, expectedSigners := range signers {
+		actualSigners, exists := response.SignedBatch.AttestationInfo.Signers[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedSigners, actualSigners)
+	}
+	for key, expectedNonsigners := range nonsigners {
+		actualNonsigners, exists := response.SignedBatch.AttestationInfo.Nonsigners[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+	}
+
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
+	deleteItems(t, []dynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchInfo"},
+		},
+	})
 }
 
 func TestFetchBatchFeed(t *testing.T) {
@@ -1041,7 +1414,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1076,29 +1449,109 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
 
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
+	// Create a local server so the internal state (e.g. cache) will be re-created.
+	// This is needed because /v2/operators/signing-info API shares the cache state with
+	// /v2/batches/feed API.
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	require.NoError(t, err)
+
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
-		reqUrls := []string{
-			"/v2/batches/feed?limit=abc",
-			"/v2/batches/feed?interval=abc",
-			"/v2/batches/feed?interval=-1",
-			"/v2/batches/feed?end=2006-01-02T15:04:05",
-			"/v2/batches/feed?end=2006-01-02T15:04:05Z",
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "`direction` must be either \"forward\" or \"backward\", found: \"abc\"",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "`after` must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
+				},
+				wantError: "must be earlier than `before` timestamp",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "`before` time cannot be more than 14 days in the past",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse `limit` param",
+			},
 		}
-		for _, url := range reqUrls {
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+			url := fmt.Sprintf("/v2/batches/feed?%s", params.Encode())
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
+
 			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
 		}
+
 	})
 
 	t.Run("default params", func(t *testing.T) {
@@ -1112,11 +1565,11 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 20; i++ {
 			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
-	t.Run("various query ranges and limits", func(t *testing.T) {
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// With 1h ending time at now, this retrieves batch[13] through batch[71] (59 batches)
 		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=0")
@@ -1125,33 +1578,76 @@ func TestFetchBatchFeed(t *testing.T) {
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		w = executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=-1&interval=7200")
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("/v2/batches/feed?limit=-1&after=%s", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 72, len(response.Batches))
 		for i := 0; i < 72; i++ {
 			assert.Equal(t, attestedAt[i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `end` is exclusive)
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
-		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
+		beforeTime := tm.Format(timeFormat)
+		reqUrl = fmt.Sprintf("/v2/batches/feed?before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
 		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[7+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves batch[71] through batch[13] (59 batches)
+		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed?direction=backward&limit=0")
+		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 2: 2-hour window captures all test batches
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("/v2/batches/feed?direction=backward&limit=-1&after=%s", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 72, len(response.Batches))
+		for i := 0; i < 72; i++ {
+			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 3: Custom end time with 1-hour window
+		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches,
+		// as the `before` is exclusive)
+		tm := time.Unix(0, int64(attestedAt[66])).UTC()
+		beforeTime := tm.Format(timeFormat)
+		reqUrl = fmt.Sprintf("/v2/batches/feed?direction=backward&before=%s&limit=-1", beforeTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, attestedAt[65-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[65-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, hex.EncodeToString(batchHeaders[65-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+		}
+	})
+
 }
 
 func TestFetchOperatorSigningInfo(t *testing.T) {
@@ -1397,14 +1893,14 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		bhh, err := attestation.BatchHeader.Hash()
+		bhh, err := attestation.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1439,6 +1935,12 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		| <5, 0>           |                 2 |                2 |          0%  |
 		+------------------+-------------------+------------------+--------------+
 	*/
+
+	// Create a local server so the internal state (e.g. cache) will be re-created.
+	// This is needed because /v2/operators/signing-info API shares the cache state with
+	// /v2/batches/feed API.
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
 
@@ -1631,7 +2133,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		// +------------------+-------------------+------------------+--------------+
 
 		tm := time.Unix(0, int64(now)+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl := fmt.Sprintf("/v2/operators/signing-info?end=%s&interval=1000", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
@@ -1689,21 +2191,22 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
+	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
+	operatorId := core.OperatorID{1}.Hex()
 	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port closed or unreachable", response.DispersalStatus)
-	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port closed or unreachable", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -1715,27 +2218,250 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
+	operatorId := core.OperatorID{1}
+	ios := &core.IndexedOperatorState{
+		IndexedOperators: map[core.OperatorID]*core.IndexedOperatorInfo{
+			operatorId: &core.IndexedOperatorInfo{
+				Socket: "1.2.3.4:3004:3005",
+			},
+		},
+	}
+
+	mockIcs := &coremock.MockIndexedChainState{}
+
+	mockIcs.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockIcs.On("GetIndexedOperatorState").Return(ios, nil)
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId.Hex())
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port is not registered", response.DispersalStatus)
-	assert.Equal(t, "", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port is not registered", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchOperatorResponses(t *testing.T) {
+func TestFetchAccountBlobFeed(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	numBlobs := 60
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(int64(numBlobs)*time.Minute.Nanoseconds())
+	nanoSecsPerBlob := uint64(time.Minute.Nanoseconds()) // 1 blob/min
+
+	accountId := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 5))
+
+	// Create blobs for testing
+	requestedAt := make([]uint64, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobHeader.PaymentMetadata.AccountID = accountId
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
+		now := time.Now()
+		metadata := &commonv2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  commonv2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		dynamoKeys[i] = dynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	r.GET("/v2/accounts/:account_id/blobs", testDataApiServerV2.FetchAccountBlobFeed)
+	baseUrl := fmt.Sprintf("/v2/accounts/%s/blobs", accountId.Hex())
+
+	t.Run("invalid account ID params", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			accountID      string
+			expectedStatus int
+			expectedError  string
+		}{
+			// Invalid format cases
+			{
+				accountID:      "not-a-hex-string",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0xG1234567890123456789012345678901234567",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x123",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x" + "1234567890123456789012345678901234567890abcdef",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			// Zero address case
+			{
+				accountID:      "0x0000000000000000000000000000000000000000",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "zero account id is not valid",
+			},
+			// Empty & whitespace cases
+			{
+				accountID:      "",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      " ",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+		}
+
+		for _, tc := range tests {
+			url := "/v2/accounts/" + tc.accountID + "/blobs"
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			var response serverv2.ErrorResponse
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+			assert.Contains(t, response.Error, tc.expectedError)
+		}
+	})
+
+	t.Run("nonexistent account", func(t *testing.T) {
+		otherID := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 6))
+		url := fmt.Sprintf("/v2/accounts/%s/blobs", otherID.Hex())
+		w := executeRequest(t, r, http.MethodGet, url)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 0, len(response.Blobs))
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs include all of blobs[1] through blobs[59]
+		// - Limited to 20 results (the default "limit")
+		// - Result will first 20 blobs
+		w := executeRequest(t, r, http.MethodGet, baseUrl)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[1] through blobs[59] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format(timeFormat)
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format(timeFormat)
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[21+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[59] through blobs[1] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format(timeFormat)
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format(timeFormat)
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[49-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+}
+
+func TestFetchOperatorDispersalResponse(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 	// Set up batch header in metadata store
@@ -1783,23 +2509,13 @@ func TestFetchOperatorResponses(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
 	assert.NoError(t, err)
 
-	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorsResponses)
+	r.GET("/v2/operators/:operator_id/dispersals/:batch_header_hash/response", testDataApiServerV2.FetchOperatorDispersalResponse)
 
 	// Fetch response of a specific operator
-	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
+	reqStr := fmt.Sprintf("/v2/operators/%s/dispersals/%s/response", operatorId.Hex(), batchHeaderHash)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w)
-	require.Equal(t, 1, len(response.Responses))
-	require.Equal(t, dispersalResponse, response.Responses[0])
-
-	// Fetch all operators' responses for a batch
-	reqStr2 := fmt.Sprintf("/v2/operators/response/%s", batchHeaderHash)
-	w2 := executeRequest(t, r, http.MethodGet, reqStr2)
-	response2 := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w2)
-
-	require.Equal(t, 2, len(response2.Responses))
-	require.Equal(t, response2.Responses[0], dispersalResponse)
-	require.Equal(t, response2.Responses[1], dispersalResponse2)
+	response := decodeResponseBody[serverv2.OperatorDispersalResponse](t, w)
+	require.Equal(t, dispersalResponse, response.Response)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {
@@ -1813,11 +2529,12 @@ func TestFetchOperatorsStake(t *testing.T) {
 		func(ids []core.OperatorID) []gethcommon.Address {
 			result := make([]gethcommon.Address, len(ids))
 			for i, id := range ids {
-				if id == opId0 {
+				switch id {
+				case opId0:
 					result[i] = addr0
-				} else if id == opId1 {
+				case opId1:
 					result[i] = addr1
-				} else {
+				default:
 					result[i] = gethcommon.Address{}
 				}
 			}
@@ -1864,7 +2581,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
-	err := s.UnmarshalJSON([]byte(mockPrometheusResponse))
+	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
 	assert.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
@@ -1876,7 +2593,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
+	assert.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
@@ -1904,6 +2621,31 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
+	r := setUpRouter()
+
+	s := new(model.SampleStream)
+	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
+	assert.NoError(t, err)
+
+	matrix := make(model.Matrix, 0)
+	matrix = append(matrix, s)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+
+	r.GET("/v2/metrics/timeseries/network-signing-rate", testDataApiServerV2.FetchNetworkSigningRate)
+
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/network-signing-rate")
+	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
+
+	require.Equal(t, 2, len(response.QuorumSigningRates))
+	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(

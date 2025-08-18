@@ -109,7 +109,7 @@ func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 	if len(in.GetBlobs()) == 0 {
 		return api.NewErrorInvalidArg("missing blobs in request")
 	}
-	for _, blob := range in.Blobs {
+	for _, blob := range in.GetBlobs() {
 		if blob.GetHeader() == nil {
 			return api.NewErrorInvalidArg("missing blob header in request")
 		}
@@ -140,13 +140,13 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 
 	blobHeadersSize := 0
 	bundleSize := 0
-	for _, blob := range in.Blobs {
+	for _, blob := range in.GetBlobs() {
 		blobHeadersSize += proto.Size(blob.GetHeader())
 		for _, bundle := range blob.GetBundles() {
 			bundleSize += proto.Size(bundle)
 		}
 	}
-	s.node.Logger.Info("StoreChunks RPC request received", "num of blobs", len(in.Blobs), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
+	s.node.Logger.Info("StoreChunks RPC request received", "num of blobs", len(in.GetBlobs()), "request message size", proto.Size(in), "total size of blob headers", blobHeadersSize, "total size of bundles", bundleSize)
 
 	// Validate the request.
 	if err := s.validateStoreChunkRequest(in); err != nil {

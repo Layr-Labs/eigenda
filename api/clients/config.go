@@ -84,10 +84,10 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 		}
 	}
 	if c.SvcManagerAddr == "" {
-		return fmt.Errorf("EigenDAClientConfig.SvcManagerAddr not set. Needed to verify blob confirmed on-chain.")
+		return fmt.Errorf("EigenDAClientConfig.SvcManagerAddr not set: needed to verify blob confirmed on-chain")
 	}
 	if c.EthRpcUrl == "" {
-		return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set. Needed to verify blob confirmed on-chain.")
+		return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set: needed to verify blob confirmed on-chain")
 	}
 
 	if c.ResponseTimeout == 0 {

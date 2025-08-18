@@ -8,6 +8,9 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/Layr-Labs/eigenda/common"
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
@@ -17,6 +20,7 @@ import (
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
+	eigendadirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -25,10 +29,8 @@ import (
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pingcap/errors"
 
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
@@ -52,6 +54,7 @@ type ContractBindings struct {
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
+	EigenDADirectory      *eigendadirectory.ContractIEigenDADirectory
 }
 
 type Reader struct {
@@ -62,6 +65,9 @@ type Reader struct {
 
 var _ core.Reader = (*Reader)(nil)
 
+// TODO: take a ctx since we possibly do contract calls in here.
+// Or even better don't pass directory here, do the contract calls outside of the reader just
+// pass in the stateRetriever and service manager addresses.
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
@@ -75,11 +81,16 @@ func NewReader(
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 
-	return e, err
+	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
+	}
+	return e, nil
 }
 
+// updateContractBindings updates the contract bindings for the reader
+// TODO: update to use address directory contract once all contracts are written into the directory
 func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
@@ -476,6 +487,43 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 			state[quorumID][operatorIndex] = core.OperatorStake{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
+			}
+		}
+	}
+
+	return state, nil
+}
+
+// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+// The indices of the operators within each quorum are also returned.
+func (t *Reader) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakesWithSocket, error) {
+	quorumBytes := make([]byte, len(quorums))
+	for ind, quorum := range quorums {
+		quorumBytes[ind] = byte(uint8(quorum))
+	}
+
+	// result is a struct{Operators [][]opstateretriever.OperatorStateRetrieverOperator; Sockets [][]string}
+	// Operators is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
+	// Sockets is a [][]string with the same length and order as quorumBytes, and then indexed by operator index
+	// By contract definition, Operators and Sockets are parallel arrays
+	result, err := t.bindings.OpStateRetriever.GetOperatorStateWithSocket(&bind.CallOpts{
+		Context: ctx,
+	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
+	if err != nil {
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
+	}
+
+	state := make(core.OperatorStakesWithSocket, len(result.Operators))
+	for i := range result.Operators {
+		quorumID := quorums[i]
+		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStakeWithSocket, len(result.Operators[i]))
+		for j, op := range result.Operators[i] {
+			operatorIndex := core.OperatorIndex(j)
+			state[quorumID][operatorIndex] = core.OperatorStakeWithSocket{
+				Stake:      op.Stake,
+				OperatorID: op.OperatorId,
+				Socket:     core.OperatorSocket(result.Sockets[i][j]),
 			}
 		}
 	}
@@ -959,4 +1007,8 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 
 func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 	return t.bindings.RelayRegistryAddress
+}
+
+func (t *Reader) GetRegistryCoordinatorAddress() gethcommon.Address {
+	return t.bindings.RegCoordinatorAddr
 }

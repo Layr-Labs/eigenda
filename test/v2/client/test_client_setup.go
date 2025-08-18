@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -22,13 +24,35 @@ var (
 	metrics    *testClientMetrics
 )
 
-const (
-	PreprodEnv = "../config/environment/preprod.json"
+// GetEnvironmentConfigPaths returns a list of paths to the environment config files.
+func GetEnvironmentConfigPaths() ([]string, error) {
+	// Golang tests are always run with CWD set to the dir in which the test file is located.
+	// These relative paths should thus only be used for tests in direct subdirs of `test/v2`,
+	// such as `test/v2/live` where they are currently used from.
+	// TODO: GetEnvironmentConfigPaths should take a base path as an argument
+	// to allow for more flexibility in where the config files are located.
+	configDir, err := util.SanitizePath("../config/environment")
+	if err != nil {
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
+	}
 
-	G1URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
-	G2URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
-	G2PowerOf2URL = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
-)
+	files, err := os.ReadDir(configDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read environment config directory: %w", err)
+	}
+	var configPaths []string
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		configPath := fmt.Sprintf("../config/environment/%s", file.Name())
+		configPaths = append(configPaths, configPath)
+	}
+	if len(configPaths) == 0 {
+		return nil, fmt.Errorf("no environment config files found in ../config/environment")
+	}
+	return configPaths, nil
+}
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
 func GetConfig(configPath string) (*TestClientConfig, error) {
@@ -39,19 +63,27 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 		return config, nil
 	}
 
-	configFile, err := ResolveTildeInPath(configPath)
+	configFile, err := util.SanitizePath(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return nil, fmt.Errorf("failed sanitize path: %w", err)
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config := &TestClientConfig{}
+	config := DefaultTestClientConfig()
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	// Resolve relative SRS path based on config file location
+	if config.SRSPath != "" && !filepath.IsAbs(config.SRSPath) {
+		configDir := filepath.Dir(configFile)
+		absPath := filepath.Join(configDir, config.SRSPath)
+		config.SRSPath = filepath.Clean(absPath)
+		// to debug this, you can print filepath.Abs(config.SRSPath)
 	}
 
 	configMap[configPath] = config
@@ -88,27 +120,19 @@ func GetClient(configPath string) (*TestClient, error) {
 	if len(clientMap) == 0 {
 		// do one time setup
 
-		var loggerConfig common.LoggerConfig
-		if os.Getenv("CI") != "" {
-			loggerConfig = common.DefaultLoggerConfig()
-		} else {
-			loggerConfig = common.DefaultConsoleLoggerConfig()
-		}
+		// TODO (cody.littley): add a setting to enable colored logging
+		loggerConfig := common.DefaultTextLoggerConfig()
 
 		logger, err = common.NewLogger(loggerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create logger: %w", err)
 		}
 
-		// only do this stuff once
-		err = setupFilesystem(testConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
+		if !testConfig.DisableMetrics {
+			testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
+			metrics = testMetrics
+			testMetrics.start()
 		}
-
-		testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
-		metrics = testMetrics
-		testMetrics.start()
 	}
 
 	client, err := NewTestClient(logger, metrics, testConfig)
@@ -122,80 +146,19 @@ func GetClient(configPath string) (*TestClient, error) {
 }
 
 func skipInCI(t *testing.T) {
-	if os.Getenv("CI") != "" {
+
+	// The environment variable "CI" will be set when running inside a github action.
+	// The environment variable "LIVE_TESTS" will be set when running live tests, which is a specific github action.
+	//
+	// There are three situations we want to consider:
+	//
+	// 1. When running a tests locally, we want to run live tests if requested. "CI" will not be set, and so
+	//    we will not skip the test.
+	// 2. When we are running general unit tests as a github action, we specifically don't want to run live tests.
+	//    "CI" will be set, and "LIVE_TESTS" will not be set, so we skip the test.
+	// 3. When we are running live tests as a github action, we want to run the test. Both "CI" and "LIVE_TESTS" will
+	//    be set, so we do not skip the test.
+	if os.Getenv("CI") != "" && os.Getenv("LIVE_TESTS") == "" {
 		t.Skip("Skipping test in CI environment")
 	}
-}
-
-// ensureSRSFileIsPresent checks if a file exists at the given path. If it does not, it downloads the file from the
-// given URL into the given path.
-func ensureSRSFileIsPresent(
-	config *TestClientConfig,
-	filePath string,
-	url string) error {
-
-	var err error
-	filePath, err = config.ResolveSRSPath(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to resolve SRS path: %w", err)
-	}
-
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = url
-		command[2] = "--output-document=" + filePath
-		logger.Info("executing %s", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to download %s: %w", url, err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("failed to check if file exists: %w", err)
-	}
-
-	return nil
-}
-
-func setupFilesystem(config *TestClientConfig) error {
-	// Create the test data directory if it does not exist
-	srsPath, err := ResolveTildeInPath(config.SRSPath)
-	if err != nil {
-		return fmt.Errorf("failed to resolve tilde in path: %w", err)
-	}
-	err = os.MkdirAll(srsPath, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create test data directory: %w", err)
-	}
-
-	// Create the SRS directories if they do not exist
-	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
-	if err != nil {
-		return fmt.Errorf("failed to resolve SRS tables path: %w", err)
-	}
-	err = os.MkdirAll(srsTablesPath, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create SRS tables directory: %w", err)
-	}
-
-	// If any of the srs files do not exist, download them.
-	err = ensureSRSFileIsPresent(config, SRSPathG1, G1URL)
-	if err != nil {
-		return fmt.Errorf("failed to locate G1 point: %w", err)
-	}
-	err = ensureSRSFileIsPresent(config, SRSPathG2, G2URL)
-	if err != nil {
-		return fmt.Errorf("failed to locate G2 point: %w", err)
-	}
-	err = ensureSRSFileIsPresent(config, SRSPathG2PowerOf2, G2PowerOf2URL)
-	if err != nil {
-		return fmt.Errorf("failed to locate G2 power of 2 point: %w", err)
-	}
-
-	return nil
 }

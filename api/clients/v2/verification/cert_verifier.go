@@ -4,336 +4,268 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
-	"time"
 
-	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// ICertVerifier is the interface representing a CertVerifier
-//
-// This interface exists in order to allow verification mocking in unit tests.
-type ICertVerifier interface {
-	// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
-	//
-	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-	VerifyCertV2(
-		ctx context.Context,
-		certVerifierAddress string,
-		eigenDACert *EigenDACert,
-	) error
-
-	// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
-	// contract, and returns the resulting NonSignerStakesAndSignature object.
-	GetNonSignerStakesAndSignature(
-		ctx context.Context,
-		certVerifierAddress string,
-		signedBatch *disperser.SignedBatch,
-	) (*verifierBindings.NonSignerStakesAndSignature, error)
-
-	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
-	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
-	GetQuorumNumbersRequired(
-		ctx context.Context,
-		certVerifierAddress string,
-	) ([]uint8, error)
-}
-
-// CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
-// structural integrity of V2 certificates
-//
-// The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol
+// CertVerifier is responsible for making eth calls against version agnostic CertVerifier contracts to ensure
+// cryptographic and structural integrity of EigenDA certificate types.
+// The V3 cert verifier contract is located at:
+// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/EigenDACertVerifier.sol
 type CertVerifier struct {
-	logger       logging.Logger
-	ethClient    common.EthClient
-	pollInterval time.Duration
-	// storage shared between goroutines, containing the most recent block number observed by calling ethClient.BlockNumber()
-	latestBlockNumber atomic.Uint64
-	// atomic bool, so that only a single goroutine is polling the internal client with BlockNumber() calls at any given time
-	pollingActive atomic.Bool
+	logger          logging.Logger
+	ethClient       common.EthClient
+	addressProvider clients.CertVerifierAddressProvider
+
 	// maps contract address to a ContractEigenDACertVerifierCaller object
 	verifierCallers sync.Map
+	// maps contract address to set of required quorums specified in the contract at that address
+	requiredQuorums sync.Map
+	// maps contract address to the confirmation threshold required by that address
+	confirmationThresholds sync.Map
+	// maps contract address to the cert version specified in the contract at that address
+	versions sync.Map
 }
 
-var _ ICertVerifier = &CertVerifier{}
-
-// NewCertVerifier constructs a CertVerifier
+// NewCertVerifier constructs a new CertVerifier instance
 func NewCertVerifier(
 	logger logging.Logger,
-	// the eth client, which should already be set up
 	ethClient common.EthClient,
-	// pollInterval is how frequently to check latest block number when waiting for the internal eth client to advance
-	// to a certain block. This is needed because the RBN in a cert might be further in the future than the internal
-	// eth client. In such a case, we must wait for the internal client to catch up to the block number
-	// contained in the cert: otherwise, calls will fail.
-	//
-	// If the configured pollInterval duration is <= 0, then the block number check will be skipped, and calls that
-	// rely on the client having reached a certain block number will fail if the internal client is behind.
-	pollInterval time.Duration,
+	certVerifierAddressProvider clients.CertVerifierAddressProvider,
 ) (*CertVerifier, error) {
-	if pollInterval <= time.Duration(0) {
-		logger.Warn(
-			`CertVerifier poll interval is <= 0. Therefore, any method calls made with this object that 
-					rely on the internal client having reached a certain block number will fail if
-					the internal client is too far behind.`,
-			"pollInterval", pollInterval)
-	}
-
 	return &CertVerifier{
-		logger:       logger,
-		ethClient:    ethClient,
-		pollInterval: pollInterval,
+		logger:          logger,
+		ethClient:       ethClient,
+		addressProvider: certVerifierAddressProvider,
 	}, nil
 }
 
-// VerifyCertV2FromSignedBatch calls the verifyDACertV2FromSignedBatch view function on the EigenDACertVerifier contract.
-//
-// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height.
-// This wait will time out if the duration exceeds the timeout configured for the input ctx parameter. If
-// CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal client to
-// advance, and will instead simply fail verification if the internal client is behind.
-//
-// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
+// CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
+// This method returns nil if the certificate is successfully verified; otherwise, it returns a
+// [CertVerifierInvalidCertError] or [CertVerifierInternalError] error.
+func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
-	// the hex address of the EigenDACertVerifier contract
-	certVerifierAddress string,
-	// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
-	// is used to verify that the described blob actually exists in a valid batch.
-	signedBatch *disperser.SignedBatch,
-	// Contains all necessary information about the blob, so that the cert can be verified.
-	blobInclusionInfo *disperser.BlobInclusionInfo,
+	cert coretypes.EigenDACert,
 ) error {
-	convertedSignedBatch, err := SignedBatchProtoToBinding(signedBatch)
-	if err != nil {
-		return fmt.Errorf("convert signed batch: %w", err)
+	// 1 - switch on the certificate type to determine which contract to call
+	var certV3 *coretypes.EigenDACertV3
+	var err error
+	switch cert := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		certV3 = cert
+	case *coretypes.EigenDACertV2:
+		// EigenDACertV3 is the only version that is supported by the CheckDACert function
+		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
+		certV3 = cert.ToV3()
+	default:
+		// If golang had enums the world would be a better place.
+		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
+			"construct offchain should have a CertVerifier contract which we can call to "+
+			"verify the certificate", cert))
 	}
 
-	convertedBlobInclusionInfo, err := InclusionInfoProtoToBinding(blobInclusionInfo)
+	// 2 - Call the contract method CheckDACert to verify the certificate
+	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
+	//       with future reference timestamp change which deprecates the reference block number
+	//       used for quorum stake check-pointing.
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
 	if err != nil {
-		return fmt.Errorf("convert blob inclusion info: %w", err)
+		return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
 	}
 
-	err = cv.MaybeWaitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
+	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
 	if err != nil {
-		return fmt.Errorf("wait for block number: %w", err)
+		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
 	}
 
-	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
-	if err != nil {
-		return fmt.Errorf("get verifier caller: %w", err)
-	}
-
-	err = certVerifierCaller.VerifyDACertV2FromSignedBatch(
+	// TODO: determine if there's any merit in passing call options to impose better determinism and
+	// safety on the operation
+	result, err := certVerifierCaller.CheckDACert(
 		&bind.CallOpts{Context: ctx},
-		*convertedSignedBatch,
-		*convertedBlobInclusionInfo)
-
+		certBytes,
+	)
 	if err != nil {
-		return fmt.Errorf("verify cert v2 from signed batch: %w", err)
+		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
+	// 3 - Cast result to structured enum type and check for success
+	verifyResultCode := coretypes.VerificationStatusCode(result)
+	if verifyResultCode == coretypes.StatusNullError {
+		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
+	} else if verifyResultCode != coretypes.StatusSuccess {
+		return &CertVerifierInvalidCertError{
+			StatusCode: verifyResultCode,
+			Msg:        verifyResultCode.String(),
+		}
+	}
 	return nil
 }
 
-// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
+// GetQuorumNumbersRequired returns the set of quorum numbers that must be set in the BlobHeader, and verified in
+// VerifyCert and CheckDACert.
 //
-// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height.
-// This wait will time out if the duration exceeds the timeout configured for the input ctx parameter. If
-// CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal client to
-// advance, and will instead simply fail verification if the internal client is behind.
-//
-// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-func (cv *CertVerifier) VerifyCertV2(
-	ctx context.Context,
-	// the hex address of the EigenDACertVerifier contract
-	certVerifierAddress string,
-	eigenDACert *EigenDACert,
-) error {
-	err := cv.MaybeWaitForBlockNumber(ctx, uint64(eigenDACert.BatchHeader.ReferenceBlockNumber))
+// This method will return required quorum numbers from an internal cache if they are already known for the currently
+// active cert verifier. Otherwise, this method will query the required quorum numbers from the currently active
+// cert verifier, and cache the result for future use.
+func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, error) {
+	// get the latest cert verifier address from the address provider
+
+	blockNum, err := cv.ethClient.BlockByNumber(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("wait for block number: %w", err)
+		return nil, fmt.Errorf("get latest block number: %w", err)
 	}
 
-	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, blockNum.NumberU64())
 	if err != nil {
-		return fmt.Errorf("get verifier caller: %w", err)
+		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
 
-	err = certVerifierCaller.VerifyDACertV2(
-		&bind.CallOpts{Context: ctx},
-		eigenDACert.BatchHeader,
-		eigenDACert.BlobInclusionInfo,
-		eigenDACert.NonSignerStakesAndSignature,
-		eigenDACert.SignedQuorumNumbers)
-
-	if err != nil {
-		return fmt.Errorf("verify cert v2: %w", err)
+	// if the quorum numbers for the active cert verifier address have already been cached, return them immediately
+	cachedQuorumNumbers, ok := cv.requiredQuorums.Load(certVerifierAddress)
+	if ok {
+		castQuorums, ok := cachedQuorumNumbers.([]uint8)
+		if !ok {
+			return nil, fmt.Errorf("expected quorum numbers to be []uint8")
+		}
+		return castQuorums, nil
 	}
 
-	return nil
-}
-
-// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
-// contract, and returns the resulting NonSignerStakesAndSignature object.
-//
-// Before getting the NonSignerStakesAndSignature, this method will wait for the internal client to advance to a
-// sufficient block height. This wait will time out if the duration exceeds the timeout configured for the input ctx
-// parameter. If CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal
-// client to advance, and will instead simply fail to get the NonSignerStakesAndSignature if the internal client is
-// behind.
-func (cv *CertVerifier) GetNonSignerStakesAndSignature(
-	ctx context.Context,
-	// the hex address of the EigenDACertVerifier contract
-	certVerifierAddress string,
-	signedBatch *disperser.SignedBatch,
-) (*verifierBindings.NonSignerStakesAndSignature, error) {
-	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
+	// quorum numbers weren't cached, so proceed to fetch them
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
 	if err != nil {
-		return nil, fmt.Errorf("convert signed batch: %w", err)
+		return nil, fmt.Errorf("get verifier caller from address: %w", err)
 	}
 
-	err = cv.MaybeWaitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
-	if err != nil {
-		return nil, fmt.Errorf("wait for block number: %w", err)
-	}
-
-	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
-	if err != nil {
-		return nil, fmt.Errorf("get verifier caller: %w", err)
-	}
-
-	nonSignerStakesAndSignature, err := certVerifierCaller.GetNonSignerStakesAndSignature(
-		&bind.CallOpts{Context: ctx},
-		*signedBatchBinding)
-
-	if err != nil {
-		return nil, fmt.Errorf("get non signer stakes and signature: %w", err)
-	}
-
-	return &nonSignerStakesAndSignature, nil
-}
-
-// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
-// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
-func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, certVerifierAddress string) ([]uint8, error) {
-	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
-	if err != nil {
-		return nil, fmt.Errorf("get verifier caller: %w", err)
-	}
-
-	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequiredV2(&bind.CallOpts{Context: ctx})
+	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequired(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
+	cv.requiredQuorums.Store(certVerifierAddress, quorumNumbersRequired)
+
 	return quorumNumbersRequired, nil
 }
 
-// MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless
-// configured pollInterval is <= 0, in which case this method will NOT wait for the internal client to advance.
+// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifier that corresponds to the input reference
+// block number.
 //
-// This method will check the current block number of the internal client every CertVerifier.pollInterval duration.
-// It will return nil if the internal client advances to (or past) the targetBlockNumber. It will return an error
-// if the input context times out, or if any error occurs when checking the block number of the internal client.
-//
-// This method is synchronized in a way that, if called by multiple goroutines, only a single goroutine will actually
-// poll the internal eth client for most recent block number. The goroutine responsible for polling at a given time
-// updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
-func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
-	if cv.pollInterval <= 0 {
-		// don't wait for the internal client to advance
-		return nil
+// This method caches ContractEigenDACertVerifier instances, since their construction requires acquiring a lock
+// and parsing json, and is therefore non-trivially expensive.
+func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
+	ctx context.Context,
+	referenceBlockNumber uint64,
+) (*certVerifierBinding.ContractEigenDACertVerifier, error) {
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
 
-	if cv.latestBlockNumber.Load() >= targetBlockNumber {
-		// immediately return if the local client isn't behind the target block number
-		return nil
-	}
-
-	ticker := time.NewTicker(cv.pollInterval)
-	defer ticker.Stop()
-
-	polling := false
-	if cv.pollingActive.CompareAndSwap(false, true) {
-		// no other goroutine is currently polling, so assume responsibility
-		polling = true
-		defer cv.pollingActive.Store(false)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf(
-				"timed out waiting for block number %d (latest block number observed was %d): %w",
-				targetBlockNumber, cv.latestBlockNumber.Load(), ctx.Err())
-		case <-ticker.C:
-			if cv.latestBlockNumber.Load() >= targetBlockNumber {
-				return nil
-			}
-
-			if cv.pollingActive.CompareAndSwap(false, true) {
-				// no other goroutine is currently polling, so assume responsibility
-				polling = true
-				defer cv.pollingActive.Store(false)
-			}
-
-			if polling {
-				actualBlockNumber, err := cv.ethClient.BlockNumber(ctx)
-				if err != nil {
-					cv.logger.Debug(
-						"ethClient.BlockNumber returned an error",
-						"targetBlockNumber", targetBlockNumber,
-						"latestBlockNumber", cv.latestBlockNumber.Load(),
-						"error", err)
-
-					// tolerate some failures here. if failure continues for too long, it will be caught by the timeout
-					continue
-				}
-
-				cv.latestBlockNumber.Store(actualBlockNumber)
-				if actualBlockNumber >= targetBlockNumber {
-					return nil
-				}
-			}
-
-			cv.logger.Debug(
-				"local client is behind the reference block number",
-				"targetBlockNumber", targetBlockNumber,
-				"actualBlockNumber", cv.latestBlockNumber.Load())
-		}
-	}
+	return cv.getVerifierCallerFromAddress(certVerifierAddress)
 }
 
-// getVerifierCaller returns a ContractEigenDACertVerifierCaller that corresponds to the input certVerifierAddress
+// getVerifierCallerFromAddress returns a ContractEigenDACertVerifier that corresponds to the input contract
+// address
 //
-// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
-// and parsing json, and is therefore not trivially inexpensive.
-func (cv *CertVerifier) getVerifierCaller(
-	certVerifierAddress string,
-) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
-
+// This method caches ContractEigenDACertVerifier instances, since their construction requires acquiring a lock
+// and parsing json, and is therefore non-trivially expensive.
+func (cv *CertVerifier) getVerifierCallerFromAddress(
+	certVerifierAddress gethcommon.Address,
+) (*certVerifierBinding.ContractEigenDACertVerifier, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierCaller)
+		existingCaller, ok := existingCallerAny.(*certVerifierBinding.ContractEigenDACertVerifier)
 		if !ok {
 			return nil, fmt.Errorf(
-				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifier. this should be impossible")
 		}
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress), cv.ethClient)
+	certVerifierCaller, err := certVerifierBinding.NewContractEigenDACertVerifier(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}
 
 	cv.verifierCallers.Store(certVerifierAddress, certVerifierCaller)
 	return certVerifierCaller, nil
+}
+
+// GetConfirmationThreshold returns the ConfirmationThreshold that corresponds to the input reference block number.
+//
+// This method will return the confirmation threshold from an internal cache if it is already known for the cert
+// verifier which corresponds to the input reference block number. Otherwise, this method will query the confirmation
+// threshold and cache the result for future use.
+func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	// if the confirmation threshold for the active cert verifier address has already been cached, return it immediately
+	cachedThreshold, ok := cv.confirmationThresholds.Load(certVerifierAddress)
+	if ok {
+		castThreshold, ok := cachedThreshold.(uint8)
+		if !ok {
+			return 0, fmt.Errorf("expected confirmation threshold to be uint8")
+		}
+		return castThreshold, nil
+	}
+
+	// confirmation threshold wasn't cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from address: %w", err)
+	}
+
+	securityThresholds, err := certVerifierCaller.SecurityThresholds(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get security thresholds via contract call: %w", err)
+	}
+
+	cv.confirmationThresholds.Store(certVerifierAddress, securityThresholds.ConfirmationThreshold)
+
+	return securityThresholds.ConfirmationThreshold, nil
+}
+
+// GetCertVersion returns the CertVersion that corresponds to the input reference block number.
+//
+// This method will return the version from an internal cache if it is already known for the cert
+// verifier which corresponds to the input reference block number. Otherwise, this method will query the version
+// and cache the result for future use.
+func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	// if the version for the active cert verifier address has already been cached, return it immediately
+	cachedVersion, ok := cv.versions.Load(certVerifierAddress)
+	if ok {
+		castVersion, ok := cachedVersion.(uint8)
+		if !ok {
+			return 0, fmt.Errorf("expected version to be uint64")
+		}
+		return castVersion, nil
+	}
+
+	// version wasn't cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromAddress(certVerifierAddress)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from address: %w", err)
+	}
+
+	version, err := certVerifierCaller.CertVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get version via contract call: %w", err)
+	}
+
+	cv.versions.Store(certVerifierAddress, version)
+
+	return version, nil
 }

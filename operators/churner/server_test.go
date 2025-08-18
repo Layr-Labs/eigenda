@@ -11,10 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,7 +27,7 @@ var (
 	quorumIds                      = []uint32{0, 1}
 	logger                         = testutils.GetLogger()
 	transactorMock                 = &coremock.MockWriter{}
-	mockIndexer                    = &indexermock.MockIndexedChainState{}
+	mockIndexer                    = &coremock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -53,29 +51,29 @@ func TestChurn(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
-		[]byte(request.OperatorAddress),
-		request.OperatorToRegisterPubkeyG1,
-		request.OperatorToRegisterPubkeyG2,
-		request.Salt,
+		[]byte(request.GetOperatorAddress()),
+		request.GetOperatorToRegisterPubkeyG1(),
+		request.GetOperatorToRegisterPubkeyG2(),
+		request.GetSalt(),
 	)
 	copy(requestHash[:], requestHashBytes)
 
 	signature := keyPair.SignMessage(requestHash)
 	request.OperatorRequestSignature = signature.Serialize()
 
-	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&dacore.IndexedOperatorInfo{
 		PubkeyG1: keyPair.PubKey,
 	}, nil)
 
 	reply, err := s.Churn(ctx, request)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply)
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetSalt())
-	assert.NotNil(t, reply.SignatureWithSaltAndExpiry.GetExpiry())
-	assert.Equal(t, expectedReplySignature, reply.SignatureWithSaltAndExpiry.GetSignature())
-	assert.Equal(t, 2, len(reply.OperatorsToChurn))
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
+	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetExpiry())
+	assert.Equal(t, expectedReplySignature, reply.GetSignatureWithSaltAndExpiry().GetSignature())
+	assert.Equal(t, 2, len(reply.GetOperatorsToChurn()))
 	actualQuorums := make([]uint32, 0)
-	for _, param := range reply.OperatorsToChurn {
+	for _, param := range reply.GetOperatorsToChurn() {
 		actualQuorums = append(actualQuorums, param.GetQuorumId())
 		if param.GetQuorumId() == 0 {
 			// no churning for quorum 0
@@ -111,16 +109,16 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	var requestHash [32]byte
 	requestHashBytes := crypto.Keccak256(
 		[]byte("ChurnRequest"),
-		request.OperatorToRegisterPubkeyG1,
-		request.OperatorToRegisterPubkeyG2,
-		request.Salt,
+		request.GetOperatorToRegisterPubkeyG1(),
+		request.GetOperatorToRegisterPubkeyG2(),
+		request.GetSalt(),
 	)
 	copy(requestHash[:], requestHashBytes)
 
 	signature := keyPair.SignMessage(requestHash)
 	request.OperatorRequestSignature = signature.Serialize()
 
-	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&dacore.IndexedOperatorInfo{
 		PubkeyG1: keyPair.PubKey,
 	}, nil)
 
@@ -165,7 +163,7 @@ func setupMockWriter() {
 
 func newTestServer(t *testing.T) *churner.Server {
 	config := &churner.Config{
-		LoggerConfig: common.DefaultLoggerConfig(),
+		LoggerConfig: *common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,

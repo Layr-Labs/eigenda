@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -18,13 +16,14 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -45,13 +44,13 @@ type DispersalServerV2 struct {
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
-	chainReader   core.Reader
-	authenticator corev2.BlobRequestAuthenticator
-	prover        encoding.Prover
-	logger        logging.Logger
+	chainReader              core.Reader
+	blobRequestAuthenticator corev2.BlobRequestAuthenticator
+	prover                   encoding.Prover
+	logger                   logging.Logger
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
@@ -60,22 +59,27 @@ type DispersalServerV2 struct {
 
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
+
+	// ReservedOnly mode doesn't support on-demand payments
+	// This would be removed with decentralized ratelimiting
+	ReservedOnly bool
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	blobStore *blobstore.BlobStore,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
-	authenticator corev2.BlobRequestAuthenticator,
+	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
+	ReservedOnly bool,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -89,8 +93,8 @@ func NewDispersalServerV2(
 	if chainReader == nil {
 		return nil, errors.New("chain reader is required")
 	}
-	if authenticator == nil {
-		return nil, errors.New("authenticator is required")
+	if blobRequestAuthenticator == nil {
+		return nil, errors.New("blobRequestAuthenticator is required")
 	}
 	if prover == nil {
 		return nil, errors.New("prover is required")
@@ -109,17 +113,19 @@ func NewDispersalServerV2(
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
-		chainReader:   chainReader,
-		authenticator: authenticator,
-		meterer:       meterer,
-		prover:        prover,
-		logger:        logger,
+		chainReader:              chainReader,
+		blobRequestAuthenticator: blobRequestAuthenticator,
+		meterer:                  meterer,
+		prover:                   prover,
+		logger:                   logger,
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
+
+		ReservedOnly: ReservedOnly,
 	}, nil
 }
 
@@ -130,6 +136,12 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	// Serve grpc requests
+	keepAliveConfig := grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle:     s.serverConfig.MaxIdleConnectionAge,
+		MaxConnectionAge:      s.serverConfig.MaxConnectionAge,
+		MaxConnectionAgeGrace: s.serverConfig.MaxConnectionAgeGrace,
+	})
+
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -137,8 +149,10 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-
-	gs := grpc.NewServer(opt, s.metrics.grpcServerOption)
+	gs := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			s.metrics.grpcMetrics.UnaryServerInterceptor(),
+		), opt, keepAliveConfig)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 
@@ -187,12 +201,13 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 	if s.prover == nil {
 		return nil, api.NewErrorUnimplemented()
 	}
-	blobSize := len(req.GetBlob())
+	blobSize := uint(len(req.GetBlob()))
 	if blobSize == 0 {
 		return nil, api.NewErrorInvalidArg("data is empty")
 	}
-	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes",
+			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
 	}
 	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
@@ -255,7 +270,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	onchainState := &OnchainState{
 		QuorumCount:           quorumCount,
 		RequiredQuorums:       requiredQuorums,
-		BlobVersionParameters: v2.NewBlobVersionParameterMap(blobParams),
+		BlobVersionParameters: corev2.NewBlobVersionParameterMap(blobParams),
 		TTL:                   time.Duration((storeDurationBlocks+blockStaleMeasure)*12) * time.Second,
 	}
 
@@ -273,10 +288,14 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
-	accountID := gethcommon.HexToAddress(req.AccountId)
+	if !gethcommon.IsHexAddress(req.GetAccountId()) {
+		return nil, api.NewErrorInvalidArg("invalid account ID")
+	}
+
+	accountID := gethcommon.HexToAddress(req.GetAccountId())
 
 	// validate the signature
-	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
+	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
@@ -289,12 +308,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, req.AccountId, currentReservationPeriod)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 

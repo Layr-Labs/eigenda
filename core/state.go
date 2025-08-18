@@ -96,6 +96,9 @@ type OperatorInfo struct {
 	Stake StakeAmount
 	// Index is the index of the operator within the quorum
 	Index OperatorIndex
+	// Socket is the socket address of the operator
+	// Populated only when using GetOperatorStateWithSocket; otherwise it is an empty string
+	Socket OperatorSocket
 }
 
 // OperatorState contains information about the current state of operators which is stored in the blockchain state
@@ -173,6 +176,7 @@ type IndexedOperatorState struct {
 type ChainState interface {
 	GetCurrentBlockNumber(ctx context.Context) (uint, error)
 	GetOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
+	GetOperatorStateWithSocket(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
 	GetOperatorSocket(ctx context.Context, blockNumber uint, operator OperatorID) (string, error)
 }

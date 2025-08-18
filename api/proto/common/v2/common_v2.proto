@@ -1,26 +1,44 @@
 syntax = "proto3";
 package common.v2;
+
 import "common/common.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common/v2";
 
 // BlobHeader contains the information describing a blob and the way it is to be dispersed.
 message BlobHeader {
-  // The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
-  // maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
-  // are checked against supplied or default security thresholds to validate the security assumptions of the
-  // blob's availability.
-  uint32 version = 1;
-  // quorum_numbers is the list of quorum numbers that the blob is part of.
-  // Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
+  // The BlobParams version to use when encoding the blob into chunks to be dispersed to operators.
   //
-  // On-demand dispersal is currently limited to using a subset of the following quorums:
+  // BlobParams versions are pushed onchain to the EigenDAThresholdRegistry by EigenDA governance in an append only fashion
+  // and store the maximum number of operators, number of chunks, and coding rate for a blob.
+  //
+  // A user can choose any of the onchain defined VersionedBlobParams, and must make sure to choose SecurityThresholds in its CertVerifier contract
+  // that along with the chosen VersionedBlobParams satisfy the checkSecurityParams function: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L188
+  // This function is called internally by the CertVerifier's checkDACert function.
+  //
+  // If a version that is not available on the ThresholdRegistry is chosen, the disperser will return an error.
+  //
+  // EigenDA maintained:
+  //   VersionedBlobParams definition: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/core/libraries/v1/EigenDATypesV1.sol#L7
+  //   IEigenDAThresholdRegistry (stores the BlobParams): https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/core/interfaces/IEigenDAThresholdRegistry.sol
+  //   EigenDAServiceManager address (implements IEigenDAThresholdRegistry): https://docs.eigenda.xyz/networks/mainnet#contract-addresses
+  // Rollup maintained:
+  //   SecurityThresholds interface: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/interfaces/IEigenDACertVerifier.sol#L23
+  //   checkDACert interface: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol#L8
+  uint32 version = 1;
+  // quorum_numbers is the list of quorum numbers that the blob shall be dispersed to.
+  // Each quorum will store the data independently, meaning that additional quorum numbers increase redundancy, making the blob more likely to be retrievable.
+  // Each quorum requires separate payment.
+  //
+  // On-demand bandwidth dispersals do not currently support custom quorums and hence are limited to dispersing to one or two of the following quorums only:
   // - 0: ETH
   // - 1: EIGEN
-  // 
-  // Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation. 
-  // Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
+  //
+  // Reserved-bandwidth dispersal do support custom quorums, as long as they are reserved onchain ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
+  // Users can check their reserved quorum numbers on the IPaymentVault's reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
   repeated uint32 quorum_numbers = 2;
-  // commitment is the KZG commitment to the blob
+  // commitment is the KZG commitment to the blob.
+  // This commitment can either be constructed locally, or obtained by using the disperser's GetBlobCommitment RPC (see disperser_v2.proto).
   common.BlobCommitment commitment = 3;
   // payment_header contains payment information for the blob
   PaymentHeader payment_header = 4;
@@ -60,71 +78,82 @@ message Batch {
   repeated BlobCertificate blob_certificates = 2;
 }
 
-// PaymentHeader contains payment information for a blob.
-// At least one of reservation_period or cumulative_payment must be set, and reservation_period 
-// is always considered before cumulative_payment. If reservation_period is set but not valid, 
-// the server will reject the request and not proceed with dispersal. If reservation_period is not set 
-// and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
-// Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
-// Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.
-// If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next 
-// multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
+// PaymentHeader contains payment information for a blob. Reservation parameters and on-demand deposits are tracked
+// on-chain in the PaymentVault contract:
+// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol
+//
+// Two payment methods are supported:
+// 1. Reservation:
+//    - Users reserve bandwidth in advance for a specified time period.
+//    - Reservations are procured out-of-band, and are set in the PaymentVault by the EigenFoundation.
+// 2. On-demand:
+//    - Users pay for each dispersal individually from funds deposited into the PaymentVault, by specifying a
+//    cumulative payment.
+//    - On-demand payments are limited to quorums 0 and 1.
+//    - On-demand payments can only be used when dispersing through the EigenDA disperser. Currently, the EigenDA
+//      disperser is the *only* disperser, but this restriction will remain in place even with decentralized dispersal.
+//
+// For payment calculations, dispersals have a minimum size of minNumSymbols, defined in the PaymentVault. Smaller blobs
+// are billed as `minNumSymbols`.
+//
+// The cost of an on-demand dispersal is calculated by multiplying the number of blob symbols by the pricePerSymbol
+// defined in the PaymentVault.
+//
+// Note: the quorum set being dispersed to has no impact on payment accounting with the current implementation.
+//
+// TODO(litt3): the current payment usage source-of-truth is the EigenDA disperser: reservation usage and latest
+// cumulative payment is persistently stored there. Once decentralized dispersal has been implemented, the validator
+// nodes will become the source-of-truth for reservation usage, but the EigenDA disperser will remain the
+// source-of-truth for on-demand usage.
+//
+// TODO(litt3): once accounting logic has been properly abstracted, put a link here to provide specific documentation of
+// how payments are processed.
 message PaymentHeader {
-  // The account ID of the disperser client. This account ID is an eth wallet address of the user,
-  // corresponding to the key used by the client to sign the BlobHeader.
-  string account_id = 1;
-  
-  // The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request, 
-  // and will be used to determine the reservation period, and compared against the reservation active start and end timestamps 
-  // On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision.
-  // If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected.
-  // The reservation period of the dispersal request is used for rate-limiting the user's account against their dedicated 
-  // bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
-  // on-chain record of reserved bandwidth for the user for some period of time. The dispersal client's accountant will set 
-  // this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request 
-  // to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches 
-  // either the current or the previous period.
+  // The account ID of the dispersing user, represented as an Ethereum wallet address in hex format (0x prefix optional)
   //
-  // Example Usage Flow:
-  //   1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp,
-  //      endTimestamp, and reservationPeriodInterval.
-  //   2. When sending a dispersal request at time t, the client fill in the timestamp field with t.
-  //   3. The disperser take timestamp t and checks the reservation period and the user's bandwidth capacity:
-  //       - If the reservation is active (t >= startTimestamp and t < endTimestamp).
-  //       - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
-  //         (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
-  //       - The request is ratelimited against the current reservation period, and calculated as reservation_period = t / reservationPeriodInterval.
-  //         the request's reservation period must either be the disperser server's current reservation period or the previous reservation period. 
-  //   4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
-  //       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
-  //       - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin.
-  //       - If the bandwidth has already been exhausted, the request is rejected. 
-  //   5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records.
-  //      Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 
-  //   6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand.
+  // This is the unique key which identifies the reservation to use, or the on-demand payment account to debit.
+  //
+  // The account ID must correspond to the key used to sign the dispersal request for the payment to be valid.
+  string account_id = 1;
+
+  // The timestamp represents the nanosecond UNIX timestamp at the time the dispersal request is created.
+  //
+  // The timestamp plays the role of a nonce, optionally allowing the same blob data to be dispersed multiple times
+  // while still having a unique blob header hash (which is used as an idempotency key).
+  //
+  // When dealing with reservations, the timestamp determines which reservation bucket the dispersal falls into.
+  // TODO(litt3): there is an ongoing effort to use a leaky bucket algorithm instead of a fixed window algorithm to
+  // track reservation usage. The timestamp is currently used for the fixed window algorithm, but will not be part of
+  // the leaky bucket algorithm. Even after this change, the timestamp should still be populated.
+  //
+  // The timestamp is currently unused in the context of on-demand payments, but this is subject to change without
+  // notice! Failure to populate this with a proper timestamp could result in failed dispersals and loss of associated
+  // payments.
   int64 timestamp = 2;
 
-  // Cumulative payment is the total amount of tokens paid by the requesting account, including the current request.
-  // This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits
-  // as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total, 
-  // requests can arrive out of order and still unambiguously declare how much of the on-chain deposit can be deducted.
+  // The cumulative_payment field is a variable-sized big endian unsigned integer, representing the total wei paid by
+  // the account for this and all previous dispersals.
+  // TODO(litt3): we ought to limit the max size of this field to 32 bytes (256-bit unsigned int), but this isn't
+  // currently being checked. This will be fixed during the ongoing accounting reimplementation.
   //
-  // Example Decision Flow:
-  //   1. In the set up phase, the user must deposit tokens into the EigenDA PaymentVault contract. The payment vault contract
-  //    specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for 
-  //    on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage. 
-  //    The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs 
-  //    out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, 
-  //    the server will only refresh every few minutes for the top-up to take effect.
-  //   2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
-  //   3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the 
-  //    payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on 
-  //    protocol defined pricing.
-  //   4. They take the sum of previousCumPmt + new incremental payment and place it in the “cumulative_payment” field.
-  //   5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment 
-  //    and smallest later payment if exists).
-  //   6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected.
+  // For example, assume a new user begins dispersing blobs with on-demand payments, and each blob costs 100 wei. For
+  // the first dispersed blob, the cumulative_payment would be set to 100. For the second, 200. Then 300, and so on.
   //
+  // If this field is *not* set, or is zero, reservation accounting will be used. If this field *is* set, and non-zero,
+  // on-demand accounting will be used EVEN IF a given account has a reservation. There is no fallback between these
+  // payment mechanisms: the dispersal will either succeed or fail on the basis of the implicitly defined payment
+  // mechanism, regardless of whether the alternate mechanism would have succeeded.
+  //
+  // Since the cumulative payment covers all historical on-demand dispersals, a client starting up must obtain the
+  // value of the latest cumulative payment for its account via the GetPaymentState disperser RPC.
+  //
+  // IMPORTANT: With the current implementation, the cumulative payment of dispersals must be strictly increasing from
+  // the perspective of the entity doing the accounting. If a given cumulative payment X is <= the cumulative payment
+  // of a previous dispersal, then X is considered to be invalid. The implication is that a user must not behave in any
+  // way that could result in payments being processed out of order, or risk dispersals failing without refund. In
+  // practice, that means waiting for confirmation from the disperser that a blob has been received before submitting
+  // the next blob.
+  // TODO(litt3): to weaken this requirement, the accounting logic would need to be modified, such that up to `n`
+  // recent on-demand payments are tracked, allowing for safe dispersal of up to `n` concurrent on-demand blobs.
   bytes cumulative_payment = 3;
-
 }
