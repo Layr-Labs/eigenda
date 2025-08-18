@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.12;
 
-import {IRegistryCoordinator} from "./interfaces/IRegistryCoordinator.sol";
-import {ISocketRegistry} from "./interfaces/ISocketRegistry.sol";
-import {IBLSApkRegistry} from "./interfaces/IBLSApkRegistry.sol";
-import {IStakeRegistry} from "./interfaces/IStakeRegistry.sol";
-import {IIndexRegistry} from "./interfaces/IIndexRegistry.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {ISocketRegistry} from "lib/eigenlayer-middleware/src/interfaces/ISocketRegistry.sol";
+import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IIndexRegistry} from "lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 
-import {BitmapUtils} from "./libraries/BitmapUtils.sol";
+import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 
 /**
- * @title OperatorStateRetriever with view functions that allow to retrieve the state of an AVSs registry system.
+ * @title EigenDAReader A stateless contract that provides getters used in EigenDA
  * @author Layr Labs Inc.
  */
-contract OperatorStateRetriever {
+contract EigenDAGetters {
     struct Operator {
         address operator;
         bytes32 operatorId;

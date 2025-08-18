@@ -4,12 +4,16 @@ out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read-write", path = "./" }]
 
+[lint]
+severity = ["high"]
+exclude_lints = ["erc20-unchecked-transfer"]
+
 # We force all warnings to be fixed
 deny_warnings = true
 # We error warnings from libraries. This should be fixed upstream but I'm lazy.
 # See https://github.com/ethereum/solidity/issues/2675 for an interesting discussion.
 ignored_warnings_from = [
-    "lib/eigenlayer-middleware/src/RegistryCoordinator.sol",
+    "lib/eigenlayer-middleware/*"
 ]
 
 gas_reports = ["*"]
