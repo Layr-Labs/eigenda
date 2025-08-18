@@ -1,4 +1,4 @@
-package ondemand
+package ephemeral
 
 import (
 	"context"

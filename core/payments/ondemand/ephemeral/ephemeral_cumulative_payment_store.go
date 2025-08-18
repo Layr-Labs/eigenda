@@ -1,9 +1,11 @@
-package ondemand
+package ephemeral
 
 import (
 	"context"
 	"fmt"
 	"math/big"
+
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 )
 
 // Implements the CumulativePaymentStore interface, by storing values in memory
@@ -16,7 +18,7 @@ type EphemeralCumulativePaymentStore struct {
 	cumulativePayment *big.Int
 }
 
-var _ CumulativePaymentStore = (*EphemeralCumulativePaymentStore)(nil)
+var _ ondemand.CumulativePaymentStore = (*EphemeralCumulativePaymentStore)(nil)
 
 // Constructs a new in-memory cumulative payment store
 func NewEphemeralCumulativePaymentStore() *EphemeralCumulativePaymentStore {
