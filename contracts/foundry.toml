@@ -4,7 +4,7 @@ out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read-write", path = "./" }]
 
-[lint]
+[profile.lint]
 severity = ["high"]
 exclude_lints = ["erc20-unchecked-transfer"]
 
