@@ -606,7 +606,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
-		*blobKey,
+		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
 		uint32(blobLengthSymbols),

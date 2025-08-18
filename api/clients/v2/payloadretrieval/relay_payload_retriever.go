@@ -165,7 +165,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
-	blobKey *core.BlobKey,
+	blobKey core.BlobKey,
 	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
 	blobLengthSymbols uint32,
 ) (*coretypes.Blob, error) {
@@ -174,7 +174,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	defer cancel()
 
 	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
-	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
+	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 	if err != nil {
 		return nil, fmt.Errorf("get blob from relay: %w", err)
 	}
