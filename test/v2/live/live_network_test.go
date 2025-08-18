@@ -500,7 +500,13 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	}
 
 	accountant := clients.NewUnpopulatedAccountant(accountId, metrics.NoopAccountantMetrics)
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, accountant, metrics.NoopDispersalMetrics)
+	disperserClient, err := clients.NewDisperserClient(
+		disperserConfig,
+		signer,
+		nil,
+		accountant,
+		metrics.NoopDispersalMetrics,
+	)
 	require.NoError(t, err)
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)

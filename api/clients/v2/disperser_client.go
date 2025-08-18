@@ -103,6 +103,7 @@ func NewDisperserClient(
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 	if metrics == nil {
+		// nolint:wrapcheck
 		return nil, api.NewErrorInvalidArg("metrics must be provided")
 	}
 
