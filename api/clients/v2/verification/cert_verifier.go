@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -105,6 +106,60 @@ func (cv *CertVerifier) CheckDACert(
 		}
 	}
 	return nil
+}
+
+// EstimateGasCheckDACert uses eth_estimateGas to estimate the gas requirements for CheckDACert.
+func (cv *CertVerifier) EstimateGasCheckDACert(
+	ctx context.Context,
+	cert coretypes.EigenDACert,
+) (uint64, error) {
+	var certV3 *coretypes.EigenDACertV3
+	var err error
+	switch cert := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		certV3 = cert
+	case *coretypes.EigenDACertV2:
+		certV3 = cert.ToV3()
+	default:
+		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
+			"construct offchain should have a CertVerifier contract which we can call to "+
+			"verify the certificate", cert))
+	}
+
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(
+		ctx,
+		certV3.ReferenceBlockNumber(),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return 0, fmt.Errorf("serialize cert: %w", err)
+	}
+
+	// Pack the checkDACert method call data
+	abi, err := certVerifierBinding.ContractEigenDACertVerifierMetaData.GetAbi()
+	if err != nil {
+		return 0, fmt.Errorf("get contract ABI: %w", err)
+	}
+
+	callData, err := abi.Pack("checkDACert", certBytes)
+	if err != nil {
+		return 0, fmt.Errorf("pack checkDACert call data: %w", err)
+	}
+
+	// Estimate gas using eth_estimateGas
+	gasEstimate, err := cv.ethClient.EstimateGas(ctx, ethereum.CallMsg{
+		To:   &certVerifierAddress,
+		Data: callData,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("estimate gas for checkDACert: %w", err)
+	}
+
+	return gasEstimate, nil
 }
 
 // GetQuorumNumbersRequired returns the set of quorum numbers that must be set in the BlobHeader, and verified in
