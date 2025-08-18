@@ -233,7 +233,7 @@ func RunController(ctx *cli.Context) error {
 		gethClient,
 		ics,
 		registryCoordinatorAddress,
-		time.Minute, // TODO config
+		config.DispatcherConfig.BatchMetadataUpdatePeriod,
 		config.DispatcherConfig.FinalizationBlockDelay,
 	)
 	if err != nil {
