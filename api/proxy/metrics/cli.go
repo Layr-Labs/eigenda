@@ -85,10 +85,9 @@ func ReadConfig(ctx *cli.Context) Config {
 
 // NewSubcommands is used by `doc metrics` to output all supported metrics to
 // stdout. For metrics to be included in the output they need to be created
-// using the factory defined in `api/clients/v2/metrics/metrics.go`, and the
-// metrics interface must have a `Document()` func. See interfaces and structs
-// defined in `api/clients/v2/metrics` or `api/proxy/metrics/metrics.go` for
-// supported usage.
+// using the factory defined in `common/metrics.go`, and the metrics interface
+// must have a `Document()` func. See interfaces and structs defined in
+// `api/clients/v2/metrics` or `api/proxy/metrics/metrics.go` for usage.
 func NewSubcommands() cli.Commands {
 	return cli.Commands{
 		{
@@ -96,11 +95,11 @@ func NewSubcommands() cli.Commands {
 			Usage: "Dumps a list of supported metrics to stdout",
 			Action: func(*cli.Context) error {
 				registry := prometheus.NewRegistry()
-				proxyMetrics := NewMetrics(registry).Document()
-				accountantMetrics := metrics.NewAccountantMetrics(registry).Document()
-				dispersalMetrics := metrics.NewDispersalMetrics(registry).Document()
-
-				supportedMetrics := slices.Concat(proxyMetrics, accountantMetrics, dispersalMetrics)
+				supportedMetrics := slices.Concat(
+					NewMetrics(registry).Document(),
+					metrics.NewAccountantMetrics(registry).Document(),
+					metrics.NewDispersalMetrics(registry).Document(),
+				)
 
 				table := tablewriter.NewWriter(os.Stdout)
 				table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
