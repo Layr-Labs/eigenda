@@ -46,7 +46,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 			Signature:  req.GetSignature(),
 		})
 		if err != nil {
-			return nil, api.NewErrorResourceExhausted(fmt.Sprintf("payment authorization failed: %v", err))
+			// Pass through the structured error from the controller
+			return nil, err
 		}
 	} else {
 		// s.controllerClient is nil, so use the old logic
