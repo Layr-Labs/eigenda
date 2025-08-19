@@ -56,18 +56,17 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 
 // handleGetOPGenericCommitment handles the GET request for optimism generic commitments.
 func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
-	return svr.handleGetShared(w, r, commitments.OptimismGenericCommitmentMode)
+	return svr.handleGetShared(w, r)
 }
 
 // handleGetStdCommitment handles the GET request for std commitments.
 func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
-	return svr.handleGetShared(w, r, commitments.StandardCommitmentMode)
+	return svr.handleGetShared(w, r)
 }
 
 func (svr *Server) handleGetShared(
 	w http.ResponseWriter,
 	r *http.Request,
-	mode commitments.CommitmentMode,
 ) error {
 	certVersion, err := parseCertVersion(w, r)
 	if err != nil {
@@ -108,8 +107,7 @@ func (svr *Server) handleGetShared(
 			versionedCert.Version, serializedCertHex, err)
 	}
 
-	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path,
-		"commitmentMode", mode, "returnEncodedPayload", returnEncodedPayload,
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "returnEncodedPayload", returnEncodedPayload,
 		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
 
 	_, err = w.Write(payloadOrEncodedPayload)
