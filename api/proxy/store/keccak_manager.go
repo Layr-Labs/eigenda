@@ -12,7 +12,11 @@ import (
 
 //go:generate mockgen -package mocks --destination ../test/mocks/keccak_manager.go . IKeccakManager
 
-// IKeccakManager handles keccak/S3 operations
+// IKeccakManager handles optimism keccak256 commitments, storing them in S3.
+// These commitments are provided either for rollups that were using them initially,
+// and are in the process of migrating to EigenDA, or potentially as a temporary failover storage layer
+// in case EigenDA is down. Failover to Keccak commitments is currently not supported by our op-fork however.
+// See https://github.com/Layr-Labs/optimism?tab=readme-ov-file#2-failover-for-liveness for latest details.
 type IKeccakManager interface {
 	// See [KeccakManager.PutOPKeccakPairInS3]
 	PutOPKeccakPairInS3(ctx context.Context, key []byte, value []byte) error
@@ -20,7 +24,8 @@ type IKeccakManager interface {
 	GetOPKeccakValueFromS3(ctx context.Context, key []byte) ([]byte, error)
 }
 
-// KeccakManager handles keccak/S3 operations
+// KeccakManager handles optimism keccak256 commitments, storing them in S3.
+// It is the only implementation for [IKeccakManager].
 type KeccakManager struct {
 	log logging.Logger
 	s3  *s3.Store // for op keccak256 commitment
