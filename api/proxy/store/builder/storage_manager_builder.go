@@ -48,17 +48,15 @@ import (
 	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 )
 
-// BuildStoreManager is the main builder for proxy's store.
-// It builds all the different store clients, and injects them into
-// a new store manager, which it returns when successful.
-func BuildStoreManager(
+// BuildManagers builds separate cert and keccak managers
+func BuildManagers(
 	ctx context.Context,
 	log logging.Logger,
 	metrics metrics.Metricer,
 	config Config,
 	secrets common.SecretConfigV2,
 	registry *prometheus.Registry,
-) (*store.Manager, error) {
+) (*store.CertManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
 	var redisStore *redis.Store
@@ -69,7 +67,7 @@ func BuildStoreManager(
 		log.Info("Using S3 storage backend")
 		s3Store, err = s3.NewStore(config.S3Config)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -77,7 +75,7 @@ func BuildStoreManager(
 		log.Info("Using Redis storage backend")
 		redisStore, err = redis.NewStore(&config.RedisConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -85,9 +83,9 @@ func BuildStoreManager(
 	v2Enabled := slices.Contains(config.StoreConfig.BackendsToEnable, common.V2EigenDABackend)
 
 	if config.StoreConfig.DispersalBackend == common.V2EigenDABackend && !v2Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
+		return nil, nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
 	} else if config.StoreConfig.DispersalBackend == common.V1EigenDABackend && !v1Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
+		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
 	var kzgVerifier *kzgverifier.Verifier
@@ -105,7 +103,7 @@ func BuildStoreManager(
 
 		kzgVerifier, err = kzgverifier.NewVerifier(&kzgConfig, nil)
 		if err != nil {
-			return nil, fmt.Errorf("new kzg verifier: %w", err)
+			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 		}
 	}
 
@@ -113,7 +111,7 @@ func BuildStoreManager(
 		log.Info("Building EigenDA v1 storage backend")
 		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
 		if err != nil {
-			return nil, fmt.Errorf("build v1 backend: %w", err)
+			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
 		}
 	}
 
@@ -121,7 +119,7 @@ func BuildStoreManager(
 		log.Info("Building EigenDA v2 storage backend")
 		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
 		if err != nil {
-			return nil, fmt.Errorf("build v2 backend: %w", err)
+			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
 	}
 
@@ -149,14 +147,23 @@ func BuildStoreManager(
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
-	return store.NewManager(
+	certMgr, err := store.NewCertManager(
 		eigenDAV1Store,
 		eigenDAV2Store,
-		s3Store,
 		log,
 		secondary,
 		config.StoreConfig.DispersalBackend,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create cert manager: %w", err)
+	}
+
+	keccakMgr, err := store.NewKeccakManager(s3Store, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create keccak manager: %w", err)
+	}
+
+	return certMgr, keccakMgr, nil
 }
 
 // buildSecondaries ... Creates a slice of secondary targets used for either read

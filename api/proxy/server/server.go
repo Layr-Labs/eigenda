@@ -37,7 +37,8 @@ func (c *Config) IsAPIEnabled(apiType string) bool {
 type Server struct {
 	log        logging.Logger
 	endpoint   string
-	sm         store.IManager
+	certMgr    store.ICertManager
+	keccakMgr  store.IKeccakManager
 	m          metrics.Metricer
 	httpServer *http.Server
 	listener   net.Listener
@@ -46,17 +47,19 @@ type Server struct {
 
 func NewServer(
 	cfg Config,
-	sm store.IManager,
+	certMgr store.ICertManager,
+	keccakMgr store.IKeccakManager,
 	log logging.Logger,
 	m metrics.Metricer,
 ) *Server {
 	endpoint := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	return &Server{
-		m:        m,
-		log:      log,
-		endpoint: endpoint,
-		sm:       sm,
-		config:   cfg,
+		m:         m,
+		log:       log,
+		endpoint:  endpoint,
+		certMgr:   certMgr,
+		keccakMgr: keccakMgr,
+		config:    cfg,
 		httpServer: &http.Server{
 			Addr:              endpoint,
 			ReadHeaderTimeout: 10 * time.Second,
@@ -113,7 +116,7 @@ func (svr *Server) Stop() error {
 
 // SetDispersalBackend configures which version of eigenDA the server disperses to
 func (svr *Server) SetDispersalBackend(backend common.EigenDABackend) {
-	svr.sm.SetDispersalBackend(backend)
+	svr.certMgr.SetDispersalBackend(backend)
 }
 
 func (svr *Server) Port() int {

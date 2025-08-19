@@ -18,7 +18,8 @@ import (
 func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockStorageMgr := mocks.NewMockIManager(ctrl)
+	mockCertManager := mocks.NewMockICertManager(ctrl)
+	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
 
 	// Test with admin endpoints disabled - they should not be accessible
 	t.Run("Admin Endpoints Disabled", func(t *testing.T) {
@@ -34,7 +35,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		r := mux.NewRouter()
-		server := NewServer(adminDisabledCfg, mockStorageMgr, testLogger, metrics.NoopMetrics)
+		server := NewServer(adminDisabledCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 		server.RegisterRoutes(r)
 		r.ServeHTTP(rec, req)
 
@@ -45,7 +46,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints enabled
 	t.Run("Admin Endpoints Enabled", func(t *testing.T) {
 		// Initial state is false
-		mockStorageMgr.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
+		mockCertManager.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
 		// Test GET endpoint first to verify initial state
 		t.Run("Get EigenDA Dispersal Backend", func(t *testing.T) {
@@ -53,7 +54,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			r := mux.NewRouter()
-			server := NewServer(testCfg, mockStorageMgr, testLogger, metrics.NoopMetrics)
+			server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -81,7 +82,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			r := mux.NewRouter()
-			server := NewServer(testCfg, mockStorageMgr, testLogger, metrics.NoopMetrics)
+			server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -98,14 +99,14 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 			jsonBody, err := json.Marshal(requestBody)
 			require.NoError(t, err)
 
-			mockStorageMgr.EXPECT().SetDispersalBackend(common.V2EigenDABackend)
-			mockStorageMgr.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
+			mockCertManager.EXPECT().SetDispersalBackend(common.V2EigenDABackend)
+			mockCertManager.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
 
 			req := httptest.NewRequest(http.MethodPut, "/admin/eigenda-dispersal-backend", bytes.NewReader(jsonBody))
 			rec := httptest.NewRecorder()
 
 			r := mux.NewRouter()
-			server := NewServer(testCfg, mockStorageMgr, testLogger, metrics.NoopMetrics)
+			server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 

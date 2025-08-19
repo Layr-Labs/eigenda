@@ -37,7 +37,7 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 		return proxyerrors.NewParsingError(
 			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	payload, err := svr.sm.GetOPKeccakValueFromS3(r.Context(), keccakCommitment)
+	payload, err := svr.keccakMgr.GetOPKeccakValueFromS3(r.Context(), keccakCommitment)
 	if err != nil {
 		return fmt.Errorf("GET keccakCommitment %v: %w", keccakCommitmentHex, err)
 	}
@@ -95,10 +95,9 @@ func (svr *Server) handleGetShared(
 	// to decode the payload themselves inside the fpvm.
 	returnEncodedPayload := parseReturnEncodedPayloadQueryParam(r)
 
-	payloadOrEncodedPayload, err := svr.sm.Get(
+	payloadOrEncodedPayload, err := svr.certMgr.Get(
 		r.Context(),
 		versionedCert,
-		mode,
 		common.GETOpts{
 			L1InclusionBlockNum:  l1InclusionBlockNum,
 			ReturnEncodedPayload: returnEncodedPayload,
@@ -143,7 +142,7 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
 	}
 
-	err = svr.sm.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
+	err = svr.keccakMgr.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
 	if err != nil {
 		return fmt.Errorf("keccak POST request failed for commitment %v: %w", keccakCommitmentHex, err)
 	}
@@ -175,19 +174,19 @@ func (svr *Server) handlePostShared(
 		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
 	}
 
-	serializedCert, err := svr.sm.Put(r.Context(), mode, payload)
+	serializedCert, err := svr.certMgr.Put(r.Context(), payload)
 	if err != nil {
 		return fmt.Errorf("post request failed: %w", err)
 	}
 
 	var certVersion certs.VersionByte
-	switch svr.sm.GetDispersalBackend() {
+	switch svr.certMgr.GetDispersalBackend() {
 	case common.V1EigenDABackend:
 		certVersion = certs.V0VersionByte
 	case common.V2EigenDABackend:
 		certVersion = certs.V2VersionByte
 	default:
-		return fmt.Errorf("unknown dispersal backend: %v", svr.sm.GetDispersalBackend())
+		return fmt.Errorf("unknown dispersal backend: %v", svr.certMgr.GetDispersalBackend())
 	}
 	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
 
