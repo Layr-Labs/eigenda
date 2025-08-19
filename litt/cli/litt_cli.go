@@ -201,7 +201,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Value:   0,
 					},
 				},
-				Action: nil, // pushCommand, // TODO this will be added in a follow up PR
+				Action: pushCommand,
 			},
 			{ // TODO test in preprod
 				Name: "sync",
