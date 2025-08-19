@@ -14,7 +14,7 @@ type CumulativePaymentStore interface {
 	// May optionally support subtraction via negative amount parameter, depending on the implementation.
 	//
 	// Returns the new cumulative payment value after the addition.
-	// Returns An an [ondemand.InsufficientFundsError] if the addition would cause the cumulative payment to exceed
+	// Returns an [ondemand.InsufficientFundsError] if the addition would cause the cumulative payment to exceed
 	// the input maxCumulativePayment. In this case, the underlying cumulative payment value is not modified.
 	AddCumulativePayment(
 		ctx context.Context,
