@@ -13,7 +13,7 @@ import (
 //
 // On-demand payments use a cumulative payment system where, each time a dispersal is made, we keep track of the total
 // amount paid by the account for that and all previous dispersals. The cumulative payment is chosen by the client
-// based on the state of its local accounting, and the chosen value can be verified by all other parties by checking:
+// based on the state of its local accounting, and the chosen value can be verified by checking:
 // 1. that the claimed value is <= the total deposits belonging to the account in the PaymentVault contract
 // 2. that the value has increased by at least the cost of the dispersal from the previously observed value
 //
