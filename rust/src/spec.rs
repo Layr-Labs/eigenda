@@ -6,7 +6,6 @@ use alloy_consensus::{
 };
 use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, B256, FixedBytes, wrap_fixed_bytes};
-use alloy_rpc_types_eth::Header as RpcHeader;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
 use reth_trie_common::{AccountProof, proof::ProofVerificationError};
@@ -127,9 +126,9 @@ impl EthereumBlockHeader {
     }
 }
 
-impl From<RpcHeader> for EthereumBlockHeader {
-    fn from(header: RpcHeader) -> Self {
-        Self(header.inner)
+impl From<Header> for EthereumBlockHeader {
+    fn from(header: Header) -> Self {
+        Self(header)
     }
 }
 

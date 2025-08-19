@@ -16,10 +16,9 @@ use crate::{
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
 pub fn verify_cert_recency(
     header: &EthereumBlockHeader,
-    cert: &StandardCommitment,
+    referenced_height: u64,
     cert_recency_window: u64,
 ) -> Result<(), CertVerificationError> {
-    let referenced_height = cert.reference_block();
     let inclusion_height = header.height();
 
     let recency_height = referenced_height + cert_recency_window;
@@ -66,4 +65,153 @@ pub fn verify_blob(
     blob::verify();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spec::EthereumBlockHeader;
+    use alloy_consensus::Header;
+
+    /// Helper function to create a mock EthereumBlockHeader with a given height
+    fn create_mock_header(height: u64) -> EthereumBlockHeader {
+        let mut header = Header::default();
+        header.number = height;
+        EthereumBlockHeader::from(header)
+    }
+
+    #[test]
+    fn test_verify_cert_recency_success_within_window() {
+        let referenced_height = 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height + cert_recency_window; // exactly at the window boundary
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_cert_recency_success_before_window_expires() {
+        let referenced_height = 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height + cert_recency_window - 10; // well within the window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_cert_recency_success_same_block() {
+        let referenced_height = 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height; // included in the same block as reference
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_cert_recency_failure_window_missed() {
+        let referenced_height = 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height + cert_recency_window + 1; // one block past the window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_err());
+
+        if let Err(CertVerificationError::RecencyWindowMissed(actual_inclusion, expected_recency)) =
+            result
+        {
+            assert_eq!(actual_inclusion, inclusion_height);
+            assert_eq!(expected_recency, referenced_height + cert_recency_window);
+        } else {
+            panic!("Expected RecencyWindowMissed error");
+        }
+    }
+
+    #[test]
+    fn test_verify_cert_recency_failure_far_past_window() {
+        let referenced_height = 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height + cert_recency_window + 100; // far past the window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_err());
+
+        if let Err(CertVerificationError::RecencyWindowMissed(actual_inclusion, expected_recency)) =
+            result
+        {
+            assert_eq!(actual_inclusion, inclusion_height);
+            assert_eq!(expected_recency, referenced_height + cert_recency_window);
+        } else {
+            panic!("Expected RecencyWindowMissed error");
+        }
+    }
+
+    #[test]
+    fn test_verify_cert_recency_zero_window() {
+        let referenced_height = 100;
+        let cert_recency_window = 0;
+        let inclusion_height = referenced_height; // must be included in the same block
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_cert_recency_zero_window_failure() {
+        let referenced_height = 100;
+        let cert_recency_window = 0;
+        let inclusion_height = referenced_height + 1; // one block past zero window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_err());
+
+        if let Err(CertVerificationError::RecencyWindowMissed(actual_inclusion, expected_recency)) =
+            result
+        {
+            assert_eq!(actual_inclusion, inclusion_height);
+            assert_eq!(expected_recency, referenced_height + cert_recency_window);
+        } else {
+            panic!("Expected RecencyWindowMissed error");
+        }
+    }
+
+    #[test]
+    fn test_verify_cert_recency_large_window() {
+        let referenced_height = 1000;
+        let cert_recency_window = u64::MAX - referenced_height; // maximum possible window
+        let inclusion_height = referenced_height + 1000; // well within the large window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_cert_recency_edge_case_max_values() {
+        let referenced_height = u64::MAX - 100;
+        let cert_recency_window = 50;
+        let inclusion_height = referenced_height + 25; // within window
+
+        let header = create_mock_header(inclusion_height);
+
+        let result = verify_cert_recency(&header, referenced_height, cert_recency_window);
+        assert!(result.is_ok());
+    }
 }

@@ -185,7 +185,9 @@ impl EigenDaService {
             };
 
             // Verify certificate recency
-            if let Err(err) = verify_cert_recency(header, &cert, self.cert_recency_window) {
+            if let Err(err) =
+                verify_cert_recency(header, cert.reference_block(), self.cert_recency_window)
+            {
                 warn!(
                     ?header,
                     ?cert,
@@ -263,7 +265,7 @@ impl EigenDaService {
             .ok_or_else(|| EigenDaServiceError::AncestorMissing(block_height))?;
 
         Ok(AncestorMetadata {
-            header: EthereumBlockHeader::from(block.header),
+            header: EthereumBlockHeader::from(block.into_consensus_header()),
             data: None,
         })
     }
@@ -469,7 +471,7 @@ impl DaService for EigenDaService {
             }
         };
 
-        let header = EthereumBlockHeader::from(block.header.clone());
+        let header = EthereumBlockHeader::from(block.header.clone().into_consensus());
 
         // Iterate over transactions in the block and fetch sequencer relevant data
         let transactions_with_ancestors = self
@@ -501,7 +503,7 @@ impl DaService for EigenDaService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
 
-        Ok(EthereumBlockHeader::from(block.header))
+        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
     }
 
     /// Fetch the head block of the most popular fork.
@@ -518,7 +520,7 @@ impl DaService for EigenDaService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
 
-        Ok(EthereumBlockHeader::from(block.header))
+        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
     }
 
     /// Extract the relevant transactions from a block.

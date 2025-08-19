@@ -330,11 +330,11 @@ impl EigenDaInclusionProof {
                 let cert = extract_certificate(tx)?;
 
                 // Skipping cert with failed recency check
-                if verify_cert_recency(header, &cert, cert_recency_window).is_err() {
+                let referenced_height = cert.reference_block();
+                if verify_cert_recency(header, referenced_height, cert_recency_window).is_err() {
                     return None;
                 }
 
-                let referenced_height = cert.reference_block();
                 let Some(ancestor) =
                     get_ancestor(proven_ancestors, header.height(), referenced_height)
                 else {
