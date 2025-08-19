@@ -67,7 +67,7 @@ func RunController(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Reset readiness probe upon start-up
@@ -77,12 +77,12 @@ func RunController(ctx *cli.Context) error {
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
-		return err
+		return fmt.Errorf("failed to create geth client: %w", err)
 	}
 
 	contractDirectory, err := directory.NewContractDirectory(
@@ -116,7 +116,7 @@ func RunController(ctx *cli.Context) error {
 		operatorStateRetrieverAddress.Hex(),
 		serviceManagerAddress.Hex())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	metricsRegistry := prometheus.NewRegistry()
@@ -195,11 +195,11 @@ func RunController(ctx *cli.Context) error {
 			logger,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create indexer: %v", err)
 		}
 		ics, err = indexer.NewIndexedChainState(chainState, idx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create indexed chain state: %v", err)
 		}
 	}
 

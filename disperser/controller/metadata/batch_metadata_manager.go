@@ -29,7 +29,7 @@ type BatchMetadataManager interface {
 
 var _ BatchMetadataManager = (*batchMetadataManager)(nil)
 
-// A standard implementation of the BatchMetadataManager interface. Does all metadata fetching in a background\
+// A standard implementation of the BatchMetadataManager interface. Does all metadata fetching in a background
 // goroutine, guaranteeing that GetMetadata() never blocks.
 type batchMetadataManager struct {
 	ctx    context.Context
@@ -59,10 +59,12 @@ type batchMetadataManager struct {
 	alive atomic.Bool
 }
 
-// Create a new BatchMetadataManager with the specified quorums.
+// Create a new BatchMetadataManager.
 //
-// updatePeriod is the period at which the manager will update its metadata. Actual update timing may vary
-// depending on the amount of time it takes to successfully get new data.
+// This constructor does an initial blocking metadata fetch, so that any call to GetMetadata() after this constructor
+// returns can immediately return valid metadata. It also starts a background goroutine that periodically updates the
+// metadata at a rate defined by updatePeriod. Actual update timing may vary depending on the amount of time it
+// takes to successfully get new data.
 func NewBatchMetadataManager(
 	ctx context.Context,
 	logger logging.Logger,
@@ -113,7 +115,8 @@ func (m *batchMetadataManager) Close() {
 
 // Fetch the next reference block number (RBN) to use.
 func (m *batchMetadataManager) getNextReferenceBlockNumber() (uint64, error) {
-	// Get the latest block header to determine the current reference block number.
+	// Get the latest block header to find the latest block number,
+	// which we use to choose a good current reference block number.
 	latestHeader, err := m.ethClient.HeaderByNumber(m.ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get latest block header: %w", err)
@@ -161,6 +164,8 @@ func (m *batchMetadataManager) updateMetadata() error {
 	previousMetadata := m.metadata.Load()
 	if previousMetadata != nil && referenceBlockNumber < previousMetadata.referenceBlockNumber {
 		// Only update if the new RBN is greater than the most recent one.
+		m.logger.Errorf("new reference block number %d is not greater than the previous one %d, skipping update",
+			referenceBlockNumber, previousMetadata.referenceBlockNumber)
 		return nil
 	}
 
