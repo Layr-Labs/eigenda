@@ -24,6 +24,13 @@ type LocalStackContainer struct {
 
 // NewLocalStackContainer creates and starts a new LocalStack container
 func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*LocalStackContainer, error) {
+	return NewLocalStackContainerWithNetwork(ctx, config, "")
+}
+
+// NewLocalStackContainerWithNetwork creates and starts a new LocalStack container in a specific network
+func NewLocalStackContainerWithNetwork(
+	ctx context.Context, config LocalStackConfig, networkName string,
+) (*LocalStackContainer, error) {
 	if !config.Enabled {
 		return nil, fmt.Errorf("localstack container is disabled in config")
 	}
@@ -39,6 +46,11 @@ func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*Loca
 		Env:          env,
 		WaitingFor:   wait.ForListeningPort("4566/tcp"),
 		Name:         uniqueName,
+	}
+
+	// Add network if specified
+	if networkName != "" {
+		req.Networks = []string{networkName}
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

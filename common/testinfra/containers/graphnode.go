@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -31,17 +30,33 @@ type GraphNodeContainer struct {
 	postgres  testcontainers.Container
 	ipfs      testcontainers.Container
 	network   *testcontainers.DockerNetwork
-	config    GraphNodeConfig
-	httpURL   string
-	wsURL     string
+	config   GraphNodeConfig
+	httpURL  string
+	wsURL    string
+	adminURL string
 }
 
 // NewGraphNodeContainer creates and starts a complete Graph Node setup
+// Note: This function assumes a shared network will be provided
 func NewGraphNodeContainer(
-	ctx context.Context, config GraphNodeConfig, ethereumRPC string,
+	ctx context.Context, config GraphNodeConfig, ethereumRPC string, networkName string,
+) (*GraphNodeContainer, error) {
+	if networkName == "" {
+		return nil, fmt.Errorf("networkName is required - GraphNode containers must use a shared network")
+	}
+	return NewGraphNodeContainerWithNetwork(ctx, config, ethereumRPC, networkName)
+}
+
+// NewGraphNodeContainerWithNetwork creates and starts a complete Graph Node setup in a specific network
+func NewGraphNodeContainerWithNetwork(
+	ctx context.Context, config GraphNodeConfig, ethereumRPC string, networkName string,
 ) (*GraphNodeContainer, error) {
 	if !config.Enabled {
 		return nil, fmt.Errorf("graph node container is disabled in config")
+	}
+
+	if networkName == "" {
+		return nil, fmt.Errorf("networkName is required - GraphNode containers must use a shared network")
 	}
 
 	// Generate unique names for all containers to avoid conflicts
@@ -50,16 +65,8 @@ func NewGraphNodeContainer(
 	ipfsName := fmt.Sprintf("ipfs-graph-test-%d", timestamp)
 	graphNodeName := fmt.Sprintf("graph-node-test-%d", timestamp)
 
-	// Create a network for the containers to communicate
-	net, err := network.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create network: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = net.Remove(ctx) // Best effort cleanup
-		}
-	}()
+	// Always use the provided shared network - never create our own
+	net := &testcontainers.DockerNetwork{Name: networkName}
 
 	// Start PostgreSQL first
 	postgres, err := startPostgres(ctx, config, net.Name, postgresName)
@@ -124,8 +131,19 @@ func NewGraphNodeContainer(
 		return nil, fmt.Errorf("failed to get graph node ws port: %w", err)
 	}
 
+	adminPort, err := graphNode.MappedPort(ctx, "8020")
+	if err != nil {
+		_ = postgres.Terminate(ctx) // Best effort cleanup
+		if ipfs != nil {
+			_ = ipfs.Terminate(ctx) // Best effort cleanup
+		}
+		_ = graphNode.Terminate(ctx) // Best effort cleanup
+		return nil, fmt.Errorf("failed to get graph node admin port: %w", err)
+	}
+
 	httpURL := fmt.Sprintf("http://%s:%s", host, httpPort.Port())
 	wsURL := fmt.Sprintf("ws://%s:%s", host, wsPort.Port())
+	adminURL := fmt.Sprintf("http://%s:%s", host, adminPort.Port())
 
 	return &GraphNodeContainer{
 		graphNode: graphNode,
@@ -135,6 +153,7 @@ func NewGraphNodeContainer(
 		config:    config,
 		httpURL:   httpURL,
 		wsURL:     wsURL,
+		adminURL:  adminURL,
 	}, nil
 }
 
@@ -146,6 +165,11 @@ func (g *GraphNodeContainer) HTTPURL() string {
 // WebSocketURL returns the Graph Node WebSocket endpoint
 func (g *GraphNodeContainer) WebSocketURL() string {
 	return g.wsURL
+}
+
+// AdminURL returns the Graph Node admin endpoint for deployments
+func (g *GraphNodeContainer) AdminURL() string {
+	return g.adminURL
 }
 
 // Terminate stops and removes all containers
@@ -170,12 +194,7 @@ func (g *GraphNodeContainer) Terminate(ctx context.Context) error {
 		}
 	}
 
-	// Remove network
-	if g.network != nil {
-		if err := g.network.Remove(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove network: %w", err))
-		}
-	}
+	// Note: We don't remove the network since it's a shared network managed by InfraManager
 
 	if len(errs) > 0 {
 		return fmt.Errorf("errors terminating containers: %v", errs)
@@ -244,7 +263,7 @@ func startGraphNode(
 			"postgres_db":   config.PostgresDB,
 			"postgres_port": "5432",
 			"ipfs":          ipfsEndpoint,
-			"ethereum":      "anvil:" + ethereumRPC,
+			"ethereum":      "devnet:" + ethereumRPC,
 			"GRAPH_LOG":     "debug",
 			"RUST_LOG":      "info",
 		},
@@ -275,4 +294,28 @@ func (g *GraphNodeContainer) WaitForReady(ctx context.Context) error {
 // GetPostgres returns the PostgreSQL container for external access
 func (g *GraphNodeContainer) GetPostgres() testcontainers.Container {
 	return g.postgres
+}
+
+// GetIPFS returns the IPFS container for external access
+func (g *GraphNodeContainer) GetIPFS() testcontainers.Container {
+	return g.ipfs
+}
+
+// IPFSURL returns the IPFS API endpoint URL
+func (g *GraphNodeContainer) IPFSURL(ctx context.Context) (string, error) {
+	if g.ipfs == nil {
+		return "", fmt.Errorf("IPFS container not available")
+	}
+
+	host, err := g.ipfs.Host(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get IPFS host: %w", err)
+	}
+
+	port, err := g.ipfs.MappedPort(ctx, "5001")
+	if err != nil {
+		return "", fmt.Errorf("failed to get IPFS port: %w", err)
+	}
+
+	return fmt.Sprintf("http://%s:%s", host, port.Port()), nil
 }

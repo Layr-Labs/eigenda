@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -24,11 +25,19 @@ type AnvilContainer struct {
 
 // NewAnvilContainer creates and starts a new Anvil container
 func NewAnvilContainer(ctx context.Context, config AnvilConfig) (*AnvilContainer, error) {
+	return NewAnvilContainerWithNetwork(ctx, config, "")
+}
+
+// NewAnvilContainerWithNetwork creates and starts a new Anvil container in a specific network
+func NewAnvilContainerWithNetwork(
+	ctx context.Context, config AnvilConfig, networkName string,
+) (*AnvilContainer, error) {
 	if !config.Enabled {
 		return nil, fmt.Errorf("anvil container is disabled in config")
 	}
 
 	args := buildAnvilArgs(config)
+	fmt.Printf("DEBUG: Anvil command will be: anvil %s\n", strings.Join(args, " "))
 
 	// Generate a unique container name using timestamp to avoid conflicts in parallel tests
 	uniqueName := fmt.Sprintf("anvil-test-%d-%d", config.ChainID, time.Now().UnixNano())
@@ -37,8 +46,14 @@ func NewAnvilContainer(ctx context.Context, config AnvilConfig) (*AnvilContainer
 		Image:        AnvilImage,
 		Cmd:          append([]string{"anvil"}, args...),
 		ExposedPorts: []string{AnvilPort},
+		Env:          map[string]string{"ANVIL_IP_ADDR": "0.0.0.0"},
 		WaitingFor:   wait.ForListeningPort("8545/tcp"),
 		Name:         uniqueName,
+	}
+
+	// Add network if specified
+	if networkName != "" {
+		req.Networks = []string{networkName}
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -92,12 +107,39 @@ func (a *AnvilContainer) Mnemonic() string {
 	return a.config.Mnemonic
 }
 
+// ContainerName returns the container name for internal network communication
+func (a *AnvilContainer) ContainerName(ctx context.Context) (string, error) {
+	name, err := a.container.Name(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get container name: %w", err)
+	}
+	// Remove leading slash that Docker adds to container names
+	if len(name) > 0 && name[0] == '/' {
+		name = name[1:]
+	}
+	return name, nil
+}
+
+// InternalRPCURL returns the RPC URL for internal container network communication
+func (a *AnvilContainer) InternalRPCURL(ctx context.Context) (string, error) {
+	name, err := a.ContainerName(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("http://%s:8545", name), nil
+}
+
 // Terminate stops and removes the container
 func (a *AnvilContainer) Terminate(ctx context.Context) error {
 	if a.container != nil {
 		return a.container.Terminate(ctx)
 	}
 	return nil
+}
+
+// GetContainer returns the underlying testcontainer for debugging
+func (a *AnvilContainer) GetContainer() testcontainers.Container {
+	return a.container
 }
 
 // GetPrivateKey returns the private key for the given account index (0-based)

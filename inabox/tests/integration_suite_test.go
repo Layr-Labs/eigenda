@@ -4,9 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"math/rand"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,7 +41,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/ory/dockertest/v3"
+	"github.com/Layr-Labs/eigenda/common/testinfra"
 )
 
 /*
@@ -54,9 +57,8 @@ var (
 	inMemoryBlobStore bool
 
 	testConfig         *deploy.Config
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	localStackPort     string
+	infraManager       *testinfra.InfraManager
+	infraResult        *testinfra.InfraResult
 
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
@@ -115,27 +117,131 @@ var _ = BeforeSuite(func() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	if testConfig.Environment.IsLocal() {
-		if !inMemoryBlobStore {
-			fmt.Println("Using shared Blob Store")
-			localStackPort = "4570"
-			pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-			Expect(err).To(BeNil())
-			dockertestPool = pool
-			dockertestResource = resource
+		// Start testinfra containers
+		ctx, infraCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
-			Expect(err).To(BeNil())
+		config := testinfra.DefaultConfig()
+		// Enable graph node if subgraphs should be deployed
+		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+		config.GraphNode.Enabled = ok && deployer.DeploySubgraphs
+
+		if inMemoryBlobStore {
+			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
+			config.LocalStack.Enabled = false
 		} else {
-			fmt.Println("Using in-memory Blob Store")
+			fmt.Println("Using shared Blob Store")
 		}
 
-		fmt.Println("Starting anvil")
-		testConfig.StartAnvil()
+		fmt.Println("Starting testinfra containers")
+		manager, result, err := testinfra.StartCustom(ctx, config)
+		Expect(err).To(BeNil())
+		infraManager = manager
+		infraResult = result
+		cancel = infraCancel
 
-		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
-		if ok && deployer.DeploySubgraphs {
-			fmt.Println("Starting graph node")
-			testConfig.StartGraphNode()
+		// Deploy AWS resources if using LocalStack
+		if config.LocalStack.Enabled {
+			localstack := infraManager.GetLocalStack()
+			Expect(localstack).ToNot(BeNil())
+
+			// Set environment variables for LocalStack compatibility
+			localStackURL := localstack.Endpoint()
+			_ = os.Setenv("AWS_ENDPOINT_URL", localStackURL)
+			_ = os.Setenv("AWS_ACCESS_KEY_ID", "test")
+			_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			_ = os.Setenv("AWS_DEFAULT_REGION", "us-east-1")
+
+			// Extract port from LocalStack URL for compatibility with existing deploy function
+			parts := strings.Split(localStackURL, ":")
+			port := "4566" // default fallback
+			if len(parts) >= 3 {
+				port = parts[2]
+			}
+
+			// Create a temporary dockertest pool for compatibility
+			// The actual pool parameter is not used when we pass nil
+			err = deploy.DeployResources(nil, port, metadataTableName, bucketTableName, metadataTableNameV2)
+			Expect(err).To(BeNil())
+		}
+
+		// Wait for infrastructure to be fully ready
+		fmt.Println("Waiting for testinfra containers to be ready")
+		err = infraManager.WaitForReady(ctx)
+		Expect(err).To(BeNil())
+
+		// Test Anvil connectivity before proceeding
+		anvil := infraManager.GetAnvil()
+		Expect(anvil).ToNot(BeNil())
+		fmt.Printf("Testing Anvil connectivity at %s\n", infraResult.AnvilRPC)
+		
+		// Debug: Check container logs
+		container := anvil.GetContainer()
+		logs, err := container.Logs(ctx)
+		if err == nil {
+			logData := make([]byte, 2048)
+			n, _ := logs.Read(logData)
+			fmt.Printf("Anvil container logs: %s\n", string(logData[:n]))
+			logs.Close()
+		}
+
+		// Test JSON-RPC health check
+		ctx2, cancel2 := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel2()
+		for {
+				// Use proper JSON-RPC call instead of plain HTTP GET
+			jsonRPCPayload := `{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`
+			resp, err := http.Post(infraResult.AnvilRPC, "application/json", strings.NewReader(jsonRPCPayload))
+			if err == nil && resp.StatusCode == 200 {
+				resp.Body.Close()
+				fmt.Println("Anvil is responding to JSON-RPC requests")
+				break
+			}
+			if resp != nil {
+				resp.Body.Close()
+			}
+			select {
+			case <-ctx2.Done():
+				fmt.Printf("Timeout waiting for Anvil to respond: %v\n", err)
+				Expect(err).To(BeNil())
+				return
+			case <-time.After(time.Second):
+				fmt.Printf("Anvil not ready yet, retrying... (%v)\n", err)
+				continue
+			}
+		}
+		
+		// Update test config to use testinfra endpoints
+		fmt.Printf("Updating RPC URL from %s to %s\n", testConfig.Deployers[0].RPC, infraResult.AnvilRPC)
+		testConfig.Deployers[0].RPC = infraResult.AnvilRPC
+
+		// Update Graph URLs if Graph Node is enabled
+		var graphURL string
+		if config.GraphNode.Enabled && infraResult.GraphNodeURL != "" {
+			graphURL = infraResult.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			fmt.Printf("Setting Graph URL to %s\n", graphURL)
+			testConfig.GraphURL = graphURL
+
+			// Set admin URL for subgraph deployment
+			fmt.Printf("Setting Graph Admin URL to %s\n", infraResult.GraphNodeAdminURL)
+			testConfig.GraphAdminURL = infraResult.GraphNodeAdminURL
+
+			// Set IPFS URL for subgraph deployment
+			if infraResult.IPFSURL != "" {
+				fmt.Printf("Setting IPFS URL to %s\n", infraResult.IPFSURL)
+				testConfig.IPFSURL = infraResult.IPFSURL
+			}
+
+			// Test Graph Node connectivity before proceeding
+			fmt.Println("Testing Graph Node connectivity...")
+			err := testGraphNodeConnectivity(graphURL, 10, 2*time.Second)
+			if err != nil {
+				fmt.Printf("⚠️  Graph Node connectivity test failed: %v\n", err)
+				fmt.Printf("📋 Debug info:\n")
+				fmt.Printf("   - GraphURL: %s\n", graphURL)
+				fmt.Printf("   - AdminURL: %s\n", infraResult.GraphNodeAdminURL)
+				fmt.Printf("   - IPFS URL: %s\n", infraResult.IPFSURL)
+				// Don't fail the test, but provide clear diagnostic info
+			}
 		}
 
 		loggerConfig := common.DefaultLoggerConfig()
@@ -144,6 +250,17 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
+		
+		// After contract and subgraph deployment, test connectivity again
+		if graphURL != "" {
+			fmt.Println("Testing Graph Node connectivity after subgraph deployment...")
+			err := testGraphNodeConnectivity(graphURL, 15, 3*time.Second)
+			if err != nil {
+				fmt.Printf("⚠️  Graph Node still not accessible after deployment: %v\n", err)
+			} else {
+				fmt.Println("✅ Graph Node confirmed working after deployment")
+			}
+		}
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
@@ -414,6 +531,74 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	return err
 }
 
+func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval time.Duration) error {
+	client := &http.Client{Timeout: 10 * time.Second}
+	
+	// Test queries - try multiple approaches
+	testQueries := []struct {
+		name  string
+		query string
+		url   string
+	}{
+		{"GraphQL root", `{"query": "{__schema{queryType{name}}}"}`, "/graphql"},
+		{"Subgraph meta", `{"query": "{_meta{block{number}}}"}`, "/graphql"},
+		{"Health check", "", "/"},
+	}
+	
+	for i := 0; i < maxRetries; i++ {
+		fmt.Printf("Testing Graph Node connectivity (attempt %d/%d)...\n", i+1, maxRetries)
+		
+		for _, test := range testQueries {
+			testURL := graphURL + test.url
+			fmt.Printf("  Testing %s at %s\n", test.name, testURL)
+			
+			var req *http.Request
+			var err error
+			
+			if test.query != "" {
+				req, err = http.NewRequest("POST", testURL, strings.NewReader(test.query))
+				if err != nil {
+					fmt.Printf("    ❌ Failed to create request: %v\n", err)
+					continue
+				}
+				req.Header.Set("Content-Type", "application/json")
+			} else {
+				req, err = http.NewRequest("GET", testURL, nil)
+				if err != nil {
+					fmt.Printf("    ❌ Failed to create request: %v\n", err)
+					continue
+				}
+			}
+			
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Printf("    ❌ Connection failed: %v\n", err)
+				continue
+			}
+			defer resp.Body.Close()
+			
+			body, _ := io.ReadAll(resp.Body)
+			bodyPreview := string(body)
+			if len(bodyPreview) > 100 {
+				bodyPreview = bodyPreview[:100] + "..."
+			}
+			fmt.Printf("    Status: %d, Body preview: %s\n", resp.StatusCode, bodyPreview)
+			
+			if resp.StatusCode == 200 {
+				fmt.Printf("✅ Graph Node is accessible via %s\n", test.name)
+				return nil
+			}
+		}
+		
+		if i < maxRetries-1 {
+			fmt.Printf("⏱️  Waiting %v before retry...\n", retryInterval)
+			time.Sleep(retryInterval)
+		}
+	}
+	
+	return fmt.Errorf("graph node at %s is not accessible after %d attempts", graphURL, maxRetries)
+}
+
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
 		if cancel != nil {
@@ -423,12 +608,14 @@ var _ = AfterSuite(func() {
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()
 
-		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
-
-		fmt.Println("Stopping graph node")
-		testConfig.StopGraphNode()
-
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		if infraManager != nil {
+			fmt.Println("Stopping testinfra containers")
+			ctx, stopCancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer stopCancel()
+			err := infraManager.Stop(ctx)
+			if err != nil {
+				fmt.Printf("Error stopping infrastructure: %v\n", err)
+			}
+		}
 	}
 })

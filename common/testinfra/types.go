@@ -81,9 +81,11 @@ func DefaultConfig() InfraConfig {
 
 // InfraResult contains connection information for started infrastructure
 type InfraResult struct {
-	AnvilRPC      string `json:"anvil_rpc"`
-	AnvilChainID  int    `json:"anvil_chain_id"`
-	LocalStackURL string `json:"localstack_url"`
-	GraphNodeURL  string `json:"graphnode_url"`
-	PostgresURL   string `json:"postgres_url"`
+	AnvilRPC        string `json:"anvil_rpc"`
+	AnvilChainID    int    `json:"anvil_chain_id"`
+	LocalStackURL   string `json:"localstack_url"`
+	GraphNodeURL    string `json:"graphnode_url"`     // GraphQL endpoint (port 8000)
+	GraphNodeAdminURL string `json:"graphnode_admin_url"` // Admin endpoint (port 8020)
+	IPFSURL         string `json:"ipfs_url"`           // IPFS API endpoint (port 5001)
+	PostgresURL     string `json:"postgres_url"`
 }

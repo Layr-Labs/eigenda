@@ -135,9 +135,31 @@ func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlo
 
 	execYarnCmd("install")
 	execYarnCmd("codegen")
-	execYarnCmd("remove-local")
-	execYarnCmd("create-local")
-	execYarnCmd("deploy-local", "--version-label", "v0.0.1")
+
+	// Use dynamic Graph Admin URL if available (testinfra), otherwise use yarn scripts
+	if env.GraphAdminURL != "" {
+		fmt.Printf("Using dynamic Graph Admin URL: %s\n", env.GraphAdminURL)
+
+		// Use dynamic IPFS URL if available, otherwise fallback to localhost:5001
+		ipfsURL := "http://localhost:5001"
+		if env.IPFSURL != "" {
+			ipfsURL = env.IPFSURL
+			fmt.Printf("Using dynamic IPFS URL: %s\n", ipfsURL)
+		}
+
+		// Use dynamic subgraph name based on path
+		subgraphName := fmt.Sprintf("Layr-Labs/%s", path)
+		
+		// Use graph CLI directly with dynamic URLs
+		execBashCmd(fmt.Sprintf("npx graph remove --node %s %s", env.GraphAdminURL, subgraphName))
+		execBashCmd(fmt.Sprintf("npx graph create --node %s %s", env.GraphAdminURL, subgraphName))
+		execBashCmd(fmt.Sprintf("npx graph deploy --node %s --ipfs %s --version-label v0.0.1 %s", env.GraphAdminURL, ipfsURL, subgraphName))
+	} else {
+		// Use hardcoded yarn scripts for backward compatibility
+		execYarnCmd("remove-local")
+		execYarnCmd("create-local")
+		execYarnCmd("deploy-local", "--version-label", "v0.0.1")
+	}
 }
 
 func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlock int) {
