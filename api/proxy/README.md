@@ -339,7 +339,7 @@ The proxy fundamentally acts as a bridge between the rollup nodes and the EigenD
 
 ![Posting Blobs](./resources/payload-blob-poly-lifecycle.png)
 
-The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DACertificate is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
+The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DA Cert is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
 
 ### Retrieving Payloads
 
@@ -347,11 +347,12 @@ Validator nodes proceed with the exact reverse process as that used by the seque
 
 ### Rollup Commitment Schemas
 
-> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DACertificate`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DACertificate` itself contains the KZG commitment to the blob.
+> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DA Cert`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DA Cert` itself contains the KZG commitment to the blob.
 
-Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DACertificate` is being used/requested. The following versions are currently supported:
-* `0x00`: EigenDA V1 certificate type (i.e, dispersal blob info struct with verification against service manager)
-* `0x01`: EigenDA V2 certificate type
+Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DA Cert` is being used/requested. The following versions are currently supported:
+- `0x00` — **EigenDA V1 protocol certificate**: Dispersal blob info struct with verification against the Service Manager.  
+- `0x01` — **EigenDA V2 legacy certificate**: The initial V2 protocol certificate format (pre–V3 support).  
+- `0x02` — **EigenDA V2 with V3 cert support**: Updated V2 protocol certificate format that includes support for V3 certificate type.  
 
 #### Optimism Commitment Mode
 For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](https://specs.optimism.io/experimental/alt-da.html#example-commitments) are supported by our proxy:
@@ -361,9 +362,12 @@ For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](
 | 0x00                   |               |              | keccak_commitment |
 | 0x01                   | 0x00          | 0x00         | eigenda_cert_v1   |
 | 0x01                   | 0x00          | 0x01         | eigenda_cert_v2   |
+| 0x01                   | 0x00          | 0x02         | eigenda_cert_v3   |
 
-`keccak256` (commitment_type 0x00) uses an S3 storage backend with where a simple keccak commitment of the `blob` is used as the key. For `generic` commitments, we only support `da_layer_byte` 0x00 which represents EigenDA.
+`keccak256` (commitment_type 0x00) uses an S3 storage backend where a simple keccak hash commitment of the `DA Cert` is used as the lookup key.
 
+For `generic` commitments, only `da_layer_byte` 0x00` is supported, which represents EigenDA. This byte is not currently processed by OP Stack chains and serves solely as an evolvability placeholder.
+.
 #### Standard Commitment Mode
 For standard clients (i.e, `clients/standard_client/client.go`) communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
 
@@ -371,8 +375,9 @@ For standard clients (i.e, `clients/standard_client/client.go`) communicating wi
 | ------------ | --------------- |
 | 0x00         | eigenda_cert_v1 |
 | 0x01         | eigenda_cert_v2 |
+| 0x02         | eigenda_cert_v3 |
 
-`eigenda_cert_v0` is an RLP-encoded [EigenDA V1 certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168). `eigenda_cert_v1` works similarly.
+As of now all certificates are returned in RLP encoded bytes for standard proxy `/get` endpoint.
 
 ## Contributor Guide
 
@@ -398,10 +403,9 @@ never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.
 
 ## Repo Structure and Releases
 
-This repo is a fairly standard Go [workspace](https://go.dev/ref/mod#workspaces), which consists of 2 separate modules:
-1. [eigenda-proxy](./go.mod) - the main module, which contains the proxy server and all the business logic
-2. [clients](./clients/go.mod) - a module containing client implementations for interacting with the proxy server
+The eigenda proxy was originally in its [own repo](https://github.com/Layr-Labs/eigenda-proxy), but was migrated into the eigenda monorepo in [PR 1611](https://github.com/Layr-Labs/eigenda/pull/1611).
 
-Both modules follow their own independent [release](https://go.dev/doc/modules/release-workflow) cadence, with independent semantic versioning:
-1. `eigenda-proxy` releases are made from `vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/v1.6.5).
-2. `clients` releases are made from `clients/vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0)
+[Releases](https://github.com/Layr-Labs/eigenda-proxy/releases) up until 1.8.2 are available in the eigenda-proxy repo.
+The following release [2.1.0](https://github.com/Layr-Labs/eigenda/releases/tag/v2.1.0) was made from the monorepo, with proxy joining the same release cadence as the rest of the services. Future releases will also follow this pattern.
+
+Only the proxy [clients](./clients/go.mod) are still packaged as a separate module that is also released independently. It is kept separate from the monorepo because the monorepo go.mod requires go1.24, which would have broken some proxy clients. The client releases are made from `api/proxy/clients/vX.Y.Z` tags. Note that previous releases in the eigenda-proxy repo were made under [clients/vX.Y.Z](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0) tags.
