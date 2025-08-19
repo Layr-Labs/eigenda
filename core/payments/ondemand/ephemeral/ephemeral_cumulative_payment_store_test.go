@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,24 +67,24 @@ func TestAddCumulativePayment(t *testing.T) {
 }
 
 func TestAddCumulativePaymentErrorCases(t *testing.T) {
-	t.Run("input validation panics", func(t *testing.T) {
+	t.Run("input validation errors", func(t *testing.T) {
 		store := NewEphemeralCumulativePaymentStore()
 		ctx := context.Background()
 
-		assert.Panics(t, func() {
-			_, _ = store.AddCumulativePayment(ctx, nil, big.NewInt(1000))
-		})
+		newValue, err := store.AddCumulativePayment(ctx, nil, big.NewInt(1000))
+		require.Error(t, err)
+		require.Nil(t, newValue)
 
-		assert.Panics(t, func() {
-			_, _ = store.AddCumulativePayment(ctx, big.NewInt(100), nil)
-		})
+		newValue, err = store.AddCumulativePayment(ctx, big.NewInt(100), nil)
+		require.Error(t, err)
+		require.Nil(t, newValue)
 
-		assert.Panics(t, func() {
-			_, _ = store.AddCumulativePayment(ctx, big.NewInt(100), big.NewInt(-1000))
-		})
+		newValue, err = store.AddCumulativePayment(ctx, big.NewInt(100), big.NewInt(-1000))
+		require.Error(t, err)
+		require.Nil(t, newValue)
 	})
 
-	t.Run("decrement below zero panics", func(t *testing.T) {
+	t.Run("decrement below zero returns error", func(t *testing.T) {
 		store := NewEphemeralCumulativePaymentStore()
 		ctx := context.Background()
 		maxPayment := big.NewInt(1000)
@@ -93,9 +92,10 @@ func TestAddCumulativePaymentErrorCases(t *testing.T) {
 		_, err := store.AddCumulativePayment(ctx, big.NewInt(500), maxPayment)
 		require.NoError(t, err)
 
-		assert.Panics(t, func() {
-			_, _ = store.AddCumulativePayment(ctx, big.NewInt(-600), maxPayment)
-		})
+		newValue, err := store.AddCumulativePayment(ctx, big.NewInt(-600), maxPayment)
+		require.Error(t, err)
+		require.Nil(t, newValue)
+		require.Equal(t, big.NewInt(500), store.cumulativePayment, "cumulative payment should not change on error")
 	})
 
 	t.Run("exceeds max returns InsufficientFundsError", func(t *testing.T) {

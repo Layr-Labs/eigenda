@@ -2,6 +2,7 @@ package ephemeral
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -35,13 +36,13 @@ func (e *EphemeralCumulativePaymentStore) AddCumulativePayment(
 	maxCumulativePayment *big.Int,
 ) (*big.Int, error) {
 	if amount == nil {
-		panic("amount cannot be nil")
+		return nil, errors.New("amount cannot be nil")
 	}
 	if maxCumulativePayment == nil {
-		panic("maxCumulativePayment cannot be nil")
+		return nil, errors.New("maxCumulativePayment cannot be nil")
 	}
 	if maxCumulativePayment.Sign() < 0 {
-		panic(fmt.Sprintf("maxCumulativePayment cannot be negative: received %s", maxCumulativePayment.String()))
+		return nil, fmt.Errorf("maxCumulativePayment cannot be negative: received %s", maxCumulativePayment.String())
 	}
 
 	e.lock.Lock()
@@ -50,8 +51,8 @@ func (e *EphemeralCumulativePaymentStore) AddCumulativePayment(
 	newCumulativePayment := new(big.Int).Add(e.cumulativePayment, amount)
 
 	if newCumulativePayment.Sign() < 0 {
-		panic(fmt.Sprintf("operation would result in negative cumulative payment: current=%s, amount=%s",
-			e.cumulativePayment.String(), amount.String()))
+		return nil, fmt.Errorf("operation would result in negative cumulative payment: current=%s, addition amount=%s",
+			e.cumulativePayment.String(), amount.String())
 	}
 
 	if newCumulativePayment.Cmp(maxCumulativePayment) > 0 {
