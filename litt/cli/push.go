@@ -59,6 +59,8 @@ func pushCommand(ctx *cli.Context) error {
 		return fmt.Errorf("invalid key path: %s", keyPath)
 	}
 
+	knownHosts := ctx.String(knownHostsFlag.Name)
+
 	deleteAfterTransfer := !ctx.Bool("no-gc")
 	threads := ctx.Uint64("threads")
 	verbose := !ctx.Bool("quiet")
@@ -72,6 +74,7 @@ func pushCommand(ctx *cli.Context) error {
 		host,
 		port,
 		keyPath,
+		knownHosts,
 		deleteAfterTransfer,
 		true,
 		threads,
@@ -88,6 +91,7 @@ func push(
 	host string,
 	port uint64,
 	keyPath string,
+	knownHosts string,
 	deleteAfterTransfer bool,
 	fsync bool,
 	threads uint64,
@@ -116,7 +120,7 @@ func push(
 	defer releaseSourceLocks()
 
 	// Create an SSH session to the remote host.
-	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, "TODO fix before merge", verbose)
+	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, knownHosts, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %w", user, host, port, err)
 	}

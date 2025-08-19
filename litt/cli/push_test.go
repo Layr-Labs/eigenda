@@ -129,7 +129,7 @@ func pushTest(
 
 	// pushing with the DB still open should fail.
 	err = push(logger, sourceDirList, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), false,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", false,
 		false, 2, 1, verbose)
 	require.Error(t, err)
 
@@ -160,13 +160,13 @@ func pushTest(
 
 	// Deleting after transfer is only support for snapshots (which we are not testing here).
 	err = push(logger, sourceDirList, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), true,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", true,
 		false, 2, 1, verbose)
 	require.Error(t, err)
 
 	// Actually push it correctly now.
 	err = push(logger, sourceDirList, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), false,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", false,
 		false, 8, 1, verbose)
 	require.NoError(t, err, "failed to close DB")
 
@@ -246,7 +246,7 @@ func pushTest(
 
 	// Push again, should fix the messed up files.
 	err = push(logger, sourceDirList, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), false,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", false,
 		false, 2, 1, verbose)
 	require.NoError(t, err)
 
@@ -447,7 +447,7 @@ func TestPushSnapshot(t *testing.T) {
 
 	// pushing with the DB still open should fail.
 	err = push(logger, sourceDirList, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), false,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", false,
 		false, 2, 1, false)
 	require.Error(t, err)
 
@@ -513,7 +513,7 @@ func TestPushSnapshot(t *testing.T) {
 
 	// Push the data. Do not delete the snapshot yet.
 	err = push(logger, []string{snapshotDir}, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), false,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", false,
 		false, 8, 1, false)
 	require.NoError(t, err, "failed to close DB")
 
@@ -593,7 +593,7 @@ func TestPushSnapshot(t *testing.T) {
 
 	// Push again, should fix the messed up files. This time, tell the push command to clean up after itself.
 	err = push(logger, []string{snapshotDir}, dockerDestDirList, container.GetUser(), container.GetHost(),
-		container.GetSSHPort(), container.GetPrivateKeyPath(), true,
+		container.GetSSHPort(), container.GetPrivateKeyPath(), "", true,
 		false, 2, 1, false)
 	require.NoError(t, err)
 
@@ -673,6 +673,7 @@ func TestPushSnapshot(t *testing.T) {
 
 	// Reopen the DB at the new destination directories.
 	config.Paths = destDirList
+	config.SnapshotDirectory = ""
 	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err, "failed to open DB after rebase")
 
