@@ -202,7 +202,7 @@ This check is optional and will be skipped when set to 0.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
 		},
-		&cli.IntFlag{
+		&cli.Uint64Flag{
 			Name:     RelayConnectionPoolSizeFlagName,
 			Usage:    "Number of gRPC connections to maintain to each relay.",
 			Value:    1,
@@ -266,6 +266,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
+		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
 	}, nil
 }
 
