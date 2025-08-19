@@ -263,7 +263,7 @@ func setupPayloadDisperserWithRouter() error {
 		0,
 		metrics.NoopAccountantMetrics,
 	)
-	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, accountant)
+	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserClientConfig, signer, nil, accountant)
 	if err != nil {
 		return err
 	}
