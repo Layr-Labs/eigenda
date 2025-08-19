@@ -339,7 +339,7 @@ The proxy fundamentally acts as a bridge between the rollup nodes and the EigenD
 
 ![Posting Blobs](./resources/payload-blob-poly-lifecycle.png)
 
-The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DACertificate is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
+The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DA Cert is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
 
 ### Retrieving Payloads
 
@@ -347,11 +347,12 @@ Validator nodes proceed with the exact reverse process as that used by the seque
 
 ### Rollup Commitment Schemas
 
-> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DACertificate`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DACertificate` itself contains the KZG commitment to the blob.
+> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DA Cert`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DA Cert` itself contains the KZG commitment to the blob.
 
-Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DACertificate` is being used/requested. The following versions are currently supported:
-* `0x00`: EigenDA V1 certificate type (i.e, dispersal blob info struct with verification against service manager)
-* `0x01`: EigenDA V2 certificate type
+Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DA Cert` is being used/requested. The following versions are currently supported:
+- `0x00` — **EigenDA V1 protocol certificate**: Dispersal blob info struct with verification against the Service Manager.  
+- `0x01` — **EigenDA V2 legacy certificate**: The initial V2 protocol certificate format (pre–V3 support).  
+- `0x02` — **EigenDA V2 with V3 cert support**: Updated V2 protocol certificate format that includes support for V3 certificate type.  
 
 #### Optimism Commitment Mode
 For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](https://specs.optimism.io/experimental/alt-da.html#example-commitments) are supported by our proxy:
@@ -361,9 +362,12 @@ For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](
 | 0x00                   |               |              | keccak_commitment |
 | 0x01                   | 0x00          | 0x00         | eigenda_cert_v1   |
 | 0x01                   | 0x00          | 0x01         | eigenda_cert_v2   |
+| 0x01                   | 0x00          | 0x02         | eigenda_cert_v3   |
 
-`keccak256` (commitment_type 0x00) uses an S3 storage backend with where a simple keccak commitment of the `blob` is used as the key. For `generic` commitments, we only support `da_layer_byte` 0x00 which represents EigenDA.
+`keccak256` (commitment_type 0x00) uses an S3 storage backend where a simple keccak hash commitment of the `DA Cert` is used as the lookup key.
 
+For `generic` commitments, only `da_layer_byte` 0x00` is supported, which represents EigenDA. This byte is not currently processed by OP Stack chains and serves solely as an evolvability placeholder.
+.
 #### Standard Commitment Mode
 For standard clients (i.e, `clients/standard_client/client.go`) communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
 
@@ -371,8 +375,9 @@ For standard clients (i.e, `clients/standard_client/client.go`) communicating wi
 | ------------ | --------------- |
 | 0x00         | eigenda_cert_v1 |
 | 0x01         | eigenda_cert_v2 |
+| 0x02         | eigenda_cert_v3 |
 
-`eigenda_cert_v0` is an RLP-encoded [EigenDA V1 certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168). `eigenda_cert_v1` works similarly.
+As of now all certificates are returned in RLP encoded bytes for standard proxy `/get` endpoint.
 
 ## Contributor Guide
 
