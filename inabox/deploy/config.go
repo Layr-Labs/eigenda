@@ -49,7 +49,7 @@ func (env *Config) loadPrivateKeys() error {
 	log.Println("service names:", names)
 
 	// Collect private keys from file
-	keyPath := "secrets"
+	keyPath := filepath.Join(env.rootPath, "inabox", "secrets")
 
 	// Read ECDSA private keys
 	fileData := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
