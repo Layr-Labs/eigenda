@@ -1,9 +1,8 @@
-use alloc::vec::Vec;
 use alloy_primitives::{Address, B256, Bytes, aliases::U96};
 use eigenda_cert::G1Point;
 use hashbrown::HashMap;
 
-use crate::{
+use crate::eigenda::verification::cert::{
     bitmap::{Bitmap, bit_indices_to_bitmap},
     convert,
     error::CertVerificationError::{self, *},
@@ -52,7 +51,10 @@ pub fn quorums_last_updated_after_most_recent_stale_block(
 
         let most_recent_stale_block = reference_block.checked_sub(window).ok_or(Underflow)?;
         let is_recent = last_updated_at_block > most_recent_stale_block;
-        is_recent.then_some(()).ok_or(StaleQuorum)
+        is_recent.then_some(()).ok_or(StaleQuorum {
+            last_updated_at_block,
+            most_recent_stale_block,
+        })
     })
 }
 
@@ -66,7 +68,7 @@ pub fn cert_apks_equal_storage_apks(
     signed_quorums
         .iter()
         .zip(apk_for_each_quorum.iter())
-        .zip(apk_index_for_each_quorum.into_iter())
+        .zip(apk_index_for_each_quorum)
         .try_for_each(|((signed_quorum, cert_apk), apk_index)| {
             let cert_apk_hash = convert::point_to_hash(cert_apk);
             let cert_apk_trunc_hash = &cert_apk_hash[..24];
@@ -90,7 +92,7 @@ pub fn relay_keys_are_set(
     relay_keys.iter().try_for_each(|relay_key| {
         let relay_address = relay_key_to_relay_address
             .get(relay_key)
-            .ok_or(MissingRelayKeyEntry)?;
+            .ok_or(MissingRelayKeyEntry(*relay_key))?;
 
         (relay_address != &Address::default())
             .then_some(())
@@ -114,10 +116,13 @@ pub fn security_assumptions_are_met(
         codingRate,
     } = versioned_blob_params
         .get(&version)
-        .ok_or(MissingVersionEntry)?;
+        .ok_or(MissingVersionEntry(version))?;
 
-    if (confirmationThreshold > adversaryThreshold) == false {
-        return Err(ConfirmationThresholdNotGreaterThanAdversaryThreshold);
+    if confirmationThreshold <= adversaryThreshold {
+        return Err(ConfirmationThresholdLessThanOrEqualToAdversaryThreshold(
+            *confirmationThreshold,
+            *adversaryThreshold,
+        ));
     }
 
     let confirmation_threshold = *confirmationThreshold as u64;
@@ -186,7 +191,7 @@ pub fn confirmed_quorums_contain_blob_quorums(
 
         confirmed_quorums.set(number as usize, left >= right);
 
-        Ok(())
+        Ok::<_, CertVerificationError>(())
     })?;
 
     contains(confirmed_quorums, blob_quorums)
@@ -217,15 +222,20 @@ pub fn leaf_node_belongs_to_merkle_tree(
     proof: Bytes,
     sibling_path: u32,
 ) -> Result<(), CertVerificationError> {
-    if proof.len() % 32 != 0 {
-        return Err(MerkleProofLengthNotMultipleOf32Bytes);
+    let proof_len = proof.len();
+    if proof_len % 32 != 0 {
+        return Err(MerkleProofLengthNotMultipleOf32Bytes(proof_len));
     }
 
     let sibling_path = Bitmap::new([sibling_path as u64, 0, 0, 0]);
 
     let proof_depth = proof.len() / 32;
-    if sibling_path.len() < proof_depth {
-        return Err(MerkleProofPathTooShort);
+    let sibling_path_len = sibling_path.len();
+    if sibling_path_len < proof_depth {
+        return Err(MerkleProofPathTooShort {
+            sibling_path_len,
+            proof_depth,
+        });
     }
 
     let mut current_node = leaf_node;
@@ -249,7 +259,7 @@ pub fn leaf_node_belongs_to_merkle_tree(
 
 #[cfg(test)]
 mod test_non_zero_equal_lengths {
-    use crate::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
 
     #[test]
     fn non_zero_equal_lengths_success() {
@@ -283,7 +293,9 @@ mod test_non_zero_equal_lengths {
 
 #[cfg(test)]
 mod test_non_signers_strictly_sorted_by_hash {
-    use crate::{check, error::CertVerificationError::*, types::NonSigner};
+    use crate::eigenda::verification::cert::{
+        check, error::CertVerificationError::*, types::NonSigner,
+    };
 
     #[test]
     fn strictly_sorted_by_hash() {
@@ -334,7 +346,7 @@ mod test_non_signers_strictly_sorted_by_hash {
 
 #[cfg(test)]
 mod test_quorums_last_updated_after_most_recent_stale_block {
-    use crate::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
 
     #[test]
     fn quorums_last_updated_after_most_recent_stale_block() {
@@ -378,7 +390,13 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         )
         .unwrap_err();
 
-        assert_eq!(err, StaleQuorum);
+        assert_eq!(
+            err,
+            StaleQuorum {
+                last_updated_at_block: 40,
+                most_recent_stale_block: 41,
+            }
+        );
     }
 
     #[test]
@@ -401,7 +419,13 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
         )
         .unwrap_err();
 
-        assert_eq!(err, StaleQuorum);
+        assert_eq!(
+            err,
+            StaleQuorum {
+                last_updated_at_block: 41,
+                most_recent_stale_block: 41,
+            }
+        );
     }
 
     #[test]
@@ -445,19 +469,18 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
 
 #[cfg(test)]
 mod test_cert_apks_equal_storage_apks {
-    use alloc::vec;
     use ark_bn254::{Fr, G1Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
     use hashbrown::HashMap;
 
-    use crate::{
+    use crate::eigenda::verification::cert::{
         check, convert,
         error::CertVerificationError::*,
         hash::TruncatedB256,
         types::{
             BlockNumber,
             conversions::IntoExt,
-            history::{History, Update},
+            history::{History, HistoryError::*, Update},
         },
     };
 
@@ -472,7 +495,7 @@ mod test_cert_apks_equal_storage_apks {
         let apk_for_each_quorum = [apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
-        let update = Update::new(42, 43, apk_trunc_hash.clone()).unwrap();
+        let update = Update::new(42, 43, apk_trunc_hash).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
         let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
@@ -500,7 +523,7 @@ mod test_cert_apks_equal_storage_apks {
         let apk_for_each_quorum = [cert_apk.into_ext()];
         let apk_index_for_each_quorum = vec![0];
 
-        let update = Update::new(42, 43, storage_apk_trunc_hash.clone()).unwrap();
+        let update = Update::new(42, 43, storage_apk_trunc_hash).unwrap();
         let history = HashMap::from([(0, update)]);
         let apk_trunc_hash_history = History(history);
         let apk_history = HashMap::from([(0, apk_trunc_hash_history)]);
@@ -560,7 +583,7 @@ mod test_cert_apks_equal_storage_apks {
         )
         .unwrap_err();
 
-        assert_eq!(err, MissingHistoryEntry);
+        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
@@ -586,17 +609,19 @@ mod test_cert_apks_equal_storage_apks {
         )
         .unwrap_err();
 
-        assert_eq!(err, ElementNotInInterval);
+        assert_eq!(
+            err,
+            WrapHistoryError(ElementNotInInterval("41".into(), "[42, 43)".into()))
+        );
     }
 }
 
 #[cfg(test)]
 mod test_relay_keys_are_set {
-    use alloc::vec;
     use alloy_primitives::Address;
     use hashbrown::HashMap;
 
-    use crate::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
 
     #[test]
     fn success_when_all_relay_keys_are_set() {
@@ -617,14 +642,14 @@ mod test_relay_keys_are_set {
 
         let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
 
-        assert_eq!(err, MissingRelayKeyEntry);
+        assert_eq!(err, MissingRelayKeyEntry(99));
     }
 
     #[test]
     fn relay_keys_are_set_fails_when_corresponding_address_is_not_set() {
         let relay_keys = vec![42];
 
-        let relay_key_to_relay_address = HashMap::from([(42, Address::default().into())]);
+        let relay_key_to_relay_address = HashMap::from([(42, Address::default())]);
 
         let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
 
@@ -636,7 +661,7 @@ mod test_relay_keys_are_set {
 mod test_security_assumptions_are_met {
     use hashbrown::HashMap;
 
-    use crate::{
+    use crate::eigenda::verification::cert::{
         check,
         error::CertVerificationError::*,
         types::{
@@ -669,7 +694,7 @@ mod test_security_assumptions_are_met {
         )
         .unwrap_err();
 
-        assert_eq!(err, MissingVersionEntry);
+        assert_eq!(err, MissingVersionEntry(Version::MAX));
     }
 
     #[test]
@@ -685,7 +710,10 @@ mod test_security_assumptions_are_met {
         )
         .unwrap_err();
 
-        assert_eq!(err, ConfirmationThresholdNotGreaterThanAdversaryThreshold);
+        assert_eq!(
+            err,
+            ConfirmationThresholdLessThanOrEqualToAdversaryThreshold(1, 1)
+        );
     }
 
     #[test]
@@ -702,7 +730,10 @@ mod test_security_assumptions_are_met {
         )
         .unwrap_err();
 
-        assert_eq!(err, ConfirmationThresholdNotGreaterThanAdversaryThreshold);
+        assert_eq!(
+            err,
+            ConfirmationThresholdLessThanOrEqualToAdversaryThreshold(0, 1)
+        );
     }
 
     #[test]
@@ -778,9 +809,12 @@ mod test_security_assumptions_are_met {
 
 #[cfg(test)]
 mod test_confirmed_quorums_contains_blob_quorums {
-    use crate::{check, error::CertVerificationError::*, types::Quorum};
     use alloy_primitives::aliases::U96;
     use ark_bn254::G1Affine;
+
+    use crate::eigenda::verification::cert::{
+        bitmap::BitmapError::*, check, error::CertVerificationError::*, types::Quorum,
+    };
 
     #[test]
     fn success_when_confirmed_quorums_contain_blob_quorums() {
@@ -801,7 +835,6 @@ mod test_confirmed_quorums_contains_blob_quorums {
                 apk: G1Affine::default(),
                 total_stake: U96::from(42),
                 signed_stake: U96::from(42),
-                ..Default::default()
             },
             Quorum {
                 number: 2,
@@ -839,7 +872,6 @@ mod test_confirmed_quorums_contains_blob_quorums {
                 apk: G1Affine::default(),
                 total_stake: U96::from(42),
                 signed_stake: U96::from(42),
-                ..Default::default()
             },
             Quorum {
                 number: 2,
@@ -927,13 +959,15 @@ mod test_confirmed_quorums_contains_blob_quorums {
         )
         .unwrap_err();
 
-        assert_eq!(err, BitIndicesNotSorted);
+        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
     }
 }
 
 #[cfg(test)]
 mod test_blob_quorums_contains_required_quorums {
-    use crate::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::{
+        bitmap::BitmapError::*, check, error::CertVerificationError::*,
+    };
 
     #[test]
     fn success_when_blob_quorums_contain_required_quorums() {
@@ -964,7 +998,7 @@ mod test_blob_quorums_contains_required_quorums {
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
 
-        assert_eq!(err, BitIndicesNotSorted);
+        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
     }
 
     #[test]
@@ -975,16 +1009,17 @@ mod test_blob_quorums_contains_required_quorums {
         let err = check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorums)
             .unwrap_err();
 
-        assert_eq!(err, BitIndicesNotSorted);
+        assert_eq!(err, WrapBitmapError(IndicesNotSorted));
     }
 }
 
 #[cfg(test)]
 mod test_leaf_node_belongs_to_merkle_tree {
-    use alloc::vec::Vec;
     use alloy_primitives::FixedBytes;
 
-    use crate::{check, error::CertVerificationError::*, hash::keccak_v256};
+    use crate::eigenda::verification::cert::{
+        check, error::CertVerificationError::*, hash::keccak_v256,
+    };
 
     #[test]
     fn single_level_tree_left_child() {
@@ -1193,7 +1228,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let err =
             check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path).unwrap_err();
 
-        assert_eq!(err, MerkleProofLengthNotMultipleOf32Bytes);
+        assert_eq!(err, MerkleProofLengthNotMultipleOf32Bytes(31));
     }
 
     #[test]
@@ -1208,7 +1243,13 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let err =
             check::leaf_node_belongs_to_merkle_tree(leaf, expected_root, proof, path).unwrap_err();
 
-        assert_eq!(err, MerkleProofPathTooShort);
+        assert_eq!(
+            err,
+            MerkleProofPathTooShort {
+                sibling_path_len: 256,
+                proof_depth: 257,
+            }
+        );
     }
 
     #[test]

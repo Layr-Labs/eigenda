@@ -6,7 +6,7 @@ use ark_ec::{
 };
 use ark_ff::{AdditiveGroup, PrimeField};
 
-use crate::{
+use crate::eigenda::verification::cert::{
     convert,
     hash::{self},
 };
@@ -26,7 +26,7 @@ pub fn verify(msg_hash: B256, apk_g1: G1Affine, apk_g2: G2Affine, sigma: G1Affin
     let b1 = (msg_point + G1Affine::generator() * gamma).into_affine();
     let b2 = apk_g2;
 
-    let miller_result = Bn254::multi_miller_loop([a1, b1].into_iter(), [a2, b2].into_iter());
+    let miller_result = Bn254::multi_miller_loop([a1, b1], [a2, b2]);
     let pairing_result = Bn254::final_exponentiation(miller_result);
     // `pairing_result` could be None if one of `a1`, `b1`, `a2`, `b2` is at infinity
     // a PairingOutput::zero() has an underlying TargetField::one()
@@ -69,7 +69,7 @@ mod tests {
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
     use ark_ec::{AffineRepr, CurveGroup, PrimeGroup};
 
-    use crate::{
+    use crate::eigenda::verification::cert::{
         convert,
         signature::verification::{compute_gamma, verify},
     };
@@ -83,7 +83,7 @@ mod tests {
         let msg_point = convert::hash_to_point(msg_hash);
         let sigma = (msg_point * sk).into_affine();
         let result = verify(msg_hash, apk_g1, apk_g2, sigma);
-        assert_eq!(result, true);
+        assert!(result);
     }
 
     #[test]
@@ -97,7 +97,7 @@ mod tests {
         let actual_signer_sk = Fr::from(43);
         let sigma = (msg_point * actual_signer_sk).into_affine();
         let result = verify(msg_hash, apk_g1, apk_g2, sigma);
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]
@@ -110,13 +110,13 @@ mod tests {
         let sigma = G1Affine::generator();
 
         let result = verify(msg_hash, G1Affine::identity(), apk_g2, sigma);
-        assert_eq!(result, false);
+        assert!(!result);
 
         let result = verify(msg_hash, apk_g1, G2Affine::identity(), sigma);
-        assert_eq!(result, false);
+        assert!(!result);
 
         let result = verify(msg_hash, apk_g1, apk_g2, G1Affine::identity());
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]

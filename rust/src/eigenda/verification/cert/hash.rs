@@ -1,6 +1,7 @@
+use core::iter::once;
+
 use alloy_primitives::B256;
 use alloy_sol_types::SolValue;
-use core::iter::once;
 use eigenda_cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 use tiny_keccak::{Hasher, Keccak};
 
@@ -58,9 +59,7 @@ pub fn signature_record(reference_block: u32, pk_hashes: &[B256]) -> B256 {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
-
-    use crate::hash;
+    use crate::eigenda::verification::cert::hash;
 
     #[test]
     fn signature_record_hash_success() {

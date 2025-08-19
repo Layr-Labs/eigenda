@@ -1,30 +1,47 @@
+//! Following eigenda-contracts/lib/eigenlayer-middleware/src/BLSSignatureChecker.sol
+//! from 6797f3821db92c2214aaa6f137d94c603011ac2a lib/eigenlayer-middleware (v0.5.4-mainnet-rewards-v2-1-g6797f38)
+
+pub mod bitmap;
+mod check;
+pub mod convert;
+pub mod error;
+pub mod hash;
+mod signature;
+pub mod types;
+
 use core::iter::once;
 
-use alloc::vec::Vec;
-use alloy_primitives::Bytes;
 use alloy_sol_types::SolValue;
 use ark_bn254::{G1Affine, G2Affine};
 use eigenda_cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
 
-use crate::{
-    check, convert,
+use crate::eigenda::verification::cert::{
     error::CertVerificationError::{self, *},
-    hash::{self, HashExt, keccak_v256},
-    signature,
-    types::{
-        NonSigner, Quorum, Stake, Storage, conversions::IntoExt, solidity::SecurityThresholds,
-    },
+    hash::{HashExt, keccak_v256},
+    types::{NonSigner, Quorum, Storage, conversions::IntoExt, solidity::SecurityThresholds},
 };
 
-pub fn verify(
-    batch_header: BatchHeaderV2,
-    blob_inclusion_info: BlobInclusionInfo,
-    non_signer_stakes_and_signature: NonSignerStakesAndSignature,
-    security_thresholds: SecurityThresholds,
-    required_quorum_numbers: Bytes,
-    signed_quorum_numbers: Bytes,
-    storage: Storage,
-) -> Result<(), CertVerificationError> {
+pub struct CertVerificationInputs {
+    pub batch_header: BatchHeaderV2,
+    pub blob_inclusion_info: BlobInclusionInfo,
+    pub non_signer_stakes_and_signature: NonSignerStakesAndSignature,
+    pub security_thresholds: SecurityThresholds,
+    pub required_quorum_numbers: alloy_primitives::Bytes,
+    pub signed_quorum_numbers: alloy_primitives::Bytes,
+    pub storage: Storage,
+}
+
+pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
+    let CertVerificationInputs {
+        batch_header,
+        blob_inclusion_info,
+        non_signer_stakes_and_signature,
+        security_thresholds,
+        required_quorum_numbers,
+        signed_quorum_numbers,
+        storage,
+    } = inputs;
+
     let Storage {
         quorum_count,
         current_block,
@@ -50,7 +67,10 @@ pub fn verify(
     )?;
 
     if batch_header.reference_block_number >= current_block {
-        return Err(ReferenceBlockDoesNotPrecedeCurrentBlock);
+        return Err(ReferenceBlockDoesNotPrecedeCurrentBlock(
+            batch_header.reference_block_number,
+            current_block,
+        ));
     }
 
     let lengths = [
@@ -111,9 +131,9 @@ pub fn verify(
             let non_signer = NonSigner {
                 pk,
                 pk_hash,
-                quorum_bitmap_history: quorum_bitmap_history,
+                quorum_bitmap_history,
             };
-            Ok(non_signer)
+            Ok::<_, CertVerificationError>(non_signer)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -148,22 +168,22 @@ pub fn verify(
                 let unsigned_stake = non_signers
                     .iter()
                     .filter(|non_signer| {
-                        let was_required_to_sign_this_quorum =
-                            non_signer.quorum_bitmap_history[bit];
-                        was_required_to_sign_this_quorum
+                        // whether signer was required to sign this quorum
+                        non_signer.quorum_bitmap_history[bit]
                     })
                     // assumption: collection_a[i] corresponds to collection_b[i] for all i
                     .zip(stake_index_for_each_required_non_signer.into_iter())
                     .map(|(required_non_signer, stake_index)| {
-                        operator_stake_history
+                        let stake = operator_stake_history
                             .get(&required_non_signer.pk_hash)
                             .ok_or(MissingSignerEntry)?
                             .get(&signed_quorum)
                             .ok_or(MissingQuorumEntry)?
                             .try_get_at(stake_index)?
-                            .try_get_against(batch_header.reference_block_number)
+                            .try_get_against(batch_header.reference_block_number)?;
+                        Ok(stake)
                     })
-                    .sum::<Result<Stake, _>>()?;
+                    .sum::<Result<_, CertVerificationError>>()?;
 
                 let signed_stake = total_stake.checked_sub(unsigned_stake).ok_or(Underflow)?;
 
@@ -175,7 +195,7 @@ pub fn verify(
                     signed_stake,
                 };
 
-                Ok(quorum)
+                Ok::<_, CertVerificationError>(quorum)
             },
         )
         .collect::<Result<Vec<_>, _>>()?;
@@ -186,7 +206,7 @@ pub fn verify(
     let apk_g2: G2Affine = non_signer_stakes_and_signature.apk_g2.into_ext();
     let sigma: G1Affine = non_signer_stakes_and_signature.sigma.into_ext();
 
-    if signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) == false {
+    if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
         return Err(SignatureVerificationFailed);
     }
 
@@ -225,8 +245,6 @@ pub fn verify(
 mod tests {
     use core::iter::once;
 
-    use alloc::vec;
-    use alloc::vec::Vec;
     use alloy_primitives::{B256, Bytes, aliases::U96};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
@@ -237,740 +255,367 @@ mod tests {
     };
     use hashbrown::HashMap;
 
-    use crate::{
-        bitmap::Bitmap,
+    use crate::eigenda::verification::cert::{
+        CertVerificationInputs,
+        bitmap::{Bitmap, BitmapError::*},
         convert,
         error::CertVerificationError::*,
         hash::{HashExt, keccak_v256},
         types::{
             Storage,
             conversions::{DefaultExt, IntoExt},
-            history::{History, Update},
+            history::{History, HistoryError::*, Update},
             solidity::{SecurityThresholds, VersionedBlobParams},
         },
-        verification,
+        verify,
     };
 
     #[test]
     fn success() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let inputs = success_inputs();
 
-        let result = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        );
+        let result = verify(inputs);
         assert_eq!(result, Ok(()));
     }
 
     #[test]
     fn leaf_node_does_not_belong_to_merkle_tree() {
-        let (
-            batch_header,
-            mut blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
         // any change to blobCertificate causes the leaf node hash to differ
-        blob_inclusion_info.blob_certificate.signature = [0u8; 32].into();
+        inputs.blob_inclusion_info.blob_certificate.signature = [0u8; 32].into();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, LeafNodeDoesNotBelongToMerkleTree);
     }
 
     #[test]
     fn reference_block_past_current_block() {
-        let (
-            mut batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        batch_header.reference_block_number = 43;
-        storage.current_block = 42;
+        inputs.batch_header.reference_block_number = 43;
+        inputs.storage.current_block = 42;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, ReferenceBlockDoesNotPrecedeCurrentBlock);
+        assert_eq!(err, ReferenceBlockDoesNotPrecedeCurrentBlock(43, 42));
     }
 
     #[test]
     fn reference_block_at_current_block() {
-        let (
-            mut batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        batch_header.reference_block_number = 42;
-        storage.current_block = 42;
+        inputs.batch_header.reference_block_number = 42;
+        inputs.storage.current_block = 42;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, ReferenceBlockDoesNotPrecedeCurrentBlock);
+        assert_eq!(err, ReferenceBlockDoesNotPrecedeCurrentBlock(42, 42));
     }
 
     #[test]
     fn empty_non_signer_vecs() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        non_signer_stakes_and_signature.non_signer_pubkeys.clear();
+        inputs
+            .non_signer_stakes_and_signature
+            .non_signer_pubkeys
+            .clear();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, EmptyVec);
     }
 
     #[test]
     fn empty_quorum_vecs() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            _signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        let signed_quorum_numbers: Bytes = [].into();
+        inputs.signed_quorum_numbers = [].into();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, EmptyVec);
     }
 
     #[test]
     fn stale_stakes_forbidden() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.stale_stakes_forbidden = true;
-        storage.quorum_update_block_number.insert(0, 41);
+        inputs.storage.stale_stakes_forbidden = true;
+        inputs.storage.quorum_update_block_number.insert(0, 41);
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, StaleQuorum);
+        assert_eq!(
+            err,
+            StaleQuorum {
+                last_updated_at_block: 41,
+                most_recent_stale_block: 41,
+            }
+        );
     }
 
     #[test]
     fn cert_apk_not_equal_storage_apk() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        non_signer_stakes_and_signature.quorum_apks[0] = G1Point {
+        inputs.non_signer_stakes_and_signature.quorum_apks[0] = G1Point {
             x: alloy_primitives::Uint::ONE,
             y: alloy_primitives::Uint::ONE,
         };
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, CertApkDoesNotEqualStorageApk);
     }
 
     #[test]
     fn quorum_bitmap_history_history_missing_signer_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.quorum_bitmap_history.clear();
+        inputs.storage.quorum_bitmap_history.clear();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, MissingSignerEntry);
     }
 
     #[test]
     fn quorum_bitmap_history_history_missing_history_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        non_signer_stakes_and_signature.non_signer_quorum_bitmap_indices[0] = 42;
+        inputs
+            .non_signer_stakes_and_signature
+            .non_signer_quorum_bitmap_indices[0] = 42;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, MissingHistoryEntry);
+        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(42)));
     }
 
     #[test]
     fn quorum_bitmap_history_history_reference_block_not_in_interval() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.quorum_bitmap_history.iter_mut().for_each(|(_, v)| {
-            v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
-        });
+        inputs
+            .storage
+            .quorum_bitmap_history
+            .iter_mut()
+            .for_each(|(_, v)| {
+                v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
+            });
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, ElementNotInInterval);
+        assert_eq!(
+            err,
+            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+        );
     }
 
     #[test]
     fn non_signers_not_strictly_sorted_by_hash() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        non_signer_stakes_and_signature.non_signer_pubkeys.reverse();
+        inputs
+            .non_signer_stakes_and_signature
+            .non_signer_pubkeys
+            .reverse();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, NotStrictlySortedByHash);
     }
 
     #[test]
     fn total_stake_history_missing_quorum_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.total_stake_history.clear();
+        inputs.storage.total_stake_history.clear();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, MissingQuorumEntry);
     }
 
     #[test]
     fn total_stake_history_missing_history_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.total_stake_history.insert(0, Default::default());
+        inputs
+            .storage
+            .total_stake_history
+            .insert(0, Default::default());
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, MissingHistoryEntry);
+        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
     fn total_stake_history_reference_block_not_in_interval() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.total_stake_history.iter_mut().for_each(|(_, v)| {
-            v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
-        });
+        inputs
+            .storage
+            .total_stake_history
+            .iter_mut()
+            .for_each(|(_, v)| {
+                v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
+            });
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, ElementNotInInterval);
+        assert_eq!(
+            err,
+            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+        );
     }
 
     #[test]
     fn stake_history_missing_signer_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.operator_stake_history.clear();
+        inputs.storage.operator_stake_history.clear();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, MissingSignerEntry);
     }
 
     #[test]
     fn stake_history_missing_quorum_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage
-            .operator_stake_history
-            .iter_mut()
-            .for_each(|(_, stake_history_by_quorum)| {
+        inputs.storage.operator_stake_history.iter_mut().for_each(
+            |(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.clear();
-            });
+            },
+        );
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, MissingQuorumEntry);
     }
 
     #[test]
     fn stake_history_missing_history_entry() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage
-            .operator_stake_history
-            .iter_mut()
-            .for_each(|(_, stake_history_by_quorum)| {
+        inputs.storage.operator_stake_history.iter_mut().for_each(
+            |(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.insert(0, Default::default());
-            });
+            },
+        );
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, MissingHistoryEntry);
+        assert_eq!(err, WrapHistoryError(MissingHistoryEntry(0)));
     }
 
     #[test]
     fn stake_history_reference_block_not_in_interval() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage
-            .operator_stake_history
-            .iter_mut()
-            .for_each(|(_, stake_history_by_quorum)| {
+        inputs.storage.operator_stake_history.iter_mut().for_each(
+            |(_, stake_history_by_quorum)| {
                 stake_history_by_quorum.iter_mut().for_each(|(_, v)| {
                     v.0.insert(0, Update::new(141, 143, Default::default()).unwrap());
                 })
-            });
+            },
+        );
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, ElementNotInInterval);
+        assert_eq!(
+            err,
+            WrapHistoryError(ElementNotInInterval("42".into(), "[141, 143)".into()))
+        );
     }
 
     #[test]
     fn stake_underflow() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.total_stake_history.iter_mut().for_each(|(_, v)| {
-            v.0.insert(0, Update::new(41, 43, U96::from(29)).unwrap());
-        });
+        inputs
+            .storage
+            .total_stake_history
+            .iter_mut()
+            .for_each(|(_, v)| {
+                v.0.insert(0, Update::new(41, 43, U96::from(29)).unwrap());
+            });
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, Underflow);
     }
 
     #[test]
     fn aggregation_failure() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage.quorum_count = 1;
+        inputs.storage.quorum_count = 1;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, BitIndexNotLessThanUpperBound);
+        assert_eq!(err, WrapBitmapError(IndexThanOrEqualToUpperBound));
     }
 
     #[test]
     fn signature_verification_failure() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        non_signer_stakes_and_signature.sigma = G1Point::default_ext();
+        inputs.non_signer_stakes_and_signature.sigma = G1Point::default_ext();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, SignatureVerificationFailed);
     }
 
     #[test]
     fn relay_keys_not_set() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        let relay_address = storage.relay_key_to_relay_address.get_mut(&42).unwrap();
+        let relay_address = inputs
+            .storage
+            .relay_key_to_relay_address
+            .get_mut(&42)
+            .unwrap();
         *relay_address = Default::default();
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, RelayKeyNotSet);
     }
 
     #[test]
     fn security_assumptions_not_met() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        let params = storage.versioned_blob_params.get_mut(&42).unwrap();
+        let params = inputs.storage.versioned_blob_params.get_mut(&42).unwrap();
         params.numChunks = 43;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, UnmetSecurityAssumptions);
     }
 
     #[test]
     fn confirmed_quorums_do_not_contain_blob_quorums() {
-        let (
-            _batch_header,
-            mut blob_inclusion_info,
-            mut non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            mut storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
 
-        storage
+        inputs
+            .storage
             .versioned_blob_params
             .iter_mut()
             .for_each(|(_, versioned_blob_params)| {
                 versioned_blob_params.maxNumOperators = 0;
             });
 
-        blob_inclusion_info
+        inputs
+            .blob_inclusion_info
             .blob_certificate
             .blob_header
             .quorum_numbers = [0, 1, 2].into(); // while confirmed_quorums: [0, 2]
@@ -978,61 +623,28 @@ mod tests {
         // any change to blobCertificate requires recomputing...
         let secret_keys = vec![Fr::from(43u64), Fr::from(44u64)];
         let (batch_header, sigma) =
-            compute_batch_header_and_sigma(&blob_inclusion_info, secret_keys);
+            compute_batch_header_and_sigma(&inputs.blob_inclusion_info, secret_keys);
 
-        non_signer_stakes_and_signature.sigma = sigma.into_ext();
+        inputs.batch_header = batch_header;
 
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        inputs.non_signer_stakes_and_signature.sigma = sigma.into_ext();
+
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, ConfirmedQuorumsDoNotContainBlobQuorums);
     }
 
     #[test]
     fn blob_quorums_do_not_contain_required_quorums() {
-        let (
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            _required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        ) = success_inputs();
+        let mut inputs = success_inputs();
+        inputs.required_quorum_numbers = [1].into(); // 3 is not in blob_quorums: [0, 2]
 
-        let required_quorum_numbers: Bytes = [1].into(); // 3 is not in blob_quorums: [0, 2]
-
-        let err = verification::verify(
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        )
-        .unwrap_err();
+        let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, BlobQuorumsDoNotContainRequiredQuorums);
     }
 
-    fn success_inputs() -> (
-        BatchHeaderV2,
-        BlobInclusionInfo,
-        NonSignerStakesAndSignature,
-        SecurityThresholds,
-        Bytes,
-        Bytes,
-        Storage,
-    ) {
+    fn success_inputs() -> CertVerificationInputs {
         let g1 = G1Projective::generator();
         let g2 = G2Projective::generator();
 
@@ -1065,7 +677,7 @@ mod tests {
                     version: 42,
                     quorum_numbers: [0, 2].into(),
                     commitment: BlobCommitment::default_ext(),
-                    payment_header_hash: [42; 32].into(),
+                    payment_header_hash: [42; 32],
                 },
                 signature: [].into(),
                 relay_keys: vec![42],
@@ -1149,7 +761,7 @@ mod tests {
 
             pk_hashes
                 .into_iter()
-                .zip(quorum_bitmap_historys.into_iter())
+                .zip(quorum_bitmap_historys)
                 .map(|(pk_hash, quorum_bitmap_history)| {
                     let update = Update::new(41, 43, quorum_bitmap_history).unwrap();
                     let history = HashMap::from([(0, update)]);
@@ -1230,7 +842,7 @@ mod tests {
 
         let required_quorum_numbers: Bytes = [0, 2].into();
 
-        (
+        CertVerificationInputs {
             batch_header,
             blob_inclusion_info,
             non_signer_stakes_and_signature,
@@ -1238,7 +850,7 @@ mod tests {
             required_quorum_numbers,
             signed_quorum_numbers,
             storage,
-        )
+        }
     }
 
     fn compute_batch_header_and_sigma(

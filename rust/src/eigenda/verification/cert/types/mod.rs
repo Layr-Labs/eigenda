@@ -1,16 +1,16 @@
+pub mod conversions;
+pub mod history;
+pub mod solidity;
+
 use alloy_primitives::{Address, B256, aliases::U96};
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
-use crate::{
+use crate::eigenda::verification::cert::{
     bitmap::Bitmap,
     hash::TruncatedB256,
     types::{history::History, solidity::VersionedBlobParams},
 };
-
-pub mod conversions;
-pub mod history;
-pub mod solidity;
 
 pub type QuorumNumber = u8;
 pub type Stake = U96;

@@ -1,9 +1,7 @@
-use alloc::vec::Vec;
 use ark_bn254::{Fr, G1Affine, G1Projective};
 
-use crate::{
-    bitmap::bit_indices_to_bitmap,
-    error::CertVerificationError,
+use crate::eigenda::verification::cert::{
+    bitmap::{BitmapError, bit_indices_to_bitmap},
     types::{NonSigner, Quorum},
 };
 
@@ -155,7 +153,7 @@ pub fn aggregate(
     quorum_count: u8,
     non_signers: &[NonSigner],
     quorums: &[Quorum],
-) -> Result<G1Affine, CertVerificationError> {
+) -> Result<G1Affine, BitmapError> {
     let total_apk = quorums
         .iter()
         .map(|quorum| quorum.apk)
@@ -186,15 +184,14 @@ pub fn aggregate(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
     use ark_bn254::{G1Affine, G1Projective};
     use ark_ec::{AffineRepr, CurveGroup, PrimeGroup};
     use ark_ff::BigInteger256;
     use bitvec::array::BitArray;
 
-    use crate::{
+    use crate::eigenda::verification::cert::{
+        bitmap::{BitmapError::*, MAX_BIT_INDICES_LENGTH},
         convert,
-        error::CertVerificationError::*,
         signature::aggregation::aggregate,
         types::{NonSigner, Quorum, conversions::IntoExt},
     };
@@ -203,7 +200,13 @@ mod tests {
     fn compute_signers_apk_fails_with_too_many_quorums() {
         let quorums = vec![Default::default(); 256 + 1];
         let err = aggregate(Default::default(), Default::default(), &quorums).unwrap_err();
-        assert_eq!(err, BitIndicesGreaterThanMaxLength);
+        assert_eq!(
+            err,
+            IndicesGreaterThanMaxLength {
+                len: 257,
+                max_len: MAX_BIT_INDICES_LENGTH
+            }
+        );
     }
 
     #[test]
@@ -218,7 +221,7 @@ mod tests {
     }
 
     fn inputs_for_3_quorums_and_6_signers() -> (u8, Vec<NonSigner>, Vec<Quorum>) {
-        let signed_quorums = vec![0, 2];
+        let signed_quorums = [0, 2];
         let quorum_count = u8::MAX;
 
         let non_signer_pks = vec![pk(0), pk(1), pk(2)];
@@ -234,7 +237,7 @@ mod tests {
 
         let non_signers = non_signer_pks
             .into_iter()
-            .zip(non_signer_quorum_bitmap_history.into_iter())
+            .zip(non_signer_quorum_bitmap_history)
             .map(|(pk, quorum_bitmap_history)| NonSigner {
                 pk,
                 pk_hash: convert::point_to_hash(&pk.into_ext()),
@@ -249,7 +252,7 @@ mod tests {
 
         let quorums = signed_quorums
             .iter()
-            .zip(apks.into_iter())
+            .zip(apks)
             .map(|(signed_quorum_number, apk)| Quorum {
                 number: *signed_quorum_number,
                 apk: apk.into_affine(),
