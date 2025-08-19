@@ -229,7 +229,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
 	if eigenDADirectory == "" {
 		if networkString == "" {
-			return common.ClientConfigV2{}, fmt.Errorf("either eigenDA directory or EigenDANetwork must be specified")
+			return common.ClientConfigV2{}, fmt.Errorf("either EigenDA Directory contract address or EigenDANetwork enum must be specified")
 		}
 		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
 		if err != nil {
