@@ -38,7 +38,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		}
 	}
 
-	destinations := ctx.StringSlice("dest")
+	destinations := ctx.StringSlice("dst")
 	if len(destinations) == 0 {
 		return fmt.Errorf("no destinations provided")
 	}
@@ -303,7 +303,7 @@ func transferDataInTable(
 	}
 
 	if !preserveOriginal {
-		err = deleteSnapshotDirectory(logger, source, tableName, verbose)
+		err = deleteSnapshotDirectory(source, tableName)
 		if err != nil {
 			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
 		}
@@ -361,7 +361,7 @@ func deleteBoundaryFiles(logger logging.Logger, source string, tableName string,
 }
 
 // delete the old snapshot directory for a table. This will be reconstructed the next time the DB is loaded.
-func deleteSnapshotDirectory(logger logging.Logger, source string, tableName string, verbose bool) error {
+func deleteSnapshotDirectory(source string, tableName string) error {
 	snapshotDir := filepath.Join(source, tableName, segment.HardLinkDirectory)
 
 	exists, err := util.Exists(snapshotDir)
@@ -370,10 +370,6 @@ func deleteSnapshotDirectory(logger logging.Logger, source string, tableName str
 	}
 	if !exists {
 		return nil
-	}
-
-	if verbose {
-		logger.Infof("Deleting snapshot directory: %s", snapshotDir)
 	}
 
 	err = os.RemoveAll(snapshotDir)
@@ -520,8 +516,8 @@ func transferSegmentFile(
 
 	if verbose {
 		count := segmentFileCount.Add(1)
-		text := fmt.Sprintf("Transferring Segment File %d/%d: %s from table '%s'",
-			count, totalSegmentFileCount, filepath.Base(segmentFilePath), tableName)
+		text := fmt.Sprintf("Transferring Segment File %d/%d from table '%s': %s",
+			count, totalSegmentFileCount, tableName, filepath.Base(segmentFilePath))
 		writer := bufio.NewWriter(os.Stdout)
 		_, _ = fmt.Fprintf(writer, "\r%-100s", text)
 		_ = writer.Flush()
