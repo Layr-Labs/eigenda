@@ -2,10 +2,10 @@
 
 The reservation package implements accounting logic for reservation-based EigenDA usage.
 
-## Key Implementation Details
+## Key Files
 
-- Reservation accounting is performed with a LeakyBucket algorithm.
-- Each instance of the LeakyBucket algorithm is configured with a BiasBehavior, to determine whether to err
-on the side of permitting more or less throughput.
-- Each instance of the LeakyBucket algorithm is configured with an OverfillBehavior, which governs behavior when bucket
-capacity is exceeded.
+- `reservation.go` - Describes parameters of a single account's reservation
+- `reservation_ledger.go` - Tracks usage of a single account's reservation
+- `leaky_bucket.go` - Rate limiting algorithm utility, utilized by the `ReservationLedger`
+- `reservation_ledger_config.go` - Configures a `ReservationLedger`
+- `errors.go` - Sentinel errors for reservation related failures

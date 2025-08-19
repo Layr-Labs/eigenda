@@ -66,10 +66,14 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
-	// The size of the thread pool for read operations on the relay.
+	// The size of the thread pool for read operations.
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// The number of connections to open for each relay.
+	RelayConnectionCount uint
+	// The number of connections to open for each disperser.
+	DisperserConnectionCount uint
 	// The port to use for the proxy.
 	ProxyPort int
 }
@@ -85,6 +89,8 @@ func DefaultTestClientConfig() *TestClientConfig {
 		ValidatorReadConnectionPoolSize: 100,
 		ValidatorReadComputePoolSize:    20,
 		ProxyPort:                       1234,
+		RelayConnectionCount:            8,
+		DisperserConnectionCount:        8,
 		EigenDADirectory:                "placeholder",
 	}
 }
