@@ -42,20 +42,22 @@ const (
 	host             = "127.0.0.1"
 	disperserPort    = "443"
 
+	// CertVerifier and SvcManager addresses are still specified by hand for V1.
+	// Probably not worth the effort to force use of EigenDADirectory for V1.
 	disperserPreprodHostname   = "disperser-preprod-holesky.eigenda.xyz"
+	preprodEigenDADirectory    = "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
 	preprodCertVerifierAddress = "0xCCFE3d87fB7D369f1eeE65221a29A83f1323043C"
 	preprodSvcManagerAddress   = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
-	preprodEigenDADirectory    = "0xfB676e909f376efFDbDee7F17342aCF55f6Ec502"
 
 	disperserTestnetHostname   = "disperser-testnet-holesky.eigenda.xyz"
+	testnetEigenDADirectory    = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 	testnetCertVerifierAddress = "0xd305aeBcdEc21D00fDF8796CE37d0e74836a6B6e"
 	testnetSvcManagerAddress   = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
-	testnetEigenDADirectory    = "0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE"
 
 	disperserSepoliaHostname   = "disperser-testnet-sepolia.eigenda.xyz"
+	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	sepoliaCertVerifierAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 	sepoliaSvcManagerAddress   = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
-	sepoliaEigenDADirectory    = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 )
 
 var (
