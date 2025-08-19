@@ -37,7 +37,7 @@ func (c *Config) IsAPIEnabled(apiType string) bool {
 type Server struct {
 	log        logging.Logger
 	endpoint   string
-	certMgr    store.ICertManager
+	certMgr    store.IEigenDAManager
 	keccakMgr  store.IKeccakManager
 	m          metrics.Metricer
 	httpServer *http.Server
@@ -47,7 +47,7 @@ type Server struct {
 
 func NewServer(
 	cfg Config,
-	certMgr store.ICertManager,
+	certMgr store.IEigenDAManager,
 	keccakMgr store.IKeccakManager,
 	log logging.Logger,
 	m metrics.Metricer,

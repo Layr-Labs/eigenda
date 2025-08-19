@@ -56,7 +56,7 @@ func BuildManagers(
 	config Config,
 	secrets common.SecretConfigV2,
 	registry *prometheus.Registry,
-) (*store.CertManager, *store.KeccakManager, error) {
+) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
 	var redisStore *redis.Store
@@ -147,7 +147,7 @@ func BuildManagers(
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
-	certMgr, err := store.NewCertManager(
+	certMgr, err := store.NewEigenDAManager(
 		eigenDAV1Store,
 		eigenDAV2Store,
 		log,

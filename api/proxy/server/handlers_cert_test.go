@@ -47,7 +47,7 @@ const (
 func TestHandlerGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockCertManager := mocks.NewMockICertManager(ctrl)
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
 
 	tests := []struct {
@@ -81,7 +81,7 @@ func TestHandlerGet(t *testing.T) {
 			name: "Failure - OP Alt-DA Internal Server Error",
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
-				mockCertManager.EXPECT().
+				mockEigenDAManager.EXPECT().
 					Get(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("internal error"))
 			},
@@ -92,7 +92,7 @@ func TestHandlerGet(t *testing.T) {
 			name: "Success - OP Alt-DA",
 			url:  fmt.Sprintf("/get/0x010000%s", testCommitStr),
 			mockBehavior: func() {
-				mockCertManager.EXPECT().
+				mockEigenDAManager.EXPECT().
 					Get(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return([]byte(testCommitStr), nil)
 			},
@@ -105,7 +105,7 @@ func TestHandlerGet(t *testing.T) {
 			name: "Success - OP Alt-DA with l1_inclusion_block_number query param",
 			url:  fmt.Sprintf("/get/0x010000%s?l1_inclusion_block_number=100", testCommitStr),
 			mockBehavior: func() {
-				mockCertManager.EXPECT().
+				mockEigenDAManager.EXPECT().
 					Get(gomock.Any(), gomock.Any(), gomock.Eq(common.GETOpts{L1InclusionBlockNum: 100})).
 					Return([]byte(testCommitStr), nil)
 			},
@@ -126,7 +126,7 @@ func TestHandlerGet(t *testing.T) {
 			// we need to create a router through which we can pass the request.
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
-			server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+			server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -144,9 +144,9 @@ func TestHandlerGet(t *testing.T) {
 func TestHandlerPutSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockCertManager := mocks.NewMockICertManager(ctrl)
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockCertManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
 
 	tests := []struct {
 		name         string
@@ -161,7 +161,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			url:  "/put",
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
-				mockCertManager.EXPECT().Put(
+				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
@@ -185,7 +185,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			url:  "/put?commitment_mode=standard",
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
-				mockCertManager.EXPECT().Put(
+				mockEigenDAManager.EXPECT().Put(
 					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
@@ -206,7 +206,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			// we need to create a router through which we can pass the request.
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
-			server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+			server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -239,42 +239,42 @@ func TestHandlerPutErrors(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockCertManager := mocks.NewMockICertManager(ctrl)
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockCertManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
 
 	tests := []struct {
-		name                          string
-		mockCertManagerPutReturnedErr error
-		expectedHTTPCode              int
+		name                             string
+		mockEigenDAManagerPutReturnedErr error
+		expectedHTTPCode                 int
 	}{
 		{
 			// we only test OK status here. Returned commitment is checked in TestHandlerPut
-			name:                          "Success - 200",
-			mockCertManagerPutReturnedErr: nil,
-			expectedHTTPCode:              http.StatusOK,
+			name:                             "Success - 200",
+			mockEigenDAManagerPutReturnedErr: nil,
+			expectedHTTPCode:                 http.StatusOK,
 		},
 		{
-			name:                          "Failure - InternalServerError 500",
-			mockCertManagerPutReturnedErr: fmt.Errorf("internal error"),
-			expectedHTTPCode:              http.StatusInternalServerError,
+			name:                             "Failure - InternalServerError 500",
+			mockEigenDAManagerPutReturnedErr: fmt.Errorf("internal error"),
+			expectedHTTPCode:                 http.StatusInternalServerError,
 		},
 		{
 			// if /put results in ErrorFailover (returned by eigenda-client), we should return 503
-			name:                          "Failure - Failover 503",
-			mockCertManagerPutReturnedErr: &api.ErrorFailover{},
-			expectedHTTPCode:              http.StatusServiceUnavailable,
+			name:                             "Failure - Failover 503",
+			mockEigenDAManagerPutReturnedErr: &api.ErrorFailover{},
+			expectedHTTPCode:                 http.StatusServiceUnavailable,
 		},
 		{
-			name:                          "Failure - TooManyRequests 429",
-			mockCertManagerPutReturnedErr: status.Errorf(codes.ResourceExhausted, "too many requests"),
-			expectedHTTPCode:              http.StatusTooManyRequests,
+			name:                             "Failure - TooManyRequests 429",
+			mockEigenDAManagerPutReturnedErr: status.Errorf(codes.ResourceExhausted, "too many requests"),
+			expectedHTTPCode:                 http.StatusTooManyRequests,
 		},
 		{
 			// only 400s are due to oversized blobs right now
-			name:                          "Failure - BadRequest 400",
-			mockCertManagerPutReturnedErr: proxyerrors.ErrProxyOversizedBlob,
-			expectedHTTPCode:              http.StatusBadRequest,
+			name:                             "Failure - BadRequest 400",
+			mockEigenDAManagerPutReturnedErr: proxyerrors.ErrProxyOversizedBlob,
+			expectedHTTPCode:                 http.StatusBadRequest,
 		},
 	}
 
@@ -282,9 +282,9 @@ func TestHandlerPutErrors(t *testing.T) {
 		for _, mode := range modes {
 			t.Run(tt.name+" / "+mode.name, func(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
-				mockCertManager.EXPECT().
+				mockEigenDAManager.EXPECT().
 					Put(gomock.Any(), gomock.Any()).
-					Return(nil, tt.mockCertManagerPutReturnedErr)
+					Return(nil, tt.mockEigenDAManagerPutReturnedErr)
 
 				req := httptest.NewRequest(
 					http.MethodPost,
@@ -296,7 +296,7 @@ func TestHandlerPutErrors(t *testing.T) {
 				// we need to create a router through which we can pass the request.
 				r := mux.NewRouter()
 				// enable this logger to help debug tests
-				server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+				server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 				server.RegisterRoutes(r)
 				r.ServeHTTP(rec, req)
 
@@ -312,9 +312,9 @@ func TestHandlerPutKeccakErrors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockCertManager := mocks.NewMockICertManager(ctrl)
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
 	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
-	mockCertManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+	mockEigenDAManager.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
 
 	tests := []struct {
 		name                            string
@@ -357,7 +357,7 @@ func TestHandlerPutKeccakErrors(t *testing.T) {
 				// we need to create a router through which we can pass the request.
 				r := mux.NewRouter()
 				// enable this logger to help debug tests
-				server := NewServer(testCfg, mockCertManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+				server := NewServer(testCfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 				server.RegisterRoutes(r)
 				r.ServeHTTP(rec, req)
 

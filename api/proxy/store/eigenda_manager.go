@@ -13,22 +13,22 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-//go:generate mockgen -package mocks --destination ../test/mocks/cert_manager.go . ICertManager
+//go:generate mockgen -package mocks --destination ../test/mocks/eigen_da_manager.go . IEigenDAManager
 
-// ICertManager handles EigenDA certificate operations
-type ICertManager interface {
-	// See [CertManager.Put]
+// IEigenDAManager handles EigenDA certificate operations
+type IEigenDAManager interface {
+	// See [EigenDAManager.Put]
 	Put(ctx context.Context, value []byte) ([]byte, error)
-	// See [CertManager.Get]
+	// See [EigenDAManager.Get]
 	Get(ctx context.Context, versionedCert certs.VersionedCert, opts common.GETOpts) ([]byte, error)
-	// See [CertManager.SetDispersalBackend]
+	// See [EigenDAManager.SetDispersalBackend]
 	SetDispersalBackend(backend common.EigenDABackend)
-	// See [CertManager.GetDispersalBackend]
+	// See [EigenDAManager.GetDispersalBackend]
 	GetDispersalBackend() common.EigenDABackend
 }
 
-// CertManager handles EigenDA certificate operations
-type CertManager struct {
+// EigenDAManager handles EigenDA certificate operations
+type EigenDAManager struct {
 	log logging.Logger
 
 	// For op generic commitments & standard commitments
@@ -40,16 +40,16 @@ type CertManager struct {
 	secondary secondary.ISecondary
 }
 
-var _ ICertManager = &CertManager{}
+var _ IEigenDAManager = &EigenDAManager{}
 
-// NewCertManager creates a new CertManager
-func NewCertManager(
+// NewEigenDAManager creates a new EigenDAManager
+func NewEigenDAManager(
 	eigenda common.EigenDAV1Store,
 	eigenDAV2 common.EigenDAV2Store,
 	l logging.Logger,
 	secondary secondary.ISecondary,
 	dispersalBackend common.EigenDABackend,
-) (*CertManager, error) {
+) (*EigenDAManager, error) {
 	// Enforce invariants
 	if dispersalBackend == common.V2EigenDABackend && eigenDAV2 == nil {
 		return nil, fmt.Errorf("EigenDA V2 dispersal enabled but no v2 store provided")
@@ -59,7 +59,7 @@ func NewCertManager(
 		return nil, fmt.Errorf("EigenDA dispersal enabled but no store provided")
 	}
 
-	manager := &CertManager{
+	manager := &EigenDAManager{
 		log:       l,
 		eigenda:   eigenda,
 		eigendaV2: eigenDAV2,
@@ -70,7 +70,7 @@ func NewCertManager(
 }
 
 // GetDispersalBackend returns which EigenDA backend is currently being used for dispersal
-func (m *CertManager) GetDispersalBackend() common.EigenDABackend {
+func (m *EigenDAManager) GetDispersalBackend() common.EigenDABackend {
 	val := m.dispersalBackend.Load()
 	backend, ok := val.(common.EigenDABackend)
 	if !ok {
@@ -81,14 +81,14 @@ func (m *CertManager) GetDispersalBackend() common.EigenDABackend {
 }
 
 // SetDispersalBackend sets which EigenDA backend to use for dispersal
-func (m *CertManager) SetDispersalBackend(backend common.EigenDABackend) {
+func (m *EigenDAManager) SetDispersalBackend(backend common.EigenDABackend) {
 	m.dispersalBackend.Store(backend)
 }
 
 // Get fetches a value from a storage backend based on the (commitment mode, type).
 // It also validates the value retrieved and returns an error if the value is invalid.
 // If opts.ReturnEncodedPayload is true, it will return the encoded payload without decoding it.
-func (m *CertManager) Get(ctx context.Context,
+func (m *EigenDAManager) Get(ctx context.Context,
 	versionedCert certs.VersionedCert,
 	opts common.GETOpts,
 ) ([]byte, error) {
@@ -152,7 +152,7 @@ func (m *CertManager) Get(ctx context.Context,
 }
 
 // Put ... inserts a value into a storage backend based on the commitment mode
-func (m *CertManager) Put(ctx context.Context, value []byte) ([]byte, error) {
+func (m *EigenDAManager) Put(ctx context.Context, value []byte) ([]byte, error) {
 	var commit []byte
 	var err error
 
@@ -170,7 +170,7 @@ func (m *CertManager) Put(ctx context.Context, value []byte) ([]byte, error) {
 	return commit, nil
 }
 
-func (m *CertManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
+func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
 	if m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
 		m.log.Debug("Publishing data to async secondary stores")
 		m.secondary.Topic() <- secondary.PutNotify{
@@ -188,7 +188,7 @@ func (m *CertManager) backupToSecondary(ctx context.Context, commitment []byte, 
 }
 
 // getVerifyMethod returns the correct verify method based on commitment type
-func (m *CertManager) getVerifyMethod(certVersion certs.VersionByte) (
+func (m *EigenDAManager) getVerifyMethod(certVersion certs.VersionByte) (
 	func(context.Context, []byte, []byte, uint64) error,
 	error,
 ) {
@@ -211,7 +211,7 @@ func (m *CertManager) getVerifyMethod(certVersion certs.VersionByte) (
 }
 
 // putToCorrectEigenDABackend ... disperses blob to EigenDA backend
-func (m *CertManager) putToCorrectEigenDABackend(ctx context.Context, value []byte) ([]byte, error) {
+func (m *EigenDAManager) putToCorrectEigenDABackend(ctx context.Context, value []byte) ([]byte, error) {
 	val := m.dispersalBackend.Load()
 	backend, ok := val.(common.EigenDABackend)
 	if !ok {
@@ -235,7 +235,7 @@ func (m *CertManager) putToCorrectEigenDABackend(ctx context.Context, value []by
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
 }
 
-func (m *CertManager) getFromCorrectEigenDABackend(
+func (m *EigenDAManager) getFromCorrectEigenDABackend(
 	ctx context.Context,
 	versionedCert certs.VersionedCert,
 	opts common.GETOpts,
