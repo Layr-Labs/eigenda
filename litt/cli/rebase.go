@@ -34,7 +34,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("invalid source path: %s", src)
+			return fmt.Errorf("failed to sanitise path %s: %w", src, err)
 		}
 	}
 
@@ -46,7 +46,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		destinations[i], err = util.SanitizePath(dest)
 		if err != nil {
-			return fmt.Errorf("invalid destination path: %s", dest)
+			return fmt.Errorf("failed to sanitise path %s: %w", dest, err)
 		}
 	}
 
@@ -88,6 +88,10 @@ func rebase(
 			return fmt.Errorf("error ensuring destination path %s exists: %w", dest, err)
 		}
 	}
+	// Don't immediately take a lock on the source directories. Each source directory will be locked individually
+	// before its data is transferred. Because source directories are deleted after their data is transferred,
+	// it is inconvenient to hold the locks in this outer scope (since we need to release the lock to
+	// delete the directory).
 
 	// Acquire locks on all destination directories.
 	releaseDestinationLocks, err := util.LockDirectories(logger, destinations, util.LockfileName, fsync)
@@ -299,7 +303,7 @@ func transferDataInTable(
 	}
 
 	if !preserveOriginal {
-		err = deleteSnapshotDirectory(logger, source, tableName, true)
+		err = deleteSnapshotDirectory(logger, source, tableName, verbose)
 		if err != nil {
 			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
 		}
