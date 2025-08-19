@@ -25,3 +25,7 @@ node_modules
 
 # release dependencies
 artifacts/
+
+# Ignore inabox deployment artifacts
+inabox/
+inabox_*.json
