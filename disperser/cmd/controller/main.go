@@ -195,11 +195,11 @@ func RunController(ctx *cli.Context) error {
 			logger,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create indexer: %v", err)
+			return fmt.Errorf("failed to create indexer: %w", err)
 		}
 		ics, err = indexer.NewIndexedChainState(chainState, idx)
 		if err != nil {
-			return fmt.Errorf("failed to create indexed chain state: %v", err)
+			return fmt.Errorf("failed to create indexed chain state: %w", err)
 		}
 	}
 

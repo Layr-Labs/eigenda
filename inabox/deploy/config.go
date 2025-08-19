@@ -358,8 +358,9 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AWS_SECRET_ACCESS_KEY:              "",
 		CONTROLLER_AWS_ENDPOINT_URL:                   "",
 		CONTROLLER_ENCODER_ADDRESS:                    "0.0.0.0:34001",
-		CONTROLLER_FINALIZATION_BLOCK_DELAY:           "5", // set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
+		// set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
 		// disperser chooses rbn = latest_block_number - finalization_block_delay
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
