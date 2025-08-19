@@ -26,7 +26,6 @@ import (
 	memstore_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/v2"
 	eigenda_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -61,21 +60,12 @@ func BuildStoreManager(
 ) (*store.Manager, error) {
 	var err error
 	var s3Store *s3.Store
-	var redisStore *redis.Store
 	var eigenDAV1Store common.EigenDAV1Store
 	var eigenDAV2Store common.EigenDAV2Store
 
 	if config.S3Config.Bucket != "" {
 		log.Info("Using S3 storage backend")
 		s3Store, err = s3.NewStore(config.S3Config)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if config.RedisConfig.Endpoint != "" {
-		log.Info("Using Redis storage backend")
-		redisStore, err = redis.NewStore(&config.RedisConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -125,8 +115,8 @@ func BuildStoreManager(
 		}
 	}
 
-	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
-	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
+	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
+	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
 	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
@@ -142,7 +132,6 @@ func BuildStoreManager(
 		"eigenda_v1", eigenDAV1Store != nil,
 		"eigenda_v2", eigenDAV2Store != nil,
 		"s3", s3Store != nil,
-		"redis", redisStore != nil,
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
@@ -164,18 +153,12 @@ func BuildStoreManager(
 func buildSecondaries(
 	targets []string,
 	s3Store common.SecondaryStore,
-	redisStore *redis.Store,
 ) []common.SecondaryStore {
 	stores := make([]common.SecondaryStore, len(targets))
 
 	for i, target := range targets {
 		//nolint:exhaustive // TODO: implement additional secondaries
 		switch common.StringToBackendType(target) {
-		case common.RedisBackendType:
-			if redisStore == nil {
-				panic(fmt.Sprintf("Redis backend not configured: %s", target))
-			}
-			stores[i] = redisStore
 		case common.S3BackendType:
 			if s3Store == nil {
 				panic(fmt.Sprintf("S3 backend not configured: %s", target))
