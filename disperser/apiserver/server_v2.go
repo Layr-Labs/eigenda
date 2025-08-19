@@ -64,8 +64,12 @@ type DispersalServerV2 struct {
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
 
-	// controllerClient is optional - used for payment authorization
-	controllerClient ControllerClient
+	// The controllerClient is part of the effort to make the Controller handle payment authorization, instead of doing
+	// in on the API servers directly.
+	//
+	// It may be nil for now, in which case old payment logic will be used. If it is non-nil, then it will be used
+	// to delegate payment authorization to the Controller.
+	controllerClient *ControllerClient
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -83,7 +87,7 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
-	controllerClient ControllerClient, // Optional - pass nil if not using controller
+	controllerClient *ControllerClient, // Optional - pass nil if not using controller
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")

@@ -38,9 +38,23 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 
-	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
-		return nil, err
+	if s.controllerClient != nil {
+		// s.controllerClient is non-nil, so use the new logic which delegates accounting and metering to the Controller
+
+		_, err := s.controllerClient.AuthorizePayment(ctx, &pb.AuthorizePaymentRequest{
+			BlobHeader: req.GetBlobHeader(),
+			Signature:  req.GetSignature(),
+		})
+		if err != nil {
+			return nil, api.NewErrorResourceExhausted(fmt.Sprintf("payment authorization failed: %v", err))
+		}
+	} else {
+		// s.controllerClient is nil, so use the old logic
+		//
+		// Check against payment meter to make sure there is quota remaining
+		if err := s.checkPaymentMeter(ctx, req, start); err != nil {
+			return nil, err
+		}
 	}
 
 	finishedValidation := time.Now()
@@ -136,21 +150,6 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		AccountID:         gethcommon.HexToAddress(accountID),
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
-	}
-
-	// TODO: Future migration - move payment authorization to controller
-	// This will enable centralized payment management across disperser instances
-	if false { // Enable when controller authorization is ready
-		if s.controllerClient != nil {
-			_, err := s.controllerClient.AuthorizePayment(ctx, &pb.AuthorizePaymentRequest{
-				BlobHeader: req.GetBlobHeader(),
-				Signature:  req.GetSignature(),
-			})
-			if err != nil {
-				return api.NewErrorResourceExhausted(fmt.Sprintf("payment authorization failed: %v", err))
-			}
-			return nil
-		}
 	}
 
 	// Existing payment meter logic remains unchanged
