@@ -608,6 +608,10 @@ var _ = AfterSuite(func() {
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()
 
+		// Force cleanup as a failsafe in case normal cleanup fails
+		fmt.Println("Performing failsafe cleanup of any remaining processes")
+		testConfig.ForceStopBinaries()
+
 		if infraManager != nil {
 			fmt.Println("Stopping testinfra containers")
 			ctx, stopCancel := context.WithTimeout(context.Background(), 1*time.Minute)

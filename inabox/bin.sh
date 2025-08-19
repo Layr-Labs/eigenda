@@ -227,11 +227,54 @@ function start_detached {
 function stop_detached {
 
     pid_file="$testpath/pids"
-    pids=$(cat $pid_file)
+    if [[ -f "$pid_file" ]]; then
+        pids=$(cat $pid_file)
+        kill_processes
+        rm -f $pid_file
+    else
+        echo "No PID file found, attempting fallback cleanup..."
+        fallback_cleanup
+    fi
+}
 
-    kill_processes
+function fallback_cleanup {
+    echo "Performing fallback process cleanup..."
+    
+    # Kill processes by name patterns that are specific to EigenDA
+    pkill -f "disperser/bin/server" 2>/dev/null || true
+    pkill -f "disperser/bin/encoder" 2>/dev/null || true
+    pkill -f "disperser/bin/batcher" 2>/dev/null || true
+    pkill -f "disperser/bin/controller" 2>/dev/null || true
+    pkill -f "node/bin/node" 2>/dev/null || true
+    pkill -f "relay/bin/relay" 2>/dev/null || true
+    pkill -f "retriever/bin/server" 2>/dev/null || true
+    pkill -f "churner/bin/server" 2>/dev/null || true
+    
+    # Wait a moment for graceful shutdown
+    sleep 2
+    
+    # Force kill any remaining processes
+    pkill -9 -f "disperser/bin/server" 2>/dev/null || true
+    pkill -9 -f "disperser/bin/encoder" 2>/dev/null || true
+    pkill -9 -f "disperser/bin/batcher" 2>/dev/null || true
+    pkill -9 -f "disperser/bin/controller" 2>/dev/null || true
+    pkill -9 -f "node/bin/node" 2>/dev/null || true
+    pkill -9 -f "relay/bin/relay" 2>/dev/null || true
+    pkill -9 -f "retriever/bin/server" 2>/dev/null || true
+    pkill -9 -f "churner/bin/server" 2>/dev/null || true
+    
+    echo "Fallback cleanup completed"
+}
 
-    rm -f $pid_file
+function force_stop {
+    echo "Force stopping all EigenDA processes..."
+    fallback_cleanup
+    
+    # Also clean up any remaining PID files
+    find ./testdata -name "pids" -type f -delete 2>/dev/null || true
+    rm -f ./anvil.pid 2>/dev/null || true
+    
+    echo "Force stop completed"
 }
 
 function start_anvil {
@@ -257,11 +300,16 @@ function start_anvil {
 function stop_anvil {
 
     pid_file="./anvil.pid"
-    anvil_pid=$(cat $pid_file)
-
-    kill $anvil_pid
-
-    rm -f $pid_file
+    if [[ -f "$pid_file" ]]; then
+        anvil_pid=$(cat $pid_file)
+        if [[ -n "$anvil_pid" ]]; then
+            kill $anvil_pid 2>/dev/null || true
+        fi
+        rm -f $pid_file
+    else
+        # Fallback: try to find and kill anvil process
+        pkill -f "anvil --host 0.0.0.0" 2>/dev/null || true
+    fi
 }
 
 function start_graph {
@@ -293,6 +341,16 @@ case "$1" in
     help)
         cat <<-EOF
         Binary experiment tool
+        
+        Available commands:
+        - start: Start all services with trap (interactive)
+        - start-detached: Start all services in detached mode
+        - stop: Stop all services gracefully
+        - force-stop: Force kill all EigenDA processes
+        - start-anvil: Start Anvil blockchain
+        - stop-anvil: Stop Anvil blockchain
+        - start-graph: Start Graph node
+        - stop-graph: Stop Graph node
 EOF
         ;;
     start)
@@ -301,6 +359,8 @@ EOF
         start_detached ${@:2} ;;
     stop)
         stop_detached ${@:2} ;;
+    force-stop)
+        force_stop ${@:2} ;;
     start-anvil)
         start_anvil ${@:2} ;;
     stop-anvil)

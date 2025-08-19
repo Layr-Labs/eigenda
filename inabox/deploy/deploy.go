@@ -410,6 +410,14 @@ func (env *Config) StopBinaries() {
 	}
 }
 
+func (env *Config) ForceStopBinaries() {
+	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+	err := execCmd("./bin.sh", []string{"force-stop"}, []string{}, true)
+	if err != nil {
+		log.Printf("Force stop completed with some errors (this is expected): %s", err)
+	}
+}
+
 func (env *Config) StartAnvil() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{}, false) // printing output causes hang

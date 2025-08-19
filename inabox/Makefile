@@ -13,7 +13,7 @@ stop-geth:
 	cd geth && docker compose down
 
 
-.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra force-clean run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -44,6 +44,12 @@ stop-infra:
 	./bin.sh stop-anvil
 	./bin.sh stop-graph
 	docker stop localstack-test
+
+force-clean:
+	./bin.sh force-stop
+	./bin.sh stop-anvil
+	./bin.sh stop-graph
+	docker stop localstack-test || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
