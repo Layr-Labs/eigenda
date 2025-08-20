@@ -914,3 +914,13 @@ func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
 	}
 	return c.proxyWrapper, nil
 }
+
+func (c *TestClient) EstimateGasCheckDACert(ctx context.Context, eigenDAV3Cert *coretypes.EigenDACertV3) (uint64, error) {
+	gas, err := c.certVerifier.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate gas for CheckDACert call: %w", err)
+	}
+
+	c.metrics.reportEstimateGasCheckDACert(gas)
+	return gas, nil
+}
