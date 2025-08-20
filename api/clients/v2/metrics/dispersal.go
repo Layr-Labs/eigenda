@@ -16,9 +16,9 @@ type DispersalMetricer interface {
 }
 
 type DispersalMetrics struct {
-	BlobSize     *prometheus.HistogramVec
-  
-  factory *metrics.Documentor
+	BlobSize prometheus.Histogram
+
+	factory *metrics.Documentor
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
@@ -42,18 +42,18 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 
 	return &DispersalMetrics{
-		BlobSize: factory.NewHistogramVec(prometheus.HistogramOpts{
+		BlobSize: factory.NewHistogram(prometheus.HistogramOpts{
 			Name:      "blob_size_bytes",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
 			Buckets:   sizeBuckets,
-		}, []string{}),
+		}),
 	}
 }
 
 func (m *DispersalMetrics) RecordBlobSizeBytes(size uint) {
-	m.BlobSize.WithLabelValues().Observe(float64(size))
+	m.BlobSize.Observe(float64(size))
 }
 
 func (m *DispersalMetrics) Document() []metrics.DocumentedMetric {
