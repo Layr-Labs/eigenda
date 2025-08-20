@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     eigenda::verification::{
-        blob::BlobVerificationError, verify_blob, verify_cert, verify_cert_recency,
+        blob::error::BlobVerificationError, verify_blob, verify_cert, verify_cert_recency,
     },
     ethereum::{extract_certificate, get_ancestor},
     spec::{

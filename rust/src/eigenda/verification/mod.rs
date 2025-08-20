@@ -6,10 +6,14 @@ use sov_rollup_interface::da::BlockHeaderTrait;
 use crate::{
     eigenda::{
         types::StandardCommitment,
-        verification::{blob::BlobVerificationError, cert::error::CertVerificationError},
+        verification::{blob::error::BlobVerificationError, cert::error::CertVerificationError},
     },
     spec::{AncestorMetadata, EthereumBlockHeader},
 };
+
+// TODO: unused?
+// #[cfg(feature = "native")]
+// use sov_rollup_interface::node::da::CheckedMath;
 
 /// Certificate recency validation
 ///
@@ -48,23 +52,20 @@ pub fn verify_cert(
 
     let inputs = ancestor_data.extract(cert, current_block)?;
 
-    cert::verify(inputs)?;
-    Ok(())
+    cert::verify(inputs)
 }
 
 /// Blob validation against the certificate
 ///
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation
-pub fn verify_blob(
-    _certificate: &StandardCommitment,
-    _blob: &[u8],
-) -> Result<(), BlobVerificationError> {
-    // TODO: Verify the blob against the certificate. Doing that we have a
-    // full validated chain of data
+pub fn verify_blob(cert: &StandardCommitment, blob: &[u8]) -> Result<(), BlobVerificationError> {
+    let blob_commitment = &cert
+        .blob_inclusion_info()
+        .blob_certificate
+        .blob_header
+        .commitment;
 
-    blob::verify();
-
-    Ok(())
+    blob::verify(blob_commitment, blob)
 }
 
 #[cfg(test)]

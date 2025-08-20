@@ -38,9 +38,11 @@ anyhow = { version = "1.0.98", default-features = false }
 ark-bn254 = { version = "0.5.0", default-features = false, features = ["curve"] }
 ark-ec = { version = "0.5.0", default-features = false }
 ark-ff = { version = "0.5.0", default-features = false }
+ark-serialize = { version = "0.5.0", default-features = false, features = ["derive"] }
 async-trait = "0.1.88"
 backon = { version = "1.5.2", optional = true }
-bitvec     = { version = "1.0.1", default-features = false }
+bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
+bitvec = { version = "1.0.1", default-features = false }
 borsh = { version = "1.5.7", default-features = false, features = ["bytes"] }
 bytes = { version = "1.10.1", default-features = false }
 derive_more = { version = "2.0.1" }
@@ -48,6 +50,8 @@ futures = { version = "0.3.31" }
 hashbrown = { version = "0.15.4", default-features = false, features = ["default-hasher"] }
 hex = { version = "0.4.3" }
 reqwest = { version = "0.12.22", features = ["json"], optional = true }
+rust-kzg-bn254-primitives = { version = "0.1.2", default-features = false }
+rust-kzg-bn254-prover = { version = "0.1.1", default-features = false }
  # Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L250
 schemars = { version = "0.8.21", default-features = false, features = [ "derive", ] }
 serde = { version = "1.0.219", default-features = false, features = [ "alloc", "derive", ] }
@@ -58,6 +62,12 @@ tiny-keccak  = { version = "2.0.2", default-features = false, features = ["kecca
 tokio = { version = "1.47.1", features = ["sync"], optional = true }
 tracing = { version = "0.1.41" }
 url = { version = "2.5.4" }
+
+[build-dependencies]
+ark-bn254 = { version = "0.5.0", default-features = false }
+ark-serialize = { version = "0.5.0", default-features = false, features = ["derive"] }
+bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
+rust-kzg-bn254-prover = { version = "0.1.1", default-features = false }
 
 [dev-dependencies]
 alloy-provider = { version = "1.0.23", default-features = false, features = [
