@@ -209,7 +209,10 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clientsv2.NewCertBuilder(logger, gethcommon.HexToAddress(config.OperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
+	certBuilder, err := clientsv2.NewCertBuilder(logger,
+		gethcommon.HexToAddress(config.OperatorStateRetrieverAddr),
+		ethReader.GetRegistryCoordinatorAddress(),
+		ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}

@@ -91,7 +91,9 @@ func NewReader(
 
 // updateContractBindings updates the contract bindings for the reader
 // TODO: update to use address directory contract once all contracts are written into the directory
-func (t *Reader) updateContractBindings(operatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
+func (t *Reader) updateContractBindings(
+	operatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address,
+) error {
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
 		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
@@ -145,7 +147,7 @@ func (t *Reader) updateContractBindings(operatorStateRetrieverAddr, eigenDAServi
 		return err
 	}
 
-	contractOprtStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(operatorStateRetrieverAddr, t.ethClient)
+	contractOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(operatorStateRetrieverAddr, t.ethClient)
 	if err != nil {
 		t.logger.Error("Failed to fetch OperatorStateRetriever contract", "err", err)
 		return err
@@ -157,7 +159,11 @@ func (t *Reader) updateContractBindings(operatorStateRetrieverAddr, eigenDAServi
 		return err
 	}
 
-	t.logger.Debug("Addresses", "operatorStateRetrieverAddr", operatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses",
+		"operatorStateRetrieverAddr", operatorStateRetrieverAddr.Hex(),
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
+		"registryCoordinatorAddr", registryCoordinatorAddr.Hex(),
+		"blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
@@ -256,7 +262,7 @@ func (t *Reader) updateContractBindings(operatorStateRetrieverAddr, eigenDAServi
 		RelayRegistryAddress:  relayRegistryAddress,
 		AVSDirectory:          contractAVSDirectory,
 		SocketRegistry:        contractSocketRegistry,
-		OpStateRetriever:      contractOprtStateRetr,
+		OpStateRetriever:      contractOpStateRetr,
 		BLSApkRegistry:        contractBLSPubkeyReg,
 		IndexRegistry:         contractIIndexReg,
 		RegistryCoordinator:   contractIRegistryCoordinator,
