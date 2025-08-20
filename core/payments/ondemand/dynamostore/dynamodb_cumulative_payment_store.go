@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -31,9 +32,9 @@ const (
 // part of the ongoing payments refactor.
 type DynamoDBCumulativePaymentStore struct {
 	// The DynamoDB client to use for storage operations
-	dynamoClient dynamodb.Client
-	// The name of the DynamoDB table to store payments in
-	tableName string
+	dynamoClient *dynamodb.Client
+	// The name of the DynamoDB table to store payments in, stored as *string for use in DynamoDB operations
+	tableName *string
 	// The account address, pre-built as a key for DynamoDB operations
 	accountKey map[string]types.AttributeValue
 }
@@ -42,7 +43,7 @@ var _ ondemand.CumulativePaymentStore = (*DynamoDBCumulativePaymentStore)(nil)
 
 // Creates a new DynamoDB-backed cumulative payment store
 func NewDynamoDBCumulativePaymentStore(
-	dynamoClient dynamodb.Client,
+	dynamoClient *dynamodb.Client,
 	tableName string,
 	// The account ID this store is tracking payments for
 	accountID gethcommon.Address,
@@ -59,7 +60,7 @@ func NewDynamoDBCumulativePaymentStore(
 
 	return &DynamoDBCumulativePaymentStore{
 		dynamoClient: dynamoClient,
-		tableName:    tableName,
+		tableName:    aws.String(tableName),
 		accountKey: map[string]types.AttributeValue{
 			attributeAccountID: &types.AttributeValueMemberS{Value: accountID.Hex()},
 		},
@@ -140,18 +141,19 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 		":max": &types.AttributeValueMemberN{Value: maxAllowedCurrent.String()},
 	}
 
-	result, err := s.dynamoClient.UpdateWithExpression(
-		ctx,
-		s.tableName,
-		s.accountKey,
-		updateExpression,
-		&conditionExpression,
-		nil,
-		expressionAttributeValues,
-	)
+	updateItemInput := &dynamodb.UpdateItemInput{
+		TableName:                 s.tableName,
+		Key:                       s.accountKey,
+		UpdateExpression:          aws.String(updateExpression),
+		ConditionExpression:       aws.String(conditionExpression),
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	}
 
+	updateItemOutput, err := s.dynamoClient.UpdateItem(ctx, updateItemInput)
 	if err != nil {
-		if errors.Is(err, dynamodb.ErrConditionFailed) {
+		var conditionCheckFailedException *types.ConditionalCheckFailedException
+		if errors.As(err, &conditionCheckFailedException) {
 			currentValue, getErr := s.getCurrentPayment(ctx)
 			if getErr != nil {
 				return nil, fmt.Errorf("conditional check failed and couldn't get current value: %w", getErr)
@@ -163,10 +165,10 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 			}
 		}
 
-		return nil, fmt.Errorf("failed to update payment: %w", err)
+		return nil, fmt.Errorf("update cumulative payment: %w", err)
 	}
 
-	return extractPaymentValue(result)
+	return extractPaymentValue(updateItemOutput.Attributes)
 }
 
 // extractPaymentValue extracts and parses attributeCumulativePayment from a DynamoDB item
@@ -196,10 +198,13 @@ func extractPaymentValue(item map[string]types.AttributeValue) (*big.Int, error)
 // getCurrentPayment is a helper method to retrieve the current payment value
 // Used for error reporting when operations fail
 func (s *DynamoDBCumulativePaymentStore) getCurrentPayment(ctx context.Context) (*big.Int, error) {
-	result, err := s.dynamoClient.GetItem(ctx, s.tableName, s.accountKey)
+	resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: s.tableName,
+		Key:       s.accountKey,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get item: %w", err)
 	}
 
-	return extractPaymentValue(result)
+	return extractPaymentValue(resp.Item)
 }
