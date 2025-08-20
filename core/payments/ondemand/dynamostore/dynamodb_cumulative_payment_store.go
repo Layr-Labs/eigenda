@@ -199,8 +199,10 @@ func extractPaymentValue(item map[string]types.AttributeValue) (*big.Int, error)
 // Used for error reporting when operations fail
 func (s *DynamoDBCumulativePaymentStore) getCurrentPayment(ctx context.Context) (*big.Int, error) {
 	resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: s.tableName,
-		Key:       s.accountKey,
+		TableName:            s.tableName,
+		Key:                  s.accountKey,
+		ConsistentRead:       aws.Bool(true),
+		ProjectionExpression: aws.String(attributeCumulativePayment),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get item: %w", err)
