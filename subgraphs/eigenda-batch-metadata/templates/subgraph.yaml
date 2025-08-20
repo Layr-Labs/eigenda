@@ -1,4 +1,4 @@
-specVersion: 0.0.5
+specVersion: 1.2.0
 schema:
   file: ./schema.graphql
 dataSources:
@@ -11,10 +11,14 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
-        - ExampleEntity
+        - BatchHeader
+        - Batch
+        - GasFees
+        - NonSigning
+        - Operator
       abis:
         - name: EigenDAServiceManager
           file: ./abis/EigenDAServiceManager.json
