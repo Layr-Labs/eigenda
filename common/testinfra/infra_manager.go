@@ -28,13 +28,20 @@ func NewInfraManager(config InfraConfig) *InfraManager {
 
 // Start initializes and starts all enabled infrastructure components
 func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
+	var success bool
+	defer func() {
+		if !success {
+			im.cleanup(ctx)
+		}
+	}()
+
 	// Create a shared network for all containers to communicate
 	sharedNetwork, err := network.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create shared network: %w", err)
 	}
 	im.network = sharedNetwork
-	
+
 	// Start containers in dependency order
 
 	// 1. Start Anvil blockchain if enabled
@@ -50,7 +57,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			Fork:      im.config.Anvil.Fork,
 			ForkBlock: im.config.Anvil.ForkBlock,
 		}
-		anvil, err := containers.NewAnvilContainerWithNetwork(ctx, anvilConfig, sharedNetwork.Name)
+		anvil, err := containers.NewAnvilContainerWithNetwork(ctx, anvilConfig, sharedNetwork)
 		if err != nil {
 			return nil, fmt.Errorf("failed to start anvil: %w", err)
 		}
@@ -67,9 +74,8 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			Region:   im.config.LocalStack.Region,
 			Debug:    im.config.LocalStack.Debug,
 		}
-		localstack, err := containers.NewLocalStackContainerWithNetwork(ctx, localstackConfig, sharedNetwork.Name)
+		localstack, err := containers.NewLocalStackContainerWithNetwork(ctx, localstackConfig, sharedNetwork)
 		if err != nil {
-			im.cleanup(ctx)
 			return nil, fmt.Errorf("failed to start localstack: %w", err)
 		}
 		im.localstack = localstack
@@ -79,19 +85,17 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 	// 3. Start Graph Node if enabled (depends on Anvil for Ethereum RPC)
 	if im.config.GraphNode.Enabled {
 		var ethereumRPC string
-		
+
 		// Use internal container network URL for Graph Node to reach Anvil
 		if im.anvil != nil {
 			internalRPC, err := im.anvil.InternalRPCURL(ctx)
 			if err != nil {
-				im.cleanup(ctx)
 				return nil, fmt.Errorf("failed to get anvil internal RPC URL: %w", err)
 			}
 			ethereumRPC = internalRPC
 		} else if im.config.GraphNode.EthereumRPC != "" {
 			ethereumRPC = im.config.GraphNode.EthereumRPC
 		} else {
-			im.cleanup(ctx)
 			return nil, fmt.Errorf("graph node requires ethereum RPC but none provided and anvil not enabled")
 		}
 
@@ -103,20 +107,19 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			EthereumRPC:  im.config.GraphNode.EthereumRPC,
 			IPFSEndpoint: im.config.GraphNode.IPFSEndpoint,
 		}
-		graphnode, err := containers.NewGraphNodeContainerWithNetwork(ctx, graphnodeConfig, ethereumRPC, sharedNetwork.Name)
+		graphnode, err := containers.NewGraphNodeContainerWithNetwork(ctx, graphnodeConfig, ethereumRPC, sharedNetwork)
 		if err != nil {
-			im.cleanup(ctx)
 			return nil, fmt.Errorf("failed to start graph node: %w", err)
 		}
 		im.graphnode = graphnode
 		im.result.GraphNodeURL = graphnode.HTTPURL()
 		im.result.GraphNodeAdminURL = graphnode.AdminURL()
-		
+
 		// Get IPFS URL if available
 		if ipfsURL, err := graphnode.IPFSURL(ctx); err == nil {
 			im.result.IPFSURL = ipfsURL
 		}
-		
+
 		// Also expose the PostgreSQL URL for direct database access if needed
 		if postgresContainer := graphnode.GetPostgres(); postgresContainer != nil {
 			postgresHost, _ := postgresContainer.Host(ctx)
@@ -128,6 +131,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
+	success = true
 	return &im.result, nil
 }
 

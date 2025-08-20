@@ -16,6 +16,19 @@ const (
 	AnvilPort  = "8545/tcp"
 )
 
+// AnvilConfig configures the Anvil blockchain container
+type AnvilConfig struct {
+	Enabled   bool   `json:"enabled"`
+	ChainID   int    `json:"chain_id"`
+	BlockTime int    `json:"block_time"` // seconds between blocks, 0 for instant mining
+	GasLimit  uint64 `json:"gas_limit"`
+	GasPrice  uint64 `json:"gas_price"`
+	Accounts  int    `json:"accounts"`   // number of pre-funded accounts
+	Mnemonic  string `json:"mnemonic"`   // custom mnemonic for deterministic accounts
+	Fork      string `json:"fork"`       // fork from this RPC URL
+	ForkBlock uint64 `json:"fork_block"` // fork from specific block
+}
+
 // AnvilContainer wraps testcontainers functionality for Anvil
 type AnvilContainer struct {
 	container testcontainers.Container
@@ -23,17 +36,16 @@ type AnvilContainer struct {
 	rpcURL    string
 }
 
-// NewAnvilContainer creates and starts a new Anvil container
-func NewAnvilContainer(ctx context.Context, config AnvilConfig) (*AnvilContainer, error) {
-	return NewAnvilContainerWithNetwork(ctx, config, "")
-}
-
 // NewAnvilContainerWithNetwork creates and starts a new Anvil container in a specific network
 func NewAnvilContainerWithNetwork(
-	ctx context.Context, config AnvilConfig, networkName string,
+	ctx context.Context, config AnvilConfig, nw *testcontainers.DockerNetwork,
 ) (*AnvilContainer, error) {
 	if !config.Enabled {
 		return nil, fmt.Errorf("anvil container is disabled in config")
+	}
+
+	if nw == nil {
+		return nil, fmt.Errorf("network is required - Anvil containers must use a shared network")
 	}
 
 	args := buildAnvilArgs(config)
@@ -43,17 +55,19 @@ func NewAnvilContainerWithNetwork(
 	uniqueName := fmt.Sprintf("anvil-test-%d-%d", config.ChainID, time.Now().UnixNano())
 
 	req := testcontainers.ContainerRequest{
-		Image:        AnvilImage,
 		Cmd:          append([]string{"anvil"}, args...),
 		ExposedPorts: []string{AnvilPort},
 		Env:          map[string]string{"ANVIL_IP_ADDR": "0.0.0.0"},
-		WaitingFor:   wait.ForListeningPort("8545/tcp"),
+		Image:        AnvilImage,
 		Name:         uniqueName,
-	}
-
-	// Add network if specified
-	if networkName != "" {
-		req.Networks = []string{networkName}
+		Networks:     []string{nw.Name},
+		NetworkAliases: map[string][]string{
+			nw.Name: {"anvil"},
+		},
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("8545/tcp"),
+			wait.ForLog("Listening on 0.0.0.0:8545").WithStartupTimeout(30*time.Second),
+		),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -67,14 +81,12 @@ func NewAnvilContainerWithNetwork(
 	// Get the mapped port
 	mappedPort, err := container.MappedPort(ctx, "8545")
 	if err != nil {
-		container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get mapped port: %w", err)
 	}
 
 	// Get the host
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
@@ -173,7 +185,6 @@ func (a *AnvilContainer) GetPrivateKey(accountIndex int) (string, error) {
 // buildAnvilArgs constructs the command line arguments for Anvil
 func buildAnvilArgs(config AnvilConfig) []string {
 	args := []string{
-		"--host", "0.0.0.0",
 		"--port", "8545",
 		"--chain-id", strconv.Itoa(config.ChainID),
 		"--accounts", strconv.Itoa(config.Accounts),
