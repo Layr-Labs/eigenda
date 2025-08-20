@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
@@ -103,7 +104,7 @@ type Node struct {
 	StoreChunksSemaphore *semaphore.Weighted
 
 	// Looks up operator state and maintains a cache of recently used operator states.
-	OperatorStateCache eth.OperatorStateCache
+	OperatorStateCache operatorstate.OperatorStateCache
 }
 
 // NewNode creates a new Node with the provided config.
@@ -138,7 +139,7 @@ func NewNode(
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
-	eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
+	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get EigenDAEjectionManager address from contract directory: %w", err)
 	}
@@ -155,7 +156,7 @@ func NewNode(
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, blsOperatorStateRetrieverAddress.Hex(), eigenDAServiceManagerAddress.Hex())
+	tx, err := eth.NewWriter(logger, client, blsOperatorStateRetrieverAddress.Hex(), serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -226,7 +227,7 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddress, client)
+	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(serviceManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
@@ -265,7 +266,7 @@ func NewNode(
 
 	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
 
-	operatorStateCache, err := eth.NewOperatorStateCache(
+	operatorStateCache, err := operatorstate.NewOperatorStateCache(
 		client,
 		cst,
 		registryCoordinatorAddress,

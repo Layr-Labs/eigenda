@@ -1,4 +1,4 @@
-package eth
+package operatorstate
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -34,7 +35,7 @@ type operatorStateCache struct {
 	chainState core.ChainState
 
 	// used to get a list of quorums registered at a given reference block number
-	quorumScanner QuorumScanner
+	quorumScanner eth.QuorumScanner
 
 	// A cache for operator state, indexed by reference block number.
 	// This cache implementation is thread safe.
@@ -58,7 +59,7 @@ func NewOperatorStateCache(
 		return nil, fmt.Errorf("NewOperatorStateCache: %w", err)
 	}
 
-	qs, err := NewQuorumScanner(contractBackend, registryCoordinatorAddress)
+	qs, err := eth.NewQuorumScanner(contractBackend, registryCoordinatorAddress)
 	if err != nil {
 		return nil, fmt.Errorf("NewQuorumScanner: %w", err)
 	}
