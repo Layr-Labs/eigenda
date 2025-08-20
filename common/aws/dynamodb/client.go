@@ -54,6 +54,10 @@ type Client interface {
 	PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error)
 	UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error)
 	UpdateItemWithCondition(ctx context.Context, tableName string, key Key, item Item, condition expression.ConditionBuilder) (Item, error)
+	// UpdateWithExpression performs a custom update with full control over expressions.
+	// This provides flexibility for complex atomic operations like conditional increments.
+	// Returns the updated item attributes based on ReturnValues setting.
+	UpdateWithExpression(ctx context.Context, tableName string, key Key, updateExpression string, conditionExpression *string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) (Item, error)
 	IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error)
 	GetItem(ctx context.Context, tableName string, key Key) (Item, error)
 	GetItemWithInput(ctx context.Context, input *dynamodb.GetItemInput) (Item, error)
@@ -261,6 +265,50 @@ func (c *client) UpdateItemWithCondition(
 	}
 
 	return resp.Attributes, err
+}
+
+// UpdateWithExpression performs a custom update with full control over expressions.
+//
+// Returns the updated item attributes after the update operation.
+func (c *client) UpdateWithExpression(
+	ctx context.Context,
+	// The name of the DynamoDB table to update
+	tableName string,
+	// The primary key that identifies the item to update.
+	key Key,
+	// The update expression that defines how to modify the item, using DynamoDB update expression syntax.
+	updateExpression string,
+	// Optional condition that must be true for the update to succeed.
+	// If nil, no condition is applied.
+	conditionExpression *string,
+	// Maps placeholder names used in expressions to actual attribute names.
+	// Used when attribute names are DynamoDB reserved words or contain special characters.
+	expressionAttributeNames map[string]string,
+	// Maps placeholder values (like :val1, :inc) used in expressions to actual values.
+	expressionAttributeValues map[string]types.AttributeValue,
+) (Item, error) {
+	input := &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		UpdateExpression:          aws.String(updateExpression),
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              types.ReturnValueUpdatedNew,
+		ConditionExpression:       conditionExpression,
+		ExpressionAttributeNames:  expressionAttributeNames,
+	}
+
+	resp, err := c.dynamoClient.UpdateItem(ctx, input)
+
+	var conditionCheckFailedException *types.ConditionalCheckFailedException
+	if errors.As(err, &conditionCheckFailedException) {
+		return nil, ErrConditionFailed
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Attributes, nil
 }
 
 // IncrementBy increments the attribute by the value for item that matches with the key
