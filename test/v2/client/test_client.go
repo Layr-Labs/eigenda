@@ -144,13 +144,15 @@ func NewTestClient(
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
-		Hostname:          config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag: true,
+		Hostname:                 config.DisperserHostname,
+		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		UseSecureGrpcFlag:        true,
+		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
 	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
 	disperserClient, err := clientsv2.NewDisperserClient(
+		logger,
 		disperserConfig,
 		signer,
 		kzgProver,
@@ -259,6 +261,7 @@ func NewTestClient(
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
+		ConnectionPoolSize: config.RelayConnectionCount,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
@@ -612,7 +615,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
-		*blobKey,
+		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
 		uint32(blobLengthSymbols),
