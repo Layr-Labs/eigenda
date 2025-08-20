@@ -35,9 +35,6 @@ type batchMetadataManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
-	// The underlying eth client used to interact with the blockchain.
-	ethClient bind.ContractBackend
-
 	// Used to get operator state. The IndexedChainState utility fetches state both from onchain sources and from
 	// the indexer. When we eventually move all data onchain, we can ditch the indexer and just call directly
 	// into the contract bindings in this file.
@@ -46,9 +43,8 @@ type batchMetadataManager struct {
 	// A handle for communicating with the registry coordinator contract.
 	registryCoordinator *regcoordinator.ContractRegistryCoordinator
 
-	// When choosing a new reference block number (RBN), select the block that is this many blocks in the past.
-	// This is a hedge against forking.
-	referenceBlockOffset uint64
+	// Used to look up the reference block number (RBN) to use for batch creation.
+	referenceBlockProvider ReferenceBlockProvider
 
 	// The time between updates to the metadata.
 	updatePeriod time.Duration
@@ -68,27 +64,29 @@ type batchMetadataManager struct {
 func NewBatchMetadataManager(
 	ctx context.Context,
 	logger logging.Logger,
-	ethClient bind.ContractBackend,
+	contractBackend bind.ContractBackend,
 	indexedChainState core.IndexedChainState,
 	registryCoordinatorAddress gethcommon.Address,
 	updatePeriod time.Duration,
 	referenceBlockOffset uint64,
 ) (BatchMetadataManager, error) {
 
-	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddress, ethClient)
+	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(
+		registryCoordinatorAddress, contractBackend)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create registry coordinator client: %w", err)
 	}
 
+	rbnProvider := NewReferenceBlockProvider(logger, contractBackend, referenceBlockOffset)
+
 	manager := &batchMetadataManager{
-		ctx:                  ctx,
-		logger:               logger,
-		ethClient:            ethClient,
-		metadata:             atomic.Pointer[BatchMetadata]{},
-		indexedChainState:    indexedChainState,
-		registryCoordinator:  registryCoordinator,
-		referenceBlockOffset: referenceBlockOffset,
-		updatePeriod:         updatePeriod,
+		ctx:                    ctx,
+		logger:                 logger,
+		metadata:               atomic.Pointer[BatchMetadata]{},
+		indexedChainState:      indexedChainState,
+		registryCoordinator:    registryCoordinator,
+		referenceBlockProvider: rbnProvider,
+		updatePeriod:           updatePeriod,
 	}
 	manager.alive.Store(true)
 
@@ -113,26 +111,10 @@ func (m *batchMetadataManager) Close() {
 	m.alive.Store(false)
 }
 
-// Fetch the next reference block number (RBN) to use.
-func (m *batchMetadataManager) getNextReferenceBlockNumber() (uint64, error) {
-	// Get the latest block header to find the latest block number,
-	// which we use to choose a good current reference block number.
-	latestHeader, err := m.ethClient.HeaderByNumber(m.ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get latest block header: %w", err)
-	}
-	latestBlockNumber := latestHeader.Number.Uint64()
-
-	if latestBlockNumber < m.referenceBlockOffset {
-		return 0, fmt.Errorf("latest block number is less than RBN offset: %d < %d",
-			latestBlockNumber, m.referenceBlockOffset)
-	}
-
-	return latestBlockNumber - m.referenceBlockOffset, nil
-}
-
 // get a list of all quorums that are registered for a particular reference block number.
 func (m *batchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.QuorumID, error) {
+
+	// TODO (cody.littley): replace this with a reusable utility
 
 	// Quorums are assigned starting at 0, and then sequentially without gaps. If we
 	// know the number of quorums, we can generate a list of quorum IDs.
@@ -156,7 +138,7 @@ func (m *batchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.Q
 // updateMetadata fetches the latest batch metadata from the blockchain and updates m.operatorState.
 // This method is called periodically to ensure that metadata reflects a recent(ish) reference block.
 func (m *batchMetadataManager) updateMetadata() error {
-	referenceBlockNumber, err := m.getNextReferenceBlockNumber()
+	referenceBlockNumber, err := m.referenceBlockProvider.GetReferenceBlockNumber(m.ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get next reference block number: %w", err)
 	}
