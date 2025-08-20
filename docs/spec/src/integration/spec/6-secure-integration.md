@@ -164,7 +164,7 @@ More information about upgrading the cert verification can be found in the [sect
 
 #### Downloading an Encoded Payload
 
-The preimage oracle served [encoded payload](./3-data-structs.md/#encodedpayload). When the EigenDA blob derivation queries the preimage oracle for the encoded payload corresponding to a DA cert, the preimage oracle (i.e. the preimage request module of the EigenDA proxy, the payload retriever) downloads the EigenDA blob from relay or directly from EigenDA operators, or any data sources including pre-populated local storage or s3 that stores the EigenDA blob.
+The preimage oracle served [encoded payload](./3-data-structs.md/#encodedpayload). When the EigenDA blob derivation queries the preimage oracle for the encoded payload corresponding to a DA cert, the preimage oracle (i.e. the preimage request module of the EigenDA proxy) downloads the EigenDA blob from relay or directly from EigenDA operators, or any data sources including pre-populated local storage or s3 that stores the EigenDA blob.
 The preimage oracle performs checks on the blob against the KZG commitment from the DA cert. 
 If verification fails, it discards the blob and retries with other sources until a valid one is found. Once verified, it returns the encoded payload to the derivation step.
 
