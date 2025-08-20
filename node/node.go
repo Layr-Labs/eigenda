@@ -112,6 +112,7 @@ func NewNode(
 	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
+	contractDirectory *directory.ContractDirectory,
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
@@ -137,8 +138,24 @@ func NewNode(
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
+	eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get EigenDAEjectionManager address from contract directory: %w", err)
+	}
+
+	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	blsOperatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(ctx, directory.BLSOperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BLSOperatorStateRetriever address from contract directory: %w", err)
+	}
+
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, blsOperatorStateRetrieverAddress.Hex(), eigenDAServiceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -209,25 +226,6 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	contractDirectory, err := directory.NewContractDirectory(
-		ctx,
-		logger,
-		client,
-		gethcommon.HexToAddress(config.EigenDADirectory))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create contract directory: %w", err)
-	}
-
-	eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get EigenDAEjectionManager address from contract directory: %w", err)
-	}
-
-	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
-	}
-
 	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
@@ -272,6 +270,9 @@ func NewNode(
 		cst,
 		registryCoordinatorAddress,
 		config.operatorStateCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
+	}
 
 	n := &Node{
 		Config:                  config,

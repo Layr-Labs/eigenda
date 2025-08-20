@@ -12,7 +12,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/urfave/cli"
@@ -84,14 +86,17 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
-	reader, err := coreeth.NewReader(
-		logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	contractDirectory, err := directory.NewContractDirectory(
+		context.Background(),
+		logger,
+		client,
+		gethcommon.HexToAddress(config.EigenDADirectory))
 	if err != nil {
-		return fmt.Errorf("cannot create eth.Reader: %w", err)
+		return fmt.Errorf("failed to create contract directory: %w", err)
 	}
 
 	// Create the node.
-	node, err := node.NewNode(context.Background(), reg, config, pubIPProvider, client, logger)
+	node, err := node.NewNode(context.Background(), reg, config, contractDirectory, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
@@ -102,11 +107,26 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	// Creates the GRPC server.
-
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
+
+	blsStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.BLSOperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
+	}
+
+	eigenDAServiceManagerAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ServiceManager address: %w", err)
+	}
+
+	reader, err := coreeth.NewReader(logger, client, blsStateRetrieverAddress.Hex(), eigenDAServiceManagerAddress.Hex())
+	if err != nil {
+		return fmt.Errorf("cannot create eth.Reader: %w", err)
+	}
 
 	var serverV2 *nodegrpc.ServerV2
 	if config.EnableV2 {
