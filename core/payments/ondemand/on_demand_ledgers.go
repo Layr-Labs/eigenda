@@ -65,7 +65,7 @@ func (odl *OnDemandLedgers) getOrCreateLedger(accountID gethcommon.Address) (*On
 	// TODO: These are placeholder values - need to get actual values from chain or config
 	totalDeposits := big.NewInt(1000000000000000000) // 1 ETH placeholder
 	pricePerSymbol := big.NewInt(100000000000000)    // 0.0001 ETH placeholder
-	minNumSymbols := big.NewInt(100)                 // 100 symbols placeholder
+	minNumSymbols := uint64(100)                     // 100 symbols placeholder
 
 	// TODO: Need to provide actual CumulativePaymentStore implementation
 	// For now, using nil as placeholder - this will need to be fixed

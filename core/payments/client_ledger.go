@@ -3,14 +3,12 @@ package payments
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"golang.org/x/sync/semaphore"
 )
 
 // TODO: write unit tests
@@ -26,10 +24,6 @@ type ClientLedger struct {
 	reservationLedger *reservation.ReservationLedger
 
 	onDemandLedger *ondemand.OnDemandLedger
-
-	alive atomic.Bool
-
-	inflightOnDemandDispersals *semaphore.Weighted
 }
 
 func NewClientLedger(
@@ -42,13 +36,11 @@ func NewClientLedger(
 ) (*ClientLedger, error) {
 
 	clientLedger := &ClientLedger{
-		accountID:                  accountID,
-		getNow:                     getNow,
-		reservationLedger:          reservationLedger,
-		onDemandLedger:             onDemandLedger,
-		inflightOnDemandDispersals: semaphore.NewWeighted(1),
+		accountID:         accountID,
+		getNow:            getNow,
+		reservationLedger: reservationLedger,
+		onDemandLedger:    onDemandLedger,
 	}
-	clientLedger.alive.Store(true)
 
 	return clientLedger, nil
 }
@@ -58,23 +50,20 @@ func (cl *ClientLedger) Debit(
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
-	if !cl.alive.Load() {
-		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
-		return nil, fmt.Errorf("ledger is not alive")
-	}
-
 	now := cl.getNow()
 
 	if cl.reservationLedger != nil {
 		err := cl.reservationLedger.CheckInvariants(quorums, now)
 		if err != nil {
-			return nil, fmt.Errorf("") // TODO make this a good error. make sure this causes client to shut down
+			// TODO: add panic text here, make sure to include error
+			panic("")
 		}
 
 		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols)
 		if err != nil {
-			// TODO: make this a type of error which causes the client to shut down
-			cl.alive.Store(false)
+
+			// TODO: check if this is a recoverable error. recoverable errors are any structured errors that debit may return
+			// if the error isn't recoverable, panic. if error is recoverable, log it and continue on (don't return)
 			return nil, fmt.Errorf("reservation debit error: %w", err)
 		}
 
@@ -86,15 +75,10 @@ func (cl *ClientLedger) Debit(
 			}
 			return paymentMetadata, nil
 		}
-		// If not successful, continue to on-demand
-		// todo: add info log
+		// todo: add info log, saying reservation payment failed
 	}
 
 	if cl.onDemandLedger != nil {
-		if err := cl.inflightOnDemandDispersals.Acquire(ctx, 1); err != nil {
-			return nil, fmt.Errorf("acquire inflight dispersal slot: %w", err)
-		}
-
 		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
 		if err == nil {
 			// Success - blob accounted for via on-demand
@@ -104,27 +88,24 @@ func (cl *ClientLedger) Debit(
 			}
 			return paymentMetadata, nil
 		} else {
-			// TODO: make this a type of error which causes the client to shut down
-			// actually, not all errors.... failure to acquire semaphore shouldn't do that
-			cl.alive.Store(false)
+			// TODO: check if this is a recoverable error. recoverable errors are any structured errors that debit may return
+			// if the error isn't recoverable, panic
 			return nil, fmt.Errorf("something unexpected happened, shut down")
 		}
 	}
 
-	return nil, fmt.Errorf("TODO: make a REALLY good error here, with all sorts of juicy details")
+	return nil, fmt.Errorf("")
 }
 
-// TODO: doc
+// Undoes a previous debit.
+//
+// This should be called in cases where the client does accounting for a blob, but then the dispersal fails before
+// the being accounted for by the disperser.
 func (cl *ClientLedger) revertDebit(
 	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
-	if !cl.alive.Load() {
-		// TODO: make special error type, which causes the whole client to crash. cannot continue without a ledger
-		return fmt.Errorf("ledger is not alive")
-	}
-
 	if paymentMetadata.IsOnDemand() {
 		if cl.onDemandLedger == nil {
 			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
@@ -154,10 +135,6 @@ func (cl *ClientLedger) DispersalSent(
 	symbolCount uint32,
 	success bool,
 ) error {
-	if paymentMetadata.IsOnDemand() {
-		cl.inflightOnDemandDispersals.Release(1)
-	}
-
 	if success {
 		return nil
 	}
