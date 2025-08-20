@@ -29,7 +29,7 @@ The diagram below shows the step-by-step transformation from input to final roll
   - Implementation varies by requirement (e.g., key-value mapping for optimistic fault proofs)
 - **Host:** Entity that provides preimage oracle responses
 
-> A encoded payload is an intermdeidate transformation form between the rollup payload and the EigenDA blob. Compared to payload, the encoded payload contains 
+> A encoded payload is an intermdeidate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
 
 
 ![](../../assets/integration/eigenda-blob-derivation.png)
@@ -125,7 +125,7 @@ The proxy combines:
 This check enforces timing guarantees: once a cert lands in the batcher inbox, optimistic and zk rollup validators must have enough time to download the EigenDA blob.
 
 
-We use fault proofs to motivate the need for a recency check.
+We use fault proofs to motivate the need for a recency check. A similar reason exists for zk rollup, where the validator of zk rollup must be able to download the eigenDA blob after the rollup prover posts the L2 state update on L1. 
 
 ![](../../assets/integration/recency-window-timeline.png)
 
@@ -158,26 +158,25 @@ The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0
 3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
 4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
 
+More information about upgrading the cert verification can be found in the [section](#upgradable-quorums-and-thresholds-for-optimistic-verification).
+
 ### 3. Downloading and Decoding an Encoded Payload
 
 #### Downloading an Encoded Payload
 
-The preimage oracle served encoded payload. When the EigenDA blob derivation queries the preimage oracle for the encoded payload corresponding to a DA cert, the preimage oracle (i.e. the preimage request module of the EigenDA proxy) downloads the EigenDA blob from relay or directly from EigenDA operators.
-If verification fails, it discards the blob and retries with other sources until a valid one is found. Once verified, it returns the encoded payload to the derivation step.
+The preimage oracle served [encoded payload](./3-data-structs.md/#encodedpayload). When the EigenDA blob derivation queries the preimage oracle for the encoded payload corresponding to a DA cert, the preimage oracle (i.e. the preimage request module of the EigenDA proxy) downloads the EigenDA blob from relay or directly from EigenDA operators.
 The preimage oracle performs checks on the blob against the KZG commitment from the DA cert. 
 If verification fails, it discards the blob and retries with other sources until a valid one is found. Once verified, it returns the encoded payload to the derivation step.
 
-> A rollup may apply an FFT on the blob to obtain its encoded payload, or use the blob directly as the encoded payload. 
-> This depends on if there is an inverse FFT is taken on the encoded payload in the dispersal path. Taking IFFT on the dispersal path lets the rollup open points on bytes using parts of the payload. Both Arbitrum Nitro and OP (optimistic or ZK) apply IFFT. The encoded payload always live in the same domain (i.e. without any data transformation) as the payload. It is formed by adding the encoded payload header and interleaving 0s to make every 32bytes a valid field element, the padding 0s at the end to a power of two number of field elements (each 32 bytes).
-> The simplest kzg check recomputes the commitment from the SRS points and compare it. An alternative is verifying a point opening via Fiat–Shamir (see this issue).
+> A rollup may apply an FFT on the blob to obtain its encoded payload, or use the blob directly as the encoded payload, depending on whether an inverse FFT was taken on the encoded payload during the dispersal path.
+> Taking IFFT on the dispersal path lets the rollup open points on bytes using parts of the payload. Both Arbitrum Nitro and OP (optimistic or ZK) apply IFFT. The encoded payload always live in the same domain (i.e. without any data transformation) as the payload. It is formed by adding the encoded payload header and interleaving 0s to make every 32bytes a valid field element, the padding 0s at the end to a power of two number of field elements (each 32 bytes).
 
 #### Decoding an Encoded Payload
 
-After verification, EigenDA blob derivation decodes the encoded payload to the original rollup payload. If any check fails, discard the blob returned from the preimage oracle. The procedure:
+After verification, EigenDA blob derivation decodes the [encoded payload](./3-data-structs.md/#encodedpayload) to the original rollup payload. If any check fails, discard the blob returned from the preimage oracle. The procedure:
 
 - checkLenInvariant
   - Encoded payload size ≥ size of encoded payload header.
-  - Total length of encoded payload perfectly is a multiple of 32 bytes.
   - Encoded payload contains a power-of-two number of 32-byte field elements (valid sizes: 32, 64, 128, 256, …). See client [implementation](https://github.com/Layr-Labs/eigenda/blob/57ed95ce77a57c53341cad10233ca2f29b29c0f5/api/clients/v2/coretypes/encoded_payload.go#L152).
 - decodeHeader: (first 32-byte field element)
   - Encoded payload size ≥ size of encoded payload header.
@@ -191,7 +190,7 @@ After verification, EigenDA blob derivation decodes the encoded payload to the o
 > The EigenDA protocol enforces blob length > 0 (see [implementation](https://github.com/Layr-Labs/eigenda/blob/57ed95ce77a57c53341cad10233ca2f29b29c0f5/node/grpc/server_v2.go#L127)).
 
 Proxy behavior. The EigenDA proxy can return either the encoded payload or the decoded rollup payload based on GET parameters:
-  - With `?return_encoded_payload=true` or `?return_encoded_payload=1`, it only performs the preimage (KZG) check and returns the encoded payload useful when integrating with proof systems to control the data transformation.
+  - With `?return_encoded_payload=true` or `?return_encoded_payload=1`, it only checks the blob against the kzg commitment and returns the encoded payload, it is useful when integrating with proof systems to control the data transformation.
   - Without parameters, it decodes and returns the rollup payload; on any decoding error, it returns HTTP 418.
 
 ### Notes on Dispersal

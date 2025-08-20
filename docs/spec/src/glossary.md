@@ -32,3 +32,7 @@ A sequence of procedures to convert a byte array representing a DA certificate t
 
 An object with an interface for fetching additional data during EigenDA blob derivation by using some keys generated from the data. Multiple implementations of the preimage oracle show up in the EigenDA. In proxy, ETH rpc serves as the preimage oracle for DAcert validity; EigenDA network rpc
 serves as the preimage oracle for EigenDA blob.
+
+## Blob Field Element
+
+EigenDA uses bn254 curve, a field element on the bn254 curve is an integer whose range is 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617. 
