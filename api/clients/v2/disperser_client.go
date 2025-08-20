@@ -95,16 +95,16 @@ func NewDisperserClient(
 ) (*disperserClient, error) {
 
 	if config == nil {
-		return nil, api.NewErrorInvalidArg("config must be provided")
+		return nil, fmt.Errorf("config must be provided")
 	}
 	if config.Hostname == "" {
-		return nil, api.NewErrorInvalidArg("hostname must be provided")
+		return nil, fmt.Errorf("hostname must be provided")
 	}
 	if config.Port == "" {
-		return nil, api.NewErrorInvalidArg("port must be provided")
+		return nil, fmt.Errorf("port must be provided")
 	}
 	if signer == nil {
-		return nil, api.NewErrorInvalidArg("signer must be provided")
+		return nil, fmt.Errorf("signer must be provided")
 	}
 
 	var connectionCount uint
