@@ -258,11 +258,10 @@ func startGraphNode(
 	})
 }
 
-// DeploySubgraph deploys a subgraph to the Graph Node
-func (g *GraphNodeContainer) DeploySubgraph(ctx context.Context, subgraphName, manifestPath string) error {
-	// This would typically use the Graph CLI or direct API calls
-	// Implementation depends on how subgraph deployment should be handled
-	return fmt.Errorf("subgraph deployment not yet implemented")
+// DeploySubgraph deploys a subgraph to the Graph Node using the Graph CLI
+func (g *GraphNodeContainer) DeploySubgraph(ctx context.Context, subgraphName, subgraphPath, ipfsURL string) error {
+	// Implementation will be added when we integrate with the actual deployment logic
+	return fmt.Errorf("subgraph deployment will be implemented in the next phase")
 }
 
 // WaitForReady waits for the Graph Node to be ready

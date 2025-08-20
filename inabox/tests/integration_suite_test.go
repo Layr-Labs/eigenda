@@ -25,9 +25,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testinfra"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -41,7 +41,6 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/Layr-Labs/eigenda/common/testinfra"
 )
 
 /*
@@ -56,9 +55,9 @@ var (
 	testName          string
 	inMemoryBlobStore bool
 
-	testConfig         *deploy.Config
-	infraManager       *testinfra.InfraManager
-	infraResult        *testinfra.InfraResult
+	testConfig   *deploy.Config
+	infraManager *testinfra.InfraManager
+	infraResult  *testinfra.InfraResult
 
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
@@ -139,28 +138,28 @@ var _ = BeforeSuite(func() {
 		infraResult = result
 		cancel = infraCancel
 
-		// Deploy AWS resources if using LocalStack
 		if config.LocalStack.Enabled {
 			localstack := infraManager.GetLocalStack()
 			Expect(localstack).ToNot(BeNil())
 
-			// Set environment variables for LocalStack compatibility
+			// This is required because the current inabox configuration expects some hardcoded
+			// environment variables to be set
 			localStackURL := localstack.Endpoint()
 			_ = os.Setenv("AWS_ENDPOINT_URL", localStackURL)
-			_ = os.Setenv("AWS_ACCESS_KEY_ID", "test")
-			_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			_ = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+			_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 			_ = os.Setenv("AWS_DEFAULT_REGION", "us-east-1")
 
-			// Extract port from LocalStack URL for compatibility with existing deploy function
-			parts := strings.Split(localStackURL, ":")
-			port := "4566" // default fallback
-			if len(parts) >= 3 {
-				port = parts[2]
+			// Use the new testinfra DeployAWSResources function
+			deploymentConfig := testinfra.DeploymentConfig{
+				BucketName:          "test-eigenda-blobstore",
+				MetadataTableName:   metadataTableName,
+				BucketTableName:     bucketTableName,
+				V2MetadataTableName: metadataTableNameV2,
+				V2PaymentPrefix:     "e2e_v2_",
+				CreateV2Resources:   metadataTableNameV2 != "",
 			}
-
-			// Create a temporary dockertest pool for compatibility
-			// The actual pool parameter is not used when we pass nil
-			err = deploy.DeployResources(nil, port, metadataTableName, bucketTableName, metadataTableNameV2)
+			err = testinfra.DeployAWSResources(ctx, localstack, deploymentConfig)
 			Expect(err).To(BeNil())
 		}
 
@@ -173,7 +172,7 @@ var _ = BeforeSuite(func() {
 		anvil := infraManager.GetAnvil()
 		Expect(anvil).ToNot(BeNil())
 		fmt.Printf("Testing Anvil connectivity at %s\n", infraResult.AnvilRPC)
-		
+
 		// Debug: Check container logs
 		container := anvil.GetContainer()
 		logs, err := container.Logs(ctx)
@@ -188,7 +187,7 @@ var _ = BeforeSuite(func() {
 		ctx2, cancel2 := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel2()
 		for {
-				// Use proper JSON-RPC call instead of plain HTTP GET
+			// Use proper JSON-RPC call instead of plain HTTP GET
 			jsonRPCPayload := `{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`
 			resp, err := http.Post(infraResult.AnvilRPC, "application/json", strings.NewReader(jsonRPCPayload))
 			if err == nil && resp.StatusCode == 200 {
@@ -209,7 +208,7 @@ var _ = BeforeSuite(func() {
 				continue
 			}
 		}
-		
+
 		// Update test config to use testinfra endpoints
 		fmt.Printf("Updating RPC URL from %s to %s\n", testConfig.Deployers[0].RPC, infraResult.AnvilRPC)
 		testConfig.Deployers[0].RPC = infraResult.AnvilRPC
@@ -250,7 +249,7 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
-		
+
 		// After contract and subgraph deployment, test connectivity again
 		if graphURL != "" {
 			fmt.Println("Testing Graph Node connectivity after subgraph deployment...")
@@ -533,7 +532,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 
 func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval time.Duration) error {
 	client := &http.Client{Timeout: 10 * time.Second}
-	
+
 	// Test queries - try multiple approaches
 	testQueries := []struct {
 		name  string
@@ -544,17 +543,17 @@ func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval ti
 		{"Subgraph meta", `{"query": "{_meta{block{number}}}"}`, "/graphql"},
 		{"Health check", "", "/"},
 	}
-	
+
 	for i := 0; i < maxRetries; i++ {
 		fmt.Printf("Testing Graph Node connectivity (attempt %d/%d)...\n", i+1, maxRetries)
-		
+
 		for _, test := range testQueries {
 			testURL := graphURL + test.url
 			fmt.Printf("  Testing %s at %s\n", test.name, testURL)
-			
+
 			var req *http.Request
 			var err error
-			
+
 			if test.query != "" {
 				req, err = http.NewRequest("POST", testURL, strings.NewReader(test.query))
 				if err != nil {
@@ -569,33 +568,33 @@ func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval ti
 					continue
 				}
 			}
-			
+
 			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Printf("    ❌ Connection failed: %v\n", err)
 				continue
 			}
 			defer resp.Body.Close()
-			
+
 			body, _ := io.ReadAll(resp.Body)
 			bodyPreview := string(body)
 			if len(bodyPreview) > 100 {
 				bodyPreview = bodyPreview[:100] + "..."
 			}
 			fmt.Printf("    Status: %d, Body preview: %s\n", resp.StatusCode, bodyPreview)
-			
+
 			if resp.StatusCode == 200 {
 				fmt.Printf("✅ Graph Node is accessible via %s\n", test.name)
 				return nil
 			}
 		}
-		
+
 		if i < maxRetries-1 {
 			fmt.Printf("⏱️  Waiting %v before retry...\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
 	}
-	
+
 	return fmt.Errorf("graph node at %s is not accessible after %d attempts", graphURL, maxRetries)
 }
 

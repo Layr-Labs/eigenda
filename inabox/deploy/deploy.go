@@ -16,18 +16,18 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testinfra"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -202,12 +202,18 @@ func (env *Config) DeployExperiment() {
 
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
-		env.deploySubgraphs(startBlock)
+
+		// Use testinfra subgraph deployment when available, otherwise fallback to legacy
+		fmt.Println("Using testinfra-based subgraph deployment")
+		err := env.deploySubgraphsWithTestinfra(startBlock)
+		if err != nil {
+			log.Panicf("Testinfra subgraph deployment failed: %v", err)
+		}
 	}
 
 	// Ideally these should be set in GenerateAllVariables, but they need to be used in GenerateDisperserKeypair
 	// which is called before GenerateAllVariables
-	
+
 	// Check if AWS_ENDPOINT_URL is set in environment (for dynamic testcontainer ports)
 	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
 		env.localstackEndpoint = endpoint
@@ -221,13 +227,13 @@ func (env *Config) DeployExperiment() {
 	if env.Services.Variables["globals"] == nil {
 		env.Services.Variables["globals"] = make(map[string]string)
 	}
-	
+
 	// Update RPC URL to use dynamic port from testcontainers
 	if len(env.Deployers) > 0 && env.Deployers[0].RPC != "" {
 		env.Services.Variables["globals"]["CHAIN_RPC"] = env.Deployers[0].RPC
 	}
-	
-	// Update AWS endpoint URL to use dynamic port from testcontainers  
+
+	// Update AWS endpoint URL to use dynamic port from testcontainers
 	if env.localstackEndpoint != "" {
 		env.Services.Variables["globals"]["AWS_ENDPOINT_URL"] = env.localstackEndpoint
 	}
@@ -460,4 +466,36 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 	if err != nil {
 		log.Panicf("Failed to run node plugin. Err: %s", err)
 	}
+}
+
+// deploySubgraphsWithTestinfra deploys subgraphs using the testinfra package
+func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
+	if !env.Environment.IsLocal() {
+		return fmt.Errorf("testinfra subgraph deployment only supported for local environments")
+	}
+
+	// Prepare subgraph deployment configuration
+	deployConfig := testinfra.SubgraphDeploymentConfig{
+		RootPath: env.rootPath,
+		Subgraphs: []testinfra.SubgraphConfig{
+			{
+				Name:    "eigenda-operator-state",
+				Path:    "eigenda-operator-state",
+				Enabled: true,
+			},
+			{
+				Name:    "eigenda-batch-metadata",
+				Path:    "eigenda-batch-metadata",
+				Enabled: true,
+			},
+		},
+		EigenDAConfig: testinfra.EigenDAContractAddresses{
+			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
+			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
+			ServiceManager:      env.EigenDA.ServiceManager,
+		},
+	}
+
+	// Use the standalone testinfra deployment function with the URLs we have
+	return testinfra.DeploySubgraphsWithURLs(deployConfig, env.GraphAdminURL, env.IPFSURL, startBlock)
 }

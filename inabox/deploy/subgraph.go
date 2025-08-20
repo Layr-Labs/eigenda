@@ -1,3 +1,11 @@
+// Package deploy contains legacy subgraph deployment functionality
+//
+// DEPRECATED: This file is deprecated and will be removed in a future release.
+// New subgraph deployment functionality has been moved to:
+// - github.com/Layr-Labs/eigenda/common/testinfra (DeploySubgraphsWithURLs)
+//
+// The legacy functions in this file are kept for backward compatibility
+// and as fallback when testinfra is not available.
 package deploy
 
 import (
@@ -113,12 +121,14 @@ func (u eigenDAUIMonitoringUpdater) UpdateNetworks(n Networks, startBlock int) {
 	n["devnet"]["EigenDAServiceManager"]["startBlock"] = startBlock
 }
 
+// DEPRECATED: Use testinfra.DeploySubgraphsWithURLs instead
+// This function is kept for backward compatibility when testinfra is not available
 func (env *Config) deploySubgraphs(startBlock int) {
 	if !env.Environment.IsLocal() {
 		return
 	}
 
-	fmt.Println("Deploying Subgraph")
+	fmt.Println("Deploying Subgraph (legacy method)")
 	env.deploySubgraph(eigenDAOperatorStateSubgraphUpdater{c: env}, "eigenda-operator-state", startBlock)
 	env.deploySubgraph(eigenDAUIMonitoringUpdater{c: env}, "eigenda-batch-metadata", startBlock)
 }
@@ -149,7 +159,7 @@ func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlo
 
 		// Use dynamic subgraph name based on path
 		subgraphName := fmt.Sprintf("Layr-Labs/%s", path)
-		
+
 		// Use graph CLI directly with dynamic URLs
 		execBashCmd(fmt.Sprintf("npx graph remove --node %s %s", env.GraphAdminURL, subgraphName))
 		execBashCmd(fmt.Sprintf("npx graph create --node %s %s", env.GraphAdminURL, subgraphName))
