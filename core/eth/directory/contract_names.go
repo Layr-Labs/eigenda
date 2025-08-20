@@ -6,8 +6,8 @@ package directory
 // When you add to this list, make sure you keep things in alphabetical order.
 
 const (
-	OperatorStateRetriever ContractName = "OPERATOR_STATE_RETRIEVER"
 	EigenDAEjectionManager ContractName = "EIGEN_DA_EJECTION_MANAGER"
+	OperatorStateRetriever ContractName = "OPERATOR_STATE_RETRIEVER"
 	RegistryCoordinator    ContractName = "REGISTRY_COORDINATOR"
 	RelayRegistry          ContractName = "RELAY_REGISTRY"
 	ServiceManager         ContractName = "SERVICE_MANAGER"
@@ -15,8 +15,8 @@ const (
 
 // a list of all contracts currently known to the EigenDA offchain code.
 var knownContracts = []ContractName{
-	OperatorStateRetriever,
 	EigenDAEjectionManager,
+	OperatorStateRetriever,
 	RegistryCoordinator,
 	RelayRegistry,
 	ServiceManager,
