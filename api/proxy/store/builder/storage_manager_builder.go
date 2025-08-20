@@ -67,7 +67,7 @@ func BuildManagers(
 		log.Info("Using S3 storage backend")
 		s3Store, err = s3.NewStore(config.S3Config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("new S3 store: %w", err)
 		}
 	}
 
@@ -75,7 +75,7 @@ func BuildManagers(
 		log.Info("Using Redis storage backend")
 		redisStore, err = redis.NewStore(&config.RedisConfig)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("new Redis store: %w", err)
 		}
 	}
 

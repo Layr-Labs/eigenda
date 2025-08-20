@@ -224,14 +224,14 @@ func (m *EigenDAManager) putToCorrectEigenDABackend(ctx context.Context, value [
 		if m.eigenda == nil {
 			return nil, errors.New("EigenDA V1 dispersal requested but not configured")
 		}
-		return m.eigenda.Put(ctx, value)
+		return m.eigenda.Put(ctx, value) //nolint: wrapcheck
 	}
 
 	if backend == common.V2EigenDABackend {
 		if m.eigendaV2 == nil {
 			return nil, errors.New("EigenDA V2 dispersal requested but not configured")
 		}
-		return m.eigendaV2.Put(ctx, value)
+		return m.eigendaV2.Put(ctx, value) //nolint: wrapcheck
 	}
 
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
@@ -255,12 +255,12 @@ func (m *EigenDAManager) getFromCorrectEigenDABackend(
 		if err == nil {
 			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("verify EigenDA V1 cert: %w", err)
 			}
 			return data, nil
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("get from EigenDA V1 backend: %w", err)
 
 	case certs.V1VersionByte, certs.V2VersionByte:
 		// The cert must be verified before attempting to get the data, since the GET logic

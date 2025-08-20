@@ -81,7 +81,9 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(
+	config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant,
+) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -130,7 +132,7 @@ func (c *disperserClient) Close() error {
 		err := c.conn.Close()
 		c.conn = nil
 		c.client = nil
-		return err
+		return err //nolint: wrapcheck
 	}
 	return nil
 }
@@ -331,7 +333,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 	request := &disperser_rpc.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	}
-	return c.client.GetBlobStatus(ctx, request)
+	return c.client.GetBlobStatus(ctx, request) //nolint: wrapcheck
 }
 
 // GetPaymentState returns the payment state of the disperser client
@@ -358,7 +360,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.client.GetPaymentState(ctx, request) //nolint: wrapcheck
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
@@ -374,7 +376,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	request := &disperser_rpc.BlobCommitmentRequest{
 		Blob: data,
 	}
-	return c.client.GetBlobCommitment(ctx, request)
+	return c.client.GetBlobCommitment(ctx, request) //nolint: wrapcheck
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
