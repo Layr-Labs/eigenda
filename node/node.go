@@ -103,7 +103,7 @@ type Node struct {
 	StoreChunksSemaphore *semaphore.Weighted
 
 	// Looks up operator state and maintains a cache of recently used operator states.
-	OperatorStateCache eth.OperatorStateCache // TODO initiate
+	OperatorStateCache eth.OperatorStateCache
 }
 
 // NewNode creates a new Node with the provided config.

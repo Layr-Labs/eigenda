@@ -84,7 +84,11 @@ func (c *operatorStateCache) GetOperatorState(
 
 	// Check if the operator state is already cached
 	if state, found := c.cache.Get(referenceBlockNumber); found {
-		return state, nil
+		filteredState, err := filterByQuorum(state, quorums)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter cached state for rbn %d: %w", referenceBlockNumber, err)
+		}
+		return filteredState, nil
 	}
 
 	// Fetch the operator state for all quorums.
@@ -103,7 +107,7 @@ func (c *operatorStateCache) GetOperatorState(
 	// Only return data on the specified quorums.
 	filteredState, err := filterByQuorum(state, quorums)
 	if err != nil {
-		return nil, fmt.Errorf("filterByQuorum: %w", err)
+		return nil, fmt.Errorf("failed to filter state for rbn %d: %w", referenceBlockNumber, err)
 	}
 
 	return filteredState, nil
