@@ -131,6 +131,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
+	success = true
 	return &im.result, nil
 }
 
