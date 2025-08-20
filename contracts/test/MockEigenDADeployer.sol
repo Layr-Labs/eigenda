@@ -2,7 +2,7 @@
 pragma solidity =0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
