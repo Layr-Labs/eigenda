@@ -35,11 +35,11 @@ type TestClientConfig struct {
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	//
-	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
+	// Currently the EigenDA address directory is just used to look up OperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
 	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
 	EigenDADirectory string
 	// The contract address for the EigenDA BLS operator state retriever
-	BLSOperatorStateRetrieverAddr string
+	OperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
 	EigenDAServiceManagerAddr string
 	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1

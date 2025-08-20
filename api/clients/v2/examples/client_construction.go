@@ -34,8 +34,8 @@ const (
 	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	// These two addresses are no longer required for the Eth Client, but parameter is still being taken until we deprecate the flags
 	eigenDAServiceManagerAddress = ""
-	// blsOperatorStateRetrieverAddress is still used for CertBuilder
-	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	// operatorStateRetrieverAddress is still used for CertBuilder
+	operatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 )
 
 func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
@@ -282,7 +282,7 @@ func createCertBuilder() (*clients.CertBuilder, error) {
 
 	return clients.NewCertBuilder(
 		logger,
-		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(operatorStateRetrieverAddress),
 		gethcommon.HexToAddress(registryCoordinatorAddress),
 		ethClient,
 	)
@@ -338,7 +338,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		blsOperatorStateRetrieverAddress,
+		operatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
 	)
 	if err != nil {
