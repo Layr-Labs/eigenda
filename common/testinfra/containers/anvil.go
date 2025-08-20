@@ -216,13 +216,6 @@ func buildAnvilArgs(config AnvilConfig) []string {
 	return args
 }
 
-// WaitForReady waits for the Anvil node to be ready to accept requests
-func (a *AnvilContainer) WaitForReady(ctx context.Context) error {
-	// The wait strategy in the container request should handle this,
-	// but we can add additional checks here if needed
-	return nil
-}
-
 // GetLogs returns the container logs for debugging
 func (a *AnvilContainer) GetLogs(ctx context.Context) (string, error) {
 	if a.container == nil {

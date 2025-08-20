@@ -258,18 +258,6 @@ func startGraphNode(
 	})
 }
 
-// DeploySubgraph deploys a subgraph to the Graph Node using the Graph CLI
-func (g *GraphNodeContainer) DeploySubgraph(ctx context.Context, subgraphName, subgraphPath, ipfsURL string) error {
-	// Implementation will be added when we integrate with the actual deployment logic
-	return fmt.Errorf("subgraph deployment will be implemented in the next phase")
-}
-
-// WaitForReady waits for the Graph Node to be ready
-func (g *GraphNodeContainer) WaitForReady(ctx context.Context) error {
-	// Additional readiness checks beyond the wait strategy
-	return nil
-}
-
 // GetPostgres returns the PostgreSQL container for external access
 func (g *GraphNodeContainer) GetPostgres() testcontainers.Container {
 	return g.postgres

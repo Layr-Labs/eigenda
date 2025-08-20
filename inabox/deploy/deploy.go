@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testinfra"
+	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -475,9 +475,9 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 	}
 
 	// Prepare subgraph deployment configuration
-	deployConfig := testinfra.SubgraphDeploymentConfig{
+	deployConfig := deployment.SubgraphDeploymentConfig{
 		RootPath: env.rootPath,
-		Subgraphs: []testinfra.SubgraphConfig{
+		Subgraphs: []deployment.SubgraphConfig{
 			{
 				Name:    "eigenda-operator-state",
 				Path:    "eigenda-operator-state",
@@ -489,7 +489,7 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 				Enabled: true,
 			},
 		},
-		EigenDAConfig: testinfra.EigenDAContractAddresses{
+		EigenDAConfig: deployment.EigenDAContractAddresses{
 			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
 			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
 			ServiceManager:      env.EigenDA.ServiceManager,
@@ -497,5 +497,5 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 	}
 
 	// Use the standalone testinfra deployment function with the URLs we have
-	return testinfra.DeploySubgraphsWithURLs(deployConfig, env.GraphAdminURL, env.IPFSURL, startBlock)
+	return deployment.DeploySubgraphsWithURLs(deployConfig, env.GraphAdminURL, env.IPFSURL, startBlock)
 }

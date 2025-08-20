@@ -26,6 +26,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testinfra"
+	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -151,7 +152,7 @@ var _ = BeforeSuite(func() {
 			_ = os.Setenv("AWS_DEFAULT_REGION", "us-east-1")
 
 			// Use the new testinfra DeployAWSResources function
-			deploymentConfig := testinfra.DeploymentConfig{
+			deploymentConfig := deployment.LocalStackDeploymentConfig{
 				BucketName:          "test-eigenda-blobstore",
 				MetadataTableName:   metadataTableName,
 				BucketTableName:     bucketTableName,
@@ -159,14 +160,9 @@ var _ = BeforeSuite(func() {
 				V2PaymentPrefix:     "e2e_v2_",
 				CreateV2Resources:   metadataTableNameV2 != "",
 			}
-			err = testinfra.DeployAWSResources(ctx, localstack, deploymentConfig)
+			err = deployment.DeployLocalStackResources(ctx, localstack, deploymentConfig)
 			Expect(err).To(BeNil())
 		}
-
-		// Wait for infrastructure to be fully ready
-		fmt.Println("Waiting for testinfra containers to be ready")
-		err = infraManager.WaitForReady(ctx)
-		Expect(err).To(BeNil())
 
 		// Test Anvil connectivity before proceeding
 		anvil := infraManager.GetAnvil()

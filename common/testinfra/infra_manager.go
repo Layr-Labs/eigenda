@@ -131,7 +131,6 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
-	success = true
 	return &im.result, nil
 }
 
@@ -199,29 +198,6 @@ func (im *InfraManager) GetGraphNode() *containers.GraphNodeContainer {
 // GetResult returns the current infrastructure result
 func (im *InfraManager) GetResult() *InfraResult {
 	return &im.result
-}
-
-// WaitForReady waits for all started containers to be ready
-func (im *InfraManager) WaitForReady(ctx context.Context) error {
-	if im.anvil != nil {
-		if err := im.anvil.WaitForReady(ctx); err != nil {
-			return fmt.Errorf("anvil not ready: %w", err)
-		}
-	}
-
-	if im.localstack != nil {
-		if err := im.localstack.WaitForReady(ctx); err != nil {
-			return fmt.Errorf("localstack not ready: %w", err)
-		}
-	}
-
-	if im.graphnode != nil {
-		if err := im.graphnode.WaitForReady(ctx); err != nil {
-			return fmt.Errorf("graph node not ready: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // StartMinimal starts only Anvil and LocalStack for basic testing
