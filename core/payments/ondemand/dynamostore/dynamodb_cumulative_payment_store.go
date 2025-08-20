@@ -156,7 +156,8 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 		if errors.As(err, &conditionCheckFailedException) {
 			currentValue, getErr := s.getCurrentPayment(ctx)
 			if getErr != nil {
-				return nil, fmt.Errorf("conditional check failed and couldn't get current value: %w", getErr)
+				return nil, fmt.Errorf(
+					"conditional check failed with error %w, and couldn't get current value: %w", err, getErr)
 			}
 			return nil, &ondemand.InsufficientFundsError{
 				CurrentCumulativePayment: currentValue,

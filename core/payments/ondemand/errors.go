@@ -30,17 +30,17 @@ func (e *InsufficientFundsError) Error() string {
 	if e.CurrentCumulativePayment != nil {
 		currentPayment = e.CurrentCumulativePayment.String()
 	}
-	
+
 	totalDeposits := "<nil>"
 	if e.TotalDeposits != nil {
 		totalDeposits = e.TotalDeposits.String()
 	}
-	
+
 	blobCost := "<nil>"
 	if e.BlobCost != nil {
 		blobCost = e.BlobCost.String()
 	}
-	
+
 	return fmt.Sprintf(
 		"insufficient on-demand funds: current cumulative payment: %s wei, total deposits: %s wei, blob cost: %s wei",
 		currentPayment, totalDeposits, blobCost)
