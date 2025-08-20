@@ -30,18 +30,19 @@ const (
 // table structure for the sake of backwards compatibility, but otherwise is intended to replace the old class, as
 // part of the ongoing payments refactor.
 type DynamoDBCumulativePaymentStore struct {
+	// The DynamoDB client to use for storage operations
 	dynamoClient dynamodb.Client
-	tableName    string
-	accountKey   map[string]types.AttributeValue // Pre-built key for DynamoDB operations
+	// The name of the DynamoDB table to store payments in
+	tableName string
+	// The account address, pre-built as a key for DynamoDB operations
+	accountKey map[string]types.AttributeValue
 }
 
 var _ ondemand.CumulativePaymentStore = (*DynamoDBCumulativePaymentStore)(nil)
 
 // Creates a new DynamoDB-backed cumulative payment store
 func NewDynamoDBCumulativePaymentStore(
-	// The DynamoDB client to use for storage operations
 	dynamoClient dynamodb.Client,
-	// The name of the DynamoDB table to store payments in
 	tableName string,
 	// The account ID this store is tracking payments for
 	accountID gethcommon.Address,
@@ -65,7 +66,7 @@ func NewDynamoDBCumulativePaymentStore(
 	}, nil
 }
 
-// AddCumulativePayment atomically increments the cumulative payment by the given amount
+// AddCumulativePayment atomically adds a given amount to the cumulative payment
 //
 // This method uses DynamoDB's conditional update feature to ensure thread-safe operations.
 // It performs an atomic read-modify-write operation that:
@@ -123,8 +124,7 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 	// This ensures we don't exceed the maximum allowed cumulative payment.
 	// The condition is: (attribute doesn't exist) OR (current value <= maxAllowedCurrent)
 	// - For new accounts: attribute_not_exists is true, so condition passes.
-	//   This is safe because we've already verified above that amount <= maxCumulativePayment
-	//   (if amount > maxCumulativePayment, maxAllowedCurrent would be negative and we'd fail early)
+	//   This is safe because we've already verified above that amount <= maxCumulativePayment above
 	// - For existing accounts: current value must be <= maxAllowedCurrent
 	//   This ensures that current + amount <= maxCumulativePayment
 	conditionExpression := fmt.Sprintf("attribute_not_exists(%s) OR %s <= :max",
@@ -162,36 +162,35 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 				BlobCost:                 amount,
 			}
 		}
-		// TODO: this should be a dynamo error, which doesn't cause anything to crash
+
 		return nil, fmt.Errorf("failed to update payment: %w", err)
 	}
 
-	// Extract the new cumulative payment from the response
-	return extractPaymentValue(result, attributeCumulativePayment)
+	return extractPaymentValue(result)
 }
 
-// extractPaymentValue extracts and parses a payment value from a DynamoDB item
-func extractPaymentValue(item map[string]types.AttributeValue, attributeName string) (*big.Int, error) {
+// extractPaymentValue extracts and parses attributeCumulativePayment from a DynamoDB item
+func extractPaymentValue(item map[string]types.AttributeValue) (*big.Int, error) {
 	if len(item) == 0 {
 		return big.NewInt(0), nil
 	}
 
-	paymentAttr, ok := item[attributeName]
+	attributeValue, ok := item[attributeCumulativePayment]
 	if !ok {
 		return big.NewInt(0), nil
 	}
 
-	paymentNumber, ok := paymentAttr.(*types.AttributeValueMemberN)
+	attributeNumber, ok := attributeValue.(*types.AttributeValueMemberN)
 	if !ok {
-		return nil, fmt.Errorf("%s has invalid type: %T", attributeName, paymentAttr)
+		return nil, fmt.Errorf("%s has invalid type: %T", attributeCumulativePayment, attributeValue)
 	}
 
-	payment := new(big.Int)
-	if _, success := payment.SetString(paymentNumber.Value, 10); !success {
-		return nil, fmt.Errorf("parse payment value: %s", paymentNumber.Value)
+	cumulativePayment := new(big.Int)
+	if _, success := cumulativePayment.SetString(attributeNumber.Value, 10); !success {
+		return nil, fmt.Errorf("parse cumulative payment value: %s", attributeNumber.Value)
 	}
 
-	return payment, nil
+	return cumulativePayment, nil
 }
 
 // getCurrentPayment is a helper method to retrieve the current payment value
@@ -202,5 +201,5 @@ func (s *DynamoDBCumulativePaymentStore) getCurrentPayment(ctx context.Context) 
 		return nil, fmt.Errorf("get item: %w", err)
 	}
 
-	return extractPaymentValue(result, attributeCumulativePayment)
+	return extractPaymentValue(result)
 }
