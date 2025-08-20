@@ -93,7 +93,7 @@ func (d *ContractDirectory) GetContractAddress(
 
 	address, err := d.caller.GetAddress0(&bind.CallOpts{Context: ctx}, (string)(contractName))
 	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("GetAddress0: %w", err)
+		return gethcommon.Address{}, fmt.Errorf("eth-call: EigenDADirectory.GetAddress0: %w", err)
 	}
 
 	if address == (gethcommon.Address{}) {

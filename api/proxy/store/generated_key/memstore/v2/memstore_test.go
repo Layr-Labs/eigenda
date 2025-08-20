@@ -53,7 +53,7 @@ func TestGetSet(t *testing.T) {
 	actual, err := msV2.Get(t.Context(), cert, false)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
-	
+
 	// Test getting the encoded payload
 	encodedPayload, err := msV2.Get(t.Context(), cert, true)
 	require.NoError(t, err)
