@@ -283,12 +283,15 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		proofs := getProofs(t, rand.Intn(100)+100)
 		err := writer.PutFrameProofs(ctx, key, proofs)
 		require.NoError(t, err)
-		require.True(t, writer.ProofExists(ctx, key))
+		proofExists, err := writer.ProofExists(ctx, key)
+		require.NoError(t, err)
+		require.True(t, proofExists)
 
 		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		metadata, err := writer.PutFrameCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
-		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
+		exist, fragmentInfo, err := writer.CoefficientsExists(ctx, key)
+		require.NoError(t, err)
 		require.True(t, exist)
 		require.Equal(t, metadata, fragmentInfo)
 	}

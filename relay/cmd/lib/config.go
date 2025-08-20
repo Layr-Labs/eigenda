@@ -38,6 +38,15 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	ChainStateConfig              thegraph.Config
+
+	// The URL where the Redis server is running.
+	RedisUrl string
+
+	// The username to use for the Redis server.
+	RedisUser string
+
+	// The password to use for the Redis server.
+	RedisPassword string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -110,6 +119,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		RedisUrl:                      ctx.String(flags.RedisUrlFlag.Name),
+		RedisUser:                     ctx.String(flags.RedisUserFlag.Name),
+		RedisPassword:                 ctx.String(flags.RedisPasswordFlag.Name),
 	}
 	for i, id := range relayKeys {
 		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)

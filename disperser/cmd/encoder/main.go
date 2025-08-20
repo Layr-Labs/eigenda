@@ -104,9 +104,15 @@ func RunEncoderServer(ctx *cli.Context) error {
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
-		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
-		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
+		// TODO: if this merges, then make this toggleable via a flag
+		//chunkStoreBucketName := config.ChunkStoreConfig.BucketName
+		//chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
+		//logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
+
+		chunkWriter, err := chunkstore.NewRedisChunkWriter(config.RedisUrl, config.RedisUser, config.RedisPassword)
+		if err != nil {
+			return fmt.Errorf("failed to create chunk writer: %w", err)
+		}
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,
