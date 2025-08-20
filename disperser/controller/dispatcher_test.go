@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -47,14 +48,15 @@ var (
 )
 
 type dispatcherComponents struct {
-	Dispatcher        *controller.Dispatcher
-	BlobMetadataStore *blobstore.BlobMetadataStore
-	Pool              common.WorkerPool
-	ChainReader       *coremock.MockWriter
-	ChainState        *coremock.ChainDataMock
-	SigAggregator     *core.StdSignatureAggregator
-	NodeClientManager *controller.MockClientManager
-	BeforeDispatch    controller.BlobCallback
+	Dispatcher           *controller.Dispatcher
+	BatchMetadataManager *metadata.MockBatchMetadataManager
+	BlobMetadataStore    *blobstore.BlobMetadataStore
+	Pool                 common.WorkerPool
+	ChainReader          *coremock.MockWriter
+	ChainState           *coremock.ChainDataMock
+	SigAggregator        *core.StdSignatureAggregator
+	NodeClientManager    *controller.MockClientManager
+	BeforeDispatch       controller.BlobCallback
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
 	CallbackBlobSet *controller.MockBlobSet
 	BlobSet         *controller.MockBlobSet
@@ -63,6 +65,8 @@ type dispatcherComponents struct {
 
 func TestDispatcherHandleBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -174,6 +178,8 @@ func TestDispatcherHandleBatch(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -283,6 +289,8 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -382,6 +390,8 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 func TestDispatcherMaxBatchSize(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -391,7 +401,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 	ctx := context.Background()
 	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
 	for i := 0; i < expectedNumBatches; i++ {
-		batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+		batchData, err := components.Dispatcher.NewBatch(ctx, nil)
 		require.NoError(t, err)
 		if i < expectedNumBatches-1 {
 			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
@@ -405,7 +415,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	_, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
@@ -413,6 +423,8 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 
 func TestDispatcherNewBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("Contains", mock.Anything).Return(false)
@@ -424,7 +436,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Len(t, objs.blobCerts, 2)
 	ctx := context.Background()
 
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	batch := batchData.Batch
 	bhh, keys, state := batchData.BatchHeaderHash, batchData.BlobKeys, batchData.OperatorState
@@ -441,7 +453,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Equal(t, bhh, hash)
 
 	// Test that the batch header is correct
-	require.Equal(t, blockNumber, batch.BatchHeader.ReferenceBlockNumber)
+	require.Equal(t, blockNumber-finalizationBlockDelay, batch.BatchHeader.ReferenceBlockNumber)
 	require.NotNil(t, batch.BatchHeader.BatchRoot)
 
 	// Test that the batch header is written
@@ -472,7 +484,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	}
 
 	// Attempt to create a batch with the same blobs
-	_, err = components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	_, err = components.Dispatcher.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
@@ -480,6 +492,8 @@ func TestDispatcherNewBatch(t *testing.T) {
 
 func TestDispatcherNewBatchFailure(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	numBlobs := int(maxBatchSize + 1)
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
@@ -493,7 +507,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	ctx := context.Background()
 
 	// process one batch to set cursor
-	_, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	_, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	for i := 0; i < int(maxBatchSize); i++ {
 		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], commonv2.GatheringSignatures)
@@ -519,7 +533,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// process another batch (excludes stale blob)
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
@@ -527,7 +541,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// cursor should be reset and pick up stale blob
-	newBatchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	newBatchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, staleKey, newBatchData.BlobKeys[0])
@@ -538,6 +552,8 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 
 func TestDispatcherDedupBlobs(t *testing.T) {
 	components := newDispatcherComponents(t)
+	defer components.BatchMetadataManager.Close()
+
 	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
@@ -546,7 +562,7 @@ func TestDispatcherDedupBlobs(t *testing.T) {
 	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
 
 	ctx := context.Background()
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
+	batchData, err := components.Dispatcher.NewBatch(ctx, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 	require.Nil(t, batchData)
 
@@ -687,27 +703,49 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 
 	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
 
-	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
-		PullInterval:            1 * time.Second,
-		FinalizationBlockDelay:  finalizationBlockDelay,
-		AttestationTimeout:      1 * time.Second,
-		BatchAttestationTimeout: 2 * time.Second,
-		SignatureTickInterval:   1 * time.Second,
-		NumRequestRetries:       3,
-		MaxBatchSize:            maxBatchSize,
-	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet, livenessChan)
+	referenceBlockNumber := blockNumber - finalizationBlockDelay
+	operatorState, err := mockChainState.GetIndexedOperatorState(
+		t.Context(),
+		uint(referenceBlockNumber),
+		[]core.QuorumID{0, 1})
+	require.NoError(t, err)
+
+	metadataManager := metadata.NewMockBatchMetadataManager(
+		metadata.NewBatchMetadata(referenceBlockNumber, operatorState))
+
+	d, err := controller.NewDispatcher(
+		&controller.DispatcherConfig{
+			PullInterval:            1 * time.Second,
+			FinalizationBlockDelay:  finalizationBlockDelay,
+			AttestationTimeout:      1 * time.Second,
+			BatchAttestationTimeout: 2 * time.Second,
+			SignatureTickInterval:   1 * time.Second,
+			NumRequestRetries:       3,
+			MaxBatchSize:            maxBatchSize,
+		}, blobMetadataStore,
+		pool,
+		mockChainState,
+		metadataManager,
+		agg,
+		nodeClientManager,
+		logger,
+		prometheus.NewRegistry(),
+		beforeDispatch,
+		blobSet,
+		livenessChan)
 	require.NoError(t, err)
 	return &dispatcherComponents{
-		Dispatcher:        d,
-		BlobMetadataStore: blobMetadataStore,
-		Pool:              pool,
-		ChainReader:       chainReader,
-		ChainState:        mockChainState,
-		SigAggregator:     agg,
-		NodeClientManager: nodeClientManager,
-		BeforeDispatch:    beforeDispatch,
-		CallbackBlobSet:   callBackBlobSet,
-		BlobSet:           blobSet,
-		LivenessChan:      livenessChan,
+		Dispatcher:           d,
+		BatchMetadataManager: metadataManager,
+		BlobMetadataStore:    blobMetadataStore,
+		Pool:                 pool,
+		ChainReader:          chainReader,
+		ChainState:           mockChainState,
+		SigAggregator:        agg,
+		NodeClientManager:    nodeClientManager,
+		BeforeDispatch:       beforeDispatch,
+		CallbackBlobSet:      callBackBlobSet,
+		BlobSet:              blobSet,
+		LivenessChan:         livenessChan,
 	}
 }

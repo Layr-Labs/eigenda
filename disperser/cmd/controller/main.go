@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -65,7 +67,7 @@ func RunController(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	// Reset readiness probe upon start-up
@@ -75,17 +77,46 @@ func RunController(ctx *cli.Context) error {
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create DynamoDB client: %w", err)
 	}
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
-		return err
+		return fmt.Errorf("failed to create geth client: %w", err)
 	}
-	chainReader, err := eth.NewReader(
-		logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+
+	contractDirectory, err := directory.NewContractDirectory(
+		context.Background(),
+		logger,
+		gethClient,
+		gethcommon.HexToAddress(config.EigenDAContractDirectoryAddress))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
+	}
+	serviceManagerAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ServiceManager address: %w", err)
+	}
+	registryCoordinatorAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
+	if err != nil {
+		return fmt.Errorf("failed to get registry coordinator address: %w", err)
+	}
+
+	chainReader, err := eth.NewReader(
+		logger,
+		gethClient,
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
+	if err != nil {
+		return fmt.Errorf("failed to create chain reader: %w", err)
 	}
 
 	metricsRegistry := prometheus.NewRegistry()
@@ -160,15 +191,15 @@ func RunController(ctx *cli.Context) error {
 			&config.IndexerConfig,
 			gethClient,
 			rpcClient,
-			config.EigenDADirectory,
+			serviceManagerAddress.Hex(),
 			logger,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create indexer: %w", err)
 		}
 		ics, err = indexer.NewIndexedChainState(chainState, idx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create indexed chain state: %w", err)
 		}
 	}
 
@@ -195,11 +226,26 @@ func RunController(ctx *cli.Context) error {
 		return nil
 	}
 	dispatcherBlobSet := controller.NewBlobSet()
+
+	batchMetadataManager, err := metadata.NewBatchMetadataManager(
+		context.Background(),
+		logger,
+		gethClient,
+		ics,
+		registryCoordinatorAddress,
+		config.DispatcherConfig.BatchMetadataUpdatePeriod,
+		config.DispatcherConfig.FinalizationBlockDelay,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create batch metadata manager: %w", err)
+	}
+
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,
+		batchMetadataManager,
 		sigAgg,
 		nodeClientManager,
 		logger,
