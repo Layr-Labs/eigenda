@@ -95,7 +95,7 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	operatorStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+		contractDirectory.GetContractAddress(context.Background(), directory.BLSOperatorStateRetriever)
 	if err != nil {
 		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
 	}
