@@ -41,6 +41,7 @@ type Config struct {
 	MetricsPort                  int
 	ControllerReadinessProbePath string
 	ControllerHealthProbePath    string
+	GrpcPort                     string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -106,6 +107,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		GrpcPort:                      ctx.GlobalString(flags.GrpcPortFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

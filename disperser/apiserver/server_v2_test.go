@@ -593,6 +593,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 		// reserved only mode
 		false,
+		nil, // No controller in tests
 	)
 	assert.NoError(t, err)
 

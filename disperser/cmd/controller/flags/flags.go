@@ -237,6 +237,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
 		Value:    &defaultSigningThresholds,
 	}
+	GrpcPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
+		Usage:    "the port for the controller gRPC server",
+		Required: false,
+		Value:    "32001",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -277,6 +284,7 @@ var optionalFlags = []cli.Flag{
 	EigenDADirectoryFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	GrpcPortFlag,
 }
 
 var Flags []cli.Flag

@@ -26,6 +26,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metering"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -227,6 +228,25 @@ func RunController(ctx *cli.Context) error {
 	err = dispatcher.Start(c)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
+	}
+
+	// Start gRPC server if port is configured
+	if config.GrpcPort != "" {
+		grpcServer, err := metering.NewGrpcServer(&metering.Config{
+			GrpcPort: config.GrpcPort,
+		}, logger, metricsRegistry)
+		if err != nil {
+			return fmt.Errorf("failed to create gRPC server: %v", err)
+		}
+
+		go func() {
+			logger.Info("Starting controller gRPC server", "port", config.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				logger.Error("gRPC server failed", "error", err)
+			}
+		}()
+	} else {
+		logger.Info("Controller gRPC server disabled (no port configured)")
 	}
 
 	go func() {
