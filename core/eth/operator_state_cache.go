@@ -50,10 +50,10 @@ func NewOperatorStateCache(
 	contractBackend bind.ContractBackend,
 	chainState core.ChainState,
 	registryCoordinatorAddress gethcommon.Address,
-	cacheSize int,
+	cacheSize uint64,
 ) (OperatorStateCache, error) {
 
-	cache, err := lru.New[uint64, *core.OperatorState](cacheSize)
+	cache, err := lru.New[uint64, *core.OperatorState](int(cacheSize))
 	if err != nil {
 		return nil, fmt.Errorf("NewOperatorStateCache: %w", err)
 	}

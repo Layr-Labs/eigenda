@@ -209,11 +209,6 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// TODO (cody.littley): make contract directory config mandatory
-
-	// If EigenDADirectory is provided, use it to get service manager addresses
-	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
-
 	contractDirectory, err := directory.NewContractDirectory(
 		ctx,
 		logger,
@@ -253,7 +248,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddress.Hex(),
+		"contractDirectoryAddress", config.EigenDADirectory,
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -276,7 +271,7 @@ func NewNode(
 		client,
 		cst,
 		registryCoordinatorAddress,
-		1024) // TODO config
+		config.operatorStateCacheSize)
 
 	n := &Node{
 		Config:                  config,

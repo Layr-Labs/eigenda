@@ -528,6 +528,13 @@ var (
 		Value:    0.1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
 	}
+	OperatorStateCacheSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "operator-state-cache-size"),
+		Usage:    "The size of the operator state cache.",
+		Required: false,
+		Value:    64,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -664,12 +671,11 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	LittRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
+	OperatorStateCacheSizeFlag,
 }
 
 func init() {
