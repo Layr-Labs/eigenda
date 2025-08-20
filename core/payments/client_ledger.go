@@ -53,13 +53,9 @@ func (cl *ClientLedger) Debit(
 	now := cl.getNow()
 
 	if cl.reservationLedger != nil {
-		err := cl.reservationLedger.CheckInvariants(quorums, now)
-		if err != nil {
-			// TODO: add panic text here, make sure to include error
-			panic("")
-		}
-
-		success, err := cl.reservationLedger.Debit(now, blobLengthSymbols)
+		// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
+		// dispersal time when constructing the payment header, and it does so with its idea of "now"
+		success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 		if err != nil {
 
 			// TODO: check if this is a recoverable error. recoverable errors are any structured errors that debit may return
