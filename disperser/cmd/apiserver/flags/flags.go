@@ -68,7 +68,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
 		Value:    time.Minute,
 	}
-	// We keep the bls- prefix in the flag name to not break clients, but the contract
 	OperatorStateRetrieverFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
 		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
