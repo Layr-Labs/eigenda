@@ -125,7 +125,7 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 	// This ensures we don't exceed the maximum allowed cumulative payment.
 	// The condition is: (attribute doesn't exist) OR (current value <= maxAllowedCurrent)
 	// - For new accounts: attribute_not_exists is true, so condition passes.
-	//   This is safe because we've already verified above that amount <= maxCumulativePayment above
+	//   This is safe because we've already verified above that amount alone doesn't exceed maxCumulativePayment
 	// - For existing accounts: current value must be <= maxAllowedCurrent
 	//   This ensures that current + amount <= maxCumulativePayment
 	conditionExpression := fmt.Sprintf("attribute_not_exists(%s) OR %s <= :max",

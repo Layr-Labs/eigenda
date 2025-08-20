@@ -36,6 +36,7 @@ var (
 func TestMain(m *testing.M) {
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		// deploy localstack
+		deployLocalStack = true
 		var err error
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 		if err != nil {
