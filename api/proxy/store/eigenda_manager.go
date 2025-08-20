@@ -106,6 +106,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 		return nil, fmt.Errorf("get verify method: %w", err)
 	}
 
+	var readErrors []error
 	// 1 - read payload from cache if enabled
 	// Secondary storages (cache and fallback) store payloads instead of blobs.
 	// For simplicity, we bypass secondary storages when requesting encoded payloads,
@@ -121,6 +122,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 			return payload, nil
 		}
 		m.log.Warn("Failed to read payload from cache targets", "err", err)
+		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))
 	}
 
 	// 2 - read payloadOrEncodedPayload from EigenDA
@@ -135,20 +137,20 @@ func (m *EigenDAManager) Get(ctx context.Context,
 
 		return payloadOrEncodedPayload, nil
 	}
+	readErrors = append(readErrors, fmt.Errorf("read from EigenDA backend: %w", err))
 
 	// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 	// Only use fallbacks if we're not requesting encoded payload
 	if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
 		payloadOrEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, true, verifyMethod, opts.L1InclusionBlockNum)
-		if err != nil {
-			m.log.Error("Failed to read payload from fallback targets", "err", err)
-			return nil, err
+		if err == nil {
+			return payloadOrEncodedPayload, nil
 		}
-	} else {
-		return nil, err
+		readErrors = append(readErrors, fmt.Errorf("read from fallback targets: %w", err))
 	}
-	return payloadOrEncodedPayload, err
+
+	return nil, fmt.Errorf("failed to read from all storage backends: %w", errors.Join(readErrors...))
 }
 
 // Put ... inserts a value into a storage backend based on the commitment mode
