@@ -1,8 +1,8 @@
 package metrics
 
 import (
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -11,10 +11,14 @@ const (
 
 type DispersalMetricer interface {
 	RecordBlobSizeBytes(size uint)
+
+	Document() []metrics.DocumentedMetric
 }
 
 type DispersalMetrics struct {
-	BlobSize *prometheus.HistogramVec
+	BlobSize     *prometheus.HistogramVec
+  
+  factory *metrics.Documentor
 }
 
 func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
@@ -22,6 +26,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 		return NoopDispersalMetrics
 	}
 
+	factory := metrics.With(registry)
 	// Define size buckets for payload and blob size measurements
 	// Starting from 0 up to 16MiB
 	sizeBuckets := []float64{
@@ -37,7 +42,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 
 	return &DispersalMetrics{
-		BlobSize: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
+		BlobSize: factory.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "blob_size_bytes",
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
@@ -51,10 +56,18 @@ func (m *DispersalMetrics) RecordBlobSizeBytes(size uint) {
 	m.BlobSize.WithLabelValues().Observe(float64(size))
 }
 
+func (m *DispersalMetrics) Document() []metrics.DocumentedMetric {
+	return m.factory.Document()
+}
+
 type noopDispersalMetricer struct {
 }
 
 var NoopDispersalMetrics DispersalMetricer = new(noopDispersalMetricer)
 
 func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ uint) {
+}
+
+func (n *noopDispersalMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }

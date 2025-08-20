@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -124,4 +125,9 @@ func (n *EmulatedMetricer) RecordSecondaryRequest(x string, y string) func(statu
 			panic(err)
 		}
 	}
+}
+
+// Document ... noop
+func (n *EmulatedMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }
