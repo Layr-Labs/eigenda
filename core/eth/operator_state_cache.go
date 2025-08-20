@@ -6,18 +6,30 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 // the size of the index lock used by the OperatorStateCache
 const indexLockSize = 64
 
-// A light wrapper around ChainState that caches the operator state. If the operator state is requested multiple
-// times for the same reference block number, this utility will only fetch the operator state once and cache it.
+// Responsible for fetching and caching operator state for a given reference block number and quorums.
 //
-// This utility is fully thread safe, and should be sufficiently fast for use in performance sensitive, multithreaded
-// environments.
-type OperatorStateCache struct {
+// This utility is thread safe, and can be used in performance sensitive, multithreaded environments.
+type OperatorStateCache interface {
+	// GetOperatorState retrieves the operator state for a given reference block number and quorums
+	GetOperatorState(
+		ctx context.Context,
+		referenceBlockNumber uint64,
+		quorums []core.QuorumID,
+	) (*core.OperatorState, error)
+}
+
+var _ OperatorStateCache = (*operatorStateCache)(nil)
+
+// A standard implementation of the OperatorStateCache interface.
+type operatorStateCache struct {
 	// indexes chain data, required to get operator public keys
 	chainState core.ChainState
 
@@ -35,24 +47,32 @@ type OperatorStateCache struct {
 
 // Create a new caching wrapper around ChainState for fetching operator state.
 func NewOperatorStateCache(
+	contractBackend bind.ContractBackend,
 	chainState core.ChainState,
+	registryCoordinatorAddress gethcommon.Address,
 	cacheSize int,
-) (*OperatorStateCache, error) {
+) (OperatorStateCache, error) {
 
 	cache, err := lru.New[uint64, *core.OperatorState](cacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("NewOperatorStateCache: %w", err)
 	}
 
-	return &OperatorStateCache{
-		chainState: chainState,
-		cache:      cache,
-		indexLock:  common.NewIndexLock(indexLockSize),
+	qs, err := NewQuorumScanner(contractBackend, registryCoordinatorAddress)
+	if err != nil {
+		return nil, fmt.Errorf("NewQuorumScanner: %w", err)
+	}
+
+	return &operatorStateCache{
+		chainState:    chainState,
+		quorumScanner: qs,
+		cache:         cache,
+		indexLock:     common.NewIndexLock(indexLockSize),
 	}, nil
 }
 
 // GetOperatorState retrieves the operator state for a given reference block number and quorums.
-func (c *OperatorStateCache) GetOperatorState(
+func (c *operatorStateCache) GetOperatorState(
 	ctx context.Context,
 	referenceBlockNumber uint64,
 	quorums []core.QuorumID,
@@ -81,7 +101,7 @@ func (c *OperatorStateCache) GetOperatorState(
 	c.cache.Add(referenceBlockNumber, state)
 
 	// Only return data on the specified quorums.
-	filteredState, err := c.filterByQuorum(state, quorums)
+	filteredState, err := filterByQuorum(state, quorums)
 	if err != nil {
 		return nil, fmt.Errorf("filterByQuorum: %w", err)
 	}
@@ -91,7 +111,7 @@ func (c *OperatorStateCache) GetOperatorState(
 
 // The code expects an operator state with an exact set of quorums, so filter out any extras. Easier to do this
 // than to rewrite existing code that expects a specific set of quorums.
-func (c *OperatorStateCache) filterByQuorum(
+func filterByQuorum(
 	state *core.OperatorState,
 	quorums []core.QuorumID,
 ) (*core.OperatorState, error) {

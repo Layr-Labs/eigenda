@@ -101,6 +101,9 @@ type Node struct {
 
 	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
 	StoreChunksSemaphore *semaphore.Weighted
+
+	// Looks up operator state and maintains a cache of recently used operator states.
+	OperatorStateCache eth.OperatorStateCache // TODO initiate
 }
 
 // NewNode creates a new Node with the provided config.
@@ -210,28 +213,27 @@ func NewNode(
 
 	// If EigenDADirectory is provided, use it to get service manager addresses
 	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
-	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
-		contractDirectory, err := directory.NewContractDirectory(
-			ctx,
-			logger,
-			client,
-			gethcommon.HexToAddress(config.EigenDADirectory))
-		if err != nil {
-			return nil, fmt.Errorf("failed to create contract directory: %w", err)
-		}
 
-		eigenDAServiceManagerAddr, err =
-			contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
-		}
-	} else {
-		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
-			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
-			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
+	contractDirectory, err := directory.NewContractDirectory(
+		ctx,
+		logger,
+		client,
+		gethcommon.HexToAddress(config.EigenDADirectory))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
 	}
-	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
+
+	eigenDAServiceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get EigenDAEjectionManager address from contract directory: %w", err)
+	}
+
+	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
@@ -251,7 +253,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddress.Hex(),
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -270,6 +272,12 @@ func NewNode(
 
 	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
 
+	operatorStateCache, err := eth.NewOperatorStateCache(
+		client,
+		cst,
+		registryCoordinatorAddress,
+		1024) // TODO config
+
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -287,6 +295,7 @@ func NewNode(
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
 		StoreChunksSemaphore:    storeChunksSemaphore,
+		OperatorStateCache:      operatorStateCache,
 	}
 
 	if !config.EnableV2 {
