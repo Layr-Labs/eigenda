@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -97,10 +98,10 @@ func NewDisperserClient(
 	if config == nil {
 		return nil, fmt.Errorf("config must be provided")
 	}
-	if config.Hostname == "" {
+	if strings.TrimSpace(config.Hostname) == "" {
 		return nil, fmt.Errorf("hostname must be provided")
 	}
-	if config.Port == "" {
+	if strings.TrimSpace(config.Port) == "" {
 		return nil, fmt.Errorf("port must be provided")
 	}
 	if signer == nil {
