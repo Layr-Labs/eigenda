@@ -157,7 +157,6 @@ func push(
 //
 // The returned map is a map from file name (e.g. 1234.metadata) to the destination path (e.g. /path/to/remote/dir).
 func mapExistingFiles(
-	logger logging.Logger,
 	destinations []string,
 	tableName string,
 	connection *util.SSHSession) (map[string]string, error) {
@@ -176,11 +175,11 @@ func mapExistingFiles(
 		for _, filePath := range filePaths {
 			// Extract the file name from the path.
 			fileName := path.Base(filePath)
-			if _, exists := existingFiles[fileName]; !exists { // TODO create unit test, test with exists and !exists
-				existingFiles[fileName] = dest
-			} else {
-				logger.Warnf("File %s already exists in destination %s, skipping", fileName, dest)
-			}
+
+			_, alreadyFoundAtDestination := existingFiles[fileName]
+			enforce.False(alreadyFoundAtDestination,
+				"duplicate file found: %s and %s", fileName, existingFiles[fileName])
+			existingFiles[fileName] = dest
 		}
 	}
 
@@ -201,7 +200,7 @@ func pushTable(
 
 	// Figure out where data currently exists at the destination(s). We don't want this operation to cause a file
 	// to exist in multiple places.
-	existingFilesMap, err := mapExistingFiles(logger, destinations, tableName, connection)
+	existingFilesMap, err := mapExistingFiles(destinations, tableName, connection)
 	if err != nil {
 		return fmt.Errorf("failed to map existing files at destinations: %w", err)
 	}

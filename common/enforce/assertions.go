@@ -7,64 +7,65 @@ import "fmt"
 // types or packages that are not part of the standard library or common Go ecosystem.
 
 // Asserts a condition is true and panics with a message if the condition is false.
-func True(condition bool, message string) {
+func True(condition bool, message string, args ...any) {
 	if !condition {
-		panic("Expected condition to be true: " + message)
+		panic("Expected condition to be true: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts a condition is false and panics with an error message if the condition is false.
-func False(condition bool, message string) {
+func False(condition bool, message string, args ...any) {
 	if condition {
-		panic("Expected condition to be false: " + message)
+		panic("Expected condition to be false: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts that two values are equal and panics with an error if they are not.
-func Equals[T comparable](expected T, actual T, message string) {
+func Equals[T comparable](expected T, actual T, message string, args ...any) {
 	if expected != actual {
-		panic(fmt.Sprintf("Expected equality, %v != %v: %s", expected, actual, message))
+		panic(fmt.Sprintf("Expected equality, %v != %v: %s", expected, actual, fmt.Sprintf(message, args...)))
 	}
 }
 
 // Asserts that two values are not equal and panics with an error if they are equal.
-func NotEquals[T comparable](notExpected T, actual T, message string) {
+func NotEquals[T comparable](notExpected T, actual T, message string, args ...any) {
 	if notExpected == actual {
-		panic(fmt.Sprintf("Expected inequality, %v == %v: %s", notExpected, actual, message))
+		panic(fmt.Sprintf("Expected inequality, %v == %v: %s", notExpected, actual,
+			fmt.Sprintf(message, args...)))
 	}
 }
 
 // Asserts that a value is not nil and panics with an error message if it is nil.
-func NotNil[T any](value *T, message string) {
+func NotNil[T any](value *T, message string, args ...any) {
 	if value == nil {
-		panic("Expected value to be not nil: " + message)
+		panic("Expected value to be not nil: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts that a value is nil and panics with an error message if it is not nil.
-func Nil[T any](value *T, message string) {
+func Nil[T any](value *T, message string, args ...any) {
 	if value != nil {
-		panic("Expected value to be nil: " + message)
+		panic("Expected value to be nil: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts that a slice is not empty and panics with an error message if it is empty.
-func NotEmptyList[T any](list []T, message string) {
+func NotEmptyList[T any](list []T, message string, args ...any) {
 	if len(list) == 0 {
-		panic("Expected list to be not empty: " + message)
+		panic("Expected list to be not empty: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts that a string is not the empty string and panics with an error message if it is.
-func NotEmptyString(value string, message string) {
+func NotEmptyString(value string, message string, args ...any) {
 	if value == "" {
-		panic("Expected string to be not empty: " + message)
+		panic("Expected string to be not empty: " + fmt.Sprintf(message, args...))
 	}
 }
 
 // Asserts that a map is not empty and panics with an error message if it is empty.
-func NotEmptyMap[K comparable, V any](m map[K]V, message string) {
+func NotEmptyMap[K comparable, V any](m map[K]V, message string, args ...any) {
 	if len(m) == 0 {
-		panic("Expected map to be not empty: " + message)
+		panic("Expected map to be not empty: " + fmt.Sprintf(message, args...))
 	}
 }
