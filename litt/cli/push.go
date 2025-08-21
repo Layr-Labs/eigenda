@@ -318,7 +318,7 @@ func pushTable(
 	if deleteAfterTransfer {
 		enforce.True(isSnapshot, "we should have already returned an error if this is a non-snapshot table")
 
-		err = deleteLocalSegments(segments, tableName, true, sources, destinations, highestSegmentIndex)
+		err = deleteLocalSegments(segments, tableName, true, sources, highestSegmentIndex)
 		if err != nil {
 			return fmt.Errorf("failed to delete segments after transfer: %w", err)
 		}
@@ -333,7 +333,6 @@ func deleteLocalSegments(
 	tableName string,
 	isSnapshot bool,
 	sources []string,
-	destinations []string,
 	highestSegmentIndex uint32) error {
 
 	// Delete the segments.
@@ -354,13 +353,13 @@ func deleteLocalSegments(
 		boundaryFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(sources[0], tableName))
 		if err != nil {
 			return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
-				tableName, destinations[0], err)
+				tableName, sources[0], err)
 		}
 
 		err = boundaryFile.Update(highestSegmentIndex)
 		if err != nil {
 			return fmt.Errorf("failed to update boundary file for table %s at path %s: %w",
-				tableName, destinations[0], err)
+				tableName, sources[0], err)
 		}
 	}
 	return nil
