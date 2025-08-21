@@ -146,12 +146,15 @@ func (c *SSHTestContainer) cleanupDataDir() error {
 	}
 	defer func() { _ = session.Close() }()
 
+	require.NotEqual(c.t, "", containerDataDir,
+		"if this is an empty string then we will attempt to 'rm -rf /*'... let's not do that")
+
 	// Remove the entire workspace directory tree from inside the container
 	// This ensures container-owned files are removed by the container user
-	cleanupCmd := fmt.Sprintf("rm -rf %s", containerDataDir)
-	_, _, err = session.Exec(cleanupCmd)
+	cleanupCmd := fmt.Sprintf("rm -rf %s/*", containerDataDir)
+	stdout, stderr, err := session.Exec(cleanupCmd)
 	if err != nil {
-		return fmt.Errorf("failed to cleanup workspace: %w", err)
+		return fmt.Errorf("failed to cleanup workspace: %w\nstdout: %s\nstderr: %s", err, stdout, stderr)
 	}
 
 	return nil
