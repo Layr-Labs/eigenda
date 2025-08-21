@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -175,7 +176,7 @@ func mapExistingFiles(
 		for _, filePath := range filePaths {
 			// Extract the file name from the path.
 			fileName := path.Base(filePath)
-			if _, exists := existingFiles[fileName]; !exists {
+			if _, exists := existingFiles[fileName]; exists { // TODO create unit test, test with exists and !exists
 				existingFiles[fileName] = dest
 			} else {
 				logger.Warnf("File %s already exists in destination %s, skipping", fileName, dest)
@@ -238,10 +239,11 @@ func pushTable(
 	}
 	if isSnapshot {
 		if len(sources) > 1 {
-			return fmt.Errorf("table %s is a snapshot, but source directories found: %v", tableName, sources)
+			return fmt.Errorf("table %s is a snapshot, but source more than one source directories found: %v",
+				tableName, sources)
 		}
 
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(sources[0], tableName))
 		if err != nil {
 			return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, sources[0], err)
@@ -316,8 +318,9 @@ func pushTable(
 
 	// Now that we have transferred the files, we can delete them if requested.
 	if deleteAfterTransfer {
+		enforce.True(isSnapshot, "we should have already returned an error if this is a non-snapshot table")
 
-		err = deleteLocalSegments(segments, tableName, isSnapshot, sources, destinations, highestSegmentIndex)
+		err = deleteLocalSegments(segments, tableName, true, sources, destinations, highestSegmentIndex)
 		if err != nil {
 			return fmt.Errorf("failed to delete segments after transfer: %w", err)
 		}
@@ -350,7 +353,7 @@ func deleteLocalSegments(
 
 	if isSnapshot {
 		// If we are dealing with a snapshot, update the lower bound file.
-		boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(sources[0], tableName))
 		if err != nil {
 			return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, destinations[0], err)
