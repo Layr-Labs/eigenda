@@ -74,7 +74,7 @@ func run(ctx *cli.Context) error {
 	}
 
 	tx, err := coreeth.NewWriter(
-		logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+		logger, gethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Fatalln("could not create new transactor", err)
 	}

@@ -95,6 +95,18 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create contract directory: %w", err)
 	}
 
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
+	}
+
+	eigenDAServiceManagerAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ServiceManager address: %w", err)
+	}
+
 	// Create the node.
 	node, err := node.NewNode(context.Background(), reg, config, contractDirectory, pubIPProvider, client, logger)
 	if err != nil {
@@ -111,19 +123,11 @@ func NodeMain(ctx *cli.Context) error {
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
 
-	blsStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.BLSOperatorStateRetriever)
-	if err != nil {
-		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
-	}
-
-	eigenDAServiceManagerAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
-	if err != nil {
-		return fmt.Errorf("failed to get ServiceManager address: %w", err)
-	}
-
-	reader, err := coreeth.NewReader(logger, client, blsStateRetrieverAddress.Hex(), eigenDAServiceManagerAddress.Hex())
+	reader, err := coreeth.NewReader(
+		logger,
+		client,
+		operatorStateRetrieverAddress.Hex(),
+		eigenDAServiceManagerAddress.Hex())
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}

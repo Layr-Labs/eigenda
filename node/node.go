@@ -149,14 +149,14 @@ func NewNode(
 		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
 	}
 
-	blsOperatorStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(ctx, directory.BLSOperatorStateRetriever)
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get BLSOperatorStateRetriever address from contract directory: %w", err)
 	}
 
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, blsOperatorStateRetrieverAddress.Hex(), serviceManagerAddress.Hex())
+	tx, err := eth.NewWriter(logger, client, operatorStateRetrieverAddress.Hex(), serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}

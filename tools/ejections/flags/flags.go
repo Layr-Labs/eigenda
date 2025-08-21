@@ -53,9 +53,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -76,7 +77,7 @@ var optionalFlags = []cli.Flag{
 	DaysFlag,
 	FirstFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
+	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	SkipFlag,
 }
