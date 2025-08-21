@@ -193,19 +193,19 @@ func (m *EigenDAManager) getVerifyMethod(certVersion certs.VersionByte) (
 	func(context.Context, []byte, []byte, uint64) error,
 	error,
 ) {
-	v0VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	eigenDAV1VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
 		// we don't add the cert version because EigenDA V1 only supported [certs.V0VersionByte] Certs.
 		return m.eigenda.Verify(ctx, cert, payload)
 	}
-	v1VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	eigenDAV2VerifyWrapper := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
 		return m.eigendaV2.VerifyCert(ctx, certs.NewVersionedCert(cert, certVersion), l1InclusionBlockNumber)
 	}
 
 	switch certVersion {
 	case certs.V0VersionByte:
-		return v0VerifyWrapper, nil
+		return eigenDAV1VerifyWrapper, nil
 	case certs.V1VersionByte, certs.V2VersionByte:
-		return v1VerifyWrapper, nil
+		return eigenDAV2VerifyWrapper, nil
 	default:
 		return nil, fmt.Errorf("cert version unknown: %b", certVersion)
 	}
