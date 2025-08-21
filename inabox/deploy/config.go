@@ -25,8 +25,18 @@ func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	return nil, false
 }
 
+// SetLocalstackEndpoint sets the LocalStack endpoint for AWS services
+func (env *Config) SetLocalstackEndpoint(endpoint string) {
+	env.localstackEndpoint = endpoint
+}
+
+// SetLocalstackRegion sets the LocalStack region for AWS services
+func (env *Config) SetLocalstackRegion(region string) {
+	env.localstackRegion = region
+}
+
 // Constructs a mapping between service names/deployer names (e.g., 'dis0', 'opr1') and private keys. Order of priority: Map, List, File
-func (env *Config) loadPrivateKeys() error {
+func (env *Config) LoadPrivateKeys() error {
 
 	// construct full list of names
 	// nTotal := env.Services.Counts.NumDis + env.Services.Counts.NumOpr + env.Services.Counts.NumRet + env.Services.Counts.NumSeq + env.Services.Counts.NumCha
@@ -114,6 +124,19 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 		field := v.FieldByName(prefix + key)
 		if field.IsValid() && field.CanSet() && field.String() == "" {
 			field.SetString(value)
+		}
+		// Special handling for CHAIN_RPC fields that need to be propagated to service-specific fields
+		if key == "CHAIN_RPC" {
+			chainRPCField := v.FieldByName(prefix + "CHAIN_RPC")
+			if chainRPCField.IsValid() && chainRPCField.CanSet() && chainRPCField.String() == "" {
+				chainRPCField.SetString(value)
+			}
+		}
+		if key == "CHAIN_RPC_FALLBACK" {
+			chainRPCFallbackField := v.FieldByName(prefix + "CHAIN_RPC_FALLBACK")
+			if chainRPCFallbackField.IsValid() && chainRPCFallbackField.CanSet() && chainRPCFallbackField.String() == "" {
+				chainRPCFallbackField.SetString(value)
+			}
 		}
 	}
 

@@ -144,7 +144,7 @@ func (env *Config) DeployExperiment() {
 
 	// Create a new experiment and deploy the contracts
 
-	err = env.loadPrivateKeys()
+	err = env.LoadPrivateKeys()
 	if err != nil {
 		log.Panicf("could not load private keys: %v", err)
 	}

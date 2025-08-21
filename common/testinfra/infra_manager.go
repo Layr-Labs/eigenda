@@ -3,10 +3,20 @@ package testinfra
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/Layr-Labs/eigenda/common"
+	caws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testinfra/containers"
+	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // InfraManager orchestrates the lifecycle of test infrastructure containers
@@ -131,6 +141,19 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
+	// 4. Deploy EigenDA contracts if enabled (depends on Anvil)
+	if im.config.EigenDA.Enabled && im.anvil != nil {
+		// Set the RPC URL to use the Anvil instance we just started
+		if im.config.EigenDA.Deployer.RPC == "" {
+			im.config.EigenDA.Deployer.RPC = im.result.AnvilRPC
+		}
+		
+		err := im.deployEigenDAContracts(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
+		}
+	}
+
 	success = true
 	return &im.result, nil
 }
@@ -238,4 +261,180 @@ func StartCustom(ctx context.Context, config InfraConfig) (*InfraManager, *Infra
 	}
 
 	return manager, result, nil
+}
+
+// StartWithEigenDA starts infrastructure with EigenDA contract deployment enabled
+func StartWithEigenDA(ctx context.Context, rootPath string) (*InfraManager, *InfraResult, error) {
+	config := DefaultEigenDAConfig(rootPath)
+	return StartCustom(ctx, config)
+}
+
+// generateDisperserKeypair generates a KMS keypair for the disperser
+func (im *InfraManager) generateDisperserKeypair() (string, gethcommon.Address, error) {
+	if im.localstack == nil {
+		return "", gethcommon.Address{}, fmt.Errorf("LocalStack not available for KMS key generation")
+	}
+
+	// Get LocalStack endpoint
+	endpoint := im.localstack.Endpoint()
+	
+	// Create KMS client
+	keyManager := kms.New(kms.Options{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String(endpoint),
+	})
+
+	// Create the KMS key
+	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
+		KeySpec:  types.KeySpecEccSecgP256k1,
+		KeyUsage: types.KeyUsageTypeSignVerify,
+	})
+	if err != nil {
+		return "", gethcommon.Address{}, fmt.Errorf("could not create KMS key: %w", err)
+	}
+
+	keyID := *createKeyOutput.KeyMetadata.KeyId
+
+	// Load the public key and convert to address
+	publicKey, err := caws.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
+	if err != nil {
+		return "", gethcommon.Address{}, fmt.Errorf("could not load public key: %w", err)
+	}
+
+	address := crypto.PubkeyToAddress(*publicKey)
+	
+	return keyID, address, nil
+}
+
+// deployEigenDAContracts handles EigenDA contract deployment and registration
+func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
+	// Get private key for deployer account
+	privateKey, err := im.anvil.GetPrivateKey(0)
+	if err != nil {
+		return fmt.Errorf("failed to get private key: %w", err)
+	}
+
+	// Clean the private key
+	privateKey = strings.TrimPrefix(privateKey, "0x")
+	privateKey = strings.TrimPrefix(privateKey, "0X")
+
+	// Create logger (assuming a default logger is available)
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Create eth client for contract operations
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{im.result.AnvilRPC},
+		PrivateKeyString: privateKey,
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gethcommon.Address{}, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create eth client: %w", err)
+	}
+
+	// Create contract deployment manager using testinfra deployment utilities
+	manager := deployment.NewContractDeploymentManager(im.config.EigenDA.RootPath, im.config.EigenDA.Deployer)
+
+	// Deploy contracts if requested
+	if im.config.EigenDA.DeployContracts {
+		// Create deployment config matching the inabox testconfig-anvil.yaml structure
+		numStrategies := 2 // Two strategies as per the stakes configuration
+		maxOperatorCount := 3 // maxOperatorCount from services.counts
+		
+		// Stakes configuration from testconfig-anvil.yaml:
+		// - total: 100e18, distribution: [1, 4, 6, 10] 
+		// - total: 100e18, distribution: [1, 3, 8, 9]
+		stakeDistribution := [][]float32{
+			{1, 4, 6, 10},  // Strategy 0 distribution
+			{1, 3, 8, 9},   // Strategy 1 distribution  
+		}
+		stakeTotals := []float32{100e18, 100e18} // 100e18 tokens per strategy
+
+		// Private keys must be provided in the config
+		if len(im.config.EigenDA.PrivateKeys) == 0 {
+			return fmt.Errorf("private keys for operators and stakers must be provided in EigenDA config")
+		}
+		privateKeys := im.config.EigenDA.PrivateKeys
+
+		deployConfig := deployment.GenerateEigenDADeployConfig(
+			numStrategies,
+			maxOperatorCount,
+			stakeDistribution,
+			stakeTotals,
+			privateKeys,
+		)
+
+		err := manager.DeployEigenDAContracts(deployConfig)
+		if err != nil {
+			return fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
+		}
+		
+		// The deployment manager populates its own EigenDAContracts field
+		// Copy it to our result
+		im.result.EigenDAContracts = manager.EigenDAContracts
+	}
+
+	// Handle disperser keypair generation and registration
+	if im.config.EigenDA.GenerateDisperserKeypair && im.localstack != nil {
+		// Generate KMS keypair for disperser
+		keyID, address, err := im.generateDisperserKeypair()
+		if err != nil {
+			return fmt.Errorf("failed to generate disperser keypair: %w", err)
+		}
+		
+		// Store in config and result for output
+		im.config.EigenDA.DisperserKMSKeyID = keyID
+		im.config.EigenDA.DisperserAddress = address.Hex()
+		im.result.DisperserKMSKeyID = keyID
+		im.result.DisperserAddress = address
+		
+		// Register the disperser address if contracts are available
+		if im.result.EigenDAContracts != nil {
+			err = manager.RegisterDisperserAddress(ethClient, address)
+			if err != nil {
+				return fmt.Errorf("failed to register disperser address: %w", err)
+			}
+		}
+	} else if im.config.EigenDA.RegisterDisperser && im.result.EigenDAContracts != nil {
+		// Use provided disperser address if available
+		if im.config.EigenDA.DisperserAddress != "" {
+			disperserAddr := gethcommon.HexToAddress(im.config.EigenDA.DisperserAddress)
+			err = manager.RegisterDisperserAddress(ethClient, disperserAddr)
+			if err != nil {
+				return fmt.Errorf("failed to register disperser address: %w", err)
+			}
+		} else {
+			// Fallback: derive disperser address from deployer private key
+			privateKeyECDSA, err := crypto.HexToECDSA(privateKey)
+			if err != nil {
+				return fmt.Errorf("failed to parse private key: %w", err)
+			}
+			disperserAddress := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
+
+			err = manager.RegisterDisperserAddress(ethClient, disperserAddress)
+			if err != nil {
+				return fmt.Errorf("failed to register disperser keypair: %w", err)
+			}
+		}
+	}
+
+	// Register blob versions and relays if requested and contracts are available
+	if im.config.EigenDA.RegisterBlobVersionAndRelays && im.result.EigenDAContracts != nil {
+		// Set the service manager address in manager (used by RegisterBlobVersionsAndRelays)
+		manager.EigenDAContracts.ServiceManager = im.result.EigenDAContracts.ServiceManager
+
+		// Register relay addresses for v2
+		// These are the standard relay ports used in inabox tests
+		relayPorts := []string{"32035", "32037", "32039", "32041"}
+
+		err = manager.RegisterBlobVersionsAndRelays(ethClient, im.config.EigenDA.BlobVersionParams, relayPorts)
+		if err != nil {
+			return fmt.Errorf("failed to register blob versions and relays: %w", err)
+		}
+	}
+
+	return nil
 }

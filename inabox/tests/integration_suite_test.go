@@ -117,13 +117,32 @@ var _ = BeforeSuite(func() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	if testConfig.Environment.IsLocal() {
-		// Start testinfra containers
+		// Start testinfra containers with EigenDA contract deployment
 		ctx, infraCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-		config := testinfra.DefaultConfig()
-		// Enable graph node if subgraphs should be deployed
+		// Use the new testinfra EigenDA API for complete orchestration
+		config := testinfra.DefaultEigenDAConfig(rootPath)
+		
+		// Configure based on test requirements
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		config.GraphNode.Enabled = ok && deployer.DeploySubgraphs
+		
+		// Load private keys from secrets directory before starting testinfra
+		// This ensures operators get funded during contract deployment
+		err = testConfig.LoadPrivateKeys()
+		if err != nil {
+			fmt.Printf("Failed to load private keys: %v\n", err)
+			Expect(err).To(BeNil())
+		}
+		
+		// Pass the loaded private keys to testinfra for contract deployment
+		config.EigenDA.PrivateKeys = make(map[string]string)
+		for name, keyInfo := range testConfig.Pks.EcdsaMap {
+			config.EigenDA.PrivateKeys[name] = keyInfo.PrivateKey
+		}
+		
+		// Tell testinfra to generate disperser keypair and register it
+		config.EigenDA.GenerateDisperserKeypair = true
 
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
@@ -132,7 +151,7 @@ var _ = BeforeSuite(func() {
 			fmt.Println("Using shared Blob Store")
 		}
 
-		fmt.Println("Starting testinfra containers")
+		fmt.Println("Starting testinfra containers with EigenDA contract deployment")
 		manager, result, err := testinfra.StartCustom(ctx, config)
 		Expect(err).To(BeNil())
 		infraManager = manager
@@ -208,6 +227,34 @@ var _ = BeforeSuite(func() {
 		// Update test config to use testinfra endpoints
 		fmt.Printf("Updating RPC URL from %s to %s\n", testConfig.Deployers[0].RPC, infraResult.AnvilRPC)
 		testConfig.Deployers[0].RPC = infraResult.AnvilRPC
+		
+		// Also update the globals to ensure the RPC is propagated to all services
+		if testConfig.Services.Variables == nil {
+			testConfig.Services.Variables = make(map[string]map[string]string)
+		}
+		if testConfig.Services.Variables["globals"] == nil {
+			testConfig.Services.Variables["globals"] = make(map[string]string)
+		}
+		testConfig.Services.Variables["globals"]["CHAIN_RPC"] = infraResult.AnvilRPC
+		
+		// Also propagate the LocalStack endpoint if it's available
+		if awsEndpoint := os.Getenv("AWS_ENDPOINT_URL"); awsEndpoint != "" {
+			testConfig.Services.Variables["globals"]["AWS_ENDPOINT_URL"] = awsEndpoint
+		}
+
+		// Update contract addresses from testinfra deployment
+		if infraResult.EigenDAContracts != nil {
+			fmt.Println("Using EigenDA contracts deployed by testinfra")
+			contracts := infraResult.EigenDAContracts
+			testConfig.EigenDA.ServiceManager = contracts.ServiceManager
+			testConfig.EigenDA.OperatorStateRetriever = contracts.OperatorStateRetriever
+			testConfig.EigenDA.RegistryCoordinator = contracts.RegistryCoordinator
+			testConfig.EigenDAV1CertVerifier = contracts.EigenDAV1CertVerifier
+			testConfig.EigenDAV2CertVerifier = contracts.EigenDAV2CertVerifier
+			testConfig.EigenDA.CertVerifierRouter = contracts.EigenDACertVerifierRouter
+			// Set CertVerifier to V2 for v2 tests
+			testConfig.EigenDA.CertVerifier = contracts.EigenDAV2CertVerifier
+		}
 
 		// Update Graph URLs if Graph Node is enabled
 		var graphURL string
@@ -243,19 +290,20 @@ var _ = BeforeSuite(func() {
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Deploying experiment")
-		testConfig.DeployExperiment()
-
-		// After contract and subgraph deployment, test connectivity again
+		// Test Graph Node connectivity after testinfra setup
 		if graphURL != "" {
-			fmt.Println("Testing Graph Node connectivity after subgraph deployment...")
+			fmt.Println("Testing Graph Node connectivity...")
 			err := testGraphNodeConnectivity(graphURL, 15, 3*time.Second)
 			if err != nil {
-				fmt.Printf("⚠️  Graph Node still not accessible after deployment: %v\n", err)
+				fmt.Printf("⚠️  Graph Node not accessible: %v\n", err)
+				fmt.Println("Note: Subgraphs will be deployed as needed by testinfra")
 			} else {
-				fmt.Println("✅ Graph Node confirmed working after deployment")
+				fmt.Println("✅ Graph Node confirmed accessible")
 			}
 		}
+
+		// Create eth client for remaining operations  
+		deployer = testConfig.Deployers[0] // Use first deployer
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
@@ -270,16 +318,96 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Registering blob versions and relays")
-		testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-		fmt.Println("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient)
-		if err != nil {
-			panic(err)
+		fmt.Println("✅ Contracts deployed and configured by testinfra")
+		
+		// Load private keys from secrets directory (needed for operators)
+		// Private keys already loaded before testinfra start
+		fmt.Println("✅ Private keys already loaded from secrets directory")
+		
+		// Use disperser keypair generated by testinfra
+		if infraResult.DisperserKMSKeyID != "" {
+			testConfig.DisperserKMSKeyID = infraResult.DisperserKMSKeyID
+			testConfig.DisperserAddress = infraResult.DisperserAddress
+			fmt.Printf("✅ Using disperser keypair from testinfra: KMS Key ID: %s, Address: %s\n", 
+				testConfig.DisperserKMSKeyID, testConfig.DisperserAddress.Hex())
+			
+			// Set LocalStack endpoint for KMS operations
+			if awsEndpoint := os.Getenv("AWS_ENDPOINT_URL"); awsEndpoint != "" {
+				testConfig.SetLocalstackEndpoint(awsEndpoint)
+				testConfig.SetLocalstackRegion("us-east-1")
+			}
+		} else {
+			// Fallback: generate disperser keypair if testinfra didn't
+			if awsEndpoint := os.Getenv("AWS_ENDPOINT_URL"); awsEndpoint != "" {
+				testConfig.SetLocalstackEndpoint(awsEndpoint)
+				testConfig.SetLocalstackRegion("us-east-1")
+			}
+			
+			fmt.Println("Generating disperser keypair using KMS...")
+			err = testConfig.GenerateDisperserKeypair()
+			if err != nil {
+				fmt.Printf("Failed to generate disperser keypair: %v\n", err)
+				Expect(err).To(BeNil())
+			}
+			fmt.Printf("✅ Disperser keypair generated: KMS Key ID: %s, Address: %s\n", 
+				testConfig.DisperserKMSKeyID, testConfig.DisperserAddress.Hex())
+		}
+		
+		fmt.Println("✅ Blob versions and relays registered by testinfra")
+		
+		// Deploy subgraphs if Graph Node is enabled
+		if config.GraphNode.Enabled && infraResult.EigenDAContracts != nil {
+			fmt.Println("Deploying subgraphs to Graph Node...")
+			
+			// Get the block number where contracts were deployed
+			blockNumber, err := ethClient.BlockNumber(ctx)
+			Expect(err).To(BeNil())
+			startBlock := int(blockNumber) - 100 // Start a bit before current block to ensure we catch all events
+			if startBlock < 0 {
+				startBlock = 0
+			}
+			
+			// Prepare subgraph deployment config
+			// Note: tests run from inabox directory, so adjust path
+			subgraphConfig := deployment.SubgraphDeploymentConfig{
+				RootPath: "../",
+				Subgraphs: []deployment.SubgraphConfig{
+					{
+						Name:    "eigenda-operator-state",
+						Path:    "eigenda-operator-state", 
+						Enabled: true,
+					},
+				},
+				EigenDAConfig: deployment.EigenDAContractAddresses{
+					RegistryCoordinator: infraResult.EigenDAContracts.RegistryCoordinator,
+					ServiceManager:      infraResult.EigenDAContracts.ServiceManager,
+					BlsApkRegistry:      infraResult.EigenDAContracts.BlsApkRegistry,
+				},
+			}
+			
+			// Deploy the subgraphs using testinfra deployment function
+			graphNode := infraManager.GetGraphNode()
+			if graphNode != nil {
+				err = deployment.DeploySubgraphs(ctx, graphNode, subgraphConfig, startBlock)
+				if err != nil {
+					// Fail fast if subgraph deployment fails since services depend on it
+					Expect(err).To(BeNil(), fmt.Sprintf("Failed to deploy subgraphs: %v", err))
+				}
+				fmt.Println("✅ Subgraphs deployed successfully")
+				
+				// Wait a bit for the subgraph to sync
+				fmt.Println("Waiting for subgraph to sync...")
+				time.Sleep(5 * time.Second)
+			}
 		}
 
-		fmt.Println("Starting binaries")
+		// Keys are now loaded from secrets directory by LoadPrivateKeys() above
+		// No need to manually populate operator and staker keys
+
+		// Now generate all config variables (including RETRIEVER_SRS_ORDER) after testinfra setup
+		testConfig.GenerateAllVariables()
+
+		fmt.Println("Starting EigenDA binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)

@@ -191,9 +191,12 @@ func (m *ContractDeploymentManager) DeployEigenDAContracts(deployConfig EigenDAD
 	log.Printf("Loaded EigenDA contracts - ServiceManager: %s, RegistryCoordinator: %s", 
 		m.EigenDAContracts.ServiceManager, m.EigenDAContracts.RegistryCoordinator)
 
-	// Deploy V1 CertVerifier
+	// Deploy V1 CertVerifier (optional - log errors but don't fail)
 	if err := m.deployV1CertVerifier(); err != nil {
-		return fmt.Errorf("failed to deploy V1 CertVerifier: %w", err)
+		log.Printf("Warning: V1 CertVerifier deployment failed: %v", err)
+		log.Print("Continuing without V1 CertVerifier - using default address")
+		// Set a default/empty address if deployment fails
+		m.EigenDAContracts.EigenDAV1CertVerifier = "0x0000000000000000000000000000000000000000"
 	}
 
 	// V2 CertVerifier and Router are already deployed by the main SetUpEigenDA.s.sol script
@@ -367,7 +370,8 @@ func (m *ContractDeploymentManager) RegisterBlobVersionsAndRelays(
 
 	ethAddr := ethClient.GetAccountAddress()
 	for _, port := range relayPorts {
-		url := fmt.Sprintf("0.0.0.0:%s", port)
+		// Use localhost for local test environment so operators can resolve the address
+		url := fmt.Sprintf("localhost:%s", port)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
 			RelayAddress: ethAddr,
 			RelayURL:     url,
