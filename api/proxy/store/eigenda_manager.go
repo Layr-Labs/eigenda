@@ -31,7 +31,6 @@ type IEigenDAManager interface {
 type EigenDAManager struct {
 	log logging.Logger
 
-	// For op generic commitments & standard commitments
 	eigenda          common.EigenDAV1Store // v0 version byte
 	eigendaV2        common.EigenDAV2Store // >= v1 version bytes
 	dispersalBackend atomic.Value          // stores the EigenDABackend to write blobs to
