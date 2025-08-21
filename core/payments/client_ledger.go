@@ -2,24 +2,47 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // TODO: write unit tests
 
 // TODO: work out how to fit metrics into this
+
+// TODO(litt3): Currently, the client ledger has no mechanism to observe the following changes that may occur in the
+// PaymentVault:
+//
+// 1. Reservation expiration
+// 2. Reservation update
+// 3. OnDemand deposit
+//
+// It is the responsibility of the user to restart the client if such a change occurs. A mechanism should be implemented
+// to remove this burden from the user.
 type ClientLedger struct {
-	// TODO: add logger
+	logger logging.Logger
 
 	accountID gethcommon.Address
 
 	getNow func() time.Time
+
+	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
+	// that this is directly configurable by the user, to ensure that reality matches intention.
+	//
+	// Consider, for example, if a user intends to operate with a reservation covering the majority of dispersals,
+	// with an on-demand balance as a backup. If there is a configuration issue which prevents the reservation from
+	// being used, the client could mistakenly burn through all backup funds before becoming aware of the
+	// misconfiguration. In such cases, it's better to fail early, to bring the misconfiguration to the attention of the
+	// user as soon as possible.
+	clientLedgerMode ClientLedgerMode
 
 	reservationLedger *reservation.ReservationLedger
 
@@ -28,15 +51,35 @@ type ClientLedger struct {
 
 func NewClientLedger(
 	accountID gethcommon.Address,
-	// may be nil if no reservation exists
+	clientLedgerMode ClientLedgerMode,
 	reservationLedger *reservation.ReservationLedger,
-	// may be nil if no on demand payments are enabled
 	onDemandLedger *ondemand.OnDemandLedger,
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
 
+	switch clientLedgerMode {
+	case ClientLedgerModeReservationOnly:
+		if reservationLedger == nil || onDemandLedger != nil {
+			panic(fmt.Sprintf("in %s mode, expected reservation ledger to be non-nil and on-demand ledger to be nil",
+				ClientLedgerModeReservationOnly))
+		}
+	case ClientLedgerModeOnDemandOnly:
+		if onDemandLedger == nil || reservationLedger != nil {
+			panic(fmt.Sprintf("in %s mode, expected on-demand ledger to be non-nil and reservation ledger to be nil",
+				ClientLedgerModeOnDemandOnly))
+		}
+	case ClientLedgerModeReservationAndOnDemand:
+		if reservationLedger == nil || onDemandLedger == nil {
+			panic(fmt.Sprintf("in %s mode, expected reservation and on-demand ledgers to be non-nil",
+				ClientLedgerModeReservationAndOnDemand))
+		}
+	default:
+		panic(fmt.Sprintf("unknown clientLedgerMode %s", clientLedgerMode))
+	}
+
 	clientLedger := &ClientLedger{
 		accountID:         accountID,
+		clientLedgerMode:  clientLedgerMode,
 		getNow:            getNow,
 		reservationLedger: reservationLedger,
 		onDemandLedger:    onDemandLedger,
@@ -52,45 +95,119 @@ func (cl *ClientLedger) Debit(
 ) (*core.PaymentMetadata, error) {
 	now := cl.getNow()
 
-	if cl.reservationLedger != nil {
-		// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-		// dispersal time when constructing the payment header, and it does so with its idea of "now"
-		success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	switch cl.clientLedgerMode {
+	case ClientLedgerModeReservationOnly:
+		return cl.debitReservationOnly(ctx, now, blobLengthSymbols, quorums)
+	case ClientLedgerModeOnDemandOnly:
+		return cl.debitOnDemandOnly(ctx, now, blobLengthSymbols, quorums)
+	case ClientLedgerModeReservationAndOnDemand:
+		return cl.debitReservationAndOnDemand(ctx, now, blobLengthSymbols, quorums)
+	default:
+		panic(fmt.Sprintf("unknown clientLedgerMode %s", cl.clientLedgerMode))
+	}
+}
+
+func (cl *ClientLedger) debitReservationOnly(
+	ctx context.Context,
+	now time.Time,
+	blobLengthSymbols uint32,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
+	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
+	// dispersal time when constructing the payment header (below), and it does so with its conception of "now"
+	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	if err != nil {
+		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		if errors.As(err, &timeMovedBackwardErr) {
+			// this is the only class of error that can be returned from Debit where trying again might help
+			return nil, err
+		}
+
+		// all other modes of failure are fatal
+		panic(fmt.Sprintf("reservation debit failed: %v", err))
+	}
+
+	if !success {
+		return nil, fmt.Errorf(
+			"reservation lacks capacity for blob with %d symbols (%d bytes), "+
+				"and no on-demand fallback is configured",
+			blobLengthSymbols, blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
+	}
+
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
+	if err != nil {
+		panic(fmt.Sprintf("new payment metadata: %w", err))
+	}
+	return paymentMetadata, nil
+}
+
+func (cl *ClientLedger) debitOnDemandOnly(
+	ctx context.Context,
+	now time.Time,
+	blobLengthSymbols uint32,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
+	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
+	if err != nil {
+		panic(fmt.Sprintf("on-demand debit failed. reservations aren't configured, and the ledger won't become "+
+			"aware of new on-chain deposits without a restart: %v", err))
+	}
+
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
+	if err != nil {
+		panic(fmt.Sprintf("new payment metadata: %w", err))
+	}
+	return paymentMetadata, nil
+}
+
+func (cl *ClientLedger) debitReservationAndOnDemand(
+	ctx context.Context,
+	now time.Time,
+	blobLengthSymbols uint32,
+	quorums []core.QuorumID,
+) (*core.PaymentMetadata, error) {
+	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
+	// dispersal time when constructing the payment header (below), and it does so with its conception of "now"
+	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	if err != nil {
+		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		if errors.As(err, &timeMovedBackwardErr) {
+			// this is the only class of error that can be returned from Debit where trying again might help
+			return nil, err
+		}
+
+		// all other modes of failure are fatal
+		panic(fmt.Sprintf("reservation debit failed: %v", err))
+	}
+
+	if success {
+		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
 		if err != nil {
-
-			// TODO: check if this is a recoverable error. recoverable errors are any structured errors that debit may return
-			// if the error isn't recoverable, panic. if error is recoverable, log it and continue on (don't return)
-			return nil, fmt.Errorf("reservation debit error: %w", err)
+			panic(fmt.Sprintf("new payment metadata: %w", err))
 		}
-
-		if success {
-			// Success - blob accounted for via reservation
-			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
-			if err != nil {
-				return nil, fmt.Errorf("new payment metadata: %w", err)
-			}
-			return paymentMetadata, nil
-		}
-		// todo: add info log, saying reservation payment failed
+		return paymentMetadata, nil
 	}
 
-	if cl.onDemandLedger != nil {
-		cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
-		if err == nil {
-			// Success - blob accounted for via on-demand
-			paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
-			if err != nil {
-				return nil, fmt.Errorf("new payment metadata: %w", err)
-			}
-			return paymentMetadata, nil
-		} else {
-			// TODO: check if this is a recoverable error. recoverable errors are any structured errors that debit may return
-			// if the error isn't recoverable, panic
-			return nil, fmt.Errorf("something unexpected happened, shut down")
+	cl.logger.Infof("Reservation lacks capacity for blob with %d symbols (%d bytes). Falling back to on-demand.",
+		blobLengthSymbols, blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
+
+	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
+	if err != nil {
+		var InsufficientFundsError *ondemand.InsufficientFundsError
+		if errors.As(err, &InsufficientFundsError) {
+			// don't panic, since future dispersals could still use the reservation, once more capacity is available
+			return nil, err
 		}
+
+		// everything else is a more serious problem, which requires human intervention
+		panic(fmt.Sprintf("on-demand debit failed: %v", err))
 	}
 
-	return nil, fmt.Errorf("")
+	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
+	if err != nil {
+		panic(fmt.Sprintf("new payment metadata: %w", err))
+	}
+	return paymentMetadata, nil
 }
 
 // Undoes a previous debit.
