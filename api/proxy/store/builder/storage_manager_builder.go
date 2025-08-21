@@ -155,12 +155,12 @@ func BuildManagers(
 		config.StoreConfig.DispersalBackend,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create cert manager: %w", err)
+		return nil, nil, fmt.Errorf("new eigenda manager: %w", err)
 	}
 
 	keccakMgr, err := store.NewKeccakManager(s3Store, log)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create keccak manager: %w", err)
+		return nil, nil, fmt.Errorf("new keccak manager: %w", err)
 	}
 
 	return certMgr, keccakMgr, nil
