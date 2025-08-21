@@ -75,9 +75,9 @@ Each integration can be tailored to fit specific rollup protocol constraints.
 ### Splitting EigenDA Blob Derivation
 
 Rollups can split the derivation pipeline between on-chain execution and off-chain verification which is secured by some proof system. This degree
-of freedom allows for variants of integrations that tailored to individual stacks. For examples,
+of freedom allows for variants of integrations that are tailored to individual stacks. For examples,
 - **Arbitrum with EigenDA V1:** All components through cert validity checked in rollup inbox
-- **OP Optimstic Fault Proof Integration:** Entire EigenDA blob derivation executes off-chain, and they are secured by the OP [FPVM](https://specs.optimism.io/fault-proof/index.html#fault-proof-vm) proof system. 
+- **OP Optimistic Fault Proof Integration:** Entire EigenDA blob derivation executes off-chain, and they are secured by the OP [FPVM](https://specs.optimism.io/fault-proof/index.html#fault-proof-vm) proof system. 
 
 ### Securely integrating with any VM
 

@@ -1,7 +1,7 @@
 # EigenDA OP Secure integration
 
 This document presents an overview on how EigenDA plugs into Optimism (OP) Stack.
-- `write` and `read` path in a L2 rollup
+- `write` and `read` path in an L2 rollup
 - Why the `read` path must stay live (even with a misbehaving op-batcher)
 - Adding an EigenDA stage to the OP derivation pipeline
 - Hokulea, Rust library that defines and implements the Eigenda derivation rule
@@ -25,7 +25,7 @@ If the read path stalls, honest nodes can’t reach the block height needed to d
 
 ### L2 Write path (happy-flow)
 - op-batcher bundles user txs.
-- Sends compressed batches to EigenDA proxy, which converts them into an Eigenda blob. Proxy sends blob to EigenDA, and forwards the returned certificate to op-batcher
+- Sends compressed batches to EigenDA proxy, which converts them into an EigenDA blob. Proxy sends blob to EigenDA, and forwards the returned certificate to op-batcher
 - EigenDA certificates are posted to the L1 Rollup Inbox.
 ![](../../assets/integration/op-integration-high-level.png)
 
@@ -35,7 +35,7 @@ The read path from L1 determines L2 consensus. OP has defined a derivation pipel
 Both [op-program](https://github.com/ethereum-optimism/optimism/tree/develop/op-program) in Golang and [Kona](https://github.com/op-rs/kona/tree/main)
 in Rust implement the derivation pipeline. Like the diagram above, the derivation pipeline consists of stages that bring L1 transactions down to Payload Attributes which are L2 blocks.
 
-To support secure integration, we have defined and inserted a Eigenda section in the OP derivation pipeline. In the diagram above, we have sketched
+To support secure integration, we have defined and inserted an Eigenda section in the OP derivation pipeline. In the diagram above, we have sketched
 where and what rules EigenDA inserts in the OP derivation pipeline.
 Both Eigenda proxy and Hokulea implement the eigenda blob derivation.
 

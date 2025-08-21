@@ -59,7 +59,7 @@ versionedBlobParams[0] = {
 }
 ```
 
-The five parameters are intricately related by this formula which is also verified onchain by the [verifyBlobSecurityParams](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/libraries/EigenDABlobVerificationUtils.sol#L386) function: 
+The five parameters are intricately related by this formula which is also verified on-chain by the [verifyBlobSecurityParams](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/libraries/EigenDABlobVerificationUtils.sol#L386) function: 
 
 $$
 numChunks \cdot (1 - \frac{100}{\gamma * codingRate}) \geq maxNumOperators

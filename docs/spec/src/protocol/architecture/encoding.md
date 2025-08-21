@@ -17,7 +17,7 @@ EigenDA uses a combination of Reed-Solomon (RS) erasure coding and KZG polynomia
 
 Basic RS encoding is used to achieve the first requirement of *Adversarial tolerance for DA nodes*. This looks like the following:
 
-1. The blob data is represented as a string of symbols, where each symbol is elements in a certain finite field. The number of symbols is called the `BlobLength`
+1. The blob data is represented as a string of symbols, where each symbol is element in a certain finite field. The number of symbols is called the `BlobLength`
 2. These symbols are interpreted as the coefficients of a `BlobLength`-1 degree polynomial.
 3. This polynomial is evaluated at `NumChunks`*`ChunkLength` distinct indices.
 4. Chunks are constructed, where each chunk consists of the polynomial evaluations at `ChunkLength` distinct indices.
