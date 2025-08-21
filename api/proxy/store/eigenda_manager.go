@@ -245,9 +245,8 @@ func (m *EigenDAManager) getFromCorrectEigenDABackend(
 	case certs.V0VersionByte:
 		m.log.Debug("Reading blob from EigenDAV1 backend")
 
-		// We don't support secure integrations for EigenDAV1 backend, so this feature is not available.
 		if opts.ReturnEncodedPayload {
-			return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates")
+			return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates (EigenDA V1)")
 		}
 
 		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
