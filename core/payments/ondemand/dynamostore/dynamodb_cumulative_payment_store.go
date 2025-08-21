@@ -108,7 +108,7 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 		}
 		return nil, &ondemand.InsufficientFundsError{
 			CurrentCumulativePayment: currentValue,
-			TotalDeposits:            maxCumulativePayment,
+			MaxCumulativePayment:     maxCumulativePayment,
 			BlobCost:                 amount,
 		}
 	}
@@ -161,7 +161,7 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 			}
 			return nil, &ondemand.InsufficientFundsError{
 				CurrentCumulativePayment: currentValue,
-				TotalDeposits:            maxCumulativePayment,
+				MaxCumulativePayment:     maxCumulativePayment,
 				BlobCost:                 amount,
 			}
 		}

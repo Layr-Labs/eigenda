@@ -140,7 +140,7 @@ func TestUpperBound(t *testing.T) {
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr)
 	require.Equal(t, big.NewInt(200), insufficientFundsErr.CurrentCumulativePayment)
-	require.Equal(t, maxCumulativePayment, insufficientFundsErr.TotalDeposits)
+	require.Equal(t, maxCumulativePayment, insufficientFundsErr.MaxCumulativePayment)
 	require.Equal(t, big.NewInt(801), insufficientFundsErr.BlobCost)
 
 	newValue, err = store.AddCumulativePayment(ctx, big.NewInt(800), maxCumulativePayment)

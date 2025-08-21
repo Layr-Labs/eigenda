@@ -58,7 +58,7 @@ func (e *EphemeralCumulativePaymentStore) AddCumulativePayment(
 	if newCumulativePayment.Cmp(maxCumulativePayment) > 0 {
 		return nil, &ondemand.InsufficientFundsError{
 			CurrentCumulativePayment: e.cumulativePayment,
-			TotalDeposits:            maxCumulativePayment,
+			MaxCumulativePayment:     maxCumulativePayment,
 			BlobCost:                 amount,
 		}
 	}

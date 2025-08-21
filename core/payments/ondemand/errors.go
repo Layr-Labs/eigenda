@@ -18,10 +18,11 @@ func (e *QuorumNotSupportedError) Error() string {
 		e.RequestedQuorum, e.SupportedQuorums)
 }
 
-// InsufficientFundsError indicates that the debit would exceed the total deposits available in the on-demand account.
+// InsufficientFundsError indicates that the debit would cause the CumulativePayment to exceed the MaxCumulativePayment
+// (total deposits that have been made for the on-demand account)
 type InsufficientFundsError struct {
 	CurrentCumulativePayment *big.Int
-	TotalDeposits            *big.Int
+	MaxCumulativePayment     *big.Int
 	BlobCost                 *big.Int
 }
 
@@ -31,9 +32,9 @@ func (e *InsufficientFundsError) Error() string {
 		currentPayment = e.CurrentCumulativePayment.String()
 	}
 
-	totalDeposits := "<nil>"
-	if e.TotalDeposits != nil {
-		totalDeposits = e.TotalDeposits.String()
+	maxCumulativePayment := "<nil>"
+	if e.MaxCumulativePayment != nil {
+		maxCumulativePayment = e.MaxCumulativePayment.String()
 	}
 
 	blobCost := "<nil>"
@@ -42,6 +43,7 @@ func (e *InsufficientFundsError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"insufficient on-demand funds: current cumulative payment: %s wei, total deposits: %s wei, blob cost: %s wei",
-		currentPayment, totalDeposits, blobCost)
+		"insufficient on-demand funds: current cumulative payment: %s wei, max cumulative payment "+
+			"(total deposits): %s wei, blob cost: %s wei",
+		currentPayment, maxCumulativePayment, blobCost)
 }

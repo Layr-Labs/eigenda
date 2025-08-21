@@ -110,7 +110,7 @@ func TestAddCumulativePaymentErrorCases(t *testing.T) {
 		var insufficientFundsErr *ondemand.InsufficientFundsError
 		require.ErrorAs(t, err, &insufficientFundsErr)
 		require.Equal(t, big.NewInt(0), insufficientFundsErr.CurrentCumulativePayment)
-		require.Equal(t, big.NewInt(400), insufficientFundsErr.TotalDeposits)
+		require.Equal(t, big.NewInt(400), insufficientFundsErr.MaxCumulativePayment)
 		require.Equal(t, big.NewInt(500), insufficientFundsErr.BlobCost)
 
 		require.Equal(t, big.NewInt(0), store.cumulativePayment, "cumulative payment should not change on error")
