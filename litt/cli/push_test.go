@@ -38,7 +38,7 @@ func pushTest(
 
 	// Start a container that is running an SSH server. The push() command will communicate with this server.
 	container := util.SetupSSHTestContainer(t, destRoot)
-	defer func() { _ = container.Cleanup() }()
+	defer container.Cleanup()
 
 	sourceDirList := make([]string, 0, sourceDirs)
 	// The destination directories relative to the test's perspective of the filesystem.
@@ -355,7 +355,7 @@ func TestPushSnapshot(t *testing.T) {
 
 	// Start a container that is running an SSH server. The push() command will communicate with this server.
 	container := util.SetupSSHTestContainer(t, destRoot)
-	defer func() { _ = container.Cleanup() }()
+	defer container.Cleanup()
 
 	sourceDirList := make([]string, 0, sourceDirs)
 	// The destination directories relative to the test's perspective of the filesystem.

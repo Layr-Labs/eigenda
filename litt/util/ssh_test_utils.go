@@ -78,6 +78,7 @@ func GetUniqueSSHTestPort(testName string) (int, error) {
 
 // SSHTestContainer manages a Docker container with SSH server for testing
 type SSHTestContainer struct {
+	t           *testing.T
 	client      *client.Client
 	containerID string
 	sshPort     uint64
@@ -157,11 +158,9 @@ func (c *SSHTestContainer) cleanupDataDir() error {
 }
 
 // Cleanup removes the Docker container and cleans up resources
-func (c *SSHTestContainer) Cleanup() error {
+func (c *SSHTestContainer) Cleanup() {
 	err := c.cleanupDataDir()
-	if err != nil {
-		return fmt.Errorf("failed to cleanup data directory: %w", err)
-	}
+	require.NoError(c.t, err)
 
 	// Use a context with timeout for cleanup operations
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -181,11 +180,7 @@ func (c *SSHTestContainer) Cleanup() error {
 	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{
 		Force: true, // Force removal even if container is still running
 	})
-	if err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
-	}
-
-	return nil
+	require.NoError(c.t, err)
 }
 
 // GenerateSSHKeyPair creates an RSA key pair for testing
@@ -322,6 +317,7 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	WaitForSSH(t, sshPort, privateKeyPath)
 
 	return &SSHTestContainer{
+		t:           t,
 		client:      cli,
 		containerID: containerID,
 		sshPort:     sshPort,
@@ -471,13 +467,17 @@ func StartSSHContainer(
 		}(),
 	}
 
+	// Create a container name that includes the test name for easier debugging
+	containerName := fmt.Sprintf("ssh-test-%s-%d",
+		strings.ReplaceAll(testName, "/", "-"), time.Now().Unix())
+
 	resp, err := cli.ContainerCreate(
 		ctx,
 		containerConfig,
 		hostConfig,
 		nil,
 		nil,
-		"")
+		containerName)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to create container: %w", err)
 	}

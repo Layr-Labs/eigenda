@@ -176,7 +176,7 @@ func mapExistingFiles(
 		for _, filePath := range filePaths {
 			// Extract the file name from the path.
 			fileName := path.Base(filePath)
-			if _, exists := existingFiles[fileName]; exists { // TODO create unit test, test with exists and !exists
+			if _, exists := existingFiles[fileName]; !exists { // TODO create unit test, test with exists and !exists
 				existingFiles[fileName] = dest
 			} else {
 				logger.Warnf("File %s already exists in destination %s, skipping", fileName, dest)
