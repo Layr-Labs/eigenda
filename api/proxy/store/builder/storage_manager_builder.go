@@ -315,7 +315,7 @@ func buildEigenDAV2Backend(
 		}
 	}
 
-	var eigenDAServiceManagerAddr, blsOperatorStateRetrieverAddr geth_common.Address
+	var eigenDAServiceManagerAddr, operatorStateRetrieverAddr geth_common.Address
 	contractDirectory, err := directory.NewContractDirectory(ctx, log, ethClient,
 		geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
 	if err != nil {
@@ -325,9 +325,9 @@ func buildEigenDAV2Backend(
 	if err != nil {
 		return nil, fmt.Errorf("get eigenDAServiceManagerAddr: %w", err)
 	}
-	blsOperatorStateRetrieverAddr, err = contractDirectory.GetContractAddress(ctx, directory.BLSOperatorStateRetriever)
+	operatorStateRetrieverAddr, err = contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
 	if err != nil {
-		return nil, fmt.Errorf("get blsOperatorStateRetrieverAddr: %w", err)
+		return nil, fmt.Errorf("get OperatorStateRetriever addr: %w", err)
 	}
 	registryCoordinator, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
@@ -353,7 +353,7 @@ func buildEigenDAV2Backend(
 			log.Info("Initializing validator payload retriever")
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
-				blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr,
+				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
 				kzgVerifier, kzgProver.Srs.G1)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
@@ -377,7 +377,7 @@ func buildEigenDAV2Backend(
 		ethClient,
 		kzgProver,
 		certVerifier,
-		blsOperatorStateRetrieverAddr,
+		operatorStateRetrieverAddr,
 		registryCoordinator,
 		registry,
 	)
@@ -546,7 +546,7 @@ func buildValidatorPayloadRetriever(
 	log logging.Logger,
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
-	blsOperatorStateRetrieverAddr geth_common.Address,
+	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
@@ -554,7 +554,7 @@ func buildValidatorPayloadRetriever(
 	ethReader, err := eth.NewReader(
 		log,
 		ethClient,
-		blsOperatorStateRetrieverAddr.String(),
+		operatorStateRetrieverAddr.String(),
 		eigenDAServiceManagerAddr.String(),
 	)
 	if err != nil {
@@ -593,7 +593,7 @@ func buildPayloadDisperser(
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
-	blsOperatorStateRetrieverAddr geth_common.Address,
+	operatorStateRetrieverAddr geth_common.Address,
 	registryCoordinatorAddr geth_common.Address,
 	registry *prometheus.Registry,
 ) (*payloaddispersal.PayloadDisperser, error) {
@@ -633,7 +633,7 @@ func buildPayloadDisperser(
 	}
 
 	certBuilder, err := clients_v2.NewCertBuilder(
-		log, blsOperatorStateRetrieverAddr, registryCoordinatorAddr, ethClient)
+		log, operatorStateRetrieverAddr, registryCoordinatorAddr, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("new cert builder: %w", err)
 	}

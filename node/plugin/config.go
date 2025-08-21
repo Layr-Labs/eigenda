@@ -112,9 +112,10 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "CHAIN_RPC"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     "bls-operator-state-retriever",
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: "bls-operator-state-retriever",
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -146,24 +147,24 @@ var (
 )
 
 type Config struct {
-	PubIPProvider                 string
-	Operation                     string
-	EcdsaKeyFile                  string
-	BlsKeyFile                    string
-	EcdsaKeyPassword              string
-	BlsKeyPassword                string
-	BLSRemoteSignerUrl            string
-	BLSPublicKeyHex               string
-	BLSSignerCertFile             string
-	Socket                        string
-	QuorumIDList                  []core.QuorumID
-	ChainRpcUrl                   string
-	EigenDADirectory              string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	ChurnerUrl                    string
-	NumConfirmations              int
-	BLSSignerAPIKey               string
+	PubIPProvider              string
+	Operation                  string
+	EcdsaKeyFile               string
+	BlsKeyFile                 string
+	EcdsaKeyPassword           string
+	BlsKeyPassword             string
+	BLSRemoteSignerUrl         string
+	BLSPublicKeyHex            string
+	BLSSignerCertFile          string
+	Socket                     string
+	QuorumIDList               []core.QuorumID
+	ChainRpcUrl                string
+	EigenDADirectory           string
+	OperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr  string
+	ChurnerUrl                 string
+	NumConfirmations           int
+	BLSSignerAPIKey            string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -189,23 +190,23 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		PubIPProvider:                 ctx.GlobalString(PubIPProviderFlag.Name),
-		Operation:                     op,
-		EcdsaKeyPassword:              ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
-		BlsKeyPassword:                ctx.GlobalString(BlsKeyPasswordFlag.Name),
-		EcdsaKeyFile:                  ctx.GlobalString(EcdsaKeyFileFlag.Name),
-		BlsKeyFile:                    ctx.GlobalString(BlsKeyFileFlag.Name),
-		BLSRemoteSignerUrl:            ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:               ctx.GlobalString(BLSPublicKeyHexFlag.Name),
-		BLSSignerCertFile:             ctx.GlobalString(BLSSignerCertFileFlag.Name),
-		Socket:                        ctx.GlobalString(SocketFlag.Name),
-		QuorumIDList:                  ids,
-		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
-		EigenDADirectory:              ctx.GlobalString(EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
-		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
-		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
-		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
+		PubIPProvider:              ctx.GlobalString(PubIPProviderFlag.Name),
+		Operation:                  op,
+		EcdsaKeyPassword:           ctx.GlobalString(EcdsaKeyPasswordFlag.Name),
+		BlsKeyPassword:             ctx.GlobalString(BlsKeyPasswordFlag.Name),
+		EcdsaKeyFile:               ctx.GlobalString(EcdsaKeyFileFlag.Name),
+		BlsKeyFile:                 ctx.GlobalString(BlsKeyFileFlag.Name),
+		BLSRemoteSignerUrl:         ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:            ctx.GlobalString(BLSPublicKeyHexFlag.Name),
+		BLSSignerCertFile:          ctx.GlobalString(BLSSignerCertFileFlag.Name),
+		Socket:                     ctx.GlobalString(SocketFlag.Name),
+		QuorumIDList:               ids,
+		ChainRpcUrl:                ctx.GlobalString(ChainRpcUrlFlag.Name),
+		EigenDADirectory:           ctx.GlobalString(EigenDADirectoryFlag.Name),
+		OperatorStateRetrieverAddr: ctx.GlobalString(OperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:  ctx.GlobalString(EigenDAServiceManagerFlag.Name),
+		ChurnerUrl:                 ctx.GlobalString(ChurnerUrlFlag.Name),
+		NumConfirmations:           ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:            ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }
