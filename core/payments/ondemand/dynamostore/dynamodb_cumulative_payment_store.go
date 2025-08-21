@@ -102,12 +102,11 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 
 	// if maxAllowedCurrent is negative, that means the cost of this single dispersal alone exceeds total deposits
 	if maxAllowedCurrent.Sign() < 0 {
-		currentValue, err := s.getCurrentPayment(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get current payment for error reporting: %w", err)
-		}
+		// we're passing in nil as the CurrentCumulativePayment as a shortcut: the blob cost alone is greater than
+		// the maxCumulativePayment, so CurrentCumulativePayment is irrelevant. It's not worth implementing extra
+		// fetching logic, just for this strange edge case.
 		return nil, &ondemand.InsufficientFundsError{
-			CurrentCumulativePayment: currentValue,
+			CurrentCumulativePayment: nil,
 			MaxCumulativePayment:     maxCumulativePayment,
 			BlobCost:                 amount,
 		}
@@ -142,22 +141,23 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 	}
 
 	updateItemInput := &dynamodb.UpdateItemInput{
-		TableName:                 s.tableName,
-		Key:                       s.accountKey,
-		UpdateExpression:          aws.String(updateExpression),
-		ConditionExpression:       aws.String(conditionExpression),
-		ExpressionAttributeValues: expressionAttributeValues,
-		ReturnValues:              types.ReturnValueUpdatedNew,
+		TableName:                           s.tableName,
+		Key:                                 s.accountKey,
+		UpdateExpression:                    aws.String(updateExpression),
+		ConditionExpression:                 aws.String(conditionExpression),
+		ExpressionAttributeValues:           expressionAttributeValues,
+		ReturnValues:                        types.ReturnValueUpdatedNew,
+		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
 	}
 
 	updateItemOutput, err := s.dynamoClient.UpdateItem(ctx, updateItemInput)
 	if err != nil {
 		var conditionCheckFailedException *types.ConditionalCheckFailedException
 		if errors.As(err, &conditionCheckFailedException) {
-			currentValue, getErr := s.getCurrentPayment(ctx)
-			if getErr != nil {
+			currentValue, parseErr := extractPaymentValue(conditionCheckFailedException.Item)
+			if parseErr != nil {
 				return nil, fmt.Errorf(
-					"conditional check failed with error %w, and couldn't get current value: %w", err, getErr)
+					"conditional check failed with error %w, and couldn't parse current value: %w", err, parseErr)
 			}
 			return nil, &ondemand.InsufficientFundsError{
 				CurrentCumulativePayment: currentValue,
@@ -194,20 +194,4 @@ func extractPaymentValue(item map[string]types.AttributeValue) (*big.Int, error)
 	}
 
 	return cumulativePayment, nil
-}
-
-// getCurrentPayment is a helper method to retrieve the current payment value
-// Used for error reporting when operations fail
-func (s *DynamoDBCumulativePaymentStore) getCurrentPayment(ctx context.Context) (*big.Int, error) {
-	resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:            s.tableName,
-		Key:                  s.accountKey,
-		ConsistentRead:       aws.Bool(true),
-		ProjectionExpression: aws.String(attributeCumulativePayment),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get item: %w", err)
-	}
-
-	return extractPaymentValue(resp.Item)
 }

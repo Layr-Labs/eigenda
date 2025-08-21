@@ -166,6 +166,10 @@ func TestSingleDispersalExceedsMaximum(t *testing.T) {
 	require.Error(t, err, "single payment exceeding total deposits should fail")
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr)
+	require.Nil(t, insufficientFundsErr.CurrentCumulativePayment)
+	require.Equal(t, big.NewInt(1000), insufficientFundsErr.MaxCumulativePayment)
+	require.Equal(t, big.NewInt(2000), insufficientFundsErr.BlobCost)
+
 }
 
 func TestAddCumulativePaymentInputValidation(t *testing.T) {
