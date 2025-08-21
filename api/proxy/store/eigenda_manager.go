@@ -173,7 +173,7 @@ func (m *EigenDAManager) Put(ctx context.Context, value []byte) ([]byte, error) 
 
 func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byte, value []byte) {
 	if m.secondary.AsyncWriteEntry() { // publish put notification to secondary's subscription on PutNotify topic
-		m.log.Debug("Publishing data to async secondary stores")
+		m.log.Debug("Publishing data to async secondary stores", "commitment", commitment)
 		m.secondary.Topic() <- secondary.PutNotify{
 			Commitment: commitment,
 			Value:      value,
