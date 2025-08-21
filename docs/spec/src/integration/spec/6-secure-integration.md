@@ -139,7 +139,7 @@ If the inequality fails, discard the cert. This also hardens security by prevent
 >
 > Despite its semantics being slightly different, sequencerWindow and recencyWindow are related concepts, and in order to not force another config change on op altda forks, we suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
 
-To ensure the ~7-day challenge window overlaps EigenDA availability, we assume the L2 state proposer posts to L1 frequently so the gap between (a) the L1 inclusion of the cert in the batcher inbox and (b) the L1 inclusion of the corresponding L2 state update stays small. Call this gap L2StatePostingPeriod. To leave validators enough time to detect and download the data, require: L2StatePostingPeriod + RecencyWindowSize < ~7 days.
+For the ~7-day challenge window overlaps EigenDA availability, we assume there is at least one honest challenger runs an L2 consensus node and downloads the EigenDA blob soon after the batch is posted on L1. Define L2StatePostingPeriod as the interval between (a) L1 inclusion of the certificate in the batcher inbox and (b) L1 inclusion of the corresponding L2 state update. As long as L2StatePostingPeriod + RecencyWindowSize < ~7 days, the honest challenger can deter any invalid-proposal attack.
 
 ![](../../assets/integration/cert-rbn-recency-window.png)
 
