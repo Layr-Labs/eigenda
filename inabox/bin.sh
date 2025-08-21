@@ -106,17 +106,29 @@ function start_detached {
         return
     fi
 
+    echo "DEBUG: Starting detached mode with testpath: $testpath"
+    echo "DEBUG: Process ID file will be: $pid_file"
+    
     mkdir -p $testpath/logs
 
+    echo "DEBUG: Starting churner service"
+    if [ ! -f "../operators/churner/bin/server" ]; then
+        echo "ERROR: Churner binary not found at ../operators/churner/bin/server"
+        echo "DEBUG: Current directory: $(pwd)"
+        echo "DEBUG: Available files in ../operators/churner/bin/: $(ls -la ../operators/churner/bin/ 2>/dev/null || echo 'directory not found')"
+        exit 1
+    fi
     set -a
     source $testpath/envs/churner.env
     set +a
+    echo "DEBUG: Churner will listen on port: ${CHURNER_GRPC_PORT}"
     ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
 
     pid="$!"
     pids="$pids $pid"
 
-    ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -- echo "Churner up" &
+    echo "DEBUG: Starting wait-for churner on port ${CHURNER_GRPC_PORT}"
+    ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -t 30 -- echo "Churner up" &
     waiters="$waiters $!"
 
     for FILE in $(ls $testpath/envs/dis*.env); do
@@ -129,7 +141,8 @@ function start_detached {
         pid="$!"
         pids="$pids $pid"
 
-        ./wait-for 0.0.0.0:${DISPERSER_SERVER_GRPC_PORT} -- echo "Disperser up" &
+        echo "DEBUG: Starting wait-for disperser on port ${DISPERSER_SERVER_GRPC_PORT}"
+        ./wait-for 0.0.0.0:${DISPERSER_SERVER_GRPC_PORT} -t 30 -- echo "Disperser up" &
         waiters="$waiters $!"
     done
 
@@ -143,7 +156,8 @@ function start_detached {
         pid="$!"
         pids="$pids $pid"
 
-        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -- echo "Encoder up" &
+        echo "DEBUG: Starting wait-for encoder on port ${DISPERSER_ENCODER_GRPC_PORT}"
+        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -t 30 -- echo "Encoder up" &
         waiters="$waiters $!"
     done
 
@@ -191,7 +205,8 @@ function start_detached {
         pid="$!"
         pids="$pids $pid"
 
-        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -- echo "Relay up" &
+        echo "DEBUG: Starting wait-for relay on port ${RELAY_GRPC_PORT}"
+        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -t 30 -- echo "Relay up" &
         waiters="$waiters $!"
     done
 
@@ -212,15 +227,25 @@ function start_detached {
         pid="$!"
         pids="$pids $pid"
 
-        ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -- echo "Node up" &
+        echo "DEBUG: Starting wait-for node on port ${NODE_DISPERSAL_PORT}"
+        ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -t 30 -- echo "Node up" &
         waiters="$waiters $!"
     done
 
     echo $pids > $pid_file
 
+    echo "DEBUG: Waiting for $(echo $waiters | wc -w) services to become available..."
+    waiter_count=0
     for waiter in $waiters; do
-        wait $waiter
+        waiter_count=$((waiter_count + 1))
+        echo "DEBUG: Waiting for service $waiter_count to be ready (PID: $waiter)"
+        if wait $waiter; then
+            echo "DEBUG: Service $waiter_count is ready"
+        else
+            echo "ERROR: Service $waiter_count failed to start (PID: $waiter)"
+        fi
     done
+    echo "DEBUG: All services startup checks completed"
 }
 
 

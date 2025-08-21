@@ -2,31 +2,21 @@ package deploy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
-	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
-	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+	testdeployment "github.com/Layr-Labs/eigenda/common/testinfra/deployment"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -50,126 +40,90 @@ func (env *Config) getKeyString(name string) string {
 	return keyInt.String()
 }
 
-// generateV1CertVerifierDeployConfig generates the input config used for deploying the V1 CertVerifier
-// NOTE: this will be killed in the future with eventual deprecation of V1
-func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient) V1CertVerifierDeployConfig {
-	config := V1CertVerifierDeployConfig{
-		ServiceManager:                env.EigenDA.ServiceManager,
-		RequiredQuorums:               []uint32{0, 1},
-		RequiredAdversarialThresholds: []uint32{33, 33},
-		RequiredConfirmationQuorums:   []uint32{55, 55},
-	}
-
-	return config
-}
-
-// generateEigenDADeployConfig generates input config fed into SetUpEigenDA.s.sol foundry script
-func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
-
-	operators := make([]string, 0)
-	stakers := make([]string, 0)
-	maxOperatorCount := env.Services.Counts.NumMaxOperatorCount
-
-	numStrategies := len(env.Services.Stakes)
-	total := make([]float32, numStrategies)
-	stakes := make([][]string, numStrategies)
-
-	for quorum, stake := range env.Services.Stakes {
-		for _, s := range stake.Distribution {
-			total[quorum] += s
-		}
-	}
-
-	for quorum := 0; quorum < numStrategies; quorum++ {
-		stakes[quorum] = make([]string, len(env.Services.Stakes[quorum].Distribution))
-		for ind, stake := range env.Services.Stakes[quorum].Distribution {
-			stakes[quorum][ind] = strconv.FormatFloat(float64(stake/total[quorum]*env.Services.Stakes[quorum].Total), 'f', 0, 32)
-		}
-	}
-
-	for i := 0; i < len(env.Services.Stakes[0].Distribution); i++ {
-		stakerName := fmt.Sprintf("staker%d", i)
-		operatorName := fmt.Sprintf("opr%d", i)
-
-		stakers = append(stakers, env.getKeyString(stakerName))
-		operators = append(operators, env.getKeyString(operatorName))
-	}
-
-	config := EigenDADeployConfig{
-		UseDefaults:         true,
-		NumStrategies:       numStrategies,
-		MaxOperatorCount:    maxOperatorCount,
-		StakerPrivateKeys:   stakers,
-		StakerTokenAmounts:  stakes,
-		OperatorPrivateKeys: operators,
-		ConfirmerPrivateKey: env.getKeyString("batcher0"),
-	}
-
-	return config
-
-}
-
-// deployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
+// deployEigenDAContracts deploys EigenDA core system and peripheral contracts using testinfra
 func (env *Config) deployEigenDAContracts() {
-	log.Print("Deploy the EigenDA and EigenLayer contracts")
+	log.Print("Deploy the EigenDA and EigenLayer contracts using testinfra")
 
-	// get deployer
+	// Get deployer configuration
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	if !ok {
 		log.Panicf("Deployer improperly configured")
 	}
 
-	changeDirectory(filepath.Join(env.rootPath, "contracts"))
-
-	eigendaDeployConfig := env.generateEigenDADeployConfig()
-	data, err := json.Marshal(&eigendaDeployConfig)
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
-	}
-	writeFile("script/input/eigenda_deploy_config.json", data)
-
-	execForgeScript("script/SetUpEigenDA.s.sol:SetupEigenDA", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, nil)
-
-	//add relevant addresses to path
-	data = readFile("script/output/eigenda_deploy_output.json")
-	err = json.Unmarshal(data, &env.EigenDA)
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+	// Create testinfra contract deployment manager
+	contractDeployer := testdeployment.ContractDeployer{
+		Name:            deployer.Name,
+		RPC:             deployer.RPC,
+		PrivateKey:      env.Pks.EcdsaMap[deployer.Name].PrivateKey,
+		DeploySubgraphs: deployer.DeploySubgraphs,
+		VerifyContracts: deployer.VerifyContracts,
+		VerifierURL:     deployer.VerifierURL,
+		Slow:            deployer.Slow,
 	}
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+	manager := testdeployment.NewContractDeploymentManager(env.rootPath, contractDeployer)
+
+	// Prepare deployment configuration
+	numStrategies := len(env.Services.Stakes)
+	stakeDistribution := make([][]float32, numStrategies)
+	stakeTotals := make([]float32, numStrategies)
+
+	for quorum, stake := range env.Services.Stakes {
+		stakeDistribution[quorum] = stake.Distribution
+		stakeTotals[quorum] = stake.Total
 	}
 
-	ethClient, err := geth.NewClient(geth.EthClientConfig{
-		RPCURLs:          []string{deployer.RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[deployer.Name].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       0,
-	}, gcommon.Address{}, 0, logger)
+	// Build private keys map for deployment
+	privateKeys := make(map[string]string)
+	for i := 0; i < len(env.Services.Stakes[0].Distribution); i++ {
+		stakerName := fmt.Sprintf("staker%d", i)
+		operatorName := fmt.Sprintf("opr%d", i)
+		privateKeys[stakerName] = env.getKeyString(stakerName)
+		privateKeys[operatorName] = env.getKeyString(operatorName)
+	}
+	privateKeys["batcher0"] = env.getKeyString("batcher0")
+
+	deployConfig := testdeployment.GenerateEigenDADeployConfig(
+		numStrategies,
+		env.Services.Counts.NumMaxOperatorCount,
+		stakeDistribution,
+		stakeTotals,
+		privateKeys,
+	)
+
+	// Deploy contracts using testinfra
+	err := manager.DeployEigenDAContracts(deployConfig)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		log.Panicf("Failed to deploy EigenDA contracts: %s", err.Error())
 	}
 
-	certVerifierV1DeployCfg := env.generateV1CertVerifierDeployConfig(ethClient)
-	data, err = json.Marshal(&certVerifierV1DeployCfg)
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
-	}
-
-	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
-	//       can be deprecated.
-	writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data)
-	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"})
-
-	data = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
-	var verifierAddress struct{ EigenDACertVerifier string }
-	err = json.Unmarshal(data, &verifierAddress)
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
-	}
-	env.EigenDAV1CertVerifier = verifierAddress.EigenDACertVerifier
+	// Copy contract addresses back to env
+	contracts := manager.GetContractAddresses()
+	env.EigenDA.ProxyAdmin = contracts.ProxyAdmin
+	env.EigenDA.PauserRegistry = contracts.PauserRegistry
+	env.EigenDA.DelegationManager = contracts.DelegationManager
+	env.EigenDA.Slasher = contracts.Slasher
+	env.EigenDA.StrategyManager = contracts.StrategyManager
+	env.EigenDA.EigenPodManager = contracts.EigenPodManager
+	env.EigenDA.AVSDirectory = contracts.AVSDirectory
+	env.EigenDA.EigenDADirectory = contracts.EigenDADirectory
+	env.EigenDA.RewardsCoordinator = contracts.RewardsCoordinator
+	env.EigenDA.StrategyFactory = contracts.StrategyFactory
+	env.EigenDA.StrategyBeacon = contracts.StrategyBeacon
+	env.EigenDA.StrategyBase = contracts.StrategyBase
+	env.EigenDA.StrategyBaseTVLLimits = contracts.StrategyBaseTVLLimits
+	env.EigenDA.Token = contracts.Token
+	env.EigenDA.ServiceManager = contracts.ServiceManager
+	env.EigenDA.RegistryCoordinator = contracts.RegistryCoordinator
+	env.EigenDA.BlsApkRegistry = contracts.BlsApkRegistry
+	env.EigenDA.StakeRegistry = contracts.StakeRegistry
+	env.EigenDA.IndexRegistry = contracts.IndexRegistry
+	env.EigenDA.OperatorStateRetriever = contracts.OperatorStateRetriever
+	env.EigenDA.ServiceManagerImplementation = contracts.ServiceManagerImplementation
+	env.EigenDAV1CertVerifier = contracts.EigenDAV1CertVerifier
+	env.EigenDAV2CertVerifier = contracts.EigenDAV2CertVerifier
+	env.EigenDA.CertVerifier = contracts.EigenDAV2CertVerifier
+	env.EigenDA.CertVerifierRouter = contracts.EigenDACertVerifierRouter
 }
 
 // Deploys a EigenDA experiment
@@ -288,123 +242,102 @@ func (env *Config) GenerateDisperserKeypair() error {
 	return nil
 }
 
-// RegisterDisperserKeypair registers the disperser's public key on-chain.
+// RegisterDisperserKeypair registers the disperser's public key on-chain using testinfra.
 func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+	log.Printf("RegisterDisperserKeypair: Starting disperser registration")
+	log.Printf("RegisterDisperserKeypair: Disperser address to register: %s", env.DisperserAddress.Hex())
+	
+	// Get deployer configuration
+	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
+	if !ok {
+		return fmt.Errorf("deployer improperly configured")
+	}
 
-	// Write the disperser's public key to on-chain storage
+	// Create testinfra contract deployment manager
+	contractDeployer := testdeployment.ContractDeployer{
+		Name:            deployer.Name,
+		RPC:             deployer.RPC,
+		PrivateKey:      env.Pks.EcdsaMap[deployer.Name].PrivateKey,
+		DeploySubgraphs: deployer.DeploySubgraphs,
+		VerifyContracts: deployer.VerifyContracts,
+		VerifierURL:     deployer.VerifierURL,
+		Slow:            deployer.Slow,
+	}
 
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
+	manager := testdeployment.NewContractDeploymentManager(env.rootPath, contractDeployer)
+	// Set the contract addresses in the manager
+	manager.EigenDAContracts.OperatorStateRetriever = env.EigenDA.OperatorStateRetriever
+	manager.EigenDAContracts.ServiceManager = env.EigenDA.ServiceManager
+	
+	log.Printf("RegisterDisperserKeypair: ServiceManager address: %s", env.EigenDA.ServiceManager)
+	log.Printf("RegisterDisperserKeypair: OperatorStateRetriever address: %s", env.EigenDA.OperatorStateRetriever)
+
+	err := manager.RegisterDisperserAddress(ethClient, env.DisperserAddress)
 	if err != nil {
-		return fmt.Errorf("could not create logger: %v", err)
+		log.Printf("RegisterDisperserKeypair: Failed to register disperser: %v", err)
+	} else {
+		log.Printf("RegisterDisperserKeypair: Successfully registered disperser")
 	}
-
-	writer, err := eth.NewWriter(
-		logger,
-		ethClient,
-		env.EigenDA.OperatorStateRetriever,
-		env.EigenDA.ServiceManager,
-	)
-	if err != nil {
-		return fmt.Errorf("could not create writer: %v", err)
-	}
-
-	err = writer.SetDisperserAddress(context.Background(), env.DisperserAddress)
-	if err != nil {
-		return fmt.Errorf("could not set disperser address: %v", err)
-	}
-
-	// Read the disperser's public key from on-chain storage to verify it was written correctly
-
-	retryTimeout := time.Now().Add(1 * time.Minute)
-	ticker := time.NewTicker(1 * time.Second)
-
-	for time.Now().Before(retryTimeout) {
-		address, err := writer.GetDisperserAddress(context.Background(), 0)
-		if err != nil {
-			logger.Warnf("could not get disperser address: %v", err)
-		} else {
-			if address != env.DisperserAddress {
-				return fmt.Errorf("expected disperser address %s, got %s", env.DisperserAddress, address)
-			}
-			return nil
-		}
-
-		<-ticker.C
-	}
-
-	return fmt.Errorf("timed out waiting for disperser address to be set")
+	return err
 }
 
 // RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract
-// and relays in RelayRegistry contract
+// and relays in RelayRegistry contract using testinfra
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
-	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
-	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
-	if err != nil {
-		log.Panicf("Error: %s", err)
+	// Get deployer configuration
+	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
+	if !ok {
+		log.Panicf("Deployer improperly configured")
 	}
-	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
-	if err != nil {
-		log.Panicf("Error: %s", err)
+
+	// Create testinfra contract deployment manager
+	contractDeployer := testdeployment.ContractDeployer{
+		Name:            deployer.Name,
+		RPC:             deployer.RPC,
+		PrivateKey:      env.Pks.EcdsaMap[deployer.Name].PrivateKey,
+		DeploySubgraphs: deployer.DeploySubgraphs,
+		VerifyContracts: deployer.VerifyContracts,
+		VerifierURL:     deployer.VerifierURL,
+		Slow:            deployer.Slow,
 	}
-	contractThresholdRegistry, err := thresholdreg.NewContractEigenDAThresholdRegistry(thresholdRegistryAddr, ethClient)
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-	opts, err := ethClient.GetNoSendTransactOpts()
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-	for _, blobVersionParam := range env.BlobVersionParams {
-		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.EigenDATypesV1VersionedBlobParams{
-			MaxNumOperators: blobVersionParam.MaxNumOperators,
-			NumChunks:       blobVersionParam.NumChunks,
-			CodingRate:      uint8(blobVersionParam.CodingRate),
-		})
-		if err != nil {
-			log.Panicf("Error: %s", err)
-		}
-		err = ethClient.SendTransaction(context.Background(), txn)
-		if err != nil {
-			log.Panicf("Error: %s", err)
+
+	manager := testdeployment.NewContractDeploymentManager(env.rootPath, contractDeployer)
+	// Set the service manager address in the manager
+	manager.EigenDAContracts.ServiceManager = env.EigenDA.ServiceManager
+
+	// Convert BlobVersionParams to testinfra format
+	blobVersionParams := make([]testdeployment.BlobVersionParam, len(env.BlobVersionParams))
+	for i, param := range env.BlobVersionParams {
+		blobVersionParams[i] = testdeployment.BlobVersionParam{
+			MaxNumOperators: param.MaxNumOperators,
+			NumChunks:       param.NumChunks,
+			CodingRate:      param.CodingRate,
 		}
 	}
 
-	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-	contractRelayRegistry, err := relayreg.NewContractEigenDARelayRegistry(relayAddr, ethClient)
-	if err != nil {
-		log.Panicf("Error: %s", err)
+	// Collect relay ports
+	relayPorts := make([]string, len(env.Relays))
+	for i, relayVars := range env.Relays {
+		relayPorts[i] = relayVars.RELAY_GRPC_PORT
 	}
 
-	ethAddr := ethClient.GetAccountAddress()
-	for _, relayVars := range env.Relays {
-		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
-		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
-			RelayAddress: ethAddr,
-			RelayURL:     url,
-		})
-		if err != nil {
-			log.Panicf("Error: %s", err)
-		}
-		err = ethClient.SendTransaction(context.Background(), txn)
-		if err != nil {
-			log.Panicf("Error: %s", err)
-		}
+	err := manager.RegisterBlobVersionsAndRelays(ethClient, blobVersionParams, relayPorts)
+	if err != nil {
+		log.Panicf("Failed to register blob versions and relays: %s", err)
 	}
 }
 
 // TODO: Supply the test path to the runner utility
 func (env *Config) StartBinaries() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+	log.Printf("Starting binaries with start-detached command...")
+	
 	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
 
 	if err != nil {
 		log.Panicf("Failed to start binaries. Err: %s", err)
 	}
+	log.Printf("Binaries started successfully")
 }
 
 // TODO: Supply the test path to the runner utility
@@ -474,10 +407,14 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 		return fmt.Errorf("testinfra subgraph deployment only supported for local environments")
 	}
 
+	// Log contract addresses before subgraph deployment
+	log.Printf("Subgraph deployment - ServiceManager: %s, RegistryCoordinator: %s, BlsApkRegistry: %s",
+		env.EigenDA.ServiceManager, env.EigenDA.RegistryCoordinator, env.EigenDA.BlsApkRegistry)
+	
 	// Prepare subgraph deployment configuration
-	deployConfig := deployment.SubgraphDeploymentConfig{
+	deployConfig := testdeployment.SubgraphDeploymentConfig{
 		RootPath: env.rootPath,
-		Subgraphs: []deployment.SubgraphConfig{
+		Subgraphs: []testdeployment.SubgraphConfig{
 			{
 				Name:    "eigenda-operator-state",
 				Path:    "eigenda-operator-state",
@@ -489,7 +426,7 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 				Enabled: true,
 			},
 		},
-		EigenDAConfig: deployment.EigenDAContractAddresses{
+		EigenDAConfig: testdeployment.EigenDAContractAddresses{
 			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
 			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
 			ServiceManager:      env.EigenDA.ServiceManager,
@@ -497,5 +434,5 @@ func (env *Config) deploySubgraphsWithTestinfra(startBlock int) error {
 	}
 
 	// Use the standalone testinfra deployment function with the URLs we have
-	return deployment.DeploySubgraphsWithURLs(deployConfig, env.GraphAdminURL, env.IPFSURL, startBlock)
+	return testdeployment.DeploySubgraphsWithURLs(deployConfig, env.GraphAdminURL, env.IPFSURL, startBlock)
 }
