@@ -69,3 +69,17 @@ func NotEmptyMap[K comparable, V any](m map[K]V, message string, args ...any) {
 		panic("Expected map to be not empty: " + fmt.Sprintf(message, args...))
 	}
 }
+
+// Asserts that a map contains a specific key and panics with an error message if it does not.
+func MapContainsKey[K comparable, V any](m map[K]V, key K, message string, args ...any) {
+	if _, ok := m[key]; !ok {
+		panic(fmt.Sprintf("Expected map to contain key %v: %s", key, fmt.Sprintf(message, args...)))
+	}
+}
+
+// Asserts that a map does not contain a specific key and panics with an error message if it does.
+func MapDoesNotContainKey[K comparable, V any](m map[K]V, key K, message string, args ...any) {
+	if _, ok := m[key]; ok {
+		panic(fmt.Sprintf("Expected map to not contain key %v: %s", key, fmt.Sprintf(message, args...)))
+	}
+}

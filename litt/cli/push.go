@@ -176,8 +176,7 @@ func mapExistingFiles(
 			// Extract the file name from the path.
 			fileName := path.Base(filePath)
 
-			_, alreadyFoundAtDestination := existingFiles[fileName]
-			enforce.False(alreadyFoundAtDestination,
+			enforce.MapDoesNotContainKey(existingFiles, fileName,
 				"duplicate file found: %s and %s", fileName, existingFiles[fileName])
 			existingFiles[fileName] = dest
 		}

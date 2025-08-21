@@ -110,3 +110,27 @@ func TestNotEmptyString(t *testing.T) {
 	emptyString := ""
 	NotEmptyString(emptyString, "This should panic, and the deferred function will catch it")
 }
+
+func TestMapContainsKey(t *testing.T) {
+	data := map[string]int{"key": 1}
+	MapContainsKey(data, "key", "This should not panic")
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic, but did not panic")
+		}
+	}()
+
+	MapContainsKey(data, "missing", "This should panic, and the deferred function will catch it")
+}
+
+func TestMapDoesNotContainKey(t *testing.T) {
+	data := map[string]int{"key": 1}
+	MapDoesNotContainKey(data, "missing", "This should not panic")
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic, but did not panic")
+		}
+	}()
+
+	MapDoesNotContainKey(data, "key", "This should panic, and the deferred function will catch it")
+}
