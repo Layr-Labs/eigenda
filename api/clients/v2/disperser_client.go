@@ -208,6 +208,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	var err error
 	successfulDispersal := false
 
+	//nolint:nestif // this is only triggering because there is old and new payment logic bundled into a single if
+	// statement. There's no use spending effort to decrease the complexity, since the old payment logic will soon
+	// go away entirely
 	if c.clientLedger != nil {
 		// TODO: set probe stages
 		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
