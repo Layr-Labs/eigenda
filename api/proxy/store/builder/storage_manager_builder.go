@@ -35,6 +35,7 @@ import (
 
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -275,11 +276,6 @@ func buildEigenDAV2Backend(
 			return nil, fmt.Errorf("build router address provider: %w", err)
 		}
 	}
-
-	ethReader, err := buildEthReader(log, config.ClientConfigV2, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("build eth reader: %w", err)
-	}
 	certVerifier, err := verification.NewCertVerifier(
 		log,
 		ethClient,
@@ -288,6 +284,7 @@ func buildEigenDAV2Backend(
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
+
 	if !isRouter {
 		// We call GetCertVersion to ensure that the cert verifier is of a supported version. See
 		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol#L12
@@ -311,13 +308,36 @@ func buildEigenDAV2Backend(
 		}
 	}
 
+	var eigenDAServiceManagerAddr, blsOperatorStateRetrieverAddr geth_common.Address
+	contractDirectory, err := directory.NewContractDirectory(ctx, log, ethClient,
+		geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
+	if err != nil {
+		return nil, fmt.Errorf("new contract directory: %w", err)
+	}
+	eigenDAServiceManagerAddr, err = contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("get eigenDAServiceManagerAddr: %w", err)
+	}
+	blsOperatorStateRetrieverAddr, err = contractDirectory.GetContractAddress(ctx, directory.BLSOperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("get blsOperatorStateRetrieverAddr: %w", err)
+	}
+	registryCoordinator, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("get registryCoordinator: %w", err)
+	}
+
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range config.ClientConfigV2.RetrieversToEnable {
 		switch retrieverType {
 		case common.RelayRetrieverType:
 			log.Info("Initializing relay payload retriever")
+			relayRegistryAddr, err := contractDirectory.GetContractAddress(ctx, directory.RelayRegistry)
+			if err != nil {
+				return nil, fmt.Errorf("get relay registry address: %w", err)
+			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, ethReader.GetRelayRegistryAddress())
+				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -325,7 +345,9 @@ func buildEigenDAV2Backend(
 		case common.ValidatorRetrieverType:
 			log.Info("Initializing validator payload retriever")
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, ethReader, kzgVerifier, kzgProver.Srs.G1)
+				log, config.ClientConfigV2, ethClient,
+				blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr,
+				kzgVerifier, kzgProver.Srs.G1)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -348,7 +370,8 @@ func buildEigenDAV2Backend(
 		ethClient,
 		kzgProver,
 		certVerifier,
-		ethReader,
+		blsOperatorStateRetrieverAddr,
+		registryCoordinator,
 		registry,
 	)
 	if err != nil {
@@ -457,13 +480,14 @@ func buildEthClient(ctx context.Context, log logging.Logger, secretConfigV2 comm
 }
 
 func buildRelayPayloadRetriever(
+	ctx context.Context,
 	log logging.Logger,
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
-	relayRegistryAddress geth_common.Address,
+	relayRegistryAddr geth_common.Address,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
-	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddress)
+	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddr)
 	if err != nil {
 		return nil, fmt.Errorf("build relay client: %w", err)
 	}
@@ -515,10 +539,20 @@ func buildValidatorPayloadRetriever(
 	log logging.Logger,
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
-	ethReader *eth.Reader,
+	blsOperatorStateRetrieverAddr geth_common.Address,
+	eigenDAServiceManagerAddr geth_common.Address,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
+	ethReader, err := eth.NewReader(
+		log,
+		ethClient,
+		blsOperatorStateRetrieverAddr.String(),
+		eigenDAServiceManagerAddr.String(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reader: %w", err)
+	}
 	chainState := eth.NewChainState(ethReader, ethClient)
 
 	retrievalClient := client_validator.NewValidatorClient(
@@ -544,23 +578,6 @@ func buildValidatorPayloadRetriever(
 	return validatorRetriever, nil
 }
 
-func buildEthReader(log logging.Logger,
-	clientConfigV2 common.ClientConfigV2,
-	ethClient common_eigenda.EthClient,
-) (*eth.Reader, error) {
-	ethReader, err := eth.NewReader(
-		log,
-		ethClient,
-		clientConfigV2.BLSOperatorStateRetrieverAddr,
-		clientConfigV2.EigenDAServiceManagerAddr,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	return ethReader, nil
-}
-
 func buildPayloadDisperser(
 	ctx context.Context,
 	log logging.Logger,
@@ -569,7 +586,8 @@ func buildPayloadDisperser(
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
-	ethReader *eth.Reader,
+	blsOperatorStateRetrieverAddr geth_common.Address,
+	registryCoordinatorAddr geth_common.Address,
 	registry *prometheus.Registry,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
@@ -611,12 +629,7 @@ func buildPayloadDisperser(
 	}
 
 	certBuilder, err := clients_v2.NewCertBuilder(
-		log,
-		geth_common.HexToAddress(clientConfigV2.BLSOperatorStateRetrieverAddr),
-		ethReader.GetRegistryCoordinatorAddress(),
-		ethClient,
-	)
-
+		log, blsOperatorStateRetrieverAddr, registryCoordinatorAddr, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("new cert builder: %w", err)
 	}

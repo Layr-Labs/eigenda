@@ -18,6 +18,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
@@ -31,21 +32,36 @@ type BlobCallback func(blobKey corev2.BlobKey) error
 type DispatcherConfig struct {
 	PullInterval time.Duration
 
+	// The number of blocks to wait before using operator state. A hedge against forking.
 	FinalizationBlockDelay uint64
+
+	// The time in between attempts to update the batch metadata (i.e. the reference block number and operator state).
+	// Since this can change at most once per eth block, it's pointless to make this period shorter than 10 seconds.
+	// In practice, it is completely ok to only check for new batch metadata every several minutes.
+	BatchMetadataUpdatePeriod time.Duration
+
 	// The maximum time permitted to wait for a node to provide a signature for a batch.
 	AttestationTimeout time.Duration
+
 	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
 	BatchAttestationTimeout time.Duration
+
 	// SignatureTickInterval is the interval at which Attestations will be updated in the blobMetadataStore,
 	// as signature gathering progresses.
 	SignatureTickInterval time.Duration
-	NumRequestRetries     int
+
+	// The number of times to retry a batch. The current implementation has major performance issues, so for the
+	// time being we should not attempt to retry batches.
+	NumRequestRetries int
+
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
+
 	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
 	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
 	// the threshold is disabled.
 	SignificantSigningThresholdPercentage uint8
+
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string
@@ -63,13 +79,19 @@ type Dispatcher struct {
 	metrics           *dispatcherMetrics
 
 	cursor *blobstore.StatusIndexCursor
+
 	// beforeDispatch function is called before dispatching a blob
 	beforeDispatch BlobCallback
+
 	// blobSet keeps track of blobs that are being dispatched
 	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
 	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet                BlobSet
+	blobSet BlobSet
+
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
+
+	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
+	batchMetadataManager metadata.BatchMetadataManager
 }
 
 type batchData struct {
@@ -85,6 +107,7 @@ func NewDispatcher(
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
+	batchMetadataManager metadata.BatchMetadataManager,
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
@@ -134,6 +157,7 @@ func NewDispatcher(
 		beforeDispatch:         beforeDispatch,
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
+		batchMetadataManager:   batchMetadataManager,
 	}, nil
 }
 
@@ -189,16 +213,9 @@ func (d *Dispatcher) HandleBatch(
 	// Signal Liveness to indicate no stall
 	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
 
-	batchProbe.SetStage("get_reference_block")
-	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
-	}
-	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
-
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, referenceBlockNumber, batchProbe)
+	batchData, err := d.NewBatch(ctx, batchProbe)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -559,9 +576,12 @@ func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
 // Warning: This function is not thread-safe
 func (d *Dispatcher) NewBatch(
 	ctx context.Context,
-	referenceBlockNumber uint64,
 	probe *common.SequenceProbe,
 ) (*batchData, error) {
+
+	batchMetadata := d.batchMetadataManager.GetMetadata()
+	referenceBlockNumber := batchMetadata.ReferenceBlockNumber()
+	operatorState := batchMetadata.OperatorState()
 
 	probe.SetStage("get_blob_metadata")
 	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(
@@ -582,12 +602,6 @@ func (d *Dispatcher) NewBatch(
 	d.logger.Debug("got new metadatas to make batch",
 		"numBlobs", len(blobMetadatas),
 		"referenceBlockNumber", referenceBlockNumber)
-
-	probe.SetStage("get_operator_state")
-	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get operator state at block %d: %w", referenceBlockNumber, err)
-	}
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
@@ -724,7 +738,7 @@ func (d *Dispatcher) NewBatch(
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
-		OperatorState:   state,
+		OperatorState:   operatorState,
 	}, nil
 }
 

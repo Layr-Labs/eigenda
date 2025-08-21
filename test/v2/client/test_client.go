@@ -391,8 +391,6 @@ func NewTestClient(
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
 					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
-					BLSOperatorStateRetrieverAddr:      config.BLSOperatorStateRetrieverAddr,
-					EigenDAServiceManagerAddr:          config.EigenDAServiceManagerAddr,
 					EigenDADirectory:                   config.EigenDADirectory,
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
