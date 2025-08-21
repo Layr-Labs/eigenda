@@ -28,11 +28,8 @@ import (
 // It is the responsibility of the user to restart the client if such a change occurs. A mechanism should be implemented
 // to remove this burden from the user.
 type ClientLedger struct {
-	logger logging.Logger
-
+	logger    logging.Logger
 	accountID gethcommon.Address
-
-	getNow func() time.Time
 
 	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
 	// that this is directly configurable by the user, to ensure that reality matches intention.
@@ -45,15 +42,20 @@ type ClientLedger struct {
 	clientLedgerMode ClientLedgerMode
 
 	reservationLedger *reservation.ReservationLedger
-
-	onDemandLedger *ondemand.OnDemandLedger
+	onDemandLedger    *ondemand.OnDemandLedger
+	getNow            func() time.Time
 }
 
+// Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
+	logger logging.Logger,
+	// The account that this client ledger is for.
 	accountID gethcommon.Address,
 	clientLedgerMode ClientLedgerMode,
 	reservationLedger *reservation.ReservationLedger,
 	onDemandLedger *ondemand.OnDemandLedger,
+	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
+	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
 
@@ -78,16 +80,25 @@ func NewClientLedger(
 	}
 
 	clientLedger := &ClientLedger{
+		logger:            logger,
 		accountID:         accountID,
 		clientLedgerMode:  clientLedgerMode,
-		getNow:            getNow,
 		reservationLedger: reservationLedger,
 		onDemandLedger:    onDemandLedger,
+		getNow:            getNow,
 	}
 
 	return clientLedger, nil
 }
 
+// Accepts parameters describing the aspects of a blob dispersal that are relevant for accounting. Attempts to use the
+// configured payment method(s) to account for the blob.
+//
+// Returns a PaymentMetadata if the blob was successfully accounted for. This PaymentMetadata contains the
+// information necessary to craft the dispersal message, and implicitly describes the payment mechanism being used.
+//
+// Returns an error for payment failures that could conceivably be resolved by retrying. Panics for all other failure
+// modes, since inability to pay for dispersals requires intervention.
 func (cl *ClientLedger) Debit(
 	ctx context.Context,
 	blobLengthSymbols uint32,
@@ -95,20 +106,23 @@ func (cl *ClientLedger) Debit(
 ) (*core.PaymentMetadata, error) {
 	now := cl.getNow()
 
+	// the handle methods in this switch contain some duplicate logic, but trying to generalize these operations
+	// incurs a high complexity cost: the same underlying function calls are being made, but logging + error behavior
+	// differs, depending on the specific mode of operation.
 	switch cl.clientLedgerMode {
 	case ClientLedgerModeReservationOnly:
-		return cl.debitReservationOnly(ctx, now, blobLengthSymbols, quorums)
+		return cl.debitReservationOnly(now, blobLengthSymbols, quorums)
 	case ClientLedgerModeOnDemandOnly:
 		return cl.debitOnDemandOnly(ctx, now, blobLengthSymbols, quorums)
 	case ClientLedgerModeReservationAndOnDemand:
-		return cl.debitReservationAndOnDemand(ctx, now, blobLengthSymbols, quorums)
+		return cl.debitReservationOrOnDemand(ctx, now, blobLengthSymbols, quorums)
 	default:
 		panic(fmt.Sprintf("unknown clientLedgerMode %s", cl.clientLedgerMode))
 	}
 }
 
+// Used ClientLedger instances where only reservation payments are configured.
 func (cl *ClientLedger) debitReservationOnly(
-	ctx context.Context,
 	now time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
@@ -141,6 +155,7 @@ func (cl *ClientLedger) debitReservationOnly(
 	return paymentMetadata, nil
 }
 
+// Used by ClientLedger instances where only on-demand payments are configured.
 func (cl *ClientLedger) debitOnDemandOnly(
 	ctx context.Context,
 	now time.Time,
@@ -160,7 +175,11 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	return paymentMetadata, nil
 }
 
-func (cl *ClientLedger) debitReservationAndOnDemand(
+// Used by ClientLedger instances where both reservation and on-demand payments are configured.
+//
+// First tries to pay for a dispersal with the reservation, and falls back to on-demand if the reservation
+// lacks capacity.
+func (cl *ClientLedger) debitReservationOrOnDemand(
 	ctx context.Context,
 	now time.Time,
 	blobLengthSymbols uint32,
