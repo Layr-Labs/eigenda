@@ -18,6 +18,12 @@ import (
 
 // TODO: work out how to fit metrics into this
 
+// The ClientLedger manages payment state for a single account. It is only used by *clients*, not by the disperser
+// or validator nodes.
+//
+// The ClientLedger aggressively triggers panics for errors that indicate no future payments will succeed. A client
+// is only useful if it can disperse blobs, and blobs can only be dispersed with a functioning payment mechanism.
+//
 // TODO(litt3): Currently, the client ledger has no mechanism to observe the following changes that may occur in the
 // PaymentVault:
 //
@@ -49,7 +55,7 @@ type ClientLedger struct {
 // Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
 	logger logging.Logger,
-	// The account that this client ledger is for.
+	// The account that this client ledger is for
 	accountID gethcommon.Address,
 	clientLedgerMode ClientLedgerMode,
 	reservationLedger *reservation.ReservationLedger,
@@ -58,6 +64,9 @@ func NewClientLedger(
 	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
+	if accountID == (gethcommon.Address{}) {
+		panic("account ID cannot be zero address")
+	}
 
 	switch clientLedgerMode {
 	case ClientLedgerModeReservationOnly:
@@ -121,14 +130,14 @@ func (cl *ClientLedger) Debit(
 	}
 }
 
-// Used ClientLedger instances where only reservation payments are configured.
+// Used by ClientLedger instances where only reservation payments are configured.
 func (cl *ClientLedger) debitReservationOnly(
 	now time.Time,
 	blobLengthSymbols uint32,
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header (below), and it does so with its conception of "now"
+	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
@@ -186,7 +195,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
-	// dispersal time when constructing the payment header (below), and it does so with its conception of "now"
+	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
@@ -229,53 +238,33 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	return paymentMetadata, nil
 }
 
-// Undoes a previous debit.
+// RevertDebit undoes a previous debit.
 //
 // This should be called in cases where the client does accounting for a blob, but then the dispersal fails before
-// the being accounted for by the disperser.
-func (cl *ClientLedger) revertDebit(
+// being accounted for by the disperser.
+func (cl *ClientLedger) RevertDebit(
 	ctx context.Context,
 	paymentMetadata *core.PaymentMetadata,
 	blobSymbolCount uint32,
 ) error {
 	if paymentMetadata.IsOnDemand() {
 		if cl.onDemandLedger == nil {
-			return fmt.Errorf("unable to revert on demand payment with nil onDemandLedger")
+			panic("payment metadata is for an on-demand payment, but OnDemandLedger is nil")
 		}
 
 		err := cl.onDemandLedger.RevertDebit(ctx, blobSymbolCount)
 		if err != nil {
-			return fmt.Errorf("revert debit: %w", err)
+			return fmt.Errorf("revert on-demand debit: %w", err)
 		}
 	} else {
 		if cl.reservationLedger == nil {
-			return fmt.Errorf("unable to revert reservation payment with nil reservationLedger")
+			panic("payment metadata is for a reservation payment, but ReservationLedger is nil")
 		}
 
 		err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
-	}
-
-	return nil
-}
-
-func (cl *ClientLedger) DispersalSent(
-	ctx context.Context,
-	paymentMetadata *core.PaymentMetadata,
-	symbolCount uint32,
-	success bool,
-) error {
-	if success {
-		return nil
-	}
-
-	// If the dispersal wasn't a success, that means that the disperser didn't charge the client for it, so the local
-	// ledger should "refund" itself the cost of the dispersal
-	err := cl.revertDebit(ctx, paymentMetadata, symbolCount)
-	if err != nil {
-		return fmt.Errorf("revert debit: %w", err)
 	}
 
 	return nil

@@ -201,17 +201,22 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	var paymentMetadata *core.PaymentMetadata
 	successfulDispersal := false
+
 	if c.clientLedger != nil {
 		// TODO: set probe stages
 		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
 		if err != nil {
-			// TODO: bring everything down if unexpected error happens. no sense continuing with payments broken
+			return nil, [32]byte{}, fmt.Errorf("debit: %w", err)
 		}
 
 		defer func() {
-			err := c.clientLedger.DispersalSent(ctx, paymentMetadata, uint32(symbolLength), successfulDispersal)
+			if successfulDispersal {
+				return
+			}
+
+			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
 			if err != nil {
-				// TODO: Log error
+				c.logger.Errorf("revert debit failed: %v", err)
 			}
 		}()
 	} else {
@@ -328,7 +333,11 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	// declare the dispersal a "success", so that the debit isn't reverted on the local ledger
+	// Mark the dispersal as successful so the defer doesn't revert the debit
+	//
+	// TODO before merge: spend more time considering in what cases this should be true vs false
+	// For example, are there some blob status returns that mean the disperser didn't do accounting? Could we
+	// be more aggressive with client side reversions in such cases?
 	successfulDispersal = true
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
