@@ -42,16 +42,8 @@ func (rl *ReservationLedgers) Debit(
 		return fmt.Errorf("get or create reservation ledger: %w", err)
 	}
 
-	// For reservation payments, first call CheckInvariants, then Debit
-	// First check invariants
-	err = ledger.CheckInvariants(quorumNumbers, dispersalTime)
-	if err != nil {
-		return fmt.Errorf("reservation payment failed invariant checks: %w", err)
-	}
-
-	// For Debit, use current time (not the dispersal time)
 	now := rl.timeSource()
-	success, err := ledger.Debit(now, symbolCount)
+	success, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
 	if err != nil {
 		return fmt.Errorf("debit reservation payment: %w", err)
 	}
@@ -83,5 +75,6 @@ func (rl *ReservationLedgers) getOrCreateLedger(accountID gethcommon.Address) (*
 	// NOTE: ReservationLedger requires a ReservationLedgerConfig and a time
 	// When implementing, use rl.timeSource() for the time parameter
 	// This is a placeholder implementation
-	return nil, fmt.Errorf("reservation ledger for account %s not found - placeholder creation not implemented", accountID.Hex())
+	return nil, fmt.Errorf(
+		"reservation ledger for account %s not found - placeholder creation not implemented", accountID.Hex())
 }

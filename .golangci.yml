@@ -18,16 +18,16 @@ linters:
     - wrapcheck   # checks that errors returned from external packages are wrapped
     - govet       # reports suspicious constructs
 
-linters-settings:
-  lll:
-    line-length: 120
-  errorlint:
-    # Check whether fmt.Errorf uses the %w verb for formatting errors
-    errorf: true
-  nestif:
-    # Reports when nesting complexity is >= this value (default is 5)
-    # Setting to 8 allows complexity up to 7
-    min-complexity: 8
+  settings:
+    lll:
+      line-length: 120
+    errorlint:
+      # Check whether fmt.Errorf uses the %w verb for formatting errors
+      errorf: true
+    nestif:
+      # Reports when nesting complexity is >= this value (default is 5)
+      # Setting to 8 allows complexity up to 7
+      min-complexity: 8
 
 issues:
   # Allow certain patterns to be ignored by lll (long lines)

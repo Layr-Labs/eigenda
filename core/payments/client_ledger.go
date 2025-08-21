@@ -149,7 +149,7 @@ func (cl *ClientLedger) debitReservationOnly(
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
-			return nil, err
+			return nil, fmt.Errorf("debit reservation: %w", err)
 		}
 
 		// all other modes of failure are fatal
@@ -165,7 +165,7 @@ func (cl *ClientLedger) debitReservationOnly(
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
 	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %w", err))
+		panic(fmt.Sprintf("new payment metadata: %v", err))
 	}
 	return paymentMetadata, nil
 }
@@ -185,7 +185,7 @@ func (cl *ClientLedger) debitOnDemandOnly(
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %w", err))
+		panic(fmt.Sprintf("new payment metadata: %v", err))
 	}
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
@@ -210,7 +210,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
-			return nil, err
+			return nil, fmt.Errorf("debit reservation: %w", err)
 		}
 
 		// all other modes of failure are fatal
@@ -220,7 +220,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	if success {
 		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
 		if err != nil {
-			panic(fmt.Sprintf("new payment metadata: %w", err))
+			panic(fmt.Sprintf("new payment metadata: %v", err))
 		}
 		return paymentMetadata, nil
 	}
@@ -233,7 +233,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		var InsufficientFundsError *ondemand.InsufficientFundsError
 		if errors.As(err, &InsufficientFundsError) {
 			// don't panic, since future dispersals could still use the reservation, once more capacity is available
-			return nil, err
+			return nil, fmt.Errorf("debit on-demand: %w", err)
 		}
 
 		// everything else is a more serious problem, which requires human intervention
@@ -242,7 +242,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %w", err))
+		panic(fmt.Sprintf("new payment metadata: %v", err))
 	}
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
