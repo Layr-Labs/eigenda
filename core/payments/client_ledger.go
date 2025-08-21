@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
@@ -15,8 +16,6 @@ import (
 )
 
 // TODO: write unit tests
-
-// TODO: work out how to fit metrics into this
 
 // The ClientLedger manages payment state for a single account. It is only used by *clients*, not by the disperser
 // or validator nodes.
@@ -34,8 +33,9 @@ import (
 // It is the responsibility of the user to restart the client if such a change occurs. A mechanism should be implemented
 // to remove this burden from the user.
 type ClientLedger struct {
-	logger    logging.Logger
-	accountID gethcommon.Address
+	logger             logging.Logger
+	accountantMetricer metrics.AccountantMetricer
+	accountID          gethcommon.Address
 
 	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
 	// that this is directly configurable by the user, to ensure that reality matches intention.
@@ -55,6 +55,7 @@ type ClientLedger struct {
 // Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
 	logger logging.Logger,
+	accountantMetricer metrics.AccountantMetricer,
 	// The account that this client ledger is for
 	accountID gethcommon.Address,
 	clientLedgerMode ClientLedgerMode,
@@ -64,6 +65,10 @@ func NewClientLedger(
 	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
 ) (*ClientLedger, error) {
+	if accountantMetricer == nil {
+		accountantMetricer = metrics.NoopAccountantMetrics
+	}
+
 	if accountID == (gethcommon.Address{}) {
 		panic("account ID cannot be zero address")
 	}
@@ -89,12 +94,13 @@ func NewClientLedger(
 	}
 
 	clientLedger := &ClientLedger{
-		logger:            logger,
-		accountID:         accountID,
-		clientLedgerMode:  clientLedgerMode,
-		reservationLedger: reservationLedger,
-		onDemandLedger:    onDemandLedger,
-		getNow:            getNow,
+		logger:             logger,
+		accountantMetricer: accountantMetricer,
+		accountID:          accountID,
+		clientLedgerMode:   clientLedgerMode,
+		reservationLedger:  reservationLedger,
+		onDemandLedger:     onDemandLedger,
+		getNow:             getNow,
 	}
 
 	return clientLedger, nil
@@ -181,6 +187,9 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	if err != nil {
 		panic(fmt.Sprintf("new payment metadata: %w", err))
 	}
+
+	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+
 	return paymentMetadata, nil
 }
 
@@ -235,6 +244,9 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	if err != nil {
 		panic(fmt.Sprintf("new payment metadata: %w", err))
 	}
+
+	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+
 	return paymentMetadata, nil
 }
 
@@ -252,10 +264,12 @@ func (cl *ClientLedger) RevertDebit(
 			panic("payment metadata is for an on-demand payment, but OnDemandLedger is nil")
 		}
 
-		err := cl.onDemandLedger.RevertDebit(ctx, blobSymbolCount)
+		newCumulativePayment, err := cl.onDemandLedger.RevertDebit(ctx, blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert on-demand debit: %w", err)
 		}
+
+		cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), newCumulativePayment)
 	} else {
 		if cl.reservationLedger == nil {
 			panic("payment metadata is for a reservation payment, but ReservationLedger is nil")

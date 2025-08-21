@@ -106,23 +106,25 @@ func (odl *OnDemandLedger) Debit(
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
 //
+// Returns the new cumulative payment amount after the revert.
+//
 // Note: this method will only succeed if the underlying CumulativePaymentStore supports subtracting from the
 // cumulative payment.
-func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) (*big.Int, error) {
 	if symbolCount == 0 {
-		return errors.New("symbolCount must be > 0")
+		return nil, errors.New("symbolCount must be > 0")
 	}
 
 	// Use AddCumulativePayment with a negative value
 	blobCost := odl.computeCost(symbolCount)
 	blobCost.Neg(blobCost)
 
-	_, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
+	newCumulativePayment, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
 	if err != nil {
-		return fmt.Errorf("add cumulative payment: %w", err)
+		return nil, fmt.Errorf("add cumulative payment: %w", err)
 	}
 
-	return nil
+	return newCumulativePayment, nil
 }
 
 // Checks whether all input quorum IDs are supported for on demand payments

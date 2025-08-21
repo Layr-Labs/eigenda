@@ -16,6 +16,8 @@ var (
 	gweiFactor = 1e9 // gweiFactor is used when converting wei to gwei
 )
 
+// TODO: add a new metric for reservation percentage. Or something that best represents reservation usage
+
 type AccountantMetricer interface {
 	RecordCumulativePayment(accountID string, wei *big.Int)
 }
