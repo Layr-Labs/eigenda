@@ -68,9 +68,10 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
 		Value:    time.Minute,
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"), // sigh
 	}
@@ -308,7 +309,7 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
 	ReservedOnly,
-	BlsOperatorStateRetrieverFlag,
+	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
 }
