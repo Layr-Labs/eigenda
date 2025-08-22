@@ -100,7 +100,7 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 	// doesn't have enough funds to pay
 	maxAllowedCurrent := new(big.Int).Sub(maxCumulativePayment, amount)
 
-	// if maxAllowedCurrent is negative, that means the cost of this single dispersal alone exceeds total deposits
+	// if maxAllowedCurrent is negative, the cost of this single dispersal alone exceeds maxCumulativePayment
 	if maxAllowedCurrent.Sign() < 0 {
 		// we're passing in nil as the CurrentCumulativePayment as a shortcut: the blob cost alone is greater than
 		// the maxCumulativePayment, so CurrentCumulativePayment is irrelevant. It's not worth implementing extra
