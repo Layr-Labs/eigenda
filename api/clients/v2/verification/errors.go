@@ -2,8 +2,6 @@ package verification
 
 import (
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // CertVerifierInternalError represents a 5xx-like error (unexpected, internal, infra, etc.)
@@ -38,7 +36,7 @@ func (e *CertVerifierInternalError) Error() string {
 // StatusNullError returns a [CertVerifierInternalError] instead as it is a contract bug
 // that should never happen.
 type CertVerifierInvalidCertError struct {
-	StatusCode coretypes.VerificationStatusCode
+	StatusCode VerificationStatusCode
 	Msg        string
 }
 

@@ -55,7 +55,7 @@ func NewValidatorPayloadRetriever(
 // verified prior to calling this method.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) (coretypes.Payload, error) {
 
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
@@ -86,7 +86,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 // eigenDACert has already been verified prior to calling this method.
 func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) (*coretypes.EncodedPayload, error) {
 
 	blobHeader, err := eigenDACert.BlobHeader()
