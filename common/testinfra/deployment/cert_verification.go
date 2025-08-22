@@ -7,6 +7,7 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
+	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -14,10 +15,12 @@ import (
 
 // CertVerificationComponents holds all certification verification components
 type CertVerificationComponents struct {
-	CertBuilder               *clientsv2.CertBuilder
-	RouterCertVerifier        *verification.CertVerifier
-	StaticCertVerifier        *verification.CertVerifier
-	EigenDACertVerifierV1     *verifierv1bindings.ContractEigenDACertVerifierV1
+	CertBuilder                      *clientsv2.CertBuilder
+	RouterCertVerifier               *verification.CertVerifier
+	StaticCertVerifier               *verification.CertVerifier
+	EigenDACertVerifierV1            *verifierv1bindings.ContractEigenDACertVerifierV1
+	EigenDACertVerifierRouter        *routerbindings.ContractEigenDACertVerifierRouterTransactor
+	EigenDACertVerifierRouterCaller  *routerbindings.ContractEigenDACertVerifierRouterCaller
 }
 
 // InitializeCertVerification sets up the certification verification components
@@ -57,8 +60,31 @@ func InitializeCertVerification(
 
 	// Initialize router address provider and cert verifier if router is available
 	if contracts.EigenDACertVerifierRouter != "" {
+		routerAddress := gethcommon.HexToAddress(contracts.EigenDACertVerifierRouter)
+		
+		// Create router transactor binding
+		eigenDACertVerifierRouter, err := routerbindings.NewContractEigenDACertVerifierRouterTransactor(
+			routerAddress,
+			ethClient,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EigenDACertVerifierRouter transactor: %w", err)
+		}
+		components.EigenDACertVerifierRouter = eigenDACertVerifierRouter
+
+		// Create router caller binding
+		eigenDACertVerifierRouterCaller, err := routerbindings.NewContractEigenDACertVerifierRouterCaller(
+			routerAddress,
+			ethClient,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create EigenDACertVerifierRouter caller: %w", err)
+		}
+		components.EigenDACertVerifierRouterCaller = eigenDACertVerifierRouterCaller
+
+		// Create router address provider
 		routerAddressProvider, err := verification.BuildRouterAddressProvider(
-			gethcommon.HexToAddress(contracts.EigenDACertVerifierRouter),
+			routerAddress,
 			ethClient,
 			logger,
 		)
@@ -66,6 +92,7 @@ func InitializeCertVerification(
 			return nil, fmt.Errorf("failed to build router address provider: %w", err)
 		}
 
+		// Create router cert verifier
 		routerCertVerifier, err := verification.NewCertVerifier(
 			logger,
 			ethClient,

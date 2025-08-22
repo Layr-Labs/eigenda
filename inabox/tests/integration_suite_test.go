@@ -259,6 +259,8 @@ var _ = BeforeSuite(func() {
 		certBuilder = infraResult.CertVerification.CertBuilder
 		routerCertVerifier = infraResult.CertVerification.RouterCertVerifier
 		staticCertVerifier = infraResult.CertVerification.StaticCertVerifier
+		eigenDACertVerifierRouter = infraResult.CertVerification.EigenDACertVerifierRouter
+		eigenDACertVerifierRouterCaller = infraResult.CertVerification.EigenDACertVerifierRouterCaller
 
 		// Use retrieval clients from testinfra if available
 		if infraResult.RetrievalClients != nil {
@@ -272,12 +274,6 @@ var _ = BeforeSuite(func() {
 		} else {
 			Expect(infraResult.RetrievalClients).ToNot(BeNil(), "retrieval clients must be initialized by testinfra")
 		}
-
-		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
-
-		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
 
 		chainID, err := ethClient.ChainID(context.Background())
 		Expect(err).To(BeNil())
