@@ -11,7 +11,7 @@ go = "1.24"
 golangci-lint = "2.1.6"
 # abigen v2 was release in v1.15.6: https://github.com/ethereum/go-ethereum/releases/tag/v1.15.6
 # and is enabled via --v2 flag feature flag to abigen command. 
-"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.15.6"
+"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.16.2"
 # Believe yarn is needed for contract npm deps (see contracts/package.json) and subgraph stuff.
 # TODO: document exactly why these are needed.
 node = "20.18.1"
