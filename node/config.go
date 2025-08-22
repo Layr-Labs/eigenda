@@ -59,7 +59,7 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	EigenDADirectory                string
-	BLSOperatorStateRetrieverAddr   string
+	OperatorStateRetrieverAddr      string
 	EigenDAServiceManagerAddr       string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
@@ -72,10 +72,12 @@ type Config struct {
 	ChurnerUseSecureGrpc            bool
 	RelayUseSecureGrpc              bool
 	RelayMaxMessageSize             uint
-	ReachabilityPollIntervalSec     uint64
-	DisableNodeInfoResources        bool
-	StoreChunksRequestMaxPastAge    time.Duration
-	StoreChunksRequestMaxFutureAge  time.Duration
+	// The number of connections to establish with each relay node.
+	RelayConnectionPoolSize        uint
+	ReachabilityPollIntervalSec    uint64
+	DisableNodeInfoResources       bool
+	StoreChunksRequestMaxPastAge   time.Duration
+	StoreChunksRequestMaxFutureAge time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -379,7 +381,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		OperatorStateRetrieverAddr:          ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
@@ -392,6 +394,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
+		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,

@@ -66,7 +66,7 @@ func CreateTestSuite(
 	// 	configString,
 	// )
 
-	storeManager, err := builder.BuildStoreManager(
+	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
 		metrics,
@@ -75,10 +75,10 @@ func CreateTestSuite(
 		nil,
 	)
 	if err != nil {
-		panic(fmt.Sprintf("build storage manager: %v", err.Error()))
+		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	proxyServer := server.NewServer(appConfig.ServerConfig, storeManager, logger, metrics)
+	proxyServer := server.NewServer(appConfig.ServerConfig, certMgr, keccakMgr, logger, metrics)
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)
 	if appConfig.StoreBuilderConfig.MemstoreEnabled {

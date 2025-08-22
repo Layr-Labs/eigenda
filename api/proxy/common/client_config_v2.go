@@ -27,6 +27,9 @@ type ClientConfigV2 struct {
 	MaxBlobSizeBytes                   uint64
 	EigenDACertVerifierOrRouterAddress string // >= V3 cert
 
+	// Number of GRPC connections to make to each relay
+	RelayConnectionPoolSize uint
+
 	// TODO: we should create an upstream VerifyingPayloadRetrievalClient upstream
 	// that would take all of the below configs, and would verify certs before retrieving,
 	// and then proceed to retrieve from its list of retrievers enabled.
@@ -34,10 +37,8 @@ type ClientConfigV2 struct {
 	// RetrieversToEnable specifies which retrievers should be enabled
 	RetrieversToEnable []RetrieverType
 
-	// Fields required for validator payload retrieval
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	EigenDADirectory              string
+	// EigenDADirectory address is used to get addresses for all EigenDA contracts needed.
+	EigenDADirectory string
 
 	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
@@ -80,16 +81,6 @@ func (cfg *ClientConfigV2) Check() error {
 	if slices.Contains(cfg.RetrieversToEnable, ValidatorRetrieverType) {
 		if cfg.EigenDADirectory == "" {
 			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
-		}
-
-		if cfg.BLSOperatorStateRetrieverAddr == "" {
-			return fmt.Errorf(
-				"BLS operator state retriever address is required for validator retrieval in EigenDA V2 backend")
-		}
-
-		if cfg.EigenDAServiceManagerAddr == "" {
-			return fmt.Errorf(
-				"EigenDA service manager address is required for validator retrieval in EigenDA V2 backend")
 		}
 	}
 
