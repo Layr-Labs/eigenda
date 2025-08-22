@@ -63,8 +63,7 @@ type disperserClient struct {
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
-  metrics                 metrics.DispersalMetricer
-
+	metrics                 metrics.DispersalMetricer
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -110,8 +109,7 @@ func NewDisperserClient(
 		return nil, fmt.Errorf("signer must be provided")
 	}
 	if metrics == nil {
-		// nolint:wrapcheck
-		return nil, api.NewErrorInvalidArg("metrics must be provided")
+		return nil, fmt.Errorf("metrics must be provided")
 	}
 
 	var connectionCount uint
@@ -141,7 +139,7 @@ func NewDisperserClient(
 		clientPool: clientPool,
 		prover:     prover,
 		accountant: accountant,
-    metrics:         metrics,
+		metrics:    metrics,
 	}, nil
 }
 
