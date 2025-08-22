@@ -33,8 +33,14 @@ func pushTest(
 	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
-	sourceRoot := t.TempDir()
-	destRoot := t.TempDir()
+	testDir := t.TempDir()
+	sourceRoot := path.Join(testDir, "source")
+	destRoot := path.Join(testDir, "dest")
+
+	err = os.MkdirAll(sourceRoot, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(destRoot, 0755)
+	require.NoError(t, err)
 
 	// Start a container that is running an SSH server. The push() command will communicate with this server.
 	container := util.SetupSSHTestContainer(t, destRoot)
@@ -215,7 +221,8 @@ func pushTest(
 		} else if choice < 0.6 {
 			// Overwrite the file with random data. Push will replace it with the correct data.
 			randomData := rand.Bytes(128)
-			err = os.WriteFile(segmentFile, randomData, 0644)
+			// use broad file permissions to avoid issues with container user having different UID/GID.
+			err = os.WriteFile(segmentFile, randomData, 0666)
 			require.NoError(t, err, "failed to overwrite file %s", segmentFile)
 		} else if choice < 0.9 {
 			// Attempt to move the file to another legal location.

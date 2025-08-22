@@ -6,8 +6,9 @@ RUN apt-get update && apt-get install -y \
     rsync \
     && rm -rf /var/lib/apt/lists/*
 
-# Create test user
-RUN useradd -m -s /bin/bash testuser
+# Create test group with GID 1337 and user with UID 1337
+RUN groupadd -g 1337 testgroup
+RUN useradd -m -s /bin/bash -u 1337 -g 1337 testuser
 
 # Setup SSH
 RUN mkdir /var/run/sshd
@@ -18,12 +19,12 @@ RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/s
 RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
 # Set proper permissions
-RUN chown -R testuser:testuser /home/testuser/.ssh
+RUN chown -R testuser:testgroup /home/testuser/.ssh
 RUN chmod 700 /home/testuser/.ssh
 
 # Create mount directories and set ownership
-RUN mkdir -p /mnt/data /mnt/test
-RUN chown testuser:testuser /mnt/data /mnt/test
+RUN mkdir -p /mnt/data
+RUN chown testuser:testgroup /mnt/data
 
 # Copy startup script with self-destruct mechanism
 COPY start.sh /start.sh

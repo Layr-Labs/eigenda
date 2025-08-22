@@ -34,6 +34,9 @@ import (
 const SSHTestPortBase = 22022
 
 const containerDataDir = "/mnt/data"
+const username = "testuser"
+const uid = 1337
+const gid = 1337
 
 // GetFreeSSHTestPort returns a free port starting from SSHTestPortBase
 func GetFreeSSHTestPort() (int, error) {
@@ -85,7 +88,6 @@ type SSHTestContainer struct {
 	tempDir     string
 	privateKey  string
 	publicKey   string
-	user        string
 	host        string
 }
 
@@ -111,7 +113,17 @@ func (c *SSHTestContainer) GetTempDir() string {
 
 // GetUser returns the SSH user for the test container
 func (c *SSHTestContainer) GetUser() string {
-	return c.user
+	return username
+}
+
+// Get the UID of the user inside the container.
+func (c *SSHTestContainer) GetUID() int {
+	return uid
+}
+
+// Get the GID of the user inside the container.
+func (c *SSHTestContainer) GetGID() int {
+	return gid
 }
 
 // GetHost returns the host address for the SSH connection
@@ -135,7 +147,7 @@ func (c *SSHTestContainer) cleanupDataDir() error {
 
 	session, err := NewSSHSession(
 		logger,
-		c.user,
+		c.GetUser(),
 		c.host,
 		c.sshPort,
 		c.privateKey,
@@ -250,7 +262,7 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 		case <-ticker.C:
 			session, err := NewSSHSession(
 				logger,
-				"testuser",
+				username,
 				"localhost",
 				sshPort,
 				privateKeyPath,
@@ -327,7 +339,6 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		tempDir:     tempDir,
 		privateKey:  privateKeyPath,
 		publicKey:   publicKeyPath,
-		user:        "testuser",
 		host:        "localhost",
 	}
 }
@@ -377,7 +388,7 @@ func BuildSSHTestImage(
 		"\n# Add test SSH public key\n"+
 			"RUN echo '%s' > /home/testuser/.ssh/authorized_keys\n"+
 			"RUN chmod 600 /home/testuser/.ssh/authorized_keys\n"+
-			"RUN chown testuser:testuser /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey))
+			"RUN chown testuser:testgroup /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey))
 	modifiedDockerfile := string(dockerfileContent) + publicKeySetup
 
 	err = os.WriteFile(filepath.Join(buildContext, "Dockerfile"), []byte(modifiedDockerfile), 0644)
