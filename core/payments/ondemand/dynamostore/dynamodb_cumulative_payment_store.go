@@ -175,12 +175,12 @@ func (s *DynamoDBCumulativePaymentStore) AddCumulativePayment(
 // extractPaymentValue extracts and parses attributeCumulativePayment from a DynamoDB item
 func extractPaymentValue(item map[string]types.AttributeValue) (*big.Int, error) {
 	if len(item) == 0 {
-		return big.NewInt(0), nil
+		return nil, fmt.Errorf("empty item attributes")
 	}
 
 	attributeValue, ok := item[attributeCumulativePayment]
 	if !ok {
-		return big.NewInt(0), nil
+		return nil, fmt.Errorf("missing required attribute %s", attributeCumulativePayment)
 	}
 
 	attributeNumber, ok := attributeValue.(*types.AttributeValueMemberN)
