@@ -90,6 +90,37 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 		im.localstack = localstack
 		im.result.LocalStackURL = localstack.Endpoint()
+		
+		// Populate AWS configuration for tests
+		im.result.AWSConfig = &AWSTestConfig{
+			EndpointURL:     localstack.Endpoint(),
+			Region:          localstack.Region(),
+			AccessKeyID:     "localstack",
+			SecretAccessKey: "localstack",
+		}
+		
+		// Deploy AWS resources if configured
+		if im.config.LocalStack.DeployResources {
+			fmt.Println("Deploying LocalStack AWS resources...")
+			err = deployment.DeployLocalStackResources(ctx, localstack, im.config.LocalStack.Resources)
+			if err != nil {
+				return nil, fmt.Errorf("failed to deploy LocalStack resources: %w", err)
+			}
+			
+			// Add deployed resource names to the result
+			im.result.AWSConfig.BucketName = im.config.LocalStack.Resources.BucketName
+			im.result.AWSConfig.MetadataTableName = im.config.LocalStack.Resources.MetadataTableName
+			im.result.AWSConfig.BucketTableName = im.config.LocalStack.Resources.BucketTableName
+			im.result.AWSConfig.V2MetadataTableName = im.config.LocalStack.Resources.V2MetadataTableName
+			im.result.AWSConfig.V2PaymentPrefix = im.config.LocalStack.Resources.V2PaymentPrefix
+			
+			fmt.Println("Successfully deployed LocalStack AWS resources")
+		}
+		
+		// Set AWS environment variables for tests to use LocalStack
+		if err := im.result.AWSConfig.SetEnvironmentVariables(); err != nil {
+			return nil, fmt.Errorf("failed to set AWS environment variables: %w", err)
+		}
 	}
 
 	// 3. Start Graph Node if enabled (depends on Anvil for Ethereum RPC)

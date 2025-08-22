@@ -1,6 +1,8 @@
 package testinfra
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testinfra/containers"
@@ -14,7 +16,7 @@ type InfraConfig struct {
 	Anvil containers.AnvilConfig `json:"anvil"`
 
 	// LocalStack AWS simulation configuration
-	LocalStack containers.LocalStackConfig `json:"localstack"`
+	LocalStack LocalStackInfraConfig `json:"localstack"`
 
 	// The Graph node configuration
 	GraphNode containers.GraphNodeConfig `json:"graphnode"`
@@ -24,6 +26,18 @@ type InfraConfig struct {
 
 	// Global test configuration
 	Timeout time.Duration `json:"timeout"`
+}
+
+// LocalStackInfraConfig combines container config with resource deployment settings
+type LocalStackInfraConfig struct {
+	// Container configuration
+	containers.LocalStackConfig
+
+	// Whether to automatically deploy AWS resources (S3 buckets, DynamoDB tables)
+	DeployResources bool `json:"deploy_resources"`
+
+	// Resource deployment configuration
+	Resources deployment.LocalStackDeploymentConfig `json:"resources"`
 }
 
 // EigenDAConfig defines configuration for EigenDA contract deployment
@@ -74,11 +88,15 @@ func DefaultConfig() InfraConfig {
 			Accounts:  10,
 			Mnemonic:  "test test test test test test test test test test test junk",
 		},
-		LocalStack: containers.LocalStackConfig{
-			Enabled:  true,
-			Services: []string{"s3", "dynamodb", "kms", "secretsmanager"},
-			Region:   "us-east-1",
-			Debug:    false,
+		LocalStack: LocalStackInfraConfig{
+			LocalStackConfig: containers.LocalStackConfig{
+				Enabled:  true,
+				Services: []string{"s3", "dynamodb", "kms", "secretsmanager"},
+				Region:   "us-east-1",
+				Debug:    false,
+			},
+			DeployResources: true, // automatically deploy AWS resources by default
+			Resources:       deployment.DefaultLocalStackDeploymentConfig(),
 		},
 		GraphNode: containers.GraphNodeConfig{
 			Enabled:      false, // disabled by default due to complexity
@@ -135,6 +153,9 @@ type InfraResult struct {
 	IPFSURL           string `json:"ipfs_url"`            // IPFS API endpoint (port 5001)
 	PostgresURL       string `json:"postgres_url"`
 
+	// AWS configuration for LocalStack (populated if LocalStack.Enabled=true)
+	AWSConfig *AWSTestConfig `json:"aws_config,omitempty"`
+
 	// EigenDA contract addresses (populated if EigenDA.Enabled=true)
 	EigenDAContracts *deployment.EigenDAContracts `json:"eigenda_contracts,omitempty"`
 
@@ -143,4 +164,43 @@ type InfraResult struct {
 
 	// Disperser address (populated if disperser keypair is generated)
 	DisperserAddress gethcommon.Address `json:"disperser_address,omitempty"`
+}
+
+// AWSTestConfig contains AWS configuration for tests
+type AWSTestConfig struct {
+	EndpointURL     string `json:"endpoint_url"`
+	Region          string `json:"region"`
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+	
+	// Deployed resource names
+	BucketName          string `json:"bucket_name,omitempty"`
+	MetadataTableName   string `json:"metadata_table_name,omitempty"`
+	BucketTableName     string `json:"bucket_table_name,omitempty"`
+	V2MetadataTableName string `json:"v2_metadata_table_name,omitempty"`
+	V2PaymentPrefix     string `json:"v2_payment_prefix,omitempty"`
+}
+
+// SetEnvironmentVariables sets AWS environment variables for LocalStack testing
+func (c *AWSTestConfig) SetEnvironmentVariables() error {
+	if c == nil {
+		return fmt.Errorf("AWSTestConfig is nil")
+	}
+	
+	fmt.Println("Setting AWS environment variables from testinfra")
+	_ = os.Setenv("AWS_ENDPOINT_URL", c.EndpointURL)
+	_ = os.Setenv("AWS_ACCESS_KEY_ID", c.AccessKeyID)
+	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", c.SecretAccessKey)
+	_ = os.Setenv("AWS_DEFAULT_REGION", c.Region)
+	
+	fmt.Printf("LocalStack resources deployed:\n")
+	fmt.Printf("  S3 Bucket: %s\n", c.BucketName)
+	fmt.Printf("  Metadata Table: %s\n", c.MetadataTableName)
+	fmt.Printf("  Bucket Table: %s\n", c.BucketTableName)
+	if c.V2MetadataTableName != "" {
+		fmt.Printf("  V2 Metadata Table: %s\n", c.V2MetadataTableName)
+		fmt.Printf("  V2 Payment Prefix: %s\n", c.V2PaymentPrefix)
+	}
+	
+	return nil
 }
