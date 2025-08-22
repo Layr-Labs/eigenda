@@ -105,6 +105,8 @@ func TestInaboxIntegration(t *testing.T) {
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 
+	// When running from inabox/deploy directory, we need to go up two levels to get to repo root
+	// Then it can find inabox/templates and inabox/testdata
 	rootPath := "../../"
 
 	var err error
@@ -167,7 +169,6 @@ var _ = BeforeSuite(func() {
 		infraManager = manager
 		infraResult = result
 		cancel = infraCancel
-
 
 		// Update test config to use testinfra endpoints
 		fmt.Printf("Updating RPC URL from %s to %s\n", testConfig.Deployers[0].RPC, infraResult.AnvilRPC)
@@ -300,56 +301,7 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("✅ Blob versions and relays registered by testinfra")
 
-		// Deploy subgraphs if Graph Node is enabled
-		if config.GraphNode.Enabled && infraResult.EigenDAContracts != nil {
-			fmt.Println("Deploying subgraphs to Graph Node...")
-
-			// Get the block number where contracts were deployed
-			blockNumber, err := ethClient.BlockNumber(ctx)
-			Expect(err).To(BeNil())
-			startBlock := int(blockNumber) - 100 // Start a bit before current block to ensure we catch all events
-			if startBlock < 0 {
-				startBlock = 0
-			}
-
-			// Prepare subgraph deployment config
-			// Note: tests run from inabox directory, so adjust path
-			subgraphConfig := deployment.SubgraphDeploymentConfig{
-				RootPath: "../",
-				Subgraphs: []deployment.SubgraphConfig{
-					{
-						Name:    "eigenda-operator-state",
-						Path:    "eigenda-operator-state",
-						Enabled: true,
-					},
-				},
-				EigenDAConfig: deployment.EigenDAContractAddresses{
-					RegistryCoordinator: infraResult.EigenDAContracts.RegistryCoordinator,
-					ServiceManager:      infraResult.EigenDAContracts.ServiceManager,
-					BlsApkRegistry:      infraResult.EigenDAContracts.BlsApkRegistry,
-				},
-			}
-
-			// Deploy the subgraphs using testinfra deployment function
-			graphNode := infraManager.GetGraphNode()
-			if graphNode != nil {
-				err = deployment.DeploySubgraphs(ctx, graphNode, subgraphConfig, startBlock)
-				if err != nil {
-					// Fail fast if subgraph deployment fails since services depend on it
-					Expect(err).To(BeNil(), fmt.Sprintf("Failed to deploy subgraphs: %v", err))
-				}
-				fmt.Println("✅ Subgraphs deployed successfully")
-
-				// Wait a bit for the subgraph to sync
-				fmt.Println("Waiting for subgraph to sync...")
-				time.Sleep(5 * time.Second)
-			}
-		}
-
-		// Keys are now loaded from secrets directory by LoadPrivateKeys() above
-		// No need to manually populate operator and staker keys
-
-		// Now generate all config variables (including RETRIEVER_SRS_ORDER) after testinfra setup
+		// Now generate all config variables after testinfra setup
 		testConfig.GenerateAllVariables()
 
 		fmt.Println("Starting EigenDA binaries")

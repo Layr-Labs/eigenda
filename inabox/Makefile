@@ -52,13 +52,13 @@ force-clean:
 	docker stop localstack-test || true
 
 run-e2e:
-	go test ./tests -v -config=../templates/testconfig-anvil.yaml
+	go test ./tests -v -config=testconfig-anvil.yaml
 
 run-e2e-nochurner:
-	go test ./tests -v -config=../templates/testconfig-anvil-nochurner.yaml
+	go test ./tests -v -config=testconfig-anvil-nochurner.yaml
 
 run-e2e-nograph:
-	go test ./tests -v -config=../templates/testconfig-anvil-nograph.yaml
+	go test ./tests -v -config=testconfig-anvil-nograph.yaml
 
 clean:
 	rm -rf testdata/*

@@ -155,6 +155,17 @@ func NewContractDeploymentManager(rootPath string, deployer ContractDeployer) *C
 func (m *ContractDeploymentManager) DeployEigenDAContracts(deployConfig EigenDADeployConfig) error {
 	log.Print("Deploying EigenDA and EigenLayer contracts")
 
+	// Save current directory to restore later
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			log.Printf("Warning: failed to restore directory to %s: %v", originalDir, err)
+		}
+	}()
+
 	// Change to contracts directory
 	contractsPath := filepath.Join(m.RootPath, "contracts")
 	if err := os.Chdir(contractsPath); err != nil {

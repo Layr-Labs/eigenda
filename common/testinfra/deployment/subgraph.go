@@ -108,6 +108,10 @@ func deploySubgraph(rootPath string, subgraph SubgraphConfig, eigenDAConfig Eige
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
+	fmt.Printf("deploySubgraph: Current directory: %s\n", originalDir)
+	fmt.Printf("deploySubgraph: Root path: %s\n", rootPath)
+	fmt.Printf("deploySubgraph: Attempting to change to subgraph path: %s\n", subgraphPath)
+	
 	defer func() { _ = os.Chdir(originalDir) }()
 
 	if err := os.Chdir(subgraphPath); err != nil {

@@ -3,7 +3,9 @@ package testinfra
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
@@ -183,6 +185,42 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
 		}
+	}
+
+	// 5. Deploy subgraphs if Graph Node is enabled and EigenDA contracts are deployed
+	if im.config.GraphNode.Enabled && im.graphnode != nil && im.result.EigenDAContracts != nil {
+		// Log current working directory for debugging
+		cwd, _ := os.Getwd()
+		fmt.Printf("Current working directory: %s\n", cwd)
+		fmt.Printf("EigenDA RootPath from config: %s\n", im.config.EigenDA.RootPath)
+		
+		// Prepare subgraph deployment config
+		subgraphConfig := deployment.SubgraphDeploymentConfig{
+			RootPath: im.config.EigenDA.RootPath,
+			Subgraphs: []deployment.SubgraphConfig{
+				{
+					Name:    "eigenda-operator-state",
+					Path:    "eigenda-operator-state",
+					Enabled: true,
+				},
+			},
+			EigenDAConfig: deployment.EigenDAContractAddresses{
+				RegistryCoordinator: im.result.EigenDAContracts.RegistryCoordinator,
+				ServiceManager:      im.result.EigenDAContracts.ServiceManager,
+				BlsApkRegistry:      im.result.EigenDAContracts.BlsApkRegistry,
+			},
+		}
+		
+		fmt.Println("Deploying subgraphs to Graph Node...")
+		err = deployment.DeploySubgraphs(ctx, im.graphnode, subgraphConfig, 0) // Start at block 0 for simplicity
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy subgraphs: %w", err)
+		}
+		fmt.Println("✅ Subgraphs deployed successfully")
+		
+		// Wait a bit for the subgraph to sync
+		fmt.Println("Waiting for subgraph to sync...")
+		time.Sleep(5 * time.Second)
 	}
 
 	success = true

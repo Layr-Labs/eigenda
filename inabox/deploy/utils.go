@@ -268,6 +268,7 @@ func CreateNewTestDirectory(templateName, rootPath string) (string, error) {
 
 	// Create the new test directory
 	testPath := filepath.Join(rootPath, fmt.Sprintf("inabox/testdata/%s", testName))
+	fmt.Println("Creating new test directory:", testPath)
 	err := os.MkdirAll(testPath, 0755)
 	if err != nil {
 		return "", fmt.Errorf("failed to create test directory: %s", err.Error())
