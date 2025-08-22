@@ -50,6 +50,7 @@ func init() {
 	Flags = append(Flags, verify.KZGCLIFlags(GlobalEnvVarPrefix, KZGCategory)...)
 
 	Flags = append(Flags, eigendaflags.DeprecatedCLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)
+	Flags = append(Flags, eigenda_v2_flags.DeprecatedCLIFlags(GlobalEnvVarPrefix, EigenDAV2ClientCategory)...)
 	Flags = append(Flags, verify.DeprecatedCLIFlags(GlobalEnvVarPrefix, VerifierCategory)...)
 	Flags = append(Flags, store.DeprecatedCLIFlags(GlobalEnvVarPrefix, StorageFlagsCategory)...)
 	Flags = append(Flags, redis.DeprecatedCLIFlags(GlobalEnvVarPrefix, DeprecatedRedisCategory)...)

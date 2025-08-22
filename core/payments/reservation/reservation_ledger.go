@@ -53,6 +53,8 @@ func NewReservationLedger(
 // Returns (true, nil) if the reservation has enough capacity to perform the debit.
 // Returns (false, nil) if the bucket lacks capacity to permit the fill.
 // Returns (false, error) if an error occurs. Possible errors include:
+//   - [QuorumNotPermittedError]: one or more of the requested quorums are not permitted by the reservation
+//   - [TimeOutOfRangeError]: the dispersal time is outside the reservation's valid time range
 //   - [TimeMovedBackwardError]: current time is before a previously observed time (only possible if input time
 //     instances don't included monotonic timestamps)
 //   - Generic errors for all other unexpected behavior
@@ -64,9 +66,24 @@ func (rl *ReservationLedger) Debit(
 	// This a local time from the perspective of the entity that owns this ledger instance, to be used with the local
 	// leaky bucket: it should NOT be sourced from the PaymentHeader
 	now time.Time,
+	// the timestamp included, or planned to be included, in the PaymentHeader
+	dispersalTime time.Time,
 	// the number of symbols to debit
 	symbolCount uint32,
+	// the quorums being dispersed to
+	quorums []core.QuorumID,
 ) (bool, error) {
+
+	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
+	if err != nil {
+		return false, fmt.Errorf("check quorums permitted: %w", err)
+	}
+
+	err = rl.config.reservation.CheckTime(dispersalTime)
+	if err != nil {
+		return false, fmt.Errorf("check time: %w", err)
+	}
+
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
@@ -91,31 +108,6 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) erro
 	err := rl.leakyBucket.RevertFill(now, symbolCount)
 	if err != nil {
 		return fmt.Errorf("revert fill: %w", err)
-	}
-
-	return nil
-}
-
-// Checks whether a dispersal with given properties is permitted under the parameters of the reservation.
-//
-// This check should be called prior to calling [ReservationLedger.Debit].
-//
-// Returns [QuorumNotPermittedError] if requested quorums are not permitted by the reservation
-// Returns [TimeOutOfRangeError] if dispersal time is outside the reservation's valid time range
-func (rl *ReservationLedger) CheckInvariants(
-	// the quorums listed in the BlobHeader
-	quorums []core.QuorumID,
-	// the timestamp included in the PaymentHeader
-	dispersalTime time.Time,
-) error {
-	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
-	if err != nil {
-		return fmt.Errorf("check quorums permitted: %w", err)
-	}
-
-	err = rl.config.reservation.CheckTime(dispersalTime)
-	if err != nil {
-		return fmt.Errorf("check time: %w", err)
 	}
 
 	return nil

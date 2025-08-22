@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -34,8 +35,8 @@ const (
 	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	// These two addresses are no longer required for the Eth Client, but parameter is still being taken until we deprecate the flags
 	eigenDAServiceManagerAddress = ""
-	// blsOperatorStateRetrieverAddress is still used for CertBuilder
-	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	// operatorStateRetrieverAddress is still used for CertBuilder
+	operatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 )
 
 func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
@@ -49,7 +50,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create kzg prover: %v", err)
 	}
 
-	disperserClient, err := createDisperserClient(privateKey, kzgProver)
+	disperserClient, err := createDisperserClient(logger, privateKey, kzgProver)
 	if err != nil {
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
@@ -197,7 +198,11 @@ func createRelayClient(
 		relayUrlProvider)
 }
 
-func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients.DisperserClient, error) {
+func createDisperserClient(
+	logger logging.Logger,
+	privateKey string,
+	kzgProver *prover.Prover,
+) (clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)
@@ -210,10 +215,12 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 	}
 
 	return clients.NewDisperserClient(
+		logger,
 		disperserClientConfig,
 		signer,
 		kzgProver,
-		nil)
+		nil,
+		metrics.NoopDispersalMetrics)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
@@ -277,7 +284,7 @@ func createCertBuilder() (*clients.CertBuilder, error) {
 
 	return clients.NewCertBuilder(
 		logger,
-		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(operatorStateRetrieverAddress),
 		gethcommon.HexToAddress(registryCoordinatorAddress),
 		ethClient,
 	)
@@ -333,7 +340,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		blsOperatorStateRetrieverAddress,
+		operatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
 	)
 	if err != nil {

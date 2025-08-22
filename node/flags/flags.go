@@ -162,9 +162,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -317,6 +318,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
 		Value:    units.GiB, // intentionally large for the time being
 	}
+	RelayConnectionPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-connection-pool-size"),
+		Usage:    "The number of connections to maintain with each relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_CONNECTION_POOL_SIZE"),
+		Value:    8,
+	}
 
 	ClientIPHeaderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "client-ip-header"),
@@ -461,9 +469,9 @@ var (
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
-		Usage:    "The size of the download pool. The default value is 16.",
+		Usage:    "The size of the download pool.",
 		Required: false,
-		Value:    16,
+		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
 	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
@@ -651,6 +659,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RelayConnectionPoolSizeFlag,
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
@@ -668,7 +677,7 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
+	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	LittRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
