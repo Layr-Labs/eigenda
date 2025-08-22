@@ -33,7 +33,7 @@ func DefaultLocalStackDeploymentConfig() LocalStackDeploymentConfig {
 		BucketName:          "test-eigenda-blobstore",
 		MetadataTableName:   "test-BlobMetadata",
 		BucketTableName:     "test-BucketStore",
-		V2MetadataTableName: "test-BlobMetadataV2",
+		V2MetadataTableName: "test-BlobMetadata-v2",
 		V2PaymentPrefix:     "test_v2_",
 		CreateV2Resources:   true,
 	}

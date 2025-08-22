@@ -134,25 +134,25 @@ func DefaultEigenDAConfig(rootPath string) InfraConfig {
 	config.EigenDA.GenerateDisperserKeypair = true
 	config.EigenDA.Deployer = deployment.ContractDeployer{
 		Name:            "default",
-		RPC:             "", // Will be set to anvil RPC automatically
+		RPC:             "",                                                                 // Will be set to anvil RPC automatically
 		PrivateKey:      "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // anvil account 0
 		DeploySubgraphs: true,
 		VerifyContracts: false,
 		VerifierURL:     "http://localhost:4000/api",
 		Slow:            false,
 	}
-	
+
 	// Configure LocalStack to deploy resources automatically
 	config.LocalStack.DeployResources = true
 	config.LocalStack.Resources = deployment.LocalStackDeploymentConfig{
 		BucketName:          "test-eigenda-blobstore",
 		MetadataTableName:   "test-BlobMetadata",
 		BucketTableName:     "test-BucketStore",
-		V2MetadataTableName: "test-BlobMetadataV2",
+		V2MetadataTableName: "test-BlobMetadata-v2",
 		V2PaymentPrefix:     "e2e_v2_",
 		CreateV2Resources:   true,
 	}
-	
+
 	return config
 }
 
@@ -185,7 +185,7 @@ type AWSTestConfig struct {
 	Region          string `json:"region"`
 	AccessKeyID     string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`
-	
+
 	// Deployed resource names
 	BucketName          string `json:"bucket_name,omitempty"`
 	MetadataTableName   string `json:"metadata_table_name,omitempty"`
@@ -199,13 +199,13 @@ func (c *AWSTestConfig) SetEnvironmentVariables() error {
 	if c == nil {
 		return fmt.Errorf("AWSTestConfig is nil")
 	}
-	
+
 	fmt.Println("Setting AWS environment variables from testinfra")
 	_ = os.Setenv("AWS_ENDPOINT_URL", c.EndpointURL)
 	_ = os.Setenv("AWS_ACCESS_KEY_ID", c.AccessKeyID)
 	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", c.SecretAccessKey)
 	_ = os.Setenv("AWS_DEFAULT_REGION", c.Region)
-	
+
 	fmt.Printf("LocalStack resources deployed:\n")
 	fmt.Printf("  S3 Bucket: %s\n", c.BucketName)
 	fmt.Printf("  Metadata Table: %s\n", c.MetadataTableName)
@@ -214,6 +214,6 @@ func (c *AWSTestConfig) SetEnvironmentVariables() error {
 		fmt.Printf("  V2 Metadata Table: %s\n", c.V2MetadataTableName)
 		fmt.Printf("  V2 Payment Prefix: %s\n", c.V2PaymentPrefix)
 	}
-	
+
 	return nil
 }
