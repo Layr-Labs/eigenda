@@ -198,8 +198,8 @@ func (m *ContractDeploymentManager) DeployEigenDAContracts(deployConfig EigenDAD
 	if err := json.Unmarshal(outputData, m.EigenDAContracts); err != nil {
 		return fmt.Errorf("failed to unmarshal deployment output: %w", err)
 	}
-	
-	log.Printf("Loaded EigenDA contracts - ServiceManager: %s, RegistryCoordinator: %s", 
+
+	log.Printf("Loaded EigenDA contracts - ServiceManager: %s, RegistryCoordinator: %s",
 		m.EigenDAContracts.ServiceManager, m.EigenDAContracts.RegistryCoordinator)
 
 	// Deploy V1 CertVerifier (optional - log errors but don't fail)

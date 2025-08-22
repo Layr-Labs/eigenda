@@ -250,46 +250,14 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting EigenDA binaries")
 		testConfig.StartBinaries()
 
-		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
-		Expect(err).To(BeNil())
+		// Use cert verification components from testinfra
+		Expect(infraResult.CertVerification).ToNot(BeNil(), "cert verification components must be initialized by testinfra")
+		eigenDACertVerifierV1 = infraResult.CertVerification.EigenDACertVerifierV1
+		certBuilder = infraResult.CertVerification.CertBuilder
+		routerCertVerifier = infraResult.CertVerification.RouterCertVerifier
+		staticCertVerifier = infraResult.CertVerification.StaticCertVerifier
+
 		err = setupRetrievalClients(testConfig)
-		Expect(err).To(BeNil())
-
-		fmt.Println("Building client verification and interaction components")
-
-		certBuilder, err = clientsv2.NewCertBuilder(
-			logger,
-			gethcommon.HexToAddress(testConfig.EigenDA.OperatorStateRetriever),
-			gethcommon.HexToAddress(testConfig.EigenDA.RegistryCoordinator),
-			ethClient,
-		)
-
-		Expect(err).To(BeNil())
-
-		routerAddressProvider, err := verification.BuildRouterAddressProvider(
-			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
-			ethClient,
-			logger)
-
-		Expect(err).To(BeNil())
-
-		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
-			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
-
-		Expect(err).To(BeNil())
-
-		staticCertVerifier, err = verification.NewCertVerifier(
-			logger,
-			ethClient,
-			staticAddressProvider)
-
-		Expect(err).To(BeNil())
-
-		routerCertVerifier, err = verification.NewCertVerifier(
-			logger,
-			ethClient,
-			routerAddressProvider)
-
 		Expect(err).To(BeNil())
 
 		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)

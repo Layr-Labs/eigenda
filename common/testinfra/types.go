@@ -177,6 +177,9 @@ type InfraResult struct {
 
 	// Disperser address (populated if disperser keypair is generated)
 	DisperserAddress gethcommon.Address `json:"disperser_address,omitempty"`
+
+	// Cert verification components (populated if EigenDA contracts are deployed)
+	CertVerification *deployment.CertVerificationComponents `json:"cert_verification,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests

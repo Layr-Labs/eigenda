@@ -185,6 +185,40 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
 		}
+
+		// Initialize cert verification components if contracts were deployed
+		if im.result.EigenDAContracts != nil {
+			logger, err := common.NewLogger(common.DefaultLoggerConfig())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create logger: %w", err)
+			}
+
+			// Get private key for eth client
+			privateKey, err := im.anvil.GetPrivateKey(0)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get private key: %w", err)
+			}
+			privateKey = strings.TrimPrefix(privateKey, "0x")
+			privateKey = strings.TrimPrefix(privateKey, "0X")
+
+			// Create eth client for cert verification
+			ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+				RPCURLs:          []string{im.result.AnvilRPC},
+				PrivateKeyString: privateKey,
+				NumConfirmations: 0,
+				NumRetries:       3,
+			}, gethcommon.Address{}, logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create eth client: %w", err)
+			}
+
+			// Initialize cert verification components
+			certComponents, err := deployment.InitializeCertVerification(ctx, ethClient, logger, im.result.EigenDAContracts)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize cert verification: %w", err)
+			}
+			im.result.CertVerification = certComponents
+		}
 	}
 
 	// 5. Deploy subgraphs if Graph Node is enabled and EigenDA contracts are deployed
