@@ -168,46 +168,6 @@ var _ = BeforeSuite(func() {
 		infraResult = result
 		cancel = infraCancel
 
-		// Test Anvil connectivity before proceeding
-		anvil := infraManager.GetAnvil()
-		Expect(anvil).ToNot(BeNil())
-		fmt.Printf("Testing Anvil connectivity at %s\n", infraResult.AnvilRPC)
-
-		// Debug: Check container logs
-		container := anvil.GetContainer()
-		logs, err := container.Logs(ctx)
-		if err == nil {
-			logData := make([]byte, 2048)
-			n, _ := logs.Read(logData)
-			fmt.Printf("Anvil container logs: %s\n", string(logData[:n]))
-			logs.Close()
-		}
-
-		// Test JSON-RPC health check
-		ctx2, cancel2 := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel2()
-		for {
-			// Use proper JSON-RPC call instead of plain HTTP GET
-			jsonRPCPayload := `{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}`
-			resp, err := http.Post(infraResult.AnvilRPC, "application/json", strings.NewReader(jsonRPCPayload))
-			if err == nil && resp.StatusCode == 200 {
-				resp.Body.Close()
-				fmt.Println("Anvil is responding to JSON-RPC requests")
-				break
-			}
-			if resp != nil {
-				resp.Body.Close()
-			}
-			select {
-			case <-ctx2.Done():
-				fmt.Printf("Timeout waiting for Anvil to respond: %v\n", err)
-				Expect(err).To(BeNil())
-				return
-			case <-time.After(time.Second):
-				fmt.Printf("Anvil not ready yet, retrying... (%v)\n", err)
-				continue
-			}
-		}
 
 		// Update test config to use testinfra endpoints
 		fmt.Printf("Updating RPC URL from %s to %s\n", testConfig.Deployers[0].RPC, infraResult.AnvilRPC)
