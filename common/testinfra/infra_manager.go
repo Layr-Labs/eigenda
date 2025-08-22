@@ -278,6 +278,22 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
+	// 7. Setup payload disperser if enabled and required components are available
+	if im.config.EigenDA.PayloadDisperser.Enabled && 
+		im.result.CertVerification != nil && 
+		im.result.RetrievalClients != nil {
+		// Get deployer private key
+		deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
+		if deployerPrivateKey == "" {
+			// Use default anvil account 0 private key
+			deployerPrivateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+		}
+		err := im.setupPayloadDisperser(ctx, deployerPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
+		}
+	}
+
 	success = true
 	return &im.result, nil
 }
@@ -734,5 +750,77 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 	}
 
 	fmt.Println("✅ Retrieval clients initialized successfully")
+	return nil
+}
+
+// setupPayloadDisperser sets up the payload disperser components
+func (im *InfraManager) setupPayloadDisperser(ctx context.Context, deployerPrivateKey string) error {
+	config := im.config.EigenDA.PayloadDisperser
+	
+	// Skip if not enabled
+	if !config.Enabled {
+		return nil
+	}
+
+	// Ensure cert verification and retrieval clients are available
+	if im.result.CertVerification == nil {
+		return fmt.Errorf("cert verification components required for payload disperser")
+	}
+	if im.result.RetrievalClients == nil {
+		return fmt.Errorf("retrieval clients required for payload disperser")
+	}
+
+	fmt.Println("Setting up payload disperser...")
+
+	// Create logger if not available
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Get eth client from retrieval clients
+	ethClient := im.result.RetrievalClients.EthClient
+	if ethClient == nil {
+		return fmt.Errorf("eth client not available from retrieval clients")
+	}
+
+	// Get chain ID
+	chainID, err := ethClient.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get chain ID: %w", err)
+	}
+
+	// Create deployer transactor opts
+	deployerTransactorOpts, err := deployment.CreateTransactorOpts(deployerPrivateKey, chainID)
+	if err != nil {
+		return fmt.Errorf("failed to create deployer transactor opts: %w", err)
+	}
+
+	// Setup the payload disperser
+	params := deployment.PayloadDisperserParams{
+		Logger:                 logger,
+		EthClient:              ethClient,
+		DisperserPrivateKey:    config.DisperserPrivateKey,
+		DisperserHostname:      config.DisperserHostname,
+		DisperserPort:          config.DisperserPort,
+		DisperseBlobTimeout:    config.DisperseBlobTimeout,
+		BlobCompleteTimeout:    config.BlobCompleteTimeout,
+		BlobStatusPollInterval: config.BlobStatusPollInterval,
+		ContractCallTimeout:    config.ContractCallTimeout,
+		CertBuilder:            im.result.CertVerification.CertBuilder,
+		RouterCertVerifier:     im.result.CertVerification.RouterCertVerifier,
+	}
+	payloadDisperser, err := deployment.SetupPayloadDisperser(params)
+	if err != nil {
+		return fmt.Errorf("failed to setup payload disperser: %w", err)
+	}
+
+	// Store components in the result
+	im.result.PayloadDisperser = &PayloadDisperserComponents{
+		PayloadDisperser:       payloadDisperser,
+		DeployerTransactorOpts: deployerTransactorOpts,
+	}
+
+	fmt.Println("✅ Payload disperser initialized successfully")
 	return nil
 }

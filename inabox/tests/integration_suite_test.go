@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -15,7 +13,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -25,12 +22,10 @@ import (
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -262,103 +257,25 @@ var _ = BeforeSuite(func() {
 		eigenDACertVerifierRouter = infraResult.CertVerification.EigenDACertVerifierRouter
 		eigenDACertVerifierRouterCaller = infraResult.CertVerification.EigenDACertVerifierRouterCaller
 
-		// Use retrieval clients from testinfra if available
-		if infraResult.RetrievalClients != nil {
-			fmt.Println("Using retrieval clients from testinfra")
-			ethClient = infraResult.RetrievalClients.EthClient
-			rpcClient = infraResult.RetrievalClients.RPCClient
-			retrievalClient = infraResult.RetrievalClients.RetrievalClient
-			chainReader = infraResult.RetrievalClients.ChainReader
-			relayRetrievalClientV2 = infraResult.RetrievalClients.RelayRetrievalClientV2
-			validatorRetrievalClientV2 = infraResult.RetrievalClients.ValidatorRetrievalClientV2
-		} else {
-			Expect(infraResult.RetrievalClients).ToNot(BeNil(), "retrieval clients must be initialized by testinfra")
-		}
+		// Use retrieval clients from testinfra
+		Expect(infraResult.RetrievalClients).ToNot(BeNil(), "retrieval clients must be initialized by testinfra")
+		fmt.Println("Using retrieval clients from testinfra")
+		ethClient = infraResult.RetrievalClients.EthClient
+		rpcClient = infraResult.RetrievalClients.RPCClient
+		retrievalClient = infraResult.RetrievalClients.RetrievalClient
+		chainReader = infraResult.RetrievalClients.ChainReader
+		relayRetrievalClientV2 = infraResult.RetrievalClients.RelayRetrievalClientV2
+		validatorRetrievalClientV2 = infraResult.RetrievalClients.ValidatorRetrievalClientV2
 
-		chainID, err := ethClient.ChainID(context.Background())
-		Expect(err).To(BeNil())
-
-		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
-
-		err = setupPayloadDisperserWithRouter()
-		Expect(err).To(BeNil())
+		// Use payload disperser from testinfra
+		Expect(infraResult.PayloadDisperser).ToNot(BeNil(), "payload disperser must be initialized by testinfra")
+		fmt.Println("Using payload disperser from testinfra")
+		payloadDisperser = infraResult.PayloadDisperser.PayloadDisperser.(*payloaddispersal.PayloadDisperser)
+		deployerTransactorOpts = infraResult.PayloadDisperser.DeployerTransactorOpts.(*bind.TransactOpts)
 
 	}
 })
 
-func setupPayloadDisperserWithRouter() error {
-	// Set up the block monitor
-	blockMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*1)
-	if err != nil {
-		return err
-	}
-
-	// Set up the PayloadDisperser
-	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
-	if err != nil {
-		return err
-	}
-
-	disperserClientConfig := &clientsv2.DisperserClientConfig{
-		Hostname: "localhost",
-		Port:     "32005",
-	}
-
-	accountId, err := signer.GetAccountID()
-	if err != nil {
-		return fmt.Errorf("error getting account ID: %w", err)
-	}
-
-	accountant := clientsv2.NewAccountant(
-		accountId,
-		nil,
-		nil,
-		0,
-		0,
-		0,
-		0,
-		metrics.NoopAccountantMetrics,
-	)
-	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, accountant)
-	if err != nil {
-		return err
-	}
-
-	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
-		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCompleteTimeout:    2 * time.Minute,
-		BlobStatusPollInterval: 1 * time.Second,
-		ContractCallTimeout:    5 * time.Second,
-	}
-
-	payloadDisperser, err = payloaddispersal.NewPayloadDisperser(
-		logger,
-		payloadDisperserConfig,
-		disperserClient,
-		blockMonitor,
-		certBuilder,
-		routerCertVerifier,
-		nil,
-	)
-
-	return err
-}
-
-func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
-	privateKey, err := crypto.HexToECDSA(privateKeyHex)
-	if err != nil {
-		log.Fatalf("invalid private key: %v", err)
-	}
-
-	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	if err != nil {
-		log.Fatalf("failed to create transactor: %v", err)
-	}
-
-	return opts
-}
 
 func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval time.Duration) error {
 	client := &http.Client{Timeout: 10 * time.Second}

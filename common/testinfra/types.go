@@ -81,6 +81,9 @@ type EigenDAConfig struct {
 
 	// Retrieval clients configuration
 	RetrievalClients RetrievalClientsConfig `json:"retrieval_clients"`
+
+	// Payload disperser configuration
+	PayloadDisperser PayloadDisperserConfig `json:"payload_disperser"`
 }
 
 // RetrievalClientsConfig defines configuration for setting up retrieval clients
@@ -103,6 +106,25 @@ type RetrievalClientsConfig struct {
 	ServiceManager         string `json:"service_manager"`
 }
 
+// PayloadDisperserConfig defines configuration for setting up payload disperser
+type PayloadDisperserConfig struct {
+	// Enable payload disperser setup
+	Enabled bool `json:"enabled"`
+
+	// Disperser private key for signing requests
+	DisperserPrivateKey string `json:"disperser_private_key"`
+
+	// Disperser client configuration
+	DisperserHostname string `json:"disperser_hostname"`
+	DisperserPort     string `json:"disperser_port"`
+
+	// Timeout configurations
+	DisperseBlobTimeout    time.Duration `json:"disperse_blob_timeout"`
+	BlobCompleteTimeout    time.Duration `json:"blob_complete_timeout"`
+	BlobStatusPollInterval time.Duration `json:"blob_status_poll_interval"`
+	ContractCallTimeout    time.Duration `json:"contract_call_timeout"`
+}
+
 // RetrievalClientsComponents contains all the retrieval clients
 type RetrievalClientsComponents struct {
 	EthClient                  common.EthClient                           `json:"-"` // Don't serialize
@@ -111,6 +133,12 @@ type RetrievalClientsComponents struct {
 	ChainReader                core.Reader                                `json:"-"` // Don't serialize
 	RelayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever    `json:"-"` // Don't serialize
 	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever `json:"-"` // Don't serialize
+}
+
+// PayloadDisperserComponents contains all the payload disperser components
+type PayloadDisperserComponents struct {
+	PayloadDisperser       interface{} `json:"-"` // Use interface{} to avoid circular import with payloaddispersal.PayloadDisperser
+	DeployerTransactorOpts interface{} `json:"-"` // Use interface{} to avoid circular import with bind.TransactOpts
 }
 
 // DefaultConfig returns a sensible default configuration
@@ -190,6 +218,18 @@ func DefaultEigenDAConfig(rootPath string) InfraConfig {
 		CreateV2Resources:   true,
 	}
 
+	// Configure PayloadDisperser with default values
+	config.EigenDA.PayloadDisperser = PayloadDisperserConfig{
+		Enabled:                true,
+		DisperserPrivateKey:    "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded",
+		DisperserHostname:      "localhost",
+		DisperserPort:          "32005",
+		DisperseBlobTimeout:    2 * time.Minute,
+		BlobCompleteTimeout:    2 * time.Minute,
+		BlobStatusPollInterval: 1 * time.Second,
+		ContractCallTimeout:    5 * time.Second,
+	}
+
 	return config
 }
 
@@ -220,6 +260,9 @@ type InfraResult struct {
 
 	// Retrieval clients (populated if EigenDA contracts are deployed and RetrievalClients.Enabled=true)
 	RetrievalClients *RetrievalClientsComponents `json:"retrieval_clients,omitempty"`
+
+	// Payload disperser components (populated if EigenDA contracts are deployed and PayloadDisperser.Enabled=true)
+	PayloadDisperser *PayloadDisperserComponents `json:"payload_disperser,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests
