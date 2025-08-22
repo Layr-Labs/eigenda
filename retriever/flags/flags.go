@@ -32,9 +32,10 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -82,7 +83,7 @@ func RetrieverFlags(envPrefix string) []cli.Flag {
 		GrpcPortFlag,
 		TimeoutFlag,
 		EigenDADirectoryFlag,
-		BlsOperatorStateRetrieverFlag,
+		OperatorStateRetrieverFlag,
 		EigenDAServiceManagerFlag,
 		NumConnectionsFlag,
 		MetricsHTTPPortFlag,

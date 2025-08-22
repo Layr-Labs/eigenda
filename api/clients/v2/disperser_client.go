@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -97,16 +98,16 @@ func NewDisperserClient(
 	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
 	if config == nil {
-		return nil, api.NewErrorInvalidArg("config must be provided")
+		return nil, fmt.Errorf("config must be provided")
 	}
-	if config.Hostname == "" {
-		return nil, api.NewErrorInvalidArg("hostname must be provided")
+	if strings.TrimSpace(config.Hostname) == "" {
+		return nil, fmt.Errorf("hostname must be provided")
 	}
-	if config.Port == "" {
-		return nil, api.NewErrorInvalidArg("port must be provided")
+	if strings.TrimSpace(config.Port) == "" {
+		return nil, fmt.Errorf("port must be provided")
 	}
 	if signer == nil {
-		return nil, api.NewErrorInvalidArg("signer must be provided")
+		return nil, fmt.Errorf("signer must be provided")
 	}
 	if metrics == nil {
 		// nolint:wrapcheck
