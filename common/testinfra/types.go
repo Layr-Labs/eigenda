@@ -131,6 +131,7 @@ func DefaultEigenDAConfig(rootPath string) InfraConfig {
 	config.EigenDA.RegisterDisperser = true
 	config.EigenDA.RegisterBlobVersionAndRelays = true
 	config.EigenDA.RootPath = rootPath
+	config.EigenDA.GenerateDisperserKeypair = true
 	config.EigenDA.Deployer = deployment.ContractDeployer{
 		Name:            "default",
 		RPC:             "", // Will be set to anvil RPC automatically
@@ -140,6 +141,18 @@ func DefaultEigenDAConfig(rootPath string) InfraConfig {
 		VerifierURL:     "http://localhost:4000/api",
 		Slow:            false,
 	}
+	
+	// Configure LocalStack to deploy resources automatically
+	config.LocalStack.DeployResources = true
+	config.LocalStack.Resources = deployment.LocalStackDeploymentConfig{
+		BucketName:          "test-eigenda-blobstore",
+		MetadataTableName:   "test-BlobMetadata",
+		BucketTableName:     "test-BucketStore",
+		V2MetadataTableName: "test-BlobMetadataV2",
+		V2PaymentPrefix:     "e2e_v2_",
+		CreateV2Resources:   true,
+	}
+	
 	return config
 }
 

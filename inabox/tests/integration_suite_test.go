@@ -26,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testinfra"
-	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -60,9 +59,6 @@ var (
 	infraManager *testinfra.InfraManager
 	infraResult  *testinfra.InfraResult
 
-	metadataTableName               = "test-BlobMetadata"
-	bucketTableName                 = "test-BucketStore"
-	metadataTableNameV2             = "test-BlobMetadata-v2"
 	logger                          logging.Logger
 	ethClient                       common.EthClient
 	rpcClient                       common.RPCEthClient
@@ -105,8 +101,8 @@ func TestInaboxIntegration(t *testing.T) {
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 
-	// When running from inabox/deploy directory, we need to go up two levels to get to repo root
-	// Then it can find inabox/templates and inabox/testdata
+	// When running the inabox tests we typically call go test ./tests -v -config=testconfig-anvil.yaml
+	// from the inabox directory so the rootPath is two levels up.
 	rootPath := "../../"
 
 	var err error
@@ -143,24 +139,11 @@ var _ = BeforeSuite(func() {
 			config.EigenDA.PrivateKeys[name] = keyInfo.PrivateKey
 		}
 
-		// Tell testinfra to generate disperser keypair and register it
-		config.EigenDA.GenerateDisperserKeypair = true
-
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
 			config.LocalStack.Enabled = false
 		} else {
-			fmt.Println("Using shared Blob Store")
-			// Configure LocalStack resource deployment
-			config.LocalStack.DeployResources = true
-			config.LocalStack.Resources = deployment.LocalStackDeploymentConfig{
-				BucketName:          "test-eigenda-blobstore",
-				MetadataTableName:   metadataTableName,
-				BucketTableName:     bucketTableName,
-				V2MetadataTableName: metadataTableNameV2,
-				V2PaymentPrefix:     "e2e_v2_",
-				CreateV2Resources:   metadataTableNameV2 != "",
-			}
+			fmt.Println("Using shared Blob Store with LocalStack")
 		}
 
 		fmt.Println("Starting testinfra containers with EigenDA contract deployment")
