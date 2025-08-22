@@ -608,6 +608,8 @@ func buildPayloadDisperser(
 	}
 
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
+	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
+
 	// The accountant is populated lazily by disperserClient.PopulateAccountant
 	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 
@@ -617,6 +619,7 @@ func buildPayloadDisperser(
 		signer,
 		kzgProver,
 		accountant,
+		dispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)

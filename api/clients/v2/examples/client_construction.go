@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -218,7 +219,8 @@ func createDisperserClient(
 		disperserClientConfig,
 		signer,
 		kzgProver,
-		nil)
+		nil,
+		metrics.NoopDispersalMetrics)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
