@@ -5,8 +5,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testinfra/containers"
 	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
+	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -74,6 +78,39 @@ type EigenDAConfig struct {
 
 	// Disperser address (output from keypair generation)
 	DisperserAddress string `json:"disperser_address"`
+
+	// Retrieval clients configuration
+	RetrievalClients RetrievalClientsConfig `json:"retrieval_clients"`
+}
+
+// RetrievalClientsConfig defines configuration for setting up retrieval clients
+type RetrievalClientsConfig struct {
+	// Enable retrieval clients setup
+	Enabled bool `json:"enabled"`
+
+	// RPC URL for the retrieval clients (defaults to Anvil RPC if not specified)
+	RPC string `json:"rpc"`
+
+	// SRS parameters for KZG verifier
+	SRSOrder         string `json:"srs_order"`
+	G1Path           string `json:"g1_path"`
+	G2Path           string `json:"g2_path"`
+	G2PowerOf2Path   string `json:"g2_power_of_2_path"`
+	CachePath        string `json:"cache_path"`
+
+	// Contract addresses (populated from EigenDAContracts if not specified)
+	OperatorStateRetriever string `json:"operator_state_retriever"`
+	ServiceManager         string `json:"service_manager"`
+}
+
+// RetrievalClientsComponents contains all the retrieval clients
+type RetrievalClientsComponents struct {
+	EthClient                  common.EthClient                           `json:"-"` // Don't serialize
+	RPCClient                  common.RPCEthClient                        `json:"-"` // Don't serialize
+	RetrievalClient            clients.RetrievalClient                    `json:"-"` // Don't serialize
+	ChainReader                core.Reader                                `json:"-"` // Don't serialize
+	RelayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever    `json:"-"` // Don't serialize
+	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever `json:"-"` // Don't serialize
 }
 
 // DefaultConfig returns a sensible default configuration
@@ -180,6 +217,9 @@ type InfraResult struct {
 
 	// Cert verification components (populated if EigenDA contracts are deployed)
 	CertVerification *deployment.CertVerificationComponents `json:"cert_verification,omitempty"`
+
+	// Retrieval clients (populated if EigenDA contracts are deployed and RetrievalClients.Enabled=true)
+	RetrievalClients *RetrievalClientsComponents `json:"retrieval_clients,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests

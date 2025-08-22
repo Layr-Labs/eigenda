@@ -7,10 +7,8 @@ import (
 	"io"
 	"log"
 	"math/big"
-	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,8 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -30,9 +26,6 @@ import (
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -139,6 +132,14 @@ var _ = BeforeSuite(func() {
 			config.EigenDA.PrivateKeys[name] = keyInfo.PrivateKey
 		}
 
+		// Configure retrieval clients
+		config.EigenDA.RetrievalClients.Enabled = true
+		config.EigenDA.RetrievalClients.SRSOrder = "10000"
+		config.EigenDA.RetrievalClients.G1Path = "resources/kzg/g1.point.300000"
+		config.EigenDA.RetrievalClients.G2Path = "resources/kzg/g2.point.300000"
+		config.EigenDA.RetrievalClients.G2PowerOf2Path = "resources/kzg/g2.point.300000.powerOf2"
+		config.EigenDA.RetrievalClients.CachePath = "resources/kzg/SRSTables"
+
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
 			config.LocalStack.Enabled = false
@@ -244,7 +245,9 @@ var _ = BeforeSuite(func() {
 				testConfig.DisperserKMSKeyID, testConfig.DisperserAddress.Hex())
 		}
 
-		// Now generate all config variables after testinfra setup
+		// Generate all config variables for the binaries. Depends on the test config being set
+		// with the output of the test infra deployment.
+		// TODO: This generate variables method is very complex, we should simplify it.
 		testConfig.GenerateAllVariables()
 
 		fmt.Println("Starting EigenDA binaries")
@@ -257,8 +260,18 @@ var _ = BeforeSuite(func() {
 		routerCertVerifier = infraResult.CertVerification.RouterCertVerifier
 		staticCertVerifier = infraResult.CertVerification.StaticCertVerifier
 
-		err = setupRetrievalClients(testConfig)
-		Expect(err).To(BeNil())
+		// Use retrieval clients from testinfra if available
+		if infraResult.RetrievalClients != nil {
+			fmt.Println("Using retrieval clients from testinfra")
+			ethClient = infraResult.RetrievalClients.EthClient
+			rpcClient = infraResult.RetrievalClients.RPCClient
+			retrievalClient = infraResult.RetrievalClients.RetrievalClient
+			chainReader = infraResult.RetrievalClients.ChainReader
+			relayRetrievalClientV2 = infraResult.RetrievalClients.RelayRetrievalClientV2
+			validatorRetrievalClientV2 = infraResult.RetrievalClients.ValidatorRetrievalClientV2
+		} else {
+			Expect(infraResult.RetrievalClients).ToNot(BeNil(), "retrieval clients must be initialized by testinfra")
+		}
 
 		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
 		Expect(err).To(BeNil())
@@ -349,117 +362,6 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 	}
 
 	return opts
-}
-
-func setupRetrievalClients(testConfig *deploy.Config) error {
-	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
-		NumConfirmations: numConfirmations,
-		NumRetries:       numRetries,
-	}
-	var err error
-	if ethClient == nil {
-		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
-		if err != nil {
-			return err
-		}
-	}
-	if rpcClient == nil {
-		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
-		if err != nil {
-			log.Fatalln("could not start tcp listener", err)
-		}
-	}
-	tx, err := eth.NewWriter(
-		logger, ethClient, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
-	if err != nil {
-		return err
-	}
-
-	cs := eth.NewChainState(tx, ethClient)
-	agn := &core.StdAssignmentCoordinator{}
-	nodeClient := clients.NewNodeClient(20 * time.Second)
-	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
-	if err != nil {
-		return err
-	}
-	kzgConfig := &kzg.KzgConfig{
-		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
-		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
-		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
-		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
-		SRSOrder:        uint64(srsOrder),
-		SRSNumberToLoad: uint64(srsOrder),
-		NumWorker:       1,
-		PreloadEncoder:  false,
-		LoadG2Points:    true,
-	}
-
-	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
-	if err != nil {
-		return err
-	}
-
-	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, kzgVerifier, 10)
-	if err != nil {
-		return err
-	}
-	chainReader, err = eth.NewReader(
-		logger,
-		ethClient,
-		testConfig.EigenDA.OperatorStateRetriever,
-		testConfig.EigenDA.ServiceManager,
-	)
-	if err != nil {
-		return err
-	}
-
-	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
-
-	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
-		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
-		RetrievalTimeout:    1 * time.Minute,
-	}
-
-	validatorRetrievalClientV2, err = payloadretrieval.NewValidatorPayloadRetriever(
-		logger,
-		validatorPayloadRetrieverConfig,
-		retrievalClientV2,
-		kzgVerifier.Srs.G1)
-
-	if err != nil {
-		return err
-	}
-
-	relayClientConfig := &relay.RelayClientConfig{
-		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit,
-	}
-
-	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
-	if err != nil {
-		return err
-	}
-
-	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
-	if err != nil {
-		return err
-	}
-
-	relayPayloadRetrieverConfig := payloadretrieval.RelayPayloadRetrieverConfig{
-		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
-		RelayTimeout:        5 * time.Second,
-	}
-
-	relayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
-		logger,
-		rand.New(rand.NewSource(time.Now().UnixNano())),
-		relayPayloadRetrieverConfig,
-		relayClient,
-		kzgVerifier.Srs.G1)
-
-	return err
 }
 
 func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval time.Duration) error {

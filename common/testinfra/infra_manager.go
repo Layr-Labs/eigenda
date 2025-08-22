@@ -3,15 +3,26 @@ package testinfra
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testinfra/containers"
 	"github.com/Layr-Labs/eigenda/common/testinfra/deployment"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -19,6 +30,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/network"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 // InfraManager orchestrates the lifecycle of test infrastructure containers
@@ -255,6 +267,15 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		// Wait a bit for the subgraph to sync
 		fmt.Println("Waiting for subgraph to sync...")
 		time.Sleep(5 * time.Second)
+	}
+
+	// 6. Setup retrieval clients if enabled and EigenDA contracts are deployed
+	if im.config.EigenDA.RetrievalClients.Enabled && im.result.EigenDAContracts != nil {
+		fmt.Println("Setting up retrieval clients...")
+		err := im.setupRetrievalClients(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup retrieval clients: %w", err)
+		}
 	}
 
 	success = true
@@ -539,5 +560,179 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		}
 	}
 
+	return nil
+}
+
+// setupRetrievalClients sets up all the retrieval clients
+func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
+	config := im.config.EigenDA.RetrievalClients
+	
+	// Skip if not enabled
+	if !config.Enabled {
+		return nil
+	}
+
+	// Save current working directory to restore it at the end
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalDir)
+	}()
+
+	// Change to the inabox directory where KZG resources are located
+	// This makes the relative paths work correctly
+	inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
+	if err := os.Chdir(inaboxDir); err != nil {
+		return fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
+	}
+
+	// Use Anvil RPC if not specified
+	rpcURL := config.RPC
+	if rpcURL == "" && im.anvil != nil {
+		rpcURL = im.result.AnvilRPC
+	}
+	if rpcURL == "" {
+		return fmt.Errorf("no RPC URL available for retrieval clients")
+	}
+
+	// Use contract addresses from deployment if not specified
+	operatorStateRetriever := config.OperatorStateRetriever
+	serviceManager := config.ServiceManager
+	if operatorStateRetriever == "" && im.result.EigenDAContracts != nil {
+		operatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+	}
+	if serviceManager == "" && im.result.EigenDAContracts != nil {
+		serviceManager = im.result.EigenDAContracts.ServiceManager
+	}
+	if operatorStateRetriever == "" || serviceManager == "" {
+		return fmt.Errorf("contract addresses not available for retrieval clients")
+	}
+
+	// Create logger
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// Setup eth client
+	ethClientConfig := geth.EthClientConfig{
+		RPCURLs:          []string{rpcURL},
+		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
+		NumConfirmations: 3,
+		NumRetries:       0,
+	}
+	
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create eth client: %w", err)
+	}
+	
+	rpcClient, err := ethrpc.Dial(rpcURL)
+	if err != nil {
+		return fmt.Errorf("failed to create RPC client: %w", err)
+	}
+	
+	tx, err := eth.NewWriter(logger, ethClient, operatorStateRetriever, serviceManager)
+	if err != nil {
+		return fmt.Errorf("failed to create eth writer: %w", err)
+	}
+
+	cs := eth.NewChainState(tx, ethClient)
+	agn := &core.StdAssignmentCoordinator{}
+	nodeClient := clients.NewNodeClient(20 * time.Second)
+	
+	srsOrder, err := strconv.Atoi(config.SRSOrder)
+	if err != nil {
+		return fmt.Errorf("failed to parse SRS order: %w", err)
+	}
+	
+	kzgConfig := &kzg.KzgConfig{
+		G1Path:          config.G1Path,
+		G2Path:          config.G2Path,
+		G2PowerOf2Path:  config.G2PowerOf2Path,
+		CacheDir:        config.CachePath,
+		SRSOrder:        uint64(srsOrder),
+		SRSNumberToLoad: uint64(srsOrder),
+		NumWorker:       1,
+		PreloadEncoder:  false,
+		LoadG2Points:    true,
+	}
+
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create KZG verifier: %w", err)
+	}
+
+	retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, kzgVerifier, 10)
+	if err != nil {
+		return fmt.Errorf("failed to create retrieval client: %w", err)
+	}
+	
+	chainReader, err := eth.NewReader(logger, ethClient, operatorStateRetriever, serviceManager)
+	if err != nil {
+		return fmt.Errorf("failed to create chain reader: %w", err)
+	}
+
+	clientConfig := validatorclientsv2.DefaultClientConfig()
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
+
+	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
+		RetrievalTimeout:    1 * time.Minute,
+	}
+
+	validatorRetrievalClientV2, err := payloadretrieval.NewValidatorPayloadRetriever(
+		logger,
+		validatorPayloadRetrieverConfig,
+		retrievalClientV2,
+		kzgVerifier.Srs.G1)
+	if err != nil {
+		return fmt.Errorf("failed to create validator retrieval client: %w", err)
+	}
+
+	relayClientConfig := &relay.RelayClientConfig{
+		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit
+	}
+
+	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+	if err != nil {
+		return fmt.Errorf("failed to create relay URL provider: %w", err)
+	}
+
+	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+	if err != nil {
+		return fmt.Errorf("failed to create relay client: %w", err)
+	}
+
+	relayPayloadRetrieverConfig := payloadretrieval.RelayPayloadRetrieverConfig{
+		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
+		RelayTimeout:        5 * time.Second,
+	}
+
+	// Use a new random source for each client instance
+	randSource := rand.New(rand.NewSource(time.Now().UnixNano()))
+	relayRetrievalClientV2, err := payloadretrieval.NewRelayPayloadRetriever(
+		logger,
+		randSource,
+		relayPayloadRetrieverConfig,
+		relayClient,
+		kzgVerifier.Srs.G1)
+	if err != nil {
+		return fmt.Errorf("failed to create relay retrieval client: %w", err)
+	}
+
+	// Store all clients in the result
+	im.result.RetrievalClients = &RetrievalClientsComponents{
+		EthClient:                  ethClient,
+		RPCClient:                  rpcClient,
+		RetrievalClient:            retrievalClient,
+		ChainReader:                chainReader,
+		RelayRetrievalClientV2:     relayRetrievalClientV2,
+		ValidatorRetrievalClientV2: validatorRetrievalClientV2,
+	}
+
+	fmt.Println("✅ Retrieval clients initialized successfully")
 	return nil
 }
