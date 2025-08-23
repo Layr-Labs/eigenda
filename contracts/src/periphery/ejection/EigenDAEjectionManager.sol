@@ -30,7 +30,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     uint256 internal immutable _estimatedGasUsedWithSig;
 
     bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
-        "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
+        "CancelEjection(address operator,uint64 proceedingTime,uint64 lastProceedingInitiated,bytes quorums,address recipient)"
     );
 
     constructor(
