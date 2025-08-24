@@ -434,7 +434,7 @@ func selectFrameSubsetByRange(
 	}
 	if endIndex > uint32(len(frames.Chunks)) {
 		return nil, fmt.Errorf(
-			"chunk range %d-%d is invald for key %s, chunk count %d",
+			"chunk range %d-%d is invalid for key %s, chunk count %d",
 			startIndex, endIndex, key, len(frames.Chunks))
 	}
 
