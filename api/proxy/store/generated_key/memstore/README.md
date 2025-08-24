@@ -67,7 +67,7 @@ curl -X PATCH http://localhost:3100/memstore/config \
   -d '{"NullableDerivationError": {"StatusCode": 3, "Msg": "Invalid cert", "Reset": false}}'
 ```
 
-This will cause all future POST request to store the specified derivation error, such that all GET requests for those keys return an HTTP 418 error with the. The POST request suceeds regardless if any derivation error is set.
+This will cause all future POST request to store the specified derivation error, such that all GET requests for those keys return an HTTP 418 error with the. The POST request succeeds regardless if any derivation error is set.
 
 ##### Resetting derivation error behavior
 To disable the derivation error behavior and return to normal operation:
