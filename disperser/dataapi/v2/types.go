@@ -9,7 +9,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 )
 
-// Base types shared acorss various API response types
+// Base types shared across various API response types
 type (
 	OperatorIdentity struct {
 		OperatorId      string `json:"operator_id"`
