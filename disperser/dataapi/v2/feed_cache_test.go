@@ -892,7 +892,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Query a larger range [3:00, 12:00)
-		// With limit=3, it'll return 11:00, 10:00, and 9:00, which are connnected to existing
+		// With limit=3, it'll return 11:00, 10:00, and 9:00, which are connected to existing
 		// cache [5:00, 10:00)
 		// The resulting cache is [5:00, 12:00)
 		newStart := baseTime.Add(3 * time.Minute)
