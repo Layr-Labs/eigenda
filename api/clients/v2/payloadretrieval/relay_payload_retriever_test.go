@@ -195,7 +195,7 @@ func TestRelayCallTimeout(t *testing.T) {
 			}
 		})
 
-	// the panic should be triggered, since it happens faster than the configured timout
+	// the panic should be triggered, since it happens faster than the configured timeout
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(
 		nil, errors.New("timeout")).Once().Run(
 		func(args mock.Arguments) {
