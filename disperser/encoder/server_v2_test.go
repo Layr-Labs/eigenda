@@ -115,7 +115,7 @@ func TestEncodeBlob(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Verify storage succeded
+	// Verify storage succeeded
 	t.Run("Verify Blob Storage", func(t *testing.T) {
 		storedData, err := c.blobStore.GetBlob(ctx, blobKey)
 		assert.NoError(t, err, "Failed to get stored blob")
