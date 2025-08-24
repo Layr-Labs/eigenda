@@ -405,7 +405,7 @@ func (s *ServerV2) getSignersAndNonSigners(
 		for _, op := range innerMap {
 			id := op.OperatorID.Hex()
 			addr, exist := operatorList.GetAddress(id)
-			// This should never happen becuase OperatorList ensures the 1:1 mapping
+			// This should never happen because OperatorList ensures the 1:1 mapping
 			if !exist {
 				addr = "Unexpected internal error"
 				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
