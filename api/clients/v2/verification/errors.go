@@ -16,7 +16,7 @@ import (
 // and geth itself does not provide temporary/retryable semantics on its returned errors.
 // See https://github.com/ethereum/go-ethereum/blob/a9523b6428238a762e1a1e55e46ead47630c3a23/accounts/abi/bind/base.go#L169
 // It seems incredibly difficult in golang (maybe due to golang's laxity with error handling) to distinguish temporary errors.
-// See the net package for exampple, which deprecated its Temporary() method: https://pkg.go.dev/net#Error
+// See the net package for example, which deprecated its Temporary() method: https://pkg.go.dev/net#Error
 type CertVerifierInternalError struct {
 	Msg string
 	// Err is optional and only present if an underlying error is available.
