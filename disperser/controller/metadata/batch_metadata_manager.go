@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -118,11 +119,17 @@ func (m *batchMetadataManager) updateMetadata() error {
 	}
 
 	previousMetadata := m.metadata.Load()
-	if previousMetadata != nil && referenceBlockNumber == previousMetadata.referenceBlockNumber {
-		// Only update if the new RBN is greater than the most recent one.
-		m.logger.Infof("reference block number %d is the same as the previous one, skipping update",
-			referenceBlockNumber)
-		return nil
+	if previousMetadata != nil {
+		// reference block provider prevents RBN from going backwards
+		enforce.GreaterThanOrEqual(referenceBlockNumber, previousMetadata.referenceBlockNumber,
+			"reference block number went backwards")
+
+		if referenceBlockNumber == previousMetadata.referenceBlockNumber {
+			// Only update if the new RBN is greater than the most recent one.
+			m.logger.Infof("reference block number %d is the same as the previous one, skipping update",
+				referenceBlockNumber)
+			return nil
+		}
 	}
 
 	quorums, err := m.quorumScanner.GetQuorums(m.ctx, referenceBlockNumber)

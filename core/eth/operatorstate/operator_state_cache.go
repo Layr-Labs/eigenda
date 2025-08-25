@@ -73,6 +73,8 @@ func NewOperatorStateCache(
 }
 
 // GetOperatorState retrieves the operator state for a given reference block number and quorums.
+//
+// WARNING: do not modify the returned OperatorState or any of its contents, as this will corrupt the cached data.
 func (c *operatorStateCache) GetOperatorState(
 	ctx context.Context,
 	referenceBlockNumber uint64,
