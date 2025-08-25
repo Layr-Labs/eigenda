@@ -296,8 +296,7 @@ func (m *EigenDAManager) backupToSecondary(ctx context.Context, commitment []byt
 			Commitment: commitment,
 			Value:      value,
 		}
-		// secondary is available only for synchronous writes
-	} else {
+	} else { // secondary is available only for synchronous writes
 		m.log.Debug("Publishing data to single threaded secondary stores")
 		err := m.secondary.HandleRedundantWrites(ctx, commitment, value)
 		if err != nil {
