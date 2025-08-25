@@ -88,12 +88,12 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 	_, err := s.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        s.tableName,
 		Key:              s.accountKey,
-		UpdateExpression: aws.String("SET #cp = :new"),
+		UpdateExpression: aws.String("SET #cp = :newValue"),
 		ExpressionAttributeNames: map[string]string{
 			"#cp": attributeCumulativePayment,
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":new": &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
+			":newValue": &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
 		},
 	})
 	if err != nil {
