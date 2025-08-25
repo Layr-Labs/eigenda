@@ -141,7 +141,7 @@ func NewNode(
 
 	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get EigenDAEjectionManager address from contract directory: %w", err)
+		return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
 	}
 
 	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)

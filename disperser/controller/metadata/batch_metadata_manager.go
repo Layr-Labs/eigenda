@@ -120,7 +120,8 @@ func (m *batchMetadataManager) updateMetadata() error {
 	previousMetadata := m.metadata.Load()
 	if previousMetadata != nil && referenceBlockNumber == previousMetadata.referenceBlockNumber {
 		// Only update if the new RBN is greater than the most recent one.
-		m.logger.Infof("reference block number %d is the same as the previous one, skipping update")
+		m.logger.Infof("reference block number %d is the same as the previous one, skipping update",
+			referenceBlockNumber)
 		return nil
 	}
 

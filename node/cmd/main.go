@@ -98,7 +98,7 @@ func NodeMain(ctx *cli.Context) error {
 	operatorStateRetrieverAddress, err :=
 		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
 	if err != nil {
-		return fmt.Errorf("failed to get BLSOperatorStateRetriever address: %w", err)
+		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
 
 	eigenDAServiceManagerAddress, err :=
