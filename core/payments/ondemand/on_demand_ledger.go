@@ -50,9 +50,13 @@ type OnDemandLedger struct {
 // debit, the latest cumulative payment will be stored in the CumulativePaymentStore.
 func OnDemandLedgerFromStore(
 	ctx context.Context,
+	// the total deposits that have been made for the account to the PaymentVault
 	totalDeposits *big.Int,
+	// the price in wei per dispersed symbol
 	pricePerSymbol *big.Int,
+	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
 	minNumSymbols uint64,
+	// the DB store backing this ledger
 	cumulativePaymentStore *CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
 	if cumulativePaymentStore == nil {
@@ -70,9 +74,13 @@ func OnDemandLedgerFromStore(
 // Creates a new OnDemandLedger, which *isn't* backed by a CumulativePayment store: the only representation of the
 // cumulative payment is in memory.
 func OnDemandLedgerFromValue(
+	// the total deposits that have been made for the account to the PaymentVault
 	totalDeposits *big.Int,
+	// the price in wei per dispersed symbol
 	pricePerSymbol *big.Int,
+	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
 	minNumSymbols uint64,
+	// the starting value for the cumulative payment
 	cumulativePayment *big.Int,
 ) (*OnDemandLedger, error) {
 	return newOnDemandLedger(totalDeposits, pricePerSymbol, minNumSymbols, nil, cumulativePayment)
