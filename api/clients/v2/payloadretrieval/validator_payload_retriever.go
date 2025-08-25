@@ -151,7 +151,7 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 // and times out based on [ValidatorPayloadRetrieverConfig.RetrievalTimeout].
 //
 // blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
-// and MUST be a power of 2. If not, this function will panic.
+// and MUST be a power of 2.
 func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	header *corev2.BlobHeaderWithHashedPayment,

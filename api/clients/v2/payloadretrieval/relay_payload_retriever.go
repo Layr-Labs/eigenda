@@ -170,7 +170,7 @@ func (pr *RelayPayloadRetriever) GetEncodedPayload(
 // and times out based on [RelayPayloadRetrieverConfig.RelayTimeout].
 //
 // blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
-// and MUST be a power of 2. If not, this function will panic.
+// and MUST be a power of 2.
 func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
