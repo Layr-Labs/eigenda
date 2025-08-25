@@ -90,7 +90,7 @@ func buildBlobAndCert(
 ) (core.BlobKey, []byte, *coretypes.EigenDACertV3) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
+	blob, err := coretypes.Payload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
 	require.NoError(t, err)
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)
@@ -154,7 +154,7 @@ func buildCertFromBlobBytes(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	return *blobKey, eigenDACert
+	return blobKey, eigenDACert
 }
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
@@ -471,7 +471,7 @@ func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 	relayKeys[0] = tester.Random.Uint32()
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
+	blob, err := coretypes.Payload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
 	require.NoError(t, err)
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)

@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
@@ -44,23 +45,25 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	log.Infof("Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v", configString)
 
-	metrics := proxy_metrics.NewMetrics("default")
+	registry := prometheus.NewRegistry()
+	metrics := proxy_metrics.NewMetrics(registry)
 
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	storeManager, err := builder.BuildStoreManager(
+	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		log,
 		metrics,
 		cfg.StoreBuilderConfig,
 		cfg.SecretConfig,
+		registry,
 	)
 	if err != nil {
-		return fmt.Errorf("build storage manager: %w", err)
+		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	proxyServer := server.NewServer(cfg.ServerConfig, storeManager, log, metrics)
+	proxyServer := server.NewServer(cfg.ServerConfig, certMgr, keccakMgr, log, metrics)
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)
 	if cfg.StoreBuilderConfig.MemstoreEnabled {
@@ -83,7 +86,8 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	if cfg.MetricsServerConfig.Enabled {
 		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
-		svr, err := metrics.StartServer(cfg.MetricsServerConfig.Host, cfg.MetricsServerConfig.Port)
+		svr := proxy_metrics.NewServer(registry, cfg.MetricsServerConfig)
+		err := svr.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)
 		}

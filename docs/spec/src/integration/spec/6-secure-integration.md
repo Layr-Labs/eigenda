@@ -29,6 +29,9 @@ The diagram below shows the step-by-step transformation from input to final roll
   - Implementation varies by requirement (e.g., key-value mapping for optimistic fault proofs)
 - **Host:** Entity that provides preimage oracle responses
 
+> A encoded payload is an intermdeidate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
+
+
 ![](../../assets/integration/eigenda-blob-derivation.png)
 
 ### Terminal States
@@ -119,31 +122,32 @@ The proxy combines:
 
 ### 1. RBN Recency Validation
 
-This check is related to time guarantees. It is important for both optimistic and zk rollup validators to have sufficient time to download the blob from EigenDA once a cert lands in the batcher inbox. 
+This check enforces timing guarantees: once a cert lands in the batcher inbox, optimistic and zk rollup validators must have enough time to download the EigenDA blob.
 
-We will use fault proofs as our base example to reason about the necessity of the recency check.
+
+We use fault proofs to motivate the need for a recency check. A similar reason exists for zk rollup, where the validator of zk rollup must be able to download the eigenDA blob after the rollup prover posts the L2 state update on L1. 
 
 ![](../../assets/integration/recency-window-timeline.png)
 
-Looking at the timing diagram above, we need the EigenDA availability period to overlap the ~7days challenge period. In order to uphold this guarantee, what we need to do is simply to have rollups' derivation pipelines reject certs whose DA availability period started a long time ago. However, from the cert itself, there is no way to know when the cert was signed and made available. The only information available on the cert itself is `cert.RBN`, the reference block number chosen by the disperser at which to anchor operator stakes. But that happens to be before validators sign, so it is enough to bound how far that can be from the cert's inclusion block.
-
-Rollups must thus enforce that
+From the timeline above, EigenDA’s availability window must overlap the ~7-day challenge period so any honest party can detect faults and fetch the required data. Rollup derivation pipelines should reject certificates whose DA window began too far in the past. While a DA cert doesn’t record its signing or availability time, it does include cert.RBN, which is the L1 Reference Block Number chosen by the disperser to anchor the operator set and stakes. Because RBN is fixed before validators sign, it provides a proxy to bound how old the cert can be at inclusion, enabling a simple recency check.
 ```
 certL1InclusionBlock - cert.RBN <= RecencyWindowSize
 ```
+If the inequality fails, discard the cert. This also hardens security by preventing a disperser from choosing a very old RBN with materially different stakes (e.g., after withdrawals).
 
-This has a second security implication. A malicious EigenDA disperser could have chosen a reference block number (RBN) that is very old, where the stake of operators was very different from the current one, due to operators withdrawing stake for example.
-
-> To give a concrete example with a rollup stack, optimism has a [sequencerWindow](https://docs.optimism.io/stack/rollup/derivation-pipeline#sequencer-window) which forces batches to land onchain in a timely fashion (12h). This filtering however, happens in the [BatchQueue](https://specs.optimism.io/protocol/derivation.html#batch-queue) stage of the derivation pipeline (DP), and doesn't prevent the DP being stalled in the [L1Retrieval](https://specs.optimism.io/protocol/derivation.html#l1-retrieval) stage by an old cert having been submitted whose blob is no longer available on EigenDA. To prevent this, we need the recencyWindow filtering to happen during the L1Retrieval stage of the DP.
+> To give a concrete example with a rollup stack, optimism has a [sequencerWindow](https://docs.optimism.io/stack/rollup/derivation-pipeline#sequencer-window) which forces batches to land onchain in a timely fashion (12h). This filtering however, happens in the [BatchQueue](https://specs.optimism.io/protocol/derivation.html#batch-queue) stage of the derivation pipeline (DP). But because EigenDA blob derivation needs to take place right after [L1Retrieval](https://specs.optimism.io/protocol/derivation.html#l1-retrieval) and before [BatchQueue], we cannot use the OP's existing mechanism in [BatchQueue] with [sequencerWindow] to discard old DA certificate. To prevent this, we need the recencyWindow filtering to happen during the L1Retrieval stage of the DP.
 >
 > Despite its semantics being slightly different, sequencerWindow and recencyWindow are related concepts, and in order to not force another config change on op altda forks, we suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
 
+For the ~7-day challenge window overlaps EigenDA availability, we assume there is at least one honest challenger runs an L2 consensus node and downloads the EigenDA blob soon after the batch is posted on L1. Define L2StatePostingPeriod as the interval between (a) L1 inclusion of the certificate in the batcher inbox and (b) L1 inclusion of the corresponding L2 state update. As long as L2StatePostingPeriod + RecencyWindowSize < ~7 days, the honest challenger can deter any invalid-proposal attack.
+
 ![](../../assets/integration/cert-rbn-recency-window.png)
 
+In the diagram, the top row shows L1 blocks every 12 s; the smaller squares are L2 blocks every 2 s. Yellow labels mark key artifacts across the batching pipeline: batches → channel → EigenDA blob. Dispersal completes between t=12 s and t=24 s. The resulting certificate has RBN equal to the L1 block at t=0 (two L1 blocks earlier). The cert is then submitted to L1 at t=24 s. Green annotations show the generalized L2→L1 submission, with batches posted to the adjacent L1 block.
 
 ### 2. Cert Validation
 
-Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
+Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://docs.beboundless.xyz/developers/steel/what-is-steel) and [Sp1CC](https://succinctlabs.github.io/sp1-contract-call/).
 
 The `checkDACert` function accepts an ABI-encoded `[]byte` certificate input. This design allows the underlying DACert structure to evolve across versions, enabling seamless upgrades without requiring changes to the `EigenDACertVerifierRouter` interface.
 
@@ -154,23 +158,42 @@ The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0
 3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
 4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
 
-### 3. Blob Validation
+More information about upgrading the cert verification can be found in the [section](#upgradable-quorums-and-thresholds-for-optimistic-verification).
 
-There are different required validation steps, depending on whether the client is retrieving or dispersing a blob.
+### 3. Downloading and Decoding an Encoded Payload
 
-Retrieval (whether data is coming from relays, or directly from DA nodes):
+#### Downloading an Encoded Payload
 
-1. Verify that received blob length is ≤ the `length` in the cert’s `BlobCommitment`
-2. Verify that the blob length claimed in the `BlobCommitment` is greater than `0`
-3. Verify that the blob length claimed in the `BlobCommitment` is a power of two
-4. Verify that the payload length claimed in the encoded payload header is ≤ the maximum permissible payload length, as calculated from the `length` in the `BlobCommitment`
-    1. The maximum permissible payload length is computed by looking at the claimed blob length, and determining how many bytes would remain if you were to remove the encoding which is performed when converting a `payload` into an `encodedPayload`. This presents an upper bound for payload length: e.g. “If the `payload` were any bigger than `X`, then the process of converting it to an `encodedPayload` would have yielded a `blob` of larger size than claimed”
-5. If the bytes received for the blob are longer than necessary to convey the payload, as determined by the claimed payload length, then verify that all extra bytes are `0x0`.
-    1. Due to how padding of a blob works, it’s possible that there may be trailing `0x0` bytes, but there shouldn’t be any trailing bytes that aren’t equal to `0x0`.
-6. Verify the KZG commitment. This can either be done:
-    1. directly: recomputing the commitment using SRS points and checking that the two commitments match (this is the current implemented way)
-    2. indirectly: verifying a point opening using Fiat-Shamir (see this [issue](https://github.com/Layr-Labs/eigenda/issues/1037))
+The preimage oracle served [encoded payload](./3-data-structs.md/#encodedpayload). When the EigenDA blob derivation queries the preimage oracle for the encoded payload corresponding to a DA cert, the preimage oracle (i.e. the preimage request module of the EigenDA proxy) downloads the EigenDA blob from relay or directly from EigenDA operators, or any data sources including pre-populated local storage or s3 that stores the EigenDA blob.
+The preimage oracle performs checks on the blob against the KZG commitment from the DA cert. 
+If verification fails, it discards the blob and retries with other sources until a valid one is found. Once verified, it returns the encoded payload to the derivation step.
 
+> A rollup may apply an FFT on the blob to obtain its encoded payload, or use the blob directly as the encoded payload, depending on whether an inverse FFT was taken on the encoded payload during the dispersal path.
+> Taking IFFT on the dispersal path lets the rollup open points on bytes using parts of the payload. Both Arbitrum Nitro and OP (optimistic or ZK) apply IFFT. The encoded payload always live in the same domain (i.e. without any data transformation) as the payload. It is formed by adding the encoded payload header and interleaving 0s to make every 32bytes a valid field element, the padding 0s at the end to a power of two number of field elements (each 32 bytes).
+
+#### Decoding an Encoded Payload
+
+After verification, EigenDA blob derivation decodes the [encoded payload](./3-data-structs.md/#encodedpayload) to the original rollup payload. If any check fails, discard the blob returned from the preimage oracle. The procedure:
+
+- checkLenInvariant
+  - Encoded payload size ≥ size of encoded payload header.
+  - Encoded payload contains a power-of-two number of 32-byte field elements (valid sizes: 32, 64, 128, 256, …). See client [implementation](https://github.com/Layr-Labs/eigenda/blob/57ed95ce77a57c53341cad10233ca2f29b29c0f5/api/clients/v2/coretypes/encoded_payload.go#L152).
+- decodeHeader: (first 32-byte field element)
+  - Encoded payload size ≥ size of encoded payload header.
+  - First byte is 0x00 so the first 32 bytes form a valid field element.
+  - Encoding version is known (currently 0x00).
+  - Returns the claimed original rollup payload size.
+- decodePayload
+  - Remove internal padding (drop the first byte of each 32-byte word).
+  - Decoded size must be ≥ the claimed length.
+
+> The EigenDA protocol enforces blob length > 0 (see [implementation](https://github.com/Layr-Labs/eigenda/blob/57ed95ce77a57c53341cad10233ca2f29b29c0f5/node/grpc/server_v2.go#L127)).
+
+Proxy behavior. The EigenDA proxy can return either the encoded payload or the decoded rollup payload based on GET parameters:
+  - With `?return_encoded_payload=true` or `?return_encoded_payload=1`, it only checks the blob against the kzg commitment and returns the encoded payload, it is useful when integrating with proof systems to control the data transformation.
+  - Without parameters, it decodes and returns the rollup payload; on any decoding error, it returns HTTP 418.
+
+### Notes on Dispersal
 Dispersal:
 
 1. If the `BlobCertificate` was generated using the disperser’s `GetBlobCommitment` RPC endpoint, verify its contents:

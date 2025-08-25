@@ -8,15 +8,14 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
+	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	"github.com/ethereum-optimism/optimism/op-service/metrics/doc"
 )
 
 var (
@@ -38,7 +37,7 @@ func main() {
 	app.Commands = []*cli.Command{
 		{
 			Name:        "doc",
-			Subcommands: doc.NewSubcommands(metrics.NewMetrics("default")),
+			Subcommands: metrics.NewSubcommands(),
 		},
 	}
 

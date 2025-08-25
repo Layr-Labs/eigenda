@@ -47,6 +47,9 @@ func main() {
 }
 
 func NodeMain(ctx *cli.Context) error {
+
+	// TODO (cody.littley): pull all business logic in this function into the NewNode() constructor.
+
 	log.Println("Initializing Node")
 	config, err := node.NewConfig(ctx)
 	if err != nil {
@@ -81,13 +84,14 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
-	reader, err := coreeth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	reader, err := coreeth.NewReader(
+		logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}
 
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
+	node, err := node.NewNode(context.Background(), reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}

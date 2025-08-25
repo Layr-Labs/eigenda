@@ -71,8 +71,7 @@ var _ core.Reader = (*Reader)(nil)
 func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
-	eigendaDirectoryHexAddr,
-	blsOperatorStateRetrieverHexAddr,
+	operatorStateRetrieverHexAddr string,
 	eigenDAServiceManagerHexAddr string) (*Reader, error) {
 
 	e := &Reader{
@@ -80,30 +79,10 @@ func NewReader(
 		logger:    logger.With("component", "Reader"),
 	}
 
-	// If EigenDADirectory is provided, use it to get the operator state retriever and service manager addresses
-	// Otherwise, use the provided addresses (legacy support; will be removed as a breaking change)
-	var blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address
-	if eigendaDirectoryHexAddr != "" && gethcommon.IsHexAddress(eigendaDirectoryHexAddr) {
-		addressReader, err := NewEigenDADirectoryReader(eigendaDirectoryHexAddr, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-		}
+	operatorStateRetrieverAddr := gethcommon.HexToAddress(operatorStateRetrieverHexAddr)
+	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
 
-		blsOperatorStateRetrieverAddr, err = addressReader.GetOperatorStateRetrieverAddress(&bind.CallOpts{})
-		if err != nil {
-			return nil, err
-		}
-
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress(&bind.CallOpts{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		blsOperatorStateRetrieverAddr = gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
-		eigenDAServiceManagerAddr = gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	}
-
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	err := e.updateContractBindings(operatorStateRetrieverAddr, eigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update contract bindings: %w", err)
 	}
@@ -112,8 +91,9 @@ func NewReader(
 
 // updateContractBindings updates the contract bindings for the reader
 // TODO: update to use address directory contract once all contracts are written into the directory
-func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
-
+func (t *Reader) updateContractBindings(
+	operatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address,
+) error {
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
 		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
@@ -167,9 +147,9 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	contractBLSOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(blsOperatorStateRetrieverAddr, t.ethClient)
+	contractOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(operatorStateRetrieverAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch BLSOperatorStateRetriever contract", "err", err)
+		t.logger.Error("Failed to fetch OperatorStateRetriever contract", "err", err)
 		return err
 	}
 
@@ -179,7 +159,11 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses",
+		"operatorStateRetrieverAddr", operatorStateRetrieverAddr.Hex(),
+		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
+		"registryCoordinatorAddr", registryCoordinatorAddr.Hex(),
+		"blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
@@ -278,7 +262,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		RelayRegistryAddress:  relayRegistryAddress,
 		AVSDirectory:          contractAVSDirectory,
 		SocketRegistry:        contractSocketRegistry,
-		OpStateRetriever:      contractBLSOpStateRetr,
+		OpStateRetriever:      contractOpStateRetr,
 		BLSApkRegistry:        contractBLSPubkeyReg,
 		IndexRegistry:         contractIIndexReg,
 		RegistryCoordinator:   contractIRegistryCoordinator,

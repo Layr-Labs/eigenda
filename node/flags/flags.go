@@ -162,9 +162,10 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -317,6 +318,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
 		Value:    units.GiB, // intentionally large for the time being
 	}
+	RelayConnectionPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-connection-pool-size"),
+		Usage:    "The number of connections to maintain with each relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_CONNECTION_POOL_SIZE"),
+		Value:    8,
+	}
 
 	ClientIPHeaderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "client-ip-header"),
@@ -451,17 +459,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
-	LittUnsafePurgeLocksFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-unsafe-purge-locks"),
-		Usage:    "Unsafe flag to purge locks in LittDB. Use with caution, as it may lead to data loss or corruption.",
+	LittRespectLocksFlag = cli.BoolFlag{
+		Name: common.PrefixFlag(FlagPrefix, "litt-respect-locks"),
+		Usage: "If set, LittDB will refuse to start if it can't acquire locks on the storage paths. " +
+			"Ideally this would always be enabled, but PID reuse in platforms like Kubernetes/Docker can make " +
+			"lock files practically impossible to manage.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_UNSAFE_PURGE_LOCKS"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_RESPECT_LOCKS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
-		Usage:    "The size of the download pool. The default value is 16.",
+		Usage:    "The size of the download pool.",
 		Required: false,
-		Value:    16,
+		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
 	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
@@ -507,6 +517,29 @@ var (
 		Required: false,
 		Value:    0.2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_FRACTION"),
+	}
+	StoreChunksBufferTimeoutFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-timeout"),
+		Usage: "The maximum amount of time to wait to acquire buffer capacity " +
+			"to store chunks in the StoreChunks() gRPC request",
+		Required: false,
+		Value:    10 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_TIMEOUT"),
+	}
+	StoreChunksBufferSizeGBFlag = cli.Float64Flag{
+		Name: common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-gb"),
+		Usage: "The maximum memory that can be used for StoreChunks() gRPC request buffer in gigabytes. " +
+			"Overrides NODE_STORE_CHUNKS_BUFFER_SIZE_FRACTION if > 0, otherwise is ignored.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_GB"),
+	}
+	StoreChunksBufferSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-buffer-size-fraction"),
+		Usage:    "The fraction of total memory to use for StoreChunks() gRPC request buffer.",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -626,6 +659,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RelayConnectionPoolSizeFlag,
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
@@ -643,9 +677,12 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
+	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
-	LittUnsafePurgeLocksFlag,
+	LittRespectLocksFlag,
+	StoreChunksBufferTimeoutFlag,
+	StoreChunksBufferSizeGBFlag,
+	StoreChunksBufferSizeFractionFlag,
 }
 
 func init() {

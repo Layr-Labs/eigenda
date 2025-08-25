@@ -1,30 +1,17 @@
 package metrics
 
 import (
-	"fmt"
-	"net"
-	"strconv"
-
-	ophttp "github.com/ethereum-optimism/optimism/op-service/httputil"
-
-	"github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
 	namespace           = "eigenda_proxy"
+	subsystem           = "default"
 	httpServerSubsystem = "http_server"
 	secondarySubsystem  = "secondary"
 )
-
-// Config ... Metrics server configuration
-type Config struct {
-	Host    string
-	Port    int
-	Enabled bool
-}
 
 // Metricer ... Interface for metrics
 type Metricer interface {
@@ -51,18 +38,16 @@ type Metrics struct {
 	SecondaryRequestsTotal      *prometheus.CounterVec
 	SecondaryRequestDurationSec *prometheus.HistogramVec
 
-	registry *prometheus.Registry
-	factory  metrics.Factory
+	factory *metrics.Documentor
 }
 
 var _ Metricer = (*Metrics)(nil)
 
-func NewMetrics(subsystem string) *Metrics {
-	if subsystem == "" {
-		subsystem = "default"
+func NewMetrics(registry *prometheus.Registry) Metricer {
+	if registry == nil {
+		return NoopMetrics
 	}
 
-	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
 	factory := metrics.With(registry)
@@ -127,8 +112,7 @@ func NewMetrics(subsystem string) *Metrics {
 		}, []string{
 			"backend_type",
 		}),
-		registry: registry,
-		factory:  factory,
+		factory: factory,
 	}
 }
 
@@ -167,23 +151,6 @@ func (m *Metrics) RecordSecondaryRequest(bt string, method string) func(status s
 	}
 }
 
-// StartServer starts the metrics server on the given hostname and port.
-// If port is 0, it automatically assigns an available port and returns the actual port.
-func (m *Metrics) StartServer(hostname string, port int) (*ophttp.HTTPServer, error) {
-	address := net.JoinHostPort(hostname, strconv.Itoa(port))
-
-	h := promhttp.InstrumentMetricHandler(
-		m.registry, promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{}),
-	)
-
-	server, err := ophttp.StartHTTPServer(address, h)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start HTTP server: %w", err)
-	}
-
-	return server, nil
-}
-
 func (m *Metrics) Document() []metrics.DocumentedMetric {
 	return m.factory.Document()
 }
@@ -192,10 +159,6 @@ type noopMetricer struct {
 }
 
 var NoopMetrics Metricer = new(noopMetricer)
-
-func (n *noopMetricer) Document() []metrics.DocumentedMetric {
-	return nil
-}
 
 func (n *noopMetricer) RecordInfo(_ string) {
 }
@@ -209,4 +172,8 @@ func (n *noopMetricer) RecordRPCServerRequest(string) func(status, mode, ver str
 
 func (n *noopMetricer) RecordSecondaryRequest(string, string) func(status string) {
 	return func(string) {}
+}
+
+func (m *noopMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }

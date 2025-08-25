@@ -35,11 +35,11 @@ type TestClientConfig struct {
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
 	//
-	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
-	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
+	// Currently the EigenDADirectory is just used to look up OperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
+	// TODO(samlaf): use EigenDADirectory for all contract address lookups.
 	EigenDADirectory string
-	// The contract address for the EigenDA BLS operator state retriever
-	BLSOperatorStateRetrieverAddr string
+	// The contract address for the OperatorStateRetriever
+	OperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
 	EigenDAServiceManagerAddr string
 	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
@@ -66,10 +66,14 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
-	// The size of the thread pool for read operations on the relay.
+	// The size of the thread pool for read operations.
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// The number of connections to open for each relay.
+	RelayConnectionCount uint
+	// The number of connections to open for each disperser.
+	DisperserConnectionCount uint
 	// The port to use for the proxy.
 	ProxyPort int
 }
@@ -85,6 +89,8 @@ func DefaultTestClientConfig() *TestClientConfig {
 		ValidatorReadConnectionPoolSize: 100,
 		ValidatorReadComputePoolSize:    20,
 		ProxyPort:                       1234,
+		RelayConnectionCount:            8,
+		DisperserConnectionCount:        8,
 		EigenDADirectory:                "placeholder",
 	}
 }

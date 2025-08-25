@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -33,6 +34,9 @@ type Accountant struct {
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
+
+	// metrics
+	metrics metrics.AccountantMetricer
 }
 
 // PeriodRecord contains the index of the reservation period and the usage of the period
@@ -43,7 +47,20 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
+func NewUnpopulatedAccountant(accountID gethcommon.Address, metrics metrics.AccountantMetricer) *Accountant {
+	return NewAccountant(accountID, nil, nil, 0, 0, 0, 0, metrics)
+}
+
+func NewAccountant(
+	accountID gethcommon.Address,
+	reservation *core.ReservedPayment,
+	onDemand *core.OnDemandPayment,
+	reservationWindow uint64,
+	pricePerSymbol uint64,
+	minNumSymbols uint64,
+	numBins uint32,
+	metrics metrics.AccountantMetricer,
+) *Accountant {
 	periodRecords := make([]PeriodRecord, max(numBins, uint32(meterer.MinNumBins)))
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
@@ -57,6 +74,7 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
+		metrics:           metrics,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -115,6 +133,7 @@ func (a *Accountant) blobPaymentInfo(
 			return big.NewInt(0), err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
+		a.metrics.RecordCumulativePayment(a.accountID.Hex(), a.cumulativePayment)
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(

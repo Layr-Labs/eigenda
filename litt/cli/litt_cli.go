@@ -109,7 +109,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Reduces the verbosity of the output.",
 					},
 				},
-				Action: nil, // rebaseCommand, // TODO this will be added in a follow up PR
+				Action: rebaseCommand,
 			},
 			{
 				Name:      "benchmark",
@@ -143,7 +143,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // pruneCommand, // TODO this will be added in a follow up PR
+				Action: pruneCommand,
 			},
 			{
 				Name:  "push",

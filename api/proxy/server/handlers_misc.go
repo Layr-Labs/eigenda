@@ -43,7 +43,7 @@ type EigenDADispersalBackendJSON struct {
 // handleGetEigenDADispersalBackend handles the GET request to check the current EigenDA backend used for dispersal.
 // This endpoint returns which EigenDA backend version (v1 or v2) is currently being used for blob dispersal.
 func (svr *Server) handleGetEigenDADispersalBackend(w http.ResponseWriter, r *http.Request) {
-	backend := svr.sm.GetDispersalBackend()
+	backend := svr.certMgr.GetDispersalBackend()
 	backendString := common.EigenDABackendToString(backend)
 
 	response := EigenDADispersalBackendJSON{EigenDADispersalBackend: backendString}
@@ -98,7 +98,7 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	w.WriteHeader(http.StatusOK)
 
 	// Exact same logic as GET handler.
-	newBackend := svr.sm.GetDispersalBackend()
+	newBackend := svr.certMgr.GetDispersalBackend()
 	backendString := common.EigenDABackendToString(newBackend)
 
 	response := EigenDADispersalBackendJSON{EigenDADispersalBackend: backendString}
