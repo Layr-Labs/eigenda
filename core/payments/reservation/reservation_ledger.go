@@ -46,10 +46,6 @@ func NewReservationLedger(
 
 // Debit the reservation with a number of symbols.
 //
-// [ReservationLedger.CheckInvariants] should be called prior to calling [ReservationLedger.Debit], to make sure the
-// dispersal is permitted under the parameters of the reservation. If [ReservationLedger.CheckInvariants] succeeds,
-// then [ReservationLedger.Debit] is called to make sure the dispersal doesn't exceed reservation capacity.
-//
 // Returns (true, nil) if the reservation has enough capacity to perform the debit.
 // Returns (false, nil) if the bucket lacks capacity to permit the fill.
 // Returns (false, error) if an error occurs. Possible errors include:

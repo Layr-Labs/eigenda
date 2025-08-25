@@ -269,6 +269,7 @@ func setupPayloadDisperserWithRouter() error {
 		signer,
 		nil,
 		accountant,
+		nil,
 		metrics.NoopDispersalMetrics,
 	)
 	if err != nil {
