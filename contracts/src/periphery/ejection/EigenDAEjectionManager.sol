@@ -29,7 +29,7 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
     uint256 internal immutable _estimatedGasUsedWithoutSig;
     uint256 internal immutable _estimatedGasUsedWithSig;
 
-    bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
+    bytes32 internal constant CANCEL_EJECTION_MESSAGE_IDENTIFIER = keccak256(
         "CancelEjection(address operator,uint64 proceedingTime,uint64 lastProceedingInitiated,bytes quorums,address recipient)"
     );
 
@@ -222,8 +222,16 @@ contract EigenDAEjectionManager is IEigenDAEjectionManager, IEigenDASemVer {
         try IRegistryCoordinator(registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
+    /// @notice Defines a unique identifier for a cancel ejection message to be signed by an operator for the purpose of authorizing a cancellation.
     function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
-        return keccak256(abi.encode(CANCEL_EJECTION_TYPEHASH, EigenDAEjectionLib.ejectionParams(operator), recipient));
+        return keccak256(
+            abi.encode(
+                CANCEL_EJECTION_MESSAGE_IDENTIFIER,
+                address(this),
+                EigenDAEjectionLib.ejectionParams(operator),
+                recipient
+            )
+        );
     }
 
     function _verifySig(
