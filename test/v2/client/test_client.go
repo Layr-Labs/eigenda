@@ -394,7 +394,7 @@ func NewTestClient(
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
 					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
-					EigenDADirectory:                   config.EigenDADirectory,
+					EigenDADirectory:                   config.ContractDirectoryAddress,
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
 						proxycommon.ValidatorRetrieverType,
