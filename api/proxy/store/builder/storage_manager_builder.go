@@ -26,7 +26,6 @@ import (
 	memstore_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/v2"
 	eigenda_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -60,7 +59,6 @@ func BuildManagers(
 ) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
-	var redisStore *redis.Store
 	var eigenDAV1Store common.EigenDAV1Store
 	var eigenDAV2Store common.EigenDAV2Store
 
@@ -69,14 +67,6 @@ func BuildManagers(
 		s3Store, err = s3.NewStore(config.S3Config)
 		if err != nil {
 			return nil, nil, fmt.Errorf("new S3 store: %w", err)
-		}
-	}
-
-	if config.RedisConfig.Endpoint != "" {
-		log.Info("Using Redis storage backend")
-		redisStore, err = redis.NewStore(&config.RedisConfig)
-		if err != nil {
-			return nil, nil, fmt.Errorf("new Redis store: %w", err)
 		}
 	}
 
@@ -124,8 +114,8 @@ func BuildManagers(
 		}
 	}
 
-	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
-	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
+	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
+	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
 	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
@@ -141,7 +131,6 @@ func BuildManagers(
 		"eigenda_v1", eigenDAV1Store != nil,
 		"eigenda_v2", eigenDAV2Store != nil,
 		"s3", s3Store != nil,
-		"redis", redisStore != nil,
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
@@ -172,18 +161,12 @@ func BuildManagers(
 func buildSecondaries(
 	targets []string,
 	s3Store common.SecondaryStore,
-	redisStore *redis.Store,
 ) []common.SecondaryStore {
 	stores := make([]common.SecondaryStore, len(targets))
 
 	for i, target := range targets {
 		//nolint:exhaustive // TODO: implement additional secondaries
 		switch common.StringToBackendType(target) {
-		case common.RedisBackendType:
-			if redisStore == nil {
-				panic(fmt.Sprintf("Redis backend not configured: %s", target))
-			}
-			stores[i] = redisStore
 		case common.S3BackendType:
 			if s3Store == nil {
 				panic(fmt.Sprintf("S3 backend not configured: %s", target))
@@ -344,7 +327,7 @@ func buildEigenDAV2Backend(
 				return nil, fmt.Errorf("get relay registry address: %w", err)
 			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				ctx, log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr)
+				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -487,7 +470,6 @@ func buildEthClient(ctx context.Context, log logging.Logger, secretConfigV2 comm
 }
 
 func buildRelayPayloadRetriever(
-	ctx context.Context,
 	log logging.Logger,
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
@@ -608,6 +590,8 @@ func buildPayloadDisperser(
 	}
 
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
+	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
+
 	// The accountant is populated lazily by disperserClient.PopulateAccountant
 	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
 
@@ -617,6 +601,7 @@ func buildPayloadDisperser(
 		signer,
 		kzgProver,
 		accountant,
+		dispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -21,21 +22,29 @@ func withEnvPrefix(envPrefix, s string) []string {
 	return []string{envPrefix + "_REDIS_" + s}
 }
 
-// CLIFlags ... used for Redis backend configuration
+// DeprecatedCLIFlags ... used for Redis backend configuration
 // category is used to group the flags in the help output (see https://cli.urfave.org/v2/examples/flags/#grouping)
-func CLIFlags(envPrefix, category string) []cli.Flag {
+func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:     EndpointFlagName,
 			Usage:    "Redis endpoint",
 			EnvVars:  withEnvPrefix(envPrefix, "ENDPOINT"),
 			Category: category,
+			Hidden:   true,
+			Action: func(ctx *cli.Context, s string) error {
+				return fmt.Errorf("redis secondary store is no longer supported: flag --%s is deprecated", EndpointFlagName)
+			},
 		},
 		&cli.StringFlag{
 			Name:     PasswordFlagName,
 			Usage:    "Redis password",
 			EnvVars:  withEnvPrefix(envPrefix, "PASSWORD"),
 			Category: category,
+			Hidden:   true,
+			Action: func(ctx *cli.Context, s string) error {
+				return fmt.Errorf("redis secondary store is no longer supported: flag --%s is deprecated", PasswordFlagName)
+			},
 		},
 		&cli.IntFlag{
 			Name:     DBFlagName,
@@ -43,6 +52,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    0,
 			EnvVars:  withEnvPrefix(envPrefix, "DB"),
 			Category: category,
+			Hidden:   true,
+			Action: func(ctx *cli.Context, _ int) error {
+				return fmt.Errorf("redis secondary store is no longer supported: flag --%s is deprecated", DBFlagName)
+			},
 		},
 		&cli.DurationFlag{
 			Name:     EvictionFlagName,
@@ -50,15 +63,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    24 * time.Hour,
 			EnvVars:  withEnvPrefix(envPrefix, "EVICTION"),
 			Category: category,
+			Hidden:   true,
+			Action: func(ctx *cli.Context, _ time.Duration) error {
+				return fmt.Errorf("redis secondary store is no longer supported: flag --%s is deprecated", EvictionFlagName)
+			},
 		},
-	}
-}
-
-func ReadConfig(ctx *cli.Context) Config {
-	return Config{
-		Endpoint: ctx.String(EndpointFlagName),
-		Password: ctx.String(PasswordFlagName),
-		DB:       ctx.Int(DBFlagName),
-		Eviction: ctx.Duration(EvictionFlagName),
 	}
 }
