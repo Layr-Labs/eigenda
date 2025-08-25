@@ -21,8 +21,8 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-compile-contracts:
-	$(MAKE) -C contracts compile
+contract-bindings:
+	$(MAKE) -C contracts bindings
 
 clean:
 	$(MAKE) -C api clean

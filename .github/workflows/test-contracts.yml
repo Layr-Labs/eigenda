@@ -84,4 +84,4 @@ jobs:
         working-directory: ./contracts
 
       - name: Bindings diff check
-        run: make compile-contracts && git diff --exit-code
+        run: make contract-bindings && git diff --exit-code
