@@ -69,7 +69,7 @@ func (odl *OnDemandLedgers) getOrCreateLedger(accountID gethcommon.Address) (*On
 
 	// TODO: Need to provide actual CumulativePaymentStore implementation
 	// For now, using nil as placeholder - this will need to be fixed
-	newLedger, err := NewOnDemandLedger(
+	newLedger, err := OnDemandLedgerFromStore(
 		totalDeposits,
 		pricePerSymbol,
 		minNumSymbols,
