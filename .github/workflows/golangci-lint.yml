@@ -4,6 +4,7 @@ on:
     branches:
       - master
   pull_request:
+  merge_group:
 
 env:
   MISE_VERSION: 2024.12.14
@@ -15,11 +16,24 @@ jobs:
     steps:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          fetch-depth: 0  # Fetch all history for all branches so golangci-lint can analyze the diff
 
-      - uses: jdx/mise-action@v2
+      # https://github.com/jdx/mise-action/releases/tag/v2.4.4
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-      - run: make lint
+      
+      - name: Run linter
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ -n "$PR_BASE" ]; then
+            make lint LINT_BASE_REV=origin/$PR_BASE
+          else
+            make lint
+          fi
+      
       - run: make fmt-check

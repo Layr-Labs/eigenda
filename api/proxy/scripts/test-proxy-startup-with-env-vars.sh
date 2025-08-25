@@ -38,12 +38,17 @@ PID=$!
 # Ensure we kill the process on script exit
 trap "kill $PID" EXIT
 
-# Wait 10 seconds for startup to happen (actual startup takes ~5 seconds with max blob length=1MiB)
-echo "sleeping 10 seconds to let the proxy start up"
-sleep 10
+# Actual startup takes ~5 seconds with max blob length=1MiB
+echo "Pinging the proxy's health endpoint until it is healthy, for up to 90 seconds"
+timeout_time=$(($(date +%s) + 90))
 
-echo "Pinging the proxy's health endpoint"
-curl 'http://localhost:3100/health'
+while (( $(date +%s) <= timeout_time )); do
+  if curl -X GET 'http://localhost:3100/health'; then
+    exit 0
+  else
+    echo "Proxy is not healthy yet, sleeping for 5 seconds and retrying..."
+    sleep 5
+  fi
+done
 
-# Script will automatically kill process due to trap
-# If eigenda-proxy has failed, trap will error out and script will exit with an error code
+exit 1

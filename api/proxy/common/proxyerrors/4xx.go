@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	_ "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
@@ -29,15 +28,6 @@ func Is400(err error) bool {
 		errors.As(err, &readRequestBodyErr) ||
 		errors.As(err, &s3KeccakKeyValueMismatchErr) ||
 		errors.Is(err, s3.ErrKeccakKeyNotFound)
-}
-
-// We return a 418 TEAPOT error for any cert validation error.
-// Rollup derivation pipeline should drop any certs that return this error.
-// See https://github.com/Layr-Labs/optimism/pull/45 for how this is
-// used in optimism's derivation pipeline.
-func Is418(err error) bool {
-	var invalidCertErr *verification.CertVerificationFailedError
-	return errors.As(err, &invalidCertErr)
 }
 
 // 429 TOO_MANY_REQUESTS is returned to the client to inform them that they are getting rate-limited

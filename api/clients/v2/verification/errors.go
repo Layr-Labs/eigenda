@@ -1,15 +1,8 @@
 package verification
 
-import "github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-
-// CertVerifierInputError represents a 4xx-like error (invalid input, misuse, unsupported, etc.)
-type CertVerifierInputError struct {
-	Msg string
-}
-
-func (e *CertVerifierInputError) Error() string {
-	return e.Msg
-}
+import (
+	"fmt"
+)
 
 // CertVerifierInternalError represents a 5xx-like error (unexpected, internal, infra, etc.)
 //
@@ -38,15 +31,15 @@ func (e *CertVerifierInternalError) Error() string {
 	return e.Msg
 }
 
-// CertVerificationFailedError is returned when cert verification fails:
+// CertVerifierInvalidCertError is returned when cert verification fails:
 // [coretypes.VerificationStatusCode] != (StatusSuccess or StatusNullError).
 // StatusNullError returns a [CertVerifierInternalError] instead as it is a contract bug
 // that should never happen.
-type CertVerificationFailedError struct {
-	StatusCode coretypes.VerificationStatusCode
+type CertVerifierInvalidCertError struct {
+	StatusCode CheckDACertStatusCode
 	Msg        string
 }
 
-func (e *CertVerificationFailedError) Error() string {
-	return e.Msg
+func (e *CertVerifierInvalidCertError) Error() string {
+	return fmt.Sprintf("invalid cert: call to CertVerifier failed with status code %d: %s", e.StatusCode, e.Msg)
 }

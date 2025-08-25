@@ -81,7 +81,7 @@ func buildMemKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -98,9 +98,7 @@ func buildMemKeyDiskTableSingleShard(
 	}
 
 	roots := make([]string, 0, len(paths))
-	for _, p := range paths {
-		roots = append(roots, path.Join(p, "table"))
-	}
+	roots = append(roots, paths...)
 
 	config, err := litt.DefaultConfig(paths...)
 	if err != nil {
@@ -136,7 +134,7 @@ func buildMemKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -152,11 +150,6 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
-	roots := make([]string, 0, len(paths))
-	for _, p := range paths {
-		roots = append(roots, path.Join(p, "table"))
-	}
-
 	config, err := litt.DefaultConfig(paths...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
@@ -176,7 +169,7 @@ func buildMemKeyDiskTableMultiShard(
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		roots,
+		paths,
 		true,
 		nil)
 
@@ -192,7 +185,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -206,11 +199,6 @@ func buildLevelDBKeyDiskTableSingleShard(
 	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
-	}
-
-	roots := make([]string, 0, len(paths))
-	for _, p := range paths {
-		roots = append(roots, path.Join(p, "table"))
 	}
 
 	config, err := litt.DefaultConfig(paths...)
@@ -231,7 +219,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		roots,
+		paths,
 		false,
 		nil)
 
@@ -247,12 +235,12 @@ func buildLevelDBKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
+	keymapPath := filepath.Join(paths[0], name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
@@ -261,11 +249,6 @@ func buildLevelDBKeyDiskTableMultiShard(
 	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
-	}
-
-	roots := make([]string, 0, len(paths))
-	for _, p := range paths {
-		roots = append(roots, path.Join(p, "table"))
 	}
 
 	config, err := litt.DefaultConfig(paths...)
@@ -287,7 +270,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		roots,
+		paths,
 		false,
 		nil)
 
@@ -419,7 +402,7 @@ func TestRestart(t *testing.T) {
 func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -466,28 +449,34 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	errorMonitor := table.(*DiskTable).errorMonitor
 
 	// Delete a file in the middle of the sequence of segments.
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
 
 	filePath := ""
-	switch typeToDelete {
-	case "key":
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
-	case "value":
+	if typeToDelete == "key" {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, middleIndex, segment.KeyFileExtension)
+	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
-		filePath = fmt.Sprintf(
-			"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
-	default:
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/%s/segments/%d-%d%s",
+			directory, tableName, middleIndex, shard, segment.ValuesFileExtension)
+	} else {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, middleIndex, segment.MetadataFileExtension)
 	}
+
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -496,7 +485,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	require.NoError(t, err)
 
 	// files in segments directory should not be changed as a result of the deletion
-	files, err := os.ReadDir(directory + "/table/segments")
+	files, err := os.ReadDir(fmt.Sprintf("%s/%s/segments", directory, tableName))
 	require.NoError(t, err)
 
 	// Restart the table. This should fail.
@@ -505,7 +494,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	require.Nil(t, table)
 
 	// Ensure that no files were added or removed from the segments directory.
-	filesAfterRestart, err := os.ReadDir(directory + "/table/segments")
+	filesAfterRestart, err := os.ReadDir(fmt.Sprintf("%s/%s/segments", directory, tableName))
 	require.NoError(t, err)
 	require.Equal(t, len(files), len(filesAfterRestart))
 	filesSet := make(map[string]struct{})
@@ -537,7 +526,7 @@ func TestMiddleFileMissing(t *testing.T) {
 func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -581,11 +570,15 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	err = table.Close()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -599,19 +592,18 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 
 	// Delete a file in the initial segment.
 	filePath := ""
-	switch typeToDelete {
-	case "key":
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.KeyFileExtension)
-	case "value":
+	if typeToDelete == "key" {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, lowestSegmentIndex, segment.KeyFileExtension)
+	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
 		filePath = fmt.Sprintf(
-			"%s/table/segments/%d-%d%s",
-			directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
-	default:
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.MetadataFileExtension)
+			"%s/%s/segments/%d-%d%s",
+			directory, tableName, lowestSegmentIndex, shard, segment.ValuesFileExtension)
+	} else {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
@@ -728,7 +720,7 @@ func TestInitialFileMissing(t *testing.T) {
 func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -772,11 +764,15 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	err = table.Close()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -790,16 +786,17 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 
 	// Delete a file in the final segment.
 	filePath := ""
-	switch typeToDelete {
-	case "key":
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeyFileExtension)
-	case "value":
+	if typeToDelete == "key" {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, highestSegmentIndex, segment.KeyFileExtension)
+	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
-		filePath = fmt.Sprintf(
-			"%s/table/segments/%d-%d%s", directory, highestSegmentIndex, shard, segment.ValuesFileExtension)
-	default:
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/%s/segments/%d-%d%s",
+			directory, tableName, highestSegmentIndex, shard, segment.ValuesFileExtension)
+	} else {
+		filePath = fmt.Sprintf("%s/%s/segments/%d%s",
+			directory, tableName, highestSegmentIndex, segment.MetadataFileExtension)
 	}
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
@@ -923,7 +920,7 @@ func TestLastFileMissing(t *testing.T) {
 func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -966,15 +963,19 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data to be truncated.
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
-	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeyFileExtension)
+	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -995,8 +996,10 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -1004,8 +1007,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
 
-	keyFileName = fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeyFileExtension)
+	keyFileName = fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err = os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1031,8 +1034,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -1149,7 +1152,7 @@ func TestTruncatedKeyFile(t *testing.T) {
 func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -1190,15 +1193,19 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	err = table.Flush()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
-	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeyFileExtension)
+	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1219,8 +1226,10 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -1240,8 +1249,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		break
 	}
 
-	valueFileName := fmt.Sprintf("%s/table/segments/%d-%d%s",
-		directory, highestSegmentIndex, shard, segment.ValuesFileExtension)
+	valueFileName := fmt.Sprintf("%s/%s/segments/%d-%d%s",
+		directory, tableName, highestSegmentIndex, shard, segment.ValuesFileExtension)
 	valueFileBytes, err := os.ReadFile(valueFileName)
 	require.NoError(t, err)
 
@@ -1273,8 +1282,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -1392,7 +1401,7 @@ func TestTruncatedValueFile(t *testing.T) {
 func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -1435,15 +1444,19 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data left unflushed.
+	segmentPath, err := segment.NewSegmentPath(directory, "", tableName)
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
-	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeyFileExtension)
+	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 	if len(keyFileBytes) == 0 {
@@ -1463,8 +1476,10 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
+		false,
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -1479,8 +1494,8 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/%s/segments/%d%s",
+		directory, tableName, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -1677,7 +1692,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Simulate an orphaned metadata file.
-	orphanedMetadataFileName := fmt.Sprintf("%s/table/%s", directory, tableMetadataSwapFileName)
+	orphanedMetadataFileName := fmt.Sprintf("%s/%s/table.metadata.swap", directory, tableName)
 	orphanedFileBytes := rand.PrintableVariableBytes(1, 1024)
 	err = os.WriteFile(orphanedMetadataFileName, orphanedFileBytes, 0644)
 	require.NoError(t, err)
@@ -1692,6 +1707,11 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	actualShardingFactor := (table.(*DiskTable)).metadata.GetShardingFactor()
 	require.Equal(t, shardingFactor, actualShardingFactor)
+
+	// The swap file we created should not be present anymore.
+	exists, err := util.Exists(orphanedMetadataFileName)
+	require.NoError(t, err)
+	require.False(t, exists)
 
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1742,18 +1762,18 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 			// Shuffle around the segment files. This should not cause problems.
 			files := make([]string, 0)
 			for _, dir := range directories {
-				segmentDir := path.Join(dir, "table", "segments")
+				segmentDir := path.Join(dir, tableName, "segments")
 
 				entries, err := os.ReadDir(segmentDir)
 				require.NoError(t, err)
 				for _, entry := range entries {
-					files = append(files, path.Join(dir, "table", "segments", entry.Name()))
+					files = append(files, path.Join(dir, tableName, "segments", entry.Name()))
 				}
 			}
 			for _, file := range files {
 				destination := path.Join(
 					directories[rand.Uint32Range(0, uint32(len(directories)))],
-					"table",
+					tableName,
 					"segments",
 					path.Base(file))
 				err = os.Rename(file, destination)
@@ -1761,10 +1781,10 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 			}
 
 			// Shuffle the table metadata location. This should not cause problems.
-			metadataDir := path.Join(directories[0], "table")
-			mPath := path.Join(metadataDir, tableMetadataFileName)
-			newMetadataDir := path.Join(directories[rand.Uint32Range(1, uint32(len(directories)))], "table")
-			newMPath := path.Join(newMetadataDir, tableMetadataFileName)
+			metadataDir := path.Join(directories[0], tableName)
+			mPath := path.Join(metadataDir, TableMetadataFileName)
+			newMetadataDir := path.Join(directories[rand.Uint32Range(1, uint32(len(directories)))], tableName)
+			newMPath := path.Join(newMetadataDir, TableMetadataFileName)
 			err = os.MkdirAll(newMetadataDir, 0755)
 			require.NoError(t, err)
 			err = os.Rename(mPath, newMPath)

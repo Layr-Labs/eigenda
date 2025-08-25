@@ -11,8 +11,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 type MetricExpression = string
@@ -33,8 +31,7 @@ type ISecondary interface {
 	// verify fn signature has to match that of common/store.go's GeneratedKeyStore.Verify fn.
 	MultiSourceRead(
 		ctx context.Context, commitment []byte, fallback bool,
-		verify func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
-		verifyOpts common.CertVerificationOpts,
+		verifyPayload func(context.Context, []byte, []byte) error,
 	) ([]byte, error)
 	WriteSubscriptionLoop(ctx context.Context)
 	WriteOnCacheMissEnabled() bool
@@ -173,9 +170,7 @@ func (sm *SecondaryManager) MultiSourceRead(
 	ctx context.Context,
 	commitment []byte,
 	fallback bool,
-	// verifyOpts are passed to the verification function
-	verify func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
-	verifyOpts common.CertVerificationOpts,
+	verifyPayload func(context.Context, []byte, []byte) error,
 ) ([]byte, error) {
 	var sources []common.SecondaryStore
 	if fallback {
@@ -202,10 +197,10 @@ func (sm *SecondaryManager) MultiSourceRead(
 
 		// verify cert:data using provided verification function
 		sm.verifyLock.Lock()
-		err = verify(ctx, commitment, data, verifyOpts)
+		err = verifyPayload(ctx, commitment, data)
 		if err != nil {
 			cb(Failed)
-			log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())
+			sm.log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())
 			sm.verifyLock.Unlock()
 			continue
 		}

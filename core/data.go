@@ -629,6 +629,10 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment
+//
+// TODO(litt3): this struct is in the process of being deprecated. It is used by the old accounting logic, but will
+// be replaced by the `reservation.Reservation` struct once the new accounting logic has superseded the old. At that
+// time, this struct should be deleted.
 type ReservedPayment struct {
 	// reserve number of symbols per second
 	SymbolsPerSecond uint64
@@ -660,6 +664,25 @@ type BlobVersionParameters struct {
 	// NumChunks is the number of individual encoded chunks of data that will be generated for each blob.
 	// NumChunks must be a power of 2.
 	NumChunks uint32
+}
+
+// Get the length of a chunk in bytes for a blob with these parameters and a given blob length in symbols.
+func (bvp *BlobVersionParameters) GetChunkLength(blobLengthSymbols uint32) (uint32, error) {
+	if blobLengthSymbols == 0 {
+		return 0, fmt.Errorf("blob length must be greater than 0")
+	}
+
+	// Check that the blob length is a power of 2 using bit manipulation
+	if blobLengthSymbols&(blobLengthSymbols-1) != 0 {
+		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLengthSymbols)
+	}
+
+	chunkLength := blobLengthSymbols * bvp.CodingRate / bvp.NumChunks
+	if chunkLength == 0 {
+		chunkLength = 1
+	}
+
+	return chunkLength, nil
 }
 
 // GetReconstructionThreshold returns the minimum difference between the ConfirmationThreshold

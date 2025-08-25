@@ -134,13 +134,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	// If the disperser is blacklisted and the blob authenticator is not nil, return an error
-	// we don't want to blacklist the disperser if the blob authenticator is nil since that indicated v1
-	if s.node.BlacklistStore.IsBlacklisted(ctx, in.GetDisperserID()) && s.config.EnableV2 {
-		s.logger.Info("disperser is blacklisted", "disperserID", in.GetDisperserID(), "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
-		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
-	}
-
 	if s.chunkAuthenticator != nil {
 		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
@@ -159,13 +152,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		for _, blobCert := range batch.BlobCertificates {
 			_, err = s.validateDispersalRequest(blobCert)
 			if err != nil {
-				// Blacklist the disperser if there's an invalid dispersal request
-				blacklistErr := s.node.BlacklistStore.BlacklistDisperserFromBlobCert(in, blobCert)
-				if blacklistErr != nil {
-					s.logger.Error("failed to blacklist disperser", "disperserID", in.GetDisperserID(), "error", blacklistErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
-					return nil, api.NewErrorInvalidArg("failed to blacklist disperser due to blobCert validation failure")
-				}
-				s.logger.Info("disperser blacklisted due to blobCert validation failure", "disperserID", in.GetDisperserID())
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 			}
 		}
@@ -196,9 +182,33 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
+	downloadSizeInBytes, relayRequests, err :=
+		s.node.DetermineChunkLocations(batch, operatorState, probe)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to determine chunk locations: %v", err))
+	}
+
+	// storeChunksSemaphore can be nil during unit tests, since there are a bunch of places where the Node struct
+	// is instantiated directly without using the constructor.
+	if s.node.StoreChunksSemaphore != nil {
+		// So far, we've only downloaded metadata for the blob. Before downloading the actual chunks, make sure there
+		// is capacity in the store chunks buffer. This is an OOM safety measure.
+
+		probe.SetStage("acquire_buffer_capacity")
+		semaphoreCtx, cancel := context.WithTimeout(ctx, s.node.Config.StoreChunksBufferTimeout)
+		defer cancel()
+		err = s.node.StoreChunksSemaphore.Acquire(semaphoreCtx, int64(downloadSizeInBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire buffer capacity: %w", err)
+		}
+		defer s.node.StoreChunksSemaphore.Release(int64(downloadSizeInBytes))
+	}
+
+	blobShards, rawBundles, err := s.node.DownloadChunksFromRelays(ctx, batch, relayRequests, probe)
+	if err != nil {
+		//nolint:wrapcheck
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download chunks: %v", err))
 	}
 
 	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)

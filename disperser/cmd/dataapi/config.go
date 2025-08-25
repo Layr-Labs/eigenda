@@ -28,12 +28,13 @@ type Config struct {
 	PrometheusApiAddr            string
 	SubgraphApiBatchMetadataAddr string
 	SubgraphApiOperatorStateAddr string
+	SubgraphApiPaymentsAddr      string
 	ServerMode                   string
 	AllowOrigins                 []string
 
-	EigenDADirectory              string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	EigenDADirectory           string
+	OperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr  string
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -57,17 +58,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoTableNameFlag.Name),
 		},
-		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
-		EthClientConfig:               ethClientConfig,
-		LoggerConfig:                  *loggerConfig,
-		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
-		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
-		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
-		ServerVersion:                 version,
+		AwsClientConfig:              aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		EthClientConfig:              ethClientConfig,
+		LoggerConfig:                 *loggerConfig,
+		SocketAddr:                   ctx.GlobalString(flags.SocketAddrFlag.Name),
+		SubgraphApiBatchMetadataAddr: ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
+		SubgraphApiOperatorStateAddr: ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
+		SubgraphApiPaymentsAddr:      ctx.GlobalString(flags.SubgraphApiPaymentsAddrFlag.Name),
+		OperatorStateRetrieverAddr:   ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:    ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		EigenDADirectory:             ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		ServerMode:                   ctx.GlobalString(flags.ServerModeFlag.Name),
+		ServerVersion:                version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),

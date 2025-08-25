@@ -25,6 +25,7 @@ on:
       - "relay/**"
       - ".github/codeql/**"
       - ".github/workflows/codeql-scanning.yaml"
+  merge_group:
   schedule:
     - cron: "0 9 * * *"
 

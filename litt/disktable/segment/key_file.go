@@ -32,8 +32,8 @@ type keyFile struct {
 	// The segment index.
 	index uint32
 
-	// The parent directory containing this file.
-	parentDirectory string
+	// Path data for the segment file.
+	segmentPath *SegmentPath
 
 	// The writer for the file. If the file is sealed, this value is nil.
 	writer *bufio.Writer
@@ -53,23 +53,23 @@ type keyFile struct {
 func createKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string,
+	segmentPath *SegmentPath,
 	swap bool,
 ) (*keyFile, error) {
 
 	keys := &keyFile{
-		logger:          logger,
-		index:           index,
-		parentDirectory: parentDirectory,
-		segmentVersion:  ValueSizeSegmentVersion,
-		swap:            swap,
+		logger:         logger,
+		index:          index,
+		segmentPath:    segmentPath,
+		segmentVersion: ValueSizeSegmentVersion,
+		swap:           swap,
 	}
 
 	filePath := keys.path()
 
 	exists, _, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("can not write to file: %v", err)
+		return nil, fmt.Errorf("can not write to file: %w", err)
 	}
 
 	if exists {
@@ -79,7 +79,7 @@ func createKeyFile(
 	flags := os.O_RDWR | os.O_CREATE
 	file, err := os.OpenFile(filePath, flags, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open key file: %v", err)
+		return nil, fmt.Errorf("failed to open key file: %w", err)
 	}
 
 	writer := bufio.NewWriter(file)
@@ -93,32 +93,31 @@ func createKeyFile(
 func loadKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectories []string,
+	segmentPaths []*SegmentPath,
 	segmentVersion SegmentVersion,
 ) (*keyFile, error) {
 
 	keyFileName := fmt.Sprintf("%d%s", index, KeyFileExtension)
-	keysPath, err := lookForFile(parentDirectories, keyFileName)
+	keysPath, err := lookForFile(segmentPaths, keyFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find key file: %w", err)
 	}
-	if keysPath == "" {
+	if keysPath == nil {
 		return nil, fmt.Errorf("failed to find key file %s", keyFileName)
 	}
-	parentDirectory := path.Dir(keysPath)
 
 	keys := &keyFile{
-		logger:          logger,
-		index:           index,
-		parentDirectory: parentDirectory,
-		segmentVersion:  segmentVersion,
+		logger:         logger,
+		index:          index,
+		segmentPath:    keysPath,
+		segmentVersion: segmentVersion,
 	}
 
 	filePath := keys.path()
 
 	exists, size, err := util.ErrIfNotWritableFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("can not write to file: %v", err)
+		return nil, fmt.Errorf("can not write to file: %w", err)
 	}
 
 	if exists {
@@ -149,7 +148,7 @@ func (k *keyFile) name() string {
 
 // path returns the full path to the key file.
 func (k *keyFile) path() string {
-	return path.Join(k.parentDirectory, k.name())
+	return path.Join(k.segmentPath.SegmentDirectory(), k.name())
 }
 
 // atomicSwap atomically replaces the key file, replacing the old one.
@@ -179,25 +178,25 @@ func (k *keyFile) write(scopedKey *types.ScopedKey) error {
 	// Write the length of the key.
 	err := binary.Write(k.writer, binary.BigEndian, uint32(len(scopedKey.Key)))
 	if err != nil {
-		return fmt.Errorf("failed to write key length to key file: %v", err)
+		return fmt.Errorf("failed to write key length to key file: %w", err)
 	}
 
 	// Write the key itself.
 	_, err = k.writer.Write(scopedKey.Key)
 	if err != nil {
-		return fmt.Errorf("failed to write key to key file: %v", err)
+		return fmt.Errorf("failed to write key to key file: %w", err)
 	}
 
 	// Write the address.
 	err = binary.Write(k.writer, binary.BigEndian, scopedKey.Address)
 	if err != nil {
-		return fmt.Errorf("failed to write address to key file: %v", err)
+		return fmt.Errorf("failed to write address to key file: %w", err)
 	}
 
 	// Write the size of the value.
 	err = binary.Write(k.writer, binary.BigEndian, scopedKey.ValueSize)
 	if err != nil {
-		return fmt.Errorf("failed to write value size to key file: %v", err)
+		return fmt.Errorf("failed to write value size to key file: %w", err)
 	}
 
 	k.size += uint64(
@@ -216,7 +215,7 @@ func getKeyFileIndex(fileName string) (uint32, error) {
 	indexString := baseName[:len(baseName)-len(KeyFileExtension)]
 	index, err := strconv.Atoi(indexString)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
+		return 0, fmt.Errorf("failed to parse index from file name %s: %w", fileName, err)
 	}
 
 	return uint32(index), nil
@@ -239,7 +238,7 @@ func (k *keyFile) seal() error {
 
 	err := k.flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush key file: %v", err)
+		return fmt.Errorf("failed to flush key file: %w", err)
 	}
 	k.writer = nil
 
@@ -251,13 +250,13 @@ func (k *keyFile) seal() error {
 // those keys may not be returned. If a key is returned, it is guaranteed to be "whole" (i.e. a partial key will
 // never be returned).
 func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
-	if k.writer != nil {
+	if !k.isSealed() {
 		return nil, fmt.Errorf("key file is not sealed")
 	}
 
 	file, err := os.Open(k.path())
 	if err != nil {
-		return nil, fmt.Errorf("failed to open key file: %v", err)
+		return nil, fmt.Errorf("failed to open key file: %w", err)
 	}
 	defer func() {
 		err = file.Close()
@@ -269,7 +268,7 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	// Key files are small as long as key length is sane. Safe to read the whole file into memory.
 	keyBytes, err := os.ReadFile(k.path())
 	if err != nil {
-		return nil, fmt.Errorf("failed to read key file: %v", err)
+		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 	keys := make([]*types.ScopedKey, 0)
 
@@ -325,7 +324,37 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	return keys, nil
 }
 
-// delete deletes the key file.
+// snapshot creates a hard link to the file in the snapshot directory, and a soft link to the hard linked file in the
+// soft link directory. Requires that the file is sealed and that snapshotting is enabled.
+func (k *keyFile) snapshot() error {
+	if !k.isSealed() {
+		return fmt.Errorf("file %s is not sealed, cannot take Snapshot", k.path())
+	}
+
+	err := k.segmentPath.Snapshot(k.name())
+	if err != nil {
+		return fmt.Errorf("failed to create Snapshot: %w", err)
+	}
+
+	return nil
+}
+
+// delete deletes the key file. If this key_file is a snapshot file (i.e. it is backed by a symlink), this method will
+// also delete the file pointed to by the symlink.
 func (k *keyFile) delete() error {
-	return os.Remove(k.path())
+	if !k.isSealed() {
+		return fmt.Errorf("key file %s is not sealed, cannot delete", k.path())
+	}
+
+	err := util.DeepDelete(k.path())
+	if err != nil {
+		return fmt.Errorf("failed to delete key file %s: %w", k.path(), err)
+	}
+
+	return nil
+}
+
+// isSealed returns true if the key file is sealed, and false otherwise.
+func (k *keyFile) isSealed() bool {
+	return k.writer == nil
 }

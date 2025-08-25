@@ -8,8 +8,8 @@ A basic REST proxy server to interact with the EigenDA network:
 - GET routes: submit a DA Certificate to retrieve its respective blob from the EigenDA network, 
   which will be decoded, validated, and returned as a response.
 
-[![per-pr-ci](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml)
-[![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
+[![per-pr-ci](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/test-proxy.yml)
+[![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
 [V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
@@ -192,7 +192,7 @@ This approach allows you to switch from V1 to V2 while the proxy is running, wit
 
 1. **Configure Both V1 and V2 Backends**
    - Use a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V1` in your configuration
       - This ensures that the proxy will continue dispersing to the V1 backend, until it's time to migrate
    - Set `EIGENDA_PROXY_API_ENABLED=admin` to expose the admin API
@@ -215,11 +215,11 @@ If you prefer a more controlled migration with explicit service updates, follow 
 
 1. **Initial Configuration (V1 Only)**
    - Start proxy with a V1-only configuration
-      - See `.env.exampleV1.holesky` for an example configuration
+      - See `.env.example` for an example configuration
 
 2. **Prepare V2 Configuration**
    - Prepare a configuration file that includes settings for both V1 and V2 backends
-      - See `.env.exampleV1AndV2.holesky` for an example configuration
+      - See `.env.example` for an example configuration
    - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2`, so that the proxy started with this config will immediately
 enable V2 dispersal
 
@@ -229,10 +229,10 @@ enable V2 dispersal
 
 ### Deployment Against Real EigenDA Network
 
-We also provide network-specific example env configuration files in `.env.example.holesky` and `.env.example.mainnet` as a place to get started:
+We also provide an example env configuration file in `.env.example` as a place to get started:
 
-1. Copy example env file: `cp .env.example.holesky .env`
-2. Update env file, setting `EIGENDA_PROXY_SIGNER_PRIVATE_KEY_HEX`. On mainnet you will also need to set `EIGENDA_PROXY_ETH_RPC`.
+1. Copy example env file: `cp .env.example .env`
+2. Populate your `.env` file with required values.
 3. Pass into binary: `ENV_PATH=.env ./bin/eigenda-proxy --addr 127.0.0.1 --port 3100`
 
 ```bash
@@ -312,7 +312,7 @@ A normal (non-archival) Ethereum node is sufficient for running the proxy with c
 
 #### SRS Points
 
-In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/verify/cli.go#L55) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/Dockerfile#L30). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
+In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/api/proxy/store/generated_key/eigenda/verify/cli.go#L67) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda/blob/86e27fa0342f4638a356ba9738cf998374889ee3/Dockerfile#L184). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
 
 #### Hardware Recommendation
 
@@ -339,7 +339,7 @@ The proxy fundamentally acts as a bridge between the rollup nodes and the EigenD
 
 ![Posting Blobs](./resources/payload-blob-poly-lifecycle.png)
 
-The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DACertificate is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
+The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DA Cert is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
 
 ### Retrieving Payloads
 
@@ -347,11 +347,12 @@ Validator nodes proceed with the exact reverse process as that used by the seque
 
 ### Rollup Commitment Schemas
 
-> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DACertificate`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DACertificate` itself contains the KZG commitment to the blob.
+> Warning: the name `commitment` here refers to the piece of data sent to the rollup's batcher inbox (see op spec's [description](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission)), not to blobs' KZG commitment. The Rollup commitment consists of a few-byte header (described below) followed by a `DA Cert`, which contains all the information necessary to retrieve and validate an EigenDA blob. The `DA Cert` itself contains the KZG commitment to the blob.
 
-Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DACertificate` is being used/requested. The following versions are currently supported:
-* `0x00`: EigenDA V1 certificate type (i.e, dispersal blob info struct with verification against service manager)
-* `0x01`: EigenDA V2 certificate type
+Currently, there are two commitment modes supported with unique encoding schemas for each. The `version byte` is shared for all modes and denotes which version of the EigenDA `DA Cert` is being used/requested. The following versions are currently supported:
+- `0x00` — **EigenDA V1 protocol certificate**: Dispersal blob info struct with verification against the Service Manager.  
+- `0x01` — **EigenDA V2 legacy certificate**: The initial V2 protocol certificate format (pre–V3 support).  
+- `0x02` — **EigenDA V2 with V3 cert support**: Updated V2 protocol certificate format that includes support for V3 certificate type.  
 
 #### Optimism Commitment Mode
 For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](https://specs.optimism.io/experimental/alt-da.html#example-commitments) are supported by our proxy:
@@ -361,9 +362,12 @@ For `alt-da` Optimism rollups using EigenDA, the following [commitment schemas](
 | 0x00                   |               |              | keccak_commitment |
 | 0x01                   | 0x00          | 0x00         | eigenda_cert_v1   |
 | 0x01                   | 0x00          | 0x01         | eigenda_cert_v2   |
+| 0x01                   | 0x00          | 0x02         | eigenda_cert_v3   |
 
-`keccak256` (commitment_type 0x00) uses an S3 storage backend with where a simple keccak commitment of the `blob` is used as the key. For `generic` commitments, we only support `da_layer_byte` 0x00 which represents EigenDA.
+`keccak256` (commitment_type 0x00) uses an S3 storage backend where a simple keccak hash commitment of the `DA Cert` is used as the lookup key.
 
+For `generic` commitments, only `da_layer_byte` 0x00` is supported, which represents EigenDA. This byte is not currently processed by OP Stack chains and serves solely as an evolvability placeholder.
+.
 #### Standard Commitment Mode
 For standard clients (i.e, `clients/standard_client/client.go`) communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
 
@@ -371,8 +375,9 @@ For standard clients (i.e, `clients/standard_client/client.go`) communicating wi
 | ------------ | --------------- |
 | 0x00         | eigenda_cert_v1 |
 | 0x01         | eigenda_cert_v2 |
+| 0x02         | eigenda_cert_v3 |
 
-`eigenda_cert_v0` is an RLP-encoded [EigenDA V1 certificate](https://github.com/Layr-Labs/eigenda/blob/eb422ff58ac6dcd4e7b30373033507414d33dba1/api/proto/disperser/disperser.proto#L168). `eigenda_cert_v1` works similarly.
+As of now all certificates are returned in RLP encoded bytes for standard proxy `/get` endpoint.
 
 ## Contributor Guide
 
@@ -398,10 +403,9 @@ never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.
 
 ## Repo Structure and Releases
 
-This repo is a fairly standard Go [workspace](https://go.dev/ref/mod#workspaces), which consists of 2 separate modules:
-1. [eigenda-proxy](./go.mod) - the main module, which contains the proxy server and all the business logic
-2. [clients](./clients/go.mod) - a module containing client implementations for interacting with the proxy server
+The eigenda proxy was originally in its [own repo](https://github.com/Layr-Labs/eigenda-proxy), but was migrated into the eigenda monorepo in [PR 1611](https://github.com/Layr-Labs/eigenda/pull/1611).
 
-Both modules follow their own independent [release](https://go.dev/doc/modules/release-workflow) cadence, with independent semantic versioning:
-1. `eigenda-proxy` releases are made from `vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/v1.6.5).
-2. `clients` releases are made from `clients/vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0)
+[Releases](https://github.com/Layr-Labs/eigenda-proxy/releases) up until 1.8.2 are available in the eigenda-proxy repo.
+The following release [2.1.0](https://github.com/Layr-Labs/eigenda/releases/tag/v2.1.0) was made from the monorepo, with proxy joining the same release cadence as the rest of the services. Future releases will also follow this pattern.
+
+Only the proxy [clients](./clients/go.mod) are still packaged as a separate module that is also released independently. It is kept separate from the monorepo because the monorepo go.mod requires go1.24, which would have broken some proxy clients. The client releases are made from `api/proxy/clients/vX.Y.Z` tags. Note that previous releases in the eigenda-proxy repo were made under [clients/vX.Y.Z](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0) tags.

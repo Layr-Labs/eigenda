@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/stretchr/testify/require"
@@ -68,20 +67,12 @@ func validCfg() Config {
 			},
 			EigenDACertVerifierOrRouterAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:                   maxBlobLengthBytes,
-			BLSOperatorStateRetrieverAddr:      "0x000000000004324311",
-			EigenDAServiceManagerAddr:          "0x000000000005324322",
 			EigenDADirectory:                   "0x000000000006324333",
 			RetrieversToEnable: []common.RetrieverType{
 				common.RelayRetrieverType,
 				common.ValidatorRetrieverType,
 			},
 			PutTries: 3,
-		},
-		RedisConfig: redis.Config{
-			Endpoint: "localhost:6379",
-			Password: "password",
-			DB:       0,
-			Eviction: 10 * time.Minute,
 		},
 		S3Config: s3.Config{
 			Bucket:          "test-bucket",
@@ -176,13 +167,6 @@ func TestConfigVerification(t *testing.T) {
 		})
 
 	t.Run("SecondaryConfigs", func(t *testing.T) {
-		t.Run("BadRedisConfiguration", func(t *testing.T) {
-			cfg := validCfg()
-			cfg.RedisConfig.Endpoint = ""
-
-			err := cfg.Check()
-			require.Error(t, err)
-		})
 
 		t.Run("MissingS3AccessKeys", func(t *testing.T) {
 			cfg := validCfg()
