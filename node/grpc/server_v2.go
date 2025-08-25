@@ -174,10 +174,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		quorumList = append(quorumList, quorum)
 	}
 
-	operatorState, err := s.node.ChainState.GetOperatorState(
-		ctx,
-		uint(batch.BatchHeader.ReferenceBlockNumber),
-		quorumList)
+	operatorState, err := s.node.OperatorStateCache.GetOperatorState(
+		ctx, batch.BatchHeader.ReferenceBlockNumber, quorumList)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}

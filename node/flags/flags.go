@@ -158,22 +158,9 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Address Directory",
-		Required: false,
+		Usage:    "Address of the EigenDA Contract Directory",
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
-	}
-	OperatorStateRetrieverFlag = cli.StringFlag{
-		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
-			"Note that the contract no longer uses the BLS prefix.",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
@@ -541,6 +528,13 @@ var (
 		Value:    0.1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
 	}
+	OperatorStateCacheSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "operator-state-cache-size"),
+		Usage:    "The size of the operator state cache.",
+		Required: false,
+		Value:    64,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -677,12 +671,11 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	OperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	LittRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
+	OperatorStateCacheSizeFlag,
 }
 
 func init() {

@@ -59,8 +59,6 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	EigenDADirectory                string
-	OperatorStateRetrieverAddr      string
-	EigenDAServiceManagerAddr       string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string
@@ -176,6 +174,9 @@ type Config struct {
 	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
 	// StoreChunksBufferSizeFraction value if greater than 0.
 	StoreChunksBufferSizeBytes uint64
+
+	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
+	operatorStateCacheSize uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -381,8 +382,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		OperatorStateRetrieverAddr:          ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
@@ -426,5 +425,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
 		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
 		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
+		operatorStateCacheSize:        ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
 	}, nil
 }
