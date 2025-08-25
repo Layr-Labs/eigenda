@@ -31,7 +31,7 @@ var (
 )
 
 // Sentinel [MaliciousOperatorsError] errors.
-// Extend these with
+// Extend these with [MaliciousOperatorsError.WithBlobKey] to add context.
 var (
 	// [encoding.BlobCommitments.Length] needs to be a power of 2, and that is checked by the eigenda validators:
 	// https://github.com/Layr-Labs/eigenda/blob/cc392dbabef362f2e03a4b35616a407d45fad510/core/v2/assignment.go#L308
