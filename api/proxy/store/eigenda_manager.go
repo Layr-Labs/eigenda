@@ -121,7 +121,7 @@ func (m *EigenDAManager) getEigenDAV1(
 		return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates (EigenDA V1)")
 	}
 
-	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
 		// We also don't use the l1InclusionBlockNumber because Recency check is only supported by EigenDA V2.
 		// TODO: we should decouple the Verify function into a VerifyCert and VerifyBlob function,
@@ -141,7 +141,7 @@ func (m *EigenDAManager) getEigenDAV1(
 	if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
 		m.log.Debug("Retrieving payload from cached backends")
 		payload, err := m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, false, verifyFnForSecondary, opts.L1InclusionBlockNum)
+			versionedCert.SerializedCert, false, verifyFnForSecondary)
 		if err == nil {
 			return payload, nil
 		}
@@ -170,7 +170,7 @@ func (m *EigenDAManager) getEigenDAV1(
 	// Only use fallbacks if we're not requesting encoded payload
 	if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
 		payload, err = m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, true, verifyFnForSecondary, opts.L1InclusionBlockNum)
+			versionedCert.SerializedCert, true, verifyFnForSecondary)
 		if err == nil {
 			return payload, nil
 		}
@@ -196,7 +196,7 @@ func (m *EigenDAManager) getEigenDAV2(
 		return nil, fmt.Errorf("verify EigenDACert: %w", err)
 	}
 
-	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte, l1InclusionBlockNumber uint64) error {
+	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// This was previously using the VerifyCert function, which is pointless because it is now verified above,
 		// and the cert only needs to be verified once.
 		// TODO: implement a verify blob function, the same way it is implemented in [payloadretrieval.RelayPayloadRetriever]
@@ -214,7 +214,7 @@ func (m *EigenDAManager) getEigenDAV2(
 	if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
 		m.log.Debug("Retrieving payload from cached backends")
 		payload, err := m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, false, verifyFnForSecondary, opts.L1InclusionBlockNum)
+			versionedCert.SerializedCert, false, verifyFnForSecondary)
 		if err == nil {
 			return payload, nil
 		}
@@ -240,7 +240,7 @@ func (m *EigenDAManager) getEigenDAV2(
 	// Only use fallbacks if we're not requesting encoded payload
 	if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
 		payloadOrEncodedPayload, err = m.secondary.MultiSourceRead(ctx,
-			versionedCert.SerializedCert, true, verifyFnForSecondary, opts.L1InclusionBlockNum)
+			versionedCert.SerializedCert, true, verifyFnForSecondary)
 		if err == nil {
 			return payloadOrEncodedPayload, nil
 		}
