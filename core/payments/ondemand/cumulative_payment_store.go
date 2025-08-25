@@ -30,7 +30,9 @@ const (
 // writer now, which doesn't need any of the distributed DB properties provided by DynamoDB.
 // 2. Implement a write queue, so that the caller doesn't need to wait for the write to complete. The callers of the
 // CumulativePaymentStore just need *eventual* persistence of the cumulative payment, so using a queue would be
-// sufficient, and would free the caller from blocking on I/O.
+// sufficient, and would free the caller from blocking on I/O. Note that this optimization would make undercharging
+// a possibility, if a crash happens before a piece of usage data has been persisted. This is an acceptable
+// tradeoff for simplified architecture and improved performance.
 type CumulativePaymentStore struct {
 	// The DynamoDB client to use for storage operations
 	dynamoClient *dynamodb.Client
