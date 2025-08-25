@@ -156,7 +156,11 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from quorums %v", blobKey.Hex(), blobHeader.QuorumNumbers)
 }
 
-// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum,
+// and times out based on [ValidatorPayloadRetrieverConfig.RetrievalTimeout].
+//
+// blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
+// and MUST be a power of 2. If not, this function will panic.
 func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	header *corev2.BlobHeaderWithHashedPayment,
