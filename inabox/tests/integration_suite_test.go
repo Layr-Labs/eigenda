@@ -4,8 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -184,9 +182,8 @@ var _ = BeforeSuite(func() {
 		}
 
 		// Update Graph URLs if Graph Node is enabled
-		var graphURL string
 		if config.GraphNode.Enabled && infraResult.GraphNodeURL != "" {
-			graphURL = infraResult.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			graphURL := infraResult.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 			fmt.Printf("Setting Graph URL to %s\n", graphURL)
 			testConfig.GraphURL = graphURL
 
@@ -198,18 +195,6 @@ var _ = BeforeSuite(func() {
 			if infraResult.IPFSURL != "" {
 				fmt.Printf("Setting IPFS URL to %s\n", infraResult.IPFSURL)
 				testConfig.IPFSURL = infraResult.IPFSURL
-			}
-
-			// Test Graph Node connectivity before proceeding
-			fmt.Println("Testing Graph Node connectivity...")
-			err := testGraphNodeConnectivity(graphURL, 10, 2*time.Second)
-			if err != nil {
-				fmt.Printf("⚠️  Graph Node connectivity test failed: %v\n", err)
-				fmt.Printf("📋 Debug info:\n")
-				fmt.Printf("   - GraphURL: %s\n", graphURL)
-				fmt.Printf("   - AdminURL: %s\n", infraResult.GraphNodeAdminURL)
-				fmt.Printf("   - IPFS URL: %s\n", infraResult.IPFSURL)
-				// Don't fail the test, but provide clear diagnostic info
 			}
 		}
 
@@ -275,75 +260,6 @@ var _ = BeforeSuite(func() {
 
 	}
 })
-
-
-func testGraphNodeConnectivity(graphURL string, maxRetries int, retryInterval time.Duration) error {
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	// Test queries - try multiple approaches
-	testQueries := []struct {
-		name  string
-		query string
-		url   string
-	}{
-		{"GraphQL root", `{"query": "{__schema{queryType{name}}}"}`, "/graphql"},
-		{"Subgraph meta", `{"query": "{_meta{block{number}}}"}`, "/graphql"},
-		{"Health check", "", "/"},
-	}
-
-	for i := 0; i < maxRetries; i++ {
-		fmt.Printf("Testing Graph Node connectivity (attempt %d/%d)...\n", i+1, maxRetries)
-
-		for _, test := range testQueries {
-			testURL := graphURL + test.url
-			fmt.Printf("  Testing %s at %s\n", test.name, testURL)
-
-			var req *http.Request
-			var err error
-
-			if test.query != "" {
-				req, err = http.NewRequest("POST", testURL, strings.NewReader(test.query))
-				if err != nil {
-					fmt.Printf("    ❌ Failed to create request: %v\n", err)
-					continue
-				}
-				req.Header.Set("Content-Type", "application/json")
-			} else {
-				req, err = http.NewRequest("GET", testURL, nil)
-				if err != nil {
-					fmt.Printf("    ❌ Failed to create request: %v\n", err)
-					continue
-				}
-			}
-
-			resp, err := client.Do(req)
-			if err != nil {
-				fmt.Printf("    ❌ Connection failed: %v\n", err)
-				continue
-			}
-			defer resp.Body.Close()
-
-			body, _ := io.ReadAll(resp.Body)
-			bodyPreview := string(body)
-			if len(bodyPreview) > 100 {
-				bodyPreview = bodyPreview[:100] + "..."
-			}
-			fmt.Printf("    Status: %d, Body preview: %s\n", resp.StatusCode, bodyPreview)
-
-			if resp.StatusCode == 200 {
-				fmt.Printf("✅ Graph Node is accessible via %s\n", test.name)
-				return nil
-			}
-		}
-
-		if i < maxRetries-1 {
-			fmt.Printf("⏱️  Waiting %v before retry...\n", retryInterval)
-			time.Sleep(retryInterval)
-		}
-	}
-
-	return fmt.Errorf("graph node at %s is not accessible after %d attempts", graphURL, maxRetries)
-}
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {

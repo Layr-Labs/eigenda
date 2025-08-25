@@ -3,7 +3,9 @@ package testinfra
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -26,11 +28,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 // InfraManager orchestrates the lifecycle of test infrastructure containers
@@ -104,7 +106,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 		im.localstack = localstack
 		im.result.LocalStackURL = localstack.Endpoint()
-		
+
 		// Populate AWS configuration for tests
 		im.result.AWSConfig = &AWSTestConfig{
 			EndpointURL:     localstack.Endpoint(),
@@ -112,7 +114,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			AccessKeyID:     "localstack",
 			SecretAccessKey: "localstack",
 		}
-		
+
 		// Deploy AWS resources if configured
 		if im.config.LocalStack.DeployResources {
 			fmt.Println("Deploying LocalStack AWS resources...")
@@ -120,17 +122,17 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to deploy LocalStack resources: %w", err)
 			}
-			
+
 			// Add deployed resource names to the result
 			im.result.AWSConfig.BucketName = im.config.LocalStack.Resources.BucketName
 			im.result.AWSConfig.MetadataTableName = im.config.LocalStack.Resources.MetadataTableName
 			im.result.AWSConfig.BucketTableName = im.config.LocalStack.Resources.BucketTableName
 			im.result.AWSConfig.V2MetadataTableName = im.config.LocalStack.Resources.V2MetadataTableName
 			im.result.AWSConfig.V2PaymentPrefix = im.config.LocalStack.Resources.V2PaymentPrefix
-			
+
 			fmt.Println("Successfully deployed LocalStack AWS resources")
 		}
-		
+
 		// Set AWS environment variables for tests to use LocalStack
 		if err := im.result.AWSConfig.SetEnvironmentVariables(); err != nil {
 			return nil, fmt.Errorf("failed to set AWS environment variables: %w", err)
@@ -192,7 +194,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		if im.config.EigenDA.Deployer.RPC == "" {
 			im.config.EigenDA.Deployer.RPC = im.result.AnvilRPC
 		}
-		
+
 		err := im.deployEigenDAContracts(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
@@ -239,7 +241,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		cwd, _ := os.Getwd()
 		fmt.Printf("Current working directory: %s\n", cwd)
 		fmt.Printf("EigenDA RootPath from config: %s\n", im.config.EigenDA.RootPath)
-		
+
 		// Prepare subgraph deployment config
 		subgraphConfig := deployment.SubgraphDeploymentConfig{
 			RootPath: im.config.EigenDA.RootPath,
@@ -256,17 +258,32 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				BlsApkRegistry:      im.result.EigenDAContracts.BlsApkRegistry,
 			},
 		}
-		
+
 		fmt.Println("Deploying subgraphs to Graph Node...")
 		err = deployment.DeploySubgraphs(ctx, im.graphnode, subgraphConfig, 0) // Start at block 0 for simplicity
 		if err != nil {
 			return nil, fmt.Errorf("failed to deploy subgraphs: %w", err)
 		}
 		fmt.Println("✅ Subgraphs deployed successfully")
-		
+
 		// Wait a bit for the subgraph to sync
 		fmt.Println("Waiting for subgraph to sync...")
 		time.Sleep(5 * time.Second)
+
+		// Test subgraph connectivity
+		subgraphURL := im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+		fmt.Println("Testing deployed subgraph connectivity...")
+		graphConnConfig := DefaultGraphConnectivityConfig()
+		err = TestGraphNodeConnectivity(subgraphURL, graphConnConfig)
+		if err != nil {
+			fmt.Printf("📋 Graph Node Debug Info:\n")
+			fmt.Printf("   - GraphQL URL: %s\n", subgraphURL)
+			fmt.Printf("   - Admin URL: %s\n", im.result.GraphNodeAdminURL)
+			fmt.Printf("   - IPFS URL: %s\n", im.result.IPFSURL)
+
+			return nil, fmt.Errorf("subgraph connectivity test failed: %w", err)
+		}
+		fmt.Println("✅ Subgraph connectivity test passed")
 	}
 
 	// 6. Setup retrieval clients if enabled and EigenDA contracts are deployed
@@ -279,8 +296,8 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 	}
 
 	// 7. Setup payload disperser if enabled and required components are available
-	if im.config.EigenDA.PayloadDisperser.Enabled && 
-		im.result.CertVerification != nil && 
+	if im.config.EigenDA.PayloadDisperser.Enabled &&
+		im.result.CertVerification != nil &&
 		im.result.RetrievalClients != nil {
 		// Get deployer private key
 		deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
@@ -417,7 +434,7 @@ func (im *InfraManager) generateDisperserKeypair() (string, gethcommon.Address, 
 
 	// Get LocalStack endpoint
 	endpoint := im.localstack.Endpoint()
-	
+
 	// Create KMS client
 	keyManager := kms.New(kms.Options{
 		Region:       "us-east-1",
@@ -442,7 +459,7 @@ func (im *InfraManager) generateDisperserKeypair() (string, gethcommon.Address, 
 	}
 
 	address := crypto.PubkeyToAddress(*publicKey)
-	
+
 	return keyID, address, nil
 }
 
@@ -481,15 +498,15 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 	// Deploy contracts if requested
 	if im.config.EigenDA.DeployContracts {
 		// Create deployment config matching the inabox testconfig-anvil.yaml structure
-		numStrategies := 2 // Two strategies as per the stakes configuration
+		numStrategies := 2    // Two strategies as per the stakes configuration
 		maxOperatorCount := 3 // maxOperatorCount from services.counts
-		
+
 		// Stakes configuration from testconfig-anvil.yaml:
-		// - total: 100e18, distribution: [1, 4, 6, 10] 
+		// - total: 100e18, distribution: [1, 4, 6, 10]
 		// - total: 100e18, distribution: [1, 3, 8, 9]
 		stakeDistribution := [][]float32{
-			{1, 4, 6, 10},  // Strategy 0 distribution
-			{1, 3, 8, 9},   // Strategy 1 distribution  
+			{1, 4, 6, 10}, // Strategy 0 distribution
+			{1, 3, 8, 9},  // Strategy 1 distribution
 		}
 		stakeTotals := []float32{100e18, 100e18} // 100e18 tokens per strategy
 
@@ -511,7 +528,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
 		}
-		
+
 		// The deployment manager populates its own EigenDAContracts field
 		// Copy it to our result
 		im.result.EigenDAContracts = manager.EigenDAContracts
@@ -524,13 +541,13 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate disperser keypair: %w", err)
 		}
-		
+
 		// Store in config and result for output
 		im.config.EigenDA.DisperserKMSKeyID = keyID
 		im.config.EigenDA.DisperserAddress = address.Hex()
 		im.result.DisperserKMSKeyID = keyID
 		im.result.DisperserAddress = address
-		
+
 		// Register the disperser address if contracts are available
 		if im.result.EigenDAContracts != nil {
 			err = manager.RegisterDisperserAddress(ethClient, address)
@@ -582,7 +599,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 // setupRetrievalClients sets up all the retrieval clients
 func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 	config := im.config.EigenDA.RetrievalClients
-	
+
 	// Skip if not enabled
 	if !config.Enabled {
 		return nil
@@ -639,17 +656,17 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 		NumConfirmations: 3,
 		NumRetries:       0,
 	}
-	
+
 	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create eth client: %w", err)
 	}
-	
+
 	rpcClient, err := ethrpc.Dial(rpcURL)
 	if err != nil {
 		return fmt.Errorf("failed to create RPC client: %w", err)
 	}
-	
+
 	tx, err := eth.NewWriter(logger, ethClient, operatorStateRetriever, serviceManager)
 	if err != nil {
 		return fmt.Errorf("failed to create eth writer: %w", err)
@@ -658,12 +675,12 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 	cs := eth.NewChainState(tx, ethClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
-	
+
 	srsOrder, err := strconv.Atoi(config.SRSOrder)
 	if err != nil {
 		return fmt.Errorf("failed to parse SRS order: %w", err)
 	}
-	
+
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          config.G1Path,
 		G2Path:          config.G2Path,
@@ -685,7 +702,7 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create retrieval client: %w", err)
 	}
-	
+
 	chainReader, err := eth.NewReader(logger, ethClient, operatorStateRetriever, serviceManager)
 	if err != nil {
 		return fmt.Errorf("failed to create chain reader: %w", err)
@@ -756,7 +773,7 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 // setupPayloadDisperser sets up the payload disperser components
 func (im *InfraManager) setupPayloadDisperser(ctx context.Context, deployerPrivateKey string) error {
 	config := im.config.EigenDA.PayloadDisperser
-	
+
 	// Skip if not enabled
 	if !config.Enabled {
 		return nil
@@ -823,4 +840,72 @@ func (im *InfraManager) setupPayloadDisperser(ctx context.Context, deployerPriva
 
 	fmt.Println("✅ Payload disperser initialized successfully")
 	return nil
+}
+
+// GraphConnectivityConfig contains configuration for testing Graph Node connectivity
+type GraphConnectivityConfig struct {
+	MaxRetries    int
+	RetryInterval time.Duration
+	Timeout       time.Duration
+}
+
+// DefaultGraphConnectivityConfig returns sensible default settings for graph connectivity testing
+func DefaultGraphConnectivityConfig() GraphConnectivityConfig {
+	return GraphConnectivityConfig{
+		MaxRetries:    10,
+		RetryInterval: 2 * time.Second,
+		Timeout:       10 * time.Second,
+	}
+}
+
+// TestGraphNodeConnectivity tests the connectivity to a Graph Node instance
+// It queries the subgraph's _meta to verify it's accessible and synced
+func TestGraphNodeConnectivity(graphURL string, config GraphConnectivityConfig) error {
+	client := &http.Client{Timeout: config.Timeout}
+
+	// Test the subgraph's actual data availability
+	// This query checks if the subgraph is synced and has block data
+	query := `{"query": "{_meta{block{number}}}"}`
+
+	for i := 0; i < config.MaxRetries; i++ {
+		fmt.Printf("Testing subgraph connectivity (attempt %d/%d)...\n", i+1, config.MaxRetries)
+
+		req, err := http.NewRequest("POST", graphURL, strings.NewReader(query))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("  ❌ Connection failed: %v\n", err)
+			if i < config.MaxRetries-1 {
+				fmt.Printf("  ⏱️  Waiting %v before retry...\n", config.RetryInterval)
+				time.Sleep(config.RetryInterval)
+			}
+			continue
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode == 200 {
+			// Check if the response contains actual block data
+			bodyStr := string(body)
+			if strings.Contains(bodyStr, "block") && strings.Contains(bodyStr, "number") {
+				fmt.Printf("  ✅ Subgraph is accessible and synced\n")
+				return nil
+			}
+			fmt.Printf("  ⚠️  Subgraph responded but may not be fully synced: %s\n", bodyStr)
+		} else {
+			fmt.Printf("  ❌ HTTP %d: %s\n", resp.StatusCode, string(body))
+		}
+
+		if i < config.MaxRetries-1 {
+			fmt.Printf("  ⏱️  Waiting %v before retry...\n", config.RetryInterval)
+			time.Sleep(config.RetryInterval)
+		}
+	}
+
+	return fmt.Errorf("graph node at %s is not accessible after %d attempts", graphURL, config.MaxRetries)
 }
