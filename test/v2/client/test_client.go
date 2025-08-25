@@ -151,7 +151,15 @@ func NewTestClient(
 	}
 
 	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
-	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserConfig, signer, kzgProver, accountant, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(
+		logger,
+		disperserConfig,
+		signer,
+		kzgProver,
+		accountant,
+		nil,
+		metricsv2.NoopDispersalMetrics,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}

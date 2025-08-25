@@ -22,11 +22,12 @@ const (
 	MetricsFlagCategory     = "Metrics"
 	MemstoreFlagsCategory   = "Memstore (for testing purposes - replaces EigenDA backend)"
 	StorageFlagsCategory    = "Storage"
-	RedisCategory           = "Redis Cache/Fallback"
 	S3Category              = "S3 Cache/Fallback"
 	VerifierCategory        = "Cert Verifier (V1 only)"
 	KZGCategory             = "KZG"
 	ProxyServerCategory     = "Proxy Server"
+
+	DeprecatedRedisCategory = "Redis Cache/Fallback"
 )
 
 // EnvVar prefix added in front of all environment variables accepted by the binary.
@@ -43,7 +44,6 @@ func init() {
 	Flags = append(Flags, eigendaflags.CLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)
 	Flags = append(Flags, eigenda_v2_flags.CLIFlags(GlobalEnvVarPrefix, EigenDAV2ClientCategory)...)
 	Flags = append(Flags, store.CLIFlags(GlobalEnvVarPrefix, StorageFlagsCategory)...)
-	Flags = append(Flags, redis.CLIFlags(GlobalEnvVarPrefix, RedisCategory)...)
 	Flags = append(Flags, s3.CLIFlags(GlobalEnvVarPrefix, S3Category)...)
 	Flags = append(Flags, memstore.CLIFlags(GlobalEnvVarPrefix, MemstoreFlagsCategory)...)
 	Flags = append(Flags, verify.VerifierCLIFlags(GlobalEnvVarPrefix, VerifierCategory)...)
@@ -53,4 +53,5 @@ func init() {
 	Flags = append(Flags, eigenda_v2_flags.DeprecatedCLIFlags(GlobalEnvVarPrefix, EigenDAV2ClientCategory)...)
 	Flags = append(Flags, verify.DeprecatedCLIFlags(GlobalEnvVarPrefix, VerifierCategory)...)
 	Flags = append(Flags, store.DeprecatedCLIFlags(GlobalEnvVarPrefix, StorageFlagsCategory)...)
+	Flags = append(Flags, redis.DeprecatedCLIFlags(GlobalEnvVarPrefix, DeprecatedRedisCategory)...)
 }
