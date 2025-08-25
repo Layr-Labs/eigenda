@@ -33,7 +33,7 @@ func (odl *OnDemandLedgers) Debit(
 	symbolCount uint32,
 	quorumNumbers []uint8,
 ) error {
-	ledger, err := odl.getOrCreateLedger(accountID)
+	ledger, err := odl.getOrCreateLedger(ctx, accountID)
 	if err != nil {
 		return fmt.Errorf("get or create on-demand ledger: %w", err)
 	}
@@ -54,7 +54,10 @@ func (odl *OnDemandLedgers) Debit(
 }
 
 // getOrCreateLedger gets an existing on-demand ledger or creates a new one if it doesn't exist
-func (odl *OnDemandLedgers) getOrCreateLedger(accountID gethcommon.Address) (*OnDemandLedger, error) {
+func (odl *OnDemandLedgers) getOrCreateLedger(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*OnDemandLedger, error) {
 	odl.lock.Lock()
 	defer odl.lock.Unlock()
 
@@ -70,6 +73,7 @@ func (odl *OnDemandLedgers) getOrCreateLedger(accountID gethcommon.Address) (*On
 	// TODO: Need to provide actual CumulativePaymentStore implementation
 	// For now, using nil as placeholder - this will need to be fixed
 	newLedger, err := OnDemandLedgerFromStore(
+		ctx,
 		totalDeposits,
 		pricePerSymbol,
 		minNumSymbols,

@@ -64,13 +64,7 @@ func OnDemandLedgerFromStore(
 		return nil, fmt.Errorf("get cumulative payment from store: %w", err)
 	}
 
-	return &OnDemandLedger{
-		totalDeposits:          totalDeposits,
-		pricePerSymbol:         pricePerSymbol,
-		minNumSymbols:          minNumSymbols,
-		cumulativePaymentStore: cumulativePaymentStore,
-		cumulativePayment:      cumulativePayment,
-	}, nil
+	return newOnDemandLedger(totalDeposits, pricePerSymbol, minNumSymbols, cumulativePaymentStore, cumulativePayment)
 }
 
 // Creates a new OnDemandLedger, which *isn't* backed by a CumulativePayment store: the only representation of the
@@ -81,18 +75,11 @@ func OnDemandLedgerFromValue(
 	minNumSymbols uint64,
 	cumulativePayment *big.Int,
 ) (*OnDemandLedger, error) {
-	return &OnDemandLedger{
-		totalDeposits:          totalDeposits,
-		pricePerSymbol:         pricePerSymbol,
-		minNumSymbols:          minNumSymbols,
-		cumulativePaymentStore: nil,
-		cumulativePayment:      cumulativePayment,
-	}, nil
+	return newOnDemandLedger(totalDeposits, pricePerSymbol, minNumSymbols, nil, cumulativePayment)
 }
 
 // Creates an OnDemandLedger, checking all input parameters
 func newOnDemandLedger(
-	ctx context.Context,
 	totalDeposits *big.Int,
 	pricePerSymbol *big.Int,
 	minNumSymbols uint64,
