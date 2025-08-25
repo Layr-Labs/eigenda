@@ -33,11 +33,11 @@ type Config struct {
 	RelayConfig relay.Config
 
 	// Configuration for the graph indexer.
-	EthClientConfig               geth.EthClientConfig
-	EigenDADirectory              string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	ChainStateConfig              thegraph.Config
+	EthClientConfig            geth.EthClientConfig
+	EigenDADirectory           string
+	OperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr  string
+	ChainStateConfig           thegraph.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -105,11 +105,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxConnectionAgeGrace: ctx.Duration(flags.MaxConnectionAgeGraceFlag.Name),
 			MaxIdleConnectionAge:  ctx.Duration(flags.MaxIdleConnectionAgeFlag.Name),
 		},
-		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
-		EigenDADirectory:              ctx.String(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:            geth.ReadEthClientConfigRPCOnly(ctx),
+		EigenDADirectory:           ctx.String(flags.EigenDADirectoryFlag.Name),
+		OperatorStateRetrieverAddr: ctx.String(flags.OperatorStateRetrieverAddrFlag.Name),
+		EigenDAServiceManagerAddr:  ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
+		ChainStateConfig:           thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayKeys {
 		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)

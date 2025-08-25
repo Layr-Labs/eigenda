@@ -12,20 +12,25 @@ A `payload` must fit inside an EigenDA blob to be dispersed. See the allowed blo
 
 ### EncodedPayload
 
-An `encodedPayload` is the bn254 encoding of the `payload`. This is an intermediary processing step, but useful to give a name to it. The encoding must respect the same constraints as those on the blob:
+An `encodedPayload` is the bn254 encoding of the `payload`, prefixed with an encoded payload header. It is an intermediary processing artifact, named here for clarity. The encoding obeys the same constraints as EigenDA blobs:
 
 > Every 32 bytes of data is interpreted as an integer in big endian format. Each such integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617.
-> 
 
-The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12), which encodes as follows:
+#### Encoded Payload Header
+
+The header carries metadata needed to decode back to the original payload. Because it is included in the encoded payload, it too must be representable as valid field elements. The header currently takes 32 bytes: the first byte is 0x00 (to ensure it forms a valid field element), followed by an encoding version_byte and 4 bytes representing the size of the original payload. The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12). The remaining bytes of the encoded payload header are zero-filled.
+
+#### Encoding Payload Version 0x0
+
+Version 0x0 specifies the following transformation from the original payload to a sequence of field element:
+- For every 31 bytes of the payload, insert a zero byte to produce a 32-byte value that is a valid field element.
+- Zero-pad the final chunk so the payload length is a multiple of 32 bytes, and ensure the encoded payload comprises a power-of-two number of 32-byte field elements (32, 64, 128, 256, …) to match EigenDA blob sizing.
 
 ```solidity
 [0x00, version_byte, big-endian uint32 len(payload), 0x00, 0x00,...] +
     [0x00, payload[0:31], 0x00, payload[32:63],..., 
         0x00, payload[n:len(payload)], 0x00, ..., 0x00]
 ```
-
-where the last chunk is padded with 0s such that the total length is a multiple of 32 bytes.
 
 For example, the payload `hello` would be encoded as
 
@@ -36,7 +41,7 @@ For example, the payload `hello` would be encoded as
 
 ### PayloadPolynomial
 
-EigenDA uses [KZG commitments](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html), which represent a commitment to a function. Abstractly speaking, we thus need to represent the encodedPayload as a polynomial. We have two choices: either treat the data as the coefficients of a polynomial, or as evaluations of a polynomial. In order to convert between these two representations, we make use of [FFTs](https://vitalik.eth.limo/general/2019/05/12/fft.html) which require the data to be a power of 2. Thus, `PolyEval` and `PolyCoeff` are defined as being an `encodedPayload` padded with 0s to the next power of 2 (if needed) and interpreted as desired.
+EigenDA uses [KZG commitments](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html), which represent a commitment to a function. Abstractly speaking, we thus need to represent the encodedPayload as a polynomial. We have two choices: either treat the data as the coefficients of a polynomial, or as evaluations of a polynomial. In order to convert between these two representations, we make use of [FFTs](https://vitalik.eth.limo/general/2019/05/12/fft.html) which require the data to be a power of 2. Thus, `PolyEval` and `PolyCoeff` are defined as being an `encodedPayload` and interpreted as desired.
 
 Once an interpretation of the data has been chosen, one can convert between them as follows:
 
@@ -53,7 +58,7 @@ Typically, optimistic rollups will interpret the data as being evaluations. This
 
 A `blob` is a bn254 field elements array that has a power of 2. It is interpreted by the EigenDA network as containing the coefficients of a polynomial (unlike Ethereum which [treats blobs as being evaluations of a polynomial](https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/polynomial-commitments.md#cryptographic-types)).
 
-An `encodedPayload` can thus be transformed into a `blob` by being padded with 0s to a power of 2, with size currently limited to 16MiB. There is no minimum size, but any blob smaller than 128KiB will be charged for 128KiB.
+An `encodedPayload` can thus be transformed into a `blob` directly or optionally by taking IFFT on itself, with size currently limited to 16MiB. There is no minimum size, but any blob smaller than 128KiB will be charged for 128KiB.
 
 ### BlobHeader
 

@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli/v2"
@@ -33,8 +32,7 @@ type Config struct {
 	MemstoreEnabled bool
 
 	// secondary storage cfgs
-	RedisConfig redis.Config
-	S3Config    s3.Config
+	S3Config s3.Config
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
@@ -87,7 +85,6 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		ClientConfigV2:   clientConfigV2,
 		MemstoreConfig:   memstoreConfig,
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
-		RedisConfig:      redis.ReadConfig(ctx),
 		S3Config:         s3.ReadConfig(ctx),
 	}
 
@@ -119,10 +116,6 @@ func (cfg *Config) Check() error {
 		if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
 			return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
 		}
-	}
-
-	if cfg.RedisConfig.Endpoint == "" && cfg.RedisConfig.Password != "" {
-		return fmt.Errorf("redis password is set, but endpoint is not")
 	}
 
 	return cfg.StoreConfig.Check()
@@ -177,9 +170,6 @@ func (cfg *Config) ToString() (string, error) {
 	if configCopy.ClientConfigV1.EdaClientCfg.EthRpcUrl != "" {
 		// hiding as RPC providers typically use sensitive API keys within
 		configCopy.ClientConfigV1.EdaClientCfg.EthRpcUrl = redacted
-	}
-	if configCopy.RedisConfig.Password != "" {
-		configCopy.RedisConfig.Password = redacted
 	}
 	if configCopy.S3Config.AccessKeySecret != "" {
 		configCopy.S3Config.AccessKeySecret = redacted
