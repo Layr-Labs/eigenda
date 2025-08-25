@@ -183,11 +183,14 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(header.BlobCommitments.Length))
 	if errors.Is(err, coretypes.ErrBlobLengthSymbolsNotPowerOf2) {
-		panic(fmt.Errorf(
-			"retrieveBlobWithTimeout: blobLengthSymbols=%d is not power of 2: "+
-				"this is a major broken invariant, that should have been checked by the validators, "+
-				"and the caller (GetEncodedPayload) should already have checked this invariant "+
-				"and returned a MaliciousOperatorsError", header.BlobCommitments.Length))
+		// In a better language I would write this as a debug assert.
+		pr.logger.Error("BROKEN INVARIANT: retrieveBlobWithTimeout: blobLengthSymbols is not power of 2: "+
+			"this is a major broken invariant, that should have been checked by the validators, "+
+			"and the caller (GetEncodedPayload) should already have checked this invariant "+
+			"and returned a MaliciousOperatorsError. Returning the same MaliciousOperatorsError "+
+			"to be safe, but this code should be fixed.", "err", err)
+		blobKey, _ := header.BlobKey() // discard error since returning the below error is most important
+		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
 	}
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
