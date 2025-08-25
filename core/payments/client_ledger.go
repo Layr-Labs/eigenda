@@ -59,7 +59,9 @@ func NewClientLedger(
 	// The account that this client ledger is for
 	accountID gethcommon.Address,
 	clientLedgerMode ClientLedgerMode,
+	// may be nil if clientLedgerMode is configured to not use reservations
 	reservationLedger *reservation.ReservationLedger,
+	// may be nil if clientLedgerMode is configured to not use on-demand payments
 	onDemandLedger *ondemand.OnDemandLedger,
 	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
 	// may occasionally fail due to NTP adjustments
