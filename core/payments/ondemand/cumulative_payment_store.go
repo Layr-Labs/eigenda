@@ -71,6 +71,11 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 	ctx context.Context,
 	newCumulativePayment *big.Int,
 ) error {
+	if s == nil {
+		// sane no-op behavior, since using a payment store is optional
+		return nil
+	}
+
 	if newCumulativePayment == nil {
 		return errors.New("newCumulativePayment cannot be nil")
 	}

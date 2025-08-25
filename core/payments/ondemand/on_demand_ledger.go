@@ -167,11 +167,10 @@ func (odl *OnDemandLedger) Debit(
 		}
 	}
 
-	if odl.cumulativePaymentStore != nil {
-		err := odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
-		if err != nil {
-			return nil, fmt.Errorf("store cumulative payment: %w", err)
-		}
+	// StoreCumulativePayment has safe behavior even if the receiver is nil
+	err = odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
+	if err != nil {
+		return nil, fmt.Errorf("store cumulative payment: %w", err)
 	}
 
 	odl.cumulativePayment.Set(newCumulativePayment)
@@ -199,11 +198,10 @@ func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) 
 			odl.cumulativePayment.String(), blobCost.String())
 	}
 
-	if odl.cumulativePaymentStore != nil {
-		err := odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
-		if err != nil {
-			return nil, fmt.Errorf("store cumulative payment: %w", err)
-		}
+	// StoreCumulativePayment has safe behavior even if the receiver is nil
+	err := odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
+	if err != nil {
+		return nil, fmt.Errorf("store cumulative payment: %w", err)
 	}
 
 	odl.cumulativePayment.Set(newCumulativePayment)
