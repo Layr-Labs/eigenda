@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -86,8 +87,12 @@ func (s *EncoderServerV2) Start() error {
 	}
 
 	gs := grpc.NewServer(
-		grpc.UnaryInterceptor(
+		grpc.ChainUnaryInterceptor(
 			s.grpcMetrics.UnaryServerInterceptor(),
+			// Recovery handler will recover from panics and return a grpc INTERNAL error to the client.
+			// Should be kept last in the chain (meaning installed as inner most middleware) so that
+			// other middlewares (e.g. logging) can operate on the recovered state instead of being skipped.
+			grpc_recovery.UnaryServerInterceptor(),
 		),
 	)
 	reflection.Register(gs)

@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -575,7 +576,14 @@ func (s *Server) Start(ctx context.Context) error {
 		MaxConnectionAgeGrace: s.config.MaxConnectionAgeGrace,
 	})
 
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), keepAliveConfig)
+	s.grpcServer = grpc.NewServer(opt, keepAliveConfig,
+		grpc.ChainUnaryInterceptor(
+			s.metrics.GetGRPCServerInterceptor(),
+			// Recovery handler will recover from panics and return a grpc INTERNAL error to the client.
+			// Should be kept last in the chain (meaning installed as inner most middleware) so that
+			// other middlewares (e.g. logging) can operate on the recovered state instead of being skipped.
+			grpc_recovery.UnaryServerInterceptor(),
+		))
 	reflection.Register(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 

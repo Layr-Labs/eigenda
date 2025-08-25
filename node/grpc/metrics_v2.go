@@ -8,7 +8,6 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"google.golang.org/grpc"
 )
 
 const namespace = "eigenda_node"
@@ -17,8 +16,8 @@ const namespace = "eigenda_node"
 type MetricsV2 struct {
 	logger logging.Logger
 
-	registry         *prometheus.Registry
-	grpcServerOption grpc.ServerOption
+	registry    *prometheus.Registry
+	grpcMetrics *grpcprom.ServerMetrics
 
 	storeChunksRequestSize *prometheus.GaugeVec
 
@@ -38,9 +37,6 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
-	grpcServerOption := grpc.UnaryInterceptor(
-		grpcMetrics.UnaryServerInterceptor(),
-	)
 
 	storeChunksRequestSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -75,17 +71,12 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 	return &MetricsV2{
 		logger:                 logger,
 		registry:               registry,
-		grpcServerOption:       grpcServerOption,
+		grpcMetrics:            grpcMetrics,
 		storeChunksRequestSize: storeChunksRequestSize,
 		getChunksLatency:       getChunksLatency,
 		getChunksDataSize:      getChunksDataSize,
 		storeChunksStageTimer:  storeChunksStageTimer,
 	}, nil
-}
-
-// GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
-func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
-	return m.grpcServerOption
 }
 
 // GetStoreChunksProbe returns a probe for measuring the latency of the StoreChunks() RPC call.
