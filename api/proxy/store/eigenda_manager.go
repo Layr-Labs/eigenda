@@ -97,7 +97,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 		if m.eigenda == nil {
 			return nil, errors.New("received CertV0 but EigenDA V1 client is not initialized")
 		}
-		return m.getEigenDAV1(ctx, versionedCert, opts)
+		return m.getEigenDAV1(ctx, versionedCert)
 	case certs.V1VersionByte, certs.V2VersionByte:
 		if m.eigendaV2 == nil {
 			return nil, errors.New("received EigenDAV2 cert but EigenDA V2 client is not initialized")
@@ -115,12 +115,7 @@ func (m *EigenDAManager) Get(ctx context.Context,
 func (m *EigenDAManager) getEigenDAV1(
 	ctx context.Context,
 	versionedCert certs.VersionedCert,
-	opts common.GETOpts,
 ) ([]byte, error) {
-	if opts.ReturnEncodedPayload {
-		return nil, fmt.Errorf("returning encoded payload is not supported for V0 certificates (EigenDA V1)")
-	}
-
 	verifyFnForSecondary := func(ctx context.Context, cert []byte, payload []byte) error {
 		// We don't add the cert version because EigenDA V1 only supports [certs.V0VersionByte] Certs.
 		// We also don't use the l1InclusionBlockNumber because Recency check is only supported by EigenDA V2.
@@ -138,7 +133,7 @@ func (m *EigenDAManager) getEigenDAV1(
 	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
 	// storages and make them all implement the [clients.PayloadRetriever] interface.
 	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
-	if m.secondary.CachingEnabled() && !opts.ReturnEncodedPayload {
+	if m.secondary.CachingEnabled() {
 		m.log.Debug("Retrieving payload from cached backends")
 		payload, err := m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, false, verifyFnForSecondary)
@@ -159,7 +154,7 @@ func (m *EigenDAManager) getEigenDAV1(
 		// Only backup to secondary storage if we're returning the decoded payload
 		// since the secondary stores are currently hardcoded to store payloads only.
 		// TODO: we could consider also storing encoded payloads under separate keys?
-		if m.secondary.WriteOnCacheMissEnabled() && !opts.ReturnEncodedPayload {
+		if m.secondary.WriteOnCacheMissEnabled() {
 			m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
 		}
 		return payload, nil
@@ -168,7 +163,7 @@ func (m *EigenDAManager) getEigenDAV1(
 
 	// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 	// Only use fallbacks if we're not requesting encoded payload
-	if m.secondary.FallbackEnabled() && !opts.ReturnEncodedPayload {
+	if m.secondary.FallbackEnabled() {
 		payload, err = m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, true, verifyFnForSecondary)
 		if err == nil {
