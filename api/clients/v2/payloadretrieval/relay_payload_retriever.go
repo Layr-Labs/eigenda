@@ -66,7 +66,7 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) (coretypes.Payload, error) {
 
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
@@ -97,7 +97,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 // eigenDACert has already been verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.EncodedPayload, error) {
+	eigenDACert coretypes.EigenDACert) (*coretypes.EncodedPayload, error) {
 
 	relayKeys := eigenDACert.RelayKeys()
 	blobCommitments, err := eigenDACert.Commitments()
