@@ -128,8 +128,6 @@ func (m *EigenDAManager) getEigenDAV1(
 	var readErrors []error
 	// 1 - read payload from cache if enabled
 	// Secondary storages (cache and fallback) store payloads instead of blobs.
-	// For simplicity, we bypass secondary storages when requesting encoded payloads,
-	// since those requests are only for V2 secure integrations and run by provers/challengers.
 	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
 	// storages and make them all implement the [clients.PayloadRetriever] interface.
 	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
@@ -151,9 +149,6 @@ func (m *EigenDAManager) getEigenDAV1(
 		if err != nil {
 			return nil, fmt.Errorf("verify EigenDA V1 cert: %w", err)
 		}
-		// Only backup to secondary storage if we're returning the decoded payload
-		// since the secondary stores are currently hardcoded to store payloads only.
-		// TODO: we could consider also storing encoded payloads under separate keys?
 		if m.secondary.WriteOnCacheMissEnabled() {
 			m.backupToSecondary(ctx, versionedCert.SerializedCert, payload)
 		}
@@ -162,7 +157,6 @@ func (m *EigenDAManager) getEigenDAV1(
 	readErrors = append(readErrors, fmt.Errorf("read from EigenDA backend: %w", err))
 
 	// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
-	// Only use fallbacks if we're not requesting encoded payload
 	if m.secondary.FallbackEnabled() {
 		payload, err = m.secondary.MultiSourceRead(ctx,
 			versionedCert.SerializedCert, true, verifyFnForSecondary)
