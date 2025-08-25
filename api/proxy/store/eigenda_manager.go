@@ -134,7 +134,7 @@ func (m *EigenDAManager) getEigenDAV1(
 	// 1 - read payload from cache if enabled
 	// Secondary storages (cache and fallback) store payloads instead of blobs.
 	// For simplicity, we bypass secondary storages when requesting encoded payloads,
-	// since those requests are only for secure integrations and run by provers/challengers.
+	// since those requests are only for V2 secure integrations and run by provers/challengers.
 	// TODO: would be nice to store blobs instead of payloads in secondary storages, such that we could standardize all
 	// storages and make them all implement the [clients.PayloadRetriever] interface.
 	// We could then get rid of the proxy notion of caches/fallbacks and only have storages.
