@@ -38,7 +38,12 @@ func TestSSHContainerSelfDestruct(t *testing.T) {
 
 	// Build Docker image
 	imageName := "ssh-test-selfdestruct:latest"
-	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
+	// Get current user's UID/GID for the container
+	uid, err := getCurrentUserUID()
+	require.NoError(t, err)
+	gid, err := getCurrentUserGID()
+	require.NoError(t, err)
+	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent), uid, gid)
 	require.NoError(t, err)
 
 	// Start container
