@@ -207,8 +207,30 @@ func (env *Config) DeployExperiment() {
 
 	// Ideally these should be set in GenerateAllVariables, but they need to be used in GenerateDisperserKeypair
 	// which is called before GenerateAllVariables
-	env.localstackEndpoint = "http://localhost:4570"
+	
+	// Check if AWS_ENDPOINT_URL is set in environment (for dynamic testcontainer ports)
+	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+		env.localstackEndpoint = endpoint
+	} else {
+		env.localstackEndpoint = "http://localhost:4570"
+	}
 	env.localstackRegion = "us-east-1"
+
+	// Update dynamic URLs in globals config to use testcontainer ports
+	// This ensures environment files get the correct URLs instead of static ones from YAML
+	if env.Services.Variables["globals"] == nil {
+		env.Services.Variables["globals"] = make(map[string]string)
+	}
+	
+	// Update RPC URL to use dynamic port from testcontainers
+	if len(env.Deployers) > 0 && env.Deployers[0].RPC != "" {
+		env.Services.Variables["globals"]["CHAIN_RPC"] = env.Deployers[0].RPC
+	}
+	
+	// Update AWS endpoint URL to use dynamic port from testcontainers  
+	if env.localstackEndpoint != "" {
+		env.Services.Variables["globals"]["AWS_ENDPOINT_URL"] = env.localstackEndpoint
+	}
 
 	fmt.Println("Generating disperser keypair")
 	err = env.GenerateDisperserKeypair()

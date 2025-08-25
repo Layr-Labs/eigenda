@@ -123,6 +123,7 @@ func execYarnCmd(command string, args ...string) {
 // Executes a forge script with a given rpc and private key
 func execForgeScript(script, privateKey string, deployer *ContractDeployer, extraArgs []string) {
 	log.Printf("Executing forge script with params %s, %s, %s", script, deployer.RPC, privateKey)
+	log.Printf("Full forge command will be: forge script %s --rpc-url %s --private-key %s --broadcast", script, deployer.RPC, privateKey)
 
 	// Execute forge script
 	var cmd *exec.Cmd

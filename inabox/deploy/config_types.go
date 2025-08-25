@@ -182,6 +182,11 @@ type Config struct {
 	EigenDAV1CertVerifier string              `yaml:"v1CertVerifier" json:"v1CertVerifier"`
 	EigenDAV2CertVerifier string              `yaml:"v2CertVerifier" json:"v2CertVerifier"`
 
+	// Testinfra overrides for dynamic endpoints
+	GraphURL      string // Graph Node URL for testinfra integration
+	GraphAdminURL string // Graph Node admin URL for subgraph deployment
+	IPFSURL       string // IPFS URL for subgraph upload
+
 	Pks *PkConfig `yaml:"privateKeys"`
 
 	Services ServicesSpec `yaml:"services"`
