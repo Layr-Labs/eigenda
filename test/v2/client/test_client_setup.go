@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -135,7 +136,7 @@ func GetClient(configPath string) (*TestClient, error) {
 		}
 	}
 
-	client, err := NewTestClient(logger, metrics, testConfig)
+	client, err := NewTestClient(context.Background(), logger, metrics, testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test client: %w", err)
 	}

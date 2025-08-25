@@ -34,14 +34,8 @@ type TestClientConfig struct {
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
-	//
-	// Currently the EigenDADirectory is just used to look up OperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
-	// TODO(samlaf): use EigenDADirectory for all contract address lookups.
-	EigenDADirectory string
+	ContractDirectoryAddress string
 	// The contract address for the OperatorStateRetriever
-	OperatorStateRetrieverAddr string
-	// The contract address for the EigenDA service manager
-	EigenDAServiceManagerAddr string
 	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
 	//
 	// If this value is not set, that tests utilizing it will be skipped
@@ -91,7 +85,6 @@ func DefaultTestClientConfig() *TestClientConfig {
 		ProxyPort:                       1234,
 		RelayConnectionCount:            8,
 		DisperserConnectionCount:        8,
-		EigenDADirectory:                "placeholder",
 	}
 }
 
