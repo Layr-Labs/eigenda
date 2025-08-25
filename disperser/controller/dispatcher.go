@@ -18,6 +18,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller/blobqueue"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -30,7 +31,6 @@ var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
 type BlobCallback func(blobKey corev2.BlobKey) error
 
 type DispatcherConfig struct {
-	PullInterval time.Duration
 
 	// The number of blocks to wait before using operator state. A hedge against forking.
 	FinalizationBlockDelay uint64
@@ -78,15 +78,13 @@ type Dispatcher struct {
 	logger            logging.Logger
 	metrics           *dispatcherMetrics
 
-	cursor *blobstore.StatusIndexCursor
+	cursor *blobstore.StatusIndexCursor // TODO can this be removed?
+
+	// Provides blobs to dispatch.
+	blobQueue blobqueue.BlobQueue
 
 	// beforeDispatch function is called before dispatching a blob
 	beforeDispatch BlobCallback
-
-	// blobSet keeps track of blobs that are being dispatched
-	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
-	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet BlobSet
 
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 
@@ -103,6 +101,7 @@ type batchData struct {
 }
 
 func NewDispatcher(
+	ctx context.Context,
 	config *DispatcherConfig,
 	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
@@ -119,8 +118,7 @@ func NewDispatcher(
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
-	if config.PullInterval == 0 ||
-		config.AttestationTimeout == 0 ||
+	if config.AttestationTimeout == 0 ||
 		config.BatchAttestationTimeout == 0 ||
 		config.SignatureTickInterval == 0 ||
 		config.MaxBatchSize == 0 {
@@ -142,6 +140,17 @@ func NewDispatcher(
 		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
 	}
 
+	blobSource := blobqueue.NewDynamoBlobSource(blobMetadataStore, 64) // TODO config flag
+	blobQueue := blobqueue.NewBlobQueue(
+		ctx,
+		logger,
+		blobSource,
+		10*time.Millisecond, // TODO flag
+		10*time.Second,      // TODO flag
+		1024,                // TODO flag
+		registry,
+	)
+
 	return &Dispatcher{
 		DispatcherConfig: config,
 
@@ -155,9 +164,9 @@ func NewDispatcher(
 
 		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
-		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
+		blobQueue:              blobQueue,
 	}, nil
 }
 
@@ -168,36 +177,20 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		ticker := time.NewTicker(d.PullInterval)
-		defer ticker.Stop()
+		ticker := time.NewTicker(time.Second) // TODO config
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
-				probe := d.metrics.newBatchProbe()
+				healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
+			case blobToDisperse := <-d.blobQueue.GetBlobToDisperse():
 
-				sigChan, batchData, err := d.HandleBatch(attestationCtx, probe)
-				if err != nil {
-					if errors.Is(err, errNoBlobsToDispatch) {
-						d.logger.Debug("no blobs to dispatch")
-					} else {
-						d.logger.Error("failed to process a batch", "err", err)
-					}
-					cancel()
-					probe.End()
-					continue
-				}
-				go func() {
-					probe.SetStage("handle_signatures")
-					err := d.HandleSignatures(ctx, attestationCtx, batchData, sigChan)
-					if err != nil {
-						d.logger.Error("failed to handle signatures", "err", err)
-					}
-					cancel()
-					probe.End()
-				}()
+				// TODO use semaphore to limit maximum blobs in flight (by blob size)
+				//  make sure to decrement semaphore after blob has 55% signatures
+
+				go d.disperseBlobAndHandleErrors(ctx, blobToDisperse)
 			}
 		}
 	}()
@@ -206,19 +199,59 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 }
 
-func (d *Dispatcher) HandleBatch(
+func (d *Dispatcher) disperseBlobAndHandleErrors(ctx context.Context, blobToDisperse *blobqueue.BlobToDisperse) {
+	defer d.blobQueue.StopTracking(blobToDisperse.GetBlobKey())
+
+	err := d.disperseBlob(ctx, blobToDisperse)
+	if err != nil {
+		d.logger.Error("failed to disperse a blob",
+			"blobKey", blobToDisperse.GetBlobKey().Hex(),
+			"err", err)
+
+		err = d.failBatch(ctx, blobToDisperse)
+		if err != nil {
+			d.logger.Error("failed to mark batch as failed",
+				"blobKey", blobToDisperse.GetBlobKey().Hex(),
+				"err", err)
+		}
+	}
+}
+
+// Disperse a blob.
+func (d *Dispatcher) disperseBlob(parentContext context.Context, blobToDisperse *blobqueue.BlobToDisperse) error {
+
+	// Provides a "global" timeout for the batch just in case the internal timeouts don't work as expected.
+	ctx, cancel := context.WithTimeout(parentContext, d.BatchAttestationTimeout)
+	defer cancel()
+
+	probe := d.metrics.newBatchProbe()
+	defer probe.End()
+
+	batch, err := d.newBatch(ctx, *blobToDisperse, probe)
+	if err != nil {
+		return fmt.Errorf("failed to create a new batch: %w", err)
+	}
+
+	sigChan, err := d.broadcastBatchMetadata(ctx, probe, batch)
+	if err != nil {
+		return fmt.Errorf("failed to handle batch: %w", err)
+	}
+
+	probe.SetStage("handle_signatures")
+	err = d.gatherBatchSignatures(parentContext, ctx, batch, sigChan)
+	if err != nil {
+		d.logger.Error("failed to handle signatures", "err", err)
+	}
+
+	return nil
+}
+
+// Send the batch metadata to all relevant validators.
+func (d *Dispatcher) broadcastBatchMetadata(
 	ctx context.Context,
 	batchProbe *common.SequenceProbe,
-) (chan core.SigningMessage, *batchData, error) {
-	// Signal Liveness to indicate no stall
-	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
-
-	// Get a batch of blobs to dispatch
-	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, batchProbe)
-	if err != nil {
-		return nil, nil, err
-	}
+	batchData *batchData,
+) (chan core.SigningMessage, error) {
 
 	batchProbe.SetStage("send_requests")
 
@@ -360,16 +393,16 @@ func (d *Dispatcher) HandleBatch(
 
 	batchProbe.SetStage("await_responses")
 
-	return sigChan, batchData, nil
+	return sigChan, nil
 }
 
-// HandleSignatures receives SigningMessages from operators for a given batch through the input sigChan. The signatures
-// are validated, aggregated, and used to put an Attestation for the batch into the blobMetadataStore. The Attestation
-// is periodically updated as additional signatures are gathered.
+// gatherBatchSignatures receives SigningMessages from operators for a given batch through the input sigChan.
+// The signatures are validated, aggregated, and used to put an Attestation for the batch into the blobMetadataStore.
+// The Attestation is periodically updated as additional signatures are gathered.
 //
 // This method will continue gathering signatures until a SigningMessage has been received from every operator, or until
 // the global attestationCtx times out.
-func (d *Dispatcher) HandleSignatures(
+func (d *Dispatcher) gatherBatchSignatures(
 	ctx context.Context,
 	attestationCtx context.Context,
 	batchData *batchData,
@@ -423,16 +456,7 @@ func (d *Dispatcher) HandleSignatures(
 		d.DispatcherConfig.SignatureTickInterval,
 		d.DispatcherConfig.SignificantSigningThresholdPercentage)
 	if err != nil {
-		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
-
-		dbErr := d.failBatch(ctx, batchData)
-		if dbErr != nil {
-			return multierror.Append(
-				receiveSignaturesErr,
-				fmt.Errorf("update blob statuses for batch to 'failed': %w", dbErr))
-		}
-
-		return receiveSignaturesErr
+		return fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 	}
 
 	// keep track of the final attestation, since that's the attestation which will determine the final batch status
@@ -557,72 +581,34 @@ func (d *Dispatcher) logAttestationUpdate(batchHeaderHash string, quorumResults 
 		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
-func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
-	dedupedBlobs := make([]*v2.BlobMetadata, 0)
-	for _, blob := range blobs {
-		key, err := blob.BlobHeader.BlobKey()
-		if err != nil {
-			d.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
-			continue
-		}
-		if !d.blobSet.Contains(key) {
-			dedupedBlobs = append(dedupedBlobs, blob)
-		}
-	}
-	return dedupedBlobs
-}
-
-// NewBatch creates a batch of blobs to dispatch
-// Warning: This function is not thread-safe
-func (d *Dispatcher) NewBatch(
+// create a batch that contains a single blob
+func (d *Dispatcher) newBatch(
 	ctx context.Context,
+	blobToDisperse blobqueue.BlobToDisperse,
 	probe *common.SequenceProbe,
 ) (*batchData, error) {
+
+	probe.SetStage("get_metadata")
+
+	blobKey := blobToDisperse.GetBlobKey()
+	blobMetadata := blobToDisperse.GetBlobMetadata()
+
+	if d.beforeDispatch != nil {
+		err := d.beforeDispatch(blobKey)
+		if err != nil {
+			d.logger.Error("beforeDispatch function failed", "blobKey", blobKey.Hex(), "err", err)
+		}
+	}
 
 	batchMetadata := d.batchMetadataManager.GetMetadata()
 	referenceBlockNumber := batchMetadata.ReferenceBlockNumber()
 	operatorState := batchMetadata.OperatorState()
 
-	probe.SetStage("get_blob_metadata")
-	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(
-		ctx,
-		v2.Encoded,
-		d.cursor,
-		d.MaxBatchSize,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
-	}
-
-	blobMetadatas = d.dedupBlobs(blobMetadatas)
-	d.metrics.reportBlobSetSize(d.blobSet.Size())
-	if len(blobMetadatas) == 0 {
-		return nil, errNoBlobsToDispatch
-	}
-	d.logger.Debug("got new metadatas to make batch",
-		"numBlobs", len(blobMetadatas),
-		"referenceBlockNumber", referenceBlockNumber)
-
-	keys := make([]corev2.BlobKey, len(blobMetadatas))
-	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
-	for i, metadata := range blobMetadatas {
-		if metadata == nil || metadata.BlobHeader == nil {
-			return nil, fmt.Errorf("invalid blob metadata")
-		}
-		blobKey, err := metadata.BlobHeader.BlobKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get blob key: %w", err)
-		}
-		keys[i] = blobKey
-		metadataMap[blobKey] = metadata
-
-		if d.beforeDispatch != nil {
-			err = d.beforeDispatch(blobKey)
-			if err != nil {
-				d.logger.Error("beforeDispatch function failed", "blobKey", blobKey.Hex(), "err", err)
-			}
-		}
-	}
+	// A bunch of functions still expect multiple blobs in a batch.
+	// Eventually we can refactor those avoid this wrapping, but for now it's simpler to keep them.
+	keys := []corev2.BlobKey{blobKey}
+	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, 1)
+	metadataMap[blobKey] = blobMetadata
 
 	probe.SetStage("get_blob_certs")
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
@@ -630,28 +616,13 @@ func (d *Dispatcher) NewBatch(
 		return nil, fmt.Errorf("failed to get blob certificates: %w", err)
 	}
 
-	if len(certs) != len(keys) {
-		return nil, fmt.Errorf("blob certificates (%d) not found for all blob keys (%d)", len(certs), len(keys))
+	if len(certs) != 1 {
+		return nil, fmt.Errorf("expected 1 blob certificate, got %d", len(certs))
 	}
 
-	certsMap := make(map[corev2.BlobKey]*corev2.BlobCertificate, len(certs))
-	for _, cert := range certs {
-		blobKey, err := cert.BlobHeader.BlobKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get blob key: %w", err)
-		}
-
-		certsMap[blobKey] = cert
-	}
-
-	// Keep the order of certs the same as the order of keys
-	for i, key := range keys {
-		c, ok := certsMap[key]
-		if !ok {
-			return nil, fmt.Errorf("blob certificate not found for blob key %s", key.Hex())
-		}
-		certs[i] = c
-	}
+	// Legacy of the multi-blob batch system, but functions still expect a map of blob keys to certs.
+	certsMap := make(map[corev2.BlobKey]*corev2.BlobCertificate, 1)
+	certsMap[blobKey] = certs[0]
 
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{},
@@ -663,7 +634,6 @@ func (d *Dispatcher) NewBatch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle tree: %w", err)
 	}
-
 	copy(batchHeader.BatchRoot[:], tree.Root())
 
 	batchHeaderHash, err := batchHeader.Hash()
@@ -725,14 +695,8 @@ func (d *Dispatcher) NewBatch(
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
 
-	d.cursor = cursor
-
-	// Add blobs to the blob set to deduplicate blobs
-	for _, blobKey := range keys {
-		d.blobSet.AddBlob(blobKey)
-	}
-
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
+
 	return &batchData{
 		Batch:           batch,
 		BatchHeaderHash: batchHeaderHash,
@@ -740,31 +704,6 @@ func (d *Dispatcher) NewBatch(
 		Metadata:        metadataMap,
 		OperatorState:   operatorState,
 	}, nil
-}
-
-// GetOperatorState returns the operator state for the given quorums at the given block number
-func (d *Dispatcher) GetOperatorState(
-	ctx context.Context,
-	metadatas []*v2.BlobMetadata,
-	blockNumber uint64,
-) (*core.IndexedOperatorState, error) {
-
-	quorums := make(map[core.QuorumID]struct{}, 0)
-	for _, m := range metadatas {
-		for _, quorum := range m.BlobHeader.QuorumNumbers {
-			quorums[quorum] = struct{}{}
-		}
-	}
-
-	quorumIds := make([]core.QuorumID, len(quorums))
-	i := 0
-	for id := range quorums {
-		quorumIds[i] = id
-		i++
-	}
-
-	// GetIndexedOperatorState should return state for valid quorums only
-	return d.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
 }
 
 func (d *Dispatcher) sendChunks(
@@ -807,8 +746,6 @@ func (d *Dispatcher) updateBatchStatus(
 			if err != nil {
 				multierr = multierror.Append(multierr,
 					fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
-			} else {
-				d.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
@@ -830,8 +767,6 @@ func (d *Dispatcher) updateBatchStatus(
 			if err != nil {
 				multierr = multierror.Append(multierr,
 					fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
-			} else {
-				d.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
@@ -843,8 +778,6 @@ func (d *Dispatcher) updateBatchStatus(
 		if err != nil {
 			multierr = multierror.Append(multierr,
 				fmt.Errorf("failed to update blob status for blob %s to complete: %w", blobKey.Hex(), err))
-		} else {
-			d.blobSet.RemoveBlob(blobKey)
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
@@ -856,19 +789,18 @@ func (d *Dispatcher) updateBatchStatus(
 	return multierr
 }
 
-func (d *Dispatcher) failBatch(ctx context.Context, batch *batchData) error {
+func (d *Dispatcher) failBatch(ctx context.Context, blobToDisperse *blobqueue.BlobToDisperse) error {
 	var multierr error
-	for _, blobKey := range batch.BlobKeys {
-		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
-		if err != nil {
-			multierr = multierror.Append(multierr,
-				fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
-		}
-		if metadata, ok := batch.Metadata[blobKey]; ok {
-			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
-		}
-		d.blobSet.RemoveBlob(blobKey)
+
+	blobKey := blobToDisperse.GetBlobKey()
+	metadata := blobToDisperse.GetBlobMetadata()
+
+	err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+	if err != nil {
+		multierr = multierror.Append(multierr,
+			fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 	}
+	d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
 
 	return multierr
 }

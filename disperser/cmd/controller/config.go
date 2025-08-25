@@ -81,7 +81,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
-			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
 			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
 			BatchMetadataUpdatePeriod:             ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),

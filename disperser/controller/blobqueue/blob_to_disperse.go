@@ -22,7 +22,7 @@ type BlobToDisperse struct {
 	enqueueTime time.Time
 
 	// Tracks whether metrics have been reported for this blob yet. Metrics are not reported until
-	// the controller calls GetMetadata() for the first time.
+	// the controller calls GetBlobMetadata() for the first time.
 	metricsReported bool
 }
 
@@ -37,10 +37,10 @@ func newBlobToDisperse(metrics *blobQueueMetrics, metadata *v2.BlobMetadata, blo
 	}
 }
 
-// GetMetadata returns the underlying blob metadata. Also reports some metrics under the hood.
+// GetBlobMetadata returns the underlying blob metadata. Also reports some metrics under the hood.
 //
 // This method is not thread-safe, and should only be called by one goroutine at a time.
-func (b *BlobToDisperse) GetMetadata() *v2.BlobMetadata {
+func (b *BlobToDisperse) GetBlobMetadata() *v2.BlobMetadata {
 	if !b.metricsReported {
 		elapsed := time.Since(b.enqueueTime)
 		b.metrics.reportTimeInQueue(elapsed)
