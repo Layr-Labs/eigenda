@@ -22,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
@@ -30,7 +29,6 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
-	redistc "github.com/testcontainers/testcontainers-go/modules/redis"
 )
 
 const (
@@ -63,8 +61,6 @@ const (
 var (
 	// set by startMinioContainer
 	minioEndpoint = ""
-	// set by startRedisContainer
-	redisEndpoint = ""
 )
 
 // TODO: we shouldn't start the containers in the init function like this.
@@ -73,10 +69,6 @@ var (
 // Starting the containers on init like this also makes it harder to import this file into other tests.
 func init() {
 	err := startMinIOContainer()
-	if err != nil {
-		panic(err)
-	}
-	err = startRedisContainer()
 	if err != nil {
 		panic(err)
 	}
@@ -104,28 +96,6 @@ func startMinIOContainer() error {
 	}
 
 	minioEndpoint = strings.TrimPrefix(endpoint, "http://")
-	return nil
-}
-
-// startRedisContainer starts a Redis container and sets the redisEndpoint global variable
-func startRedisContainer() error {
-	// TODO: we should pass in the test.Test here and using t.Context() instead of creating a new context.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	redisContainer, err := redistc.Run(
-		ctx,
-		"docker.io/redis:7",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start Redis container: %w", err)
-	}
-
-	endpoint, err := redisContainer.Endpoint(ctx, "")
-	if err != nil {
-		return fmt.Errorf("failed to get Redis endpoint: %w", err)
-	}
-	redisEndpoint = endpoint
 	return nil
 }
 
@@ -174,7 +144,6 @@ type TestConfig struct {
 	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
-	UseRedisCaching    bool
 	UseS3Fallback      bool
 }
 
@@ -201,19 +170,9 @@ func NewTestConfig(
 		Expiration:         14 * 24 * time.Hour,
 		UseKeccak256ModeS3: false,
 		UseS3Caching:       false,
-		UseRedisCaching:    false,
 		UseS3Fallback:      false,
 		WriteThreadCount:   0,
 		WriteOnCacheMiss:   false,
-	}
-}
-
-func createRedisConfig() redis.Config {
-	return redis.Config{
-		Endpoint: redisEndpoint,
-		Password: "",
-		DB:       0,
-		Eviction: 10 * time.Minute,
 	}
 }
 
@@ -375,9 +334,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	case testCfg.UseS3Fallback:
 		builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
 		builderConfig.S3Config = createS3Config()
-	case testCfg.UseRedisCaching:
-		builderConfig.StoreConfig.CacheTargets = []string{"redis"}
-		builderConfig.RedisConfig = createRedisConfig()
 	}
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: pk,
