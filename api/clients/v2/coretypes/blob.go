@@ -24,6 +24,12 @@ type Blob struct {
 // The bytes passed in will be appended with zeros to match the blobLengthSymbols if they are shorter than that length,
 // or an error will be returned if they are longer than that length.
 func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
+	// we check that length of bytes is <= blob length, rather than checking for equality, because it's possible
+	// that the bytes being deserialized have had trailing 0s truncated.
+	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+		return nil, ErrBlobLengthSymbolsNotPowerOf2
+	}
+
 	blobLengthBytes := blobLengthSymbols * encoding.BYTES_PER_SYMBOL
 	if uint32(len(bytes)) > blobLengthBytes {
 		return nil, fmt.Errorf(
