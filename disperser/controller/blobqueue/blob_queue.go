@@ -5,8 +5,8 @@ import (
 	"time"
 
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Responsible for polling for blobs that need to be put into batches for dispersal.
@@ -16,7 +16,7 @@ type BlobQueue interface {
 	Close()
 
 	// Get the channel that will receive blobs to disperse.
-	GetBlobToDisperse() <-chan *v2.BlobMetadata
+	GetBlobToDisperse() <-chan *BlobToDisperse
 
 	// It is assumed that the blob source may return duplicates "for a while". After the blob source will no longer
 	// return duplicates for a particular blob (i.e. when its status in DynamoDB is updated), this method will be
@@ -26,8 +26,6 @@ type BlobQueue interface {
 }
 
 var _ BlobQueue = (*blobQueue)(nil)
-
-// TODO wire up metrics
 
 // A stab implementation of BlobQueue.
 type blobQueue struct {
@@ -45,7 +43,7 @@ type blobQueue struct {
 	pollTimeout time.Duration
 
 	// The channel with blobs to disperse.
-	blobChan chan *v2.BlobMetadata
+	blobChan chan *BlobToDisperse
 
 	// When StopTracking() is called, the blobKey is sent to this channel to be processed by the controlLoop goroutine.
 	stopTrackingChan chan corev2.BlobKey
@@ -53,9 +51,14 @@ type blobQueue struct {
 	// A set of blobs that have been previously observed, and that might be re-emitted by the BlobSource.
 	// This is used to detect this re-emission and prevent duplicates from being sent to the blobQueue channel.
 	observedBlobs map[corev2.BlobKey]struct{}
+
+	// Encapsulates all metrics for the blob queue.
+	metrics *blobQueueMetrics
 }
 
 // NewBlobQueue creates a new BlobQueue.
+//
+// If the metrics registry is nil, then no metrics will be registered.
 func NewBlobQueue(
 	ctx context.Context,
 	logger logging.Logger,
@@ -63,19 +66,22 @@ func NewBlobQueue(
 	pollInterval time.Duration,
 	pollTimeout time.Duration,
 	queueSize uint64,
+	registry *prometheus.Registry,
 ) BlobQueue {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	bq := &blobQueue{
-		ctx:           ctx,
-		cancel:        cancel,
-		logger:        logger,
-		blobSource:    blobSource,
-		pollInterval:  pollInterval,
-		pollTimeout:   pollTimeout,
-		blobChan:      make(chan *v2.BlobMetadata, queueSize),
-		observedBlobs: make(map[corev2.BlobKey]struct{}, queueSize),
+		ctx:              ctx,
+		cancel:           cancel,
+		logger:           logger,
+		blobSource:       blobSource,
+		pollInterval:     pollInterval,
+		pollTimeout:      pollTimeout,
+		blobChan:         make(chan *BlobToDisperse, queueSize),
+		observedBlobs:    make(map[corev2.BlobKey]struct{}, queueSize),
+		stopTrackingChan: make(chan corev2.BlobKey, queueSize),
+		metrics:          newBlobQueueMetrics(registry),
 	}
 
 	go bq.controlLoop()
@@ -84,7 +90,7 @@ func NewBlobQueue(
 }
 
 // Get the channel that will receive blobs to disperse.
-func (q *blobQueue) GetBlobToDisperse() <-chan *v2.BlobMetadata {
+func (q *blobQueue) GetBlobToDisperse() <-chan *BlobToDisperse {
 	return q.blobChan
 }
 
@@ -115,6 +121,8 @@ func (q *blobQueue) controlLoop() {
 			q.stopTracking(blobKey)
 		case <-ticker.C:
 			q.pollForBlobs()
+			q.metrics.reportQueueSize(uint64(len(q.blobChan)))
+			q.metrics.reportDedupSetSize(uint64(len(q.observedBlobs)))
 		}
 	}
 }
@@ -131,11 +139,16 @@ func (q *blobQueue) pollForBlobs() {
 	ctx, cancel := context.WithTimeout(q.ctx, q.pollTimeout)
 	defer cancel()
 
+	start := time.Now()
+
 	// Get a batch of blobs to disperse.
 	blobMetadata, err := q.blobSource.GetBlobsToDisperse(ctx)
 	if err != nil {
 		q.logger.Errorf("Error getting blobs to disperse: %v", err)
 	}
+
+	elapsed := time.Since(start)
+	duplicateBlobCount := uint64(0)
 
 	// For each blob, make sure it is unique and put it into the channel.
 	for _, metadata := range blobMetadata {
@@ -146,16 +159,18 @@ func (q *blobQueue) pollForBlobs() {
 		}
 
 		if q.isDuplicate(blobKey) {
-			// ignore duplicates
+			duplicateBlobCount++
 			continue
 		}
 
 		select {
 		case <-q.ctx.Done():
 			return
-		case q.blobChan <- metadata:
+		case q.blobChan <- newBlobToDisperse(q.metrics, metadata, blobKey):
 		}
 	}
+
+	q.metrics.reportBlobSourcePoll(uint64(len(blobMetadata)), duplicateBlobCount, elapsed)
 }
 
 // Returns true if the blob has already been observed, and false otherwise. This method updates the internal
