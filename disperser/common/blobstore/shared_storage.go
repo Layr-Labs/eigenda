@@ -265,7 +265,7 @@ func (s *SharedBlobStore) GetAllBlobMetadataByBatchWithPagination(ctx context.Co
 	return s.blobMetadataStore.GetAllBlobMetadataByBatchWithPagination(ctx, batchHeaderHash, limit, exclusiveStartKey)
 }
 
-// GetMetadata returns a blob metadata given a metadata key
+// GetBlobMetadata returns a blob metadata given a metadata key
 func (s *SharedBlobStore) GetBlobMetadata(ctx context.Context, metadataKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
 	return s.blobMetadataStore.GetBlobMetadata(ctx, metadataKey)
 }

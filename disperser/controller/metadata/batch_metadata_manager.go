@@ -57,10 +57,10 @@ type batchMetadataManager struct {
 
 // Create a new BatchMetadataManager.
 //
-// This constructor does an initial blocking metadata fetch, so that any call to GetMetadata() after this constructor
-// returns can immediately return valid metadata. It also starts a background goroutine that periodically updates the
-// metadata at a rate defined by updatePeriod. Actual update timing may vary depending on the amount of time it
-// takes to successfully get new data.
+// This constructor does an initial blocking metadata fetch, so that any call to GetBlobMetadata() after this
+// constructor returns can immediately return valid metadata. It also starts a background goroutine that periodically
+// updates the metadata at a rate defined by updatePeriod. Actual update timing may vary depending on the amount of
+// time it takes to successfully get new data.
 func NewBatchMetadataManager(
 	ctx context.Context,
 	logger logging.Logger,
