@@ -144,7 +144,7 @@ func (m *EigenDAManager) getEigenDAV1(
 		readErrors = append(readErrors, fmt.Errorf("read from cache targets: %w", err))
 	}
 
-	// 2 - read payloadOrEncodedPayload from EigenDA
+	// 2 - read payload from EigenDA
 	payload, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
 	if err == nil {
 		err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, payload)
