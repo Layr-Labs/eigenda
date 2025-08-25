@@ -1,14 +1,14 @@
 package verification
 
-// VerificationStatusCode represents the status codes that are returned by
+// CheckDACertStatusCode represents the status codes that are returned by
 // EigenDACertVerifier.checkDACert contract calls. The enum values below should match exactly
 // the status codes defined in the contract:
 // https://github.com/Layr-Labs/eigenda/blob/1091f460ba762b84019389cbb82d9b04bb2c2bdb/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L48-L54
-type VerificationStatusCode uint8
+type CheckDACertStatusCode uint8
 
 const (
 	// NULL_ERROR Unused status code. If this is returned, there is a bug in the code.
-	StatusNullError VerificationStatusCode = iota
+	StatusNullError CheckDACertStatusCode = iota
 	// SUCCESS Verification succeeded
 	StatusSuccess
 	// INVALID_INCLUSION_PROOF Merkle inclusion proof is invalid
@@ -22,7 +22,7 @@ const (
 )
 
 // String returns a human-readable representation of the StatusCode.
-func (s VerificationStatusCode) String() string {
+func (s CheckDACertStatusCode) String() string {
 	switch s {
 	case StatusNullError:
 		return "Null Error: Unused status code. If this is returned, there is a bug in the code."

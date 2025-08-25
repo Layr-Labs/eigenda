@@ -36,7 +36,7 @@ func (e *CertVerifierInternalError) Error() string {
 // StatusNullError returns a [CertVerifierInternalError] instead as it is a contract bug
 // that should never happen.
 type CertVerifierInvalidCertError struct {
-	StatusCode VerificationStatusCode
+	StatusCode CheckDACertStatusCode
 	Msg        string
 }
 
