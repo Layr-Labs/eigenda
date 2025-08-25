@@ -200,29 +200,6 @@ func testProxyCaching(t *testing.T, dispersalBackend common.EigenDABackend) {
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
-func TestProxyCachingWithRedisV1(t *testing.T) {
-	testProxyCachingWithRedis(t, common.V1EigenDABackend)
-}
-
-func TestProxyCachingWithRedisV2(t *testing.T) {
-	testProxyCachingWithRedis(t, common.V2EigenDABackend)
-}
-
-func testProxyCachingWithRedis(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
-	testCfg.UseRedisCaching = true
-
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.RedisBackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
 func TestProxyReadFallbackV1(t *testing.T) {
 	testProxyReadFallback(t, common.V1EigenDABackend)
 }

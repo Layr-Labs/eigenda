@@ -1,6 +1,5 @@
 ## The following is a proxy instance 
-## pointed to redis for storage caching and S3
-## for storage failovers
+## pointed to S3 for storage failovers
 
 services:
   ## Used as secondary read failover target
@@ -25,15 +24,6 @@ services:
     entrypoint: ["/bin/sh", "-c", "/usr/bin/create-bucket.sh"]
     volumes:
       - ./scripts/create-test-s3-bucket.sh:/usr/bin/create-bucket.sh
-
-  redis:
-    image: redis:latest
-    container_name: redis
-    command: redis-server --requirepass redispassword
-    environment:
-      - REDIS_PASSWORD=redispassword
-    ports:
-      - "6379:6379"
 
   eigenda_proxy:
     depends_on:
@@ -67,15 +57,8 @@ services:
       - EIGENDA_PROXY_S3_ENDPOINT=minio:9000
       - EIGENDA_PROXY_S3_ENABLE_TLS=false
 
-      # Redis Configuration
-      - EIGENDA_PROXY_REDIS_DB=0
-      - EIGENDA_PROXY_REDIS_ENDPOINT=redis:6379
-      - EIGENDA_PROXY_REDIS_PASSWORD=redispassword
-      - EIGENDA_PROXY_REDIS_EVICTION=24h0m0s
-
       ## Secondary routing
       - EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS=s3
-      - EIGENDA_PROXY_STORAGE_CACHE_TARGETS=redis
 
     ports:
       - 4242:4242

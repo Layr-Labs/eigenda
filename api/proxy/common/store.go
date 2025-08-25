@@ -16,7 +16,6 @@ const (
 	MemstoreV1BackendType
 	MemstoreV2BackendType
 	S3BackendType
-	RedisBackendType
 
 	UnknownBackendType
 )
@@ -33,8 +32,6 @@ func (b BackendType) String() string {
 		return "EigenDAV2Memstore"
 	case S3BackendType:
 		return "S3"
-	case RedisBackendType:
-		return "Redis"
 	case UnknownBackendType:
 		fallthrough
 	default:
@@ -56,8 +53,6 @@ func StringToBackendType(s string) BackendType {
 		return MemstoreV2BackendType
 	case "s3":
 		return S3BackendType
-	case "redis":
-		return RedisBackendType
 	case "unknown":
 		fallthrough
 	default:
