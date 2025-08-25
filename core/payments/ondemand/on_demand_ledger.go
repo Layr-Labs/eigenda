@@ -48,6 +48,9 @@ type OnDemandLedger struct {
 //
 // The CumulativePaymentStore is used in this constructor to get the current cumulative payment value. After each
 // debit, the latest cumulative payment will be stored in the CumulativePaymentStore.
+//
+// This is the constructor that should be used by those who persist on-demand payment data. Under the current
+// payment architecture, that means the disperser.
 func OnDemandLedgerFromStore(
 	ctx context.Context,
 	// the total deposits that have been made for the account to the PaymentVault
@@ -73,6 +76,10 @@ func OnDemandLedgerFromStore(
 
 // Creates a new OnDemandLedger, which *isn't* backed by a CumulativePayment store: the only representation of the
 // cumulative payment is in memory.
+//
+// This is the constructor that should be used by those who don't persist on-demand data. Under the current
+// payment architecture, that means the client. The client will get the latest cumulativePayment from the disperser
+// when starting up, and use that value to initialize the OnDemandLedger.
 func OnDemandLedgerFromValue(
 	// the total deposits that have been made for the account to the PaymentVault
 	totalDeposits *big.Int,
