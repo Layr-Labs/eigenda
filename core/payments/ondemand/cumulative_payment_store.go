@@ -90,7 +90,7 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("put cumulative payment: %w", err)
+		return fmt.Errorf("update cumulative payment: %w", err)
 	}
 
 	return nil
@@ -101,6 +101,7 @@ func (s *CumulativePaymentStore) GetCumulativePayment(ctx context.Context) (*big
 	resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:            s.tableName,
 		Key:                  s.accountKey,
+		ConsistentRead:       aws.Bool(true),
 		ProjectionExpression: aws.String(attributeCumulativePayment),
 	})
 	if err != nil {

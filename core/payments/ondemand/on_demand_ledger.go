@@ -103,13 +103,19 @@ func newOnDemandLedger(
 	if cumulativePayment == nil {
 		return nil, errors.New("cumulativePayment cannot be nil")
 	}
+	if cumulativePayment.Sign() < 0 {
+		return nil, errors.New("cumulativePayment cannot be negative")
+	}
+	if cumulativePayment.Cmp(totalDeposits) > 0 {
+		return nil, errors.New("cumulativePayment cannot exceed totalDeposits")
+	}
 
 	return &OnDemandLedger{
-		totalDeposits:          totalDeposits,
-		pricePerSymbol:         pricePerSymbol,
+		totalDeposits:          new(big.Int).Set(totalDeposits),
+		pricePerSymbol:         new(big.Int).Set(pricePerSymbol),
 		minNumSymbols:          minNumSymbols,
 		cumulativePaymentStore: cumulativePaymentStore,
-		cumulativePayment:      cumulativePayment,
+		cumulativePayment:      new(big.Int).Set(cumulativePayment),
 	}, nil
 }
 
