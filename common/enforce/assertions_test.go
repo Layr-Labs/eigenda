@@ -1,6 +1,7 @@
 package enforce
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -143,5 +144,13 @@ func TestMapDoesNotContainKey(t *testing.T) {
 
 	require.Panics(t, func() {
 		MapDoesNotContainKey(data, "key", "This should panic")
+	})
+}
+
+func TestNilError(t *testing.T) {
+	NilError(nil, "This should not panic")
+
+	require.Panics(t, func() {
+		NilError(fmt.Errorf("test error"), "This should panic")
 	})
 }

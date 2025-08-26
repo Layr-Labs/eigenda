@@ -125,3 +125,10 @@ func MapDoesNotContainKey[K comparable, V any](m map[K]V, key K, message string,
 		panic(fmt.Sprintf("Expected map to not contain key %v: %s", key, fmt.Sprintf(message, args...)))
 	}
 }
+
+// Asserts that an error is nil and panics with a message if it is not nil.
+func NilError(err error, message string, args ...any) {
+	if err != nil {
+		panic("Expected error to be nil: " + fmt.Sprintf(message, args...))
+	}
+}
