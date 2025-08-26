@@ -53,7 +53,7 @@ interface IEigenDAEjectionManager {
     /// @notice Returns the amount of deposit required for ejection processes.
     function getDepositAmount() external view returns (uint256);
 
-    /// @notice Returns the address of the ejector for a given operator.
+    /// @notice Returns the address of the ejector for a given operator. If the returned address is zero, then there is no ejection in progress.
     function getEjector(address operator) external view returns (address);
 
     /// @notice Returns whether an ejection process has been initiated for a given operator.
