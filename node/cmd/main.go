@@ -85,7 +85,7 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	reader, err := coreeth.NewReader(
-		logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+		logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}

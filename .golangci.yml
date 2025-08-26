@@ -1,4 +1,5 @@
 version: "2"
+# This config file should follow syntax in https://golangci-lint.run/docs/configuration/file/
 
 run:
   # CI was timing out with the default timeout of 1m.
@@ -7,39 +8,40 @@ run:
 linters:
   enable:
     - protogetter # reports direct reads from proto message fields when getters should be used
-    - lll         # enforces line length limits
-    - errorlint   # makes sure errors are wrapped correctly
-    - misspell    # checks for common misspellings
-    - nestif      # limits nesting depth
-    - exhaustive  # makes sure enum switch statements are exhaustive
-    - errcheck    # enforces that all errors are checked
-    - unused      # checks for unused constants, variables, functions and types
-    - unconvert   # removes unnecessary type conversions
-    - wrapcheck   # checks that errors returned from external packages are wrapped
-    - govet       # reports suspicious constructs
+    - lll # enforces line length limits
+    - errorlint # makes sure errors are wrapped correctly
+    - misspell # checks for common misspellings
+    - nestif # limits nesting depth
+    - exhaustive # makes sure enum switch statements are exhaustive
+    - errcheck # enforces that all errors are checked
+    - unused # checks for unused constants, variables, functions and types
+    - unconvert # removes unnecessary type conversions
+    - wrapcheck # checks that errors returned from external packages are wrapped
+    - govet # reports suspicious constructs
 
-linters-settings:
-  lll:
-    line-length: 120
-  errorlint:
-    # Check whether fmt.Errorf uses the %w verb for formatting errors
-    errorf: true
-  nestif:
-    # Reports when nesting complexity is >= this value (default is 5)
-    # Setting to 8 allows complexity up to 7
-    min-complexity: 8
+  settings:
+    lll:
+      line-length: 120
+    errorlint:
+      # Check whether fmt.Errorf uses the %w verb for formatting errors
+      errorf: true
+    nestif:
+      # Reports when nesting complexity is >= this value (default is 5)
+      # Setting to 8 allows complexity up to 7
+      min-complexity: 8
+
+  exclusions:
+    # Allow certain patterns to be ignored by lll (long lines)
+    # This should probably be 120 to match our lll rule, but there is a weird interaction which an external contributor
+    # hit. The bug was a string smaller than 120, but with key + string made the line bigger than 120, which invalidated
+    # the exclusion rule.
+    rules:
+      - source: '".{100,}"' # ignores double-quoted strings longer than 100 chars
+        linters: [lll]
+      - source: "// https?://" # pattern matches comments containing URLs
+        linters: [lll]
 
 issues:
-  # Allow certain patterns to be ignored by lll (long lines)
-  # This should probably be 120 to match our lll rule, but there is a weird interaction which an external contributor
-  # hit. The bug was a string smaller than 120, but with key + string made the line bigger than 120, which invalidated
-  # the exclusion rule.
-  exclude-rules:
-    - source: '".{100,}"' # ignores double-quoted strings longer than 100 chars
-      linters: [lll]
-    - source: "// https?://" # pattern matches comments containing URLs
-      linters: [lll]
-  
   # Only show issues in new/modified code, not existing code
   new: true
   # Diff compared to origin/master will be linted by default, but the --new-from-rev= flag can be used when running the linter

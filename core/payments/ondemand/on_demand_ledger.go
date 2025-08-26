@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -23,20 +24,7 @@ import (
 // On-demand payments are currently limited to quorums 0 (ETH) and 1 (EIGEN) and can only be used when dispersing
 // through the EigenDA disperser.
 //
-// This is a goroutine safe struct, with some caveats. While the methods themselves can be called concurrently, there
-// are some practical concurrency limits based on the logic behind on-demand payments:
-// 1. Dispersals must be accounted for *in order*, since cumulative payment may only increase. Example:
-// - Assume a user creates two on-demand dispersals, `A` and `B`
-// - `B` will have a higher cumulative payment, since it was created second
-// - If the dispersals are accounted for out of order (`B` then `A`), then the accounting for `A` will fail,
-// since cumulative payment from `B`->`A` would decrease
-// 2. Debit reversion is only possible for a dispersal if no subsequent dispersals have been accounted for. Example:
-// - Assume a user creates two on-demand dispersals, `A` and `B`
-// - If `A` is accounted for, the debit for `A` can be reverted *only if* `B` has not yet been accounted for
-// - If this is not respected, the entity doing the accounting will diverge from the correct ledger state
-//
-// TODO(litt3): There are some improvements that may be made to the on-demand logic in the future, to permit a larger
-// number of concurrent on-demand dispersals.
+// This is a goroutine safe struct.
 type OnDemandLedger struct {
 	// total deposits available for the account in wei
 	totalDeposits *big.Int
@@ -44,16 +32,74 @@ type OnDemandLedger struct {
 	pricePerSymbol *big.Int
 	// minimum number of symbols to bill
 	minNumSymbols uint64
-	// stores the cumulative payment for this ledger in wei
-	cumulativePaymentStore CumulativePaymentStore
+
+	// an optional store to back the cumulative payment for this account
+	//
+	// if non-nil, the new cumulative payment value will be stored here after each debit
+	cumulativePaymentStore *CumulativePaymentStore
+
+	// the latest cumulative payment for the account
+	cumulativePayment *big.Int
+	// used to synchronize computation and optional storing of the cumulativePayment
+	lock sync.Mutex
 }
 
-// Constructs a new OnDemandLedger, backed by the input CumulativePaymentStore
-func NewOnDemandLedger(
+// Creates a new OnDemandLedger, backed by a CumulativePaymentStore
+//
+// The CumulativePaymentStore is used in this constructor to get the current cumulative payment value. After each
+// debit, the latest cumulative payment will be stored in the CumulativePaymentStore.
+//
+// This is the constructor that should be used by those who persist on-demand payment data. Under the current
+// payment architecture, that means the disperser.
+func OnDemandLedgerFromStore(
+	ctx context.Context,
+	// the total deposits that have been made for the account to the PaymentVault
+	totalDeposits *big.Int,
+	// the price in wei per dispersed symbol
+	pricePerSymbol *big.Int,
+	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
+	minNumSymbols uint64,
+	// the DB store backing this ledger
+	cumulativePaymentStore *CumulativePaymentStore,
+) (*OnDemandLedger, error) {
+	if cumulativePaymentStore == nil {
+		return nil, errors.New("cumulativePaymentStore cannot be nil")
+	}
+
+	cumulativePayment, err := cumulativePaymentStore.GetCumulativePayment(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get cumulative payment from store: %w", err)
+	}
+
+	return newOnDemandLedger(totalDeposits, pricePerSymbol, minNumSymbols, cumulativePaymentStore, cumulativePayment)
+}
+
+// Creates a new OnDemandLedger, which *isn't* backed by a CumulativePayment store: the only representation of the
+// cumulative payment is in memory.
+//
+// This is the constructor that should be used by those who don't persist on-demand data. Under the current
+// payment architecture, that means the client. The client will get the latest cumulativePayment from the disperser
+// when starting up, and use that value to initialize the OnDemandLedger.
+func OnDemandLedgerFromValue(
+	// the total deposits that have been made for the account to the PaymentVault
+	totalDeposits *big.Int,
+	// the price in wei per dispersed symbol
+	pricePerSymbol *big.Int,
+	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
+	minNumSymbols uint64,
+	// the starting value for the cumulative payment
+	cumulativePayment *big.Int,
+) (*OnDemandLedger, error) {
+	return newOnDemandLedger(totalDeposits, pricePerSymbol, minNumSymbols, nil, cumulativePayment)
+}
+
+// Creates an OnDemandLedger, checking all input parameters
+func newOnDemandLedger(
 	totalDeposits *big.Int,
 	pricePerSymbol *big.Int,
 	minNumSymbols uint64,
-	cumulativePaymentStore CumulativePaymentStore,
+	cumulativePaymentStore *CumulativePaymentStore,
+	cumulativePayment *big.Int,
 ) (*OnDemandLedger, error) {
 	if totalDeposits == nil {
 		return nil, errors.New("totalDeposits cannot be nil")
@@ -69,15 +115,22 @@ func NewOnDemandLedger(
 		return nil, errors.New("pricePerSymbol cannot be negative")
 	}
 
-	if cumulativePaymentStore == nil {
-		return nil, errors.New("cumulativePaymentStore cannot be nil")
+	if cumulativePayment == nil {
+		return nil, errors.New("cumulativePayment cannot be nil")
+	}
+	if cumulativePayment.Sign() < 0 {
+		return nil, errors.New("cumulativePayment cannot be negative")
+	}
+	if cumulativePayment.Cmp(totalDeposits) > 0 {
+		return nil, errors.New("cumulativePayment cannot exceed totalDeposits")
 	}
 
 	return &OnDemandLedger{
-		totalDeposits:          totalDeposits,
-		pricePerSymbol:         pricePerSymbol,
+		totalDeposits:          new(big.Int).Set(totalDeposits),
+		pricePerSymbol:         new(big.Int).Set(pricePerSymbol),
 		minNumSymbols:          minNumSymbols,
 		cumulativePaymentStore: cumulativePaymentStore,
+		cumulativePayment:      new(big.Int).Set(cumulativePayment),
 	}, nil
 }
 
@@ -109,33 +162,58 @@ func (odl *OnDemandLedger) Debit(
 
 	blobCost := odl.computeCost(symbolCount)
 
-	newCumulativePayment, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
-	if err != nil {
-		return nil, fmt.Errorf("add cumulative payment: %w", err)
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	newCumulativePayment := new(big.Int).Add(odl.cumulativePayment, blobCost)
+	if newCumulativePayment.Cmp(odl.totalDeposits) > 0 {
+		return nil, &InsufficientFundsError{
+			CurrentCumulativePayment: odl.cumulativePayment,
+			TotalDeposits:            odl.totalDeposits,
+			BlobCost:                 blobCost,
+		}
 	}
+
+	// StoreCumulativePayment has safe behavior even if the receiver is nil
+	err = odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
+	if err != nil {
+		return nil, fmt.Errorf("store cumulative payment: %w", err)
+	}
+
+	odl.cumulativePayment.Set(newCumulativePayment)
 
 	return newCumulativePayment, nil
 }
 
 // RevertDebit reverts a previous debit operation, following a failed dispersal.
 //
-// Note: this method will only succeed if the underlying CumulativePaymentStore supports subtracting from the
-// cumulative payment.
-func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) error {
+// Returns the new cumulative payment amount after the revert.
+func (odl *OnDemandLedger) RevertDebit(ctx context.Context, symbolCount uint32) (*big.Int, error) {
 	if symbolCount == 0 {
-		return errors.New("symbolCount must be > 0")
+		return nil, errors.New("symbolCount must be > 0")
 	}
 
-	// Use AddCumulativePayment with a negative value
 	blobCost := odl.computeCost(symbolCount)
 	blobCost.Neg(blobCost)
 
-	_, err := odl.cumulativePaymentStore.AddCumulativePayment(ctx, blobCost, odl.totalDeposits)
-	if err != nil {
-		return fmt.Errorf("add cumulative payment: %w", err)
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	newCumulativePayment := new(big.Int).Add(odl.cumulativePayment, blobCost)
+	if newCumulativePayment.Sign() < 0 {
+		return nil, fmt.Errorf("operation would result in negative cumulative payment: current=%s, addition amount=%s",
+			odl.cumulativePayment.String(), blobCost.String())
 	}
 
-	return nil
+	// StoreCumulativePayment has safe behavior even if the receiver is nil
+	err := odl.cumulativePaymentStore.StoreCumulativePayment(ctx, newCumulativePayment)
+	if err != nil {
+		return nil, fmt.Errorf("store cumulative payment: %w", err)
+	}
+
+	odl.cumulativePayment.Set(newCumulativePayment)
+
+	return newCumulativePayment, nil
 }
 
 // Checks whether all input quorum IDs are supported for on demand payments

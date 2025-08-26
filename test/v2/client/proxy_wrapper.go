@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
@@ -38,7 +38,7 @@ func NewProxyWrapper(
 	registry := prometheus.NewRegistry()
 	proxyMetrics := proxymetrics.NewMetrics(registry)
 
-	storeManager, err := builder.BuildStoreManager(
+	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
 		proxyMetrics,
@@ -50,7 +50,7 @@ func NewProxyWrapper(
 		return nil, fmt.Errorf("build store manager: %w", err)
 	}
 
-	proxyServer := server.NewServer(proxyConfig.ServerConfig, storeManager, logger, proxyMetrics)
+	proxyServer := server.NewServer(proxyConfig.ServerConfig, certMgr, keccakMgr, logger, proxyMetrics)
 
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)

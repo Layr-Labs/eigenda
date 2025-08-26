@@ -59,7 +59,7 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	EigenDADirectory                string
-	BLSOperatorStateRetrieverAddr   string
+	OperatorStateRetrieverAddr      string
 	EigenDAServiceManagerAddr       string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
@@ -381,7 +381,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		OperatorStateRetrieverAddr:          ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,

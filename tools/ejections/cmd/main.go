@@ -68,7 +68,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewReader(logger, client, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
