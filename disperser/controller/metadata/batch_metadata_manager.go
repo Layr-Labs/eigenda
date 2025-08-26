@@ -3,12 +3,12 @@ package metadata
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync/atomic"
 	"time"
 
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -40,8 +40,8 @@ type batchMetadataManager struct {
 	// into the contract bindings in this file.
 	indexedChainState core.IndexedChainState
 
-	// A handle for communicating with the registry coordinator contract.
-	registryCoordinator *regcoordinator.ContractRegistryCoordinator
+	// A utility for fetching the list of registered quorums for a given reference block number.
+	quorumScanner eth.QuorumScanner
 
 	// Used to look up the reference block number (RBN) to use for batch creation.
 	referenceBlockProvider ReferenceBlockProvider
@@ -71,20 +71,19 @@ func NewBatchMetadataManager(
 	referenceBlockOffset uint64,
 ) (BatchMetadataManager, error) {
 
-	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(
-		registryCoordinatorAddress, contractBackend)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create registry coordinator client: %w", err)
-	}
-
 	rbnProvider := NewReferenceBlockProvider(logger, contractBackend, referenceBlockOffset)
+
+	quorumScanner, err := eth.NewQuorumScanner(contractBackend, registryCoordinatorAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create quorum scanner: %w", err)
+	}
 
 	manager := &batchMetadataManager{
 		ctx:                    ctx,
 		logger:                 logger,
 		metadata:               atomic.Pointer[BatchMetadata]{},
 		indexedChainState:      indexedChainState,
-		registryCoordinator:    registryCoordinator,
+		quorumScanner:          quorumScanner,
 		referenceBlockProvider: rbnProvider,
 		updatePeriod:           updatePeriod,
 	}
@@ -111,30 +110,6 @@ func (m *batchMetadataManager) Close() {
 	m.alive.Store(false)
 }
 
-// get a list of all quorums that are registered for a particular reference block number.
-func (m *batchMetadataManager) getQuorums(referenceBlockNumber uint64) ([]core.QuorumID, error) {
-
-	// TODO (cody.littley): replace this with a reusable utility
-
-	// Quorums are assigned starting at 0, and then sequentially without gaps. If we
-	// know the number of quorums, we can generate a list of quorum IDs.
-
-	quorumCount, err := m.registryCoordinator.QuorumCount(&bind.CallOpts{
-		Context:     m.ctx,
-		BlockNumber: new(big.Int).SetUint64(referenceBlockNumber),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get quorum count: %w", err)
-	}
-
-	quorums := make([]core.QuorumID, quorumCount)
-	for i := uint8(0); i < quorumCount; i++ {
-		quorums[i] = i
-	}
-
-	return quorums, nil
-}
-
 // updateMetadata fetches the latest batch metadata from the blockchain and updates m.operatorState.
 // This method is called periodically to ensure that metadata reflects a recent(ish) reference block.
 func (m *batchMetadataManager) updateMetadata() error {
@@ -144,13 +119,20 @@ func (m *batchMetadataManager) updateMetadata() error {
 	}
 
 	previousMetadata := m.metadata.Load()
-	if previousMetadata != nil && referenceBlockNumber == previousMetadata.referenceBlockNumber {
-		// Only update if the new RBN is greater than the most recent one.
-		m.logger.Infof("reference block number %d is the same as the previous one, skipping update")
-		return nil
+	if previousMetadata != nil {
+		// reference block provider prevents RBN from going backwards
+		enforce.GreaterThanOrEqual(referenceBlockNumber, previousMetadata.referenceBlockNumber,
+			"reference block number went backwards")
+
+		if referenceBlockNumber == previousMetadata.referenceBlockNumber {
+			// Only update if the new RBN is greater than the most recent one.
+			m.logger.Infof("reference block number %d is the same as the previous one, skipping update",
+				referenceBlockNumber)
+			return nil
+		}
 	}
 
-	quorums, err := m.getQuorums(referenceBlockNumber)
+	quorums, err := m.quorumScanner.GetQuorums(m.ctx, referenceBlockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get quorums for block %d: %w", referenceBlockNumber, err)
 	}
