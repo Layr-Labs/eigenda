@@ -38,6 +38,8 @@ type LoadGenerator struct {
 	relayReadLimiter chan struct{}
 	// The channel to limit the number of parallel blob reads sent to the validators.
 	validatorReadLimiter chan struct{}
+	// The channel to limit the number of parallel gas estimation operations.
+	gasEstimationLimiter chan struct{}
 	// The channel to limit the number of blobs in all phases of the read/write lifecycle.
 	lifecycleLimiter chan struct{}
 	// if true, the load generator is running.
@@ -98,6 +100,7 @@ func NewLoadGenerator(
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
 	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
 	validatorReadLimiter := make(chan struct{}, config.ValidatorReadParallelism)
+	gasEstimationLimiter := make(chan struct{}, config.GasEstimationParallelism)
 	lifecycleLimiter := make(chan struct{},
 		config.SubmissionParallelism+
 			config.RelayReadParallelism+
@@ -129,6 +132,7 @@ func NewLoadGenerator(
 		submissionFrequency:  submissionFrequency,
 		submissionLimiter:    submissionLimiter,
 		relayReadLimiter:     relayReadLimiter,
+		gasEstimationLimiter: gasEstimationLimiter,
 		lifecycleLimiter:     lifecycleLimiter,
 		validatorReadLimiter: validatorReadLimiter,
 		alive:                atomic.Bool{},
@@ -258,12 +262,26 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	}
 
 	// Estimate gas for CheckDACert call
-	_, err = l.client.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	go l.estimateGasCheckDACertAsync(eigenDAV3Cert)
+
+	return blobKey, payload, eigenDACert, nil
+}
+
+// estimateGasCheckDACertAsync performs gas estimation in a separate goroutine to avoid blocking blob dispersal.
+func (l *LoadGenerator) estimateGasCheckDACertAsync(eigenDAV3Cert *coretypes.EigenDACertV3) {
+	l.gasEstimationLimiter <- struct{}{}
+	defer func() {
+		<-l.gasEstimationLimiter
+	}()
+
+	gasTimeout := time.Duration(l.config.GasEstimationTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), gasTimeout)
+	defer cancel()
+
+	_, err := l.client.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to estimate gas for CheckDACert call: %v", err)
 	}
-
-	return blobKey, payload, eigenDACert, nil
 }
 
 func (l *LoadGenerator) readAndWriteBlobWithProxy() {
