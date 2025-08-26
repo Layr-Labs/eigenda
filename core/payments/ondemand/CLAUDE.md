@@ -11,7 +11,7 @@ to pay for blobs as they are dispersed.
 
 - `on_demand_ledger.go` - Tracks cumulative payment state for on-demand dispersals for a single account
 - `on_demand_ledgers.go` - Tracks cumulative payment state for on-demand dispersals for multiple accounts
-- `cumulative_payment_store.go` - Interface for storing and retrieving cumulative payment state
+- `cumulative_payment_store.go` - Struct for storing and retrieving cumulative payment state in/from DynamoDB
 - `errors.go` - Error types for on-demand payment failures
 
 ## Sub-packages

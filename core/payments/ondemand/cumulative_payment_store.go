@@ -30,7 +30,9 @@ const (
 // writer now, which doesn't need any of the distributed DB properties provided by DynamoDB.
 // 2. Implement a write queue, so that the caller doesn't need to wait for the write to complete. The callers of the
 // CumulativePaymentStore just need *eventual* persistence of the cumulative payment, so using a queue would be
-// sufficient, and would free the caller from blocking on I/O.
+// sufficient, and would free the caller from blocking on I/O. Note that this optimization would make undercharging
+// a possibility, if a crash happens before a piece of usage data has been persisted. This is an acceptable
+// tradeoff for simplified architecture and improved performance.
 type CumulativePaymentStore struct {
 	// The DynamoDB client to use for storage operations
 	dynamoClient *dynamodb.Client
@@ -71,6 +73,11 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 	ctx context.Context,
 	newCumulativePayment *big.Int,
 ) error {
+	if s == nil {
+		// sane no-op behavior, since using a payment store is optional
+		return nil
+	}
+
 	if newCumulativePayment == nil {
 		return errors.New("newCumulativePayment cannot be nil")
 	}
@@ -78,19 +85,19 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 		return fmt.Errorf("cumulative payment cannot be negative: received %s", newCumulativePayment.String())
 	}
 
-    _, err := s.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-        TableName:        s.tableName,
-        Key:              s.accountKey,
-        UpdateExpression: aws.String("SET #cp = :new"),
-        ExpressionAttributeNames: map[string]string{
-            "#cp": attributeCumulativePayment,
-        },
-        ExpressionAttributeValues: map[string]types.AttributeValue{
-            ":new": &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
-        },
-    })
+	_, err := s.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:        s.tableName,
+		Key:              s.accountKey,
+		UpdateExpression: aws.String("SET #cp = :newValue"),
+		ExpressionAttributeNames: map[string]string{
+			"#cp": attributeCumulativePayment,
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":newValue": &types.AttributeValueMemberN{Value: newCumulativePayment.String()},
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("put cumulative payment: %w", err)
+		return fmt.Errorf("update cumulative payment: %w", err)
 	}
 
 	return nil
@@ -98,11 +105,12 @@ func (s *CumulativePaymentStore) StoreCumulativePayment(
 
 // Retrieves the current cumulative payment value from DynamoDB
 func (s *CumulativePaymentStore) GetCumulativePayment(ctx context.Context) (*big.Int, error) {
-    resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
-        TableName:            s.tableName,
-        Key:                  s.accountKey,
-        ProjectionExpression: aws.String(attributeCumulativePayment),
-    })
+	resp, err := s.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:            s.tableName,
+		Key:                  s.accountKey,
+		ConsistentRead:       aws.Bool(true),
+		ProjectionExpression: aws.String(attributeCumulativePayment),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get item: %w", err)
 	}
