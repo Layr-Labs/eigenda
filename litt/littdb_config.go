@@ -164,7 +164,7 @@ type Config struct {
 
 	// If Flush() is called more frequently than this interval, the flushes may be batched together to improve
 	// performance. If this is set to zero, then no batching is performed and all flushes are executed immediately.
-	MinimumFlushInterval time.Duration // TODO set this in the validator software
+	MinimumFlushInterval time.Duration
 }
 
 // DefaultConfig returns a Config with default values.
