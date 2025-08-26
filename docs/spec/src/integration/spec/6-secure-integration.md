@@ -29,7 +29,7 @@ The diagram below shows the step-by-step transformation from input to final roll
   - Implementation varies by requirement (e.g., key-value mapping for optimistic fault proofs)
 - **Host:** Entity that provides preimage oracle responses
 
-> A encoded payload is an intermdeidate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
+> A encoded payload is an intermediate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
 
 
 ![](../../assets/integration/eigenda-blob-derivation.png)
@@ -80,7 +80,7 @@ Each integration can be tailored to fit specific rollup protocol constraints.
 Rollups can split the derivation pipeline between on-chain execution and off-chain verification which is secured by some proof system. This degree
 of freedom allows for variants of integrations that tailored to individual stacks. For examples,
 - **Arbitrum with EigenDA V1:** All components through cert validity checked in rollup inbox
-- **OP Optimstic Fault Proof Integration:** Entire EigenDA blob derivation executes off-chain, and they are secured by the OP [FPVM](https://specs.optimism.io/fault-proof/index.html#fault-proof-vm) proof system. 
+- **OP Optimistic Fault Proof Integration:** Entire EigenDA blob derivation executes off-chain, and they are secured by the OP [FPVM](https://specs.optimism.io/fault-proof/index.html#fault-proof-vm) proof system. 
 
 ### Securely integrating with any VM
 
@@ -97,7 +97,7 @@ In order to secure parts from the EigenDA blob derivation taking place off-chain
 
 ### Secure integration with ZKVM
 
-The ZKVM integration must also satisfy the requirements described above. Using a ZKVM can also eliminate the need for pessimistic on‑chain execution,
+The ZKVM integration must also satisfy the requirements described above. Using a ZKVM can also eliminate the need for pessimistic on-chain execution,
 but more importantly it allows the system to either act as a ZK rollup or as a standard optimistic rollup that relies on a challenge mechanism.
 - ZK rollup integration: Every time the L2 state is updated to L1, a ZK proof must accompany it, covering all state changes since the previous valid update.
 - Optimistic ZK fault‑proof integration: Functionally identical to the standard Optimistic Fault‑Proof integration, except the proof system runs on the ZKVM.
@@ -125,7 +125,7 @@ The proxy combines:
 This check enforces timing guarantees: once a cert lands in the batcher inbox, optimistic and zk rollup validators must have enough time to download the EigenDA blob.
 
 
-We use fault proofs to motivate the need for a recency check. A similar reason exists for zk rollup, where the validator of zk rollup must be able to download the eigenDA blob after the rollup prover posts the L2 state update on L1. 
+We use fault proofs to motivate the need for a recency check. A similar reason exists for zk rollup, where the validator of zk rollup must be able to download the EigenDA blob after the rollup prover posts the L2 state update on L1. 
 
 ![](../../assets/integration/recency-window-timeline.png)
 
