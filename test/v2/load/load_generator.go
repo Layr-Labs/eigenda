@@ -261,7 +261,6 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	_, err = l.client.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to estimate gas for CheckDACert call: %v", err)
-		return corev2.BlobKey{}, nil, nil, fmt.Errorf("failed to estimate gas for CheckDACert call: %w", err)
 	}
 
 	return blobKey, payload, eigenDACert, nil
