@@ -29,7 +29,7 @@ The diagram below shows the step-by-step transformation from input to final roll
   - Implementation varies by requirement (e.g., key-value mapping for optimistic fault proofs)
 - **Host:** Entity that provides preimage oracle responses
 
-> A encoded payload is an intermediate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
+> An encoded payload is an intermediate artifact between the rollup payload and the EigenDA blob. See its [definition](./3-data-structs.md/#encodedpayload).
 
 
 ![](../../assets/integration/eigenda-blob-derivation.png)
