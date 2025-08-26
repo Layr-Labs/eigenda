@@ -84,7 +84,9 @@ func run(ctx *cli.Context) error {
 	logger.Info("Using graph node")
 
 	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+	// Add a test query to verify connectivity
 	indexer := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	logger.Info("Created indexer, will test connectivity on first request")
 
 	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 

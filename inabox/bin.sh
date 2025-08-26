@@ -12,13 +12,18 @@ function kill_processes {
 function start_trap {
     trap kill_processes SIGINT
 
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    ../operators/churner/bin/server &
+    # Check if churner is provided by testinfra
+    if [ -z "$CHURNER_URL" ]; then
+        set -a
+        source $testpath/envs/churner.env
+        set +a
+        ../operators/churner/bin/server &
 
-    pid="$!"
-    pids="$pids $pid"
+        pid="$!"
+        pids="$pids $pid"
+    else
+        echo "Using churner from testinfra at $CHURNER_URL"
+    fi
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -111,25 +116,30 @@ function start_detached {
     
     mkdir -p $testpath/logs
 
-    echo "DEBUG: Starting churner service"
-    if [ ! -f "../operators/churner/bin/server" ]; then
-        echo "ERROR: Churner binary not found at ../operators/churner/bin/server"
-        echo "DEBUG: Current directory: $(pwd)"
-        echo "DEBUG: Available files in ../operators/churner/bin/: $(ls -la ../operators/churner/bin/ 2>/dev/null || echo 'directory not found')"
-        exit 1
+    # Check if churner is provided by testinfra
+    if [ -n "$CHURNER_URL" ]; then
+        echo "DEBUG: Using churner from testinfra at $CHURNER_URL"
+    else
+        echo "DEBUG: Starting churner service"
+        if [ ! -f "../operators/churner/bin/server" ]; then
+            echo "ERROR: Churner binary not found at ../operators/churner/bin/server"
+            echo "DEBUG: Current directory: $(pwd)"
+            echo "DEBUG: Available files in ../operators/churner/bin/: $(ls -la ../operators/churner/bin/ 2>/dev/null || echo 'directory not found')"
+            exit 1
+        fi
+        set -a
+        source $testpath/envs/churner.env
+        set +a
+        echo "DEBUG: Churner will listen on port: ${CHURNER_GRPC_PORT}"
+        ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        echo "DEBUG: Starting wait-for churner on port ${CHURNER_GRPC_PORT}"
+        ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -t 30 -- echo "Churner up" &
+        waiters="$waiters $!"
     fi
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    echo "DEBUG: Churner will listen on port: ${CHURNER_GRPC_PORT}"
-    ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
-
-    pid="$!"
-    pids="$pids $pid"
-
-    echo "DEBUG: Starting wait-for churner on port ${CHURNER_GRPC_PORT}"
-    ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -t 30 -- echo "Churner up" &
-    waiters="$waiters $!"
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a

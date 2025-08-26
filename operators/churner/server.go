@@ -55,11 +55,15 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 }
 
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
+	s.logger.Info("Churn request received", "operator", req.GetOperatorAddress(), "quorumIds", req.GetQuorumIds())
+	
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
+		s.logger.Error("Churn request validation failed", "error", err, "operator", req.GetOperatorAddress())
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid request: %s", err.Error()))
 	}
+	s.logger.Info("Churn request validated successfully", "operator", req.GetOperatorAddress())
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("Churn", f*1000) // make milliseconds
@@ -69,32 +73,43 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	now := time.Now()
 	// Global rate limiting: check that we are after the previous approval's expiry
+	s.logger.Info("Checking global rate limit", "now", now.Unix(), "latestExpiry", s.latestExpiry)
 	if now.Unix() < s.latestExpiry {
+		s.logger.Warn("Previous approval not expired", "retryIn", s.latestExpiry-now.Unix())
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("previous approval not expired, retry in %d seconds", s.latestExpiry-now.Unix()))
 	}
 
+	s.logger.Info("Creating churn request object")
 	request, err := createChurnRequest(req)
 	if err != nil {
+		s.logger.Error("Failed to create churn request", "error", err)
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
+	s.logger.Info("Verifying request signature")
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
+		s.logger.Error("Failed to verify request signature", "error", err)
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
 	}
+	s.logger.Info("Request signature verified", "operatorAddress", operatorToRegisterAddress.Hex())
 
 	// Per-operator rate limiting: check if the request should be rate limited
+	s.logger.Info("Checking per-operator rate limit")
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
+		s.logger.Warn("Rate limit exceeded", "error", err)
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limiter error: %s", err.Error()))
 	}
 
+	s.logger.Info("Processing churn request", "operator", operatorToRegisterAddress.Hex())
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
 	if err != nil {
+		s.logger.Error("Failed to process churn request", "error", err)
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}

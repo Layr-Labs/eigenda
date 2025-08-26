@@ -41,6 +41,7 @@ type InfraManager struct {
 	anvil      *containers.AnvilContainer
 	localstack *containers.LocalStackContainer
 	graphnode  *containers.GraphNodeContainer
+	churner    *containers.ChurnerContainer
 	network    *testcontainers.DockerNetwork
 	result     InfraResult
 }
@@ -311,6 +312,56 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
+	// 8. Start churner if enabled and EigenDA contracts are deployed
+	if im.config.EigenDA.Churner.Enabled && im.result.EigenDAContracts != nil {
+		fmt.Println("Starting churner service...")
+		
+		// Configure churner with deployed contract addresses
+		churnerConfig := im.config.EigenDA.Churner.ChurnerConfig
+		churnerConfig.EigenDADirectory = im.config.EigenDA.RootPath
+		churnerConfig.OperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+		churnerConfig.ServiceManager = im.result.EigenDAContracts.ServiceManager
+		
+		// Use internal Anvil URL for containers on the same network
+		if im.network != nil && im.anvil != nil {
+			churnerConfig.ChainRPC = "http://anvil:8545"
+		} else {
+			churnerConfig.ChainRPC = im.result.AnvilRPC
+		}
+		
+		// Use deployer private key for churner
+		deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
+		if deployerPrivateKey == "" {
+			deployerPrivateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+		}
+		churnerConfig.PrivateKey = deployerPrivateKey
+		
+		// Set Graph URL if Graph Node is enabled
+		if im.config.GraphNode.Enabled && im.graphnode != nil {
+			if im.network != nil {
+				// Use internal URL for containers on the same network
+				churnerConfig.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			} else {
+				churnerConfig.GraphURL = im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			}
+		}
+		
+		// Start the churner container
+		churner, err := containers.NewChurnerContainerWithNetwork(ctx, churnerConfig, im.network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start churner: %w", err)
+		}
+		im.churner = churner
+		im.result.ChurnerURL = churner.URL()
+		
+		// Use internal URL for other containers
+		if im.network != nil {
+			im.result.ChurnerInternalURL = churner.InternalURL()
+		}
+		
+		fmt.Printf("✅ Churner service started at %s\n", im.result.ChurnerURL)
+	}
+
 	success = true
 	return &im.result, nil
 }
@@ -325,6 +376,17 @@ func (im *InfraManager) cleanup(ctx context.Context) error {
 	var errs []error
 
 	// Terminate in reverse dependency order
+	if im.churner != nil {
+		// Print log path for debugging
+		if logPath := im.churner.LogPath(); logPath != "" {
+			fmt.Printf("Churner logs available at: %s\n", logPath)
+		}
+		if err := im.churner.Terminate(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to terminate churner: %w", err))
+		}
+		im.churner = nil
+	}
+
 	if im.graphnode != nil {
 		if err := im.graphnode.Terminate(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to terminate graph node: %w", err))

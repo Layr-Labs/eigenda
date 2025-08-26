@@ -133,6 +133,9 @@ var _ = BeforeSuite(func() {
 		config.EigenDA.RetrievalClients.G2PowerOf2Path = "resources/kzg/g2.point.300000.powerOf2"
 		config.EigenDA.RetrievalClients.CachePath = "resources/kzg/SRSTables"
 
+		// Enable churner service
+		config.EigenDA.Churner.Enabled = true
+
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
 			config.LocalStack.Enabled = false
@@ -223,6 +226,17 @@ var _ = BeforeSuite(func() {
 			testConfig.DisperserAddress = infraResult.DisperserAddress
 			fmt.Printf("✅ Using disperser keypair from testinfra: KMS Key ID: %s, Address: %s\n",
 				testConfig.DisperserKMSKeyID, testConfig.DisperserAddress.Hex())
+		}
+
+		// Pass churner URL from testinfra to GenerateAllVariables if available
+		if infraResult.ChurnerURL != "" {
+			// Use external URL for local binaries
+			os.Setenv("CHURNER_URL", infraResult.ChurnerURL)
+			fmt.Printf("✅ Using churner from testinfra: %s\n", infraResult.ChurnerURL)
+			// Verify it was set
+			fmt.Printf("✅ CHURNER_URL env var is now: %s\n", os.Getenv("CHURNER_URL"))
+		} else {
+			fmt.Printf("⚠️ No ChurnerURL in infraResult\n")
 		}
 
 		// Generate all config variables for the binaries. Depends on the test config being set

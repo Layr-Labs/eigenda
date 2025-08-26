@@ -84,6 +84,18 @@ type EigenDAConfig struct {
 
 	// Payload disperser configuration
 	PayloadDisperser PayloadDisperserConfig `json:"payload_disperser"`
+
+	// Churner configuration
+	Churner ChurnerConfig `json:"churner"`
+}
+
+// ChurnerConfig defines configuration for the churner service
+type ChurnerConfig struct {
+	// Enable churner service
+	Enabled bool `json:"enabled"`
+
+	// Container configuration (if using containerized churner)
+	containers.ChurnerConfig
 }
 
 // RetrievalClientsConfig defines configuration for setting up retrieval clients
@@ -230,6 +242,12 @@ func DefaultEigenDAConfig(rootPath string) InfraConfig {
 		ContractCallTimeout:    5 * time.Second,
 	}
 
+	// Configure Churner with default values
+	config.EigenDA.Churner = ChurnerConfig{
+		Enabled: true,
+		ChurnerConfig: containers.DefaultChurnerConfig(),
+	}
+
 	return config
 }
 
@@ -263,6 +281,10 @@ type InfraResult struct {
 
 	// Payload disperser components (populated if EigenDA contracts are deployed and PayloadDisperser.Enabled=true)
 	PayloadDisperser *PayloadDisperserComponents `json:"payload_disperser,omitempty"`
+
+	// Churner service URLs (populated if Churner.Enabled=true)
+	ChurnerURL         string `json:"churner_url,omitempty"`
+	ChurnerInternalURL string `json:"churner_internal_url,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests

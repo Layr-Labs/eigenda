@@ -101,11 +101,15 @@ func (c *churner) VerifyRequestSignature(ctx context.Context, churnRequest *Chur
 
 func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAddress gethcommon.Address, churnRequest *ChurnRequest) (*ChurnResponse, error) {
 	operatorToRegisterId := churnRequest.OperatorToRegisterPubkeyG1.GetOperatorID()
+	c.logger.Info("ProcessChurnRequest started", "operatorId", fmt.Sprintf("%x", operatorToRegisterId), "address", operatorToRegisterAddress.Hex())
 
+	c.logger.Info("Getting current quorum bitmap for operator")
 	quorumBitmap, err := c.Transactor.GetCurrentQuorumBitmapByOperatorId(ctx, operatorToRegisterId)
 	if err != nil {
+		c.logger.Error("Failed to get quorum bitmap", "error", err, "operatorId", fmt.Sprintf("%x", operatorToRegisterId))
 		return nil, err
 	}
+	c.logger.Info("Got quorum bitmap", "bitmap", quorumBitmap)
 
 	quorumIDsAlreadyRegisteredFor := eth.BitmapToQuorumIds(quorumBitmap)
 
@@ -143,16 +147,24 @@ func (c *churner) createChurnResponse(
 	operatorToRegisterId core.OperatorID,
 	quorumIDs []core.QuorumID,
 ) (*ChurnResponse, error) {
+	c.logger.Info("Creating churn response", "operatorId", fmt.Sprintf("%x", operatorToRegisterId), "quorumIDs", quorumIDs)
+	
+	c.logger.Info("Getting current block number")
 	currentBlockNumber, err := c.Transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
+		c.logger.Error("Failed to get current block number", "error", err)
 		return nil, err
 	}
+	c.logger.Info("Current block number", "block", currentBlockNumber)
 
 	// get the operator list for each quorum
+	c.logger.Info("Getting operator stakes for quorums", "quorumIDs", quorumIDs, "blockNumber", currentBlockNumber)
 	operatorStakes, err := c.Transactor.GetOperatorStakesForQuorums(ctx, quorumIDs, currentBlockNumber)
 	if err != nil {
+		c.logger.Error("Failed to get operator stakes", "error", err, "quorumIDs", quorumIDs)
 		return nil, err
 	}
+	c.logger.Info("Got operator stakes", "numQuorums", len(operatorStakes))
 
 	// get the registering operator's stakes for each quorum
 	operatorsToChurn, err := c.getOperatorsToChurn(ctx, quorumIDs, operatorStakes, operatorToRegisterAddress, currentBlockNumber)

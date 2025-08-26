@@ -161,7 +161,7 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort string) ChurnerVars {
 	v := ChurnerVars{
 		CHURNER_LOG_FORMAT:                  "text",
-		CHURNER_HOSTNAME:                    "",
+		CHURNER_HOSTNAME:                    "localhost",
 		CHURNER_GRPC_PORT:                   grpcPort,
 		CHURNER_EIGENDA_DIRECTORY:           env.EigenDA.EigenDADirectory,
 		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
@@ -654,18 +654,32 @@ func (env *Config) GenerateAllVariables() {
 	// Create participants
 	port := env.Services.BasePort
 
-	// Generate churners
-	name := "churner"
-	port += 2
-	logPath, _, filename, envFile := env.getPaths(name)
-	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
-	writeEnv(churnerConfig.getEnvMap(), envFile)
-	env.Churner = churnerConfig
-	env.genService(
-		compose, name, churnerImage,
-		filename, []string{fmt.Sprint(port)})
-
-	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
+	// Determine churner URL - either from testinfra or generate locally
+	var churnerUrl string
+	var name string
+	
+	// Check if churner URL is provided from testinfra
+	if envChurnerUrl := os.Getenv("CHURNER_URL"); envChurnerUrl != "" {
+		// Use churner from testinfra
+		churnerUrl = envChurnerUrl
+		fmt.Printf("Using churner from testinfra at %s\n", churnerUrl)
+		// Still need to increment port to avoid conflicts with churner's port
+		port += 2
+	} else {
+		fmt.Printf("CHURNER_URL not set, generating local churner config\n")
+		// Generate churner locally (legacy path for non-testinfra deployments)
+		name = "churner"
+		port += 2
+		logPath, _, filename, envFile := env.getPaths(name)
+		churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
+		writeEnv(churnerConfig.getEnvMap(), envFile)
+		env.Churner = churnerConfig
+		env.genService(
+			compose, name, churnerImage,
+			filename, []string{fmt.Sprint(port)})
+		
+		churnerUrl = fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
+	}
 
 	// Generate disperser nodes
 

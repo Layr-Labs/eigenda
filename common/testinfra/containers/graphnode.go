@@ -248,7 +248,7 @@ func startGraphNode(
 		Name:       containerName,
 		Networks:   []string{nw.Name},
 		NetworkAliases: map[string][]string{
-			nw.Name: {"graph"},
+			nw.Name: {"graph-node"},
 		},
 	}
 
