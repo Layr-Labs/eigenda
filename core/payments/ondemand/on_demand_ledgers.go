@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
@@ -85,4 +86,30 @@ func (odl *OnDemandLedgers) getOrCreateLedger(
 
 	odl.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
+}
+
+// UpdateTotalDeposits updates the total deposits for multiple accounts.
+func (odl *OnDemandLedgers) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	var result *multierror.Error
+	for _, update := range updates {
+		ledger, exists := odl.ledgers.Get(update.AccountAddress)
+		if !exists {
+			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
+			// account ever makes an on-demand dispersal
+			continue
+		}
+
+		err := ledger.UpdateTotalDeposits(update.NewTotalDeposit)
+		if err != nil {
+			result = multierror.Append(
+				result, fmt.Errorf("failed to update deposits for account %v: %w", update.AccountAddress.Hex(), err))
+			continue
+		}
+	}
+
+	return result.ErrorOrNil()
 }
