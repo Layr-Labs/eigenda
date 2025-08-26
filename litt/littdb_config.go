@@ -161,6 +161,10 @@ type Config struct {
 	// permit multiple databases to be opened against the same data directories. If ever there are two LittDB
 	// instances running against the same data directories, data corruption is almost a certainty.
 	PurgeLocks bool
+
+	// If Flush() is called more frequently than this interval, the flushes may be batched together to improve
+	// performance. If this is set to zero, then no batching is performed and all flushes are executed immediately.
+	MinimumFlushInterval time.Duration // TODO set this in the validator software
 }
 
 // DefaultConfig returns a Config with default values.
