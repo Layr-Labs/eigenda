@@ -4,25 +4,35 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 // OnDemandLedgers manages and validates on-demand payments for multiple accounts
 type OnDemandLedgers struct {
-	// map from account ID to OnDemandLedger
-	ledgers map[gethcommon.Address]*OnDemandLedger
-
-	// lock protects concurrent access to the ledgers map
-	lock sync.Mutex
+	logger  logging.Logger
+	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
 }
 
-// NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator
-func NewOnDemandPaymentValidator() *OnDemandLedgers {
-	return &OnDemandLedgers{
-		ledgers: make(map[gethcommon.Address]*OnDemandLedger),
+// NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
+func NewOnDemandPaymentValidator(logger logging.Logger, maxLedgers int) (*OnDemandLedgers, error) {
+	cache, err := lru.NewWithEvict(
+		maxLedgers,
+		func(key gethcommon.Address, _ *OnDemandLedger) {
+			logger.Infof("purged account %v from LRU on-demand ledger cache", key)
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
+
+	return &OnDemandLedgers{
+		logger:  logger,
+		ledgers: cache,
+	}, nil
 }
 
 // Debit validates an on-demand payment for a blob dispersal
@@ -38,17 +48,10 @@ func (odl *OnDemandLedgers) Debit(
 		return fmt.Errorf("get or create on-demand ledger: %w", err)
 	}
 
-	// For on-demand payments, call Debit with actual values
 	_, err = ledger.Debit(ctx, symbolCount, quorumNumbers)
 	if err != nil {
 		return fmt.Errorf("debit on-demand payment: %w", err)
 	}
-
-	// TODO: Consider in what cases we should remove the ledger from the map
-	// Possible cases:
-	// - Account has exhausted all funds
-	// - Account has been inactive for a certain period
-	// - Explicit cleanup request
 
 	return nil
 }
@@ -58,10 +61,7 @@ func (odl *OnDemandLedgers) getOrCreateLedger(
 	ctx context.Context,
 	accountID gethcommon.Address,
 ) (*OnDemandLedger, error) {
-	odl.lock.Lock()
-	defer odl.lock.Unlock()
-
-	if ledger, exists := odl.ledgers[accountID]; exists {
+	if ledger, exists := odl.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
@@ -83,6 +83,6 @@ func (odl *OnDemandLedgers) getOrCreateLedger(
 		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
 	}
 
-	odl.ledgers[accountID] = newLedger
+	odl.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
 }
