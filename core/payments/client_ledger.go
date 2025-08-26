@@ -66,7 +66,7 @@ func NewClientLedger(
 	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
 	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
-) (*ClientLedger, error) {
+) *ClientLedger {
 	if accountantMetricer == nil {
 		accountantMetricer = metrics.NoopAccountantMetrics
 	}
@@ -95,6 +95,10 @@ func NewClientLedger(
 		panic(fmt.Sprintf("unknown clientLedgerMode %s", clientLedgerMode))
 	}
 
+	if getNow == nil {
+		panic("getNow must not be nil")
+	}
+
 	clientLedger := &ClientLedger{
 		logger:             logger,
 		accountantMetricer: accountantMetricer,
@@ -105,7 +109,7 @@ func NewClientLedger(
 		getNow:             getNow,
 	}
 
-	return clientLedger, nil
+	return clientLedger
 }
 
 // Accepts parameters describing the aspects of a blob dispersal that are relevant for accounting. Attempts to use the
