@@ -505,6 +505,43 @@ type PaymentMetadata struct {
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
+func NewPaymentMetadata(
+	// account that the payment is for. must not be a 0 address
+	accountID gethcommon.Address,
+	// the time of the dispersal, which is stored as a unix nano timestamp
+	timestamp time.Time,
+	// total number of wei paid by the account, for this and all previous on-demand dispersals
+	// if this is 0 or nil, it indicates that the dispersal will be paid for with a reservation
+	cumulativePayment *big.Int,
+) (*PaymentMetadata, error) {
+	if accountID == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("account ID cannot be zero address")
+	}
+
+	if cumulativePayment == nil {
+		return &PaymentMetadata{
+			AccountID:         accountID,
+			Timestamp:         timestamp.UnixNano(),
+			CumulativePayment: big.NewInt(0),
+		}, nil
+	}
+
+	if cumulativePayment.Sign() < 0 {
+		return nil, fmt.Errorf("cumulative payment cannot be negative")
+	}
+
+	return &PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         timestamp.UnixNano(),
+		CumulativePayment: cumulativePayment,
+	}, nil
+}
+
+// Returns true if the PaymentMetadata represents an on-demand payment, or false if it's a reservation payment
+func (pm *PaymentMetadata) IsOnDemand() bool {
+	return pm.CumulativePayment != nil && pm.CumulativePayment.Cmp(big.NewInt(0)) != 0
+}
+
 // Hash returns the Keccak256 hash of the PaymentMetadata
 func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 	if pm == nil {
@@ -631,7 +668,7 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 // ReservedPayment contains information the onchain state about a reserved payment
 //
 // TODO(litt3): this struct is in the process of being deprecated. It is used by the old accounting logic, but will
-// be replaced by the `reservation.Reservation` struct once the new accounting logic has superseded the old. At that
+// be replaced by the [reservation.Reservation] struct once the new accounting logic has superseded the old. At that
 // time, this struct should be deleted.
 type ReservedPayment struct {
 	// reserve number of symbols per second
