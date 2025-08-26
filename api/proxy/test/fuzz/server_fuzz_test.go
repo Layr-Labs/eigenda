@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
