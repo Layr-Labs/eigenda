@@ -76,17 +76,17 @@ func (c *flushCoordinator) Flush() error {
 	// send the request
 	err := util.Send(c.errorMonitor, c.requestChan, request)
 	if err != nil {
-		return fmt.Errorf("error sending flush coordinator request: %v", err)
+		return fmt.Errorf("error sending flush coordinator request: %w", err)
 	}
 
 	// await the response
 	response, err := util.Await(c.errorMonitor, request)
 	if err != nil {
-		return fmt.Errorf("error awaiting flush coordinator response: %v", err)
+		return fmt.Errorf("error awaiting flush coordinator response: %w", err)
 	}
 
 	if response != nil {
-		return fmt.Errorf("flush failed: %w", response.(error))
+		return fmt.Errorf("flush failed: %w", response)
 	}
 	return nil
 
@@ -112,16 +112,15 @@ func (c *flushCoordinator) controlLoop() {
 
 		if timerActive {
 			// There are pending flushes we want to handle, but we need to wait until the timer expires.
-
 			select {
 			case <-c.errorMonitor.ImmediateShutdownRequired():
 				return
 			case request := <-c.requestChan:
 				waitingRequests.Enqueue(request)
 			case <-timer.C:
-				// we can now perform a flush
-				err := c.Flush()
 
+				// we can now perform a flush
+				err := c.internalFlush()
 				// send a response to each waiting caller
 				for request, ok := waitingRequests.Dequeue(); ok; request, ok = waitingRequests.Dequeue() {
 					request.(flushCoordinatorRequest) <- err
@@ -131,7 +130,6 @@ func (c *flushCoordinator) controlLoop() {
 			}
 		} else {
 			// There are pending flushes, we can handle requests immediately if the rate limiter allows it.
-
 			select {
 			case <-c.errorMonitor.ImmediateShutdownRequired():
 				return
@@ -145,6 +143,7 @@ func (c *flushCoordinator) controlLoop() {
 
 					timeUntilPermitted := c.rateLimiter.Reserve().Delay()
 					timer.Reset(timeUntilPermitted)
+					timerActive = true
 				}
 			}
 		}

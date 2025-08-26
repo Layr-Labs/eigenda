@@ -189,7 +189,7 @@ func NewDiskTable(
 		metrics:        metrics,
 		fsync:          config.Fsync,
 	}
-	table.flushCoordinator = newFlushCoordinator(config.CTX, table.flushInternal, config.MinimumFlushInterval)
+	table.flushCoordinator = newFlushCoordinator(errorMonitor, table.flushInternal, config.MinimumFlushInterval)
 
 	snapshottingEnabled := config.SnapshotDirectory != ""
 
