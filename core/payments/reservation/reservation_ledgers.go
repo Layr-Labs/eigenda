@@ -1,43 +1,83 @@
 package reservation
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 // ReservationLedgers manages and validates reservation payments for multiple accounts
 type ReservationLedgers struct {
-	// map from account ID to ReservationLedger
-	ledgers map[gethcommon.Address]*ReservationLedger
+	logger       logging.Logger
+	ledgers      *lru.Cache[gethcommon.Address, *ReservationLedger]
+	onChainState meterer.OnchainPayment
 
-	// lock protects concurrent access to the ledgers map
-	lock sync.Mutex
-
-	// timeSource is a function that returns the current time
-	// This allows for easier testing and consistent time handling
 	timeSource func() time.Time
+
+	// Configuration for constructing underlying ReservationLedger instances
+	startFull            bool
+	overfillBehavior     OverfillBehavior
+	bucketCapacityPeriod time.Duration
 }
 
-// NewReservationPaymentValidator creates a new ReservationPaymentValidator
-func NewReservationPaymentValidator(timeSource func() time.Time) *ReservationLedgers {
-	return &ReservationLedgers{
-		ledgers:    make(map[gethcommon.Address]*ReservationLedger),
-		timeSource: timeSource,
+// NewReservationPaymentValidator creates a new ReservationLedgers with specified cache size and on-chain reader
+func NewReservationPaymentValidator(
+	logger logging.Logger,
+	maxLedgers int,
+	// expected to be initialized and have its background update thread started
+	onChainState meterer.OnchainPayment,
+	timeSource func() time.Time,
+	startFull bool,
+	overfillBehavior OverfillBehavior,
+	bucketCapacityPeriod time.Duration,
+) (*ReservationLedgers, error) {
+	if onChainState == nil {
+		return nil, errors.New("onChainState cannot be nil")
 	}
+	if maxLedgers <= 0 {
+		return nil, errors.New("maxLedgers must be > 0")
+	}
+	if bucketCapacityPeriod <= 0 {
+		return nil, errors.New("bucketCapacityPeriod must be > 0")
+	}
+
+	cache, err := lru.NewWithEvict(
+		maxLedgers,
+		func(key gethcommon.Address, _ *ReservationLedger) {
+			logger.Infof("evicted account %s from LRU reservation ledger cache", key.Hex())
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
+	}
+
+	return &ReservationLedgers{
+		logger:               logger,
+		ledgers:              cache,
+		onChainState:         onChainState,
+		timeSource:           timeSource,
+		startFull:            startFull,
+		overfillBehavior:     overfillBehavior,
+		bucketCapacityPeriod: bucketCapacityPeriod,
+	}, nil
 }
 
 // Debit validates a reservation payment for a blob dispersal
 // The caller is responsible for verifying the signature before calling this method
 func (rl *ReservationLedgers) Debit(
+	ctx context.Context,
 	accountID gethcommon.Address,
 	symbolCount uint32,
 	quorumNumbers []uint8,
 	dispersalTime time.Time,
 ) error {
-	ledger, err := rl.getOrCreateLedger(accountID)
+	ledger, err := rl.getOrCreateLedger(ctx, accountID)
 	if err != nil {
 		return fmt.Errorf("get or create reservation ledger: %w", err)
 	}
@@ -52,29 +92,53 @@ func (rl *ReservationLedgers) Debit(
 		return fmt.Errorf("reservation debit failed: insufficient capacity")
 	}
 
-	// TODO: Consider in what cases we should remove the ledger from the map
-	// Possible cases:
-	// - Reservation has expired
-	// - Account has been inactive for a certain period
-	// - Explicit cleanup request
-
 	return nil
 }
 
 // getOrCreateLedger gets an existing reservation ledger or creates a new one if it doesn't exist
-func (rl *ReservationLedgers) getOrCreateLedger(accountID gethcommon.Address) (*ReservationLedger, error) {
-	rl.lock.Lock()
-	defer rl.lock.Unlock()
-
-	if ledger, exists := rl.ledgers[accountID]; exists {
+func (rl *ReservationLedgers) getOrCreateLedger(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*ReservationLedger, error) {
+	if ledger, exists := rl.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
-	// TODO: These are placeholder values - need to get actual reservation from chain or config
-	// Creating placeholder reservation config
-	// NOTE: ReservationLedger requires a ReservationLedgerConfig and a time
-	// When implementing, use rl.timeSource() for the time parameter
-	// This is a placeholder implementation
-	return nil, fmt.Errorf(
-		"reservation ledger for account %s not found - placeholder creation not implemented", accountID.Hex())
+	// Fetch on-chain reservation for account
+	reservedPayment, err := rl.onChainState.GetReservedPaymentByAccount(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reserved payment for account %v: %w", accountID.Hex(), err)
+	}
+
+	// Build Reservation object
+	startTime := time.Unix(int64(reservedPayment.StartTimestamp), 0)
+	endTime := time.Unix(int64(reservedPayment.EndTimestamp), 0)
+
+	reservationObj, err := NewReservation(
+		reservedPayment.SymbolsPerSecond,
+		startTime,
+		endTime,
+		reservedPayment.QuorumNumbers)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationLedgerConfig, err := NewReservationLedgerConfig(
+		*reservationObj,
+		rl.startFull,
+		rl.overfillBehavior,
+		rl.bucketCapacityPeriod,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	now := rl.timeSource()
+	newLedger, err := NewReservationLedger(*reservationLedgerConfig, now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reservation ledger: %w", err)
+	}
+
+	rl.ledgers.Add(accountID, newLedger)
+	return newLedger, nil
 }
