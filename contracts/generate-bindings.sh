@@ -8,6 +8,7 @@ set -o errexit -o nounset -o pipefail
 #
 # This allows us to migrate contracts over time to use abigen v2 without introducing a very large
 # breaking change at once.
+# Make sure that `forge build` has been run before executing this script.
 
 binding_dir="./bindings"
 artifacts_root="./out"
@@ -101,9 +102,6 @@ create_golang_abi_binding() {
 }
 
 main() {
-  # Compile once
-  forge build
-
   # abigen v1
   for contract in "${ABIGEN_V1_CONTRACTS[@]}"; do
     create_golang_abi_binding "${contract}" ${abi_gen_v1}

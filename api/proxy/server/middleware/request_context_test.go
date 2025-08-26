@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -62,4 +63,8 @@ func (m *MockMetricer) RecordRPCServerRequest(method string) func(status string,
 }
 func (m *MockMetricer) RecordSecondaryRequest(bt string, method string) func(status string) {
 	return func(status string) {}
+}
+
+func (m *MockMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }
