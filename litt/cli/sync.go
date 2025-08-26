@@ -172,7 +172,7 @@ func (s *syncEngine) run() error {
 	// Wait for signal
 	select {
 	case <-s.ctx.Done():
-		s.logger.Infof("Received shutdown signal, stopping benchmark.")
+		s.logger.Infof("Received shutdown signal, stopping")
 	case <-sigChan:
 		// Cancel the context when signal is received
 		s.cancel()
