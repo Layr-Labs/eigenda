@@ -15,8 +15,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// TODO: write unit tests
-
 // The ClientLedger manages payment state for a single account. It is only used by *clients*, not by the disperser
 // or validator nodes.
 //
@@ -38,7 +36,7 @@ type ClientLedger struct {
 	accountID          gethcommon.Address
 
 	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
-	// that this is directly configurable by the user, to ensure that reality matches intention.
+	// that this be directly configurable by the user, to ensure that reality matches intention.
 	//
 	// Consider, for example, if a user intends to operate with a reservation covering the majority of dispersals,
 	// with an on-demand balance as a backup. If there is a configuration issue which prevents the reservation from
