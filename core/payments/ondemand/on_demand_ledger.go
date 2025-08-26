@@ -10,6 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
+// TODO: add unit tests for this struct
+
 // Keeps track of the cumulative payment state for on-demand dispersals for a single account.
 //
 // On-demand payments use a cumulative payment system where, each time a dispersal is made, we keep track of the total
@@ -231,6 +233,25 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 		}
 	}
 
+	return nil
+}
+
+// Updates the total deposits for this ledger
+//
+// Note: this function intentionally doesn't assert that total deposits strictly increases. While that will generally
+// be the case, it could theoretically happen that a reorg could cause this value to decrease.
+func (odl *OnDemandLedger) UpdateTotalDeposits(newTotalDeposits *big.Int) error {
+	if newTotalDeposits == nil {
+		return errors.New("newTotalDeposits cannot be nil")
+	}
+	if newTotalDeposits.Sign() < 0 {
+		return fmt.Errorf("newTotalDeposits cannot be negative, got %s", newTotalDeposits.String())
+	}
+
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	odl.totalDeposits.Set(newTotalDeposits)
 	return nil
 }
 
