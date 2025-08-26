@@ -1,7 +1,8 @@
 #!/bin/bash
 set -o errexit -o nounset -o pipefail
 
-# This script compiles the Solidity contracts and generates Go bindings using abigen.
+# This script uses abigen to generate Go bindings from pre-compiled contract artifacts.
+# Make sure that `forge build` has been run before executing this script.
 
 function create_binding_abi_only {
   contract_dir=$1
@@ -22,9 +23,6 @@ function create_binding_abi_only {
   # using `jq -r '.bytecode.object'` on the contract JSON file.
   abigen --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
 }
-
-forge clean
-forge build
 
 contracts="PaymentVault \
   SocketRegistry \
