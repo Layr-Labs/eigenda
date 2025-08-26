@@ -2,10 +2,13 @@ package ondemand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -13,26 +16,50 @@ import (
 
 // OnDemandLedgers manages and validates on-demand payments for multiple accounts
 type OnDemandLedgers struct {
-	logger  logging.Logger
-	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	logger       logging.Logger
+	ledgers      *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	onChainState meterer.OnchainPayment
+
+	dynamoClient      *dynamodb.Client
+	onDemandTableName string
 }
 
 // NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
-func NewOnDemandPaymentValidator(logger logging.Logger, maxLedgers int) (*OnDemandLedgers, error) {
+func NewOnDemandPaymentValidator(
+	logger logging.Logger,
+	maxLedgers int,
+	// expected to be initialized and have its background update thread started
+	onChainState meterer.OnchainPayment,
+	dynamoClient *dynamodb.Client,
+	onDemandTableName string,
+) (*OnDemandLedgers, error) {
+	if onChainState == nil {
+		return nil, errors.New("onChainState cannot be nil")
+	}
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
 		func(key gethcommon.Address, _ *OnDemandLedger) {
-			logger.Infof("purged account %v from LRU on-demand ledger cache", key)
+			logger.Infof("evicted account %s from LRU on-demand ledger cache", key.Hex())
 		},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
 
+	if dynamoClient == nil {
+		return nil, errors.New("dynamo client cannot be nil")
+	}
+
+	if onDemandTableName == "" {
+		return nil, errors.New("on demand table name cannot be nil")
+	}
+
 	return &OnDemandLedgers{
-		logger:  logger,
-		ledgers: cache,
+		logger:            logger,
+		ledgers:           cache,
+		onChainState:      onChainState,
+		dynamoClient:      dynamoClient,
+		onDemandTableName: onDemandTableName,
 	}, nil
 }
 
@@ -66,19 +93,25 @@ func (odl *OnDemandLedgers) getOrCreateLedger(
 		return ledger, nil
 	}
 
-	// TODO: These are placeholder values - need to get actual values from chain or config
-	totalDeposits := big.NewInt(1000000000000000000) // 1 ETH placeholder
-	pricePerSymbol := big.NewInt(100000000000000)    // 0.0001 ETH placeholder
-	minNumSymbols := uint64(100)                     // 100 symbols placeholder
+	onDemandPayment, err := odl.onChainState.GetOnDemandPaymentByAccount(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
+	}
 
-	// TODO: Need to provide actual CumulativePaymentStore implementation
-	// For now, using nil as placeholder - this will need to be fixed
+	pricePerSymbol := big.NewInt(int64(odl.onChainState.GetPricePerSymbol()))
+	minNumSymbols := odl.onChainState.GetMinNumSymbols()
+
+	cumulativePaymentStore, err := NewCumulativePaymentStore(odl.dynamoClient, odl.onDemandTableName, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("new cumulative payment store: %w", err)
+	}
+
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
-		totalDeposits,
+		onDemandPayment.CumulativePayment,
 		pricePerSymbol,
 		minNumSymbols,
-		nil, // placeholder for CumulativePaymentStore
+		cumulativePaymentStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
@@ -111,5 +144,5 @@ func (odl *OnDemandLedgers) UpdateTotalDeposits(updates []TotalDepositUpdate) er
 		}
 	}
 
-	return result.ErrorOrNil()
+	return fmt.Errorf("update total deposits: %w", result.ErrorOrNil())
 }
