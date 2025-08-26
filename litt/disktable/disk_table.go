@@ -496,7 +496,6 @@ func (d *DiskTable) Close() error {
 		return nil
 	}
 
-	// TODO this should be integrated with the error monitor!
 	d.flushCoordinator.Close()
 
 	if ok, err := d.errorMonitor.IsOk(); !ok {
