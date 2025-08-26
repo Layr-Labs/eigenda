@@ -505,33 +505,39 @@ type PaymentMetadata struct {
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
-// TODO doc
 func NewPaymentMetadata(
+	// account that the payment is for. must not be a 0 address
 	accountID gethcommon.Address,
+	// the time of the dispersal, which is stored as a unix nano timestamp
 	timestamp time.Time,
+	// total number of wei paid by the account, for this and all previous on-demand dispersals
+	// if this is 0 or nil, it indicates that the dispersal will be paid for with a reservation
 	cumulativePayment *big.Int,
 ) (*PaymentMetadata, error) {
 	if accountID == (gethcommon.Address{}) {
 		return nil, fmt.Errorf("account ID cannot be zero address")
 	}
 
-	var nonNilCumulativePayment *big.Int
 	if cumulativePayment == nil {
-		nonNilCumulativePayment = big.NewInt(0)
+		return &PaymentMetadata{
+			AccountID:         accountID,
+			Timestamp:         timestamp.UnixNano(),
+			CumulativePayment: big.NewInt(0),
+		}, nil
 	}
 
-	if nonNilCumulativePayment.Sign() < 0 {
+	if cumulativePayment.Sign() < 0 {
 		return nil, fmt.Errorf("cumulative payment cannot be negative")
 	}
 
 	return &PaymentMetadata{
 		AccountID:         accountID,
 		Timestamp:         timestamp.UnixNano(),
-		CumulativePayment: nonNilCumulativePayment,
+		CumulativePayment: cumulativePayment,
 	}, nil
 }
 
-// TODO doc
+// Returns true if the PaymentMetadata represents an on-demand payment, or false if it's a reservation payment
 func (pm *PaymentMetadata) IsOnDemand() bool {
 	return pm.CumulativePayment != nil && pm.CumulativePayment.Cmp(big.NewInt(0)) != 0
 }
