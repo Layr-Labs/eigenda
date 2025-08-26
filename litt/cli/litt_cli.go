@@ -246,6 +246,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Path to the SSH private key file for authentication.",
 						Value:   "~/.ssh/id_rsa",
 					},
+					knownHostsFlag,
 					&cli.BoolFlag{
 						Name:    "no-gc",
 						Aliases: []string{"n"},

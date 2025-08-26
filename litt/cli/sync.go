@@ -22,7 +22,7 @@ func syncCommand(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
@@ -68,6 +68,12 @@ func syncCommand(ctx *cli.Context) error {
 	maxAgeSeconds := ctx.Uint64("max-age")
 	remoteLittBinary := ctx.String("litt-binary")
 
+	knownHosts := ctx.String(knownHostsFlag.Name)
+	knownHosts, err = util.SanitizePath(knownHosts)
+	if err != nil {
+		return fmt.Errorf("invalid known hosts path: %s", knownHostsFlag.Name)
+	}
+
 	return newSyncEngine(
 		context.Background(),
 		logger,
@@ -77,6 +83,7 @@ func syncCommand(ctx *cli.Context) error {
 		host,
 		port,
 		keyPath,
+		knownHosts,
 		deleteAfterTransfer,
 		true,
 		threads,
@@ -98,6 +105,7 @@ type syncEngine struct {
 	host                string
 	port                uint64
 	keyPath             string
+	knownHosts          string
 	deleteAfterTransfer bool
 	fsync               bool
 	threads             uint64
@@ -118,6 +126,7 @@ func newSyncEngine(
 	host string,
 	port uint64,
 	keyPath string,
+	knownHosts string,
 	deleteAfterTransfer bool,
 	fsync bool,
 	threads uint64,
@@ -140,6 +149,7 @@ func newSyncEngine(
 		host:                host,
 		port:                port,
 		keyPath:             keyPath,
+		knownHosts:          knownHosts,
 		deleteAfterTransfer: deleteAfterTransfer,
 		fsync:               fsync,
 		threads:             threads,
@@ -198,7 +208,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
-		"TODO",
+		s.knownHosts,
 		s.deleteAfterTransfer,
 		s.fsync,
 		s.threads,
@@ -226,7 +236,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
-		"TODO fix before merge",
+		s.knownHosts,
 		s.verbose)
 	if err != nil {
 		s.logger.Errorf("Failed to create SSH session to %s@%s port %d: %v", s.user, s.host, s.port, err)
