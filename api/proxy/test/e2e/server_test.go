@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/clients/memconfig_client"
-	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/memconfig_client"
+	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
@@ -197,29 +197,6 @@ func testProxyCaching(t *testing.T, dispersalBackend common.EigenDABackend) {
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
-}
-
-func TestProxyCachingWithRedisV1(t *testing.T) {
-	testProxyCachingWithRedis(t, common.V1EigenDABackend)
-}
-
-func TestProxyCachingWithRedisV2(t *testing.T) {
-	testProxyCachingWithRedis(t, common.V2EigenDABackend)
-}
-
-func testProxyCachingWithRedis(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
-	testCfg.UseRedisCaching = true
-
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.RedisBackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 

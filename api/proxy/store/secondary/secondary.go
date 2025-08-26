@@ -31,8 +31,7 @@ type ISecondary interface {
 	// verify fn signature has to match that of common/store.go's GeneratedKeyStore.Verify fn.
 	MultiSourceRead(
 		ctx context.Context, commitment []byte, fallback bool,
-		verify func(context.Context, []byte, []byte, uint64) error,
-		l1InclusionBlockNum uint64,
+		verifyPayload func(context.Context, []byte, []byte) error,
 	) ([]byte, error)
 	WriteSubscriptionLoop(ctx context.Context)
 	WriteOnCacheMissEnabled() bool
@@ -171,9 +170,7 @@ func (sm *SecondaryManager) MultiSourceRead(
 	ctx context.Context,
 	commitment []byte,
 	fallback bool,
-	// l1InclusionBlockNum is passed to the verification function
-	verify func(context.Context, []byte, []byte, uint64) error,
-	l1InclusionBlockNum uint64,
+	verifyPayload func(context.Context, []byte, []byte) error,
 ) ([]byte, error) {
 	var sources []common.SecondaryStore
 	if fallback {
@@ -200,7 +197,7 @@ func (sm *SecondaryManager) MultiSourceRead(
 
 		// verify cert:data using provided verification function
 		sm.verifyLock.Lock()
-		err = verify(ctx, commitment, data, l1InclusionBlockNum)
+		err = verifyPayload(ctx, commitment, data)
 		if err != nil {
 			cb(Failed)
 			sm.log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())

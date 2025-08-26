@@ -59,8 +59,6 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	EigenDADirectory                string
-	BLSOperatorStateRetrieverAddr   string
-	EigenDAServiceManagerAddr       string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string
@@ -72,10 +70,12 @@ type Config struct {
 	ChurnerUseSecureGrpc            bool
 	RelayUseSecureGrpc              bool
 	RelayMaxMessageSize             uint
-	ReachabilityPollIntervalSec     uint64
-	DisableNodeInfoResources        bool
-	StoreChunksRequestMaxPastAge    time.Duration
-	StoreChunksRequestMaxFutureAge  time.Duration
+	// The number of connections to establish with each relay node.
+	RelayConnectionPoolSize        uint
+	ReachabilityPollIntervalSec    uint64
+	DisableNodeInfoResources       bool
+	StoreChunksRequestMaxPastAge   time.Duration
+	StoreChunksRequestMaxFutureAge time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -174,6 +174,9 @@ type Config struct {
 	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
 	// StoreChunksBufferSizeFraction value if greater than 0.
 	StoreChunksBufferSizeBytes uint64
+
+	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
+	operatorStateCacheSize uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -379,8 +382,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
@@ -392,6 +393,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ChurnerUseSecureGrpc:                ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		RelayUseSecureGrpc:                  ctx.GlobalBoolT(flags.RelayUseSecureGRPC.Name),
 		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
+		RelayConnectionPoolSize:             ctx.GlobalUint(flags.RelayConnectionPoolSizeFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
@@ -423,5 +425,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
 		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
 		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
+		operatorStateCacheSize:        ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
 	}, nil
 }

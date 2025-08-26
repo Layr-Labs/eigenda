@@ -158,21 +158,9 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Address Directory",
-		Required: false,
+		Usage:    "Address of the EigenDA Contract Directory",
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
-	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
@@ -316,6 +304,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
 		Value:    units.GiB, // intentionally large for the time being
+	}
+	RelayConnectionPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-connection-pool-size"),
+		Usage:    "The number of connections to maintain with each relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_CONNECTION_POOL_SIZE"),
+		Value:    8,
 	}
 
 	ClientIPHeaderFlag = cli.StringFlag{
@@ -461,9 +456,9 @@ var (
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
-		Usage:    "The size of the download pool. The default value is 16.",
+		Usage:    "The size of the download pool.",
 		Required: false,
-		Value:    16,
+		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
 	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
@@ -532,6 +527,13 @@ var (
 		Required: false,
 		Value:    0.1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
+	}
+	OperatorStateCacheSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "operator-state-cache-size"),
+		Usage:    "The size of the operator state cache.",
+		Required: false,
+		Value:    64,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -651,6 +653,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RelayConnectionPoolSizeFlag,
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
@@ -668,12 +671,11 @@ var optionalFlags = []cli.Flag{
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	LittRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
+	OperatorStateCacheSizeFlag,
 }
 
 func init() {

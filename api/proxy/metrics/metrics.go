@@ -1,9 +1,9 @@
 package metrics
 
 import (
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -20,6 +20,8 @@ type Metricer interface {
 
 	RecordRPCServerRequest(method string) func(status string, mode string, ver string)
 	RecordSecondaryRequest(bt string, method string) func(status string)
+
+	Document() []metrics.DocumentedMetric
 }
 
 // Metrics ... Metrics struct
@@ -36,7 +38,7 @@ type Metrics struct {
 	SecondaryRequestsTotal      *prometheus.CounterVec
 	SecondaryRequestDurationSec *prometheus.HistogramVec
 
-	registry *prometheus.Registry
+	factory *metrics.Documentor
 }
 
 var _ Metricer = (*Metrics)(nil)
@@ -48,15 +50,16 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
+	factory := metrics.With(registry)
 
 	return &Metrics{
-		Up: promauto.With(registry).NewGauge(prometheus.GaugeOpts{
+		Up: factory.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if the proxy server has finished starting up",
 		}),
-		Info: promauto.With(registry).NewGaugeVec(prometheus.GaugeOpts{
+		Info: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "info",
@@ -64,7 +67,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"version",
 		}),
-		HTTPServerRequestsTotal: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
+		HTTPServerRequestsTotal: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "requests_total",
@@ -72,7 +75,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"method", "status", "commitment_mode", "cert_version",
 		}),
-		HTTPServerBadRequestHeader: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
+		HTTPServerBadRequestHeader: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "requests_bad_header_total",
@@ -80,7 +83,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"method", "error_type",
 		}),
-		HTTPServerRequestDurationSeconds: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
+		HTTPServerRequestDurationSeconds: factory.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: httpServerSubsystem,
 			Name:      "request_duration_seconds",
@@ -92,7 +95,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"method", // no status on histograms because those are very expensive
 		}),
-		SecondaryRequestsTotal: promauto.With(registry).NewCounterVec(prometheus.CounterOpts{
+		SecondaryRequestsTotal: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: secondarySubsystem,
 			Name:      "requests_total",
@@ -100,7 +103,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"backend_type", "method", "status",
 		}),
-		SecondaryRequestDurationSec: promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
+		SecondaryRequestDurationSec: factory.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: secondarySubsystem,
 			Name:      "request_duration_seconds",
@@ -109,7 +112,7 @@ func NewMetrics(registry *prometheus.Registry) Metricer {
 		}, []string{
 			"backend_type",
 		}),
-		registry: registry,
+		factory: factory,
 	}
 }
 
@@ -148,6 +151,10 @@ func (m *Metrics) RecordSecondaryRequest(bt string, method string) func(status s
 	}
 }
 
+func (m *Metrics) Document() []metrics.DocumentedMetric {
+	return m.factory.Document()
+}
+
 type noopMetricer struct {
 }
 
@@ -165,4 +172,8 @@ func (n *noopMetricer) RecordRPCServerRequest(string) func(status, mode, ver str
 
 func (n *noopMetricer) RecordSecondaryRequest(string, string) func(status string) {
 	return func(string) {}
+}
+
+func (m *noopMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }

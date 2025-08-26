@@ -20,22 +20,22 @@ type Config struct {
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
-	EigenDADirectory              string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	EigenDADirectory           string
+	OperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr  string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
 	return &Config{
-		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
-		Workers:                       ctx.Int(flags.WorkersFlag.Name),
-		OperatorId:                    ctx.String(flags.OperatorIdFlag.Name),
-		UseRetrievalClient:            ctx.Bool(flags.UseRetrievalClientFlag.Name),
-		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		Timeout:                    ctx.Duration(flags.TimeoutFlag.Name),
+		Workers:                    ctx.Int(flags.WorkersFlag.Name),
+		OperatorId:                 ctx.String(flags.OperatorIdFlag.Name),
+		UseRetrievalClient:         ctx.Bool(flags.UseRetrievalClientFlag.Name),
+		ChainStateConfig:           thegraph.ReadCLIConfig(ctx),
+		EthClientConfig:            geth.ReadEthClientConfig(ctx),
+		EigenDADirectory:           ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
+		OperatorStateRetrieverAddr: ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:  ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 	}
 }
 

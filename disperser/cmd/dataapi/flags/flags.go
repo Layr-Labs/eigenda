@@ -84,9 +84,10 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SUBGRAPH_PAYMENTS_API_SOCKET_ADDR"),
 		Required: true,
 	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
+	OperatorStateRetrieverFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
 	}
@@ -177,7 +178,7 @@ var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
+	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 }
 

@@ -5,7 +5,7 @@
 // 1. [omitted]
 // 2. if you have a repository with a complex set of dependencies, but you have a client API with a smaller set of dependencies.
 //    In some cases, it might make sense to have an api or clientapi or similar directory with its own go.mod, or to separate out that clientapi into its own repository.
-module github.com/Layr-Labs/eigenda-proxy/clients
+module github.com/Layr-Labs/eigenda/api/proxy/clients
 
 go 1.22
 
@@ -62,13 +62,4 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-// See https://go.dev/ref/mod#go-mod-file-retract for more information about the retract directive.
-retract (
-	// We published a `clients/v1.0.1` tag by mistake, which got picked up by pkg.go.dev, and now
-	// the latest version of the docs (pointed to in our README) leads to https://pkg.go.dev/github.com/Layr-Labs/eigenda-proxy/clients@v1.0.1/standard_client.
-	// This directive retracts that version, such that the docs (and go commands) no longer point to this version (at this point v0.2.0 is the latest).
-	// Once we reach semver v1.0.1, we can possibly remove this retract directive (??), or just skip this number and go to v1.0.2.
-    v1.0.1
 )

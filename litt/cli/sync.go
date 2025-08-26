@@ -175,6 +175,7 @@ func (s *syncEngine) run() error {
 func (s *syncEngine) syncLoop() {
 
 	ticker := time.NewTicker(s.period)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -197,6 +198,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
+		"TODO",
 		s.deleteAfterTransfer,
 		s.fsync,
 		s.threads,

@@ -23,7 +23,7 @@ import (
 func rebaseCommand(ctx *cli.Context) error {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
@@ -34,11 +34,11 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("invalid source path: %s", src)
+			return fmt.Errorf("failed to sanitise path %s: %w", src, err)
 		}
 	}
 
-	destinations := ctx.StringSlice("dest")
+	destinations := ctx.StringSlice("dst")
 	if len(destinations) == 0 {
 		return fmt.Errorf("no destinations provided")
 	}
@@ -46,7 +46,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		destinations[i], err = util.SanitizePath(dest)
 		if err != nil {
-			return fmt.Errorf("invalid destination path: %s", dest)
+			return fmt.Errorf("failed to sanitise path %s: %w", dest, err)
 		}
 	}
 
@@ -88,6 +88,10 @@ func rebase(
 			return fmt.Errorf("error ensuring destination path %s exists: %w", dest, err)
 		}
 	}
+	// Don't immediately take a lock on the source directories. Each source directory will be locked individually
+	// before its data is transferred. Because source directories are deleted after their data is transferred,
+	// it is inconvenient to hold the locks in this outer scope (since we need to release the lock to
+	// delete the directory).
 
 	// Acquire locks on all destination directories.
 	releaseDestinationLocks, err := util.LockDirectories(logger, destinations, util.LockfileName, fsync)
@@ -299,7 +303,7 @@ func transferDataInTable(
 	}
 
 	if !preserveOriginal {
-		err = deleteSnapshotDirectory(logger, source, tableName, true)
+		err = deleteSnapshotDirectory(source, tableName)
 		if err != nil {
 			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
 		}
@@ -357,7 +361,7 @@ func deleteBoundaryFiles(logger logging.Logger, source string, tableName string,
 }
 
 // delete the old snapshot directory for a table. This will be reconstructed the next time the DB is loaded.
-func deleteSnapshotDirectory(logger logging.Logger, source string, tableName string, verbose bool) error {
+func deleteSnapshotDirectory(source string, tableName string) error {
 	snapshotDir := filepath.Join(source, tableName, segment.HardLinkDirectory)
 
 	exists, err := util.Exists(snapshotDir)
@@ -366,10 +370,6 @@ func deleteSnapshotDirectory(logger logging.Logger, source string, tableName str
 	}
 	if !exists {
 		return nil
-	}
-
-	if verbose {
-		logger.Infof("Deleting snapshot directory: %s", snapshotDir)
 	}
 
 	err = os.RemoveAll(snapshotDir)
@@ -516,8 +516,8 @@ func transferSegmentFile(
 
 	if verbose {
 		count := segmentFileCount.Add(1)
-		text := fmt.Sprintf("Transferring Segment File %d/%d: %s from table '%s'",
-			count, totalSegmentFileCount, filepath.Base(segmentFilePath), tableName)
+		text := fmt.Sprintf("Transferring Segment File %d/%d from table '%s': %s",
+			count, totalSegmentFileCount, tableName, filepath.Base(segmentFilePath))
 		writer := bufio.NewWriter(os.Stdout)
 		_, _ = fmt.Fprintf(writer, "\r%-100s", text)
 		_ = writer.Flush()
@@ -589,5 +589,3 @@ func determineDestination(source string, destinations []string) (string, error) 
 
 	return destinations[hasher.Sum64()%uint64(len(destinations))], nil
 }
-
-// TODO make sure rebase works if the source contains symlinks

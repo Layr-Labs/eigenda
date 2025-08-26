@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -23,7 +24,7 @@ func pushCommand(ctx *cli.Context) error {
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 
 	sources := ctx.StringSlice("src")
@@ -59,6 +60,8 @@ func pushCommand(ctx *cli.Context) error {
 		return fmt.Errorf("invalid key path: %s", keyPath)
 	}
 
+	knownHosts := ctx.String(knownHostsFlag.Name)
+
 	deleteAfterTransfer := !ctx.Bool("no-gc")
 	threads := ctx.Uint64("threads")
 	verbose := !ctx.Bool("quiet")
@@ -72,6 +75,7 @@ func pushCommand(ctx *cli.Context) error {
 		host,
 		port,
 		keyPath,
+		knownHosts,
 		deleteAfterTransfer,
 		true,
 		threads,
@@ -88,6 +92,7 @@ func push(
 	host string,
 	port uint64,
 	keyPath string,
+	knownHosts string,
 	deleteAfterTransfer bool,
 	fsync bool,
 	threads uint64,
@@ -111,19 +116,19 @@ func push(
 	// we are interacting with the remote machine via SSH and rsync.
 	releaseSourceLocks, err := util.LockDirectories(logger, sources, util.LockfileName, fsync)
 	if err != nil {
-		return fmt.Errorf("failed to lock source directories: %v", err)
+		return fmt.Errorf("failed to lock source directories: %w", err)
 	}
 	defer releaseSourceLocks()
 
 	// Create an SSH session to the remote host.
-	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, "TODO fix before merge", verbose)
+	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, knownHosts, verbose)
 	if err != nil {
-		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %v", user, host, port, err)
+		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %w", user, host, port, err)
 	}
 
 	tables, err := lsPaths(logger, sources, false, fsync)
 	if err != nil {
-		return fmt.Errorf("failed to list tables in source paths %v: %v", sources, err)
+		return fmt.Errorf("failed to list tables in source paths %v: %w", sources, err)
 	}
 
 	for _, tableName := range tables {
@@ -140,7 +145,7 @@ func push(
 		)
 
 		if err != nil {
-			return fmt.Errorf("failed to push table %s: %v", tableName, err)
+			return fmt.Errorf("failed to push table %s: %w", tableName, err)
 		}
 	}
 
@@ -152,7 +157,6 @@ func push(
 //
 // The returned map is a map from file name (e.g. 1234.metadata) to the destination path (e.g. /path/to/remote/dir).
 func mapExistingFiles(
-	logger logging.Logger,
 	destinations []string,
 	tableName string,
 	connection *util.SSHSession) (map[string]string, error) {
@@ -165,17 +169,16 @@ func mapExistingFiles(
 		tableDestination := path.Join(dest, tableName, segment.SegmentDirectory)
 		filePaths, err := connection.FindFiles(tableDestination, extensions)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list files in destination %s: %v", dest, err)
+			return nil, fmt.Errorf("failed to list files in destination %s: %w", dest, err)
 		}
 
 		for _, filePath := range filePaths {
 			// Extract the file name from the path.
 			fileName := path.Base(filePath)
-			if _, exists := existingFiles[fileName]; !exists {
-				existingFiles[fileName] = dest
-			} else {
-				logger.Warnf("File %s already exists in destination %s, skipping", fileName, dest)
-			}
+
+			enforce.MapDoesNotContainKey(existingFiles, fileName,
+				"duplicate file found: %s and %s", fileName, existingFiles[fileName])
+			existingFiles[fileName] = dest
 		}
 	}
 
@@ -196,14 +199,14 @@ func pushTable(
 
 	// Figure out where data currently exists at the destination(s). We don't want this operation to cause a file
 	// to exist in multiple places.
-	existingFilesMap, err := mapExistingFiles(logger, destinations, tableName, connection)
+	existingFilesMap, err := mapExistingFiles(destinations, tableName, connection)
 	if err != nil {
-		return fmt.Errorf("failed to map existing files at destinations: %v", err)
+		return fmt.Errorf("failed to map existing files at destinations: %w", err)
 	}
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)
 	if err != nil {
-		return fmt.Errorf("failed to build segment paths for table %s at paths %v: %v", tableName, sources, err)
+		return fmt.Errorf("failed to build segment paths for table %s at paths %v: %w", tableName, sources, err)
 	}
 
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
@@ -218,7 +221,7 @@ func pushTable(
 		false,
 		fsync)
 	if err != nil {
-		return fmt.Errorf("failed to gather segment files for table %s at paths %v: %v",
+		return fmt.Errorf("failed to gather segment files for table %s at paths %v: %w",
 			tableName, sources, err)
 	}
 
@@ -230,16 +233,17 @@ func pushTable(
 	// Special handling if we are transferring data from a snapshot.
 	isSnapshot, err := segments[lowestSegmentIndex].IsSnapshot()
 	if err != nil {
-		return fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
+		return fmt.Errorf("failed to check if segment %d is a snapshot: %w", lowestSegmentIndex, err)
 	}
 	if isSnapshot {
 		if len(sources) > 1 {
-			return fmt.Errorf("table %s is a snapshot, but source directories found: %v", tableName, sources)
+			return fmt.Errorf("table %s is a snapshot, but source more than one source directories found: %v",
+				tableName, sources)
 		}
 
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.UpperBound, path.Join(sources[0], tableName))
 		if err != nil {
-			return fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+			return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
 				tableName, sources[0], err)
 		}
 
@@ -255,7 +259,7 @@ func pushTable(
 		segmentDir := path.Join(dest, tableName, segment.SegmentDirectory)
 		err = connection.Mkdirs(segmentDir)
 		if err != nil {
-			return fmt.Errorf("failed to create segment directory %s at destination %s: %v",
+			return fmt.Errorf("failed to create segment directory %s at destination %s: %w",
 				segmentDir, dest, err)
 		}
 	}
@@ -279,7 +283,7 @@ func pushTable(
 			} else {
 				destination, err = determineDestination(fileName, destinations)
 				if err != nil {
-					return fmt.Errorf("failed to determine destination for file %s: %v", fileName, err)
+					return fmt.Errorf("failed to determine destination for file %s: %w", fileName, err)
 				}
 			}
 
@@ -307,40 +311,56 @@ func pushTable(
 
 	// Check if there were any errors during the transfer.
 	if ok, err := errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("error detected during transfer: %v", err)
+		return fmt.Errorf("error detected during transfer: %w", err)
 	}
 
 	// Now that we have transferred the files, we can delete them if requested.
 	if deleteAfterTransfer {
+		enforce.True(isSnapshot, "we should have already returned an error if this is a non-snapshot table")
 
-		// Delete the segments.
-		for _, seg := range segments {
-			seg.Release()
-		}
-		// Wait for deletion to complete.
-		for _, seg := range segments {
-			err = seg.BlockUntilFullyDeleted()
-			if err != nil {
-				return fmt.Errorf("failed to delete segment %d for table %s: %v",
-					seg.SegmentIndex(), tableName, err)
-			}
-		}
-
-		if isSnapshot {
-			// If we are dealing with a snapshot, update the lower bound file.
-			boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
-			if err != nil {
-				return fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
-					tableName, destinations[0], err)
-			}
-
-			err = boundaryFile.Update(highestSegmentIndex)
-			if err != nil {
-				return fmt.Errorf("failed to update boundary file for table %s at path %s: %v",
-					tableName, destinations[0], err)
-			}
+		err = deleteLocalSegments(segments, tableName, true, sources, highestSegmentIndex)
+		if err != nil {
+			return fmt.Errorf("failed to delete segments after transfer: %w", err)
 		}
 	}
 
+	return nil
+}
+
+// Deletes local segments after they have been successfully transferred to the remote destination(s).
+func deleteLocalSegments(
+	segments map[uint32]*segment.Segment,
+	tableName string,
+	isSnapshot bool,
+	sources []string,
+	highestSegmentIndex uint32) error {
+
+	// Delete the segments.
+	for _, seg := range segments {
+		seg.Release()
+	}
+	// Wait for deletion to complete.
+	for _, seg := range segments {
+		err := seg.BlockUntilFullyDeleted()
+		if err != nil {
+			return fmt.Errorf("failed to delete segment %d for table %s: %w",
+				seg.SegmentIndex(), tableName, err)
+		}
+	}
+
+	if isSnapshot {
+		// If we are dealing with a snapshot, update the lower bound file.
+		boundaryFile, err := disktable.LoadBoundaryFile(disktable.LowerBound, path.Join(sources[0], tableName))
+		if err != nil {
+			return fmt.Errorf("failed to load boundary file for table %s at path %s: %w",
+				tableName, sources[0], err)
+		}
+
+		err = boundaryFile.Update(highestSegmentIndex)
+		if err != nil {
+			return fmt.Errorf("failed to update boundary file for table %s at path %s: %w",
+				tableName, sources[0], err)
+		}
+	}
 	return nil
 }

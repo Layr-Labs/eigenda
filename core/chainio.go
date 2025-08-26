@@ -121,9 +121,6 @@ type Reader interface {
 	// GetNumBlobVersions returns the number of blob versions.
 	GetNumBlobVersions(ctx context.Context) (uint16, error)
 
-	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
-	GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*BlobVersionParameters, error)
-
 	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 

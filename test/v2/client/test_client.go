@@ -23,6 +23,7 @@ import (
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/server"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -76,6 +77,7 @@ type TestClient struct {
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
+	ctx context.Context,
 	logger logging.Logger,
 	metrics *testClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
@@ -144,13 +146,21 @@ func NewTestClient(
 	}
 
 	disperserConfig := &clientsv2.DisperserClientConfig{
-		Hostname:          config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag: true,
+		Hostname:                 config.DisperserHostname,
+		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		UseSecureGrpcFlag:        true,
+		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
 	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
-	disperserClient, err := clientsv2.NewDisperserClient(disperserConfig, signer, kzgProver, accountant)
+	disperserClient, err := clientsv2.NewDisperserClient(
+		logger,
+		disperserConfig,
+		signer,
+		kzgProver,
+		accountant,
+		metricsv2.NoopDispersalMetrics,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
@@ -175,11 +185,27 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
+	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
+	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, contractDirectoryAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OperatorStateRetriever address from contract directory: %w", err)
+	}
+
+	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ServiceManager address from contract directory: %w", err)
+	}
+
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
@@ -208,7 +234,10 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clientsv2.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
+	certBuilder, err := clientsv2.NewCertBuilder(logger,
+		operatorStateRetrieverAddress,
+		ethReader.GetRegistryCoordinatorAddress(),
+		ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}
@@ -253,6 +282,7 @@ func NewTestClient(
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
+		ConnectionPoolSize: config.RelayConnectionCount,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
@@ -382,9 +412,7 @@ func NewTestClient(
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
 					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
-					BLSOperatorStateRetrieverAddr:      config.BLSOperatorStateRetrieverAddr,
-					EigenDAServiceManagerAddr:          config.EigenDAServiceManagerAddr,
-					EigenDADirectory:                   config.EigenDADirectory,
+					EigenDADirectory:                   contractDirectoryAddress.Hex(),
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
 						proxycommon.ValidatorRetrieverType,
@@ -606,7 +634,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
-		*blobKey,
+		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
 		uint32(blobLengthSymbols),
