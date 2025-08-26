@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"go.uber.org/zap"
 )
 
 // CertVerifier is responsible for making eth calls against version agnostic CertVerifier contracts to ensure
@@ -126,12 +127,19 @@ func (cv *CertVerifier) EstimateGasCheckDACert(
 		return 0, fmt.Errorf("pack checkDACert call data: %w", err)
 	}
 
-	// Estimate gas using eth_estimateGas
-	gasEstimate, err := cv.ethClient.EstimateGas(ctx, ethereum.CallMsg{
+	callMsg := ethereum.CallMsg{
 		To:   &certVerifierAddress,
 		Data: callData,
-	})
+	}
+
+	// Estimate gas using eth_estimateGas
+	gasEstimate, err := cv.ethClient.EstimateGas(ctx, callMsg)
 	if err != nil {
+		cv.logger.Error(
+			"eth_estimateGas",
+			zap.String("to", callMsg.To.Hex()),
+			zap.String("data", fmt.Sprintf("0x%x", callMsg.Data)),
+		)
 		return 0, fmt.Errorf("estimate gas for checkDACert: %w", err)
 	}
 
