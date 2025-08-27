@@ -269,6 +269,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
-	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 )
