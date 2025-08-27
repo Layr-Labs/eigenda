@@ -162,7 +162,7 @@ func (cl *ClientLedger) debitReservationOnly(
 	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
-	enforce.NilError(err, "new payment metadata: %v", err)
+	enforce.NilError(err, "new payment metadata")
 	return paymentMetadata, nil
 }
 
@@ -175,10 +175,10 @@ func (cl *ClientLedger) debitOnDemandOnly(
 ) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
 	enforce.NilError(err, "on-demand debit failed. reservations aren't configured, and the ledger won't become "+
-		"aware of new on-chain deposits without a restart: %v", err)
+		"aware of new on-chain deposits without a restart")
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
-	enforce.NilError(err, "new payment metadata: %v", err)
+	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
 
@@ -211,7 +211,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 
 	if success {
 		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
-		enforce.NilError(err, "new payment metadata: %v", err)
+		enforce.NilError(err, "new payment metadata")
 		return paymentMetadata, nil
 	}
 
@@ -231,7 +231,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
-	enforce.NilError(err, "new payment metadata: %v", err)
+	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
 
