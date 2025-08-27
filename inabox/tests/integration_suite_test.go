@@ -137,17 +137,36 @@ var _ = BeforeSuite(func() {
 		// Enable churner service
 		config.EigenDA.Churner.Enabled = true
 		
-		// Enable encoder and batcher services
-		config.EigenDA.Encoder.Enabled = true
-		config.EigenDA.Encoder.EncoderConfig = containers.DefaultEncoderV1Config()
+		// Enable both v1 and v2 encoders
+		encoderV1Config := testinfra.EncoderConfig{
+			Enabled:       true,
+			EncoderConfig: containers.DefaultEncoderV1Config(),
+		}
+		encoderV1Config.GRPCPort = "34000" // v1 on port 34000
+		
+		encoderV2Config := testinfra.EncoderConfig{
+			Enabled:       true,
+			EncoderConfig: containers.DefaultEncoderV2Config(),
+		}
+		encoderV2Config.GRPCPort = "34001" // v2 on port 34001
+		
+		config.EigenDA.Encoders = []testinfra.EncoderConfig{encoderV1Config, encoderV2Config}
 		
 		config.EigenDA.Batcher.Enabled = true
 		config.EigenDA.Batcher.BatcherConfig = containers.DefaultBatcherConfig()
+		
+		// Enable controller service
+		config.EigenDA.Controller.Enabled = true
+		config.EigenDA.Controller.ControllerConfig = containers.DefaultControllerConfig()
 		
 		// Enable operators
 		config.EigenDA.Operators.Enabled = true
 		config.EigenDA.Operators.Count = 4  // Start 4 operators as specified in testconfig
 		config.EigenDA.Operators.MaxOperatorCount = 3  // But limit to 3 running (for testing churn)
+		
+		// Enable relays (requirement: 4 relays as per inabox config)
+		config.EigenDA.Relays.Enabled = true
+		config.EigenDA.Relays.Count = 4  // Start 4 relays as required by inabox
 
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
@@ -252,14 +271,20 @@ var _ = BeforeSuite(func() {
 			fmt.Printf("⚠️ No ChurnerURL in infraResult\n")
 		}
 
-		// Pass encoder URL from testinfra if available
-		if infraResult.EncoderURL != "" {
-			// Use external URL for local binaries
+		// Pass encoder URLs from testinfra if available
+		if infraResult.EncoderURLs != nil && len(infraResult.EncoderURLs) > 0 {
+			// Use external URLs for local binaries
 			// Note: When batcher is also containerized, it uses internal URL directly
-			os.Setenv("ENCODER_URL", infraResult.EncoderURL)
-			fmt.Printf("✅ Using encoder from testinfra: %s\n", infraResult.EncoderURL)
+			if url, ok := infraResult.EncoderURLs["1"]; ok {
+				os.Setenv("ENCODER_URL", url)
+				fmt.Printf("✅ Using encoder v1 from testinfra: %s\n", url)
+			}
+			if url, ok := infraResult.EncoderURLs["2"]; ok {
+				os.Setenv("ENCODER_V2_URL", url)
+				fmt.Printf("✅ Using encoder v2 from testinfra: %s\n", url)
+			}
 		} else {
-			fmt.Printf("⚠️ No EncoderURL in infraResult\n")
+			fmt.Printf("⚠️ No EncoderURLs in infraResult\n")
 		}
 
 		// Pass batcher info from testinfra if available
@@ -271,6 +296,15 @@ var _ = BeforeSuite(func() {
 			fmt.Printf("⚠️ No BatcherURL in infraResult\n")
 		}
 		
+		// Pass controller info from testinfra if available
+		if infraResult.ControllerMetricsURL != "" {
+			// Controller is containerized, so we flag its existence
+			os.Setenv("CONTROLLER_PROVIDED", "true")
+			fmt.Printf("✅ Using controller from testinfra (metrics: %s)\n", infraResult.ControllerMetricsURL)
+		} else {
+			fmt.Printf("⚠️ No ControllerMetricsURL in infraResult\n")
+		}
+		
 		// Pass operators info from testinfra if available
 		if infraResult.OperatorAddresses != nil && len(infraResult.OperatorAddresses) > 0 {
 			os.Setenv("OPERATORS_PROVIDED", "true")
@@ -280,6 +314,19 @@ var _ = BeforeSuite(func() {
 			}
 		} else {
 			fmt.Printf("⚠️ No operators in infraResult\n")
+		}
+		
+		// Pass relays info from testinfra if available
+		if infraResult.RelayURLs != nil && len(infraResult.RelayURLs) > 0 {
+			os.Setenv("RELAYS_PROVIDED", "true")
+			fmt.Printf("✅ Using %d relays from testinfra\n", len(infraResult.RelayURLs))
+			for id, url := range infraResult.RelayURLs {
+				fmt.Printf("  - Relay %d: %s\n", id, url)
+				// Set environment variables for each relay
+				os.Setenv(fmt.Sprintf("RELAY_%d_URL", id), url)
+			}
+		} else {
+			fmt.Printf("⚠️ No relays in infraResult\n")
 		}
 
 		// Generate all config variables for the binaries. Depends on the test config being set

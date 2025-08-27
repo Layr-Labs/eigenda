@@ -36,11 +36,12 @@ type EncoderConfig struct {
 	MetricsHTTPPort string
 
 	// SRS configuration
-	G1Path    string
-	G2Path    string
-	SRSOrder  string
-	SRSLoad   string
-	CachePath string
+	G1Path         string
+	G2Path         string
+	G2PowerOf2Path string
+	SRSOrder       string
+	SRSLoad        string
+	CachePath      string
 
 	// Performance configuration
 	Verbose               string
@@ -80,6 +81,7 @@ func DefaultEncoderV1Config() EncoderConfig {
 		MetricsHTTPPort:       "9095",
 		G1Path:                "",
 		G2Path:                "",
+		G2PowerOf2Path:        "",
 		SRSOrder:              "10000",
 		SRSLoad:               "10000",
 		CachePath:             "",
@@ -163,6 +165,14 @@ func NewEncoderContainerWithNetwork(ctx context.Context, config EncoderConfig, n
 	// Build environment variables with updated paths
 	env := buildEncoderEnv(containerConfig)
 
+	// Determine network alias and container name based on encoder version
+	networkAlias := "encoder-v1"
+	containerName := "eigenda-encoder-v1"
+	if config.EncoderVersion == "2" {
+		networkAlias = "encoder-v2"
+		containerName = "eigenda-encoder-v2"
+	}
+
 	// Configure container request with network
 	req := testcontainers.ContainerRequest{
 		Image:        config.Image,
@@ -170,14 +180,14 @@ func NewEncoderContainerWithNetwork(ctx context.Context, config EncoderConfig, n
 		ExposedPorts: []string{config.GRPCPort + "/tcp"},
 		Networks:     []string{network.Name},
 		NetworkAliases: map[string][]string{
-			network.Name: {"encoder-v1"},
+			network.Name: {networkAlias},
 		},
 		Mounts: mounts,
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort(nat.Port(config.GRPCPort+"/tcp")).WithStartupTimeout(30*time.Second),
 			wait.ForLog("GRPC Listening").WithStartupTimeout(30*time.Second),
 		),
-		Name:            "eigenda-encoder-v1",
+		Name:            containerName,
 		AlwaysPullImage: false, // Use local image if available
 	}
 
@@ -227,7 +237,11 @@ func (c *EncoderContainer) URL() string {
 
 // InternalURL returns the encoder service URL for internal network communication
 func (c *EncoderContainer) InternalURL() string {
-	return fmt.Sprintf("encoder-v1:%s", c.config.GRPCPort)
+	networkAlias := "encoder-v1"
+	if c.config.EncoderVersion == "2" {
+		networkAlias = "encoder-v2"
+	}
+	return fmt.Sprintf("%s:%s", networkAlias, c.config.GRPCPort)
 }
 
 // Config returns the encoder configuration
@@ -264,6 +278,9 @@ func buildEncoderEnv(config EncoderConfig) map[string]string {
 	}
 	if config.G2Path != "" {
 		env["DISPERSER_ENCODER_G2_PATH"] = config.G2Path
+	}
+	if config.G2PowerOf2Path != "" {
+		env["DISPERSER_ENCODER_G2_POWER_OF_2_PATH"] = config.G2PowerOf2Path
 	}
 	if config.CachePath != "" {
 		env["DISPERSER_ENCODER_CACHE_PATH"] = config.CachePath

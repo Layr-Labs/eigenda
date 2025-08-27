@@ -91,11 +91,17 @@ type EigenDAConfig struct {
 	// Batcher configuration
 	Batcher BatcherConfig `json:"batcher"`
 
-	// Encoder configuration
-	Encoder EncoderConfig `json:"encoder"`
+	// Encoder configurations (can run multiple encoders, e.g., v1 and v2)
+	Encoders []EncoderConfig `json:"encoders"`
+	
+	// Controller configuration
+	Controller ControllerConfig `json:"controller"`
 	
 	// Operators configuration
 	Operators OperatorsConfig `json:"operators"`
+	
+	// Relays configuration
+	Relays RelaysConfig `json:"relays"`
 }
 
 // ChurnerConfig defines configuration for the churner service
@@ -114,6 +120,15 @@ type BatcherConfig struct {
 
 	// Container configuration (if using containerized batcher)
 	containers.BatcherConfig
+}
+
+// ControllerConfig defines configuration for the controller service
+type ControllerConfig struct {
+	// Enable controller service
+	Enabled bool `json:"enabled"`
+
+	// Container configuration
+	containers.ControllerConfig
 }
 
 // EncoderConfig defines configuration for the encoder service
@@ -141,6 +156,18 @@ type OperatorsConfig struct {
 	
 	// Stakes for each operator (quorum -> operator index -> stake amount)
 	Stakes map[uint32]map[int]int `json:"stakes"`
+}
+
+// RelaysConfig defines configuration for relay nodes
+type RelaysConfig struct {
+	// Enable relays
+	Enabled bool `json:"enabled"`
+	
+	// Number of relays to deploy (default 4 as per inabox requirement)
+	Count int `json:"count"`
+	
+	// Base relay configuration (will be customized per relay)
+	BaseConfig containers.RelayConfig `json:"base_config"`
 }
 
 // RetrievalClientsConfig defines configuration for setting up retrieval clients
@@ -331,17 +358,27 @@ type InfraResult struct {
 	ChurnerURL         string `json:"churner_url,omitempty"`
 	ChurnerInternalURL string `json:"churner_internal_url,omitempty"`
 
-	// Encoder service URLs (populated if Encoder.Enabled=true)
-	EncoderURL         string `json:"encoder_url,omitempty"`
-	EncoderInternalURL string `json:"encoder_internal_url,omitempty"`
+	// Encoder service URLs (populated if encoders are enabled)
+	// Map from encoder version ("1" or "2") to URLs
+	EncoderURLs         map[string]string `json:"encoder_urls,omitempty"`
+	EncoderInternalURLs map[string]string `json:"encoder_internal_urls,omitempty"`
 
 	// Batcher service URLs (populated if Batcher.Enabled=true)
 	BatcherURL         string `json:"batcher_url,omitempty"`
 	BatcherInternalURL string `json:"batcher_internal_url,omitempty"`
 	
+	// Controller service metrics URLs (populated if Controller.Enabled=true)
+	ControllerMetricsURL         string `json:"controller_metrics_url,omitempty"`
+	ControllerInternalMetricsURL string `json:"controller_internal_metrics_url,omitempty"`
+	
 	// Operator addresses (populated if Operators.Enabled=true)
 	// Map from operator ID to their addresses
 	OperatorAddresses map[int]string `json:"operator_addresses,omitempty"`
+	
+	// Relay service URLs (populated if Relays.Enabled=true)
+	// Map from relay ID to their gRPC addresses
+	RelayURLs         map[int]string `json:"relay_urls,omitempty"`
+	RelayInternalURLs map[int]string `json:"relay_internal_urls,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests

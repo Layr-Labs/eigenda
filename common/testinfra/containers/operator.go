@@ -235,9 +235,9 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 		AlwaysPullImage: false, // Use local image if available
 	}
 
-	// Add port bindings when hostname is 0.0.0.0 or using localtest.me domain
+	// Add port bindings when hostname is 0.0.0.0 or using localhost domain
 	// This ensures the operator ports are accessible from the host at the expected ports
-	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localtest.me") {
+	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localhost") {
 		req.HostConfigModifier = func(hc *container.HostConfig) {
 			hc.PortBindings = nat.PortMap{
 				nat.Port(config.InternalDispersalPort + "/tcp"):   []nat.PortBinding{{HostPort: config.DispersalPort}},
@@ -253,9 +253,9 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 	// Add network configuration if provided
 	if nw != nil {
 		req.Networks = []string{nw.Name}
-		// Use localtest.me domain which resolves to 127.0.0.1
+		// Use localhost domain which resolves to 127.0.0.1
 		// This allows the batcher to use host-gateway to reach operators
-		operatorHostname := fmt.Sprintf("operator-%d.localtest.me", config.ID)
+		operatorHostname := fmt.Sprintf("operator-%d.localhost", config.ID)
 		req.NetworkAliases = map[string][]string{
 			nw.Name: {operatorHostname, config.Hostname, fmt.Sprintf("operator-%d", config.ID)},
 		}
@@ -399,6 +399,7 @@ func buildOperatorEnv(config OperatorConfig) map[string]string {
 		"NODE_PUBLIC_IP_CHECK_INTERVAL": "0", // Disable IP update checks in containerized environment
 		"NODE_DISABLE_DISPERSAL_AUTH":   "false",
 		"NODE_REGISTER_AT_NODE_START":   "true",
+		"NODE_RELAY_USE_SECURE_GRPC":    "false", // Disable TLS for relay connections in test environment
 
 		// KZG configuration
 		"NODE_G1_PATH":    "/app/resources/kzg/g1.point.300000",

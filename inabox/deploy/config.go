@@ -830,17 +830,19 @@ func (env *Config) GenerateAllVariables() {
 	writeEnv(retrieverConfig.getEnvMap(), retrieverEnvFile)
 	env.Retriever = retrieverConfig
 
-	// Controller
-	name = "controller0"
-	_, _, _, controllerEnvFile := env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl)
-	// Set encoder address for controller (v2 encoder)
-	if envEncoderUrl := os.Getenv("ENCODER_URL"); envEncoderUrl != "" {
-		// For v2 operations, controller needs encoder address
-		controllerConfig.CONTROLLER_ENCODER_ADDRESS = encoderAddress
+	// Controller - only generate if not provided by testinfra
+	if os.Getenv("CONTROLLER_PROVIDED") != "true" {
+		name = "controller0"
+		_, _, _, controllerEnvFile := env.getPaths(name)
+		controllerConfig := env.generateControllerVars(0, graphUrl)
+		// Set encoder address for controller (v2 encoder)
+		if envEncoderUrl := os.Getenv("ENCODER_URL"); envEncoderUrl != "" {
+			// For v2 operations, controller needs encoder address
+			controllerConfig.CONTROLLER_ENCODER_ADDRESS = encoderAddress
+		}
+		writeEnv(controllerConfig.getEnvMap(), controllerEnvFile)
+		env.Controller = controllerConfig
 	}
-	writeEnv(controllerConfig.getEnvMap(), controllerEnvFile)
-	env.Controller = controllerConfig
 
 	if env.Environment.IsLocal() {
 

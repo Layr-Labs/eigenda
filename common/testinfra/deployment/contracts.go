@@ -327,7 +327,7 @@ func (m *ContractDeploymentManager) RegisterDisperserAddress(ethClient common.Et
 func (m *ContractDeploymentManager) RegisterBlobVersionsAndRelays(
 	ethClient common.EthClient,
 	blobVersionParams []BlobVersionParam,
-	relayPorts []string,
+	relayURLs []string,
 ) error {
 	log.Print("Registering blob versions and relays")
 
@@ -380,9 +380,8 @@ func (m *ContractDeploymentManager) RegisterBlobVersionsAndRelays(
 	}
 
 	ethAddr := ethClient.GetAccountAddress()
-	for _, port := range relayPorts {
-		// Use localhost for local test environment so operators can resolve the address
-		url := fmt.Sprintf("localhost:%s", port)
+	for _, url := range relayURLs {
+		// URL should already include the proper hostname (e.g., relay-0.localhost:34000)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
 			RelayAddress: ethAddr,
 			RelayURL:     url,

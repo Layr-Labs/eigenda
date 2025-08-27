@@ -55,28 +55,37 @@ function start_trap {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/controller*.env); do
-        set -a
-        source $FILE
-        set +a
-        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
+    # Check if controller is provided by testinfra
+    if [ -n "$CONTROLLER_PROVIDED" ]; then
+        echo "DEBUG: Using controller from testinfra"
+    else
+        for FILE in $(ls $testpath/envs/controller*.env); do
+            set -a
+            source $FILE
+            set +a
+            ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
-    done
+            pid="$!"
+            pids="$pids $pid"
+        done
+    fi
 
 
-    files=($(ls $testpath/envs/relay*.env))
-    for i in "${!files[@]}"; do
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        ../relay/bin/relay &
+    if [ -n "$RELAYS_PROVIDED" ]; then
+        echo "Using relays from testinfra containers, skipping local relay startup"
+    else
+        files=($(ls $testpath/envs/relay*.env))
+        for i in "${!files[@]}"; do
+            FILE=${files[$i]}
+            set -a
+            source $FILE
+            set +a
+            ../relay/bin/relay &
 
-        pid="$!"
-        pids="$pids $pid"
-    done
+            pid="$!"
+            pids="$pids $pid"
+        done
+    fi
 
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
@@ -202,33 +211,42 @@ function start_detached {
         pids="$pids $pid"
     done
 
-    for FILE in $(ls $testpath/envs/controller*.env); do
-        set -a
-        source $FILE
-        set +a
-        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
+    # Check if controller is provided by testinfra
+    if [ -n "$CONTROLLER_PROVIDED" ]; then
+        echo "DEBUG: Using controller from testinfra"
+    else
+        for FILE in $(ls $testpath/envs/controller*.env); do
+            set -a
+            source $FILE
+            set +a
+            ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
-    done
+            pid="$!"
+            pids="$pids $pid"
+        done
+    fi
 
-    files=($(ls $testpath/envs/relay*.env))
-    last_index=$(( ${#files[@]} - 1 ))
-    for i in "${!files[@]}"; do
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
+    if [ -n "$RELAYS_PROVIDED" ]; then
+        echo "Using relays from testinfra containers, skipping local relay startup"
+    else
+        files=($(ls $testpath/envs/relay*.env))
+        last_index=$(( ${#files[@]} - 1 ))
+        for i in "${!files[@]}"; do
+            FILE=${files[$i]}
+            set -a
+            source $FILE
+            set +a
+            id=$(basename $FILE | tr -d -c 0-9)
+            ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
+            pid="$!"
+            pids="$pids $pid"
 
-        echo "DEBUG: Starting wait-for relay on port ${RELAY_GRPC_PORT}"
-        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -t 30 -- echo "Relay up" &
-        waiters="$waiters $!"
-    done
+            echo "DEBUG: Starting wait-for relay on port ${RELAY_GRPC_PORT}"
+            ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -t 30 -- echo "Relay up" &
+            waiters="$waiters $!"
+        done
+    fi
 
     # Check if operators are provided by testinfra
     if [ -n "$OPERATORS_PROVIDED" ]; then

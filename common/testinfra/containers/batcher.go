@@ -32,23 +32,23 @@ type BatcherConfig struct {
 	AWSEndpointURL     string
 
 	// Batch configuration
-	PullInterval     string
-	BatchSizeLimit   string
-	SRSOrder         string
-	UseGraph         bool
-	GraphURL         string
-	GraphBackoff     string
-	GraphMaxRetries  string
+	PullInterval    string
+	BatchSizeLimit  string
+	SRSOrder        string
+	UseGraph        bool
+	GraphURL        string
+	GraphBackoff    string
+	GraphMaxRetries string
 
 	// Encoder configuration
-	EncoderAddress                string
-	EncodingTimeout               string
-	EncodingRequestQueueSize      string
-	NumConnections                string
-	MaxNumRetriesPerBlob          string
-	TargetNumChunks               string
-	MaxBlobsToFetchFromStore      string
-	EnableGnarkBundleEncoding     bool
+	EncoderAddress            string
+	EncodingTimeout           string
+	EncodingRequestQueueSize  string
+	NumConnections            string
+	MaxNumRetriesPerBlob      string
+	TargetNumChunks           string
+	MaxBlobsToFetchFromStore  string
+	EnableGnarkBundleEncoding bool
 
 	// Metrics configuration
 	EnableMetrics   bool
@@ -73,22 +73,22 @@ type BatcherConfig struct {
 	IndexerDataDir         string
 
 	// Finalizer configuration
-	FinalizerInterval       string
-	FinalizerPoolSize       string
-	FinalizationBlockDelay  string
+	FinalizerInterval      string
+	FinalizerPoolSize      string
+	FinalizationBlockDelay string
 
 	// Attestation configuration
-	AttestationTimeout      string
-	BatchAttestationTimeout string
-	MaxNodeConnections      string
+	AttestationTimeout        string
+	BatchAttestationTimeout   string
+	MaxNodeConnections        string
 	MaxNumRetriesPerDispersal string
 
 	// Fragment configuration
-	FragmentPrefixChars        string
-	FragmentParallelismFactor  string
+	FragmentPrefixChars         string
+	FragmentParallelismFactor   string
 	FragmentParallelismConstant string
-	FragmentReadTimeout        string
-	FragmentWriteTimeout       string
+	FragmentReadTimeout         string
+	FragmentWriteTimeout        string
 
 	// KMS configuration
 	KMSKeyID      string
@@ -210,7 +210,7 @@ func NewBatcherContainerWithNetwork(ctx context.Context, config BatcherConfig, n
 			},
 		},
 		WaitingFor: wait.ForAll(
-			wait.ForLog("starting metrics server").WithStartupTimeout(60*time.Second),
+			wait.ForLog("starting metrics server").WithStartupTimeout(60 * time.Second),
 		),
 		Name:            "eigenda-batcher",
 		AlwaysPullImage: false, // Use local image if available
@@ -225,14 +225,14 @@ func NewBatcherContainerWithNetwork(ctx context.Context, config BatcherConfig, n
 		)
 	}
 
-	// Add HostConfigModifier to set up ExtraHosts for operator localtest.me domains
-	// This maps operator-{i}.localtest.me to host-gateway, allowing the batcher
-	// to reach operators running on the host through the localtest.me domain
+	// Add HostConfigModifier to set up ExtraHosts for operator localhost domains
+	// This maps operator-{i}.localhost to host-gateway, allowing the batcher
+	// to reach operators running on the host through the localhost domain
 	req.HostConfigModifier = func(hc *container.HostConfig) {
-		// Add entries for each operator's localtest.me domain
+		// Add entries for each operator's localhost domain
 		// host-gateway is a special Docker hostname that resolves to the host machine
 		for i := 0; i < 4; i++ {
-			operatorHost := fmt.Sprintf("operator-%d.localtest.me:host-gateway", i)
+			operatorHost := fmt.Sprintf("operator-%d.localhost:host-gateway", i)
 			hc.ExtraHosts = append(hc.ExtraHosts, operatorHost)
 		}
 	}
@@ -303,51 +303,51 @@ func buildBatcherEnv(config BatcherConfig) map[string]string {
 	privateKey = strings.TrimPrefix(privateKey, "0X")
 
 	env := map[string]string{
-		"BATCHER_LOG_FORMAT":                         config.LogFormat,
-		"BATCHER_LOG_LEVEL":                          config.LogLevel,
-		"BATCHER_LOG_PATH":                           "/logs/batcher.log", // Log to a file we can access
-		"BATCHER_S3_BUCKET_NAME":                     config.S3BucketName,
-		"BATCHER_DYNAMODB_TABLE_NAME":                config.DynamoDBTableName,
-		"BATCHER_PULL_INTERVAL":                      config.PullInterval,
-		"BATCHER_ENCODER_ADDRESS":                    config.EncoderAddress,
-		"BATCHER_ENABLE_METRICS":                     fmt.Sprintf("%t", config.EnableMetrics),
-		"BATCHER_METRICS_HTTP_PORT":                  config.MetricsHTTPPort,
-		"BATCHER_BATCH_SIZE_LIMIT":                   config.BatchSizeLimit,
-		"BATCHER_USE_GRAPH":                          fmt.Sprintf("%t", config.UseGraph),
-		"BATCHER_SRS_ORDER":                          config.SRSOrder,
-		"BATCHER_INDEXER_DATA_DIR":                   config.IndexerDataDir,
-		"BATCHER_ENCODING_TIMEOUT":                   config.EncodingTimeout,
-		"BATCHER_ATTESTATION_TIMEOUT":                config.AttestationTimeout,
-		"BATCHER_BATCH_ATTESTATION_TIMEOUT":          config.BatchAttestationTimeout,
-		"BATCHER_CHAIN_READ_TIMEOUT":                 config.ChainReadTimeout,
-		"BATCHER_CHAIN_WRITE_TIMEOUT":                config.ChainWriteTimeout,
-		"BATCHER_CHAIN_STATE_TIMEOUT":                config.ChainStateTimeout,
-		"BATCHER_TRANSACTION_BROADCAST_TIMEOUT":      config.TransactionBroadcastTimeout,
-		"BATCHER_NUM_CONNECTIONS":                    config.NumConnections,
-		"BATCHER_FINALIZER_INTERVAL":                 config.FinalizerInterval,
-		"BATCHER_FINALIZER_POOL_SIZE":                config.FinalizerPoolSize,
-		"BATCHER_ENCODING_REQUEST_QUEUE_SIZE":        config.EncodingRequestQueueSize,
-		"BATCHER_MAX_NUM_RETRIES_PER_BLOB":           config.MaxNumRetriesPerBlob,
-		"BATCHER_TARGET_NUM_CHUNKS":                  config.TargetNumChunks,
-		"BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE":      config.MaxBlobsToFetchFromStore,
-		"BATCHER_FINALIZATION_BLOCK_DELAY":           config.FinalizationBlockDelay,
-		"BATCHER_MAX_NODE_CONNECTIONS":               config.MaxNodeConnections,
-		"BATCHER_MAX_NUM_RETRIES_PER_DISPERSAL":      config.MaxNumRetriesPerDispersal,
-		"BATCHER_ENABLE_GNARK_BUNDLE_ENCODING":       fmt.Sprintf("%t", config.EnableGnarkBundleEncoding),
-		"BATCHER_BLS_OPERATOR_STATE_RETRIVER":        config.OperatorStateRetriever,
-		"BATCHER_EIGENDA_SERVICE_MANAGER":             config.ServiceManager,
-		"BATCHER_EIGENDA_DIRECTORY":                  config.EigenDADirectory,
-		"BATCHER_CHAIN_RPC":                          config.ChainRPC,
-		"BATCHER_PRIVATE_KEY":                        privateKey,
-		"BATCHER_NUM_CONFIRMATIONS":                  config.NumConfirmations,
-		"BATCHER_NUM_RETRIES":                        config.NumRetries,
-		"BATCHER_INDEXER_PULL_INTERVAL":              config.IndexerPullInterval,
-		"BATCHER_FRAGMENT_PREFIX_CHARS":              config.FragmentPrefixChars,
-		"BATCHER_FRAGMENT_PARALLELISM_FACTOR":        config.FragmentParallelismFactor,
-		"BATCHER_FRAGMENT_PARALLELISM_CONSTANT":      config.FragmentParallelismConstant,
-		"BATCHER_FRAGMENT_READ_TIMEOUT":              config.FragmentReadTimeout,
-		"BATCHER_FRAGMENT_WRITE_TIMEOUT":             config.FragmentWriteTimeout,
-		"BATCHER_KMS_KEY_DISABLE":                    fmt.Sprintf("%t", config.KMSKeyDisable),
+		"BATCHER_LOG_FORMAT":                    config.LogFormat,
+		"BATCHER_LOG_LEVEL":                     config.LogLevel,
+		"BATCHER_LOG_PATH":                      "/logs/batcher.log", // Log to a file we can access
+		"BATCHER_S3_BUCKET_NAME":                config.S3BucketName,
+		"BATCHER_DYNAMODB_TABLE_NAME":           config.DynamoDBTableName,
+		"BATCHER_PULL_INTERVAL":                 config.PullInterval,
+		"BATCHER_ENCODER_ADDRESS":               config.EncoderAddress,
+		"BATCHER_ENABLE_METRICS":                fmt.Sprintf("%t", config.EnableMetrics),
+		"BATCHER_METRICS_HTTP_PORT":             config.MetricsHTTPPort,
+		"BATCHER_BATCH_SIZE_LIMIT":              config.BatchSizeLimit,
+		"BATCHER_USE_GRAPH":                     fmt.Sprintf("%t", config.UseGraph),
+		"BATCHER_SRS_ORDER":                     config.SRSOrder,
+		"BATCHER_INDEXER_DATA_DIR":              config.IndexerDataDir,
+		"BATCHER_ENCODING_TIMEOUT":              config.EncodingTimeout,
+		"BATCHER_ATTESTATION_TIMEOUT":           config.AttestationTimeout,
+		"BATCHER_BATCH_ATTESTATION_TIMEOUT":     config.BatchAttestationTimeout,
+		"BATCHER_CHAIN_READ_TIMEOUT":            config.ChainReadTimeout,
+		"BATCHER_CHAIN_WRITE_TIMEOUT":           config.ChainWriteTimeout,
+		"BATCHER_CHAIN_STATE_TIMEOUT":           config.ChainStateTimeout,
+		"BATCHER_TRANSACTION_BROADCAST_TIMEOUT": config.TransactionBroadcastTimeout,
+		"BATCHER_NUM_CONNECTIONS":               config.NumConnections,
+		"BATCHER_FINALIZER_INTERVAL":            config.FinalizerInterval,
+		"BATCHER_FINALIZER_POOL_SIZE":           config.FinalizerPoolSize,
+		"BATCHER_ENCODING_REQUEST_QUEUE_SIZE":   config.EncodingRequestQueueSize,
+		"BATCHER_MAX_NUM_RETRIES_PER_BLOB":      config.MaxNumRetriesPerBlob,
+		"BATCHER_TARGET_NUM_CHUNKS":             config.TargetNumChunks,
+		"BATCHER_MAX_BLOBS_TO_FETCH_FROM_STORE": config.MaxBlobsToFetchFromStore,
+		"BATCHER_FINALIZATION_BLOCK_DELAY":      config.FinalizationBlockDelay,
+		"BATCHER_MAX_NODE_CONNECTIONS":          config.MaxNodeConnections,
+		"BATCHER_MAX_NUM_RETRIES_PER_DISPERSAL": config.MaxNumRetriesPerDispersal,
+		"BATCHER_ENABLE_GNARK_BUNDLE_ENCODING":  fmt.Sprintf("%t", config.EnableGnarkBundleEncoding),
+		"BATCHER_BLS_OPERATOR_STATE_RETRIVER":   config.OperatorStateRetriever,
+		"BATCHER_EIGENDA_SERVICE_MANAGER":       config.ServiceManager,
+		"BATCHER_EIGENDA_DIRECTORY":             config.EigenDADirectory,
+		"BATCHER_CHAIN_RPC":                     config.ChainRPC,
+		"BATCHER_PRIVATE_KEY":                   privateKey,
+		"BATCHER_NUM_CONFIRMATIONS":             config.NumConfirmations,
+		"BATCHER_NUM_RETRIES":                   config.NumRetries,
+		"BATCHER_INDEXER_PULL_INTERVAL":         config.IndexerPullInterval,
+		"BATCHER_FRAGMENT_PREFIX_CHARS":         config.FragmentPrefixChars,
+		"BATCHER_FRAGMENT_PARALLELISM_FACTOR":   config.FragmentParallelismFactor,
+		"BATCHER_FRAGMENT_PARALLELISM_CONSTANT": config.FragmentParallelismConstant,
+		"BATCHER_FRAGMENT_READ_TIMEOUT":         config.FragmentReadTimeout,
+		"BATCHER_FRAGMENT_WRITE_TIMEOUT":        config.FragmentWriteTimeout,
+		"BATCHER_KMS_KEY_DISABLE":               fmt.Sprintf("%t", config.KMSKeyDisable),
 	}
 
 	// Add optional configurations if provided

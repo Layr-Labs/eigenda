@@ -44,9 +44,11 @@ type InfraManager struct {
 	localstack *containers.LocalStackContainer
 	graphnode  *containers.GraphNodeContainer
 	churner    *containers.ChurnerContainer
-	encoder    *containers.EncoderContainer
+	encoders   []*containers.EncoderContainer
 	batcher    *containers.BatcherContainer
+	controller *containers.ControllerContainer
 	operators  []*containers.OperatorContainer
+	relays     []*containers.RelayContainer
 	network    *testcontainers.DockerNetwork
 	result     InfraResult
 }
@@ -461,7 +463,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			fmt.Printf("DEBUG: EigenDA root path for operator %d: %s\n", i, operatorConfig.EigenDADirectory)
 
 			// Set the hostname for operator registration
-			operatorConfig.Hostname = fmt.Sprintf("operator-%d.localtest.me", i)
+			operatorConfig.Hostname = fmt.Sprintf("operator-%d.localhost", i)
 
 			// Start the operator container
 			operator, err := containers.NewOperatorContainerWithNetwork(ctx, operatorConfig, im.network)
@@ -479,100 +481,126 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		fmt.Printf("✅ %d operators started successfully\n", numToStart)
 	}
 
-	// 10. Start encoder if enabled (needed by batcher)
-	if im.config.EigenDA.Encoder.Enabled {
-		fmt.Println("Starting encoder service...")
+	// 10. Start encoders if configured (needed by batcher)
+	if len(im.config.EigenDA.Encoders) > 0 {
+		fmt.Println("Starting encoder services...")
 
-		// Configure encoder
-		encoderConfig := im.config.EigenDA.Encoder.EncoderConfig
+		// Initialize encoder URL maps
+		im.result.EncoderURLs = make(map[string]string)
+		im.result.EncoderInternalURLs = make(map[string]string)
 
-		// Configure AWS resources (required even for encoder v1)
-		if im.config.LocalStack.Enabled && im.localstack != nil {
-			// Use internal endpoint when containers are on the same network
-			if im.network != nil {
-				encoderConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+		for _, encoderCfg := range im.config.EigenDA.Encoders {
+			if !encoderCfg.Enabled {
+				continue
+			}
+
+			// Configure encoder
+			encoderConfig := encoderCfg.EncoderConfig
+
+			// Configure AWS resources (required even for encoder v1)
+			if im.config.LocalStack.Enabled && im.localstack != nil {
+				// Use internal endpoint when containers are on the same network
+				if im.network != nil {
+					encoderConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+				} else {
+					encoderConfig.AWSEndpointURL = im.localstack.Endpoint()
+				}
+				encoderConfig.AWSRegion = im.localstack.Region()
+				encoderConfig.AWSAccessKeyID = "localstack"
+				encoderConfig.AWSSecretAccessKey = "localstack"
+
+				// Use configured bucket name for encoder v2
+				if encoderConfig.EncoderVersion == "2" && im.config.LocalStack.Resources.BucketName != "" {
+					encoderConfig.S3BucketName = im.config.LocalStack.Resources.BucketName
+				}
 			} else {
-				encoderConfig.AWSEndpointURL = im.localstack.Endpoint()
+				// Use default AWS region if LocalStack is not enabled
+				if encoderConfig.AWSRegion == "" {
+					encoderConfig.AWSRegion = "us-east-1"
+				}
 			}
-			encoderConfig.AWSRegion = im.localstack.Region()
-			encoderConfig.AWSAccessKeyID = "localstack"
-			encoderConfig.AWSSecretAccessKey = "localstack"
 
-			// Use configured bucket name for encoder v2
-			if encoderConfig.EncoderVersion == "2" && im.config.LocalStack.Resources.BucketName != "" {
-				encoderConfig.S3BucketName = im.config.LocalStack.Resources.BucketName
-			}
-		} else {
-			// Use default AWS region if LocalStack is not enabled
-			if encoderConfig.AWSRegion == "" {
-				encoderConfig.AWSRegion = "us-east-1"
-			}
-		}
-
-		// Set KZG paths if not already configured - must be absolute paths for Docker
-		// Save current working directory to restore it after getting absolute paths
-		originalDir, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current working directory: %w", err)
-		}
-
-		// Change to the inabox directory where KZG resources are located (same as retrieval client)
-		inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
-		if err := os.Chdir(inaboxDir); err != nil {
-			return nil, fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
-		}
-
-		// Now get absolute paths for KZG resources from the inabox directory
-		if encoderConfig.G1Path == "" {
-			// Use relative path from inabox directory (same as retrieval client)
-			g1Path := "resources/kzg/g1.point.300000"
-			absG1Path, err := filepath.Abs(g1Path)
+			// Set KZG paths if not already configured - must be absolute paths for Docker
+			// Save current working directory to restore it after getting absolute paths
+			originalDir, err := os.Getwd()
 			if err != nil {
-				os.Chdir(originalDir) // Restore directory before returning error
-				return nil, fmt.Errorf("failed to get absolute path for G1: %w", err)
+				return nil, fmt.Errorf("failed to get current working directory: %w", err)
 			}
-			encoderConfig.G1Path = absG1Path
-		}
-		if encoderConfig.G2Path == "" {
-			// Use relative path from inabox directory (same as retrieval client)
-			g2Path := "resources/kzg/g2.point.300000"
-			absG2Path, err := filepath.Abs(g2Path)
+
+			// Change to the inabox directory where KZG resources are located (same as retrieval client)
+			inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
+			if err := os.Chdir(inaboxDir); err != nil {
+				return nil, fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
+			}
+
+			// Now get absolute paths for KZG resources from the inabox directory
+			if encoderConfig.G1Path == "" {
+				// Use relative path from inabox directory (same as retrieval client)
+				g1Path := "resources/kzg/g1.point.300000"
+				absG1Path, err := filepath.Abs(g1Path)
+				if err != nil {
+					os.Chdir(originalDir) // Restore directory before returning error
+					return nil, fmt.Errorf("failed to get absolute path for G1: %w", err)
+				}
+				encoderConfig.G1Path = absG1Path
+			}
+			if encoderConfig.G2Path == "" {
+				// Use relative path from inabox directory (same as retrieval client)
+				g2Path := "resources/kzg/g2.point.300000"
+				absG2Path, err := filepath.Abs(g2Path)
+				if err != nil {
+					os.Chdir(originalDir) // Restore directory before returning error
+					return nil, fmt.Errorf("failed to get absolute path for G2: %w", err)
+				}
+				encoderConfig.G2Path = absG2Path
+			}
+			if encoderConfig.G2PowerOf2Path == "" {
+				// Use relative path from inabox directory (same as retrieval client)
+				g2PowerOf2Path := "resources/kzg/g2.point.300000.powerOf2"
+				absG2PowerOf2Path, err := filepath.Abs(g2PowerOf2Path)
+				if err != nil {
+					os.Chdir(originalDir) // Restore directory before returning error
+					return nil, fmt.Errorf("failed to get absolute path for G2PowerOf2: %w", err)
+				}
+				encoderConfig.G2PowerOf2Path = absG2PowerOf2Path
+			}
+			if encoderConfig.CachePath == "" {
+				// Use relative path from inabox directory (same as retrieval client)
+				cachePath := "resources/kzg/SRSTables"
+				absCachePath, err := filepath.Abs(cachePath)
+				if err != nil {
+					os.Chdir(originalDir) // Restore directory before returning error
+					return nil, fmt.Errorf("failed to get absolute path for cache: %w", err)
+				}
+				encoderConfig.CachePath = absCachePath
+			}
+
+			// Restore original directory
+			if err := os.Chdir(originalDir); err != nil {
+				return nil, fmt.Errorf("failed to restore directory: %w", err)
+			}
+
+			// Start the encoder container
+			encoder, err := containers.NewEncoderContainerWithNetwork(ctx, encoderConfig, im.network)
 			if err != nil {
-				os.Chdir(originalDir) // Restore directory before returning error
-				return nil, fmt.Errorf("failed to get absolute path for G2: %w", err)
+				return nil, fmt.Errorf("failed to start encoder v%s: %w", encoderConfig.EncoderVersion, err)
 			}
-			encoderConfig.G2Path = absG2Path
-		}
-		if encoderConfig.CachePath == "" {
-			// Use relative path from inabox directory (same as retrieval client)
-			cachePath := "resources/kzg/SRSTables"
-			absCachePath, err := filepath.Abs(cachePath)
-			if err != nil {
-				os.Chdir(originalDir) // Restore directory before returning error
-				return nil, fmt.Errorf("failed to get absolute path for cache: %w", err)
+			im.encoders = append(im.encoders, encoder)
+
+			// Store URLs by encoder version
+			version := encoderConfig.EncoderVersion
+			if version == "" {
+				version = "1" // Default to v1
 			}
-			encoderConfig.CachePath = absCachePath
-		}
+			im.result.EncoderURLs[version] = encoder.URL()
 
-		// Restore original directory
-		if err := os.Chdir(originalDir); err != nil {
-			return nil, fmt.Errorf("failed to restore directory: %w", err)
-		}
+			// Use internal URL for other containers
+			if im.network != nil {
+				im.result.EncoderInternalURLs[version] = encoder.InternalURL()
+			}
 
-		// Start the encoder container
-		encoder, err := containers.NewEncoderContainerWithNetwork(ctx, encoderConfig, im.network)
-		if err != nil {
-			return nil, fmt.Errorf("failed to start encoder: %w", err)
+			fmt.Printf("✅ Encoder v%s service started at %s\n", version, encoder.URL())
 		}
-		im.encoder = encoder
-		im.result.EncoderURL = encoder.URL()
-
-		// Use internal URL for other containers
-		if im.network != nil {
-			im.result.EncoderInternalURL = encoder.InternalURL()
-		}
-
-		fmt.Printf("✅ Encoder service started at %s\n", im.result.EncoderURL)
 	}
 
 	// 11. Start batcher if enabled and required components are available
@@ -631,13 +659,18 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 		}
 
-		// Set encoder address if encoder is enabled
-		if im.config.EigenDA.Encoder.Enabled && im.encoder != nil {
+		// Set encoder address if encoders are configured (batcher uses v1)
+		if len(im.encoders) > 0 && im.result.EncoderURLs != nil {
+			// Batcher needs encoder v1
 			if im.network != nil {
 				// Use internal URL for containers on the same network
-				batcherConfig.EncoderAddress = im.result.EncoderInternalURL
+				if url, ok := im.result.EncoderInternalURLs["1"]; ok {
+					batcherConfig.EncoderAddress = url
+				}
 			} else {
-				batcherConfig.EncoderAddress = im.result.EncoderURL
+				if url, ok := im.result.EncoderURLs["1"]; ok {
+					batcherConfig.EncoderAddress = url
+				}
 			}
 		}
 
@@ -655,6 +688,191 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 
 		fmt.Printf("✅ Batcher service started (metrics at %s)\n", im.result.BatcherURL)
+	}
+
+	// 12. Start controller if enabled and encoders are available
+	if im.config.EigenDA.Controller.Enabled && len(im.encoders) > 0 && im.result.EigenDAContracts != nil {
+		fmt.Println("Starting controller service...")
+
+		// Configure controller
+		controllerConfig := im.config.EigenDA.Controller.ControllerConfig
+
+		// Set encoder address (controller uses v2 encoder)
+		if im.network != nil {
+			if url, ok := im.result.EncoderInternalURLs["2"]; ok {
+				controllerConfig.EncoderAddress = url
+			}
+		} else {
+			if url, ok := im.result.EncoderURLs["2"]; ok {
+				controllerConfig.EncoderAddress = url
+			}
+		}
+
+		// Configure AWS resources
+		if im.config.LocalStack.Enabled && im.localstack != nil {
+			if im.network != nil {
+				controllerConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+			} else {
+				controllerConfig.AWSEndpointURL = im.localstack.Endpoint()
+			}
+			controllerConfig.AWSRegion = im.localstack.Region()
+			controllerConfig.AWSAccessKeyID = "localstack"
+			controllerConfig.AWSSecretAccessKey = "localstack"
+		}
+
+		// Configure chain settings
+		if im.anvil != nil {
+			if im.network != nil {
+				internalURL, err := im.anvil.InternalRPCURL(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get anvil internal RPC URL: %w", err)
+				}
+				controllerConfig.ChainRPC = internalURL
+			} else {
+				controllerConfig.ChainRPC = im.anvil.RPCURL()
+			}
+		}
+
+		// Set contract addresses from deployment
+		controllerConfig.EigenDAServiceManager = im.result.EigenDAContracts.ServiceManager
+		controllerConfig.BLSOperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+
+		// Configure graph URL if available
+		if im.config.GraphNode.Enabled && im.graphnode != nil {
+			controllerConfig.UseGraph = true
+			// GraphNode uses internal network name "graphnode" on port 8000
+			if im.network != nil {
+				controllerConfig.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			} else {
+				controllerConfig.GraphURL = im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			}
+		}
+
+		// Set disperser KMS key ID if available
+		if im.result.DisperserKMSKeyID != "" {
+			controllerConfig.DisperserKMSKeyID = im.result.DisperserKMSKeyID
+		}
+
+		// Start the controller container
+		controller, err := containers.NewControllerContainerWithNetwork(ctx, controllerConfig, im.network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start controller: %w", err)
+		}
+		im.controller = controller
+		im.result.ControllerMetricsURL = controller.MetricsURL()
+
+		// Use internal URL for other containers
+		if im.network != nil {
+			im.result.ControllerInternalMetricsURL = controller.InternalMetricsURL()
+		}
+
+		fmt.Printf("✅ Controller service started (metrics at %s)\n", im.result.ControllerMetricsURL)
+	}
+
+	// 12. Start relays if enabled
+	if im.config.EigenDA.Relays.Enabled && im.result.EigenDAContracts != nil {
+		fmt.Printf("Starting %d relay services...\n", im.config.EigenDA.Relays.Count)
+
+		// Initialize relay URL maps
+		im.result.RelayURLs = make(map[int]string)
+		im.result.RelayInternalURLs = make(map[int]string)
+
+		for i := 0; i < im.config.EigenDA.Relays.Count; i++ {
+			// Configure relay with base configuration
+			relayConfig := im.config.EigenDA.Relays.BaseConfig
+			relayConfig.ID = i
+			
+			// Override with default configuration if not set
+			if relayConfig.Image == "" {
+				relayConfig = containers.DefaultRelayConfig(i)
+			} else {
+				// Merge with defaults to ensure all required fields are set
+				defaultConfig := containers.DefaultRelayConfig(i)
+				relayConfig.ID = defaultConfig.ID
+				if relayConfig.GRPCPort == "" {
+					relayConfig.GRPCPort = defaultConfig.GRPCPort
+				}
+				if relayConfig.InternalGRPCPort == "" {
+					relayConfig.InternalGRPCPort = defaultConfig.InternalGRPCPort
+				}
+				if relayConfig.MetricsPort == "" {
+					relayConfig.MetricsPort = defaultConfig.MetricsPort
+				}
+				if relayConfig.Hostname == "" {
+					relayConfig.Hostname = defaultConfig.Hostname
+				}
+			}
+			
+			// Set the hostname for relay registration (using relay-N.localhost pattern)
+			relayConfig.Hostname = fmt.Sprintf("relay-%d.localhost", i)
+
+			// Configure AWS resources if LocalStack is enabled
+			if im.config.LocalStack.Enabled && im.localstack != nil {
+				// Use internal endpoint when containers are on the same network
+				if im.network != nil {
+					relayConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+				} else {
+					relayConfig.AWSEndpointURL = im.localstack.Endpoint()
+				}
+				relayConfig.AWSRegion = im.localstack.Region()
+				relayConfig.AWSAccessKeyID = "localstack"
+				relayConfig.AWSSecretAccessKey = "localstack"
+
+				// Use configured bucket and table names
+				if im.config.LocalStack.Resources.BucketName != "" {
+					relayConfig.BucketName = im.config.LocalStack.Resources.BucketName
+				}
+				if im.config.LocalStack.Resources.V2MetadataTableName != "" {
+					relayConfig.MetadataTableName = im.config.LocalStack.Resources.V2MetadataTableName
+				}
+			}
+
+			// Configure chain settings
+			if im.anvil != nil {
+				if im.network != nil {
+					relayConfig.ChainRPC = "http://anvil:8545"
+				} else {
+					relayConfig.ChainRPC = im.anvil.RPCURL()
+				}
+			}
+
+			// Configure graph URL if available
+			if im.config.GraphNode.Enabled && im.graphnode != nil {
+				// GraphNode uses internal network name "graphnode" on port 8000
+				if im.network != nil {
+					relayConfig.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+				} else {
+					relayConfig.GraphURL = im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+				}
+			}
+
+			// Set contract addresses from deployment
+			relayConfig.BLSOperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+			relayConfig.EigenDAServiceManager = im.result.EigenDAContracts.ServiceManager
+			if im.result.EigenDAContracts.EigenDADirectory != "" {
+				relayConfig.EigenDADirectory = im.result.EigenDAContracts.EigenDADirectory
+			}
+
+			// Set the relay keys - by default each relay serves its own index
+			relayConfig.RelayKeys = []int{i}
+
+			// Start the relay container
+			relay, err := containers.NewRelayContainerWithNetwork(ctx, relayConfig, im.network)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start relay %d: %w", i, err)
+			}
+			im.relays = append(im.relays, relay)
+
+			// Store the relay's addresses
+			im.result.RelayURLs[i] = relay.GetGRPCAddress()
+			if im.network != nil {
+				im.result.RelayInternalURLs[i] = relay.GetInternalGRPCAddress()
+			}
+
+			fmt.Printf("  ✅ Relay %d started: %s\n", i, relay.GetGRPCAddress())
+		}
+
+		fmt.Printf("✅ %d relays started successfully\n", im.config.EigenDA.Relays.Count)
 	}
 
 	success = true
@@ -682,16 +900,31 @@ func (im *InfraManager) cleanup(ctx context.Context) error {
 		im.batcher = nil
 	}
 
-	if im.encoder != nil {
+	// Terminate controller
+	if im.controller != nil {
 		// Print log path for debugging
-		if logPath := im.encoder.LogPath(); logPath != "" {
-			fmt.Printf("Encoder logs available at: %s\n", logPath)
+		if logPath := im.controller.LogPath(); logPath != "" {
+			fmt.Printf("Controller logs available at: %s\n", logPath)
 		}
-		if err := im.encoder.Terminate(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to terminate encoder: %w", err))
+		if err := im.controller.Terminate(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to terminate controller: %w", err))
 		}
-		im.encoder = nil
+		im.controller = nil
 	}
+
+	// Terminate encoders
+	for _, encoder := range im.encoders {
+		if encoder != nil {
+			// Print log path for debugging
+			if logPath := encoder.LogPath(); logPath != "" {
+				fmt.Printf("Encoder logs available at: %s\n", logPath)
+			}
+			if err := encoder.Terminate(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to terminate encoder: %w", err))
+			}
+		}
+	}
+	im.encoders = nil
 
 	// Terminate operators
 	for i, operator := range im.operators {
@@ -706,6 +939,20 @@ func (im *InfraManager) cleanup(ctx context.Context) error {
 		}
 	}
 	im.operators = nil
+
+	// Terminate relays
+	for i, relay := range im.relays {
+		if relay != nil {
+			// Print log path for debugging
+			if logPath := relay.LogPath(); logPath != "" {
+				fmt.Printf("Relay %d logs available at: %s\n", i, logPath)
+			}
+			if err := relay.Terminate(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to terminate relay %d: %w", i, err))
+			}
+		}
+	}
+	im.relays = nil
 
 	if im.churner != nil {
 		// Print log path for debugging
@@ -1026,11 +1273,28 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		// Set the service manager address in manager (used by RegisterBlobVersionsAndRelays)
 		manager.EigenDAContracts.ServiceManager = im.result.EigenDAContracts.ServiceManager
 
-		// Register relay addresses for v2
-		// These are the standard relay ports used in inabox tests
-		relayPorts := []string{"32035", "32037", "32039", "32041"}
+		// Collect relay URLs from running relays if they exist
+		var relayURLs []string
+		if len(im.relays) > 0 {
+			// Use actual relay URLs from running relays with proper hostnames
+			for i, relay := range im.relays {
+				// Use relay-N.localhost:PORT format for Docker network resolution
+				url := fmt.Sprintf("relay-%d.localhost:%s", i, relay.Config().GRPCPort)
+				relayURLs = append(relayURLs, url)
+			}
+		} else if im.config.EigenDA.Relays.Enabled {
+			// If relays will be started later, use their expected URLs
+			for i := 0; i < im.config.EigenDA.Relays.Count; i++ {
+				basePort := 34000 + (i * 2) // Match DefaultRelayConfig port calculation
+				url := fmt.Sprintf("relay-%d.localhost:%d", i, basePort)
+				relayURLs = append(relayURLs, url)
+			}
+		} else {
+			// Fallback to standard relay URLs used in inabox tests
+			relayURLs = []string{"localhost:32035", "localhost:32037", "localhost:32039", "localhost:32041"}
+		}
 
-		err = manager.RegisterBlobVersionsAndRelays(ethClient, im.config.EigenDA.BlobVersionParams, relayPorts)
+		err = manager.RegisterBlobVersionsAndRelays(ethClient, im.config.EigenDA.BlobVersionParams, relayURLs)
 		if err != nil {
 			return fmt.Errorf("failed to register blob versions and relays: %w", err)
 		}
