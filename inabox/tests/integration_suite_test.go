@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testinfra"
+	"github.com/Layr-Labs/eigenda/common/testinfra/containers"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -135,6 +136,18 @@ var _ = BeforeSuite(func() {
 
 		// Enable churner service
 		config.EigenDA.Churner.Enabled = true
+		
+		// Enable encoder and batcher services
+		config.EigenDA.Encoder.Enabled = true
+		config.EigenDA.Encoder.EncoderConfig = containers.DefaultEncoderV1Config()
+		
+		config.EigenDA.Batcher.Enabled = true
+		config.EigenDA.Batcher.BatcherConfig = containers.DefaultBatcherConfig()
+		
+		// Enable operators
+		config.EigenDA.Operators.Enabled = true
+		config.EigenDA.Operators.Count = 4  // Start 4 operators as specified in testconfig
+		config.EigenDA.Operators.MaxOperatorCount = 3  // But limit to 3 running (for testing churn)
 
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
@@ -237,6 +250,36 @@ var _ = BeforeSuite(func() {
 			fmt.Printf("✅ CHURNER_URL env var is now: %s\n", os.Getenv("CHURNER_URL"))
 		} else {
 			fmt.Printf("⚠️ No ChurnerURL in infraResult\n")
+		}
+
+		// Pass encoder URL from testinfra if available
+		if infraResult.EncoderURL != "" {
+			// Use external URL for local binaries
+			// Note: When batcher is also containerized, it uses internal URL directly
+			os.Setenv("ENCODER_URL", infraResult.EncoderURL)
+			fmt.Printf("✅ Using encoder from testinfra: %s\n", infraResult.EncoderURL)
+		} else {
+			fmt.Printf("⚠️ No EncoderURL in infraResult\n")
+		}
+
+		// Pass batcher info from testinfra if available
+		if infraResult.BatcherURL != "" {
+			// Batcher doesn't expose a service URL, only metrics, so we flag its existence
+			os.Setenv("BATCHER_PROVIDED", "true")
+			fmt.Printf("✅ Using batcher from testinfra (metrics: %s)\n", infraResult.BatcherURL)
+		} else {
+			fmt.Printf("⚠️ No BatcherURL in infraResult\n")
+		}
+		
+		// Pass operators info from testinfra if available
+		if infraResult.OperatorAddresses != nil && len(infraResult.OperatorAddresses) > 0 {
+			os.Setenv("OPERATORS_PROVIDED", "true")
+			fmt.Printf("✅ Using %d operators from testinfra\n", len(infraResult.OperatorAddresses))
+			for id, addr := range infraResult.OperatorAddresses {
+				fmt.Printf("  - Operator %d: %s\n", id, addr)
+			}
+		} else {
+			fmt.Printf("⚠️ No operators in infraResult\n")
 		}
 
 		// Generate all config variables for the binaries. Depends on the test config being set

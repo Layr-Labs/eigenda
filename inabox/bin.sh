@@ -156,31 +156,41 @@ function start_detached {
         waiters="$waiters $!"
     done
 
-    for FILE in $(ls $testpath/envs/enc*.env); do
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../disperser/bin/encoder > $testpath/logs/enc${id}.log 2>&1 &
+    # Check if encoder is provided by testinfra
+    if [ -n "$ENCODER_URL" ]; then
+        echo "DEBUG: Using encoder from testinfra at $ENCODER_URL"
+    else
+        for FILE in $(ls $testpath/envs/enc*.env); do
+            set -a
+            source $FILE
+            set +a
+            id=$(basename $FILE | tr -d -c 0-9)
+            ../disperser/bin/encoder > $testpath/logs/enc${id}.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
+            pid="$!"
+            pids="$pids $pid"
 
-        echo "DEBUG: Starting wait-for encoder on port ${DISPERSER_ENCODER_GRPC_PORT}"
-        ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -t 30 -- echo "Encoder up" &
-        waiters="$waiters $!"
-    done
+            echo "DEBUG: Starting wait-for encoder on port ${DISPERSER_ENCODER_GRPC_PORT}"
+            ./wait-for 0.0.0.0:${DISPERSER_ENCODER_GRPC_PORT} -t 30 -- echo "Encoder up" &
+            waiters="$waiters $!"
+        done
+    fi
 
-    for FILE in $(ls $testpath/envs/batcher*.env); do
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../disperser/bin/batcher > $testpath/logs/batcher${id}.log 2>&1 &
+    # Check if batcher is provided by testinfra
+    if [ -n "$BATCHER_PROVIDED" ]; then
+        echo "DEBUG: Using batcher from testinfra"
+    else
+        for FILE in $(ls $testpath/envs/batcher*.env); do
+            set -a
+            source $FILE
+            set +a
+            id=$(basename $FILE | tr -d -c 0-9)
+            ../disperser/bin/batcher > $testpath/logs/batcher${id}.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
-    done
+            pid="$!"
+            pids="$pids $pid"
+        done
+    fi
 
     for FILE in $(ls $testpath/envs/retriever*.env); do
         set -a
@@ -220,27 +230,32 @@ function start_detached {
         waiters="$waiters $!"
     done
 
-    files=($(ls $testpath/envs/opr*.env))
-    last_index=$(( ${#files[@]} - 1 ))
+    # Check if operators are provided by testinfra
+    if [ -n "$OPERATORS_PROVIDED" ]; then
+        echo "DEBUG: Using operators from testinfra"
+    else
+        files=($(ls $testpath/envs/opr*.env))
+        last_index=$(( ${#files[@]} - 1 ))
 
-    for i in "${!files[@]}"; do
-        if [ $i -eq $last_index ]; then
-            sleep 10  # Sleep for 10 seconds before the last loop iteration
-        fi
-        FILE=${files[$i]}
-        set -a
-        source $FILE
-        set +a
-        id=$(basename $FILE | tr -d -c 0-9)
-        ../node/bin/node > $testpath/logs/opr${id}.log 2>&1 &
+        for i in "${!files[@]}"; do
+            if [ $i -eq $last_index ]; then
+                sleep 10  # Sleep for 10 seconds before the last loop iteration
+            fi
+            FILE=${files[$i]}
+            set -a
+            source $FILE
+            set +a
+            id=$(basename $FILE | tr -d -c 0-9)
+            ../node/bin/node > $testpath/logs/opr${id}.log 2>&1 &
 
-        pid="$!"
-        pids="$pids $pid"
+            pid="$!"
+            pids="$pids $pid"
 
-        echo "DEBUG: Starting wait-for node on port ${NODE_DISPERSAL_PORT}"
-        ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -t 30 -- echo "Node up" &
-        waiters="$waiters $!"
-    done
+            echo "DEBUG: Starting wait-for node on port ${NODE_DISPERSAL_PORT}"
+            ./wait-for 0.0.0.0:${NODE_DISPERSAL_PORT} -t 30 -- echo "Node up" &
+            waiters="$waiters $!"
+        done
+    fi
 
     echo $pids > $pid_file
 

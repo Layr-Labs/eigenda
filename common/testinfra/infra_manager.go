@@ -1,12 +1,14 @@
 package testinfra
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +44,9 @@ type InfraManager struct {
 	localstack *containers.LocalStackContainer
 	graphnode  *containers.GraphNodeContainer
 	churner    *containers.ChurnerContainer
+	encoder    *containers.EncoderContainer
+	batcher    *containers.BatcherContainer
+	operators  []*containers.OperatorContainer
 	network    *testcontainers.DockerNetwork
 	result     InfraResult
 }
@@ -315,27 +320,27 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 	// 8. Start churner if enabled and EigenDA contracts are deployed
 	if im.config.EigenDA.Churner.Enabled && im.result.EigenDAContracts != nil {
 		fmt.Println("Starting churner service...")
-		
+
 		// Configure churner with deployed contract addresses
 		churnerConfig := im.config.EigenDA.Churner.ChurnerConfig
 		churnerConfig.EigenDADirectory = im.config.EigenDA.RootPath
 		churnerConfig.OperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
 		churnerConfig.ServiceManager = im.result.EigenDAContracts.ServiceManager
-		
+
 		// Use internal Anvil URL for containers on the same network
 		if im.network != nil && im.anvil != nil {
 			churnerConfig.ChainRPC = "http://anvil:8545"
 		} else {
 			churnerConfig.ChainRPC = im.result.AnvilRPC
 		}
-		
+
 		// Use deployer private key for churner
 		deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
 		if deployerPrivateKey == "" {
 			deployerPrivateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 		}
 		churnerConfig.PrivateKey = deployerPrivateKey
-		
+
 		// Set Graph URL if Graph Node is enabled
 		if im.config.GraphNode.Enabled && im.graphnode != nil {
 			if im.network != nil {
@@ -345,7 +350,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				churnerConfig.GraphURL = im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 			}
 		}
-		
+
 		// Start the churner container
 		churner, err := containers.NewChurnerContainerWithNetwork(ctx, churnerConfig, im.network)
 		if err != nil {
@@ -353,13 +358,303 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 		im.churner = churner
 		im.result.ChurnerURL = churner.URL()
-		
+
 		// Use internal URL for other containers
 		if im.network != nil {
 			im.result.ChurnerInternalURL = churner.InternalURL()
 		}
-		
+
 		fmt.Printf("✅ Churner service started at %s\n", im.result.ChurnerURL)
+	}
+
+	// 9. Start operators if enabled and EigenDA contracts are deployed
+	if im.config.EigenDA.Operators.Enabled && im.result.EigenDAContracts != nil {
+		fmt.Printf("Starting %d operators...\n", im.config.EigenDA.Operators.Count)
+
+		// Initialize operator addresses map
+		im.result.OperatorAddresses = make(map[int]string)
+
+		// Determine how many operators to actually run
+		numToStart := im.config.EigenDA.Operators.Count
+
+		// Start each operator
+		for i := 0; i < numToStart; i++ {
+			// Create operator config based on base config
+			operatorConfig := containers.DefaultOperatorConfig(i)
+
+			// Override with base config values if provided
+			if im.config.EigenDA.Operators.BaseConfig.Image != "" {
+				operatorConfig.Image = im.config.EigenDA.Operators.BaseConfig.Image
+			}
+
+			// Set contract addresses
+			operatorConfig.BLSOperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+			operatorConfig.EigenDAServiceManager = im.result.EigenDAContracts.ServiceManager
+
+			// Debug log the contract addresses
+			fmt.Printf("DEBUG: Setting operator %d contracts - BLSOperatorStateRetriever: %s, ServiceManager: %s\n",
+				i, operatorConfig.BLSOperatorStateRetriever, operatorConfig.EigenDAServiceManager)
+
+			// Use internal Anvil URL for containers on the same network
+			if im.network != nil && im.anvil != nil {
+				operatorConfig.ChainRPC = "http://anvil:8545"
+			} else {
+				operatorConfig.ChainRPC = im.result.AnvilRPC
+			}
+
+			// Set operator private keys from config
+			operatorKey := fmt.Sprintf("opr%d", i)
+			if privKey, ok := im.config.EigenDA.PrivateKeys[operatorKey]; ok {
+				operatorConfig.PrivateKey = privKey
+			}
+
+			// Set BLS and ECDSA key file configuration following inabox pattern
+			// Use operator index + 1 to match the numbering in the key files (1-based)
+			keyIndex := i + 1
+			operatorConfig.BlsKeyFile = fmt.Sprintf("/app/secrets/bls_keys/keys/%d.bls.key.json", keyIndex)
+			operatorConfig.EcdsaKeyFile = fmt.Sprintf("/app/secrets/ecdsa_keys/keys/%d.ecdsa.key.json", keyIndex)
+
+			// Read BLS password from the password file
+			blsPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "bls_keys", "password.txt")
+			blsPasswords, err := readPasswordFile(blsPasswordFile)
+			if err != nil {
+				fmt.Printf("Warning: Could not read BLS password file: %v\n", err)
+				operatorConfig.BlsKeyFile = ""
+			} else if keyIndex <= len(blsPasswords) {
+				operatorConfig.BlsKeyPassword = blsPasswords[keyIndex-1]
+				fmt.Printf("DEBUG: Loaded BLS password for operator %d\n", i)
+			} else {
+				fmt.Printf("Warning: No BLS password for operator %d\n", i)
+				operatorConfig.BlsKeyFile = ""
+			}
+
+			// Read ECDSA password from the password file
+			ecdsaPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "password.txt")
+			ecdsaPasswords, err := readPasswordFile(ecdsaPasswordFile)
+			if err != nil {
+				// Fallback to using private key directly if password file is not available
+				fmt.Printf("Warning: Could not read ECDSA password file, falling back to private key: %v\n", err)
+				operatorConfig.EcdsaPrivateKey = operatorConfig.PrivateKey
+				operatorConfig.EcdsaKeyFile = ""
+			} else if keyIndex <= len(ecdsaPasswords) {
+				operatorConfig.EcdsaKeyPassword = ecdsaPasswords[keyIndex-1]
+
+				// In test mode, we also need to provide the raw private key
+				// Read the ECDSA private key from the private_key_hex.txt file
+				ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "private_key_hex.txt")
+				ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
+				if err == nil && keyIndex <= len(ecdsaKeys) {
+					operatorConfig.EcdsaPrivateKey = ecdsaKeys[keyIndex-1]
+					fmt.Printf("DEBUG: Loaded ECDSA private key for operator %d\n", i)
+				} else {
+					fmt.Printf("Warning: Could not load ECDSA private key for operator %d: %v\n", i, err)
+				}
+			} else {
+				// Fallback if key index is beyond available passwords
+				fmt.Printf("Warning: No ECDSA password for operator %d, falling back to private key\n", i)
+				operatorConfig.EcdsaPrivateKey = operatorConfig.PrivateKey
+				operatorConfig.EcdsaKeyFile = ""
+			}
+
+			// Set EigenDA directory for resource paths
+			operatorConfig.EigenDADirectory = im.config.EigenDA.RootPath
+			fmt.Printf("DEBUG: EigenDA root path for operator %d: %s\n", i, operatorConfig.EigenDADirectory)
+
+			// Set the hostname for operator registration
+			operatorConfig.Hostname = fmt.Sprintf("operator-%d.localtest.me", i)
+
+			// Start the operator container
+			operator, err := containers.NewOperatorContainerWithNetwork(ctx, operatorConfig, im.network)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start operator %d: %w", i, err)
+			}
+			im.operators = append(im.operators, operator)
+
+			// Store the operator's internal address for other services to use
+			im.result.OperatorAddresses[i] = operator.GetInternalDispersalAddress()
+
+			fmt.Printf("  ✅ Operator %d started: %s\n", i, operator.GetInternalDispersalAddress())
+		}
+
+		fmt.Printf("✅ %d operators started successfully\n", numToStart)
+	}
+
+	// 10. Start encoder if enabled (needed by batcher)
+	if im.config.EigenDA.Encoder.Enabled {
+		fmt.Println("Starting encoder service...")
+
+		// Configure encoder
+		encoderConfig := im.config.EigenDA.Encoder.EncoderConfig
+
+		// Configure AWS resources (required even for encoder v1)
+		if im.config.LocalStack.Enabled && im.localstack != nil {
+			// Use internal endpoint when containers are on the same network
+			if im.network != nil {
+				encoderConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+			} else {
+				encoderConfig.AWSEndpointURL = im.localstack.Endpoint()
+			}
+			encoderConfig.AWSRegion = im.localstack.Region()
+			encoderConfig.AWSAccessKeyID = "localstack"
+			encoderConfig.AWSSecretAccessKey = "localstack"
+
+			// Use configured bucket name for encoder v2
+			if encoderConfig.EncoderVersion == "2" && im.config.LocalStack.Resources.BucketName != "" {
+				encoderConfig.S3BucketName = im.config.LocalStack.Resources.BucketName
+			}
+		} else {
+			// Use default AWS region if LocalStack is not enabled
+			if encoderConfig.AWSRegion == "" {
+				encoderConfig.AWSRegion = "us-east-1"
+			}
+		}
+
+		// Set KZG paths if not already configured - must be absolute paths for Docker
+		// Save current working directory to restore it after getting absolute paths
+		originalDir, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current working directory: %w", err)
+		}
+
+		// Change to the inabox directory where KZG resources are located (same as retrieval client)
+		inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
+		if err := os.Chdir(inaboxDir); err != nil {
+			return nil, fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
+		}
+
+		// Now get absolute paths for KZG resources from the inabox directory
+		if encoderConfig.G1Path == "" {
+			// Use relative path from inabox directory (same as retrieval client)
+			g1Path := "resources/kzg/g1.point.300000"
+			absG1Path, err := filepath.Abs(g1Path)
+			if err != nil {
+				os.Chdir(originalDir) // Restore directory before returning error
+				return nil, fmt.Errorf("failed to get absolute path for G1: %w", err)
+			}
+			encoderConfig.G1Path = absG1Path
+		}
+		if encoderConfig.G2Path == "" {
+			// Use relative path from inabox directory (same as retrieval client)
+			g2Path := "resources/kzg/g2.point.300000"
+			absG2Path, err := filepath.Abs(g2Path)
+			if err != nil {
+				os.Chdir(originalDir) // Restore directory before returning error
+				return nil, fmt.Errorf("failed to get absolute path for G2: %w", err)
+			}
+			encoderConfig.G2Path = absG2Path
+		}
+		if encoderConfig.CachePath == "" {
+			// Use relative path from inabox directory (same as retrieval client)
+			cachePath := "resources/kzg/SRSTables"
+			absCachePath, err := filepath.Abs(cachePath)
+			if err != nil {
+				os.Chdir(originalDir) // Restore directory before returning error
+				return nil, fmt.Errorf("failed to get absolute path for cache: %w", err)
+			}
+			encoderConfig.CachePath = absCachePath
+		}
+
+		// Restore original directory
+		if err := os.Chdir(originalDir); err != nil {
+			return nil, fmt.Errorf("failed to restore directory: %w", err)
+		}
+
+		// Start the encoder container
+		encoder, err := containers.NewEncoderContainerWithNetwork(ctx, encoderConfig, im.network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start encoder: %w", err)
+		}
+		im.encoder = encoder
+		im.result.EncoderURL = encoder.URL()
+
+		// Use internal URL for other containers
+		if im.network != nil {
+			im.result.EncoderInternalURL = encoder.InternalURL()
+		}
+
+		fmt.Printf("✅ Encoder service started at %s\n", im.result.EncoderURL)
+	}
+
+	// 11. Start batcher if enabled and required components are available
+	if im.config.EigenDA.Batcher.Enabled && im.result.EigenDAContracts != nil {
+		fmt.Println("Starting batcher service...")
+
+		// Configure batcher with deployed contract addresses and AWS resources
+		batcherConfig := im.config.EigenDA.Batcher.BatcherConfig
+		batcherConfig.EigenDADirectory = im.config.EigenDA.RootPath
+		batcherConfig.OperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+		batcherConfig.ServiceManager = im.result.EigenDAContracts.ServiceManager
+
+		// Configure AWS resources if LocalStack is enabled
+		if im.config.LocalStack.Enabled && im.localstack != nil {
+			// Use internal endpoint when containers are on the same network
+			if im.network != nil {
+				batcherConfig.AWSEndpointURL = im.localstack.InternalEndpoint()
+			} else {
+				batcherConfig.AWSEndpointURL = im.localstack.Endpoint()
+			}
+			batcherConfig.AWSRegion = im.localstack.Region()
+			batcherConfig.AWSAccessKeyID = "localstack"
+			batcherConfig.AWSSecretAccessKey = "localstack"
+
+			// Use configured bucket and table names
+			if im.config.LocalStack.Resources.BucketName != "" {
+				batcherConfig.S3BucketName = im.config.LocalStack.Resources.BucketName
+			}
+			if im.config.LocalStack.Resources.MetadataTableName != "" {
+				batcherConfig.DynamoDBTableName = im.config.LocalStack.Resources.MetadataTableName
+			}
+		}
+
+		// Use internal Anvil URL for containers on the same network
+		if im.network != nil && im.anvil != nil {
+			batcherConfig.ChainRPC = "http://anvil:8545"
+		} else {
+			batcherConfig.ChainRPC = im.result.AnvilRPC
+		}
+
+		// Use batcher0 private key
+		batcherPrivateKey := im.config.EigenDA.PrivateKeys["batcher0"]
+		if batcherPrivateKey == "" {
+			// Use a default test private key if not provided
+			batcherPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+		}
+		batcherConfig.PrivateKey = batcherPrivateKey
+
+		// Set Graph URL if Graph Node is enabled
+		if im.config.GraphNode.Enabled && im.graphnode != nil {
+			if im.network != nil {
+				// Use internal URL for containers on the same network
+				batcherConfig.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			} else {
+				batcherConfig.GraphURL = im.result.GraphNodeURL + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
+			}
+		}
+
+		// Set encoder address if encoder is enabled
+		if im.config.EigenDA.Encoder.Enabled && im.encoder != nil {
+			if im.network != nil {
+				// Use internal URL for containers on the same network
+				batcherConfig.EncoderAddress = im.result.EncoderInternalURL
+			} else {
+				batcherConfig.EncoderAddress = im.result.EncoderURL
+			}
+		}
+
+		// Start the batcher container
+		batcher, err := containers.NewBatcherContainerWithNetwork(ctx, batcherConfig, im.network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to start batcher: %w", err)
+		}
+		im.batcher = batcher
+		im.result.BatcherURL = batcher.URL()
+
+		// Use internal URL for other containers
+		if im.network != nil {
+			im.result.BatcherInternalURL = batcher.InternalURL()
+		}
+
+		fmt.Printf("✅ Batcher service started (metrics at %s)\n", im.result.BatcherURL)
 	}
 
 	success = true
@@ -376,6 +671,42 @@ func (im *InfraManager) cleanup(ctx context.Context) error {
 	var errs []error
 
 	// Terminate in reverse dependency order
+	if im.batcher != nil {
+		// Print log path for debugging
+		if logPath := im.batcher.LogPath(); logPath != "" {
+			fmt.Printf("Batcher logs available at: %s\n", logPath)
+		}
+		if err := im.batcher.Terminate(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to terminate batcher: %w", err))
+		}
+		im.batcher = nil
+	}
+
+	if im.encoder != nil {
+		// Print log path for debugging
+		if logPath := im.encoder.LogPath(); logPath != "" {
+			fmt.Printf("Encoder logs available at: %s\n", logPath)
+		}
+		if err := im.encoder.Terminate(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to terminate encoder: %w", err))
+		}
+		im.encoder = nil
+	}
+
+	// Terminate operators
+	for i, operator := range im.operators {
+		if operator != nil {
+			// Print log path for debugging
+			if logPath := operator.LogPath(); logPath != "" {
+				fmt.Printf("Operator %d logs available at: %s\n", i, logPath)
+			}
+			if err := operator.Terminate(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to terminate operator %d: %w", i, err))
+			}
+		}
+	}
+	im.operators = nil
+
 	if im.churner != nil {
 		// Print log path for debugging
 		if logPath := im.churner.LogPath(); logPath != "" {
@@ -441,6 +772,32 @@ func (im *InfraManager) GetGraphNode() *containers.GraphNodeContainer {
 // GetResult returns the current infrastructure result
 func (im *InfraManager) GetResult() *InfraResult {
 	return &im.result
+}
+
+// readPasswordFile reads a password file and returns a slice of passwords (one per line)
+func readPasswordFile(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open password file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	var passwords []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		password := strings.TrimSpace(scanner.Text())
+		if password != "" {
+			passwords = append(passwords, password)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan password file: %w", err)
+	}
+
+	return passwords, nil
 }
 
 // StartMinimal starts only Anvil and LocalStack for basic testing
@@ -578,6 +935,21 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		}
 		privateKeys := im.config.EigenDA.PrivateKeys
 
+		// Load operator ECDSA private keys from the secrets directory
+		// These are the actual keys the operators will use for transactions
+		ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "private_key_hex.txt")
+		ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
+		if err == nil {
+			// Add ECDSA keys to the privateKeys map with "opr{i}_ecdsa" naming
+			for i, ecdsaKey := range ecdsaKeys {
+				keyName := fmt.Sprintf("opr%d_ecdsa", i)
+				privateKeys[keyName] = ecdsaKey
+				fmt.Printf("Added operator %d ECDSA key for funding\n", i)
+			}
+		} else {
+			fmt.Printf("Warning: Could not load operator ECDSA keys for funding, operators may not have ETH for gas: %v\n", err)
+		}
+
 		deployConfig := deployment.GenerateEigenDADeployConfig(
 			numStrategies,
 			maxOperatorCount,
@@ -586,7 +958,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 			privateKeys,
 		)
 
-		err := manager.DeployEigenDAContracts(deployConfig)
+		err = manager.DeployEigenDAContracts(deployConfig)
 		if err != nil {
 			return fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
 		}
@@ -594,6 +966,15 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		// The deployment manager populates its own EigenDAContracts field
 		// Copy it to our result
 		im.result.EigenDAContracts = manager.EigenDAContracts
+
+		// Debug log the loaded contracts
+		if im.result.EigenDAContracts != nil {
+			fmt.Printf("DEBUG: Loaded EigenDA contracts - OperatorStateRetriever: %s, ServiceManager: %s\n",
+				im.result.EigenDAContracts.OperatorStateRetriever,
+				im.result.EigenDAContracts.ServiceManager)
+		} else {
+			fmt.Printf("WARNING: EigenDAContracts is nil after deployment!\n")
+		}
 	}
 
 	// Handle disperser keypair generation and registration

@@ -87,6 +87,15 @@ type EigenDAConfig struct {
 
 	// Churner configuration
 	Churner ChurnerConfig `json:"churner"`
+
+	// Batcher configuration
+	Batcher BatcherConfig `json:"batcher"`
+
+	// Encoder configuration
+	Encoder EncoderConfig `json:"encoder"`
+	
+	// Operators configuration
+	Operators OperatorsConfig `json:"operators"`
 }
 
 // ChurnerConfig defines configuration for the churner service
@@ -96,6 +105,42 @@ type ChurnerConfig struct {
 
 	// Container configuration (if using containerized churner)
 	containers.ChurnerConfig
+}
+
+// BatcherConfig defines configuration for the batcher service
+type BatcherConfig struct {
+	// Enable batcher service
+	Enabled bool `json:"enabled"`
+
+	// Container configuration (if using containerized batcher)
+	containers.BatcherConfig
+}
+
+// EncoderConfig defines configuration for the encoder service
+type EncoderConfig struct {
+	// Enable encoder service
+	Enabled bool `json:"enabled"`
+
+	// Container configuration (if using containerized encoder)
+	containers.EncoderConfig
+}
+
+// OperatorsConfig defines configuration for operator nodes
+type OperatorsConfig struct {
+	// Enable operators
+	Enabled bool `json:"enabled"`
+	
+	// Number of operators to deploy
+	Count int `json:"count"`
+	
+	// Maximum number of operators to actually run (for testing partial network)
+	MaxOperatorCount int `json:"max_operator_count"`
+	
+	// Base operator configuration (will be customized per operator)
+	BaseConfig containers.OperatorConfig `json:"base_config"`
+	
+	// Stakes for each operator (quorum -> operator index -> stake amount)
+	Stakes map[uint32]map[int]int `json:"stakes"`
 }
 
 // RetrievalClientsConfig defines configuration for setting up retrieval clients
@@ -285,6 +330,18 @@ type InfraResult struct {
 	// Churner service URLs (populated if Churner.Enabled=true)
 	ChurnerURL         string `json:"churner_url,omitempty"`
 	ChurnerInternalURL string `json:"churner_internal_url,omitempty"`
+
+	// Encoder service URLs (populated if Encoder.Enabled=true)
+	EncoderURL         string `json:"encoder_url,omitempty"`
+	EncoderInternalURL string `json:"encoder_internal_url,omitempty"`
+
+	// Batcher service URLs (populated if Batcher.Enabled=true)
+	BatcherURL         string `json:"batcher_url,omitempty"`
+	BatcherInternalURL string `json:"batcher_internal_url,omitempty"`
+	
+	// Operator addresses (populated if Operators.Enabled=true)
+	// Map from operator ID to their addresses
+	OperatorAddresses map[int]string `json:"operator_addresses,omitempty"`
 }
 
 // AWSTestConfig contains AWS configuration for tests

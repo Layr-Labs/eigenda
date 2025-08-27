@@ -7,6 +7,7 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 const (
@@ -46,6 +47,9 @@ func NewLocalStackContainerWithNetwork(
 	// Add environment variables
 	env := buildLocalStackEnv(config)
 	opts = append(opts, testcontainers.WithEnv(env))
+	
+	// Add network configuration using the recommended approach
+	opts = append(opts, network.WithNetwork([]string{"localstack"}, nw))
 
 	// Start the container using the official module
 	container, err := localstack.Run(ctx, LocalStackImage, opts...)
@@ -76,6 +80,11 @@ func NewLocalStackContainerWithNetwork(
 // Endpoint returns the LocalStack endpoint URL
 func (ls *LocalStackContainer) Endpoint() string {
 	return ls.endpoint
+}
+
+// InternalEndpoint returns the LocalStack endpoint URL for internal Docker network communication
+func (ls *LocalStackContainer) InternalEndpoint() string {
+	return "http://localstack:4566"
 }
 
 // Region returns the configured AWS region

@@ -735,37 +735,65 @@ func (env *Config) GenerateAllVariables() {
 			filename, []string{dispersalPort, retrievalPort})
 	}
 
-	// Batcher
-	name = "batcher0"
-	logPath, _, filename, envFile = env.getPaths(name)
-	key, _ := env.getKey(name)
-	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
-	writeEnv(batcherConfig.getEnvMap(), envFile)
-	env.Batcher = append(env.Batcher, batcherConfig)
-	env.genService(
-		compose, name, batcherImage,
-		filename, []string{})
+	// Determine encoder URL - either from testinfra or generate locally
+	var encoderAddress string
+	
+	// Check if encoder is provided from testinfra
+	if envEncoderUrl := os.Getenv("ENCODER_URL"); envEncoderUrl != "" {
+		// Use encoder from testinfra
+		encoderAddress = envEncoderUrl
+		fmt.Printf("Using encoder from testinfra at %s\n", encoderAddress)
+	} else {
+		// Generate encoder locally (legacy path for non-testinfra deployments)
+		// Encoders
+		// TODO: Add more encoders
+		name = "enc0"
+		_, _, filename, envFile := env.getPaths(name)
+		encoderConfig := env.generateEncoderVars(0, "34000")
+		writeEnv(encoderConfig.getEnvMap(), envFile)
+		env.Encoder = append(env.Encoder, encoderConfig)
+		env.genService(
+			compose, name, encoderImage,
+			filename, []string{"34000"})
+		encoderAddress = "0.0.0.0:34000"
 
-	// Encoders
-	// TODO: Add more encoders
-	name = "enc0"
-	_, _, filename, envFile = env.getPaths(name)
-	encoderConfig := env.generateEncoderVars(0, "34000")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
-	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34000"})
+		// v2 encoder
+		name = "enc1"
+		_, _, filename, envFile = env.getPaths(name)
+		encoderConfig = env.generateEncoderV2Vars(0, "34001")
+		writeEnv(encoderConfig.getEnvMap(), envFile)
+		env.Encoder = append(env.Encoder, encoderConfig)
+		env.genService(
+			compose, name, encoderImage,
+			filename, []string{"34001"})
+	}
 
-	// v2 encoder
-	name = "enc1"
-	_, _, filename, envFile = env.getPaths(name)
-	encoderConfig = env.generateEncoderV2Vars(0, "34001")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
-	env.Encoder = append(env.Encoder, encoderConfig)
-	env.genService(
-		compose, name, encoderImage,
-		filename, []string{"34001"})
+	// Update globals with encoder address (used by disperser and other services)
+	if env.Services.Variables == nil {
+		env.Services.Variables = make(map[string]map[string]string)
+	}
+	if env.Services.Variables["globals"] == nil {
+		env.Services.Variables["globals"] = make(map[string]string)
+	}
+	env.Services.Variables["globals"]["ENCODER_ADDRESS"] = encoderAddress
+	
+	// Check if batcher is provided from testinfra
+	if batcherProvided := os.Getenv("BATCHER_PROVIDED"); batcherProvided != "" {
+		fmt.Println("Using batcher from testinfra")
+	} else {
+		// Batcher
+		name = "batcher0"
+		logPath, _, filename, envFile := env.getPaths(name)
+		key, _ := env.getKey(name)
+		batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
+		// Set encoder address for batcher
+		batcherConfig.BATCHER_ENCODER_ADDRESS = encoderAddress
+		writeEnv(batcherConfig.getEnvMap(), envFile)
+		env.Batcher = append(env.Batcher, batcherConfig)
+		env.genService(
+			compose, name, batcherImage,
+			filename, []string{})
+	}
 
 	// Stakers
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
@@ -796,17 +824,22 @@ func (env *Config) GenerateAllVariables() {
 	}
 
 	name = "retriever0"
-	key, _ = env.getKey(name)
-	logPath, _, _, envFile = env.getPaths(name)
-	retrieverConfig := env.generateRetrieverVars(0, key, graphUrl, logPath, fmt.Sprint(port+1))
-	writeEnv(retrieverConfig.getEnvMap(), envFile)
+	retrieverKey, _ := env.getKey(name)
+	retrieverLogPath, _, _, retrieverEnvFile := env.getPaths(name)
+	retrieverConfig := env.generateRetrieverVars(0, retrieverKey, graphUrl, retrieverLogPath, fmt.Sprint(port+1))
+	writeEnv(retrieverConfig.getEnvMap(), retrieverEnvFile)
 	env.Retriever = retrieverConfig
 
 	// Controller
 	name = "controller0"
-	_, _, _, envFile = env.getPaths(name)
+	_, _, _, controllerEnvFile := env.getPaths(name)
 	controllerConfig := env.generateControllerVars(0, graphUrl)
-	writeEnv(controllerConfig.getEnvMap(), envFile)
+	// Set encoder address for controller (v2 encoder)
+	if envEncoderUrl := os.Getenv("ENCODER_URL"); envEncoderUrl != "" {
+		// For v2 operations, controller needs encoder address
+		controllerConfig.CONTROLLER_ENCODER_ADDRESS = encoderAddress
+	}
+	writeEnv(controllerConfig.getEnvMap(), controllerEnvFile)
 	env.Controller = controllerConfig
 
 	if env.Environment.IsLocal() {

@@ -468,8 +468,7 @@ func GenerateEigenDADeployConfig(
 	maxOperatorCount int,
 	stakeDistribution [][]float32,
 	stakeTotals []float32,
-	privateKeys map[string]string,
-) EigenDADeployConfig {
+	privateKeys map[string]string) EigenDADeployConfig {
 	operators := make([]string, 0)
 	stakers := make([]string, 0)
 	stakes := make([][]string, numStrategies)
@@ -505,12 +504,33 @@ func GenerateEigenDADeployConfig(
 			stakers = append(stakers, keyInt.String())
 		}
 
-		if operatorKey, ok := privateKeys[operatorName]; ok {
+		// For operators, we need to use ECDSA private keys, not BLS keys
+		// Look for operator ECDSA keys first with "opr{i}_ecdsa" naming
+		ecdsaKeyName := fmt.Sprintf("%s_ecdsa", operatorName)
+		if ecdsaKey, ok := privateKeys[ecdsaKeyName]; ok {
+			keyInt, ok := new(big.Int).SetString(ecdsaKey, 0)
+			if !ok {
+				log.Printf("Warning: could not parse operator ECDSA key %s", ecdsaKeyName)
+				// Fallback to BLS key if ECDSA key parsing fails
+				if operatorKey, ok := privateKeys[operatorName]; ok {
+					keyInt, ok := new(big.Int).SetString(operatorKey, 0)
+					if !ok {
+						log.Printf("Warning: could not parse operator BLS key %s", operatorName)
+						continue
+					}
+					operators = append(operators, keyInt.String())
+				}
+			} else {
+				operators = append(operators, keyInt.String())
+			}
+		} else if operatorKey, ok := privateKeys[operatorName]; ok {
+			// Fallback to BLS key if no ECDSA key is provided
 			keyInt, ok := new(big.Int).SetString(operatorKey, 0)
 			if !ok {
 				log.Printf("Warning: could not parse operator key %s", operatorName)
 				continue
 			}
+			log.Printf("Warning: Using BLS key for operator %s funding - this may not match the actual operator ECDSA address", operatorName)
 			operators = append(operators, keyInt.String())
 		}
 	}
