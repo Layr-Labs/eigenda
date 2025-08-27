@@ -202,9 +202,10 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
 		Value:    1,
 	}
-	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever",
+	OperatorStateRetrieverAddrFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
 	}
@@ -401,7 +402,7 @@ var optionalFlags = []cli.Flag{
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverAddrFlag,
+	OperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
 	MaxConnectionAgeFlag,
 	MaxConnectionAgeGraceFlag,

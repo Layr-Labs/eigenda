@@ -74,7 +74,7 @@ func NewStore(
 // This function is bug-prone as is because it returns []byte which can either be a raw payload or an encoded payload.
 // TODO: Refactor to use [coretypes.EncodedPayload] and [coretypes.Payload] instead of []byte.
 func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool) ([]byte, error) {
-	var cert coretypes.RetrievableEigenDACert
+	var cert coretypes.EigenDACert
 
 	switch versionedCert.Version {
 	case certs.V0VersionByte, certs.V1VersionByte:

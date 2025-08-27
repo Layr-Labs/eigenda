@@ -20,10 +20,10 @@ type PayloadRetriever interface {
 	// GetPayload retrieves a payload from some backend, using the provided certificate
 	// GetPayload should return a [coretypes.ErrBlobDecodingFailedDerivationError] if the blob cannot be decoding according
 	// to one of the encodings available via [codecs.PayloadEncodingVersion]s.
-	GetPayload(ctx context.Context, eigenDACert coretypes.RetrievableEigenDACert) (coretypes.Payload, error)
+	GetPayload(ctx context.Context, eigenDACert coretypes.EigenDACert) (coretypes.Payload, error)
 
 	// GetEncodedPayload retrieves an encoded payload from some backend, using the provided certificate.
 	// This method performs the same operations as GetPayload but stops before decoding the payload,
 	// returning the encoded form instead.
-	GetEncodedPayload(ctx context.Context, eigenDACert coretypes.RetrievableEigenDACert) (*coretypes.EncodedPayload, error)
+	GetEncodedPayload(ctx context.Context, eigenDACert coretypes.EigenDACert) (*coretypes.EncodedPayload, error)
 }

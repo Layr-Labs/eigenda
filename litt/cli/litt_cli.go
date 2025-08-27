@@ -23,6 +23,13 @@ var (
 		Aliases: []string{"f"},
 		Usage:   "Force the operation without prompting for confirmation.",
 	}
+	knownHostsFlag = &cli.StringSliceFlag{
+		Name:     "known-hosts",
+		Aliases:  []string{"k"},
+		Usage:    "Path to a file containing known hosts for SSH connections.",
+		Required: false,
+		Value:    cli.NewStringSlice("~/.ssh/known_hosts"),
+	}
 )
 
 // buildCliParser creates a command line parser for the LittDB CLI tool.
@@ -109,7 +116,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Reduces the verbosity of the output.",
 					},
 				},
-				Action: nil, // rebaseCommand, // TODO this will be added in a follow up PR
+				Action: rebaseCommand,
 			},
 			{
 				Name:      "benchmark",
@@ -172,6 +179,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "SSH port to connect to the remote host.",
 						Value:   22,
 					},
+					knownHostsFlag,
 					&cli.StringFlag{
 						Name:    "key",
 						Aliases: []string{"i"},
@@ -201,7 +209,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Value:   0,
 					},
 				},
-				Action: nil, // pushCommand, // TODO this will be added in a follow up PR
+				Action: pushCommand,
 			},
 			{ // TODO test in preprod
 				Name: "sync",
