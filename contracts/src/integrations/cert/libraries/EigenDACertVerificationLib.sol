@@ -44,19 +44,30 @@ library EigenDACertVerificationLib {
     /// @param blobQuorumsBitmap The bitmap of blob quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap);
 
-    /// @notice Status codes for certificate verification results
+    /// @notice Thrown when certificate decoding fails
+    error CertDecodeRevert();
+
+    /// @notice Thrown when the external call to the signature verifier reverts
+    error SignatureVerificationCallRevert(bytes reason);
+
+    /// @notice Status codes for certificate verification results.
+    /// @dev Returned by checkDACert and checkDACertV2 functions, along with an errParam bytes array for additional context.
+    ///      See the revertOnError function for what errParams contains for each error code.
     enum StatusCode {
         NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
-        REQUIRED_QUORUMS_NOT_SUBSET // Required quorums not a subset of blob quorums
-
+        REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
+        CERT_DECODE_REVERT, // Certificate abi.decoding reverted
+        SIGNATURE_VERIFICATION_CALL_REVERT // External call to signature verifier reverted
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
-    function decodeCert(bytes calldata data) internal pure returns (CT.EigenDACertV3 memory cert) {
+    /// @dev This function should not be called directly. It is exposes as external
+    //       for the purpose of try/catch'ing it inside checkDACert.
+    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
         return abi.decode(data, (CT.EigenDACertV3));
     }
 
@@ -76,17 +87,20 @@ library EigenDACertVerificationLib {
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view returns (StatusCode, bytes memory) {
-        CT.EigenDACertV3 memory cert = decodeCert(certBytes);
-        return checkDACertV2(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            cert.batchHeader,
-            cert.blobInclusionInfo,
-            cert.nonSignerStakesAndSignature,
-            securityThresholds,
-            requiredQuorumNumbers,
-            cert.signedQuorumNumbers
-        );
+        try this._decodeCert(certBytes) returns (CT.EigenDACertV3 memory cert) {
+            return checkDACertV2(
+                eigenDAThresholdRegistry,
+                eigenDASignatureVerifier,
+                cert.batchHeader,
+                cert.blobInclusionInfo,
+                cert.nonSignerStakesAndSignature,
+                securityThresholds,
+                requiredQuorumNumbers,
+                cert.signedQuorumNumbers
+            );
+        } catch {
+            return (StatusCode.CERT_DECODE_ERROR, "");
+        }
     }
 
     /**
@@ -121,8 +135,8 @@ library EigenDACertVerificationLib {
             eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
-        if (err != StatusCode.SUCCESS) {
-            return (err, errParams);
+            if (err != StatusCode.SUCCESS) {
+                return (err, errParams);
         }
 
         // Verify signatures and build confirmed quorums bitmap
@@ -220,23 +234,41 @@ library EigenDACertVerificationLib {
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (StatusCode err, bytes memory errParams, uint256 confirmedQuorumsBitmap) {
-        (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
+        try signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
-        );
+        ) returns (DATypesV1.QuorumStakeTotals memory quorumStakeTotals, bytes32) {
+            confirmedQuorumsBitmap = 0;
 
-        confirmedQuorumsBitmap = 0;
-
-        // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
+            // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
         for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
             if (
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
                     >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
             ) {
-                confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
+                        confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
+                }
             }
-        }
 
-        return (StatusCode.SUCCESS, "", confirmedQuorumsBitmap);
+            return (StatusCode.SUCCESS, "", confirmedQuorumsBitmap);
+        } catch Error(string memory reason) {
+            // This would match any require(..., "string reason") revert that is pre custom errors,
+            // which earlier versions of BLSSignatureChecker used, and might still be deployed. See:
+            // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
+            return (StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT, reason, 0);
+        } catch (bytes memory reason) {
+            if (reason.length < 4) {
+                // We re-throw any non custom-error that was caught here. For example,
+                // low-level evm reverts such as out-of-gas don't return any data.
+                // See https://rareskills.io/post/try-catch-solidity#gdvnie-9-what-gets-returned-during-an-out-of-gas?
+                // These generally mean there is a bug in our implementation, which should be addressed by a human debugger.
+                // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
+                // a maliciously constructed cert.
+                revert(reason);
+            }
+            // We assume that any revert here is coming from a failed require(..., SomeCustomError()) statement
+            // TODO: make sure that this doesn't catch failing asserts, panics, or other low-level evm reverts like out of gas.
+            return (StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT, reason, 0);
+        }
     }
 
     /**
@@ -253,11 +285,11 @@ library EigenDACertVerificationLib {
         returns (StatusCode err, bytes memory errParams, uint256 blobQuorumsBitmap)
     {
         blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
-
-        if (BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
-            return (StatusCode.SUCCESS, "", blobQuorumsBitmap);
-        } else {
-            return (StatusCode.BLOB_QUORUMS_NOT_SUBSET, abi.encode(blobQuorumsBitmap, confirmedQuorumsBitmap), 0);
+            
+            if (BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
+                return (StatusCode.SUCCESS, "", blobQuorumsBitmap);
+            } else {
+                return (StatusCode.BLOB_QUORUMS_NOT_SUBSET, abi.encode(blobQuorumsBitmap, confirmedQuorumsBitmap), 0);
         }
     }
 
@@ -275,10 +307,10 @@ library EigenDACertVerificationLib {
     {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
 
-        if (BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
-            return (StatusCode.SUCCESS, "");
-        } else {
-            return (StatusCode.REQUIRED_QUORUMS_NOT_SUBSET, abi.encode(requiredQuorumsBitmap, blobQuorumsBitmap));
+            if (BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
+                return (StatusCode.SUCCESS, "");
+            } else {
+                return (StatusCode.REQUIRED_QUORUMS_NOT_SUBSET, abi.encode(requiredQuorumsBitmap, blobQuorumsBitmap));
         }
     }
 
@@ -332,6 +364,8 @@ library EigenDACertVerificationLib {
      * @notice Handles error codes by reverting with appropriate custom errors
      * @param err The error code
      * @param errParams The error parameters
+     * @dev This function is not meant to be called, but is exposed here as a schema of the different error codes
+     *  returned by this library, and what data their accompanying errParams contain.
      */
     function revertOnError(StatusCode err, bytes memory errParams) internal pure {
         if (err == StatusCode.SUCCESS) {
@@ -350,6 +384,11 @@ library EigenDACertVerificationLib {
         } else if (err == StatusCode.REQUIRED_QUORUMS_NOT_SUBSET) {
             (uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
+        } else if (err == StatusCode.CERT_DECODE_REVERT) {
+            revert CertDecodeRevert();
+        } else if (err == StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT) {
+            // errParams contains the revert reason
+            revert SignatureVerificationCallRevert(errParams);
         } else {
             revert("Unknown error code");
         }

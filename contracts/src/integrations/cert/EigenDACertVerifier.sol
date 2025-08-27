@@ -34,7 +34,7 @@ contract EigenDACertVerifier is
     bytes internal _quorumNumbersRequired;
 
     uint8 internal constant MAJOR_VERSION = 3;
-    uint8 internal constant MINOR_VERSION = 0;
+    uint8 internal constant MINOR_VERSION = 1;
     uint8 internal constant PATCH_VERSION = 0;
 
     constructor(
