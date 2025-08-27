@@ -152,6 +152,21 @@ var _ = BeforeSuite(func() {
 		
 		config.EigenDA.Encoders = []testinfra.EncoderConfig{encoderV1Config, encoderV2Config}
 		
+		// Enable both v1 and v2 dispersers
+		disperserV1Config := testinfra.DisperserConfig{
+			Enabled:         true,
+			DisperserConfig: containers.DefaultDisperserConfig(1), // v1 disperser
+		}
+		disperserV1Config.GRPCPort = "32003"
+		
+		disperserV2Config := testinfra.DisperserConfig{
+			Enabled:         true,
+			DisperserConfig: containers.DefaultDisperserConfig(2), // v2 disperser
+		}
+		disperserV2Config.GRPCPort = "32005"
+		
+		config.EigenDA.Dispersers = []testinfra.DisperserConfig{disperserV1Config, disperserV2Config}
+		
 		config.EigenDA.Batcher.Enabled = true
 		config.EigenDA.Batcher.BatcherConfig = containers.DefaultBatcherConfig()
 		
@@ -200,6 +215,19 @@ var _ = BeforeSuite(func() {
 			testConfig.Services.Variables["globals"]["AWS_ENDPOINT_URL"] = awsEndpoint
 			testConfig.SetLocalstackEndpoint(awsEndpoint)
 			testConfig.SetLocalstackRegion("us-east-1")
+		}
+		
+		// Set environment variable to indicate dispersers are provided by testinfra
+		os.Setenv("DISPERSERS_PROVIDED", "true")
+		
+		// Also export disperser URLs if needed by other components
+		if infraResult.DisperserURLs != nil {
+			if url, ok := infraResult.DisperserURLs["1"]; ok {
+				os.Setenv("DISPERSER_V1_URL", url)
+			}
+			if url, ok := infraResult.DisperserURLs["2"]; ok {
+				os.Setenv("DISPERSER_V2_URL", url)
+			}
 		}
 
 		// Update contract addresses from testinfra deployment

@@ -44,6 +44,7 @@ type InfraManager struct {
 	localstack *containers.LocalStackContainer
 	graphnode  *containers.GraphNodeContainer
 	churner    *containers.ChurnerContainer
+	dispersers []*containers.DisperserContainer
 	encoders   []*containers.EncoderContainer
 	batcher    *containers.BatcherContainer
 	controller *containers.ControllerContainer
@@ -303,23 +304,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		}
 	}
 
-	// 7. Setup payload disperser if enabled and required components are available
-	if im.config.EigenDA.PayloadDisperser.Enabled &&
-		im.result.CertVerification != nil &&
-		im.result.RetrievalClients != nil {
-		// Get deployer private key
-		deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
-		if deployerPrivateKey == "" {
-			// Use default anvil account 0 private key
-			deployerPrivateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-		}
-		err := im.setupPayloadDisperser(ctx, deployerPrivateKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
-		}
-	}
-
-	// 8. Start churner if enabled and EigenDA contracts are deployed
+	// 7. Start churner if enabled and EigenDA contracts are deployed
 	if im.config.EigenDA.Churner.Enabled && im.result.EigenDAContracts != nil {
 		fmt.Println("Starting churner service...")
 
@@ -369,7 +354,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		fmt.Printf("✅ Churner service started at %s\n", im.result.ChurnerURL)
 	}
 
-	// 9. Start operators if enabled and EigenDA contracts are deployed
+	// 8. Start operators if enabled and EigenDA contracts are deployed
 	if im.config.EigenDA.Operators.Enabled && im.result.EigenDAContracts != nil {
 		fmt.Printf("Starting %d operators...\n", im.config.EigenDA.Operators.Count)
 
@@ -481,7 +466,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		fmt.Printf("✅ %d operators started successfully\n", numToStart)
 	}
 
-	// 10. Start encoders if configured (needed by batcher)
+	// 9. Start encoders if configured (needed by batcher)
 	if len(im.config.EigenDA.Encoders) > 0 {
 		fmt.Println("Starting encoder services...")
 
@@ -600,6 +585,95 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 
 			fmt.Printf("✅ Encoder v%s service started at %s\n", version, encoder.URL())
+		}
+	}
+
+	// 10. Start dispersers if enabled and EigenDA contracts are deployed
+	if len(im.config.EigenDA.Dispersers) > 0 && im.result.EigenDAContracts != nil {
+		fmt.Printf("Starting %d dispersers...\n", len(im.config.EigenDA.Dispersers))
+
+		// Initialize disperser URL maps
+		im.result.DisperserURLs = make(map[string]string)
+		im.result.DisperserInternalURLs = make(map[string]string)
+
+		for _, disperserCfg := range im.config.EigenDA.Dispersers {
+			if !disperserCfg.Enabled {
+				continue
+			}
+
+			// Configure disperser with deployed contract addresses
+			disperserConfig := disperserCfg.DisperserConfig
+			disperserConfig.EigenDADirectory = im.config.EigenDA.RootPath
+			disperserConfig.OperatorStateRetriever = im.result.EigenDAContracts.OperatorStateRetriever
+			disperserConfig.ServiceManager = im.result.EigenDAContracts.ServiceManager
+
+			// Use internal URLs for containers on the same network
+			if im.network != nil {
+				if im.anvil != nil {
+					disperserConfig.ChainRPC = "http://anvil:8545"
+				}
+				if im.localstack != nil {
+					disperserConfig.AWSEndpointURL = "http://localstack:4566"
+				}
+			} else {
+				disperserConfig.ChainRPC = im.result.AnvilRPC
+				if im.localstack != nil {
+					disperserConfig.AWSEndpointURL = im.result.LocalStackURL
+				}
+			}
+
+			// Set encoder address if encoders are available
+			if len(im.encoders) > 0 {
+				// For v1 disperser, use the first encoder
+				// For v2 disperser, use the second encoder if available, otherwise first
+				encoderIdx := 0
+				if disperserConfig.Version == 2 && len(im.encoders) > 1 {
+					encoderIdx = 1
+				}
+				if im.network != nil {
+					// Use internal URL for containers on the same network
+					disperserConfig.EncoderAddress = fmt.Sprintf("encoder-%d:%s", encoderIdx, im.encoders[encoderIdx].Config().GRPCPort)
+				} else {
+					disperserConfig.EncoderAddress = im.encoders[encoderIdx].URL()
+				}
+			}
+
+			// Set KZG paths for v2 disperser (required)
+			if disperserConfig.Version == 2 {
+				// Use the same KZG paths as encoders if not already configured
+				if disperserConfig.G1Path == "" && len(im.encoders) > 0 {
+					// Copy KZG configuration from the encoder (they should have the same paths)
+					encoderIdx := 0
+					if len(im.encoders) > 1 {
+						encoderIdx = 1 // Use v2 encoder's config if available
+					}
+					encoderConfig := im.encoders[encoderIdx].Config()
+					disperserConfig.G1Path = encoderConfig.G1Path
+					disperserConfig.G2Path = encoderConfig.G2Path
+					disperserConfig.G2PowerOf2Path = encoderConfig.G2PowerOf2Path
+					disperserConfig.CachePath = encoderConfig.CachePath
+					disperserConfig.SRSOrder = encoderConfig.SRSOrder
+					disperserConfig.SRSLoad = encoderConfig.SRSLoad
+				}
+			}
+
+			// Start the disperser container
+			disperser, err := containers.NewDisperserContainerWithNetwork(ctx, disperserConfig, im.network)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start disperser v%d: %w", disperserConfig.Version, err)
+			}
+			im.dispersers = append(im.dispersers, disperser)
+
+			// Store URLs by version
+			versionStr := fmt.Sprintf("%d", disperserConfig.Version)
+			im.result.DisperserURLs[versionStr] = disperser.URL()
+
+			// Use internal URL for other containers
+			if im.network != nil {
+				im.result.DisperserInternalURLs[versionStr] = disperser.InternalURL()
+			}
+
+			fmt.Printf("✅ Disperser v%d service started at %s\n", disperserConfig.Version, disperser.URL())
 		}
 	}
 
@@ -769,7 +843,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		fmt.Printf("✅ Controller service started (metrics at %s)\n", im.result.ControllerMetricsURL)
 	}
 
-	// 12. Start relays if enabled
+	// 13. Start relays if enabled
 	if im.config.EigenDA.Relays.Enabled && im.result.EigenDAContracts != nil {
 		fmt.Printf("Starting %d relay services...\n", im.config.EigenDA.Relays.Count)
 
@@ -875,6 +949,42 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		fmt.Printf("✅ %d relays started successfully\n", im.config.EigenDA.Relays.Count)
 	}
 
+	// 14. Setup payload disperser if enabled and required components are available
+	if im.config.EigenDA.PayloadDisperser.Enabled &&
+		im.result.CertVerification != nil &&
+		im.result.RetrievalClients != nil &&
+		len(im.dispersers) > 0 {
+		
+		// Use the v2 disperser URL if available, otherwise v1
+		disperserURL := ""
+		if v2URL, ok := im.result.DisperserURLs["2"]; ok {
+			disperserURL = v2URL
+		} else if v1URL, ok := im.result.DisperserURLs["1"]; ok {
+			disperserURL = v1URL
+		}
+		
+		if disperserURL != "" {
+			// Parse the URL to get hostname and port
+			parts := strings.Split(disperserURL, ":")
+			if len(parts) == 2 {
+				// Override the config with actual disperser URL
+				im.config.EigenDA.PayloadDisperser.DisperserHostname = parts[0]
+				im.config.EigenDA.PayloadDisperser.DisperserPort = parts[1]
+			}
+			
+			// Get deployer private key
+			deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
+			if deployerPrivateKey == "" {
+				// Use default anvil account 0 private key
+				deployerPrivateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+			}
+			err := im.setupPayloadDisperser(ctx, deployerPrivateKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to setup payload disperser: %w", err)
+			}
+		}
+	}
+
 	success = true
 	return &im.result, nil
 }
@@ -911,6 +1021,20 @@ func (im *InfraManager) cleanup(ctx context.Context) error {
 		}
 		im.controller = nil
 	}
+
+	// Terminate dispersers
+	for _, disperser := range im.dispersers {
+		if disperser != nil {
+			// Print log path for debugging
+			if logPath := disperser.LogPath(); logPath != "" {
+				fmt.Printf("Disperser v%d logs available at: %s\n", disperser.Version(), logPath)
+			}
+			if err := disperser.Terminate(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to terminate disperser v%d: %w", disperser.Version(), err))
+			}
+		}
+	}
+	im.dispersers = nil
 
 	// Terminate encoders
 	for _, encoder := range im.encoders {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -35,9 +36,19 @@ var _ = Describe("Inabox Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
+		// Use the actual disperser v1 URL from testinfra
+		disperserURL := infraResult.DisperserURLs["1"]
+		parts := strings.Split(disperserURL, ":")
+		hostname := "localhost"
+		port := "32003"
+		if len(parts) == 2 {
+			hostname = parts[0]
+			port = parts[1]
+		}
+
 		disp, err := clients.NewDisperserClient(&clients.Config{
-			Hostname: "localhost",
-			Port:     "32003",
+			Hostname: hostname,
+			Port:     port,
 			Timeout:  10 * time.Second,
 		}, signer)
 		Expect(err).To(BeNil())

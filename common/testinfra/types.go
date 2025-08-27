@@ -88,6 +88,9 @@ type EigenDAConfig struct {
 	// Churner configuration
 	Churner ChurnerConfig `json:"churner"`
 
+	// Disperser configurations (v1 and v2)
+	Dispersers []DisperserConfig `json:"dispersers"`
+
 	// Batcher configuration
 	Batcher BatcherConfig `json:"batcher"`
 
@@ -111,6 +114,15 @@ type ChurnerConfig struct {
 
 	// Container configuration (if using containerized churner)
 	containers.ChurnerConfig
+}
+
+// DisperserConfig defines configuration for the disperser service
+type DisperserConfig struct {
+	// Enable disperser service
+	Enabled bool `json:"enabled"`
+
+	// Container configuration (if using containerized disperser)
+	containers.DisperserConfig
 }
 
 // BatcherConfig defines configuration for the batcher service
@@ -357,6 +369,11 @@ type InfraResult struct {
 	// Churner service URLs (populated if Churner.Enabled=true)
 	ChurnerURL         string `json:"churner_url,omitempty"`
 	ChurnerInternalURL string `json:"churner_internal_url,omitempty"`
+
+	// Disperser service URLs (populated if dispersers are enabled)
+	// Map from disperser version ("1" or "2") to URLs
+	DisperserURLs         map[string]string `json:"disperser_urls,omitempty"`
+	DisperserInternalURLs map[string]string `json:"disperser_internal_urls,omitempty"`
 
 	// Encoder service URLs (populated if encoders are enabled)
 	// Map from encoder version ("1" or "2") to URLs

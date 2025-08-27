@@ -681,35 +681,43 @@ func (env *Config) GenerateAllVariables() {
 		churnerUrl = fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
 	}
 
-	// Generate disperser nodes
+	// Check if dispersers are provided from testinfra
+	if dispersersProvided := os.Getenv("DISPERSERS_PROVIDED"); dispersersProvided != "" {
+		fmt.Println("Using dispersers from testinfra")
+		// Still need to increment port to avoid conflicts
+		port += 4 // Skip ports for both dispersers
+	} else {
+		fmt.Printf("DISPERSERS_PROVIDED not set, generating local disperser configs\n")
+		// Generate disperser nodes locally (legacy path for non-testinfra deployments)
+		
+		grpcPort := fmt.Sprint(port + 1)
+		port += 2
 
-	grpcPort := fmt.Sprint(port + 1)
-	port += 2
+		name = "dis0"
+		logPath, dbPath, filename, envFile := env.getPaths(name)
+		disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
+		writeEnv(disperserConfig.getEnvMap(), envFile)
+		env.Dispersers = append(env.Dispersers, disperserConfig)
+		env.genService(
+			compose, name, disImage,
+			filename, []string{grpcPort})
 
-	name = "dis0"
-	logPath, dbPath, filename, envFile := env.getPaths(name)
-	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
-	env.Dispersers = append(env.Dispersers, disperserConfig)
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
+		// v2 disperser
+		grpcPort = fmt.Sprint(port + 1)
+		port += 2
 
-	// v2 disperser
-	grpcPort = fmt.Sprint(port + 1)
-	port += 2
+		name = "dis1"
+		logPath, dbPath, filename, envFile = env.getPaths(name)
 
-	name = "dis1"
-	logPath, dbPath, filename, envFile = env.getPaths(name)
+		// Convert key to address
+		disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
+		writeEnv(disperserConfig.getEnvMap(), envFile)
+		env.Dispersers = append(env.Dispersers, disperserConfig)
 
-	// Convert key to address
-	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
-	env.Dispersers = append(env.Dispersers, disperserConfig)
-
-	env.genService(
-		compose, name, disImage,
-		filename, []string{grpcPort})
+		env.genService(
+			compose, name, disImage,
+			filename, []string{grpcPort})
+	}
 
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 		metricsPort := fmt.Sprint(port + 1) // port
