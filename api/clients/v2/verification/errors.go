@@ -1,11 +1,7 @@
 package verification
 
 import (
-	"errors"
 	"fmt"
-	"strings"
-
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // CertVerifierInternalError represents a 5xx-like error (unexpected, internal, infra, etc.)
@@ -46,34 +42,4 @@ type CertVerifierInvalidCertError struct {
 
 func (e *CertVerifierInvalidCertError) Error() string {
 	return fmt.Sprintf("invalid cert: call to CertVerifier failed with status code %d: %s", e.StatusCode, e.Msg)
-}
-
-// IsEVMOutOfGasError tries detecting an EVM out-of-gas error. This assumes the RPC provider
-// returns a standard error message and does not malform the EVM return data in transit.
-func IsEVMOutOfGasError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Try to catch go-ethereum's RPC error (might be wrapped or modified based on provider)
-	var rerr rpc.Error
-	if errors.As(err, &rerr) {
-		msg := strings.ToLower(rerr.Error())
-		if containsOOGMessage(msg) {
-			return true
-		}
-	}
-
-	// Fallback to lain error text (covers bindings that rewrap)
-	return containsOOGMessage(strings.ToLower(err.Error()))
-}
-
-// containsOOGMessage returns true if the error message includes a known
-// go-ethereum or client variant string indicating insufficient gas.
-// Some messages originate outside strict EVM execution, but are included
-// for coverage of custom RPC provider behaviors.
-func containsOOGMessage(msg string) bool {
-	return strings.Contains(msg, "out of gas") ||
-		strings.Contains(msg, "gas required exceeds allowance") ||
-		strings.Contains(msg, "intrinsic gas too low")
 }

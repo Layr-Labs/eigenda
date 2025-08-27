@@ -16,10 +16,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const (
-	MaxGasPerCheckDACert = 20_000_000
-)
-
 // CertVerifier is responsible for making eth calls against version agnostic CertVerifier contracts to ensure
 // cryptographic and structural integrity of EigenDA certificate types.
 // The V3 cert verifier contract is located at:
@@ -92,38 +88,33 @@ func (cv *CertVerifier) CheckDACert(
 		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
 	}
 
-	// TODO: determine if there's any merit in passing call options to impose better determinism and
-	// safety on the operation
+	// TODO(ethenotethan): determine if there's any merit in passing call context
+	// options (e.g, block number) to impose better determinism and safety on the simulation
+	// call
 
 	callMsgBytes, err := cv.v2VerifierBinding.TryPackCheckDACert(certBytes)
 	if err != nil {
 		return &CertVerifierInternalError{Msg: "pack checkDACert call", Err: err}
 	}
 
-	// Perform an eth_call with a gas limit of 20M or 2/3 of the current block gas limit.
-	// On-chain (e.g. in a rollup prover tx), budget additional gas since checkDACert adds
-	// to the overall execution path. The 2/3 factor is a heuristic and may be tuned further.
+	// TODO(ethenoethan): understand the best mechanisms for determining if the call ran into an
+	// out-of-gas exception. Furthermore it's worth exploring whether an eth_simulateV1 rpc call
+	// would provide better granularity and coverage while ensuring existing performance guarantees
+	// see: https://www.quicknode.com/docs/ethereum/eth_simulateV1
 	returnData, err := cv.ethClient.CallContract(ctx, ethereum.CallMsg{
 		To:   &certVerifierAddr,
-		Gas:  MaxGasPerCheckDACert,
 		Data: callMsgBytes,
 	}, nil)
-
-	if err != nil && IsEVMOutOfGasError(err) {
-		panic(fmt.Errorf("eth_call to checkDACert ran out of gas. "+
-			"This should not occur with a 2/3 block gas limit allocation, "+
-			"indicating a malformed certificate, potential exploit, or RPC issue: %w", err))
-	}
 	if err != nil {
 		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
 	result, err := cv.v2VerifierBinding.UnpackCheckDACert(returnData)
 	if err != nil {
-		return &CertVerifierInternalError{Msg: "upack checkDACert return data", Err: err}
+		return &CertVerifierInternalError{Msg: "unpack checkDACert return data", Err: err}
 	}
 
-	// 3 - Cast result to structured enum type and check for success
+	// 3 - Cast result to structured enum type and check for not success status codes
 	verifyResultCode := CheckDACertStatusCode(result)
 	if verifyResultCode == StatusNullError {
 		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
