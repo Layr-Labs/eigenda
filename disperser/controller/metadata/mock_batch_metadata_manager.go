@@ -11,7 +11,7 @@ type MockBatchMetadataManager struct {
 }
 
 // Create a mock BatchMetadataManager that returns canned data. The metadata provided to the constructor will
-// be returned by GetMetadata, unless SetMetadata is called to change it.
+// be returned by GetBlobMetadata, unless SetMetadata is called to change it.
 func NewMockBatchMetadataManager(metadata *BatchMetadata) *MockBatchMetadataManager {
 	m := &MockBatchMetadataManager{}
 	m.metadata.Store(metadata)
