@@ -36,6 +36,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 			Help:      "Size of blobs created from payloads in bytes",
 			Buckets:   blobSizeBuckets,
 		}),
+		factory: factory,
 	}
 }
 
