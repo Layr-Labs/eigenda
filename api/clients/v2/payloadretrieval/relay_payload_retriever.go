@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -28,6 +29,7 @@ type RelayPayloadRetriever struct {
 	config      RelayPayloadRetrieverConfig
 	relayClient relay.RelayClient
 	g1Srs       []bn254.G1Affine
+	metrics     metrics.RetrievalMetricer
 }
 
 var _ clients.PayloadRetriever = &RelayPayloadRetriever{}
@@ -39,7 +41,8 @@ func NewRelayPayloadRetriever(
 	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	relayClient relay.RelayClient,
-	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
+	g1Srs []bn254.G1Affine,
+	metrics metrics.RetrievalMetricer) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
 	if err != nil {
@@ -52,6 +55,7 @@ func NewRelayPayloadRetriever(
 		config:      relayPayloadRetrieverConfig,
 		relayClient: relayClient,
 		g1Srs:       g1Srs,
+		metrics:     metrics,
 	}, nil
 }
 
@@ -83,6 +87,8 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		}
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
 	}
+
+	pr.metrics.RecordPayloadSizeBytes(uint(len(payload)))
 
 	return payload, nil
 }
