@@ -6,7 +6,7 @@ use thiserror::Error;
 
 pub(crate) const MAX_BIT_INDICES_LENGTH: usize = 256;
 
-pub type Bitmap = BitArray<[u64; 4]>;
+pub type Bitmap = BitArray<[usize; 4]>;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum BitmapError {

@@ -17,9 +17,9 @@ pub mod srs;
 
 use std::sync::LazyLock;
 
+use crate::eigenda::cert::{BlobCommitment, G1Point};
 use ark_bn254::G1Affine;
 use ark_serialize::CanonicalDeserialize;
-use eigenda_cert::{BlobCommitment, G1Point};
 use rust_kzg_bn254_primitives::blob::Blob;
 use rust_kzg_bn254_prover::{kzg::KZG, srs::SRS};
 
@@ -187,8 +187,8 @@ fn verify_kzg_commitment(
 
 #[cfg(test)]
 mod test {
+    use crate::eigenda::cert::{BlobCommitment, G1Point};
     use ark_bn254::{G1Affine, G2Affine};
-    use eigenda_cert::{BlobCommitment, G1Point};
     use rust_kzg_bn254_primitives::{blob::Blob, errors::KzgError};
     use rust_kzg_bn254_prover::kzg::KZG;
 

@@ -1,8 +1,8 @@
 use core::iter::once;
 
+use crate::eigenda::cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 use alloy_primitives::B256;
 use alloy_sol_types::SolValue;
-use eigenda_cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 use tiny_keccak::{Hasher, Keccak};
 
 pub type TruncatedB256 = [u8; 24];

@@ -1,8 +1,8 @@
+use crate::eigenda::cert::{BlobCommitment, G1Point, G2Point};
 use alloy_primitives::Uint;
 use ark_bn254::{Fq, Fq2, G1Affine, G2Affine};
 use ark_ec::AffineRepr;
 use ark_ff::PrimeField;
-use eigenda_cert::{BlobCommitment, G1Point, G2Point};
 
 use crate::eigenda::verification::cert::convert;
 

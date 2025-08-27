@@ -1,6 +1,7 @@
 use alloy_primitives::StorageKey;
 
 use crate::eigenda::{
+    cert::StandardCommitment,
     extraction::{
         ApkHistoryExtractor, MinWithdrawalDelayBlocksExtractor, OperatorBitmapHistoryExtractor,
         OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
@@ -8,7 +9,6 @@ use crate::eigenda::{
         SecurityThresholdsV2Extractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
         TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
     },
-    types::StandardCommitment,
 };
 
 pub struct EigenDaRelayRegistry;

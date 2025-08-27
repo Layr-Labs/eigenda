@@ -1,15 +1,16 @@
 #[cfg(feature = "native")]
 pub mod provider;
+pub mod tx;
 
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
 
-use crate::{eigenda::types::StandardCommitment, spec::AncestorMetadata};
+use crate::{eigenda::cert::StandardCommitment, spec::AncestorMetadata};
 
 /// Extract certificate from the transaction. Return None if no parsable
 /// certificate exists.
 pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<StandardCommitment> {
     let eip4844_tx = tx.as_eip1559()?;
-    let raw_cert = eip4844_tx.input();
+    let raw_cert = eip4844_tx.tx().input();
 
     StandardCommitment::from_rlp_bytes(raw_cert).ok()
 }

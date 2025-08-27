@@ -1,7 +1,7 @@
+use crate::eigenda::cert::G1Point;
 use alloy_primitives::{B256, Uint};
 use ark_bn254::{Fq, G1Affine};
 use ark_ff::{BigInt, BigInteger, Field, MontFp, PrimeField};
-use eigenda_cert::G1Point;
 
 use crate::eigenda::verification::cert::hash::{self};
 
@@ -59,11 +59,13 @@ pub(crate) fn fq_to_uint(fq: Fq) -> Uint<256, 4> {
 
 #[cfg(test)]
 mod tests {
-    use crate::eigenda::verification::cert::{convert, types::conversions::IntoExt};
+    use crate::eigenda::{
+        cert::G1Point,
+        verification::cert::{convert, types::conversions::IntoExt},
+    };
     use alloy_primitives::Uint;
     use ark_bn254::G1Affine;
     use ark_ec::AffineRepr;
-    use eigenda_cert::G1Point;
 
     #[test]
     fn convert_point_to_hash() {

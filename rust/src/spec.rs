@@ -1,9 +1,6 @@
 use std::{hash::Hash, str::FromStr};
 
-use alloy_consensus::{
-    EthereumTxEnvelope, Header, Transaction, TxEip4844,
-    serde_bincode_compat::{self},
-};
+use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
 use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, B256, FixedBytes, wrap_fixed_bytes};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -20,6 +17,7 @@ use sov_rollup_interface::{
 
 use crate::{
     eigenda::{
+        cert::StandardCommitment,
         extraction::{
             ApkHistoryExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor,
             OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
@@ -28,16 +26,18 @@ use crate::{
             StaleStakesForbiddenExtractor, TotalStakeHistoryExtractor,
             VersionedBlobParamsExtractor,
         },
-        types::StandardCommitment,
         verification::cert::{
             CertVerificationInputs, error::CertVerificationError, types::Storage,
         },
     },
+    ethereum::tx::serde_bincode_compat::{self},
     verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
 };
 
 /// A specification for the types used by a DA layer.
-#[derive(Clone, Debug, Default, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize, BorshSerialize,
+)]
 pub struct EigenDaSpec;
 
 impl DaSpec for EigenDaSpec {
@@ -78,27 +78,43 @@ pub struct RollupParams {
     pub cert_recency_window: u64,
 }
 
-/// A namespace id used to identify transactions of the sequencer. The namespace
-/// is a regular [`EthereumAddress`]. We say that the specific transaction is
-/// part of a namespace if the receiver equals the [`EthereumAddress`] used as a namespace.
+/// A namespace id used to identify transactions of the sequencer. We say that
+/// the specific transaction is part of a namespace if the receiver equals the
+/// [`Address`] used as a namespace.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
-pub struct NamespaceId(EthereumAddress);
+pub struct NamespaceId(Address);
 
 impl NamespaceId {
+    pub const fn from_bytes(bytes: [u8; 20]) -> Self {
+        Self(Address(FixedBytes(bytes)))
+    }
+
     /// Check if namespace contains this transaction. The namespace contains
     /// transaction if the receiver of transaction is the address used as a namespace.
     pub fn contains<T>(&self, tx: &T) -> bool
     where
         T: Typed2718 + Transaction,
     {
-        tx.is_eip1559() && tx.to().is_some_and(|to| to == self.0.0)
+        tx.is_eip1559() && tx.to().is_some_and(|to| to == self.0)
+    }
+}
+
+impl From<[u8; 20]> for NamespaceId {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self::from_bytes(bytes)
+    }
+}
+
+impl From<Address> for NamespaceId {
+    fn from(address: Address) -> Self {
+        Self(address)
     }
 }
 
 impl From<NamespaceId> for Address {
     fn from(value: NamespaceId) -> Self {
-        value.0.0
+        value.0
     }
 }
 
@@ -106,7 +122,7 @@ impl FromStr for NamespaceId {
     type Err = AddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(EthereumAddress::from_str(s)?))
+        Ok(Self(Address::from_str(s)?))
     }
 }
 
@@ -240,6 +256,37 @@ impl From<Address> for EthereumAddress {
 impl From<EthereumAddress> for Address {
     fn from(value: EthereumAddress) -> Self {
         value.0
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+mod arbitrary_impl {
+    use prop::arbitrary::any;
+    use prop::strategy::Strategy;
+    use proptest::prelude::prop;
+    use proptest::strategy::BoxedStrategy;
+
+    use super::*;
+
+    fn new(bytes: [u8; 20]) -> EthereumAddress {
+        EthereumAddress(Address(FixedBytes::from(bytes)))
+    }
+
+    impl<'a> ::arbitrary::Arbitrary<'a> for EthereumAddress {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let bytes = <[u8; 20]>::arbitrary(u)?;
+            Ok(new(bytes))
+        }
+    }
+
+    impl proptest::arbitrary::Arbitrary for EthereumAddress {
+        type Parameters = ();
+
+        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+            any::<[u8; 20]>().prop_map(new).boxed()
+        }
+
+        type Strategy = BoxedStrategy<Self>;
     }
 }
 

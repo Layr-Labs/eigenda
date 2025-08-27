@@ -1,5 +1,5 @@
+use crate::eigenda::cert::G1Point;
 use alloy_primitives::{Address, B256, Bytes, aliases::U96};
-use eigenda_cert::G1Point;
 use hashbrown::HashMap;
 
 use crate::eigenda::verification::cert::{
@@ -227,7 +227,7 @@ pub fn leaf_node_belongs_to_merkle_tree(
         return Err(MerkleProofLengthNotMultipleOf32Bytes(proof_len));
     }
 
-    let sibling_path = Bitmap::new([sibling_path as u64, 0, 0, 0]);
+    let sibling_path = Bitmap::new([sibling_path as usize, 0, 0, 0]);
 
     let proof_depth = proof.len() / 32;
     let sibling_path_len = sibling_path.len();

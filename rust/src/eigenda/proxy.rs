@@ -8,7 +8,7 @@ use thiserror::Error;
 use tracing::trace;
 
 use crate::{
-    eigenda::types::{StandardCommitment, StandardCommitmentParseError},
+    eigenda::cert::{StandardCommitment, StandardCommitmentParseError},
     service::config::EigenDaConfig,
 };
 

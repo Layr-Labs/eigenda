@@ -12,7 +12,7 @@ use reth_trie_common::StorageProof;
 use thiserror::Error;
 
 use crate::eigenda::{
-    types::StandardCommitment,
+    cert::StandardCommitment,
     verification::cert::{
         bitmap::Bitmap,
         hash::TruncatedB256,
@@ -349,7 +349,7 @@ impl DataDecoder for OperatorBitmapHistoryExtractor {
 
                 let quorum_bitmap = U192::from_le_bytes::<24>(le[8..32].try_into().unwrap());
                 let [lo, mid, hi] = quorum_bitmap.into_limbs();
-                let bitmap = Bitmap::new([lo, mid, hi, 0]);
+                let bitmap = Bitmap::new([lo as usize, mid as usize, hi as usize, 0]);
 
                 let update =
                     decode_helpers::create_update(update_block, next_update_block, bitmap)?;

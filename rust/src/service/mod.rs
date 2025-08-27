@@ -2,7 +2,6 @@ pub mod config;
 
 use std::{future::ready, ops::Not, str::FromStr, time::Duration};
 
-use alloy_consensus::{TxEip4844, transaction::SignerRecoverable};
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
 use alloy_provider::Provider;
@@ -28,16 +27,17 @@ use tracing::{debug, error, instrument, warn};
 
 use crate::{
     eigenda::{
+        cert::StandardCommitment,
         extraction::contract,
         proxy::{ProxyClient, ProxyError},
-        types::StandardCommitment,
         verification::{verify_cert, verify_cert_recency},
     },
     ethereum::{
         extract_certificate,
         provider::{EthereumProviders, init_ethereum_provider},
+        tx::map_eip4844,
     },
-    service::config::{EigenDaConfig, EigenDaContracts},
+    service::config::{EigenDaConfig, EigenDaContracts, Network},
     spec::{
         AncestorMetadata, AncestorStateData, BlobWithSender, EigenDaSpec, EthereumAddress,
         EthereumBlockHeader, EthereumHash, NamespaceId, RollupParams, TransactionWithBlob,
@@ -64,7 +64,7 @@ pub enum EigenDaServiceError {
 /// EigenDaService is responsible for interacting with the EigenDA data availability layer.
 /// It provides functionality to submit blobs (data) to EigenDA and interfaces with Ethereum
 /// for block information and finality status.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct EigenDaService {
     /// Client for interacting with the EigenDA proxy node
     proxy: ProxyClient,
@@ -95,10 +95,19 @@ impl EigenDaService {
             ));
         }
 
+        // Setup ethereum client
         let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)
             .map_err(|err| EigenDaServiceError::Configuration(err.to_string()))?;
         let ethereum = init_ethereum_provider(&config, sequencer_signer.clone()).await?;
+
+        // Setup proxy client
         let proxy = ProxyClient::new(&config)?;
+
+        // Set contracts
+        let contracts = match config.network {
+            Network::Mainnet => EigenDaContracts::mainnet(),
+            Network::Holesky => EigenDaContracts::holesky(),
+        };
 
         Ok(Self {
             proxy,
@@ -107,7 +116,7 @@ impl EigenDaService {
             rollup_proof_namespace: params.rollup_proof_namespace,
             cert_recency_window: params.cert_recency_window,
             sequencer_signer,
-            contracts: config.contracts,
+            contracts,
         })
     }
 
@@ -167,7 +176,7 @@ impl EigenDaService {
         let mut block_transactions = Vec::with_capacity(transactions.len());
 
         for transaction in transactions {
-            let tx = transaction.into_inner().map_eip4844(TxEip4844::from);
+            let tx = map_eip4844(transaction.into_inner());
 
             // Transaction is not relevant for the rollup. We still need it for
             // later when proving the completeness
@@ -263,9 +272,10 @@ impl EigenDaService {
             .get_block_by_number(block_height.into())
             .await?
             .ok_or_else(|| EigenDaServiceError::AncestorMissing(block_height))?;
+        let header = block.header.into_consensus();
 
         Ok(AncestorMetadata {
-            header: EthereumBlockHeader::from(block.into_consensus_header()),
+            header: EthereumBlockHeader::from(header),
             data: None,
         })
     }
@@ -327,7 +337,7 @@ impl EigenDaService {
         let eigen_da_relay_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.eigen_da_relay_registry.into(), keys)
+            .get_proof(self.contracts.eigen_da_relay_registry, keys)
             .number(block_height)
             .into_future();
 
@@ -335,7 +345,7 @@ impl EigenDaService {
         let eigen_da_threshold_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.eigen_da_threshold_registry.into(), keys)
+            .get_proof(self.contracts.eigen_da_threshold_registry, keys)
             .number(block_height)
             .into_future();
 
@@ -343,7 +353,7 @@ impl EigenDaService {
         let registry_coordinator_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.registry_coordinator.into(), keys)
+            .get_proof(self.contracts.registry_coordinator, keys)
             .number(block_height)
             .into_future();
 
@@ -351,7 +361,7 @@ impl EigenDaService {
         let bls_signature_checker_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.bls_signature_checker.into(), keys)
+            .get_proof(self.contracts.bls_signature_checker, keys)
             .number(block_height)
             .into_future();
 
@@ -359,7 +369,7 @@ impl EigenDaService {
         let delegation_manager_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.delegation_manager.into(), keys)
+            .get_proof(self.contracts.delegation_manager, keys)
             .number(block_height)
             .into_future();
 
@@ -367,7 +377,7 @@ impl EigenDaService {
         let bls_apk_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.bls_apk_registry.into(), keys)
+            .get_proof(self.contracts.bls_apk_registry, keys)
             .number(block_height)
             .into_future();
 
@@ -375,7 +385,7 @@ impl EigenDaService {
         let stake_registry_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.stake_registry.into(), keys)
+            .get_proof(self.contracts.stake_registry, keys)
             .number(block_height)
             .into_future();
 
@@ -383,7 +393,7 @@ impl EigenDaService {
         let eigen_da_cert_verifier_fut = self
             .ethereum
             .cached
-            .get_proof(self.contracts.eigen_da_cert_verifier.into(), keys)
+            .get_proof(self.contracts.eigen_da_cert_verifier, keys)
             .number(block_height)
             .into_future();
 
@@ -502,8 +512,9 @@ impl DaService for EigenDaService {
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
+        let header = block.header.into_consensus();
 
-        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
+        Ok(EthereumBlockHeader::from(header))
     }
 
     /// Fetch the head block of the most popular fork.
@@ -519,8 +530,9 @@ impl DaService for EigenDaService {
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
+        let header = block.header.into_consensus();
 
-        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
+        Ok(EthereumBlockHeader::from(header))
     }
 
     /// Extract the relevant transactions from a block.

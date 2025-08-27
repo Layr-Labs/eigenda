@@ -11,9 +11,9 @@ pub mod types;
 
 use core::iter::once;
 
+use crate::eigenda::cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
 use alloy_sol_types::SolValue;
 use ark_bn254::{G1Affine, G2Affine};
-use eigenda_cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
 
 use crate::eigenda::verification::cert::{
     error::CertVerificationError::{self, *},
@@ -245,14 +245,14 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
 mod tests {
     use core::iter::once;
 
+    use crate::eigenda::cert::{
+        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo, G1Point,
+        NonSignerStakesAndSignature,
+    };
     use alloy_primitives::{B256, Bytes, aliases::U96};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
-    use eigenda_cert::{
-        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo, G1Point,
-        NonSignerStakesAndSignature,
-    };
     use hashbrown::HashMap;
 
     use crate::eigenda::verification::cert::{

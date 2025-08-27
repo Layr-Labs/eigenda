@@ -5,6 +5,7 @@ use alloy_provider::{
 use alloy_rpc_client::RpcClient;
 use alloy_signer_local::PrivateKeySigner;
 use alloy_transport::layers::RetryBackoffLayer;
+use rustls::crypto::{CryptoProvider, aws_lc_rs};
 
 use crate::service::{EigenDaServiceError, config::EigenDaConfig};
 
@@ -18,7 +19,7 @@ const DEFAULT_MAX_CACHE_ITEMS: u32 = 100;
 const DEFAULT_COMPUTE_UNITS: u64 = u64::MAX;
 
 /// Ethereum providers used by the [`crate::service::EigenDaService`].
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct EthereumProviders {
     pub cached: DynProvider,
     pub wallet: DynProvider,
@@ -29,6 +30,8 @@ pub async fn init_ethereum_provider(
     config: &EigenDaConfig,
     signer: PrivateKeySigner,
 ) -> Result<EthereumProviders, EigenDaServiceError> {
+    let _ = CryptoProvider::install_default(aws_lc_rs::default_provider());
+
     let max_retry_times = config
         .ethereum_max_retry_times
         .unwrap_or(DEFAULT_MAX_RETRY_TIMES);
@@ -59,7 +62,7 @@ pub async fn init_ethereum_provider(
     // retrieval. The only difference is that the data is not cached.
     let provider = ProviderBuilder::new()
         .wallet(signer)
-        .connect_client(client)
+        .on_client(client)
         .erased();
     let cached = CacheProvider::new(provider.clone(), SharedCache::new(max_cache_items)).erased();
 

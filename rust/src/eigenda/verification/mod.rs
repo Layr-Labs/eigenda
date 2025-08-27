@@ -5,7 +5,7 @@ use sov_rollup_interface::da::BlockHeaderTrait;
 
 use crate::{
     eigenda::{
-        types::StandardCommitment,
+        cert::StandardCommitment,
         verification::{blob::error::BlobVerificationError, cert::error::CertVerificationError},
     },
     spec::{AncestorMetadata, EthereumBlockHeader},
