@@ -2,8 +2,12 @@ deps:
 	yarn
 
 compile: deps
-	# compile.sh compiles the contracts and creates go bindings
-	./compile.sh
+	forge build
+
+# make bindings compiles the contracts and creates go bindings
+bindings: compile
+	rm -rf ./bindings
+	./generate-bindings.sh
 
 fmt:
 	forge fmt

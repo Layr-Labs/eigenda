@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
@@ -14,8 +15,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
-
-// TODO: write unit tests
 
 // The ClientLedger manages payment state for a single account. It is only used by *clients*, not by the disperser
 // or validator nodes.
@@ -38,7 +37,7 @@ type ClientLedger struct {
 	accountID          gethcommon.Address
 
 	// Though it would theoretically be possible to infer mode of operation based on on-chain state, it's important
-	// that this is directly configurable by the user, to ensure that reality matches intention.
+	// that this be directly configurable by the user, to ensure that reality matches intention.
 	//
 	// Consider, for example, if a user intends to operate with a reservation covering the majority of dispersals,
 	// with an on-demand balance as a backup. If there is a configuration issue which prevents the reservation from
@@ -71,33 +70,26 @@ func NewClientLedger(
 		accountantMetricer = metrics.NoopAccountantMetrics
 	}
 
-	if accountID == (gethcommon.Address{}) {
-		panic("account ID cannot be zero address")
-	}
+	enforce.NotEquals(accountID, gethcommon.Address{}, "account ID cannot be zero address")
 
 	switch clientLedgerMode {
 	case ClientLedgerModeReservationOnly:
-		if reservationLedger == nil || onDemandLedger != nil {
-			panic(fmt.Sprintf("in %s mode, expected reservation ledger to be non-nil and on-demand ledger to be nil",
-				ClientLedgerModeReservationOnly))
-		}
+		enforce.NotNil(reservationLedger,
+			"in %s mode, reservation ledger must be non-nil", ClientLedgerModeReservationOnly)
+		enforce.Nil(onDemandLedger, "in %s mode, on-demand ledger must be nil", ClientLedgerModeReservationOnly)
 	case ClientLedgerModeOnDemandOnly:
-		if onDemandLedger == nil || reservationLedger != nil {
-			panic(fmt.Sprintf("in %s mode, expected on-demand ledger to be non-nil and reservation ledger to be nil",
-				ClientLedgerModeOnDemandOnly))
-		}
+		enforce.NotNil(onDemandLedger, "in %s mode, on-demand ledger must be non-nil", ClientLedgerModeOnDemandOnly)
+		enforce.Nil(reservationLedger, "in %s mode, reservation ledger must be nil", ClientLedgerModeOnDemandOnly)
 	case ClientLedgerModeReservationAndOnDemand:
-		if reservationLedger == nil || onDemandLedger == nil {
-			panic(fmt.Sprintf("in %s mode, expected reservation and on-demand ledgers to be non-nil",
-				ClientLedgerModeReservationAndOnDemand))
-		}
+		enforce.NotNil(reservationLedger, "in %s mode, reservation ledger must be non-nil",
+			ClientLedgerModeReservationAndOnDemand)
+		enforce.NotNil(onDemandLedger, "in %s mode, on-demand ledger must be non-nil",
+			ClientLedgerModeReservationAndOnDemand)
 	default:
 		panic(fmt.Sprintf("unknown clientLedgerMode %s", clientLedgerMode))
 	}
 
-	if getNow == nil {
-		panic("getNow must not be nil")
-	}
+	enforce.True(getNow != nil, "getNow function must not be nil")
 
 	clientLedger := &ClientLedger{
 		logger:             logger,
@@ -170,9 +162,7 @@ func (cl *ClientLedger) debitReservationOnly(
 	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
-	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %v", err))
-	}
+	enforce.NilError(err, "new payment metadata")
 	return paymentMetadata, nil
 }
 
@@ -184,15 +174,11 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	quorums []core.QuorumID,
 ) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := cl.onDemandLedger.Debit(ctx, blobLengthSymbols, quorums)
-	if err != nil {
-		panic(fmt.Sprintf("on-demand debit failed. reservations aren't configured, and the ledger won't become "+
-			"aware of new on-chain deposits without a restart: %v", err))
-	}
+	enforce.NilError(err, "on-demand debit failed. reservations aren't configured, and the ledger won't become "+
+		"aware of new on-chain deposits without a restart")
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
-	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %v", err))
-	}
+	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
 
@@ -225,9 +211,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 
 	if success {
 		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
-		if err != nil {
-			panic(fmt.Sprintf("new payment metadata: %v", err))
-		}
+		enforce.NilError(err, "new payment metadata")
 		return paymentMetadata, nil
 	}
 
@@ -247,9 +231,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	}
 
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
-	if err != nil {
-		panic(fmt.Sprintf("new payment metadata: %v", err))
-	}
+	enforce.NilError(err, "new payment metadata")
 
 	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
 
@@ -266,9 +248,7 @@ func (cl *ClientLedger) RevertDebit(
 	blobSymbolCount uint32,
 ) error {
 	if paymentMetadata.IsOnDemand() {
-		if cl.onDemandLedger == nil {
-			panic("payment metadata is for an on-demand payment, but OnDemandLedger is nil")
-		}
+		enforce.NotNil(cl.onDemandLedger, "payment metadata is for an on-demand payment, but OnDemandLedger is nil")
 
 		newCumulativePayment, err := cl.onDemandLedger.RevertDebit(ctx, blobSymbolCount)
 		if err != nil {
@@ -277,9 +257,8 @@ func (cl *ClientLedger) RevertDebit(
 
 		cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), newCumulativePayment)
 	} else {
-		if cl.reservationLedger == nil {
-			panic("payment metadata is for a reservation payment, but ReservationLedger is nil")
-		}
+		enforce.NotNil(cl.reservationLedger,
+			"payment metadata is for a reservation payment, but ReservationLedger is nil")
 
 		err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
 		if err != nil {

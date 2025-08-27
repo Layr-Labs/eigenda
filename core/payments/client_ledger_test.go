@@ -374,7 +374,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
 
-		// Second debit should fallback to on-demand but fail due to insufficient funds
+		// Second debit should fallback to on-demand but fails due to insufficient funds
 		paymentMetadata, err = clientLedger.Debit(context.Background(), 1001, []core.QuorumID{0, 1})
 		require.Error(t, err, "insufficient funds in on-demand should cause retriable error in combined mode")
 		require.Nil(t, paymentMetadata)

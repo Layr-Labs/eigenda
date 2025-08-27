@@ -9,9 +9,6 @@ go 1.24
 // See https://tip.golang.org/doc/devel/release#go1.24.0
 toolchain go1.24.4
 
-// We need to keep eigenda-proxy clients separate because they are imported from modules that are not on go1.24 yet.
-replace github.com/Layr-Labs/eigenda-proxy/clients => ./api/proxy/clients
-
 // Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/50
 // TODO: update to a proper version once we make the next release.
 replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v1.13.1-0.20250716111202-d4a6faccf8c5
@@ -20,10 +17,10 @@ replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v
 // https://github.com/ethereum-optimism/optimism/blob/5662448279e4fb16e073e00baeb6e458b12a59b2/go.mod#L253C90-L253C106
 // Make sure to update this replace directive when github.com/ethereum-optimism/optimism version above is updated.
 // TODO: we should get rid of op dependencies altogether in our production code.
-replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101503.2-rc.5
+replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101511.1
 
 require (
-	github.com/Layr-Labs/eigenda-proxy/clients v1.0.1
+	github.com/Layr-Labs/eigenda/api/proxy/clients v0.1.0
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
 	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28
 	github.com/avast/retry-go/v4 v4.6.0
@@ -121,8 +118,8 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
-	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
@@ -131,7 +128,7 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
