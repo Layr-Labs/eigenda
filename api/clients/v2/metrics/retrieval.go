@@ -27,19 +27,6 @@ func NewRetrievalMetrics(registry *prometheus.Registry) RetrievalMetricer {
 	}
 
 	factory := metrics.With(registry)
-	// Define size buckets for payload and blob size measurements
-	// Starting from 0 up to 16MiB
-	sizeBuckets := []float64{
-		0,
-		131072,   // 128KiB
-		262144,   // 256KiB
-		524288,   // 512KiB
-		1048576,  // 1MiB
-		2097152,  // 2MiB
-		4194304,  // 4MiB
-		8388608,  // 8MiB
-		16777216, // 16MiB
-	}
 
 	return &RetrievalMetrics{
 		PayloadSize: factory.NewHistogram(prometheus.HistogramOpts{
@@ -47,7 +34,7 @@ func NewRetrievalMetrics(registry *prometheus.Registry) RetrievalMetricer {
 			Namespace: namespace,
 			Subsystem: retrievalSubsystem,
 			Help:      "Size of decoded payloads in bytes",
-			Buckets:   sizeBuckets,
+			Buckets:   blobSizeBuckets,
 		}),
 		factory: factory,
 	}
