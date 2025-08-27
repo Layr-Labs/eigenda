@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -16,21 +17,36 @@ import (
 
 // OnDemandLedgers manages and validates on-demand payments for multiple accounts
 type OnDemandLedgers struct {
-	logger       logging.Logger
-	ledgers      *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	logger logging.Logger
+	// A cache of the ledgers being tracked.
+	//
+	// New OnDemandLedgers are added to this cache as Debit requests are received from new accounts. Least recently
+	// used OnDemandLedgers are removed if the cache gets above the configured size. Since on-demand payment data
+	// is stored in a persistent way, deleting an OnDemandLedger from memory doesn't result in data loss: it just
+	// means that a new OnDemandLedger object will need to be constructed if any future Debits must be handled from
+	// that account.
+	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	// protects concurrent access to the ledgers cache during ledger creation
+	ledgerCreationLock sync.Mutex
+	// Provides access to the values stored in the PaymentVault contract.
+	//
+	// The state of this object is updated on a background thread.
 	onChainState meterer.OnchainPayment
-
-	dynamoClient      *dynamodb.Client
+	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
+	dynamoClient *dynamodb.Client
+	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string
 }
 
 // NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
 func NewOnDemandPaymentValidator(
 	logger logging.Logger,
+	// the maximum number of OnDemandLedgers to be kept in the LRU cache
 	maxLedgers int,
 	// expected to be initialized and have its background update thread started
 	onChainState meterer.OnchainPayment,
 	dynamoClient *dynamodb.Client,
+	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,
 ) (*OnDemandLedgers, error) {
 	if onChainState == nil {
@@ -38,8 +54,8 @@ func NewOnDemandPaymentValidator(
 	}
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
-		func(key gethcommon.Address, _ *OnDemandLedger) {
-			logger.Infof("evicted account %s from LRU on-demand ledger cache", key.Hex())
+		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
+			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
 		},
 	)
 	if err != nil {
@@ -51,7 +67,7 @@ func NewOnDemandPaymentValidator(
 	}
 
 	if onDemandTableName == "" {
-		return nil, errors.New("on demand table name cannot be nil")
+		return nil, errors.New("on demand table name cannot be empty")
 	}
 
 	return &OnDemandLedgers{
@@ -84,11 +100,20 @@ func (odl *OnDemandLedgers) Debit(
 	return nil
 }
 
-// getOrCreateLedger gets an existing on-demand ledger or creates a new one if it doesn't exist
+// getOrCreateLedger gets an existing on-demand ledger from the cache, or creates a new one if it doesn't exist
 func (odl *OnDemandLedgers) getOrCreateLedger(
 	ctx context.Context,
 	accountID gethcommon.Address,
 ) (*OnDemandLedger, error) {
+	// Fast path: check if ledger already exists in cache
+	if ledger, exists := odl.ledgers.Get(accountID); exists {
+		return ledger, nil
+	}
+
+	// Slow path: acquire lock and check again
+	odl.ledgerCreationLock.Lock()
+	defer odl.ledgerCreationLock.Unlock()
+
 	if ledger, exists := odl.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
@@ -139,7 +164,7 @@ func (odl *OnDemandLedgers) UpdateTotalDeposits(updates []TotalDepositUpdate) er
 		err := ledger.UpdateTotalDeposits(update.NewTotalDeposit)
 		if err != nil {
 			result = multierror.Append(
-				result, fmt.Errorf("failed to update deposits for account %v: %w", update.AccountAddress.Hex(), err))
+				result, fmt.Errorf("update total deposit for account %v: %w", update.AccountAddress.Hex(), err))
 			continue
 		}
 	}
