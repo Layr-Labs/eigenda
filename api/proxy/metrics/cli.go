@@ -99,6 +99,7 @@ func NewSubcommands() cli.Commands {
 					NewMetrics(registry).Document(),
 					metrics.NewAccountantMetrics(registry).Document(),
 					metrics.NewDispersalMetrics(registry).Document(),
+					metrics.NewRetrievalMetrics(registry).Document(),
 				)
 
 				table := tablewriter.NewWriter(os.Stdout)
