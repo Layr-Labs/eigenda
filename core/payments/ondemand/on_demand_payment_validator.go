@@ -81,13 +81,13 @@ func NewOnDemandPaymentValidator(
 
 // Debit validates an on-demand payment for a blob dispersal
 // The caller is responsible for verifying the signature before calling this method
-func (odl *OnDemandPaymentValidator) Debit(
+func (pv *OnDemandPaymentValidator) Debit(
 	ctx context.Context,
 	accountID gethcommon.Address,
 	symbolCount uint32,
 	quorumNumbers []uint8,
 ) error {
-	ledger, err := odl.getOrCreateLedger(ctx, accountID)
+	ledger, err := pv.getOrCreateLedger(ctx, accountID)
 	if err != nil {
 		return fmt.Errorf("get or create on-demand ledger: %w", err)
 	}
@@ -101,32 +101,32 @@ func (odl *OnDemandPaymentValidator) Debit(
 }
 
 // getOrCreateLedger gets an existing on-demand ledger from the cache, or creates a new one if it doesn't exist
-func (odl *OnDemandPaymentValidator) getOrCreateLedger(
+func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 	ctx context.Context,
 	accountID gethcommon.Address,
 ) (*OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
-	if ledger, exists := odl.ledgers.Get(accountID); exists {
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
 	// Slow path: acquire lock and check again
-	odl.ledgerCreationLock.Lock()
-	defer odl.ledgerCreationLock.Unlock()
+	pv.ledgerCreationLock.Lock()
+	defer pv.ledgerCreationLock.Unlock()
 
-	if ledger, exists := odl.ledgers.Get(accountID); exists {
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
-	onDemandPayment, err := odl.onChainState.GetOnDemandPaymentByAccount(ctx, accountID)
+	onDemandPayment, err := pv.onChainState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
 	}
 
-	pricePerSymbol := big.NewInt(int64(odl.onChainState.GetPricePerSymbol()))
-	minNumSymbols := odl.onChainState.GetMinNumSymbols()
+	pricePerSymbol := big.NewInt(int64(pv.onChainState.GetPricePerSymbol()))
+	minNumSymbols := pv.onChainState.GetMinNumSymbols()
 
-	cumulativePaymentStore, err := NewCumulativePaymentStore(odl.dynamoClient, odl.onDemandTableName, accountID)
+	cumulativePaymentStore, err := NewCumulativePaymentStore(pv.dynamoClient, pv.onDemandTableName, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
@@ -142,7 +142,7 @@ func (odl *OnDemandPaymentValidator) getOrCreateLedger(
 		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
 	}
 
-	odl.ledgers.Add(accountID, newLedger)
+	pv.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
 }
 
@@ -150,14 +150,14 @@ func (odl *OnDemandPaymentValidator) getOrCreateLedger(
 //
 // Will attempt to make all updates, even if one update fails. A multierror is returned, describing any/all errors
 // that occurred during the updates.
-func (odl *OnDemandPaymentValidator) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
+func (pv *OnDemandPaymentValidator) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
 	if len(updates) == 0 {
 		return nil
 	}
 
 	var result *multierror.Error
 	for _, update := range updates {
-		ledger, exists := odl.ledgers.Get(update.AccountAddress)
+		ledger, exists := pv.ledgers.Get(update.AccountAddress)
 		if !exists {
 			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
 			// account ever makes an on-demand dispersal
