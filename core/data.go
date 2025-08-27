@@ -511,7 +511,7 @@ type PaymentMetadata struct {
 func NewPaymentMetadata(
 	// account that the payment is for. must not be a 0 address
 	accountID gethcommon.Address,
-	// the time of the dispersal, which is stored as a unix nano timestamp
+	// The time of the dispersal. The non-monotonic unix nano timestamp is extracted from this and stored as an integer
 	timestamp time.Time,
 	// total number of wei paid by the account, for this and all previous on-demand dispersals
 	// if this is 0 or nil, it indicates that the dispersal will be paid for with a reservation
