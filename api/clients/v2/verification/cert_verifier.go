@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -53,22 +54,8 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// 1 - switch on the certificate type to determine which contract to call
-	var certV3 *coretypes.EigenDACertV3
-	var err error
-	switch cert := cert.(type) {
-	case *coretypes.EigenDACertV3:
-		certV3 = cert
-	case *coretypes.EigenDACertV2:
-		// EigenDACertV3 is the only version that is supported by the CheckDACert function
-		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
-		certV3 = cert.ToV3()
-	default:
-		// If golang had enums the world would be a better place.
-		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
-			"construct offchain should have a CertVerifier contract which we can call to "+
-			"verify the certificate", cert))
-	}
+	// 1 - Normalize cert to V3
+	certV3 := NormalizeCertV3(cert)
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
 	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
@@ -105,6 +92,57 @@ func (cv *CertVerifier) CheckDACert(
 		}
 	}
 	return nil
+}
+
+// EstimateGasCheckDACert uses eth_estimateGas to estimate the gas requirements for a CheckDACert call.
+func (cv *CertVerifier) EstimateGasCheckDACert(
+	ctx context.Context,
+	cert coretypes.EigenDACert,
+) (uint64, error) {
+	// Normalize cert to V3
+	certV3 := NormalizeCertV3(cert)
+
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(
+		ctx,
+		certV3.ReferenceBlockNumber(),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return 0, fmt.Errorf("serialize cert: %w", err)
+	}
+
+	// Pack the checkDACert method call data
+	abi, err := certVerifierBinding.ContractEigenDACertVerifierMetaData.GetAbi()
+	if err != nil {
+		return 0, fmt.Errorf("get contract ABI: %w", err)
+	}
+
+	callData, err := abi.Pack("checkDACert", certBytes)
+	if err != nil {
+		return 0, fmt.Errorf("pack checkDACert call data: %w", err)
+	}
+
+	callMsg := ethereum.CallMsg{
+		To:   &certVerifierAddress,
+		Data: callData,
+	}
+
+	// Estimate gas using eth_estimateGas
+	gasEstimate, err := cv.ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		cv.logger.Error(
+			"eth_estimateGas",
+			"to", callMsg.To.Hex(),
+			"data", fmt.Sprintf("0x%x", callMsg.Data),
+		)
+		return 0, fmt.Errorf("estimate gas for checkDACert: %w", err)
+	}
+
+	return gasEstimate, nil
 }
 
 // GetQuorumNumbersRequired returns the set of quorum numbers that must be set in the BlobHeader, and verified in
@@ -268,4 +306,29 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	cv.versions.Store(certVerifierAddress, version)
 
 	return version, nil
+}
+
+// NormalizeCertV3 returns a EigenDACertV3 for a given EigenDACert
+//
+// This method normalizes a given EigenDACert (V2 or V3) to V3. If a V2 cert is given
+// it is converted to V3 then returned, otherwise the given V3 cert is returned. All
+// other versions will result in a panic.
+func NormalizeCertV3(cert coretypes.EigenDACert) *coretypes.EigenDACertV3 {
+	// switch on the certificate type to determine which contract to call
+	var certV3 *coretypes.EigenDACertV3
+	switch cert := cert.(type) {
+	case *coretypes.EigenDACertV3:
+		certV3 = cert
+	case *coretypes.EigenDACertV2:
+		// EigenDACertV3 is the only version that is supported by the CheckDACert function
+		// but the V2 cert is a simple permutation of the V3 cert fields, so we convert it.
+		certV3 = cert.ToV3()
+	default:
+		// If golang had enums the world would be a better place.
+		panic(fmt.Sprintf("unsupported cert version: %T. All cert versions that we can "+
+			"construct offchain should have a CertVerifier contract which we can call to "+
+			"verify the certificate", cert))
+	}
+
+	return certV3
 }
