@@ -172,3 +172,65 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	err = ledgers.Debit(ctx, accountID, uint32(10), []uint8{0})
 	require.NoError(t, err, "debit should now succeed after increasing deposits")
 }
+
+func TestLRUCacheEvictionAndReload(t *testing.T) {
+	ctx := context.Background()
+	tableName := createPaymentTable(t, "TestLRUCacheEvictionAndReload")
+	defer deleteTable(t, tableName)
+
+	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	accountC := gethcommon.HexToAddress("0xcccccccccccccccccccccccccccccccccccccccc")
+
+	mockOnChainState := &coremock.MockOnchainPaymentState{}
+	mockOnChainState.On("GetPricePerSymbol").Return(uint64(1000))
+	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
+
+	// Account A has 8000 wei total deposits (can afford 8 symbols at 1000 wei each)
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountA).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(8000)}, nil)
+
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountB).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(5000)}, nil)
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountC).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(3000)}, nil)
+
+	// Create ledgers with small LRU cache size to force eviction
+	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+		testutils.GetLogger(),
+		2,
+		mockOnChainState,
+		dynamoClient,
+		tableName,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, ledgers)
+
+	// Make a dispersal from account A using 3/4 of total deposits (6 symbols = 6000 wei)
+	err = ledgers.Debit(ctx, accountA, uint32(6), []uint8{0})
+	require.NoError(t, err, "first debit from account A should succeed")
+
+	// Add dispersals from accounts B and C to evict account A from cache
+	err = ledgers.Debit(ctx, accountB, uint32(3), []uint8{0})
+	require.NoError(t, err, "debit from account B should succeed")
+	err = ledgers.Debit(ctx, accountC, uint32(2), []uint8{0})
+	require.NoError(t, err, "debit from account C should succeed")
+
+	// At this point, account A should have been evicted from the LRU cache
+	// Cache now contains accounts B and C only
+
+	// Attempt another dispersal from account A that should fail if it was instantiated correctly
+	// Account A had 8000 wei total, spent 6000 wei, has 2000 wei left
+	// Trying to spend 3000 wei (3 symbols) should fail
+	err = ledgers.Debit(ctx, accountA, uint32(3), []uint8{0})
+	require.Error(t, err, "second debit from account A should fail due to insufficient funds")
+	var insufficientFundsErr *ondemand.InsufficientFundsError
+	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
+
+	// Verify that GetOnDemandPaymentByAccount was called exactly 4 times:
+	// 1. Initial call for account A
+	// 2. Initial call for account B
+	// 3. Initial call for account C
+	// 4. Second call for account A after it was evicted and accessed again
+	mockOnChainState.AssertNumberOfCalls(t, "GetOnDemandPaymentByAccount", 4)
+}
