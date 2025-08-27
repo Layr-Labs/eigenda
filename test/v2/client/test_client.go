@@ -915,7 +915,7 @@ func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
 	return c.proxyWrapper, nil
 }
 
-func (c *TestClient) EstimateGasCheckDACert(
+func (c *TestClient) EstimateGasAndReportCheckDACert(
 	ctx context.Context,
 	eigenDAV3Cert *coretypes.EigenDACertV3,
 ) (uint64, error) {

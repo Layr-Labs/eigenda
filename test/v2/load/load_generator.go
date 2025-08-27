@@ -262,23 +262,24 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	}
 
 	// Estimate gas for CheckDACert call
-	go l.estimateGasCheckDACertAsync(eigenDAV3Cert)
+	go l.estimateAndReportGasCheckDACert(eigenDAV3Cert)
 
 	return blobKey, payload, eigenDACert, nil
 }
 
-// estimateGasCheckDACertAsync performs gas estimation in a separate goroutine to avoid blocking blob dispersal.
-func (l *LoadGenerator) estimateGasCheckDACertAsync(eigenDAV3Cert *coretypes.EigenDACertV3) {
+// estimateAndReportGasCheckDACert performs gas estimation and reports it as a metric.
+// Make sure to call this in a separate goroutine to avoid blocking blob dispersal.
+func (l *LoadGenerator) estimateAndReportGasCheckDACert(eigenDAV3Cert *coretypes.EigenDACertV3) {
 	l.gasEstimationLimiter <- struct{}{}
 	defer func() {
 		<-l.gasEstimationLimiter
 	}()
 
 	gasTimeout := time.Duration(l.config.GasEstimationTimeout) * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), gasTimeout)
+	ctx, cancel := context.WithTimeout(l.ctx, gasTimeout)
 	defer cancel()
 
-	_, err := l.client.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	_, err := l.client.EstimateGasAndReportCheckDACert(ctx, eigenDAV3Cert)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to estimate gas for CheckDACert call: %v", err)
 	}
