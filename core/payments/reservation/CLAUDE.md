@@ -12,6 +12,7 @@ Dispersals can only be made when there is enough available capacity in the bucke
 
 - `reservation.go` - Describes parameters of a single account's reservation
 - `reservation_ledger.go` - Tracks usage of a single account's reservation
+- `reservation_payment_validator.go` - Validates reservation payments for multiple accounts
 - `leaky_bucket.go` - Rate limiting algorithm utility, utilized by the `ReservationLedger`
 - `reservation_ledger_config.go` - Configures a `ReservationLedger`
 - `errors.go` - Sentinel errors for reservation related failures
