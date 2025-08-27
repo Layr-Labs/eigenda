@@ -826,7 +826,7 @@ func (env *Config) GenerateAllVariables() {
 	name = "retriever0"
 	retrieverKey, _ := env.getKey(name)
 	retrieverLogPath, _, _, retrieverEnvFile := env.getPaths(name)
-	retrieverConfig := env.generateRetrieverVars(0, retrieverKey, graphUrl, retrieverLogPath, fmt.Sprint(port+1))
+	retrieverConfig := env.generateRetrieverVars(0, retrieverKey, graphUrl, retrieverLogPath, fmt.Sprint(port+100))
 	writeEnv(retrieverConfig.getEnvMap(), retrieverEnvFile)
 	env.Retriever = retrieverConfig
 

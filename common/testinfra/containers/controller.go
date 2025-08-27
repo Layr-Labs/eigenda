@@ -153,6 +153,13 @@ func NewControllerContainerWithNetwork(ctx context.Context, config ControllerCon
 		NetworkAliases: map[string][]string{
 			network.Name: {"controller"},
 		},
+		// Add host access configuration for accessing operators on host ports
+		HostAccessPorts: []int{
+			32011, 32012, 32013, 32014, 32015, 32016, // operator-0 ports
+			32021, 32022, 32023, 32024, 32025, 32026, // operator-1 ports
+			32031, 32032, 32033, 32034, 32035, 32036, // operator-2 ports
+			32041, 32042, 32043, 32044, 32045, 32046, // operator-3 ports
+		},
 		Mounts: mounts,
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort(nat.Port(config.MetricsPort+"/tcp")).WithStartupTimeout(30*time.Second),
@@ -163,13 +170,13 @@ func NewControllerContainerWithNetwork(ctx context.Context, config ControllerCon
 	}
 
 	// Add HostConfigModifier to set up ExtraHosts for operator localhost domains
-	// This maps operator-{i}.localhost to host-gateway, allowing the controller
+	// This maps operator-{i}.localtest.me to host-gateway, allowing the controller
 	// to reach operators running on the host through the localhost domain
 	req.HostConfigModifier = func(hc *container.HostConfig) {
 		// Add entries for each operator's localhost domain
 		// host-gateway is a special Docker hostname that resolves to the host machine
 		for i := 0; i < 4; i++ {
-			operatorHost := fmt.Sprintf("operator-%d.localhost:host-gateway", i)
+			operatorHost := fmt.Sprintf("operator-%d.localtest.me:host-gateway", i)
 			hc.ExtraHosts = append(hc.ExtraHosts, operatorHost)
 		}
 	}

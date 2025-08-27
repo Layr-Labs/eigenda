@@ -232,6 +232,7 @@ func (sr *signatureReceiver) handleNextSignature(
 			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 			"operatorID", signingMessage.Operator.Hex(),
 			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"socket", indexedOperatorInfo.Socket,
 			"error", err)
 		return
 	}

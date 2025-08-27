@@ -228,7 +228,7 @@ func NewRelayContainerWithNetwork(ctx context.Context, config RelayConfig, nw *t
 	}
 
 	// Add port bindings when hostname is 0.0.0.0 or using localhost domain
-	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localhost") {
+	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localtest.me") {
 		req.HostConfigModifier = func(hc *container.HostConfig) {
 			hc.PortBindings = nat.PortMap{
 				nat.Port(config.InternalGRPCPort + "/tcp"): []nat.PortBinding{{HostPort: config.GRPCPort}},
@@ -241,7 +241,7 @@ func NewRelayContainerWithNetwork(ctx context.Context, config RelayConfig, nw *t
 	if nw != nil {
 		req.Networks = []string{nw.Name}
 		// Use localhost domain which resolves to 127.0.0.1
-		relayHostname := fmt.Sprintf("relay-%d.localhost", config.ID)
+		relayHostname := fmt.Sprintf("relay-%d.localtest.me", config.ID)
 		req.NetworkAliases = map[string][]string{
 			nw.Name: {relayHostname, config.Hostname, fmt.Sprintf("relay-%d", config.ID), fmt.Sprintf("relay%d", config.ID)},
 		}

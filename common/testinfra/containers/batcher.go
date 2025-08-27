@@ -226,13 +226,13 @@ func NewBatcherContainerWithNetwork(ctx context.Context, config BatcherConfig, n
 	}
 
 	// Add HostConfigModifier to set up ExtraHosts for operator localhost domains
-	// This maps operator-{i}.localhost to host-gateway, allowing the batcher
+	// This maps operator-{i}.localtest.me to host-gateway, allowing the batcher
 	// to reach operators running on the host through the localhost domain
 	req.HostConfigModifier = func(hc *container.HostConfig) {
 		// Add entries for each operator's localhost domain
 		// host-gateway is a special Docker hostname that resolves to the host machine
 		for i := 0; i < 4; i++ {
-			operatorHost := fmt.Sprintf("operator-%d.localhost:host-gateway", i)
+			operatorHost := fmt.Sprintf("operator-%d.localtest.me:host-gateway", i)
 			hc.ExtraHosts = append(hc.ExtraHosts, operatorHost)
 		}
 	}

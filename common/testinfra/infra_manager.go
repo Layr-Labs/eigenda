@@ -463,7 +463,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			fmt.Printf("DEBUG: EigenDA root path for operator %d: %s\n", i, operatorConfig.EigenDADirectory)
 
 			// Set the hostname for operator registration
-			operatorConfig.Hostname = fmt.Sprintf("operator-%d.localhost", i)
+			operatorConfig.Hostname = fmt.Sprintf("operator-%d.localtest.me", i)
 
 			// Start the operator container
 			operator, err := containers.NewOperatorContainerWithNetwork(ctx, operatorConfig, im.network)
@@ -781,7 +781,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			// Configure relay with base configuration
 			relayConfig := im.config.EigenDA.Relays.BaseConfig
 			relayConfig.ID = i
-			
+
 			// Override with default configuration if not set
 			if relayConfig.Image == "" {
 				relayConfig = containers.DefaultRelayConfig(i)
@@ -802,9 +802,9 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 					relayConfig.Hostname = defaultConfig.Hostname
 				}
 			}
-			
-			// Set the hostname for relay registration (using relay-N.localhost pattern)
-			relayConfig.Hostname = fmt.Sprintf("relay-%d.localhost", i)
+
+			// Set the hostname for relay registration
+			relayConfig.Hostname = fmt.Sprintf("relay-%d.localtest.me", i)
 
 			// Configure AWS resources if LocalStack is enabled
 			if im.config.LocalStack.Enabled && im.localstack != nil {
@@ -1278,15 +1278,15 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		if len(im.relays) > 0 {
 			// Use actual relay URLs from running relays with proper hostnames
 			for i, relay := range im.relays {
-				// Use relay-N.localhost:PORT format for Docker network resolution
-				url := fmt.Sprintf("relay-%d.localhost:%s", i, relay.Config().GRPCPort)
+				// Use relay-N.localtest.me:PORT format for Docker network resolution
+				url := fmt.Sprintf("relay-%d.localtest.me:%s", i, relay.Config().GRPCPort)
 				relayURLs = append(relayURLs, url)
 			}
 		} else if im.config.EigenDA.Relays.Enabled {
 			// If relays will be started later, use their expected URLs
 			for i := 0; i < im.config.EigenDA.Relays.Count; i++ {
 				basePort := 34000 + (i * 2) // Match DefaultRelayConfig port calculation
-				url := fmt.Sprintf("relay-%d.localhost:%d", i, basePort)
+				url := fmt.Sprintf("relay-%d.localtest.me:%d", i, basePort)
 				relayURLs = append(relayURLs, url)
 			}
 		} else {

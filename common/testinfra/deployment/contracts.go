@@ -381,7 +381,7 @@ func (m *ContractDeploymentManager) RegisterBlobVersionsAndRelays(
 
 	ethAddr := ethClient.GetAccountAddress()
 	for _, url := range relayURLs {
-		// URL should already include the proper hostname (e.g., relay-0.localhost:34000)
+		// URL should already include the proper hostname (e.g., relay-0.localtest.me:34000)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
 			RelayAddress: ethAddr,
 			RelayURL:     url,

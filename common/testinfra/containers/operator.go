@@ -229,7 +229,7 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort(nat.Port(config.InternalDispersalPort+"/tcp")).WithStartupTimeout(60*time.Second),
-			wait.ForLog("v1 dispersal enabled").WithStartupTimeout(90*time.Second),
+			wait.ForLog("v2 dispersal enabled").WithStartupTimeout(90*time.Second),
 		),
 		Name:            fmt.Sprintf("eigenda-operator-%d", config.ID),
 		AlwaysPullImage: false, // Use local image if available
@@ -237,7 +237,7 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 
 	// Add port bindings when hostname is 0.0.0.0 or using localhost domain
 	// This ensures the operator ports are accessible from the host at the expected ports
-	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localhost") {
+	if config.Hostname == "0.0.0.0" || strings.HasSuffix(config.Hostname, ".localtest.me") {
 		req.HostConfigModifier = func(hc *container.HostConfig) {
 			hc.PortBindings = nat.PortMap{
 				nat.Port(config.InternalDispersalPort + "/tcp"):   []nat.PortBinding{{HostPort: config.DispersalPort}},
@@ -255,7 +255,7 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 		req.Networks = []string{nw.Name}
 		// Use localhost domain which resolves to 127.0.0.1
 		// This allows the batcher to use host-gateway to reach operators
-		operatorHostname := fmt.Sprintf("operator-%d.localhost", config.ID)
+		operatorHostname := fmt.Sprintf("operator-%d.localtest.me", config.ID)
 		req.NetworkAliases = map[string][]string{
 			nw.Name: {operatorHostname, config.Hostname, fmt.Sprintf("operator-%d", config.ID)},
 		}

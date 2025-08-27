@@ -236,6 +236,8 @@ func (d *Dispatcher) HandleBatch(
 				return
 			}
 
+			// Socket value
+			d.logger.Debugf("Attempting to connect to dispersal node at %s:%d", host, v2DispersalPort)
 			client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 			if err != nil {
 				d.logger.Warn("failed to get node client; node may not be reachable",
