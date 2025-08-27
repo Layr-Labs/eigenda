@@ -147,6 +147,9 @@ func (odl *OnDemandLedgers) getOrCreateLedger(
 }
 
 // UpdateTotalDeposits updates the total deposits for multiple accounts.
+//
+// Will attempt to make all updates, even if one update fails. A multierror is returned, describing any/all errors
+// that occurred during the updates.
 func (odl *OnDemandLedgers) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
 	if len(updates) == 0 {
 		return nil
