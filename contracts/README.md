@@ -13,15 +13,18 @@ forge install
 
 
 ### Compile
-To compile contracts and generate golang ABI bindings, run the following:
-```
-make compile-contracts
 
+To compile contracts, run the following:
+```
+make compile
 ```
 
-To just compile contracts, run the following:
+## Generate Golang Bindings
+
+To generate golang ABI bindings, run the following (which will compile the contracts as a dependency):
 ```
-yarn run build
+make bindings
+
 ```
 
 ### Testing

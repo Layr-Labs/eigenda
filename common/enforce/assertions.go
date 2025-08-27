@@ -1,8 +1,12 @@
 package enforce
 
-import "fmt"
+import (
+	"fmt"
 
-// If convenient, it's ok at add additional assertions to this collection, as long as those assertions are
+	"golang.org/x/exp/constraints"
+)
+
+// If convenient, it's ok to add additional assertions to this collection, as long as those assertions are
 // general purpose and not specific to a particular domain or use case. For example, don't import custom
 // types or packages that are not part of the standard library or common Go ecosystem.
 
@@ -13,7 +17,7 @@ func True(condition bool, message string, args ...any) {
 	}
 }
 
-// Asserts a condition is false and panics with an error message if the condition is false.
+// Asserts a condition is false and panics with an error message if the condition is true.
 func False(condition bool, message string, args ...any) {
 	if condition {
 		panic("Expected condition to be false: " + fmt.Sprintf(message, args...))
@@ -28,10 +32,48 @@ func Equals[T comparable](expected T, actual T, message string, args ...any) {
 }
 
 // Asserts that two values are not equal and panics with an error if they are equal.
+//
+// May not behave as expected for NaN values in floating point comparisons.
 func NotEquals[T comparable](notExpected T, actual T, message string, args ...any) {
 	if notExpected == actual {
 		panic(fmt.Sprintf("Expected inequality, %v == %v: %s", notExpected, actual,
 			fmt.Sprintf(message, args...)))
+	}
+}
+
+// Asserts a > b
+//
+// May not behave as expected for NaN values in floating point comparisons.
+func GreaterThan[T constraints.Ordered](a T, b T, message string, args ...any) {
+	if a <= b {
+		panic(fmt.Sprintf("Expected %v > %v: %s", a, b, fmt.Sprintf(message, args...)))
+	}
+}
+
+// Asserts a >= b
+//
+// May not behave as expected for NaN values in floating point comparisons.
+func GreaterThanOrEqual[T constraints.Ordered](a T, b T, message string, args ...any) {
+	if a < b {
+		panic(fmt.Sprintf("Expected %v >= %v: %s", a, b, fmt.Sprintf(message, args...)))
+	}
+}
+
+// Asserts a < b
+//
+// May not behave as expected for NaN values in floating point comparisons.
+func LessThan[T constraints.Ordered](a T, b T, message string, args ...any) {
+	if a >= b {
+		panic(fmt.Sprintf("Expected %v < %v: %s", a, b, fmt.Sprintf(message, args...)))
+	}
+}
+
+// Asserts a <= b
+//
+// May not behave as expected for NaN values in floating point comparisons.
+func LessThanOrEqual[T constraints.Ordered](a T, b T, message string, args ...any) {
+	if a > b {
+		panic(fmt.Sprintf("Expected %v <= %v: %s", a, b, fmt.Sprintf(message, args...)))
 	}
 }
 
