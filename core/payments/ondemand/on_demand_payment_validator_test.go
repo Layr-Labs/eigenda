@@ -97,7 +97,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountB).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(20000)}, nil)
 
-	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		10,
 		mockOnChainState,
@@ -105,18 +105,18 @@ func TestDebitMultipleAccounts(t *testing.T) {
 		tableName,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, ledgers)
+	require.NotNil(t, paymentValidator)
 
 	// debit from account A
-	err = ledgers.Debit(ctx, accountA, uint32(50), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountA, uint32(50), []uint8{0})
 	require.NoError(t, err, "first debit from account A should succeed")
 
 	// debit from account B
-	err = ledgers.Debit(ctx, accountB, uint32(75), []uint8{0, 1})
+	err = paymentValidator.Debit(ctx, accountB, uint32(75), []uint8{0, 1})
 	require.NoError(t, err, "first debit from account B should succeed")
 
 	// debit from account A (should reuse cached ledger)
-	err = ledgers.Debit(ctx, accountA, uint32(25), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountA, uint32(25), []uint8{0})
 	require.NoError(t, err, "second debit from account A should succeed")
 
 	// Each account should only trigger GetOnDemandPaymentByAccount once (on first access)
@@ -138,7 +138,7 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountID).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(5000)}, nil)
 
-	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		10,
 		mockOnChainState,
@@ -148,7 +148,7 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to debit more than available funds (5000 wei / 1000 wei per symbol = 5 symbols max)
-	err = ledgers.Debit(ctx, accountID, uint32(10), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{0})
 	require.Error(t, err, "debit should fail when insufficient funds")
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
@@ -165,11 +165,11 @@ func TestDebitInsufficientFunds(t *testing.T) {
 			NewTotalDeposit: big.NewInt(50000),
 		},
 	}
-	err = ledgers.UpdateTotalDeposits(updates)
+	err = paymentValidator.UpdateTotalDeposits(updates)
 	require.NoError(t, err, "updating total deposits should succeed")
 
 	// Retry the same debit that previously failed - should now succeed
-	err = ledgers.Debit(ctx, accountID, uint32(10), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{0})
 	require.NoError(t, err, "debit should now succeed after increasing deposits")
 }
 
@@ -195,8 +195,8 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountC).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(3000)}, nil)
 
-	// Create ledgers with small LRU cache size to force eviction
-	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+	// Create paymentValidator with small LRU cache size to force eviction
+	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		2,
 		mockOnChainState,
@@ -204,16 +204,16 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 		tableName,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, ledgers)
+	require.NotNil(t, paymentValidator)
 
 	// Make a dispersal from account A using 3/4 of total deposits (6 symbols = 6000 wei)
-	err = ledgers.Debit(ctx, accountA, uint32(6), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountA, uint32(6), []uint8{0})
 	require.NoError(t, err, "first debit from account A should succeed")
 
 	// Add dispersals from accounts B and C to evict account A from cache
-	err = ledgers.Debit(ctx, accountB, uint32(3), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountB, uint32(3), []uint8{0})
 	require.NoError(t, err, "debit from account B should succeed")
-	err = ledgers.Debit(ctx, accountC, uint32(2), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountC, uint32(2), []uint8{0})
 	require.NoError(t, err, "debit from account C should succeed")
 
 	// At this point, account A should have been evicted from the LRU cache
@@ -222,7 +222,7 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	// Attempt another dispersal from account A that should fail if it was instantiated correctly
 	// Account A had 8000 wei total, spent 6000 wei, has 2000 wei left
 	// Trying to spend 3000 wei (3 symbols) should fail
-	err = ledgers.Debit(ctx, accountA, uint32(3), []uint8{0})
+	err = paymentValidator.Debit(ctx, accountA, uint32(3), []uint8{0})
 	require.Error(t, err, "second debit from account A should fail due to insufficient funds")
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
