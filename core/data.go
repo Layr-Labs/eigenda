@@ -495,6 +495,9 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 }
 
 // PaymentMetadata represents the header information for a blob
+//
+// TODO(litt3): this struct should be moved into the payments package once the migration to the new payment logic
+// is complete. I'm not moving it right now, to minimize changes to the old payment logic, which also uses this struct.
 type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID gethcommon.Address `json:"account_id"`
