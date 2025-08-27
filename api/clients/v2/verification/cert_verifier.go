@@ -124,10 +124,10 @@ func (cv *CertVerifier) CheckDACert(
 	}
 
 	// 3 - Cast result to structured enum type and check for success
-	verifyResultCode := coretypes.VerificationStatusCode(result)
-	if verifyResultCode == coretypes.StatusNullError {
+	verifyResultCode := CheckDACertStatusCode(result)
+	if verifyResultCode == StatusNullError {
 		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
-	} else if verifyResultCode != coretypes.StatusSuccess {
+	} else if verifyResultCode != StatusSuccess {
 		return &CertVerifierInvalidCertError{
 			StatusCode: verifyResultCode,
 			Msg:        verifyResultCode.String(),

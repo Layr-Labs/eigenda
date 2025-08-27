@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -41,7 +40,7 @@ func (e *CertVerifierInternalError) Error() string {
 // StatusNullError returns a [CertVerifierInternalError] instead as it is a contract bug
 // that should never happen.
 type CertVerifierInvalidCertError struct {
-	StatusCode coretypes.VerificationStatusCode
+	StatusCode CheckDACertStatusCode
 	Msg        string
 }
 

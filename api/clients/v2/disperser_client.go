@@ -3,10 +3,12 @@ package clients
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -61,6 +63,7 @@ type disperserClient struct {
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
+	metrics                 metrics.DispersalMetricer
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -91,19 +94,22 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
+	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
-
 	if config == nil {
-		return nil, api.NewErrorInvalidArg("config must be provided")
+		return nil, fmt.Errorf("config must be provided")
 	}
-	if config.Hostname == "" {
-		return nil, api.NewErrorInvalidArg("hostname must be provided")
+	if strings.TrimSpace(config.Hostname) == "" {
+		return nil, fmt.Errorf("hostname must be provided")
 	}
-	if config.Port == "" {
-		return nil, api.NewErrorInvalidArg("port must be provided")
+	if strings.TrimSpace(config.Port) == "" {
+		return nil, fmt.Errorf("port must be provided")
 	}
 	if signer == nil {
-		return nil, api.NewErrorInvalidArg("signer must be provided")
+		return nil, fmt.Errorf("signer must be provided")
+	}
+	if metrics == nil {
+		return nil, fmt.Errorf("metrics must be provided")
 	}
 
 	var connectionCount uint
@@ -133,6 +139,7 @@ func NewDisperserClient(
 		clientPool: clientPool,
 		prover:     prover,
 		accountant: accountant,
+		metrics:    metrics,
 	}, nil
 }
 
@@ -310,6 +317,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
+
+	c.metrics.RecordBlobSizeBytes(uint(len(data)))
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
 }
