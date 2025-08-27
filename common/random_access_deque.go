@@ -1,6 +1,10 @@
 package common
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Layr-Labs/eigenda/common/enforce"
+)
 
 // A double-ended queue (deque) that supports O(1) lookup by index.
 //
@@ -54,10 +58,8 @@ func (s *RandomAccessDeque[T]) PushFront(value T) {
 		s.startIndex -= 1
 	}
 
-	err := s.Set(0, value)
-	enforce.NoError(err, "failed to push value")
-
-	// TODO
+	_, err := s.Set(0, value)
+	enforce.NilError(err, "Set failed, this should never happen")
 }
 
 // Return the value at the front of the deque without removing it. If the deque is empty, returns an error.
@@ -71,11 +73,7 @@ func (s *RandomAccessDeque[T]) PeekFront() (value T, err error) {
 	}
 
 	value, err = s.Get(0)
-
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("cannot peek front: %w", err)
-	}
+	enforce.NilError(err, "Get failed, this should never happen if size check passes")
 
 	return value, nil
 }
@@ -92,11 +90,7 @@ func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
 
 	var zero T
 	value, err = s.Set(0, zero)
-
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("cannot pop front: %w", err)
-	}
+	enforce.NilError(err, "Set failed, this should never happen if size check passes")
 
 	if s.startIndex == uint64(len(s.data)-1) {
 		// wrap around
@@ -112,7 +106,19 @@ func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
 //
 // O(1) average, O(n) worst-case (when resizing is needed)
 func (s *RandomAccessDeque[T]) PushBack(value T) {
-	// TODO
+	s.resizeForInsertion()
+
+	if s.endIndex == uint64(len(s.data)-1) {
+		// wrap around
+		s.endIndex = 0
+	} else {
+		s.endIndex += 1
+	}
+
+	size := s.Size()
+
+	_, err := s.Set(size-1, value)
+	enforce.NilError(err, "Set failed, this should never happen")
 }
 
 // Return the value at the back of the deque without removing it. If the deque is empty, returns an error.
@@ -126,11 +132,7 @@ func (s *RandomAccessDeque[T]) PeekBack() (value T, err error) {
 	}
 
 	value, err = s.Get(size - 1)
-
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("cannot peek back: %w", err)
-	}
+	enforce.NilError(err, "Get failed, this should never happen if size check passes")
 
 	return value, nil
 }
@@ -147,11 +149,7 @@ func (s *RandomAccessDeque[T]) PopBack() (value T, err error) {
 
 	var zero T
 	value, err = s.Set(size-1, zero)
-
-	if err != nil {
-		var zero T
-		return zero, fmt.Errorf("cannot pop back: %w", err)
-	}
+	enforce.NilError(err, "Set failed, this should never happen if size check passes")
 
 	if s.endIndex == 0 {
 		// wrap around
@@ -205,8 +203,15 @@ func (s *RandomAccessDeque[T]) Clear() {
 //
 // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
-	// TODO
-	return nil
+	return func(yield func(int, T) bool) {
+		size := s.Size()
+		for i := uint64(0); i < size; i++ {
+			value, err := s.Get(i)
+			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
+
+			yield(int(i), value)
+		}
+	}
 }
 
 // Get an iterator over the elements in the deque, from back to front. It is not safe to get an iterator,
@@ -214,8 +219,15 @@ func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
 //
 // // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(int, T) bool) {
-	// TODO
-	return nil
+	return func(yield func(int, T) bool) {
+		size := s.Size()
+		for i := size; i > 0; i-- {
+			value, err := s.Get(i - 1)
+			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
+
+			yield(int(i-1), value)
+		}
+	}
 }
 
 // Resize the underlying array to accommodate at least one more insertion. Preserves existing elements.
