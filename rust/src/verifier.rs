@@ -190,7 +190,6 @@ impl EigenDaCompletenessProof {
 
         // Validate the data state of the ancestor blocks
         for ancestor in &self.ancestors {
-            dbg!(ancestor);
             if let Some(data) = &ancestor.data {
                 data.verify(ancestor.header.as_ref().state_root)?;
             }

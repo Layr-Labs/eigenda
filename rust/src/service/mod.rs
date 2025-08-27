@@ -4,7 +4,7 @@ use std::{future::ready, ops::Not, str::FromStr, time::Duration};
 
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
-use alloy_provider::Provider;
+use alloy_provider::{DynProvider, Provider};
 use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction, TransactionRequest};
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
@@ -32,11 +32,7 @@ use crate::{
         proxy::{ProxyClient, ProxyError},
         verification::{verify_cert, verify_cert_recency},
     },
-    ethereum::{
-        extract_certificate,
-        provider::{EthereumProviders, init_ethereum_provider},
-        tx::map_eip4844,
-    },
+    ethereum::{extract_certificate, provider::init_ethereum_provider, tx::map_eip4844},
     service::config::{EigenDaConfig, EigenDaContracts, Network},
     spec::{
         AncestorMetadata, AncestorStateData, BlobWithSender, EigenDaSpec, EthereumAddress,
@@ -69,7 +65,7 @@ pub struct EigenDaService {
     /// Client for interacting with the EigenDA proxy node
     proxy: ProxyClient,
     /// Provider for interacting with an Ethereum node
-    ethereum: EthereumProviders,
+    ethereum: DynProvider,
     /// The account to which we are storing the certificates of the batch blobs
     rollup_batch_namespace: NamespaceId,
     /// The account to which we are storing the certificates of the proof blobs
@@ -164,7 +160,7 @@ impl EigenDaService {
             .with_to(namespace.into())
             .with_input(bytes);
 
-        let transaction = self.ethereum.wallet.send_transaction(tx).await?;
+        let transaction = self.ethereum.send_transaction(tx).await?;
         Ok(transaction.tx_hash().to_owned().into())
     }
 
@@ -268,7 +264,6 @@ impl EigenDaService {
     ) -> Result<AncestorMetadata, EigenDaServiceError> {
         let block = self
             .ethereum
-            .cached
             .get_block_by_number(block_height.into())
             .await?
             .ok_or_else(|| EigenDaServiceError::AncestorMissing(block_height))?;
@@ -336,7 +331,6 @@ impl EigenDaService {
         let keys = contract::EigenDaRelayRegistry::storage_keys(cert);
         let eigen_da_relay_registry_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.eigen_da_relay_registry, keys)
             .number(block_height)
             .into_future();
@@ -344,7 +338,6 @@ impl EigenDaService {
         let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
         let eigen_da_threshold_registry_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.eigen_da_threshold_registry, keys)
             .number(block_height)
             .into_future();
@@ -352,7 +345,6 @@ impl EigenDaService {
         let keys = contract::RegistryCoordinator::storage_keys(cert);
         let registry_coordinator_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.registry_coordinator, keys)
             .number(block_height)
             .into_future();
@@ -360,7 +352,6 @@ impl EigenDaService {
         let keys = contract::BlsSignatureChecker::storage_keys(cert);
         let bls_signature_checker_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.bls_signature_checker, keys)
             .number(block_height)
             .into_future();
@@ -368,7 +359,6 @@ impl EigenDaService {
         let keys = contract::DelegationManager::storage_keys(cert);
         let delegation_manager_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.delegation_manager, keys)
             .number(block_height)
             .into_future();
@@ -376,7 +366,6 @@ impl EigenDaService {
         let keys = contract::BlsApkRegistry::storage_keys(cert);
         let bls_apk_registry_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.bls_apk_registry, keys)
             .number(block_height)
             .into_future();
@@ -384,7 +373,6 @@ impl EigenDaService {
         let keys = contract::StakeRegistry::storage_keys(cert);
         let stake_registry_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.stake_registry, keys)
             .number(block_height)
             .into_future();
@@ -392,7 +380,6 @@ impl EigenDaService {
         let keys = contract::EigenDaCertVerifier::storage_keys(cert);
         let eigen_da_cert_verifier_fut = self
             .ethereum
-            .cached
             .get_proof(self.contracts.eigen_da_cert_verifier, keys)
             .number(block_height)
             .into_future();
@@ -462,13 +449,7 @@ impl DaService for EigenDaService {
         // Poll until the requested block is mined
         let poll_interval = Duration::from_secs(10);
         let block = loop {
-            match self
-                .ethereum
-                .cached
-                .get_block_by_number(number)
-                .full()
-                .await
-            {
+            match self.ethereum.get_block_by_number(number).full().await {
                 Ok(Some(block)) => break block,
                 Ok(None) => {
                     sleep(poll_interval).await;
@@ -508,7 +489,6 @@ impl DaService for EigenDaService {
         let block = BlockId::finalized();
         let block = self
             .ethereum
-            .cached
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
@@ -526,7 +506,6 @@ impl DaService for EigenDaService {
         let block = BlockId::latest();
         let block = self
             .ethereum
-            .cached
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;

@@ -30,7 +30,6 @@ pub async fn setup_adapter(
         ethereum_compute_units: None,
         ethereum_max_retry_times: None,
         ethereum_initial_backoff: None,
-        ethereum_max_cache_items: None,
         proxy_url,
         proxy_min_retry_delay: None,
         proxy_max_retry_delay: None,

@@ -20,8 +20,6 @@ pub struct EigenDaConfig {
     /// The initial backoff in milliseconds used when retrying Ethereum
     /// requests. It is increased on each subsequent retry.
     pub ethereum_initial_backoff: Option<u64>,
-    /// Maximal number of responses that the cache stores. The
-    pub ethereum_max_cache_items: Option<u32>,
     /// URL of the EigenDA proxy node.
     pub proxy_url: String,
     /// The initial backoff in milliseconds used when retrying EigenDA proxy
