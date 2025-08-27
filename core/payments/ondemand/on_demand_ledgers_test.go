@@ -1,18 +1,21 @@
 package ondemand_test
 
 import (
+	"context"
+	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandPaymentValidator(t *testing.T) {
-	mockOnChainState := &mock.MockOnchainPaymentState{}
-	dynamoClient := &dynamodb.Client{}
+	mockOnChainState := &coremock.MockOnchainPaymentState{}
 	tableName := "test-table"
 	maxLedgers := 100
 
@@ -75,4 +78,97 @@ func TestNewOnDemandPaymentValidator(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, validator)
 	})
+}
+
+func TestDebitMultipleAccounts(t *testing.T) {
+	ctx := context.Background()
+	tableName := createPaymentTable(t, "TestDebitMultipleAccounts")
+	defer deleteTable(t, tableName)
+
+	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+	mockOnChainState := &coremock.MockOnchainPaymentState{}
+	mockOnChainState.On("GetPricePerSymbol").Return(uint64(100))
+	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
+
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountA).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(10000)}, nil)
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountB).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(20000)}, nil)
+
+	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+		testutils.GetLogger(),
+		10,
+		mockOnChainState,
+		dynamoClient,
+		tableName,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, ledgers)
+
+	// debit from account A
+	err = ledgers.Debit(ctx, accountA, uint32(50), []uint8{0})
+	require.NoError(t, err, "first debit from account A should succeed")
+
+	// debit from account B
+	err = ledgers.Debit(ctx, accountB, uint32(75), []uint8{0, 1})
+	require.NoError(t, err, "first debit from account B should succeed")
+
+	// debit from account A (should reuse cached ledger)
+	err = ledgers.Debit(ctx, accountA, uint32(25), []uint8{0})
+	require.NoError(t, err, "second debit from account A should succeed")
+
+	// Each account should only trigger GetOnDemandPaymentByAccount once (on first access)
+	mockOnChainState.AssertNumberOfCalls(t, "GetOnDemandPaymentByAccount", 2)
+	mockOnChainState.AssertCalled(t, "GetPricePerSymbol")
+	mockOnChainState.AssertCalled(t, "GetMinNumSymbols")
+}
+
+func TestDebitInsufficientFunds(t *testing.T) {
+	ctx := context.Background()
+	tableName := createPaymentTable(t, "TestDebitInsufficientFunds")
+	defer deleteTable(t, tableName)
+
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+
+	mockOnChainState := &coremock.MockOnchainPaymentState{}
+	mockOnChainState.On("GetPricePerSymbol").Return(uint64(1000))
+	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
+	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountID).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(5000)}, nil)
+
+	ledgers, err := ondemand.NewOnDemandPaymentValidator(
+		testutils.GetLogger(),
+		10,
+		mockOnChainState,
+		dynamoClient,
+		tableName,
+	)
+	require.NoError(t, err)
+
+	// Try to debit more than available funds (5000 wei / 1000 wei per symbol = 5 symbols max)
+	err = ledgers.Debit(ctx, accountID, uint32(10), []uint8{0})
+	require.Error(t, err, "debit should fail when insufficient funds")
+	var insufficientFundsErr *ondemand.InsufficientFundsError
+	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
+
+	updates := []ondemand.TotalDepositUpdate{
+		{
+			// Update total deposits to 15000 wei (enough for 15 symbols at 1000 wei each)
+			AccountAddress:  accountID,
+			NewTotalDeposit: big.NewInt(15000),
+		},
+		{
+			// Also include an untracked account that should be skipped, to exercise that logic
+			AccountAddress:  gethcommon.HexToAddress("0xcccccccccccccccccccccccccccccccccccccccc"),
+			NewTotalDeposit: big.NewInt(50000),
+		},
+	}
+	err = ledgers.UpdateTotalDeposits(updates)
+	require.NoError(t, err, "updating total deposits should succeed")
+
+	// Retry the same debit that previously failed - should now succeed
+	err = ledgers.Debit(ctx, accountID, uint32(10), []uint8{0})
+	require.NoError(t, err, "debit should now succeed after increasing deposits")
 }

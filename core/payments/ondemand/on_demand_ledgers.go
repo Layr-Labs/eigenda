@@ -169,5 +169,8 @@ func (odl *OnDemandLedgers) UpdateTotalDeposits(updates []TotalDepositUpdate) er
 		}
 	}
 
-	return fmt.Errorf("update total deposits: %w", result.ErrorOrNil())
+	if err := result.ErrorOrNil(); err != nil {
+		return fmt.Errorf("update total deposits: %w", err)
+	}
+	return nil
 }
