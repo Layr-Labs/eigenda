@@ -10,7 +10,7 @@ const (
 )
 
 type RetrievalMetricer interface {
-	RecordPayloadSizeBytes(size uint)
+	RecordPayloadSizeBytes(size int)
 
 	Document() []metrics.DocumentedMetric
 }
@@ -40,7 +40,7 @@ func NewRetrievalMetrics(registry *prometheus.Registry) RetrievalMetricer {
 	}
 }
 
-func (m *RetrievalMetrics) RecordPayloadSizeBytes(size uint) {
+func (m *RetrievalMetrics) RecordPayloadSizeBytes(size int) {
 	m.PayloadSize.Observe(float64(size))
 }
 
@@ -53,7 +53,7 @@ type noopRetrievalMetricer struct {
 
 var NoopRetrievalMetrics RetrievalMetricer = new(noopRetrievalMetricer)
 
-func (n *noopRetrievalMetricer) RecordPayloadSizeBytes(_ uint) {
+func (n *noopRetrievalMetricer) RecordPayloadSizeBytes(_ int) {
 }
 
 func (n *noopRetrievalMetricer) Document() []metrics.DocumentedMetric {

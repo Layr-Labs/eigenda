@@ -79,7 +79,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
 	}
 
-	pr.metrics.RecordPayloadSizeBytes(uint(len(payload)))
+	pr.metrics.RecordPayloadSizeBytes(len(payload))
 
 	return payload, nil
 }

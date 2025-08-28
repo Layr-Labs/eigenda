@@ -10,7 +10,7 @@ const (
 )
 
 type DispersalMetricer interface {
-	RecordBlobSizeBytes(size uint)
+	RecordBlobSizeBytes(size int)
 
 	Document() []metrics.DocumentedMetric
 }
@@ -40,7 +40,7 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 }
 
-func (m *DispersalMetrics) RecordBlobSizeBytes(size uint) {
+func (m *DispersalMetrics) RecordBlobSizeBytes(size int) {
 	m.BlobSize.Observe(float64(size))
 }
 
@@ -53,7 +53,7 @@ type noopDispersalMetricer struct {
 
 var NoopDispersalMetrics DispersalMetricer = new(noopDispersalMetricer)
 
-func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ uint) {
+func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ int) {
 }
 
 func (n *noopDispersalMetricer) Document() []metrics.DocumentedMetric {
