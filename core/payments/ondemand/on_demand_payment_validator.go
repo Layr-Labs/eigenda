@@ -88,12 +88,13 @@ func NewOnDemandPaymentValidator(
 	}
 
 	return &OnDemandPaymentValidator{
-		logger:            logger,
-		ledgers:           cache,
-		paymentVaultState: paymentVaultState,
-		updateInterval:    updateInterval,
-		dynamoClient:      dynamoClient,
-		onDemandTableName: onDemandTableName,
+		logger:             logger,
+		ledgers:            cache,
+		paymentVaultParams: paymentVaultParams,
+		paymentVaultState:  paymentVaultState,
+		updateInterval:     updateInterval,
+		dynamoClient:       dynamoClient,
+		onDemandTableName:  onDemandTableName,
 	}, nil
 }
 

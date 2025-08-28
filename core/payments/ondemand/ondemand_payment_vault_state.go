@@ -1,4 +1,4 @@
-package paymentvault
+package ondemand
 
 import (
 	"context"
@@ -21,6 +21,7 @@ type OnDemandPaymentVaultState struct {
 
 // NewOnDemandPaymentVaultState creates a new OnDemandPaymentVaultState
 func NewOnDemandPaymentVaultState(logger logging.Logger, ethReader *eth.Reader) *OnDemandPaymentVaultState {
+	// TODO: fetch initial state. also for reservation one
 	return &OnDemandPaymentVaultState{
 		logger:           logger,
 		ethReader:        ethReader,
@@ -35,6 +36,7 @@ func (vs *OnDemandPaymentVaultState) RefreshOnDemandPayments(ctx context.Context
 	vs.lock.Lock()
 	defer vs.lock.Unlock()
 
+	// TODO: this is totally wrong. also fix the reservation one
 	if len(vs.onDemandPayments) == 0 {
 		vs.logger.Info("No on-demand payments to refresh")
 		return nil, nil
