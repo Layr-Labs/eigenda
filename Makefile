@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-churner integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi check-fmt
+.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests integration-tests-churner integration-tests-indexer integration-tests-node-plugin integration-tests-eigenda-client integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer integration-tests-dataapi integration-tests-e2e check-fmt
 
 ifeq ($(wildcard .git/*),)
 $(warning semver disabled - building from release zip)
@@ -115,6 +115,10 @@ integration-tests-inabox: build
 #   TODO: TestIndexerIntegration in core/thegraph/state_integration_test.go fails to start its inabox dependency...
 #         Seems like it was never run in CI, and I don't know how to fix it, so just commenting and will let someone else fix.
 # 	go test -v ./core/thegraph
+
+# New e2e tests using standard Go testing (replaces Ginkgo-based inabox tests)
+integration-tests-e2e: docker-build
+	cd e2e && make test
 
 # These are e2e tests that run against live environments (preprod and holesky currently).
 live-tests:

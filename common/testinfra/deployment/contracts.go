@@ -495,6 +495,10 @@ func GenerateEigenDADeployConfig(
 		operatorName := fmt.Sprintf("opr%d", i)
 
 		if stakerKey, ok := privateKeys[stakerName]; ok {
+			// Ensure the key has 0x prefix for proper parsing
+			if !strings.HasPrefix(stakerKey, "0x") {
+				stakerKey = "0x" + stakerKey
+			}
 			keyInt, ok := new(big.Int).SetString(stakerKey, 0)
 			if !ok {
 				log.Printf("Warning: could not parse staker key %s", stakerName)
@@ -507,11 +511,18 @@ func GenerateEigenDADeployConfig(
 		// Look for operator ECDSA keys first with "opr{i}_ecdsa" naming
 		ecdsaKeyName := fmt.Sprintf("%s_ecdsa", operatorName)
 		if ecdsaKey, ok := privateKeys[ecdsaKeyName]; ok {
+			// Ensure the key has 0x prefix for proper parsing
+			if !strings.HasPrefix(ecdsaKey, "0x") {
+				ecdsaKey = "0x" + ecdsaKey
+			}
 			keyInt, ok := new(big.Int).SetString(ecdsaKey, 0)
 			if !ok {
 				log.Printf("Warning: could not parse operator ECDSA key %s", ecdsaKeyName)
 				// Fallback to BLS key if ECDSA key parsing fails
 				if operatorKey, ok := privateKeys[operatorName]; ok {
+					if !strings.HasPrefix(operatorKey, "0x") {
+						operatorKey = "0x" + operatorKey
+					}
 					keyInt, ok := new(big.Int).SetString(operatorKey, 0)
 					if !ok {
 						log.Printf("Warning: could not parse operator BLS key %s", operatorName)
@@ -524,6 +535,9 @@ func GenerateEigenDADeployConfig(
 			}
 		} else if operatorKey, ok := privateKeys[operatorName]; ok {
 			// Fallback to BLS key if no ECDSA key is provided
+			if !strings.HasPrefix(operatorKey, "0x") {
+				operatorKey = "0x" + operatorKey
+			}
 			keyInt, ok := new(big.Int).SetString(operatorKey, 0)
 			if !ok {
 				log.Printf("Warning: could not parse operator key %s", operatorName)
@@ -534,13 +548,21 @@ func GenerateEigenDADeployConfig(
 		}
 	}
 
-	// Get batcher key
-	batcherKey := ""
+	// Get batcher/confirmer key
+	confirmerKey := ""
 	if key, ok := privateKeys["batcher0"]; ok {
+		// Ensure the key has 0x prefix for proper parsing
+		if !strings.HasPrefix(key, "0x") {
+			key = "0x" + key
+		}
 		keyInt, ok := new(big.Int).SetString(key, 0)
 		if ok {
-			batcherKey = keyInt.String()
+			confirmerKey = keyInt.String()
+		} else {
+			log.Printf("Warning: Could not parse batcher0 key as big.Int")
 		}
+	} else {
+		log.Printf("Warning: batcher0 key not found in privateKeys")
 	}
 
 	return EigenDADeployConfig{
@@ -550,6 +572,6 @@ func GenerateEigenDADeployConfig(
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
 		OperatorPrivateKeys: operators,
-		ConfirmerPrivateKey: batcherKey,
+		ConfirmerPrivateKey: confirmerKey,
 	}
 }

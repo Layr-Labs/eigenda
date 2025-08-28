@@ -506,63 +506,42 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 
 			// Set KZG paths if not already configured - must be absolute paths for Docker
-			// Save current working directory to restore it after getting absolute paths
-			originalDir, err := os.Getwd()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get current working directory: %w", err)
-			}
-
-			// Change to the inabox directory where KZG resources are located (same as retrieval client)
-			inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
-			if err := os.Chdir(inaboxDir); err != nil {
-				return nil, fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
-			}
-
-			// Now get absolute paths for KZG resources from the inabox directory
+			// Use the KZG resources from testinfra package
 			if encoderConfig.G1Path == "" {
-				// Use relative path from inabox directory (same as retrieval client)
-				g1Path := "resources/kzg/g1.point.300000"
+				// Use testinfra's KZG resources
+				g1Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g1.point.300000")
 				absG1Path, err := filepath.Abs(g1Path)
 				if err != nil {
-					os.Chdir(originalDir) // Restore directory before returning error
 					return nil, fmt.Errorf("failed to get absolute path for G1: %w", err)
 				}
 				encoderConfig.G1Path = absG1Path
 			}
 			if encoderConfig.G2Path == "" {
-				// Use relative path from inabox directory (same as retrieval client)
-				g2Path := "resources/kzg/g2.point.300000"
+				// Use testinfra's KZG resources
+				g2Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000")
 				absG2Path, err := filepath.Abs(g2Path)
 				if err != nil {
-					os.Chdir(originalDir) // Restore directory before returning error
 					return nil, fmt.Errorf("failed to get absolute path for G2: %w", err)
 				}
 				encoderConfig.G2Path = absG2Path
 			}
 			if encoderConfig.G2PowerOf2Path == "" {
-				// Use relative path from inabox directory (same as retrieval client)
-				g2PowerOf2Path := "resources/kzg/g2.point.300000.powerOf2"
+				// Use testinfra's KZG resources
+				g2PowerOf2Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000.powerOf2")
 				absG2PowerOf2Path, err := filepath.Abs(g2PowerOf2Path)
 				if err != nil {
-					os.Chdir(originalDir) // Restore directory before returning error
 					return nil, fmt.Errorf("failed to get absolute path for G2PowerOf2: %w", err)
 				}
 				encoderConfig.G2PowerOf2Path = absG2PowerOf2Path
 			}
 			if encoderConfig.CachePath == "" {
-				// Use relative path from inabox directory (same as retrieval client)
-				cachePath := "resources/kzg/SRSTables"
+				// Use testinfra's KZG resources
+				cachePath := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/SRSTables")
 				absCachePath, err := filepath.Abs(cachePath)
 				if err != nil {
-					os.Chdir(originalDir) // Restore directory before returning error
 					return nil, fmt.Errorf("failed to get absolute path for cache: %w", err)
 				}
 				encoderConfig.CachePath = absCachePath
-			}
-
-			// Restore original directory
-			if err := os.Chdir(originalDir); err != nil {
-				return nil, fmt.Errorf("failed to restore directory: %w", err)
 			}
 
 			// Start the encoder container
@@ -954,7 +933,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		im.result.CertVerification != nil &&
 		im.result.RetrievalClients != nil &&
 		len(im.dispersers) > 0 {
-		
+
 		// Use the v2 disperser URL if available, otherwise v1
 		disperserURL := ""
 		if v2URL, ok := im.result.DisperserURLs["2"]; ok {
@@ -962,7 +941,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 		} else if v1URL, ok := im.result.DisperserURLs["1"]; ok {
 			disperserURL = v1URL
 		}
-		
+
 		if disperserURL != "" {
 			// Parse the URL to get hostname and port
 			parts := strings.Split(disperserURL, ":")
@@ -971,7 +950,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				im.config.EigenDA.PayloadDisperser.DisperserHostname = parts[0]
 				im.config.EigenDA.PayloadDisperser.DisperserPort = parts[1]
 			}
-			
+
 			// Get deployer private key
 			deployerPrivateKey := im.config.EigenDA.Deployer.PrivateKey
 			if deployerPrivateKey == "" {
@@ -1300,11 +1279,12 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 		}
 		stakeTotals := []float32{100e18, 100e18} // 100e18 tokens per strategy
 
-		// Private keys must be provided in the config
-		if len(im.config.EigenDA.PrivateKeys) == 0 {
-			return fmt.Errorf("private keys for operators and stakers must be provided in EigenDA config")
-		}
+		// Generate test private keys if none provided
 		privateKeys := im.config.EigenDA.PrivateKeys
+		if len(privateKeys) == 0 {
+			fmt.Println("No private keys provided, generating test keys for local testing...")
+			privateKeys = generateTestPrivateKeys()
+		}
 
 		// Load operator ECDSA private keys from the secrets directory
 		// These are the actual keys the operators will use for transactions
@@ -1436,21 +1416,7 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 		return nil
 	}
 
-	// Save current working directory to restore it at the end
-	originalDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-	defer func() {
-		_ = os.Chdir(originalDir)
-	}()
-
-	// Change to the inabox directory where KZG resources are located
-	// This makes the relative paths work correctly
-	inaboxDir := strings.TrimSuffix(im.config.EigenDA.RootPath, "/") + "/inabox"
-	if err := os.Chdir(inaboxDir); err != nil {
-		return fmt.Errorf("failed to change to inabox directory %s: %w", inaboxDir, err)
-	}
+	// No need to change directories - we'll use absolute paths to testinfra's KZG resources
 
 	// Use Anvil RPC if not specified
 	rpcURL := config.RPC
@@ -1512,11 +1478,42 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 		return fmt.Errorf("failed to parse SRS order: %w", err)
 	}
 
+	// Use default KZG paths from testinfra resources if not specified
+	g1Path := config.G1Path
+	if g1Path == "" {
+		g1Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g1.point.300000")
+	}
+	g2Path := config.G2Path
+	if g2Path == "" {
+		g2Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000")
+	}
+	g2PowerOf2Path := config.G2PowerOf2Path
+	if g2PowerOf2Path == "" {
+		g2PowerOf2Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000.powerOf2")
+	}
+	cachePath := config.CachePath
+	if cachePath == "" {
+		cachePath = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/SRSTables")
+	}
+
+	// Get absolute paths
+	g1Path, _ = filepath.Abs(g1Path)
+	g2Path, _ = filepath.Abs(g2Path)
+	g2PowerOf2Path, _ = filepath.Abs(g2PowerOf2Path)
+	cachePath, _ = filepath.Abs(cachePath)
+
+	// Print absolute paths, for debugging purposes
+	fmt.Println("Using KZG resources from:")
+	fmt.Printf(" - G1: %s\n", g1Path)
+	fmt.Printf(" - G2: %s\n", g2Path)
+	fmt.Printf(" - G2 (Power of 2): %s\n", g2PowerOf2Path)
+	fmt.Printf(" - Cache: %s\n", cachePath)
+
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          config.G1Path,
-		G2Path:          config.G2Path,
-		G2PowerOf2Path:  config.G2PowerOf2Path,
-		CacheDir:        config.CachePath,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2PowerOf2Path:  g2PowerOf2Path,
+		CacheDir:        cachePath,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
 		NumWorker:       1,
@@ -1739,4 +1736,34 @@ func TestGraphNodeConnectivity(graphURL string, config GraphConnectivityConfig) 
 	}
 
 	return fmt.Errorf("graph node at %s is not accessible after %d attempts", graphURL, config.MaxRetries)
+}
+
+// generateTestPrivateKeys generates deterministic test private keys for local testing
+func generateTestPrivateKeys() map[string]string {
+	// These are the same test keys used in inabox/secrets/ecdsa_keys/private_key_hex.txt
+	// We hardcode them for reproducibility in tests
+	return map[string]string{
+		"default":  "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // anvil account 0 (deployer)
+		"batcher0": "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", // anvil account 1 (batcher/confirmer)
+		"dis0":     "d1d51de8ce6bbaac0572e481268232898bfe46491766214c5738929dd557c552",
+		"dis1":     "6374444d520f8ae51eee2683f4790644ee5f2d95ca4382fa78021e0460cb1663",
+		"opr0":     "a2788f1c26c799b7e1ac32ababc0b598fc7e9c6fc3d319c461ae67ffb1ee57dd",
+		"opr1":     "ea25637d76e7ddae9dab9bfac7467d76a1e3bf2d67941b267edc60f2b80d9413",
+		"opr2":     "a9ab261a3f506a5e6402dbbaea7bee9496f12117dbe5fa24522e483c07bbe77c",
+		"opr3":     "6f84250b1bffd06109bbfa46cc58fb3293008fd43e12a1a5d68d06ab25d060e8",
+		"opr4":     "ff7a197fb9c52232f259c26f065c06968eeb982154abcd03d2d08d72641a362a",
+		"opr5":     "e5d450c2ffdd19cbf55afbbde7b86e6b841e895546eea7813a9f7360fd38c2db",
+		"opr6":     "a4c5553f2d13f96bac694272e94446bfe5e15ed853628c4bd9916e2b5509f956",
+		"opr7":     "ef49de2f52c0552484214ebe8e5ba2b13a53dafda560584c1e2426e33dd699a3",
+		"staker0":  "aa2b0489fc587a3d8ecac7d97ddea9fa4f2e23e53381ddd8f3b5356287706c28",
+		"staker1":  "530f8ec291b5f48481809aa0d5d30f49e32d90620cddc7c178175c69229dbcfe",
+		"staker2":  "253f81e5e1c027cf072a27184306b719f851b5b0f6338abe7e595e67ec7c6577",
+		"staker3":  "56d6d5d6d7e808ee3cd70cbd44e6d23f1a736e3f94b376ff8a57f61d4fbccd39",
+		"relay0":   "f820cde94ba36deefac7ba6a9d12f504b87bfb205c0c87f749008792bb8ba9c3",
+		"relay1":   "efbd203977694c18ee6da3a2a42ba13dc95d769a9c814a9fc17e85f0e5eb8360",
+		"relay2":   "a1bd1b667b2f37d4ce06d88a9d72e717943a8036ef2e10dc6df419698a77bb07",
+		"relay3":   "824435bd114abbf405ad1f7b35fe9421346fb09b1b4cb9a67eea32fe68ff651c",
+		"churner":  "b3fec0e8fa0461216ea04ea15faec83cc259e2b066561206f8f455171bdc6de3",
+		"dataapi":  "40cc6882bb859e5ae339629f80c559c0c0a85ecca5eb2c58529dbde78a0a5ce4",
+	}
 }

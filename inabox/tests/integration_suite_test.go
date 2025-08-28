@@ -129,59 +129,55 @@ var _ = BeforeSuite(func() {
 		// Configure retrieval clients
 		config.EigenDA.RetrievalClients.Enabled = true
 		config.EigenDA.RetrievalClients.SRSOrder = "10000"
-		config.EigenDA.RetrievalClients.G1Path = "resources/kzg/g1.point.300000"
-		config.EigenDA.RetrievalClients.G2Path = "resources/kzg/g2.point.300000"
-		config.EigenDA.RetrievalClients.G2PowerOf2Path = "resources/kzg/g2.point.300000.powerOf2"
-		config.EigenDA.RetrievalClients.CachePath = "resources/kzg/SRSTables"
 
 		// Enable churner service
 		config.EigenDA.Churner.Enabled = true
-		
+
 		// Enable both v1 and v2 encoders
 		encoderV1Config := testinfra.EncoderConfig{
 			Enabled:       true,
 			EncoderConfig: containers.DefaultEncoderV1Config(),
 		}
 		encoderV1Config.GRPCPort = "34000" // v1 on port 34000
-		
+
 		encoderV2Config := testinfra.EncoderConfig{
 			Enabled:       true,
 			EncoderConfig: containers.DefaultEncoderV2Config(),
 		}
 		encoderV2Config.GRPCPort = "34001" // v2 on port 34001
-		
+
 		config.EigenDA.Encoders = []testinfra.EncoderConfig{encoderV1Config, encoderV2Config}
-		
+
 		// Enable both v1 and v2 dispersers
 		disperserV1Config := testinfra.DisperserConfig{
 			Enabled:         true,
 			DisperserConfig: containers.DefaultDisperserConfig(1), // v1 disperser
 		}
 		disperserV1Config.GRPCPort = "32003"
-		
+
 		disperserV2Config := testinfra.DisperserConfig{
 			Enabled:         true,
 			DisperserConfig: containers.DefaultDisperserConfig(2), // v2 disperser
 		}
 		disperserV2Config.GRPCPort = "32005"
-		
+
 		config.EigenDA.Dispersers = []testinfra.DisperserConfig{disperserV1Config, disperserV2Config}
-		
+
 		config.EigenDA.Batcher.Enabled = true
 		config.EigenDA.Batcher.BatcherConfig = containers.DefaultBatcherConfig()
-		
+
 		// Enable controller service
 		config.EigenDA.Controller.Enabled = true
 		config.EigenDA.Controller.ControllerConfig = containers.DefaultControllerConfig()
-		
+
 		// Enable operators
 		config.EigenDA.Operators.Enabled = true
-		config.EigenDA.Operators.Count = 4  // Start 4 operators as specified in testconfig
-		config.EigenDA.Operators.MaxOperatorCount = 3  // But limit to 3 running (for testing churn)
-		
+		config.EigenDA.Operators.Count = 4            // Start 4 operators as specified in testconfig
+		config.EigenDA.Operators.MaxOperatorCount = 3 // But limit to 3 running (for testing churn)
+
 		// Enable relays (requirement: 4 relays as per inabox config)
 		config.EigenDA.Relays.Enabled = true
-		config.EigenDA.Relays.Count = 4  // Start 4 relays as required by inabox
+		config.EigenDA.Relays.Count = 4 // Start 4 relays as required by inabox
 
 		if inMemoryBlobStore {
 			fmt.Println("Using in-memory Blob Store - disabling LocalStack")
@@ -216,10 +212,10 @@ var _ = BeforeSuite(func() {
 			testConfig.SetLocalstackEndpoint(awsEndpoint)
 			testConfig.SetLocalstackRegion("us-east-1")
 		}
-		
+
 		// Set environment variable to indicate dispersers are provided by testinfra
 		os.Setenv("DISPERSERS_PROVIDED", "true")
-		
+
 		// Also export disperser URLs if needed by other components
 		if infraResult.DisperserURLs != nil {
 			if url, ok := infraResult.DisperserURLs["1"]; ok {
@@ -323,7 +319,7 @@ var _ = BeforeSuite(func() {
 		} else {
 			fmt.Printf("⚠️ No BatcherURL in infraResult\n")
 		}
-		
+
 		// Pass controller info from testinfra if available
 		if infraResult.ControllerMetricsURL != "" {
 			// Controller is containerized, so we flag its existence
@@ -332,7 +328,7 @@ var _ = BeforeSuite(func() {
 		} else {
 			fmt.Printf("⚠️ No ControllerMetricsURL in infraResult\n")
 		}
-		
+
 		// Pass operators info from testinfra if available
 		if infraResult.OperatorAddresses != nil && len(infraResult.OperatorAddresses) > 0 {
 			os.Setenv("OPERATORS_PROVIDED", "true")
@@ -343,7 +339,7 @@ var _ = BeforeSuite(func() {
 		} else {
 			fmt.Printf("⚠️ No operators in infraResult\n")
 		}
-		
+
 		// Pass relays info from testinfra if available
 		if infraResult.RelayURLs != nil && len(infraResult.RelayURLs) > 0 {
 			os.Setenv("RELAYS_PROVIDED", "true")
