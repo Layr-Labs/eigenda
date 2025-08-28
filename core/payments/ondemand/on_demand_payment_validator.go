@@ -41,7 +41,7 @@ type OnDemandPaymentValidator struct {
 	// on-chain.
 	paymentVaultParams PaymentVaultParams
 	// Provides access to the values stored in the PaymentVault contract and update notifications
-	paymentVaultState *OnDemandPaymentVaultState
+	paymentVaultState OnDemandPaymentVaultState
 
 	// Background update configuration
 	updateInterval time.Duration
@@ -59,7 +59,7 @@ func NewOnDemandPaymentValidator(
 	maxLedgers int,
 	paymentVaultParams PaymentVaultParams,
 	// provides access to on-demand payment state and update notifications
-	paymentVaultState *OnDemandPaymentVaultState,
+	paymentVaultState OnDemandPaymentVaultState,
 	dynamoClient *dynamodb.Client,
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,

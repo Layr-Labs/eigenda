@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/payments/paymentvault"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
@@ -37,7 +36,7 @@ type ReservationPaymentValidator struct {
 	// protects concurrent access to the ledgers cache during ledger creation
 	ledgerCreationLock sync.Mutex
 	// Provides access to the values stored in the PaymentVault contract and update notifications
-	paymentVaultState *paymentvault.ReservationPaymentVaultState
+	paymentVaultState *ReservationPaymentVaultState
 
 	// Background update configuration
 	updateInterval time.Duration
@@ -55,7 +54,7 @@ func NewReservationPaymentValidator(
 	// the maximum number of ReservationLedger entries to be kept in the LRU cache
 	maxLedgers int,
 	// provides access to reservation payment state and update notifications
-	paymentVaultState *paymentvault.ReservationPaymentVaultState,
+	paymentVaultState *ReservationPaymentVaultState,
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time,
 	// how to handle requests that would overfill the bucket

@@ -1,4 +1,4 @@
-package paymentvault
+package reservation
 
 import (
 	"context"
