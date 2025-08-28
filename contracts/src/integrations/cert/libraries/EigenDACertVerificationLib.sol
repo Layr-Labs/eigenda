@@ -60,9 +60,11 @@ library EigenDACertVerificationLib {
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
         REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
+        EMPTY_BLOB_QUORUMS, // Certificate quorums are empty.
+        UNORDERED_OR_DUPLICATE_QUORUMS, // Quorum numbers are not ordered, or contain duplicates
+        GREATER_THAN_256_QUORUMS, // Quorum numbers exceed 256
         CERT_DECODE_REVERT, // Certificate abi.decoding reverted
         SIGNATURE_VERIFICATION_CALL_REVERT // External call to signature verifier reverted
-
     }
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
@@ -101,7 +103,8 @@ library EigenDACertVerificationLib {
      * @param blobInclusionInfo The blob inclusion info
      * @param nonSignerStakesAndSignature The non-signer stakes and signature
      * @param securityThresholds The security thresholds to verify against
-     * @param requiredQuorumNumbers The required quorum numbers
+     * @param requiredQuorumNumbers The required quorum numbers. This library does not require these to be non-empty.
+     * Callers should ensure that the requiredQuorumNumbers passed are non-empty if required.
      * @param signedQuorumNumbers The signed quorum numbers
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
@@ -116,12 +119,15 @@ library EigenDACertVerificationLib {
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
     ) internal view returns (StatusCode err, bytes memory errParams) {
+        // TODO: this can revert on a wrong inclusionProof length
         (err, errParams) = checkBlobInclusion(batchHeader, blobInclusionInfo);
         if (err != StatusCode.SUCCESS) {
             return (err, errParams);
         }
 
         (err, errParams) = checkSecurityParams(
+            // TODO: need to make sure the version is valid, otherwise this would result in a 0 
+            // codingRate which will divide by 0 in checkSecurityParams
             eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
@@ -170,6 +176,7 @@ library EigenDACertVerificationLib {
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
 
+        // TODO: this can revert on a wrong inclusionProof length
         bool isValid = Merkle.verifyInclusionKeccak(
             blobInclusionInfo.inclusionProof, rootHash, encodedBlobHash, blobInclusionInfo.blobIndex
         );
@@ -188,11 +195,17 @@ library EigenDACertVerificationLib {
      * @param securityThresholds The security thresholds to verify against
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
+     * @dev Checks the invariant `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
      */
     function checkSecurityParams(
         DATypesV1.VersionedBlobParams memory blobParams,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal pure returns (StatusCode err, bytes memory errParams) {
+        // In order to not revert, we need gamma > 0 and codingRate > 0.
+        // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
+        // TODO: need to figure out how to deal with codingRate = 0. Return errocode? use default value?
+        // if user sets codingRate to a non-existent version... will return codingRate=0. This is a 400!
+        // so we want to return 
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
@@ -262,7 +275,7 @@ library EigenDACertVerificationLib {
     }
 
     /**
-     * @notice Checks that blob quorums are a subset of confirmed quorums
+     * @notice Checks that blob quorums requested as part of the dispersal are a subset of confirmed quorums
      * @param blobQuorumNumbers The blob quorum numbers
      * @param confirmedQuorumsBitmap The bitmap of confirmed quorums
      * @return err Error code (SUCCESS if verification succeeded)
@@ -274,7 +287,15 @@ library EigenDACertVerificationLib {
         pure
         returns (StatusCode err, bytes memory errParams, uint256 blobQuorumsBitmap)
     {
-        blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
+        // A blobCert containing no quorum numbers means the cert is invalid, so we return a status code.
+        if (blobQuorumNumbers.length == 0) {
+            return (StatusCode.EMPTY_BLOB_QUORUMS, "", 0);
+        }
+
+        (err, errParams, blobQuorumsBitmap) = orderedQuorumsToBitmap(blobQuorumNumbers);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams, 0);
+        }
 
         if (BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
             return (StatusCode.SUCCESS, "", blobQuorumsBitmap);
@@ -295,7 +316,11 @@ library EigenDACertVerificationLib {
         pure
         returns (StatusCode err, bytes memory errParams)
     {
-        uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
+        uint256 requiredQuorumsBitmap;
+        (err, errParams, requiredQuorumsBitmap) = orderedQuorumsToBitmap(requiredQuorumNumbers);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
+        }
 
         if (BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
             return (StatusCode.SUCCESS, "");
@@ -415,5 +440,49 @@ library EigenDACertVerificationLib {
                 hashBlobHeaderV2(blobCertificate.blobHeader), blobCertificate.signature, blobCertificate.relayKeys
             )
         );
+    }
+
+    /**
+     * @notice Converts an ordered array of quorum numbers into a bitmap.
+     * @param orderedQuorums The array of quorum numbers to convert/compress into a bitmap. Must be in strictly ascending order.
+     * @return err The status code indicating success or failure.
+     * @return errParams Additional parameters related to the error, if any.
+     * @return The resulting bitmap.
+     * @dev Each byte in the input is processed as indicating a single bit to flip in the bitmap.
+     * @dev This function returns an error status code if there >256 quorums, or the quorums are not ordered or contain duplicates.
+     */
+    function orderedQuorumsToBitmap(bytes memory orderedQuorums) internal pure returns (StatusCode err, bytes memory errParams, uint256) {
+        // sanity-check on input. a too-long input would fail later on due to having duplicate entry(s)
+        if (orderedQuorums.length > 256) {
+            return (StatusCode.GREATER_THAN_256_QUORUMS, abi.encode(orderedQuorums.length), 0);
+        }
+
+        // Return empty bitmap early if length of array is 0.
+        // This could be used for example if a caller doesn't want to enforce any required quorums.
+        if (orderedQuorums.length == 0) {
+            return (StatusCode.SUCCESS, "", uint256(0));
+        }
+
+        // initialize the empty bitmap, to be built inside the loop
+        uint256 bitmap;
+        // initialize an empty uint256 to be used as a bitmask inside the loop
+        uint256 bitMask;
+
+        // perform the 0-th loop iteration with the ordering check *omitted* (since it is unnecessary / will always pass)
+        // construct a single-bit mask from the numerical value of the 0th byte of the array, and immediately add it to the bitmap
+        bitmap = uint256(1 << uint8(orderedQuorums[0]));
+
+        // loop through each byte in the array to construct the bitmap
+        for (uint256 i = 1; i < orderedQuorums.length; ++i) {
+            // construct a single-bit mask from the numerical value of the next byte of the array
+            bitMask = uint256(1 << uint8(orderedQuorums[i]));
+            // check strictly ascending array ordering by comparing the mask to the bitmap so far (revert if mask isn't greater than bitmap)
+            if (bitMask <= bitmap) {
+                return (StatusCode.UNORDERED_OR_DUPLICATE_QUORUMS, abi.encode(orderedQuorums), 0);
+            }
+            // add the entry to the bitmap
+            bitmap = (bitmap | bitMask);
+        }
+        return (StatusCode.SUCCESS, "", bitmap);
     }
 }

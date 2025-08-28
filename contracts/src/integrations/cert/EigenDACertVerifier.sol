@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {
-    IEigenDACertVerifier,
-    IEigenDACertVerifierBase,
-    IVersionedEigenDACertVerifier
-} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifier, IEigenDACertVerifierBase, IVersionedEigenDACertVerifier} from "src/integrations/cert/interfaces/IEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -25,6 +21,7 @@ contract EigenDACertVerifier is
     IEigenDASemVer
 {
     error InvalidSecurityThresholds();
+    error InvalidQuorumNumbersRequired(uint256 length);
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
 
@@ -44,8 +41,14 @@ contract EigenDACertVerifier is
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
         bytes memory initQuorumNumbersRequired
     ) {
-        if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
+        if (
+            initSecurityThresholds.confirmationThreshold <=
+            initSecurityThresholds.adversaryThreshold
+        ) {
             revert InvalidSecurityThresholds();
+        }
+        if (initQuorumNumbersRequired.length == 0 || initQuorumNumbersRequired.length > 256) {
+            revert InvalidQuorumNumbersRequired(initQuorumNumbersRequired.length);
         }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
@@ -55,38 +58,60 @@ contract EigenDACertVerifier is
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
     /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert.
-    function decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
+    function decodeCert(
+        bytes calldata data
+    ) external pure returns (CT.EigenDACertV3 memory cert) {
         return abi.decode(data, (CT.EigenDACertV3));
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
-    function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
+    function checkDACert(
+        bytes calldata abiEncodedCert
+    ) external view returns (uint8) {
         CT.EigenDACertV3 memory daCert;
 
-        try this.decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory cert) {
+        try this.decodeCert(abiEncodedCert) returns (
+            CT.EigenDACertV3 memory cert
+        ) {
             daCert = cert;
         } catch {
             return uint8(CertLib.StatusCode.CERT_DECODE_REVERT);
         }
 
-        (CertLib.StatusCode status,) = CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
+        (CertLib.StatusCode status, ) = CertLib.checkDACert(
+            _eigenDAThresholdRegistry,
+            _eigenDASignatureVerifier,
+            daCert,
+            _securityThresholds,
+            _quorumNumbersRequired
         );
         return uint8(status);
     }
 
     /// @inheritdoc IEigenDACertVerifier
-    function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry) {
+    function eigenDAThresholdRegistry()
+        external
+        view
+        returns (IEigenDAThresholdRegistry)
+    {
         return _eigenDAThresholdRegistry;
     }
 
     /// @inheritdoc IEigenDACertVerifier
-    function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
+    function eigenDASignatureVerifier()
+        external
+        view
+        returns (IEigenDASignatureVerifier)
+    {
         return _eigenDASignatureVerifier;
     }
 
     /// @inheritdoc IEigenDACertVerifier
-    function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory) {
+    function securityThresholds()
+        external
+        view
+        returns (DATypesV1.SecurityThresholds memory)
+    {
         return _securityThresholds;
     }
 
@@ -101,7 +126,11 @@ contract EigenDACertVerifier is
     }
 
     /// @inheritdoc IEigenDASemVer
-    function semver() external pure returns (uint8 major, uint8 minor, uint8 patch) {
+    function semver()
+        external
+        pure
+        returns (uint8 major, uint8 minor, uint8 patch)
+    {
         major = MAJOR_VERSION;
         minor = MINOR_VERSION;
         patch = PATCH_VERSION;
