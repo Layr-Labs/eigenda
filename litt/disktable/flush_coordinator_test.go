@@ -68,7 +68,6 @@ func TestRapidFlushes(t *testing.T) {
 	require.True(t, flushCount.Load() <= uint64(upperBound),
 		"Expected at most %d flushes, got %d", upperBound, flushCount.Load())
 
-	fc.Close()
 	ok, _ := errorMonitor.IsOk()
 	require.True(t, ok)
 	errorMonitor.Shutdown()
@@ -125,8 +124,7 @@ func TestInfrequentFlushes(t *testing.T) {
 	require.True(t, duration < minimumFlushTime,
 		"Expected third flush to take less than %v, took %v", minimumFlushTime, duration)
 	require.Equal(t, uint64(3), flushCount.Load())
-
-	fc.Close()
+	
 	ok, _ := errorMonitor.IsOk()
 	require.True(t, ok)
 	errorMonitor.Shutdown()

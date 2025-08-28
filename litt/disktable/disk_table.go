@@ -496,8 +496,6 @@ func (d *DiskTable) Close() error {
 		return nil
 	}
 
-	d.flushCoordinator.Close()
-
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}

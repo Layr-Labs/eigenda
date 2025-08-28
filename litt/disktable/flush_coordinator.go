@@ -2,7 +2,6 @@ package disktable
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -30,9 +29,6 @@ type flushCoordinator struct {
 
 	// used to rate limit flushes
 	rateLimiter *rate.Limiter
-
-	// set to false when the coordinator is closed
-	alive atomic.Bool
 }
 
 // A request to flush the underlying database. When the flush is eventually performed, a response is sent on
@@ -54,7 +50,6 @@ func newFlushCoordinator(
 		internalFlush: internalFlush,
 		requestChan:   make(chan any, requestChanBufferSize),
 	}
-	fc.alive.Store(true)
 
 	if flushPeriod > 0 {
 		fc.rateLimiter = rate.NewLimiter(rate.Every(flushPeriod), 1)
@@ -92,11 +87,6 @@ func (c *flushCoordinator) Flush() error {
 
 }
 
-// Closes the flush coordinator, cleaning up any resources.
-func (c *flushCoordinator) Close() {
-	c.alive.Store(false)
-}
-
 // The control loop that manages flush timing.
 func (c *flushCoordinator) controlLoop() {
 	defer close(c.requestChan)
@@ -106,9 +96,10 @@ func (c *flushCoordinator) controlLoop() {
 
 	// timer used to wait until the next flush can be performed
 	timer := time.NewTimer(0)
+	defer timer.Stop()
 	var timerActive bool
 
-	for c.alive.Load() {
+	for {
 
 		if timerActive {
 			// There are pending flushes we want to handle, but we need to wait until the timer expires.
@@ -129,7 +120,8 @@ func (c *flushCoordinator) controlLoop() {
 				timerActive = false
 			}
 		} else {
-			// There are pending flushes, we can handle requests immediately if the rate limiter allows it.
+			// We don't have any pending flush requests, so we aren't waiting on the timer. If we get a new request,
+			// check to see if the rate limiter will allow it to be flushed immediately, and do so if possible.
 			select {
 			case <-c.errorMonitor.ImmediateShutdownRequired():
 				return
