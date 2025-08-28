@@ -495,6 +495,9 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 }
 
 // PaymentMetadata represents the header information for a blob
+//
+// TODO(litt3): this struct should be moved into the payments package once the migration to the new payment logic
+// is complete. I'm not moving it right now, to minimize changes to the old payment logic, which also uses this struct.
 type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID gethcommon.Address `json:"account_id"`
@@ -503,6 +506,43 @@ type PaymentMetadata struct {
 	Timestamp int64 `json:"timestamp"`
 	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
+}
+
+func NewPaymentMetadata(
+	// account that the payment is for. must not be a 0 address
+	accountID gethcommon.Address,
+	// The time of the dispersal. The non-monotonic unix nano timestamp is extracted from this and stored as an integer
+	timestamp time.Time,
+	// total number of wei paid by the account, for this and all previous on-demand dispersals
+	// if this is 0 or nil, it indicates that the dispersal will be paid for with a reservation
+	cumulativePayment *big.Int,
+) (*PaymentMetadata, error) {
+	if accountID == (gethcommon.Address{}) {
+		return nil, fmt.Errorf("account ID cannot be zero address")
+	}
+
+	if cumulativePayment == nil {
+		return &PaymentMetadata{
+			AccountID:         accountID,
+			Timestamp:         timestamp.UnixNano(),
+			CumulativePayment: big.NewInt(0),
+		}, nil
+	}
+
+	if cumulativePayment.Sign() < 0 {
+		return nil, fmt.Errorf("cumulative payment cannot be negative")
+	}
+
+	return &PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         timestamp.UnixNano(),
+		CumulativePayment: cumulativePayment,
+	}, nil
+}
+
+// Returns true if the PaymentMetadata represents an on-demand payment, or false if it's a reservation payment
+func (pm *PaymentMetadata) IsOnDemand() bool {
+	return pm.CumulativePayment != nil && pm.CumulativePayment.Cmp(big.NewInt(0)) != 0
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -631,7 +671,7 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 // ReservedPayment contains information the onchain state about a reserved payment
 //
 // TODO(litt3): this struct is in the process of being deprecated. It is used by the old accounting logic, but will
-// be replaced by the `reservation.Reservation` struct once the new accounting logic has superseded the old. At that
+// be replaced by the [reservation.Reservation] struct once the new accounting logic has superseded the old. At that
 // time, this struct should be deleted.
 type ReservedPayment struct {
 	// reserve number of symbols per second
