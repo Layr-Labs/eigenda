@@ -90,6 +90,9 @@ type DiskTable struct {
 
 	// If true then ensure file operations are synced to disk.
 	fsync bool
+
+	// Manages flush requests and flush request batching. This is a performance optimization.
+	flushCoordinator *flushCoordinator
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -186,6 +189,7 @@ func NewDiskTable(
 		metrics:        metrics,
 		fsync:          config.Fsync,
 	}
+	table.flushCoordinator = newFlushCoordinator(errorMonitor, table.flushInternal, config.MinimumFlushInterval)
 
 	snapshottingEnabled := config.SnapshotDirectory != ""
 
@@ -799,6 +803,17 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
+	// The flush coordinator batches flush requests together to improve performance if
+	// flushes are being requested very frequently.
+	err := d.flushCoordinator.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush: %w", err)
+	}
+	return nil
+}
+
+// actually flushes the internal DB
+func (d *DiskTable) flushInternal() error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Flush() request, DB is in panicked state due to error: %w", err)
 	}
