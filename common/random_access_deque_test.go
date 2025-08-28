@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -12,6 +13,15 @@ import (
 
 func TestRandomDequeOperations(t *testing.T) {
 	rand := random.NewTestRandom()
+
+	// The gods implementation of a doubly linked has a fmt.Println()... sigh. Squelch standard out during this test.
+	null, _ := os.Open(os.DevNull)
+	old := os.Stdout
+	os.Stdout = null
+	defer func() {
+		_ = null.Close()
+		os.Stdout = old
+	}()
 
 	initialSize := rand.Uint64Range(0, 8)
 
@@ -37,8 +47,8 @@ func TestRandomDequeOperations(t *testing.T) {
 			expectedData.Clear()
 			expectedSize = 0
 
-		} else if choice < 0.3 {
-			// ~30% chance
+		} else if choice < 0.25 {
+			// ~25% chance
 			// Add to the front
 
 			value := rand.Int()
@@ -46,8 +56,8 @@ func TestRandomDequeOperations(t *testing.T) {
 			expectedData.Insert(0, value)
 
 			expectedSize++
-		} else if choice < 0.6 {
-			// ~30% chance
+		} else if choice < 0.5 {
+			// ~25% chance
 			// Add to the back
 
 			value := rand.Int()
@@ -55,7 +65,7 @@ func TestRandomDequeOperations(t *testing.T) {
 			expectedData.Add(value)
 
 			expectedSize++
-		} else if choice < 0.8 {
+		} else if choice < 0.7 {
 			// ~20% chance
 			// Remove from the front
 
@@ -74,7 +84,7 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				expectedSize--
 			}
-		} else {
+		} else if choice < 0.9 {
 			// ~20% chance
 			// remove from the back
 
@@ -92,6 +102,34 @@ func TestRandomDequeOperations(t *testing.T) {
 				require.Equal(t, expectedValue, value)
 
 				expectedSize--
+			}
+		} else {
+			// ~10% chance
+			// set a random index
+
+			if expectedSize == 0 {
+				_, err := deque.Set(0, rand.Int())
+				require.Error(t, err)
+				_, err = deque.Set(rand.Uint64(), rand.Int())
+				require.Error(t, err)
+			} else {
+				index := 0
+				if expectedSize > 2 {
+					index = rand.Intn(int(expectedSize - 1))
+				}
+
+				newValue := rand.Int()
+
+				// This is O(2 * n)... hard to test this efficiently without a trusted reference implementation
+				// that supports O(1) index access. ;(
+				expectedOldValue, ok := expectedData.Get(index)
+				require.True(t, ok)
+				expectedData.Set(index, newValue)
+
+				oldValue, err := deque.Set(uint64(index), newValue)
+				require.NoError(t, err)
+
+				require.Equal(t, expectedOldValue, oldValue)
 			}
 		}
 
@@ -173,5 +211,4 @@ func TestRandomDequeOperations(t *testing.T) {
 			require.Equal(t, -1, expectedIndex, "backward iteration count mismatch")
 		}
 	}
-
 }
