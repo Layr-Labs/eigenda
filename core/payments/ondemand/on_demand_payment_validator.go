@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/payments/paymentvault"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -28,6 +27,11 @@ type OnDemandPaymentValidator struct {
 	// from that account.
 	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
 	// protects concurrent access to the ledgers cache during ledger creation
+	//
+	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
+	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
+	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
+	// to add them to the cache.
 	ledgerCreationLock sync.Mutex
 	// global payment parameters from the PaymentVault
 	//
@@ -35,9 +39,9 @@ type OnDemandPaymentValidator struct {
 	// used by the old metering logic wasn't actually safe: updates to the global payment params must be made
 	// deterministically based on RBN. This logic should be implemented before updates to these parameters are made
 	// on-chain.
-	paymentVaultParams paymentvault.PaymentVaultParams
+	paymentVaultParams PaymentVaultParams
 	// Provides access to the values stored in the PaymentVault contract and update notifications
-	paymentVaultState *paymentvault.OnDemandPaymentVaultState
+	paymentVaultState *OnDemandPaymentVaultState
 
 	// Background update configuration
 	updateInterval time.Duration
@@ -53,9 +57,9 @@ func NewOnDemandPaymentValidator(
 	logger logging.Logger,
 	// the maximum number of OnDemandLedger entries to be kept in the LRU cache
 	maxLedgers int,
-	paymentVaultParams paymentvault.PaymentVaultParams,
+	paymentVaultParams PaymentVaultParams,
 	// provides access to on-demand payment state and update notifications
-	paymentVaultState *paymentvault.OnDemandPaymentVaultState,
+	paymentVaultState *OnDemandPaymentVaultState,
 	dynamoClient *dynamodb.Client,
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,

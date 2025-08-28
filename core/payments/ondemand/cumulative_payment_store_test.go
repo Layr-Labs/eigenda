@@ -30,7 +30,7 @@ func TestConstructor(t *testing.T) {
 func TestStoreCumulativePaymentInputValidation(t *testing.T) {
 	tableName := createPaymentTable(t, "StoreInputValidation")
 	defer deleteTable(t, tableName)
-	
+
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	store, err := ondemand.NewCumulativePaymentStore(dynamoClient, tableName, accountID)
 	require.NoError(t, err)

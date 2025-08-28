@@ -29,12 +29,16 @@ type LoadGeneratorConfig struct {
 	RelayReadParallelism uint64
 	// The maximum number of parallel blob validator read operations in flight.
 	ValidatorReadParallelism uint64
+	// The maximum number of parallel gas estimation operations in flight.
+	GasEstimationParallelism uint64
 	// The timeout for each blob dispersal, in seconds.
 	DispersalTimeout uint32
 	// The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read.
 	RelayReadTimeout uint32
 	// The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read.
 	ValidatorReadTimeout uint32
+	// The timeout for gas estimation operations, in seconds.
+	GasEstimationTimeout uint32
 	// EnablePprof enables the pprof HTTP server for profiling
 	EnablePprof bool
 	// PprofHttpPort is the port that the pprof HTTP server listens on
@@ -58,9 +62,11 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		SubmissionParallelism:         300,
 		RelayReadParallelism:          300,
 		ValidatorReadParallelism:      300,
+		GasEstimationParallelism:      300,
 		DispersalTimeout:              600,
 		RelayReadTimeout:              600,
 		ValidatorReadTimeout:          600,
+		GasEstimationTimeout:          15,
 		EnablePprof:                   false,
 		PprofHttpPort:                 6060,
 		FrequencyAcceleration:         0.0025,
