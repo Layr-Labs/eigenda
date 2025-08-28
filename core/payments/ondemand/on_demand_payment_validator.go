@@ -27,6 +27,11 @@ type OnDemandPaymentValidator struct {
 	// from that account.
 	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
 	// protects concurrent access to the ledgers cache during ledger creation
+	//
+	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
+	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
+	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
+	// to add them to the cache.
 	ledgerCreationLock sync.Mutex
 	// Provides access to the values stored in the PaymentVault contract.
 	//
