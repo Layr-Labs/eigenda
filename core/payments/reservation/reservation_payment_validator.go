@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payments/paymentvault"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
@@ -36,10 +36,12 @@ type ReservationPaymentValidator struct {
 	ledgers *lru.Cache[gethcommon.Address, *ReservationLedger]
 	// protects concurrent access to the ledgers cache during ledger creation
 	ledgerCreationLock sync.Mutex
-	// Provides access to the values stored in the PaymentVault contract.
-	//
-	// The state of this object is updated on a background thread.
-	onChainState meterer.OnchainPayment
+	// Provides access to the values stored in the PaymentVault contract and update notifications
+	paymentVaultState *paymentvault.ReservationPaymentVaultState
+
+	// Background update configuration
+	updateInterval time.Duration
+	cancelFunc     context.CancelFunc
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time
 
@@ -52,18 +54,25 @@ func NewReservationPaymentValidator(
 	logger logging.Logger,
 	// the maximum number of ReservationLedger entries to be kept in the LRU cache
 	maxLedgers int,
-	// expected to be initialized and have its background update thread started
-	onChainState meterer.OnchainPayment,
+	// provides access to reservation payment state and update notifications
+	paymentVaultState *paymentvault.ReservationPaymentVaultState,
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time,
 	// how to handle requests that would overfill the bucket
 	overfillBehavior OverfillBehavior,
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration,
+	// interval for checking for payment updates
+	updateInterval time.Duration,
 ) (*ReservationPaymentValidator, error) {
-	if onChainState == nil {
-		return nil, errors.New("onChainState cannot be nil")
+	if paymentVaultState == nil {
+		return nil, errors.New("paymentVaultState cannot be nil")
 	}
+
+	if updateInterval <= 0 {
+		return nil, errors.New("updateInterval must be > 0")
+	}
+
 	if bucketCapacityPeriod <= 0 {
 		return nil, errors.New("bucketCapacityPeriod must be > 0")
 	}
@@ -88,7 +97,8 @@ func NewReservationPaymentValidator(
 	return &ReservationPaymentValidator{
 		logger:               logger,
 		ledgers:              cache,
-		onChainState:         onChainState,
+		paymentVaultState:    paymentVaultState,
+		updateInterval:       updateInterval,
 		timeSource:           timeSource,
 		overfillBehavior:     overfillBehavior,
 		bucketCapacityPeriod: bucketCapacityPeriod,
@@ -141,7 +151,7 @@ func (pv *ReservationPaymentValidator) getOrCreateLedger(
 	}
 
 	// Fetch on-chain reservation for account
-	reservedPayment, err := pv.onChainState.GetReservedPaymentByAccount(ctx, accountID)
+	reservedPayment, err := pv.paymentVaultState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get reserved payment for account %v: %w", accountID.Hex(), err)
 	}
@@ -176,13 +186,48 @@ func (pv *ReservationPaymentValidator) getOrCreateLedger(
 	return newLedger, nil
 }
 
-// UpdateReservations updates the reservation parameters for multiple accounts.
+// Start starts the background update thread
+func (pv *ReservationPaymentValidator) Start(ctx context.Context) {
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	pv.cancelFunc = cancel
+
+	go pv.runUpdateLoop(ctxWithCancel)
+}
+
+// Stop stops the background update thread
+func (pv *ReservationPaymentValidator) Stop() {
+	if pv.cancelFunc != nil {
+		pv.cancelFunc()
+	}
+}
+
+// Runs the background update loop, to periodically consume updates made to the PaymentVault
 //
-// Will attempt to make all updates, even if one update fails. A multierror is returned, describing any/all errors
-// that occurred during the updates.
-func (pv *ReservationPaymentValidator) UpdateReservations(updates []ReservationUpdate) error {
-	if len(updates) == 0 {
-		return nil
+// TODO(litt3): Replace periodic polling with event-driven updates from PaymentVault contract
+func (pv *ReservationPaymentValidator) runUpdateLoop(ctx context.Context) {
+	ticker := time.NewTicker(pv.updateInterval)
+	defer ticker.Stop()
+
+	pv.logger.Info("Starting ReservationPaymentValidator background update thread", "updateInterval", pv.updateInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := pv.performUpdates(ctx); err != nil {
+				pv.logger.Error("Failed to perform reservation payment updates", "error", err)
+			}
+		case <-ctx.Done():
+			pv.logger.Info("ReservationPaymentValidator background update thread stopped")
+			return
+		}
+	}
+}
+
+// performUpdates fetches and applies updates immediately as they are discovered
+func (pv *ReservationPaymentValidator) performUpdates(ctx context.Context) error {
+	updates, err := pv.paymentVaultState.RefreshReservedPayments(ctx)
+	if err != nil {
+		return fmt.Errorf("refresh reserved payments: %w", err)
 	}
 
 	now := pv.timeSource()

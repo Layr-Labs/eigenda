@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payments/paymentvault"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -28,10 +29,19 @@ type OnDemandPaymentValidator struct {
 	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
 	// protects concurrent access to the ledgers cache during ledger creation
 	ledgerCreationLock sync.Mutex
-	// Provides access to the values stored in the PaymentVault contract.
+	// global payment parameters from the PaymentVault
 	//
-	// The state of this object is updated on a background thread.
-	onChainState meterer.OnchainPayment
+	// TODO(litt3): there is currently no consideration for updates that may be made to these parameters. The strategy
+	// used by the old metering logic wasn't actually safe: updates to the global payment params must be made
+	// deterministically based on RBN. This logic should be implemented before updates to these parameters are made
+	// on-chain.
+	paymentVaultParams paymentvault.PaymentVaultParams
+	// Provides access to the values stored in the PaymentVault contract and update notifications
+	paymentVaultState *paymentvault.OnDemandPaymentVaultState
+
+	// Background update configuration
+	updateInterval time.Duration
+	cancelFunc     context.CancelFunc
 	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
 	dynamoClient *dynamodb.Client
 	// the name of the dynamo table where on-demand payment information is stored
@@ -43,14 +53,21 @@ func NewOnDemandPaymentValidator(
 	logger logging.Logger,
 	// the maximum number of OnDemandLedger entries to be kept in the LRU cache
 	maxLedgers int,
-	// expected to be initialized and have its background update thread started
-	onChainState meterer.OnchainPayment,
+	paymentVaultParams paymentvault.PaymentVaultParams,
+	// provides access to on-demand payment state and update notifications
+	paymentVaultState *paymentvault.OnDemandPaymentVaultState,
 	dynamoClient *dynamodb.Client,
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,
+	// interval for checking for payment updates
+	updateInterval time.Duration,
 ) (*OnDemandPaymentValidator, error) {
-	if onChainState == nil {
-		return nil, errors.New("onChainState cannot be nil")
+	if paymentVaultState == nil {
+		return nil, errors.New("paymentVaultState cannot be nil")
+	}
+
+	if updateInterval <= 0 {
+		return nil, errors.New("updateInterval must be > 0")
 	}
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
@@ -73,7 +90,8 @@ func NewOnDemandPaymentValidator(
 	return &OnDemandPaymentValidator{
 		logger:            logger,
 		ledgers:           cache,
-		onChainState:      onChainState,
+		paymentVaultState: paymentVaultState,
+		updateInterval:    updateInterval,
 		dynamoClient:      dynamoClient,
 		onDemandTableName: onDemandTableName,
 	}, nil
@@ -81,13 +99,13 @@ func NewOnDemandPaymentValidator(
 
 // Debit validates an on-demand payment for a blob dispersal
 // The caller is responsible for verifying the signature before calling this method
-func (odl *OnDemandPaymentValidator) Debit(
+func (pv *OnDemandPaymentValidator) Debit(
 	ctx context.Context,
 	accountID gethcommon.Address,
 	symbolCount uint32,
 	quorumNumbers []uint8,
 ) error {
-	ledger, err := odl.getOrCreateLedger(ctx, accountID)
+	ledger, err := pv.getOrCreateLedger(ctx, accountID)
 	if err != nil {
 		return fmt.Errorf("get or create on-demand ledger: %w", err)
 	}
@@ -101,32 +119,29 @@ func (odl *OnDemandPaymentValidator) Debit(
 }
 
 // getOrCreateLedger gets an existing on-demand ledger from the cache, or creates a new one if it doesn't exist
-func (odl *OnDemandPaymentValidator) getOrCreateLedger(
+func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 	ctx context.Context,
 	accountID gethcommon.Address,
 ) (*OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
-	if ledger, exists := odl.ledgers.Get(accountID); exists {
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
 	// Slow path: acquire lock and check again
-	odl.ledgerCreationLock.Lock()
-	defer odl.ledgerCreationLock.Unlock()
+	pv.ledgerCreationLock.Lock()
+	defer pv.ledgerCreationLock.Unlock()
 
-	if ledger, exists := odl.ledgers.Get(accountID); exists {
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
 		return ledger, nil
 	}
 
-	onDemandPayment, err := odl.onChainState.GetOnDemandPaymentByAccount(ctx, accountID)
+	onDemandPayment, err := pv.paymentVaultState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
 	}
 
-	pricePerSymbol := big.NewInt(int64(odl.onChainState.GetPricePerSymbol()))
-	minNumSymbols := odl.onChainState.GetMinNumSymbols()
-
-	cumulativePaymentStore, err := NewCumulativePaymentStore(odl.dynamoClient, odl.onDemandTableName, accountID)
+	cumulativePaymentStore, err := NewCumulativePaymentStore(pv.dynamoClient, pv.onDemandTableName, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
@@ -134,30 +149,65 @@ func (odl *OnDemandPaymentValidator) getOrCreateLedger(
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
 		onDemandPayment.CumulativePayment,
-		pricePerSymbol,
-		minNumSymbols,
+		big.NewInt(int64(pv.paymentVaultParams.PricePerSymbol)),
+		pv.paymentVaultParams.MinNumSymbols,
 		cumulativePaymentStore,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
 	}
 
-	odl.ledgers.Add(accountID, newLedger)
+	pv.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
 }
 
-// UpdateTotalDeposits updates the total deposits for multiple accounts.
+// Start starts the background update thread
+func (pv *OnDemandPaymentValidator) Start(ctx context.Context) {
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	pv.cancelFunc = cancel
+
+	go pv.runUpdateLoop(ctxWithCancel)
+}
+
+// Stop stops the background update thread
+func (pv *OnDemandPaymentValidator) Stop() {
+	if pv.cancelFunc != nil {
+		pv.cancelFunc()
+	}
+}
+
+// Runs the background update loop, to periodically consume updates made to the PaymentVault
 //
-// Will attempt to make all updates, even if one update fails. A multierror is returned, describing any/all errors
-// that occurred during the updates.
-func (odl *OnDemandPaymentValidator) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
-	if len(updates) == 0 {
-		return nil
+// TODO(litt3): Replace periodic polling with event-driven updates from PaymentVault contract
+func (pv *OnDemandPaymentValidator) runUpdateLoop(ctx context.Context) {
+	ticker := time.NewTicker(pv.updateInterval)
+	defer ticker.Stop()
+
+	pv.logger.Info("Starting OnDemandPaymentValidator background update thread", "updateInterval", pv.updateInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := pv.performUpdates(ctx); err != nil {
+				pv.logger.Error("perform on-demand payment updates", "error", err)
+			}
+		case <-ctx.Done():
+			pv.logger.Info("OnDemandPaymentValidator background update thread stopped")
+			return
+		}
+	}
+}
+
+// performUpdates fetches and applies updates that have been made to the payment vault
+func (pv *OnDemandPaymentValidator) performUpdates(ctx context.Context) error {
+	updates, err := pv.paymentVaultState.RefreshOnDemandPayments(ctx)
+	if err != nil {
+		return fmt.Errorf("refresh on-demand payments: %w", err)
 	}
 
 	var result *multierror.Error
 	for _, update := range updates {
-		ledger, exists := odl.ledgers.Get(update.AccountAddress)
+		ledger, exists := pv.ledgers.Get(update.AccountAddress)
 		if !exists {
 			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
 			// account ever makes an on-demand dispersal
