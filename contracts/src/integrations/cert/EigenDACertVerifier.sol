@@ -54,9 +54,8 @@ contract EigenDACertVerifier is
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
-    /// @dev This function should not be called directly. It is exposes as external
-    //       for the purpose of try/catch'ing it inside checkDACert.
-    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
+    /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert.
+    function decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
         return abi.decode(data, (CT.EigenDACertV3));
     }
 
