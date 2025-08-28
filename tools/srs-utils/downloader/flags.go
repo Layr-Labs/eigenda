@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	flagBlobSize  = "blob-size-bytes"
-	flagOutputDir = "output-dir"
-	flagBaseURL   = "base-url"
+	flagBlobSize         = "blob-size-bytes"
+	flagOutputDir        = "output-dir"
+	flagBaseURL          = "base-url"
+	flagIncludePowerOf2  = "include-g2-power-of-2"
 )
 
 // Flags defines command line flags for the download command
@@ -27,6 +28,10 @@ var Flags = []cli.Flag{
 		Usage: "Base URL for downloading SRS files",
 		Value: defaultBaseURL,
 	},
+	cli.BoolFlag{
+		Name:  flagIncludePowerOf2,
+		Usage: "Include g2.point.powerOf2 file in download",
+	},
 }
 
 // ReadCLIConfig reads command line flags into a config struct
@@ -35,5 +40,6 @@ func ReadCLIConfig(cCtx *cli.Context) (DownloaderConfig, error) {
 		cCtx.Uint64(flagBlobSize),
 		cCtx.String(flagOutputDir),
 		cCtx.String(flagBaseURL),
+		cCtx.Bool(flagIncludePowerOf2),
 	)
 }

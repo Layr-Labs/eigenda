@@ -15,9 +15,10 @@ const (
 
 // DownloaderConfig holds configuration for the SRS file download
 type DownloaderConfig struct {
-	blobSizeBytes uint64
-	outputDir     string
-	baseURL       string
+	blobSizeBytes    uint64
+	outputDir        string
+	baseURL          string
+	includePowerOf2  bool
 }
 
 // NewDownloaderConfig creates a new config with the specified parameters,
@@ -26,6 +27,7 @@ func NewDownloaderConfig(
 	blobSizeBytes uint64,
 	outputDir string,
 	baseURL string,
+	includePowerOf2 bool,
 ) (DownloaderConfig, error) {
 	// Apply defaults
 	if baseURL == "" {
@@ -43,8 +45,9 @@ func NewDownloaderConfig(
 	}
 
 	return DownloaderConfig{
-		blobSizeBytes: blobSizeBytes,
-		outputDir:     outputDir,
-		baseURL:       baseURL,
+		blobSizeBytes:   blobSizeBytes,
+		outputDir:       outputDir,
+		baseURL:         baseURL,
+		includePowerOf2: includePowerOf2,
 	}, nil
 }
