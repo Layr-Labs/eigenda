@@ -11,6 +11,7 @@ import (
 // - Insertion time: O(1) average, O(n) worst-case (when resizing is needed)
 // - Deletion time: O(1) average, array space is not reclaimed
 // - Lookup time by index: O(1)
+// - Iteration: O(1) to build iterator, O(1) per step
 //
 // This data structure is not thread safe.
 type RandomAccessDeque[T any] struct {
