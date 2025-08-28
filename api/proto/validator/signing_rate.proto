@@ -1,6 +1,8 @@
 syntax = "proto3";
 package common;
 
+// TODO what package should this live in?
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 
 // Records information about validator signing rate during a time period.
