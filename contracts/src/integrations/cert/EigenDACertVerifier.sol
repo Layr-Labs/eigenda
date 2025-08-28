@@ -63,7 +63,7 @@ contract EigenDACertVerifier is
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
         CT.EigenDACertV3 memory daCert;
 
-        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory cert) {
+        try this.decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory cert) {
             daCert = cert;
         } catch {
             return uint8(CertLib.StatusCode.CERT_DECODE_REVERT);
