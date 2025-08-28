@@ -15,6 +15,8 @@ import (
 //
 // This data structure is not thread safe.
 type RandomAccessDeque[T any] struct {
+	// The current number of elements in the deque.
+	size uint64
 	// Underlying data storage
 	data []T
 	// The index in data that corresponds to the logical start of the deque.
@@ -27,10 +29,15 @@ type RandomAccessDeque[T any] struct {
 
 // Create a new RandomAccessDeque with the specified initial capacity. Queue can grow beyond this capacity if needed.
 func NewRandomAccessDeque[T any](initialCapacity uint64) *RandomAccessDeque[T] {
+
+	if initialCapacity < 8 {
+		initialCapacity = 8 // TODO test better
+	}
+
 	return &RandomAccessDeque[T]{
 		data:            make([]T, initialCapacity),
 		startIndex:      0,
-		endIndex:        1,
+		endIndex:        0,
 		initialCapacity: initialCapacity,
 	}
 }
@@ -39,10 +46,7 @@ func NewRandomAccessDeque[T any](initialCapacity uint64) *RandomAccessDeque[T] {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) Size() uint64 {
-	if s.endIndex >= s.startIndex {
-		return s.endIndex - s.startIndex
-	}
-	return uint64(len(s.data)) - s.startIndex + s.endIndex
+	return s.size
 }
 
 // Insert a value at the front of the deque. This value will have index 0 after insertion, and all other values will
@@ -56,19 +60,18 @@ func (s *RandomAccessDeque[T]) PushFront(value T) {
 		// wrap around
 		s.startIndex = uint64(len(s.data)) - 1
 	} else {
-		s.startIndex -= 1
+		s.startIndex--
 	}
 
-	_, err := s.Set(0, value)
-	enforce.NilError(err, "Set failed, this should never happen")
+	s.data[s.startIndex] = value
+	s.size++
 }
 
 // Return the value at the front of the deque without removing it. If the deque is empty, returns an error.
 //
 // O(1)
 func (s *RandomAccessDeque[T]) PeekFront() (value T, err error) {
-	size := s.Size()
-	if size == 0 {
+	if s.size == 0 {
 		var zero T
 		return zero, fmt.Errorf("cannot peek front: deque is empty")
 	}
@@ -83,22 +86,24 @@ func (s *RandomAccessDeque[T]) PeekFront() (value T, err error) {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
-	size := s.Size()
-	if size == 0 {
+	if s.size == 0 {
 		var zero T
 		return zero, fmt.Errorf("cannot pop front: deque is empty")
 	}
 
+	value = s.data[s.startIndex]
+
 	var zero T
-	value, err = s.Set(0, zero)
-	enforce.NilError(err, "Set failed, this should never happen if size check passes")
+	s.data[s.startIndex] = zero
 
 	if s.startIndex == uint64(len(s.data)-1) {
 		// wrap around
 		s.startIndex = 0
 	} else {
-		s.startIndex += 1
+		s.startIndex++
 	}
+
+	s.size--
 
 	return value, nil
 }
@@ -109,30 +114,28 @@ func (s *RandomAccessDeque[T]) PopFront() (value T, err error) {
 func (s *RandomAccessDeque[T]) PushBack(value T) {
 	s.resizeForInsertion()
 
+	s.data[s.endIndex] = value
+
 	if s.endIndex == uint64(len(s.data)-1) {
 		// wrap around
 		s.endIndex = 0
 	} else {
-		s.endIndex += 1
+		s.endIndex++
 	}
 
-	size := s.Size()
-
-	_, err := s.Set(size-1, value)
-	enforce.NilError(err, "Set failed, this should never happen")
+	s.size++
 }
 
 // Return the value at the back of the deque without removing it. If the deque is empty, returns an error.
 //
 // O(1)
 func (s *RandomAccessDeque[T]) PeekBack() (value T, err error) {
-	size := s.Size()
-	if size == 0 {
+	if s.size == 0 {
 		var zero T
 		return zero, fmt.Errorf("cannot peek back: deque is empty")
 	}
 
-	value, err = s.Get(size - 1)
+	value, err = s.Get(s.size - 1)
 	enforce.NilError(err, "Get failed, this should never happen if size check passes")
 
 	return value, nil
@@ -142,32 +145,35 @@ func (s *RandomAccessDeque[T]) PeekBack() (value T, err error) {
 //
 // O(1)
 func (s *RandomAccessDeque[T]) PopBack() (value T, err error) {
-	size := s.Size()
-	if size == 0 {
+	if s.size == 0 {
 		var zero T
 		return zero, fmt.Errorf("cannot pop back: deque is empty")
 	}
 
-	var zero T
-	value, err = s.Set(size-1, zero)
-	enforce.NilError(err, "Set failed, this should never happen if size check passes")
-
+	var backIndex uint64
 	if s.endIndex == 0 {
-		// wrap around
-		s.endIndex = uint64(len(s.data)) - 1
+		backIndex = uint64(len(s.data)) - 1
 	} else {
-		s.endIndex -= 1
+		backIndex = s.endIndex - 1
 	}
+
+	value = s.data[backIndex]
+
+	var zero T
+	s.data[backIndex] = zero
+
+	s.endIndex = backIndex
+
+	s.size--
 
 	return value, nil
 }
 
 // Get the value at the specified index. If the index is out of bounds returns an error.
 func (s *RandomAccessDeque[T]) Get(index uint64) (value T, err error) {
-	size := s.Size()
-	if index >= size {
+	if index >= s.size {
 		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, size)
+		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
 	}
 
 	realIndex := (s.startIndex + index) % uint64(len(s.data))
@@ -177,10 +183,9 @@ func (s *RandomAccessDeque[T]) Get(index uint64) (value T, err error) {
 // Set the value at the specified index, replacing the existing value, which is returned.
 // If the index is out of bounds returns an error.
 func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err error) {
-	size := s.Size()
-	if index >= size {
+	if index >= s.size {
 		var zero T
-		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, size)
+		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
 	}
 
 	realIndex := (s.startIndex + index) % uint64(len(s.data))
@@ -195,6 +200,7 @@ func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err 
 func (s *RandomAccessDeque[T]) Clear() {
 	s.startIndex = 0
 	s.endIndex = 0
+	s.size = 0
 	// Reset the underlying array to allow garbage collection of contained elements.
 	s.data = make([]T, s.initialCapacity)
 }
@@ -205,8 +211,7 @@ func (s *RandomAccessDeque[T]) Clear() {
 // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
 	return func(yield func(int, T) bool) {
-		size := s.Size()
-		for i := uint64(0); i < size; i++ {
+		for i := uint64(0); i < s.size; i++ {
 			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
@@ -221,8 +226,7 @@ func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
 // // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(int, T) bool) {
 	return func(yield func(int, T) bool) {
-		size := s.Size()
-		for i := size; i > 0; i-- {
+		for i := s.size; i > 0; i-- {
 			value, err := s.Get(i - 1)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
@@ -234,8 +238,7 @@ func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(int, T) bool) {
 // Resize the underlying array to accommodate at least one more insertion. Preserves existing elements.
 // If no resizing is needed, this is a no-op.
 func (s *RandomAccessDeque[T]) resizeForInsertion() {
-	size := s.Size()
-	remainingCapacity := uint64(len(s.data)) - size
+	remainingCapacity := uint64(len(s.data)) - s.size
 
 	if remainingCapacity > 0 {
 		return
@@ -249,5 +252,5 @@ func (s *RandomAccessDeque[T]) resizeForInsertion() {
 
 	s.data = newData
 	s.startIndex = 0
-	s.endIndex = size
+	s.endIndex = s.size
 }

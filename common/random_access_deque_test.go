@@ -20,6 +20,7 @@ func TestRandomDequeOperations(t *testing.T) {
 	// Use a linked list library we trust to verify correctness. The linked list can't do O(1) index access, but we can
 	// work around that in the test code.
 	expectedData := doublylinkedlist.New()
+	expectedSize := uint64(0)
 
 	operationCount := 10_000
 	for i := 0; i < operationCount; i++ {
@@ -27,12 +28,14 @@ func TestRandomDequeOperations(t *testing.T) {
 		// Do a random mutation.
 		choice := rand.Float64()
 
+		// nolint:nestif
 		if choice < 0.001 {
 			// ~1 time per 1000 operations
 			// clear
 
 			deque.Clear()
 			expectedData.Clear()
+			expectedSize = 0
 
 		} else if choice < 0.3 {
 			// ~30% chance
@@ -40,21 +43,23 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			value := rand.Int()
 			deque.PushFront(value)
-			expectedData.Add(value)
+			expectedData.Insert(0, value)
 
+			expectedSize++
 		} else if choice < 0.6 {
 			// ~30% chance
 			// Add to the back
 
 			value := rand.Int()
 			deque.PushBack(value)
-			expectedData.Insert(0, value)
+			expectedData.Add(value)
 
+			expectedSize++
 		} else if choice < 0.8 {
 			// ~20% chance
 			// Remove from the front
 
-			if expectedData.Size() == 0 {
+			if expectedSize == 0 {
 				_, err := deque.PopFront()
 				require.Error(t, err)
 			} else {
@@ -66,12 +71,14 @@ func TestRandomDequeOperations(t *testing.T) {
 				expectedData.Remove(0)
 
 				require.Equal(t, expectedValue, value)
+
+				expectedSize--
 			}
 		} else {
 			// ~20% chance
 			// remove from the back
 
-			if expectedData.Size() == 0 {
+			if expectedSize == 0 {
 				_, err := deque.PopBack()
 				require.Error(t, err)
 			} else {
@@ -83,12 +90,14 @@ func TestRandomDequeOperations(t *testing.T) {
 				expectedData.Remove(expectedData.Size() - 1)
 
 				require.Equal(t, expectedValue, value)
+
+				expectedSize--
 			}
 		}
 
 		// Always check things that are fast to check.
-		require.Equal(t, uint64(expectedData.Size()), deque.Size(), "size mismatch after %d operations", i)
-		if expectedData.Size() == 0 {
+		require.Equal(t, expectedSize, deque.Size(), "size mismatch after %d operations", i)
+		if expectedSize == 0 {
 			_, err := deque.PeekFront()
 			require.Error(t, err)
 			_, err = deque.PeekBack()
@@ -130,7 +139,10 @@ func TestRandomDequeOperations(t *testing.T) {
 
 			if expectedData.Size() > 0 {
 				// Verify a random index.
-				index := rand.Intn(expectedData.Size() - 1)
+				index := 0
+				if expectedData.Size() > 2 {
+					index = rand.Intn(expectedData.Size() - 1)
+				}
 				value, err := deque.Get(uint64(index))
 				require.NoError(t, err)
 				require.Equal(t, expectedArray[index], value)
