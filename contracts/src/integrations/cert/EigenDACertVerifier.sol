@@ -16,6 +16,7 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
+import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
 contract EigenDACertVerifier is
     IEigenDACertVerifier,
@@ -52,14 +53,25 @@ contract EigenDACertVerifier is
         _quorumNumbersRequired = initQuorumNumbersRequired;
     }
 
+    /// @notice Decodes a certificate from bytes to an EigenDACertV3
+    /// @dev This function should not be called directly. It is exposes as external
+    //       for the purpose of try/catch'ing it inside checkDACert.
+    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV3));
+    }
+
     /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
+        CT.EigenDACertV3 memory daCert;
+
+        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory cert) {
+            daCert = cert;
+        } catch {
+            return uint8(CertLib.StatusCode.CERT_DECODE_REVERT);
+        }
+
         (CertLib.StatusCode status,) = CertLib.checkDACert(
-            _eigenDAThresholdRegistry,
-            _eigenDASignatureVerifier,
-            abiEncodedCert,
-            _securityThresholds,
-            _quorumNumbersRequired
+            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
         );
         return uint8(status);
     }

@@ -37,13 +37,21 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         assertEq(res, 1);
     }
 
-    function test_verifyDACert_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
+    function test_verifyDACert_returns_InvalidInclusionProofCode_when_ProofIsInvalid(uint256 pseudoRandomNumber)
+        public
+    {
         EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
-
         cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
         assertEq(res, uint8(CertLib.StatusCode.INVALID_INCLUSION_PROOF));
+    }
+
+    function test_verifyDACert_returns_CERT_DECODE_REVERT_when_CertIsMalformedBytes() public view {
+        bytes memory staticBytes = hex"feaf968c";
+
+        uint8 res = eigenDACertVerifier.checkDACert(staticBytes);
+        assertEq(res, uint8(CertLib.StatusCode.CERT_DECODE_REVERT));
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)

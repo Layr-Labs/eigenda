@@ -62,20 +62,14 @@ library EigenDACertVerificationLib {
         REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
         CERT_DECODE_REVERT, // Certificate abi.decoding reverted
         SIGNATURE_VERIFICATION_CALL_REVERT // External call to signature verifier reverted
-    }
 
-    /// @notice Decodes a certificate from bytes to an EigenDACertV3
-    /// @dev This function should not be called directly. It is exposes as external
-    //       for the purpose of try/catch'ing it inside checkDACert.
-    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
-        return abi.decode(data, (CT.EigenDACertV3));
     }
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
-    /// @param certBytes The certificate bytes
+    /// @param daCert The EigenDA certificate
     /// @param securityThresholds The security thresholds to verify against
     /// @param requiredQuorumNumbers The required quorum numbers
     /// @return status Status code (SUCCESS if verification succeeded)
@@ -83,24 +77,20 @@ library EigenDACertVerificationLib {
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
-        bytes calldata certBytes,
+        CT.EigenDACertV3 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view returns (StatusCode, bytes memory) {
-        try this._decodeCert(certBytes) returns (CT.EigenDACertV3 memory cert) {
-            return checkDACertV2(
-                eigenDAThresholdRegistry,
-                eigenDASignatureVerifier,
-                cert.batchHeader,
-                cert.blobInclusionInfo,
-                cert.nonSignerStakesAndSignature,
-                securityThresholds,
-                requiredQuorumNumbers,
-                cert.signedQuorumNumbers
-            );
-        } catch {
-            return (StatusCode.CERT_DECODE_ERROR, "");
-        }
+        return checkDACertV2(
+            eigenDAThresholdRegistry,
+            eigenDASignatureVerifier,
+            daCert.batchHeader,
+            daCert.blobInclusionInfo,
+            daCert.nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers,
+            daCert.signedQuorumNumbers
+        );
     }
 
     /**
@@ -135,8 +125,8 @@ library EigenDACertVerificationLib {
             eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
-            if (err != StatusCode.SUCCESS) {
-                return (err, errParams);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
         }
 
         // Verify signatures and build confirmed quorums bitmap
@@ -240,12 +230,12 @@ library EigenDACertVerificationLib {
             confirmedQuorumsBitmap = 0;
 
             // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
-        for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
-            if (
-                quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
-                    >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
-            ) {
-                        confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
+            for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
+                if (
+                    quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
+                        >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
+                ) {
+                    confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
                 }
             }
 
@@ -254,7 +244,7 @@ library EigenDACertVerificationLib {
             // This would match any require(..., "string reason") revert that is pre custom errors,
             // which earlier versions of BLSSignatureChecker used, and might still be deployed. See:
             // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
-            return (StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT, reason, 0);
+            return (StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT, bytes(reason), 0);
         } catch (bytes memory reason) {
             if (reason.length < 4) {
                 // We re-throw any non custom-error that was caught here. For example,
@@ -263,7 +253,7 @@ library EigenDACertVerificationLib {
                 // These generally mean there is a bug in our implementation, which should be addressed by a human debugger.
                 // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
                 // a maliciously constructed cert.
-                revert(reason);
+                revert(string(reason));
             }
             // We assume that any revert here is coming from a failed require(..., SomeCustomError()) statement
             // TODO: make sure that this doesn't catch failing asserts, panics, or other low-level evm reverts like out of gas.
@@ -285,11 +275,11 @@ library EigenDACertVerificationLib {
         returns (StatusCode err, bytes memory errParams, uint256 blobQuorumsBitmap)
     {
         blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
-            
-            if (BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
-                return (StatusCode.SUCCESS, "", blobQuorumsBitmap);
-            } else {
-                return (StatusCode.BLOB_QUORUMS_NOT_SUBSET, abi.encode(blobQuorumsBitmap, confirmedQuorumsBitmap), 0);
+
+        if (BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
+            return (StatusCode.SUCCESS, "", blobQuorumsBitmap);
+        } else {
+            return (StatusCode.BLOB_QUORUMS_NOT_SUBSET, abi.encode(blobQuorumsBitmap, confirmedQuorumsBitmap), 0);
         }
     }
 
@@ -307,10 +297,10 @@ library EigenDACertVerificationLib {
     {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
 
-            if (BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
-                return (StatusCode.SUCCESS, "");
-            } else {
-                return (StatusCode.REQUIRED_QUORUMS_NOT_SUBSET, abi.encode(requiredQuorumsBitmap, blobQuorumsBitmap));
+        if (BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
+            return (StatusCode.SUCCESS, "");
+        } else {
+            return (StatusCode.REQUIRED_QUORUMS_NOT_SUBSET, abi.encode(requiredQuorumsBitmap, blobQuorumsBitmap));
         }
     }
 
