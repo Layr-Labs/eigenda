@@ -506,10 +506,10 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 
 			// Set KZG paths if not already configured - must be absolute paths for Docker
-			// Use the KZG resources from testinfra package
+			// Use the KZG resources from root resources/srs directory
 			if encoderConfig.G1Path == "" {
-				// Use testinfra's KZG resources
-				g1Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g1.point.300000")
+				// Use root resources/srs KZG files
+				g1Path := filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g1.point")
 				absG1Path, err := filepath.Abs(g1Path)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get absolute path for G1: %w", err)
@@ -517,8 +517,8 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				encoderConfig.G1Path = absG1Path
 			}
 			if encoderConfig.G2Path == "" {
-				// Use testinfra's KZG resources
-				g2Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000")
+				// Use root resources/srs KZG files
+				g2Path := filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g2.point")
 				absG2Path, err := filepath.Abs(g2Path)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get absolute path for G2: %w", err)
@@ -526,8 +526,8 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				encoderConfig.G2Path = absG2Path
 			}
 			if encoderConfig.G2PowerOf2Path == "" {
-				// Use testinfra's KZG resources
-				g2PowerOf2Path := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000.powerOf2")
+				// Use root resources/srs KZG files
+				g2PowerOf2Path := filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g2.point.powerOf2")
 				absG2PowerOf2Path, err := filepath.Abs(g2PowerOf2Path)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get absolute path for G2PowerOf2: %w", err)
@@ -535,8 +535,8 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				encoderConfig.G2PowerOf2Path = absG2PowerOf2Path
 			}
 			if encoderConfig.CachePath == "" {
-				// Use testinfra's KZG resources
-				cachePath := filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/SRSTables")
+				// Use root resources/srs cache directory
+				cachePath := filepath.Join(im.config.EigenDA.RootPath, "resources/srs/SRSTables")
 				absCachePath, err := filepath.Abs(cachePath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get absolute path for cache: %w", err)
@@ -1478,22 +1478,22 @@ func (im *InfraManager) setupRetrievalClients(ctx context.Context) error {
 		return fmt.Errorf("failed to parse SRS order: %w", err)
 	}
 
-	// Use default KZG paths from testinfra resources if not specified
+	// Use default KZG paths from root resources/srs (official mainnet) if not specified
 	g1Path := config.G1Path
 	if g1Path == "" {
-		g1Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g1.point.300000")
+		g1Path = filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g1.point")
 	}
 	g2Path := config.G2Path
 	if g2Path == "" {
-		g2Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000")
+		g2Path = filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g2.point")
 	}
 	g2PowerOf2Path := config.G2PowerOf2Path
 	if g2PowerOf2Path == "" {
-		g2PowerOf2Path = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/g2.point.300000.powerOf2")
+		g2PowerOf2Path = filepath.Join(im.config.EigenDA.RootPath, "resources/srs/g2.point.powerOf2")
 	}
 	cachePath := config.CachePath
 	if cachePath == "" {
-		cachePath = filepath.Join(im.config.EigenDA.RootPath, "common/testinfra/resources/kzg/SRSTables")
+		cachePath = filepath.Join(im.config.EigenDA.RootPath, "resources/srs/cache")
 	}
 
 	// Get absolute paths

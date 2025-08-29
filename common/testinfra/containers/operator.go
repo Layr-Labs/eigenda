@@ -63,6 +63,7 @@ type OperatorConfig struct {
 	G2Path                               string
 	CachePath                            string
 	SRSOrder                             uint64
+	SRSLoad                              uint64
 	NumBatchDeserializationWorkers       int
 	NumBatchHeaderDeserializationWorkers int
 	EnableGnarkBundleEncoding            bool
@@ -128,6 +129,7 @@ func DefaultOperatorConfig(id int) OperatorConfig {
 		G2Path:                               "",
 		CachePath:                            "",
 		SRSOrder:                             10000,
+		SRSLoad:                              10000,
 		NumBatchDeserializationWorkers:       4,
 		NumBatchHeaderDeserializationWorkers: 4,
 		EnableGnarkBundleEncoding:            true,
@@ -168,7 +170,7 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 	fmt.Printf("DEBUG: Mounting secrets from: %s to /app/secrets\n", secretsDir)
 
 	// Determine the resources directory path for KZG params (must be absolute)
-	resourcesDir, err := filepath.Abs(filepath.Join(config.EigenDADirectory, "inabox", "resources"))
+	resourcesDir, err := filepath.Abs(filepath.Join(config.EigenDADirectory, "resources"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for resources: %w", err)
 	}
@@ -402,9 +404,9 @@ func buildOperatorEnv(config OperatorConfig) map[string]string {
 		"NODE_RELAY_USE_SECURE_GRPC":    "false", // Disable TLS for relay connections in test environment
 
 		// KZG configuration
-		"NODE_G1_PATH":    "/app/resources/kzg/g1.point.300000",
-		"NODE_CACHE_PATH": "/app/resources/kzg/SRSTables",
-		"NODE_SRS_LOAD":   "10000",
+		"NODE_G1_PATH":    "/app/resources/srs/g1.point",
+		"NODE_CACHE_PATH": "/app/resources/srs/SRSTables",
+		"NODE_SRS_LOAD":   fmt.Sprintf("%d", config.SRSLoad),
 	}
 
 	// Add optional configurations if provided
@@ -414,7 +416,7 @@ func buildOperatorEnv(config OperatorConfig) map[string]string {
 	if config.G2Path != "" {
 		env["NODE_G2_PATH"] = config.G2Path
 	} else {
-		env["NODE_G2_POWER_OF_2_PATH"] = "/app/resources/kzg/g2.point.300000.powerOf2"
+		env["NODE_G2_POWER_OF_2_PATH"] = "/app/resources/srs/g2.point.powerOf2"
 	}
 	if config.CachePath != "" {
 		env["NODE_CACHE_PATH"] = config.CachePath

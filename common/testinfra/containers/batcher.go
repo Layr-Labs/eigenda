@@ -121,7 +121,7 @@ func DefaultBatcherConfig() BatcherConfig {
 		AWSEndpointURL:              "", // Will be populated from LocalStack if enabled
 		PullInterval:                "5s",
 		BatchSizeLimit:              "10240", // 10 GiB
-		SRSOrder:                    "300000",
+		SRSOrder:                    "10000", // 2^28
 		UseGraph:                    true,
 		GraphURL:                    "", // Will be populated from GraphNode if enabled
 		GraphBackoff:                "100ms",
