@@ -220,6 +220,7 @@ func createDisperserClient(
 		signer,
 		kzgProver,
 		nil,
+		nil,
 		metrics.NoopDispersalMetrics)
 }
 

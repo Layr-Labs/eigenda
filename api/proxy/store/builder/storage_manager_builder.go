@@ -601,6 +601,7 @@ func buildPayloadDisperser(
 		signer,
 		kzgProver,
 		accountant,
+		nil,
 		dispersalMetrics,
 	)
 	if err != nil {

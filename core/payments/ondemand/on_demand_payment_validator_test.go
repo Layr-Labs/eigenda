@@ -4,76 +4,107 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestNewOnDemandPaymentValidator(t *testing.T) {
-	mockOnChainState := &coremock.MockOnchainPaymentState{}
 	tableName := "test-table"
 	maxLedgers := 100
+	testParams := ondemand.PaymentVaultParams{
+		PricePerSymbol: 100,
+		MinNumSymbols:  1,
+	}
+	updateInterval := time.Second
 
 	t.Run("nil onChainState", func(t *testing.T) {
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			testutils.GetLogger(),
 			maxLedgers,
+			testParams,
 			nil,
 			dynamoClient,
 			tableName,
+			updateInterval,
 		)
 		require.Error(t, err)
 		require.Nil(t, validator)
 	})
 
 	t.Run("nil dynamoClient", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
+
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			testutils.GetLogger(),
 			maxLedgers,
-			mockOnChainState,
+			testParams,
+			mockState,
 			nil,
 			tableName,
+			updateInterval,
 		)
 		require.Error(t, err)
 		require.Nil(t, validator)
 	})
 
 	t.Run("empty table name", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
+
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			testutils.GetLogger(),
 			maxLedgers,
-			mockOnChainState,
+			testParams,
+			mockState,
 			dynamoClient,
 			"",
+			updateInterval,
 		)
 		require.Error(t, err)
 		require.Nil(t, validator)
 	})
 
 	t.Run("zero max ledgers", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
+
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			testutils.GetLogger(),
 			0,
-			mockOnChainState,
+			testParams,
+			mockState,
 			dynamoClient,
 			tableName,
+			updateInterval,
 		)
 		require.Error(t, err)
 		require.Nil(t, validator)
 	})
 
 	t.Run("negative max ledgers", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
+
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			testutils.GetLogger(),
 			-1,
-			mockOnChainState,
+			testParams,
+			mockState,
 			dynamoClient,
 			tableName,
+			updateInterval,
 		)
 		require.Error(t, err)
 		require.Nil(t, validator)
@@ -88,21 +119,28 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 
-	mockOnChainState := &coremock.MockOnchainPaymentState{}
-	mockOnChainState.On("GetPricePerSymbol").Return(uint64(100))
-	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
 
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountA).Return(
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountA).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(10000)}, nil)
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountB).Return(
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountB).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(20000)}, nil)
+
+	testParams := ondemand.PaymentVaultParams{
+		PricePerSymbol: 100,
+		MinNumSymbols:  1,
+	}
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		10,
-		mockOnChainState,
+		testParams,
+		mockState,
 		dynamoClient,
 		tableName,
+		time.Second,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -118,11 +156,6 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	// debit from account A (should reuse cached ledger)
 	err = paymentValidator.Debit(ctx, accountA, uint32(25), []uint8{0})
 	require.NoError(t, err, "second debit from account A should succeed")
-
-	// Each account should only trigger GetOnDemandPaymentByAccount once (on first access)
-	mockOnChainState.AssertNumberOfCalls(t, "GetOnDemandPaymentByAccount", 2)
-	mockOnChainState.AssertCalled(t, "GetPricePerSymbol")
-	mockOnChainState.AssertCalled(t, "GetMinNumSymbols")
 }
 
 func TestDebitInsufficientFunds(t *testing.T) {
@@ -132,18 +165,26 @@ func TestDebitInsufficientFunds(t *testing.T) {
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
-	mockOnChainState := &coremock.MockOnchainPaymentState{}
-	mockOnChainState.On("GetPricePerSymbol").Return(uint64(1000))
-	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountID).Return(
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
+
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountID).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(5000)}, nil)
+
+	testParams := ondemand.PaymentVaultParams{
+		PricePerSymbol: 1000,
+		MinNumSymbols:  1,
+	}
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		10,
-		mockOnChainState,
+		testParams,
+		mockState,
 		dynamoClient,
 		tableName,
+		time.Second,
 	)
 	require.NoError(t, err)
 
@@ -152,25 +193,6 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	require.Error(t, err, "debit should fail when insufficient funds")
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
-
-	updates := []ondemand.TotalDepositUpdate{
-		{
-			// Update total deposits to 15000 wei (enough for 15 symbols at 1000 wei each)
-			AccountAddress:  accountID,
-			NewTotalDeposit: big.NewInt(15000),
-		},
-		{
-			// Also include an untracked account that should be skipped, to exercise that logic
-			AccountAddress:  gethcommon.HexToAddress("0xcccccccccccccccccccccccccccccccccccccccc"),
-			NewTotalDeposit: big.NewInt(50000),
-		},
-	}
-	err = paymentValidator.UpdateTotalDeposits(updates)
-	require.NoError(t, err, "updating total deposits should succeed")
-
-	// Retry the same debit that previously failed - should now succeed
-	err = paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{0})
-	require.NoError(t, err, "debit should now succeed after increasing deposits")
 }
 
 func TestLRUCacheEvictionAndReload(t *testing.T) {
@@ -182,26 +204,32 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	accountC := gethcommon.HexToAddress("0xcccccccccccccccccccccccccccccccccccccccc")
 
-	mockOnChainState := &coremock.MockOnchainPaymentState{}
-	mockOnChainState.On("GetPricePerSymbol").Return(uint64(1000))
-	mockOnChainState.On("GetMinNumSymbols").Return(uint64(1))
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockState := coremock.NewMockOnDemandPaymentVaultStateInterface(ctrl)
 
 	// Account A has 8000 wei total deposits (can afford 8 symbols at 1000 wei each)
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountA).Return(
-		&core.OnDemandPayment{CumulativePayment: big.NewInt(8000)}, nil)
-
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountB).Return(
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountA).Return(
+		&core.OnDemandPayment{CumulativePayment: big.NewInt(8000)}, nil).Times(2) // Called twice due to cache eviction
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountB).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(5000)}, nil)
-	mockOnChainState.On("GetOnDemandPaymentByAccount", mock.Anything, accountC).Return(
+	mockState.EXPECT().GetOnDemandPaymentByAccount(gomock.Any(), accountC).Return(
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(3000)}, nil)
+
+	testParams := ondemand.PaymentVaultParams{
+		PricePerSymbol: 1000,
+		MinNumSymbols:  1,
+	}
 
 	// Create paymentValidator with small LRU cache size to force eviction
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		testutils.GetLogger(),
 		2,
-		mockOnChainState,
+		testParams,
+		mockState,
 		dynamoClient,
 		tableName,
+		time.Second,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -226,11 +254,4 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	require.Error(t, err, "second debit from account A should fail due to insufficient funds")
 	var insufficientFundsErr *ondemand.InsufficientFundsError
 	require.ErrorAs(t, err, &insufficientFundsErr, "error should be InsufficientFundsError")
-
-	// Verify that GetOnDemandPaymentByAccount was called exactly 4 times:
-	// 1. Initial call for account A
-	// 2. Initial call for account B
-	// 3. Initial call for account C
-	// 4. Second call for account A after it was evicted and accessed again
-	mockOnChainState.AssertNumberOfCalls(t, "GetOnDemandPaymentByAccount", 4)
 }

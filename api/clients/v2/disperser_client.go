@@ -12,6 +12,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -63,6 +64,7 @@ type disperserClient struct {
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
+	clientLedger            *payments.ClientLedger
 	metrics                 metrics.DispersalMetricer
 }
 
@@ -94,6 +96,7 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
+	clientLedger *payments.ClientLedger,
 	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
 	if config == nil {
@@ -133,13 +136,14 @@ func NewDisperserClient(
 	}
 
 	return &disperserClient{
-		logger:     logger,
-		config:     config,
-		signer:     signer,
-		clientPool: clientPool,
-		prover:     prover,
-		accountant: accountant,
-		metrics:    metrics,
+		logger:       logger,
+		config:       config,
+		signer:       signer,
+		clientPool:   clientPool,
+		prover:       prover,
+		accountant:   accountant,
+		clientLedger: clientLedger,
+		metrics:      metrics,
 	}, nil
 }
 
@@ -205,30 +209,57 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		}
 	}
 
-	probe.SetStage("acquire_accountant_lock")
-	c.accountantLock.Lock()
-
-	probe.SetStage("accountant")
-
-	err := c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
 
-	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
-		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-		c.accountantLock.Unlock()
+	var paymentMetadata *core.PaymentMetadata
+	var err error
+	successfulDispersal := false
+
+	//nolint:nestif // this is only triggering because there is old and new payment logic bundled into a single if
+	// statement. There's no use spending effort to decrease the complexity, since the old payment logic will soon
+	// go away entirely
+	if c.clientLedger != nil {
+		// TODO: set probe stages
+		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
+		if err != nil {
+			return nil, [32]byte{}, fmt.Errorf("debit: %w", err)
+		}
+
+		defer func() {
+			if successfulDispersal {
+				return
+			}
+
+			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
+			if err != nil {
+				c.logger.Errorf("revert debit failed: %v", err)
+			}
+		}()
 	} else {
-		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-		defer c.accountantLock.Unlock()
+		probe.SetStage("acquire_accountant_lock")
+		c.accountantLock.Lock()
+
+		probe.SetStage("accountant")
+
+		err = c.initOncePopulateAccountant(ctx)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, [32]byte{}, api.NewErrorFailover(err)
+		}
+
+		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+		}
+
+		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
+			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+			c.accountantLock.Unlock()
+		} else {
+			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+			defer c.accountantLock.Unlock()
+		}
 	}
 
 	probe.SetStage("verify_field_element")
@@ -281,7 +312,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: *payment,
+		PaymentMetadata: *paymentMetadata,
 	}
 
 	probe.SetStage("sign_blob_request")
@@ -317,6 +348,13 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
+
+	// Mark the dispersal as successful so the defer doesn't revert the debit
+	//
+	// TODO before merge: spend more time considering in what cases this should be true vs false
+	// For example, are there some blob status returns that mean the disperser didn't do accounting? Could we
+	// be more aggressive with client side reversions in such cases?
+	successfulDispersal = true
 
 	c.metrics.RecordBlobSizeBytes(uint(len(data)))
 

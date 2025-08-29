@@ -159,6 +159,7 @@ func NewTestClient(
 		signer,
 		kzgProver,
 		accountant,
+		nil,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
