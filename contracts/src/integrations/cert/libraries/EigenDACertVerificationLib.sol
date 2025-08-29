@@ -22,6 +22,17 @@ library EigenDACertVerificationLib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
+    // TODO: discuss whether we really need these errors + revertOnError fct.
+    // Given that we're trying to write a library that doesn't revert,
+    // the only use case for these is to try/catch on custom errors in the CertVerifier,
+    // but is that really how we want to architect this?
+    // For example, we have the revertOnError internal function, but its never called,
+    // so these errors are never thrown right now...
+
+    /// @notice Thrown when the inclusion proof is not a multiple of 32
+    /// @param length Length of the inclusion proof
+    error InclusionProofNotMultipleOf32(uint256 length);
+
     /// @notice Thrown when the inclusion proof is invalid
     /// @param blobIndex The index of the blob in the batch
     /// @param blobHash The hash of the blob certificate
@@ -56,6 +67,7 @@ library EigenDACertVerificationLib {
     enum StatusCode {
         NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
+        INCLUSION_PROOF_NOT_MULTIPLE_32, // Merkle inclusion proof not right length
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
@@ -119,7 +131,6 @@ library EigenDACertVerificationLib {
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
     ) internal view returns (StatusCode err, bytes memory errParams) {
-        // TODO: this can revert on a wrong inclusionProof length
         (err, errParams) = checkBlobInclusion(batchHeader, blobInclusionInfo);
         if (err != StatusCode.SUCCESS) {
             return (err, errParams);
@@ -176,7 +187,10 @@ library EigenDACertVerificationLib {
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
 
-        // TODO: this can revert on a wrong inclusionProof length
+        // Explicitly check this before calling verifyInclusionKeccak which reverts.
+        if (blobInclusionInfo.inclusionProof.length % 32 != 0) {
+            return (StatusCode.INCLUSION_PROOF_NOT_MULTIPLE_32, abi.encode(blobInclusionInfo.inclusionProof.length));
+        }
         bool isValid = Merkle.verifyInclusionKeccak(
             blobInclusionInfo.inclusionProof, rootHash, encodedBlobHash, blobInclusionInfo.blobIndex
         );
@@ -390,6 +404,9 @@ library EigenDACertVerificationLib {
         if (err == StatusCode.INVALID_INCLUSION_PROOF) {
             (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) = abi.decode(errParams, (uint256, bytes32, bytes32));
             revert InvalidInclusionProof(blobIndex, blobHash, rootHash);
+        } else if (err == StatusCode.INCLUSION_PROOF_NOT_MULTIPLE_32) {
+            uint256 inclusionProofLen = abi.decode(errParams, (uint256));
+            revert InclusionProofNotMultipleOf32(inclusionProofLen);
         } else if (err == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
             (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(errParams, (uint256, uint256, uint256));
             revert SecurityAssumptionsNotMet(gamma, n, minRequired);
@@ -405,6 +422,7 @@ library EigenDACertVerificationLib {
             // errParams contains the revert reason
             revert SignatureVerificationCallRevert(errParams);
         } else {
+            // TODO: add EMPTY_BLOB_QUORUMS, UNORDERED_OR_DUPLICATE_QUORUMS, GREATER_THAN_256_QUORUMS
             revert("Unknown error code");
         }
     }
