@@ -16,12 +16,12 @@ func NewDynamoSigningRateStorage() (SigningRateStorage, error) {
 	return &dynamoSigningRateStorage{}, nil
 }
 
-func (d *dynamoSigningRateStorage) StoreBucket(buckets []Bucket) error {
+func (d *dynamoSigningRateStorage) StoreBuckets(buckets []*Bucket) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (d *dynamoSigningRateStorage) LoadBuckets(startTimestamp time.Time) ([]Bucket, error) {
+func (d *dynamoSigningRateStorage) LoadBuckets(startTimestamp time.Time) ([]*Bucket, error) {
 	//TODO implement me
 	panic("implement me")
 }

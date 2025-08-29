@@ -6,6 +6,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/enforce"
 )
 
+// The minimum initial capacity of a RandomAccessDeque.
+const minimumInitialCapacity = 32
+
 // A double-ended queue (deque) that supports O(1) lookup by index.
 //
 // - Insertion time: O(1) average, O(n) worst-case (when resizing is needed)
@@ -30,8 +33,8 @@ type RandomAccessDeque[T any] struct {
 // Create a new RandomAccessDeque with the specified initial capacity. Queue can grow beyond this capacity if needed.
 func NewRandomAccessDeque[T any](initialCapacity uint64) *RandomAccessDeque[T] {
 
-	if initialCapacity < 8 {
-		initialCapacity = 8 // TODO test better
+	if initialCapacity < minimumInitialCapacity {
+		initialCapacity = minimumInitialCapacity
 	}
 
 	return &RandomAccessDeque[T]{

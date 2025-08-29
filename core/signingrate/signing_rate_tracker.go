@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -40,6 +41,22 @@ type SigningRateTracker interface {
 // A standard implementation of the SigningRateTracker interface. Is not thread safe on its own.
 type signingRateTracker struct {
 	logger logging.Logger
+
+	// Signing data storage, split up into buckets for each time interval. Buckets are stored in chronological order.
+	buckets *common.RandomAccessDeque[*Bucket]
+
+	// Stores buckets in a way that survives restarts.
+	storage SigningRateStorage
+
+	// The length of time to keep loaded in memory.
+	timespan time.Duration
+
+	// The duration of each bucket. Buckets loaded from storage may have different spans, but new buckets will
+	// always have this span.
+	bucketSpan time.Duration
+
+	// How often to flush in-memory data to the database.
+	flushPeriod time.Duration
 }
 
 // Create a new SigningRateTracker.
@@ -50,13 +67,31 @@ type signingRateTracker struct {
 //   - flushPeriod: How often to flush in-memory data to the database. If the process is shut down/crashes, any data
 //     not yet flushed to the database may be lost.
 func NewSigningRateTracker(
-	signingRateDatabase SigningRateStorage,
+	logger logging.Logger,
+	storage SigningRateStorage,
 	timespan time.Duration,
 	bucketSpan time.Duration,
 	flushPeriod time.Duration,
 ) (SigningRateTracker, error) {
 
-	store := &signingRateTracker{}
+	store := &signingRateTracker{
+		logger:      logger,
+		buckets:     common.NewRandomAccessDeque[*Bucket](0),
+		storage:     storage,
+		timespan:    timespan,
+		bucketSpan:  bucketSpan,
+		flushPeriod: flushPeriod,
+	}
+
+	// Load old buckets from storage.
+	startTimestamp := time.Now().Add(-timespan)
+	previousBuckets, err := storage.LoadBuckets(startTimestamp)
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range previousBuckets {
+		store.buckets.PushBack(b)
+	}
 
 	return store, nil
 }
