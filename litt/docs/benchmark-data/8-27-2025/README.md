@@ -125,21 +125,21 @@ of this two week benchmark, no data corruption was detected. Note that since the
 the read rate, only a small fraction of the data written was actually read and validated. But if there was systemic
 and large scale data corruption, it is very likely that the random sampling would have detected it.
 
-## Further Work
+# Future Work
 
-### Test Length
+## Test Length
 
 The intended use case of the DB requires continuous uptime over months or years. This test was only 2 weeks long, so
 it's possible that issues could arise over longer time periods. The length of this test was limited by cost 
 considerations,
 
-### Read Workload
+## Read Workload
 
 The read workload of this test was intentionally kept light. The primary purpose of this test was to verify that
 performance did not degrade with large quantities of data on disk. It might be interesting to repeat this test
 with a more realistic read workload.
 
-### Larger Data Set
+## Larger Data Set
 
 The target data size for this test was ~200 TB. The test only achieved ~192 TB, but this is close enough for all
 practical purposes. The exact quantity of data stored on disk is a function of the write throughput and the TTL.
