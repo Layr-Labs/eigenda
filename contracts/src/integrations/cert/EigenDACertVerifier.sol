@@ -14,6 +14,14 @@ import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
 import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
+/// @title EigenDACertVerifier
+/// @notice Verifies EigenDA certificates
+/// @dev This contract's checkDACert function is designed to be zk provable by risczero's Steel library,
+/// which does not support zk proving reverting calls: https://github.com/risc0/risc0-ethereum/issues/438.
+/// For this reason, we avoid using revert statements and instead return error codes.
+/// The only acceptable reverts are from bugs, such as contract misconfiguration.
+/// The goal is to be able to perfectly classify into 3 categories: valid certs, invalid certs, and bugs.
+/// Bugs could be configuration mistakes (_eigenDAThresholdRegistry points to 0x0), or other unexpected logic issues.
 contract EigenDACertVerifier is
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
