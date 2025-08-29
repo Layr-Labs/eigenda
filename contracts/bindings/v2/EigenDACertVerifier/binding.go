@@ -69,8 +69,7 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackConstructor(
 }
 
 // PackCertVersion is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x2ead0b96.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0x2ead0b96.
 //
 // Solidity: function certVersion() pure returns(uint8)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCertVersion() []byte {
@@ -79,15 +78,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCertVersion(
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackCertVersion is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x2ead0b96.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function certVersion() pure returns(uint8)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackCertVersion() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("certVersion")
 }
 
 // UnpackCertVersion is the Go binding that unpacks the parameters returned
@@ -100,12 +90,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackCertVersio
 		return *new(uint8), err
 	}
 	out0 := *abi.ConvertType(out[0], new(uint8)).(*uint8)
-	return out0, nil
+	return out0, err
 }
 
 // PackCheckDACert is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x9077193b.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0x9077193b.
 //
 // Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCheckDACert(abiEncodedCert []byte) []byte {
@@ -114,15 +103,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackCheckDACert(
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackCheckDACert is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x9077193b.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackCheckDACert(abiEncodedCert []byte) ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("checkDACert", abiEncodedCert)
 }
 
 // UnpackCheckDACert is the Go binding that unpacks the parameters returned
@@ -135,12 +115,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackCheckDACer
 		return *new(uint8), err
 	}
 	out0 := *abi.ConvertType(out[0], new(uint8)).(*uint8)
-	return out0, nil
+	return out0, err
 }
 
 // PackEigenDASignatureVerifier is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xefd4532b.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0xefd4532b.
 //
 // Solidity: function eigenDASignatureVerifier() view returns(address)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackEigenDASignatureVerifier() []byte {
@@ -149,15 +128,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackEigenDASigna
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackEigenDASignatureVerifier is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xefd4532b.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function eigenDASignatureVerifier() view returns(address)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackEigenDASignatureVerifier() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("eigenDASignatureVerifier")
 }
 
 // UnpackEigenDASignatureVerifier is the Go binding that unpacks the parameters returned
@@ -170,12 +140,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackEigenDASig
 		return *new(common.Address), err
 	}
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-	return out0, nil
+	return out0, err
 }
 
 // PackEigenDAThresholdRegistry is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xf8c66814.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0xf8c66814.
 //
 // Solidity: function eigenDAThresholdRegistry() view returns(address)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackEigenDAThresholdRegistry() []byte {
@@ -184,15 +153,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackEigenDAThres
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackEigenDAThresholdRegistry is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xf8c66814.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function eigenDAThresholdRegistry() view returns(address)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackEigenDAThresholdRegistry() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("eigenDAThresholdRegistry")
 }
 
 // UnpackEigenDAThresholdRegistry is the Go binding that unpacks the parameters returned
@@ -205,12 +165,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackEigenDAThr
 		return *new(common.Address), err
 	}
 	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-	return out0, nil
+	return out0, err
 }
 
 // PackQuorumNumbersRequired is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xe15234ff.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0xe15234ff.
 //
 // Solidity: function quorumNumbersRequired() view returns(bytes)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackQuorumNumbersRequired() []byte {
@@ -219,15 +178,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackQuorumNumber
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackQuorumNumbersRequired is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xe15234ff.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function quorumNumbersRequired() view returns(bytes)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackQuorumNumbersRequired() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("quorumNumbersRequired")
 }
 
 // UnpackQuorumNumbersRequired is the Go binding that unpacks the parameters returned
@@ -240,12 +190,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackQuorumNumb
 		return *new([]byte), err
 	}
 	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
-	return out0, nil
+	return out0, err
 }
 
 // PackSecurityThresholds is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x21b9b2fb.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0x21b9b2fb.
 //
 // Solidity: function securityThresholds() view returns((uint8,uint8))
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackSecurityThresholds() []byte {
@@ -254,15 +203,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackSecurityThre
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackSecurityThresholds is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0x21b9b2fb.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function securityThresholds() view returns((uint8,uint8))
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackSecurityThresholds() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("securityThresholds")
 }
 
 // UnpackSecurityThresholds is the Go binding that unpacks the parameters returned
@@ -275,12 +215,11 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackSecurityTh
 		return *new(EigenDATypesV1SecurityThresholds), err
 	}
 	out0 := *abi.ConvertType(out[0], new(EigenDATypesV1SecurityThresholds)).(*EigenDATypesV1SecurityThresholds)
-	return out0, nil
+	return out0, err
 }
 
 // PackSemver is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xcda493c8.  This method will panic if any
-// invalid/nil inputs are passed.
+// the contract method with ID 0xcda493c8.
 //
 // Solidity: function semver() pure returns(uint8 major, uint8 minor, uint8 patch)
 func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackSemver() []byte {
@@ -289,15 +228,6 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) PackSemver() []b
 		panic(err)
 	}
 	return enc
-}
-
-// TryPackSemver is the Go binding used to pack the parameters required for calling
-// the contract method with ID 0xcda493c8.  This method will return an error
-// if any inputs are invalid/nil.
-//
-// Solidity: function semver() pure returns(uint8 major, uint8 minor, uint8 patch)
-func (contractEigenDACertVerifier *ContractEigenDACertVerifier) TryPackSemver() ([]byte, error) {
-	return contractEigenDACertVerifier.abi.Pack("semver")
 }
 
 // SemverOutput serves as a container for the return parameters of contract
@@ -321,7 +251,8 @@ func (contractEigenDACertVerifier *ContractEigenDACertVerifier) UnpackSemver(dat
 	outstruct.Major = *abi.ConvertType(out[0], new(uint8)).(*uint8)
 	outstruct.Minor = *abi.ConvertType(out[1], new(uint8)).(*uint8)
 	outstruct.Patch = *abi.ConvertType(out[2], new(uint8)).(*uint8)
-	return *outstruct, nil
+	return *outstruct, err
+
 }
 
 // UnpackError attempts to decode the provided error data using user-defined
