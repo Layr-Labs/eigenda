@@ -28,7 +28,6 @@ type TestPaymentVault struct {
 
 var _ payments.PaymentVault = &TestPaymentVault{}
 
-// NewTestPaymentVault creates a new test payment vault with default values
 func NewTestPaymentVault() *TestPaymentVault {
 	return &TestPaymentVault{
 		totalDeposits:          make(map[gethcommon.Address]*big.Int),
@@ -38,7 +37,6 @@ func NewTestPaymentVault() *TestPaymentVault {
 	}
 }
 
-// SetDeposit sets the deposit amount for a specific account
 func (t *TestPaymentVault) SetDeposit(account gethcommon.Address, amount *big.Int) {
 	if amount == nil {
 		delete(t.totalDeposits, account)
@@ -47,47 +45,38 @@ func (t *TestPaymentVault) SetDeposit(account gethcommon.Address, amount *big.In
 	}
 }
 
-// SetGlobalSymbolsPerSecond sets the global symbols per second parameter
 func (t *TestPaymentVault) SetGlobalSymbolsPerSecond(value uint64) {
 	t.globalSymbolsPerSecond = value
 }
 
-// SetMinNumSymbols sets the minimum number of symbols parameter
 func (t *TestPaymentVault) SetMinNumSymbols(value uint64) {
 	t.minNumSymbols = value
 }
 
-// SetPricePerSymbol sets the price per symbol parameter
 func (t *TestPaymentVault) SetPricePerSymbol(value uint64) {
 	t.PricePerSymbol = value
 }
 
-// SetGetTotalDepositsErr sets the error to return from GetTotalDeposits
 func (t *TestPaymentVault) SetGetTotalDepositsErr(err error) {
 	t.getTotalDepositsErr = err
 }
 
-// SetGetTotalDepositErr sets the error to return from GetTotalDeposit
 func (t *TestPaymentVault) SetGetTotalDepositErr(err error) {
 	t.getTotalDepositErr = err
 }
 
-// SetGetGlobalSymbolsPerSecErr sets the error to return from GetGlobalSymbolsPerSecond
 func (t *TestPaymentVault) SetGetGlobalSymbolsPerSecErr(err error) {
 	t.getGlobalSymbolsPerSecErr = err
 }
 
-// SetGetMinNumSymbolsErr sets the error to return from GetMinNumSymbols
 func (t *TestPaymentVault) SetGetMinNumSymbolsErr(err error) {
 	t.getMinNumSymbolsErr = err
 }
 
-// SetGetPricePerSymbolErr sets the error to return from GetPricePerSymbol
 func (t *TestPaymentVault) SetGetPricePerSymbolErr(err error) {
 	t.getPricePerSymbolErr = err
 }
 
-// GetTotalDeposits retrieves on-demand payment information for multiple accounts
 func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []gethcommon.Address) ([]*big.Int, error) {
 	if t.getTotalDepositsErr != nil {
 		return nil, t.getTotalDepositsErr
@@ -104,7 +93,6 @@ func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []ge
 	return result, nil
 }
 
-// GetTotalDeposit retrieves on-demand payment information for a single account
 func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	if t.getTotalDepositErr != nil {
 		return nil, t.getTotalDepositErr
@@ -116,7 +104,6 @@ func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethco
 	return big.NewInt(0), nil
 }
 
-// GetGlobalSymbolsPerSecond retrieves the global symbols per second parameter
 func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
 	if t.getGlobalSymbolsPerSecErr != nil {
 		return 0, t.getGlobalSymbolsPerSecErr
@@ -124,7 +111,6 @@ func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint6
 	return t.globalSymbolsPerSecond, nil
 }
 
-// GetMinNumSymbols retrieves the minimum number of symbols parameter
 func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
 	if t.getMinNumSymbolsErr != nil {
 		return 0, t.getMinNumSymbolsErr
@@ -132,7 +118,6 @@ func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error)
 	return t.minNumSymbols, nil
 }
 
-// GetPricePerSymbol retrieves the price per symbol parameter
 func (t *TestPaymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	if t.getPricePerSymbolErr != nil {
 		return 0, t.getPricePerSymbolErr

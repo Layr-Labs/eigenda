@@ -22,7 +22,6 @@ type paymentVault struct {
 
 var _ payments.PaymentVault = &paymentVault{}
 
-// NewPaymentVault creates a new PaymentVault instance
 func NewPaymentVault(
 	logger logging.Logger,
 	ethClient common.EthClient,
