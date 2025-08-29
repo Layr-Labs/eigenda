@@ -183,6 +183,20 @@ func (s *RandomAccessDeque[T]) Get(index uint64) (value T, err error) {
 	return s.data[realIndex], nil
 }
 
+// Get an element indexed from the last thing in the deque. Equivalent to Get(Size() - 1 - index).
+// If the index is out of bounds returns an error.
+func (s *RandomAccessDeque[T]) GetFromBack(index uint64) (value T, err error) {
+	if index >= s.size {
+		var zero T
+		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+	}
+
+	value, err = s.Get(s.size - 1 - index)
+	enforce.NilError(err, "Get failed, this should never happen if size check passes")
+
+	return value, nil
+}
+
 // Set the value at the specified index, replacing the existing value, which is returned.
 // If the index is out of bounds returns an error.
 func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err error) {

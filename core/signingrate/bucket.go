@@ -21,8 +21,11 @@ const (
 )
 
 // TODO unit test
+// TODO: periodic logging of validators with bad signing rates
 
 // A Bucket for tracking signing rates. A bucket holds information about signing rates for a specific time interval.
+// Roughly correlates to the validator.SigningRateBucket protobuf message, but also includes extra data structures
+// to help with tracking state while the bucket is being written to.
 type Bucket struct {
 	logger logging.Logger
 
@@ -34,16 +37,20 @@ type Bucket struct {
 
 	// Signing rate info for each validator in this bucket. If a validator is not present in this map, it can be
 	// assumed that the validator has been Down for the entire duration of the bucket.
-	validatorInfo map[core.OperatorID]*validator.ValidatorSigningRate
+	validatorInfo map[core.OperatorID]*SigningRate
 
 	// For each validator, whether we think that validator is Up or Down.
 	// If a validator is not present in this map, it can be assumed that it has been "down" for the entire duration
-	// of the bucket.
+	// of the bucket. This field is ignored when a bucket is immutable, since it's only
+	// a tool for tracking state while the bucket is being written to.
 	statusMap map[core.OperatorID]ValidatorStatus
 
 	// For each validator, the timestamp when its entry in the statusMap last changed. If a validator is not present
 	// in this map, it can be assumed that the validator has been down for the entire duration of the bucket.
 	lastStatusUpdate map[core.OperatorID]time.Time
+
+	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
+	cachedProtobuf *validator.SigningRateBucket
 }
 
 // Create a new empty Bucket. If provided with validator IDs, then those validators will be initialized as Up.
@@ -51,16 +58,17 @@ type Bucket struct {
 func NewBucket(
 	logger logging.Logger,
 	startTime time.Time,
+	span time.Duration,
 	onlineValidators ...core.OperatorID,
 ) *Bucket {
 
-	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+	validatorInfo := make(map[core.OperatorID]*SigningRate)
 	statusMap := make(map[core.OperatorID]ValidatorStatus)
 	lastStatusUpdate := make(map[core.OperatorID]time.Time)
 	bucket := &Bucket{
 		logger:           logger,
 		startTimestamp:   startTime,
-		endTimestamp:     startTime,
+		endTimestamp:     startTime.Add(span),
 		validatorInfo:    validatorInfo,
 		statusMap:        statusMap,
 		lastStatusUpdate: lastStatusUpdate,
@@ -73,31 +81,72 @@ func NewBucket(
 	return bucket
 }
 
+// Parse a Bucket from its protobuf representation.
+func NewBucketFromProto(
+	logger logging.Logger,
+	pb *validator.SigningRateBucket,
+) *Bucket {
+
+	startTime := time.Unix(int64(pb.StartTimestamp), 0)
+	endTime := time.Unix(int64(pb.EndTimestamp), 0)
+
+	validatorInfo := make(map[core.OperatorID]*SigningRate)
+	statusMap := make(map[core.OperatorID]ValidatorStatus)
+	lastStatusUpdate := make(map[core.OperatorID]time.Time)
+
+	for _, info := range pb.ValidatorSigningRates {
+		var id core.OperatorID
+		copy(id[:], info.Id)
+		validatorInfo[id] = NewSigningRateFromProtobuf(info)
+		lastStatusUpdate[id] = startTime
+	}
+
+	return &Bucket{
+		logger:           logger,
+		startTimestamp:   startTime,
+		endTimestamp:     endTime,
+		validatorInfo:    validatorInfo,
+		statusMap:        statusMap,
+		lastStatusUpdate: lastStatusUpdate,
+	}
+}
+
 // Convert this Bucket to its protobuf representation.
 //
 // If now is nil, then the EndTimestamp will be set to the last time that data was added to this bucket.
 // If now is non-nil, then the EndTimestamp will be set to now. In general, a non-nil value for now should
 // be provided when getting information about a bucket that is currently being written to, and nil should
 // be provided when getting information about bucket in the past that is no longer being written to.
-func (b *Bucket) ToProto(now *time.Time) *validator.SigningRateBucket {
+func (b *Bucket) ToProtobuf(now time.Time) *validator.SigningRateBucket {
+	if b.cachedProtobuf != nil {
+		return b.cachedProtobuf
+	}
+
 	start := uint64(b.startTimestamp.Unix())
+
 	var end uint64
-	if now != nil {
+	if b.endTimestamp.IsZero() {
+		// The end timestamp of this bucket is not yet set. Use the current time as the end timestamp.
 		end = uint64(now.Unix())
 	} else {
+		// The end timestamp of this bucket is set. Use it.
 		end = uint64(b.endTimestamp.Unix())
 	}
 
 	validatorSigningRates := make([]*validator.ValidatorSigningRate, 0, len(b.validatorInfo))
 	for _, info := range b.validatorInfo {
-		validatorSigningRates = append(validatorSigningRates, info)
+		validatorSigningRates = append(validatorSigningRates, info.ToProtobuf())
 	}
 
-	return &validator.SigningRateBucket{
+	// Sort for deterministic output. Not strictly necessary, but sometimes nice to have.
+	sortValidatorSigningRate(validatorSigningRates)
+
+	b.cachedProtobuf = &validator.SigningRateBucket{
 		StartTimestamp:        start,
 		EndTimestamp:          end,
 		ValidatorSigningRates: validatorSigningRates,
 	}
+	return b.cachedProtobuf
 }
 
 // Report that a validator has successfully signed a batch of the given size.
@@ -114,11 +163,12 @@ func (b *Bucket) ReportSuccess(
 
 	b.handleStatusChange(now, id, Up)
 
-	info.SignedBatches += 1
-	info.SignedBytes += batchSize
-	info.SigningLatency += uint64(signingLatency.Nanoseconds())
+	info.IncrementSignedBatches()
+	info.AddSignedBytes(batchSize)
+	info.AddSigningLatency(uint64(signingLatency.Nanoseconds()))
 
 	b.endTimestamp = now
+	b.cachedProtobuf = nil
 }
 
 // Report that a validator has failed to sign a batch of the given size.
@@ -130,14 +180,36 @@ func (b *Bucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint
 
 	b.handleStatusChange(now, id, Down)
 
-	info.UnsignedBatches += 1
-	info.UnsignedBytes += batchSize
+	info.IncrementSignedBatches()
+	info.AddUnsignedBytes(batchSize)
 
 	b.endTimestamp = now
+	b.cachedProtobuf = nil
+}
+
+// Get the start timestamp of this bucket.
+func (b *Bucket) StartTimestamp() time.Time {
+	return b.startTimestamp
+}
+
+// Get the end timestamp of this bucket.
+func (b *Bucket) EndTimestamp() time.Time {
+	return b.endTimestamp
+}
+
+// Fetch a list of validator IDs that are currently considered to be Up.
+func (b *Bucket) GetOnlineValidators() []core.OperatorID {
+	ids := make([]core.OperatorID, 0, len(b.statusMap))
+	for id, status := range b.statusMap {
+		if status == Up {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // Get the signing rate info for a validator, creating a new entry if necessary.
-func (b *Bucket) getValidator(id core.OperatorID, now time.Time) *validator.ValidatorSigningRate {
+func (b *Bucket) getValidator(id core.OperatorID, now time.Time) *SigningRate {
 	info, exists := b.validatorInfo[id]
 	if !exists {
 		info = b.newValidator(id, now, Down)
@@ -149,11 +221,9 @@ func (b *Bucket) getValidator(id core.OperatorID, now time.Time) *validator.Vali
 func (b *Bucket) newValidator(
 	id core.OperatorID,
 	now time.Time,
-	status ValidatorStatus) *validator.ValidatorSigningRate {
+	status ValidatorStatus) *SigningRate {
 
-	signingRate := &validator.ValidatorSigningRate{
-		Id: id[:],
-	}
+	signingRate := NewSigningRate(id)
 	b.validatorInfo[id] = signingRate
 	b.statusMap[id] = status
 	b.lastStatusUpdate[id] = now
@@ -197,5 +267,5 @@ func (b *Bucket) handleStatusChange(now time.Time, id core.OperatorID, newStatus
 	nanosecondsUp := now.Sub(lastUpdateTime).Nanoseconds()
 	info, ok := b.validatorInfo[id]
 	enforce.True(ok, "validator %v not found in validator info map", id)
-	info.Uptime += uint64(nanosecondsUp)
+	info.AddUptime(uint64(nanosecondsUp))
 }

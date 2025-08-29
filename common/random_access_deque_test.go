@@ -147,6 +147,10 @@ func TestRandomDequeOperations(t *testing.T) {
 			_, err = deque.Get(0)
 			require.Error(t, err)
 			_, err = deque.Get(rand.Uint64())
+			_, err = deque.GetFromBack(0)
+			require.Error(t, err)
+			_, err = deque.GetFromBack(rand.Uint64())
+			require.Error(t, err)
 			require.Error(t, err)
 			_, err = deque.Set(0, rand.Int())
 			require.Error(t, err)
@@ -184,6 +188,11 @@ func TestRandomDequeOperations(t *testing.T) {
 				value, err := deque.Get(uint64(index))
 				require.NoError(t, err)
 				require.Equal(t, expectedArray[index], value)
+
+				// fetch the same value, but indexed from the back
+				valueFromBack, err := deque.GetFromBack(expectedSize - uint64(index) - 1)
+				require.NoError(t, err)
+				require.Equal(t, expectedArray[index], valueFromBack)
 			}
 
 			// Iterate forwards

@@ -14,32 +14,24 @@ type threadsafeSigningRateTracker struct {
 	base SigningRateTracker
 }
 
-// Create a new threadsafeSigningRateTracker that wraps the provided base SigningRateTracker.
-func NewThreadsafeSigningRateStore(base SigningRateTracker) SigningRateTracker {
-
-	store := &threadsafeSigningRateTracker{
-		base: base,
-	}
-
-	return store
-}
-
-func (t threadsafeSigningRateTracker) Close() {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (t threadsafeSigningRateTracker) GetValidatorSigningRate(
 	operatorID []byte,
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
-
 	//TODO implement me
 	panic("implement me")
 }
 
-func (t threadsafeSigningRateTracker) GetSigningRateDump() ([]*validator.SigningRateBucket, error) {
+func (t threadsafeSigningRateTracker) GetSigningRateDump(
+	startTime time.Time,
+	now time.Time,
+) []*validator.SigningRateBucket {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t threadsafeSigningRateTracker) GetUnflushedBuckets() []*validator.SigningRateBucket {
 	//TODO implement me
 	panic("implement me")
 }
@@ -55,6 +47,11 @@ func (t threadsafeSigningRateTracker) ReportSuccess(
 }
 
 func (t threadsafeSigningRateTracker) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t threadsafeSigningRateTracker) Close() {
 	//TODO implement me
 	panic("implement me")
 }
