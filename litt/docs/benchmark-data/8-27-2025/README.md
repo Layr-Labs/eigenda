@@ -23,7 +23,7 @@ did not degrade over time and with this quantity of data on disk.
 | Disk encryption   | disabled                                     |
 | Disk backup       | disabled                                     |
 
-# Setup
+# Configuration
 
 I used the following benchmark configuration:
 
