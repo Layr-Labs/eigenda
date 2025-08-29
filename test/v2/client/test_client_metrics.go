@@ -36,6 +36,7 @@ type testClientMetrics struct {
 	validatorReadFailures  *prometheus.CounterVec
 	proxyReadSuccesses     *prometheus.CounterVec
 	proxyReadFailures      *prometheus.CounterVec
+	gasCheckDACert         prometheus.Gauge
 }
 
 // newTestClientMetrics creates a new testClientMetrics.
@@ -194,6 +195,14 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		[]string{},
 	)
 
+	gasCheckDACert := promauto.With(registry).NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "gas_checkdacert",
+			Help:      "Gas estimate for CheckDACert call",
+		},
+	)
+
 	return &testClientMetrics{
 		logger:                 logger,
 		server:                 server,
@@ -211,6 +220,7 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		validatorReadFailures:  validatorReadFailures,
 		proxyReadSuccesses:     proxyReadSuccesses,
 		proxyReadFailures:      proxyReadFailures,
+		gasCheckDACert:         gasCheckDACert,
 	}
 }
 
@@ -336,4 +346,11 @@ func (m *testClientMetrics) reportProxyReadFailure() {
 		return
 	}
 	m.proxyReadFailures.WithLabelValues().Inc()
+}
+
+func (m *testClientMetrics) reportEstimateGasCheckDACert(gas uint64) {
+	if m == nil {
+		return
+	}
+	m.gasCheckDACert.Set(float64(gas))
 }

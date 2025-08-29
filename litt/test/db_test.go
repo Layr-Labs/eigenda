@@ -50,6 +50,11 @@ var restartableBuilders = []*dbBuilder{
 	},
 }
 
+var flushLimitedBuilder = &dbBuilder{
+	name:    "levelDB keymap disk table with flush limiter",
+	builder: buildLevelDBDiskDBWithFlushLimiter,
+}
+
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
@@ -94,6 +99,24 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.DoubleWriteProtection = true
 
 	return littbuilder.NewDB(config)
+}
+
+func buildLevelDBDiskDBWithFlushLimiter(t *testing.T, path string) (litt.DB, error) {
+	config, err := litt.DefaultConfig(path)
+	require.NoError(t, err)
+	config.KeymapType = keymap.UnsafeLevelDBKeymapType
+	config.WriteCacheSize = 1000
+	config.TargetSegmentFileSize = 100
+	config.ShardingFactor = 4
+	config.Fsync = false // fsync is too slow for unit test workloads
+	config.DoubleWriteProtection = true
+	config.MinimumFlushInterval = 50 * time.Millisecond
+
+	db, err := littbuilder.NewDB(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build levelDB: %w", err)
+	}
+	return db, nil
 }
 
 func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
@@ -194,6 +217,13 @@ func TestRandomDBOperations(t *testing.T) {
 			randomDBOperationsTest(t, builder)
 		})
 	}
+}
+
+// Test with flush limiting enabled. This will be slower for the unit test data access pattern, but we need to
+// exercise the code pathways.
+func TestRandomDBOperationsWithFlushLimiter(t *testing.T) {
+	t.Parallel()
+	randomDBOperationsTest(t, flushLimitedBuilder)
 }
 
 func dbRestartTest(t *testing.T, builder *dbBuilder) {

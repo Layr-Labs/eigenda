@@ -318,7 +318,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	c.metrics.RecordBlobSizeBytes(uint(len(data)))
+	c.metrics.RecordBlobSizeBytes(len(data))
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
 }

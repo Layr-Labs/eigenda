@@ -10,7 +10,7 @@ const (
 )
 
 type DispersalMetricer interface {
-	RecordBlobSizeBytes(size uint)
+	RecordBlobSizeBytes(size int)
 
 	Document() []metrics.DocumentedMetric
 }
@@ -27,19 +27,6 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 	}
 
 	factory := metrics.With(registry)
-	// Define size buckets for payload and blob size measurements
-	// Starting from 0 up to 16MiB
-	sizeBuckets := []float64{
-		0,
-		131072,   // 128KiB
-		262144,   // 256KiB
-		524288,   // 512KiB
-		1048576,  // 1MiB
-		2097152,  // 2MiB
-		4194304,  // 4MiB
-		8388608,  // 8MiB
-		16777216, // 16MiB
-	}
 
 	return &DispersalMetrics{
 		BlobSize: factory.NewHistogram(prometheus.HistogramOpts{
@@ -47,12 +34,13 @@ func NewDispersalMetrics(registry *prometheus.Registry) DispersalMetricer {
 			Namespace: namespace,
 			Subsystem: dispersalSubsystem,
 			Help:      "Size of blobs created from payloads in bytes",
-			Buckets:   sizeBuckets,
+			Buckets:   blobSizeBuckets,
 		}),
+		factory: factory,
 	}
 }
 
-func (m *DispersalMetrics) RecordBlobSizeBytes(size uint) {
+func (m *DispersalMetrics) RecordBlobSizeBytes(size int) {
 	m.BlobSize.Observe(float64(size))
 }
 
@@ -65,7 +53,7 @@ type noopDispersalMetricer struct {
 
 var NoopDispersalMetrics DispersalMetricer = new(noopDispersalMetricer)
 
-func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ uint) {
+func (n *noopDispersalMetricer) RecordBlobSizeBytes(_ int) {
 }
 
 func (n *noopDispersalMetricer) Document() []metrics.DocumentedMetric {

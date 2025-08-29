@@ -135,6 +135,11 @@ type Config struct {
 	// users of this software will be running in such an environment, this is disabled by default.
 	LittRespectLocks bool
 
+	// The minimum interval between littDB flushes. If zero, then there is no minimum interval.
+	// Useful for "batching" flush operations when flush operations become extremely frequent.
+	// Set this to zero to disable this feature.
+	LittMinimumFlushInterval time.Duration
+
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
 	GetChunksHotCacheReadLimitMB float64
@@ -415,6 +420,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
 		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
 		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
+		LittMinimumFlushInterval:      ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
 		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
