@@ -46,6 +46,7 @@ ABIGEN_V1_CONTRACTS=(
   "IEigenDARelayRegistry"
   "EigenDADisperserRegistry"
   "IEigenDADirectory"
+  "IEigenDAEjectionManager"
 )
 
 build_artifact_json_path() {
