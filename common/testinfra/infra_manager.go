@@ -402,7 +402,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			operatorConfig.EcdsaKeyFile = fmt.Sprintf("/app/secrets/ecdsa_keys/keys/%d.ecdsa.key.json", keyIndex)
 
 			// Read BLS password from the password file
-			blsPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "bls_keys", "password.txt")
+			blsPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "common", "testinfra", "secrets", "bls_keys", "password.txt")
 			blsPasswords, err := readPasswordFile(blsPasswordFile)
 			if err != nil {
 				fmt.Printf("Warning: Could not read BLS password file: %v\n", err)
@@ -416,7 +416,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 
 			// Read ECDSA password from the password file
-			ecdsaPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "password.txt")
+			ecdsaPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "common", "testinfra", "secrets", "ecdsa_keys", "password.txt")
 			ecdsaPasswords, err := readPasswordFile(ecdsaPasswordFile)
 			if err != nil {
 				// Fallback to using private key directly if password file is not available
@@ -428,7 +428,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 
 				// In test mode, we also need to provide the raw private key
 				// Read the ECDSA private key from the private_key_hex.txt file
-				ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
+				ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "common", "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
 				ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
 				if err == nil && keyIndex <= len(ecdsaKeys) {
 					operatorConfig.EcdsaPrivateKey = ecdsaKeys[keyIndex-1]
@@ -1288,7 +1288,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 
 		// Load operator ECDSA private keys from the secrets directory
 		// These are the actual keys the operators will use for transactions
-		ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
+		ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "common", "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
 		ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
 		if err == nil {
 			// Add ECDSA keys to the privateKeys map with "opr{i}_ecdsa" naming
