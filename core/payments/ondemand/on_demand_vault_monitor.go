@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -34,7 +35,11 @@ func NewOnDemandVaultMonitor(
 	updateInterval time.Duration,
 	getAccountsToUpdate func() []gethcommon.Address,
 	updateTotalDeposit func(accountID gethcommon.Address, newTotalDeposit *big.Int) error,
-) *OnDemandVaultMonitor {
+) (*OnDemandVaultMonitor, error) {
+	if updateInterval <= 0 {
+		return nil, errors.New("updateInterval must be > 0")
+	}
+
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	monitor := &OnDemandVaultMonitor{
@@ -47,7 +52,7 @@ func NewOnDemandVaultMonitor(
 	}
 
 	go monitor.runUpdateLoop(ctxWithCancel)
-	return monitor
+	return monitor, nil
 }
 
 func (vm *OnDemandVaultMonitor) Stop() {

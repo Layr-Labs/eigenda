@@ -17,13 +17,6 @@ type TestPaymentVault struct {
 	globalSymbolsPerSecond uint64
 	minNumSymbols          uint64
 	PricePerSymbol         uint64
-
-	// Error injection for testing error paths
-	getTotalDepositsErr       error
-	getTotalDepositErr        error
-	getGlobalSymbolsPerSecErr error
-	getMinNumSymbolsErr       error
-	getPricePerSymbolErr      error
 }
 
 var _ payments.PaymentVault = &TestPaymentVault{}
@@ -37,7 +30,7 @@ func NewTestPaymentVault() *TestPaymentVault {
 	}
 }
 
-func (t *TestPaymentVault) SetDeposit(account gethcommon.Address, amount *big.Int) {
+func (t *TestPaymentVault) SetTotalDeposit(account gethcommon.Address, amount *big.Int) {
 	if amount == nil {
 		delete(t.totalDeposits, account)
 	} else {
@@ -57,31 +50,7 @@ func (t *TestPaymentVault) SetPricePerSymbol(value uint64) {
 	t.PricePerSymbol = value
 }
 
-func (t *TestPaymentVault) SetGetTotalDepositsErr(err error) {
-	t.getTotalDepositsErr = err
-}
-
-func (t *TestPaymentVault) SetGetTotalDepositErr(err error) {
-	t.getTotalDepositErr = err
-}
-
-func (t *TestPaymentVault) SetGetGlobalSymbolsPerSecErr(err error) {
-	t.getGlobalSymbolsPerSecErr = err
-}
-
-func (t *TestPaymentVault) SetGetMinNumSymbolsErr(err error) {
-	t.getMinNumSymbolsErr = err
-}
-
-func (t *TestPaymentVault) SetGetPricePerSymbolErr(err error) {
-	t.getPricePerSymbolErr = err
-}
-
 func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []gethcommon.Address) ([]*big.Int, error) {
-	if t.getTotalDepositsErr != nil {
-		return nil, t.getTotalDepositsErr
-	}
-
 	result := make([]*big.Int, len(accountIDs))
 	for i, accountID := range accountIDs {
 		if deposit, exists := t.totalDeposits[accountID]; exists {
@@ -94,10 +63,6 @@ func (t *TestPaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []ge
 }
 
 func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
-	if t.getTotalDepositErr != nil {
-		return nil, t.getTotalDepositErr
-	}
-
 	if deposit, exists := t.totalDeposits[accountID]; exists {
 		return new(big.Int).Set(deposit), nil
 	}
@@ -105,22 +70,13 @@ func (t *TestPaymentVault) GetTotalDeposit(ctx context.Context, accountID gethco
 }
 
 func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
-	if t.getGlobalSymbolsPerSecErr != nil {
-		return 0, t.getGlobalSymbolsPerSecErr
-	}
 	return t.globalSymbolsPerSecond, nil
 }
 
 func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
-	if t.getMinNumSymbolsErr != nil {
-		return 0, t.getMinNumSymbolsErr
-	}
 	return t.minNumSymbols, nil
 }
 
 func (t *TestPaymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
-	if t.getPricePerSymbolErr != nil {
-		return 0, t.getPricePerSymbolErr
-	}
 	return t.PricePerSymbol, nil
 }

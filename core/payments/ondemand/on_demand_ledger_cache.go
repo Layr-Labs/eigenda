@@ -73,10 +73,6 @@ func NewOnDemandLedgerCache(
 		return nil, errors.New("payment vault must be non-nil")
 	}
 
-	if updateInterval <= 0 {
-		return nil, errors.New("updateInterval must be > 0")
-	}
-
 	if dynamoClient == nil {
 		return nil, errors.New("dynamo client must be non-nil")
 	}
@@ -101,7 +97,7 @@ func NewOnDemandLedgerCache(
 	}
 
 	// Create the vault monitor with callback functions
-	ledgerCache.vaultMonitor = NewOnDemandVaultMonitor(
+	ledgerCache.vaultMonitor, err = NewOnDemandVaultMonitor(
 		ctx,
 		logger,
 		paymentVault,
@@ -109,6 +105,9 @@ func NewOnDemandLedgerCache(
 		ledgerCache.GetAccountsToUpdate,
 		ledgerCache.UpdateTotalDeposit,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("new on-demand vault monitor: %w", err)
+	}
 
 	return ledgerCache, nil
 }
