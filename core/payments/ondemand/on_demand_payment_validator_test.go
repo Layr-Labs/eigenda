@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core/payments/mock"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 func TestNewOnDemandPaymentValidator(t *testing.T) {
@@ -35,16 +34,13 @@ func TestNewOnDemandPaymentValidator(t *testing.T) {
 	})
 
 	t.Run("nil dynamoClient", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		mockVault := mock.NewMockPaymentVault(ctrl)
-		// No expectations needed - the constructor should fail before using the vault
+		testVault := vault.NewTestPaymentVault()
 
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			ctx,
 			testutils.GetLogger(),
 			maxLedgers,
-			mockVault,
+			testVault,
 			nil,
 			tableName,
 			updateInterval,
@@ -54,15 +50,13 @@ func TestNewOnDemandPaymentValidator(t *testing.T) {
 	})
 
 	t.Run("zero update interval", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		mockVault := mock.NewMockPaymentVault(ctrl)
+		testVault := vault.NewTestPaymentVault()
 
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			ctx,
 			testutils.GetLogger(),
 			maxLedgers,
-			mockVault,
+			testVault,
 			dynamoClient,
 			tableName,
 			0,
@@ -72,15 +66,13 @@ func TestNewOnDemandPaymentValidator(t *testing.T) {
 	})
 
 	t.Run("negative update interval", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		mockVault := mock.NewMockPaymentVault(ctrl)
+		testVault := vault.NewTestPaymentVault()
 
 		validator, err := ondemand.NewOnDemandPaymentValidator(
 			ctx,
 			testutils.GetLogger(),
 			maxLedgers,
-			mockVault,
+			testVault,
 			dynamoClient,
 			tableName,
 			-time.Second,
@@ -98,23 +90,15 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockVault := mock.NewMockPaymentVault(ctrl)
-	
-	// Setup expectations for constructor
-	mockVault.EXPECT().GetPricePerSymbol(gomock.Any()).Return(uint64(100), nil)
-	mockVault.EXPECT().GetMinNumSymbols(gomock.Any()).Return(uint64(1), nil)
-	
-	// Setup expectations for GetTotalDeposit calls during GetOrCreate
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountA).Return(big.NewInt(10000), nil)
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountB).Return(big.NewInt(20000), nil)
+	testVault := vault.NewTestPaymentVault()
+	testVault.SetDeposit(accountA, big.NewInt(10000))
+	testVault.SetDeposit(accountB, big.NewInt(20000))
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
-		mockVault,
+		testVault,
 		dynamoClient,
 		tableName,
 		time.Second,
@@ -143,22 +127,15 @@ func TestDebitInsufficientFunds(t *testing.T) {
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockVault := mock.NewMockPaymentVault(ctrl)
-	
-	// Setup expectations for constructor
-	mockVault.EXPECT().GetPricePerSymbol(gomock.Any()).Return(uint64(1000), nil)
-	mockVault.EXPECT().GetMinNumSymbols(gomock.Any()).Return(uint64(1), nil)
-	
-	// Setup expectations for GetTotalDeposit
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountID).Return(big.NewInt(5000), nil)
+	testVault := vault.NewTestPaymentVault()
+	testVault.SetPricePerSymbol(1000)
+	testVault.SetDeposit(accountID, big.NewInt(5000))
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
-		mockVault,
+		testVault,
 		dynamoClient,
 		tableName,
 		time.Second,
@@ -182,26 +159,19 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	accountB := gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	accountC := gethcommon.HexToAddress("0xcccccccccccccccccccccccccccccccccccccccc")
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mockVault := mock.NewMockPaymentVault(ctrl)
-	
-	// Setup expectations for constructor
-	mockVault.EXPECT().GetPricePerSymbol(gomock.Any()).Return(uint64(1000), nil)
-	mockVault.EXPECT().GetMinNumSymbols(gomock.Any()).Return(uint64(1), nil)
-	
+	testVault := vault.NewTestPaymentVault()
+	testVault.SetPricePerSymbol(1000)
 	// Account A has 8000 wei total deposits (can afford 8 symbols at 1000 wei each)
-	// Account A will be called twice due to cache eviction
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountA).Return(big.NewInt(8000), nil).Times(2)
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountB).Return(big.NewInt(5000), nil)
-	mockVault.EXPECT().GetTotalDeposit(gomock.Any(), accountC).Return(big.NewInt(3000), nil)
+	testVault.SetDeposit(accountA, big.NewInt(8000))
+	testVault.SetDeposit(accountB, big.NewInt(5000))
+	testVault.SetDeposit(accountC, big.NewInt(3000))
 
 	// Create paymentValidator with small LRU cache size to force eviction
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		2,
-		mockVault,
+		testVault,
 		dynamoClient,
 		tableName,
 		time.Second,

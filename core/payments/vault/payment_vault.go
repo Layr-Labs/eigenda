@@ -65,7 +65,6 @@ func (pv *paymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommo
 }
 
 // Retrieves the global symbols per second parameter
-// TODO: is this actually per second?
 func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
 	globalSymbolsPerSecond, err := pv.paymentVaultBinding.GlobalSymbolsPerPeriod(&bind.CallOpts{Context: ctx})
 	if err != nil {
