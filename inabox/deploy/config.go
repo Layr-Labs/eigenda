@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -48,7 +49,7 @@ func (env *Config) loadPrivateKeys() error {
 	log.Println("service names:", names)
 
 	// Collect private keys from file
-	keyPath := "secrets"
+	keyPath := filepath.Join(env.rootPath, "inabox", "secrets")
 
 	// Read ECDSA private keys
 	fileData := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
@@ -595,10 +596,25 @@ func (env *Config) getKey(name string) (key, address string) {
 // Returns an object that corresponds to the participants of the
 // current experiment.
 func (env *Config) GenerateAllVariables() {
-	// hardcode graphurl for now
-	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+	// Save current working directory to restore it at the end
+	originalDir, err := os.Getwd()
+	if err != nil {
+		log.Panicf("Failed to get current working directory. Error: %s", err)
+	}
+	defer changeDirectory(originalDir)
 
-	env.localstackEndpoint = "http://localhost:4570"
+	// Use configured Graph URL from testinfra if available, otherwise hardcode for backward compatibility
+	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+	if env.GraphURL != "" {
+		graphUrl = env.GraphURL
+	}
+
+	// Check if AWS_ENDPOINT_URL is set in environment (for dynamic testcontainer ports)
+	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+		env.localstackEndpoint = endpoint
+	} else {
+		env.localstackEndpoint = "http://localhost:4570"
+	}
 	env.localstackRegion = "us-east-1"
 
 	// Create envs directory
