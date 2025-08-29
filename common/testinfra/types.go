@@ -175,7 +175,7 @@ type RelaysConfig struct {
 	// Enable relays
 	Enabled bool `json:"enabled"`
 	
-	// Number of relays to deploy (default 4 as per inabox requirement)
+	// Number of relays to deploy (default 4)
 	Count int `json:"count"`
 	
 	// Base relay configuration (will be customized per relay)

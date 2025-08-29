@@ -40,7 +40,6 @@ func DefaultLocalStackDeploymentConfig() LocalStackDeploymentConfig {
 }
 
 // DeployLocalStackResources creates S3 buckets and DynamoDB tables in LocalStack
-// This function replaces the DeployResources function from inabox/deploy/localstack.go
 func DeployLocalStackResources(ctx context.Context, ls *containers.LocalStackContainer, cfg LocalStackDeploymentConfig) error {
 	if ls == nil {
 		return fmt.Errorf("localstack container is not initialized")

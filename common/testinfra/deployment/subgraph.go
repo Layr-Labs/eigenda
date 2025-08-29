@@ -55,7 +55,6 @@ func DefaultSubgraphDeploymentConfig(rootPath string) SubgraphDeploymentConfig {
 }
 
 // DeploySubgraphs deploys EigenDA subgraphs to a Graph Node using container
-// This function replaces the functionality from inabox/deploy/subgraph.go
 func DeploySubgraphs(ctx context.Context, graphNode *containers.GraphNodeContainer, config SubgraphDeploymentConfig, startBlock int) error {
 	if graphNode == nil {
 		return fmt.Errorf("graph node container is not available")

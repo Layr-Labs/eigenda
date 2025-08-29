@@ -395,14 +395,14 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 				operatorConfig.PrivateKey = privKey
 			}
 
-			// Set BLS and ECDSA key file configuration following inabox pattern
+			// Set BLS and ECDSA key file configuration
 			// Use operator index + 1 to match the numbering in the key files (1-based)
 			keyIndex := i + 1
 			operatorConfig.BlsKeyFile = fmt.Sprintf("/app/secrets/bls_keys/keys/%d.bls.key.json", keyIndex)
 			operatorConfig.EcdsaKeyFile = fmt.Sprintf("/app/secrets/ecdsa_keys/keys/%d.ecdsa.key.json", keyIndex)
 
 			// Read BLS password from the password file
-			blsPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "bls_keys", "password.txt")
+			blsPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "bls_keys", "password.txt")
 			blsPasswords, err := readPasswordFile(blsPasswordFile)
 			if err != nil {
 				fmt.Printf("Warning: Could not read BLS password file: %v\n", err)
@@ -416,7 +416,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 			}
 
 			// Read ECDSA password from the password file
-			ecdsaPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "password.txt")
+			ecdsaPasswordFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "password.txt")
 			ecdsaPasswords, err := readPasswordFile(ecdsaPasswordFile)
 			if err != nil {
 				// Fallback to using private key directly if password file is not available
@@ -428,7 +428,7 @@ func (im *InfraManager) Start(ctx context.Context) (*InfraResult, error) {
 
 				// In test mode, we also need to provide the raw private key
 				// Read the ECDSA private key from the private_key_hex.txt file
-				ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "private_key_hex.txt")
+				ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
 				ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
 				if err == nil && keyIndex <= len(ecdsaKeys) {
 					operatorConfig.EcdsaPrivateKey = ecdsaKeys[keyIndex-1]
@@ -1266,7 +1266,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 
 	// Deploy contracts if requested
 	if im.config.EigenDA.DeployContracts {
-		// Create deployment config matching the inabox testconfig-anvil.yaml structure
+		// Create deployment config matching the test configuration structure
 		numStrategies := 2    // Two strategies as per the stakes configuration
 		maxOperatorCount := 3 // maxOperatorCount from services.counts
 
@@ -1288,7 +1288,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 
 		// Load operator ECDSA private keys from the secrets directory
 		// These are the actual keys the operators will use for transactions
-		ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "inabox", "secrets", "ecdsa_keys", "private_key_hex.txt")
+		ecdsaPrivKeyFile := filepath.Join(im.config.EigenDA.RootPath, "testinfra", "secrets", "ecdsa_keys", "private_key_hex.txt")
 		ecdsaKeys, err := readPasswordFile(ecdsaPrivKeyFile)
 		if err == nil {
 			// Add ECDSA keys to the privateKeys map with "opr{i}_ecdsa" naming
@@ -1394,7 +1394,7 @@ func (im *InfraManager) deployEigenDAContracts(_ context.Context) error {
 				relayURLs = append(relayURLs, url)
 			}
 		} else {
-			// Fallback to standard relay URLs used in inabox tests
+			// Fallback to standard relay URLs used in tests
 			relayURLs = []string{"localhost:32035", "localhost:32037", "localhost:32039", "localhost:32041"}
 		}
 
@@ -1740,8 +1740,7 @@ func TestGraphNodeConnectivity(graphURL string, config GraphConnectivityConfig) 
 
 // generateTestPrivateKeys generates deterministic test private keys for local testing
 func generateTestPrivateKeys() map[string]string {
-	// These are the same test keys used in inabox/secrets/ecdsa_keys/private_key_hex.txt
-	// We hardcode them for reproducibility in tests
+	// These are hardcoded test keys for reproducibility in tests
 	return map[string]string{
 		"default":  "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // anvil account 0 (deployer)
 		"batcher0": "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", // anvil account 1 (batcher/confirmer)

@@ -104,24 +104,24 @@ type GraphNodeConfig struct {
 }
 ```
 
-## Migration from inabox
+## Migration Guide
 
-### Before (inabox shell scripts)
+### Legacy Setup (shell scripts)
 ```bash
 # Terminal 1
 anvil --host 0.0.0.0
 
 # Terminal 2  
-cd inabox/thegraph && docker compose up
+cd thegraph && docker compose up
 
 # Terminal 3
 LOCALSTACK_HOST=localhost.localstack.cloud:4570 localstack start
 
 # Terminal 4
-cd inabox && make exp && ./bin.sh start
+make build && ./start.sh
 ```
 
-### After (testinfra)
+### New Setup (testinfra)
 ```go
 func TestEigenDAFlow(t *testing.T) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

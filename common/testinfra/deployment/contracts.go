@@ -239,19 +239,19 @@ func (m *ContractDeploymentManager) deployV1CertVerifier() error {
 		return fmt.Errorf("failed to marshal V1 config: %w", err)
 	}
 
-	configPath := "script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json"
+	configPath := "script/deploy/certverifier/config/v1/testinfra_deploy_config_v1.json"
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write V1 config: %w", err)
 	}
 
 	// Execute V1 deployment script
-	extraArgs := []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"}
+	extraArgs := []string{"--sig", "run(string, string)", "testinfra_deploy_config_v1.json", "testinfra_v1_deploy.json"}
 	if err := m.execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", extraArgs); err != nil {
 		return fmt.Errorf("failed to execute V1 deployment script: %w", err)
 	}
 
 	// Read V1 deployment output
-	outputPath := "script/deploy/certverifier/output/inabox_v1_deploy.json"
+	outputPath := "script/deploy/certverifier/output/testinfra_v1_deploy.json"
 	outputData, err := os.ReadFile(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to read V1 deployment output: %w", err)

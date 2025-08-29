@@ -163,7 +163,7 @@ func NewOperatorContainerWithNetwork(ctx context.Context, config OperatorConfig,
 	logPath := filepath.Join(logDir, "operator.log")
 
 	// Determine the secrets directory path (must be absolute)
-	secretsDir, err := filepath.Abs(filepath.Join(config.EigenDADirectory, "inabox", "secrets"))
+	secretsDir, err := filepath.Abs(filepath.Join(config.EigenDADirectory, "testinfra", "secrets"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for secrets: %w", err)
 	}
