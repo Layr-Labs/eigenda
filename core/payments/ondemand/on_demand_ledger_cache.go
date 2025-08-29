@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -28,24 +29,40 @@ type OnDemandLedgerCache struct {
 	dynamoClient *dynamodb.Client
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string
+	// price per symbol in wei, from the PaymentVault
+	pricePerSymbol *big.Int
+	// minimum number of symbols to bill, from the PaymentVault
+	minNumSymbols uint64
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
 	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
 	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
 	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
 	// to add them to the cache.
+	//
+	// This lock is intentionally more restrictive than it needs to be, for the sake of simplicity. It could be
+	// converted to an account-based lock instead of a global creation lock, if it ever becomes a bottleneck.
 	ledgerCreationLock sync.Mutex
 }
 
 var _ UpdatableOnDemandLedgers = &OnDemandLedgerCache{}
 
 func NewOnDemandLedgerCache(
+	ctx context.Context,
 	logger logging.Logger,
 	maxLedgers int,
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
 	onDemandTableName string,
 ) (*OnDemandLedgerCache, error) {
+	if paymentVault == nil {
+		return nil, errors.New("payment vault must be non-nil")
+	}
+
+	if dynamoClient == nil {
+		return nil, errors.New("dynamo client must be non-nil")
+	}
+
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
 		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
@@ -56,12 +73,24 @@ func NewOnDemandLedgerCache(
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
 
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
 	return &OnDemandLedgerCache{
 		logger:            logger,
 		cache:             cache,
 		paymentVault:      paymentVault,
 		dynamoClient:      dynamoClient,
 		onDemandTableName: onDemandTableName,
+		pricePerSymbol:    new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols:     minNumSymbols,
 	}, nil
 }
 
@@ -90,21 +119,11 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
 
-	pricePerSymbol, err := c.paymentVault.GetPricePerSymbol(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get price per symbol: %w", err)
-	}
-
-	minNumSymbols, err := c.paymentVault.GetMinNumSymbols(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get min num symbols: %w", err)
-	}
-
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
 		onDemandPayment,
-		big.NewInt(int64(pricePerSymbol)),
-		minNumSymbols,
+		c.pricePerSymbol,
+		c.minNumSymbols,
 		cumulativePaymentStore,
 	)
 	if err != nil {

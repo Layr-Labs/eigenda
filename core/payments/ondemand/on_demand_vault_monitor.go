@@ -55,7 +55,13 @@ func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error 
 		return nil
 	}
 
-	newDeposits, err := vm.paymentVault.GetTotalDeposits(ctx, accountIDs)
+	// Add timeout to prevent hanging if the RPC node is unresponsive.
+	// This timeout is higher than it needs to be, but at least if we are unable to access
+	// the eth node, then we will time out before the next refresh try.
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, vm.updateInterval)
+	defer cancel()
+
+	newDeposits, err := vm.paymentVault.GetTotalDeposits(ctxWithTimeout, accountIDs)
 	if err != nil {
 		return fmt.Errorf("get total deposits: %w", err)
 	}
@@ -81,7 +87,7 @@ func (vm *OnDemandVaultMonitor) runUpdateLoop(ctx context.Context) {
 	ticker := time.NewTicker(vm.updateInterval)
 	defer ticker.Stop()
 
-	vm.logger.Infof("Starting OnDemandPaymentVault background update thread with updateInterval %d", vm.updateInterval)
+	vm.logger.Infof("Starting OnDemandPaymentVault background update thread with updateInterval %v", vm.updateInterval)
 
 	for {
 		select {

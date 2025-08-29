@@ -170,9 +170,9 @@ func (odl *OnDemandLedger) Debit(
 	newCumulativePayment := new(big.Int).Add(odl.cumulativePayment, blobCost)
 	if newCumulativePayment.Cmp(odl.totalDeposits) > 0 {
 		return nil, &InsufficientFundsError{
-			CurrentCumulativePayment: odl.cumulativePayment,
-			TotalDeposits:            odl.totalDeposits,
-			BlobCost:                 blobCost,
+			CurrentCumulativePayment: new(big.Int).Set(odl.cumulativePayment),
+			TotalDeposits:            new(big.Int).Set(odl.totalDeposits),
+			BlobCost:                 blobCost, // no copy needed, since new big.Int was returned from computeCost
 		}
 	}
 
@@ -270,5 +270,6 @@ func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
 		billableSymbols = odl.minNumSymbols
 	}
 
-	return new(big.Int).Mul(big.NewInt(int64(billableSymbols)), odl.pricePerSymbol)
+	billableSymbolsBig := new(big.Int).SetUint64(billableSymbols)
+	return billableSymbolsBig.Mul(billableSymbolsBig, odl.pricePerSymbol)
 }

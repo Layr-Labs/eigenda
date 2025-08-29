@@ -43,17 +43,9 @@ func NewOnDemandPaymentValidator(
 		return nil, errors.New("updateInterval must be > 0")
 	}
 
-	ledgerCache, err := NewOnDemandLedgerCache(logger, maxLedgers, paymentVault, dynamoClient, onDemandTableName)
+	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, maxLedgers, paymentVault, dynamoClient, onDemandTableName)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger cache: %w", err)
-	}
-
-	if dynamoClient == nil {
-		return nil, errors.New("dynamo client cannot be nil")
-	}
-
-	if onDemandTableName == "" {
-		return nil, errors.New("on demand table name cannot be empty")
 	}
 
 	vaultMonitor := NewOnDemandVaultMonitor(ctx, logger, paymentVault, ledgerCache, updateInterval)
