@@ -220,6 +220,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	// go away entirely
 	if c.clientLedger != nil {
 		// TODO: set probe stages
+		// TODO: make sure you use min symbols
 		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("debit: %w", err)
