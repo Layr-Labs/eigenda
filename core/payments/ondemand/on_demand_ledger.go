@@ -236,6 +236,14 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	return nil
 }
 
+// GetTotalDeposits returns the current total deposits for this ledger
+func (odl *OnDemandLedger) GetTotalDeposits() *big.Int {
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	return new(big.Int).Set(odl.totalDeposits)
+}
+
 // Updates the total deposits for this ledger
 //
 // Note: this function intentionally doesn't assert that total deposits strictly increases. While that will generally
