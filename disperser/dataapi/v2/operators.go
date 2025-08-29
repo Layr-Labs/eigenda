@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -654,14 +655,11 @@ func computeNumFailed(
 				op,
 				uint32(at.ReferenceBlockNumber),
 			) {
-				for _, batchQuorum := range at.QuorumNumbers {
-					if operatorQuorum == batchQuorum {
-						if _, ok := numFailed[op]; !ok {
-							numFailed[op] = make(map[uint8]int)
-						}
-						numFailed[op][operatorQuorum]++
-						break
+				if slices.Contains(at.QuorumNumbers, operatorQuorum) {
+					if _, ok := numFailed[op]; !ok {
+						numFailed[op] = make(map[uint8]int)
 					}
+					numFailed[op][operatorQuorum]++
 				}
 			}
 		}
