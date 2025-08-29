@@ -76,7 +76,8 @@ library EigenDACertVerificationLib {
         UNORDERED_OR_DUPLICATE_QUORUMS, // Quorum numbers are not ordered, or contain duplicates
         GREATER_THAN_256_QUORUMS, // Quorum numbers exceed 256
         CERT_DECODE_REVERT, // Certificate abi.decoding reverted
-        SIGNATURE_VERIFICATION_CALL_REVERT // External call to signature verifier reverted
+        SIGNATURE_VERIFICATION_CALL_REVERT, // External call to signature verifier reverted
+        INVALID_BLOB_VERSION // Blob version does not exist onchain
     }
 
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
@@ -136,9 +137,14 @@ library EigenDACertVerificationLib {
             return (err, errParams);
         }
 
+        // We validate that the cert's blob_version is valid. Otherwise the getBlobParams call below
+        // would return a codingRate=0 which will cause a divide by 0 in checkSecurityParams.
+        uint16 nextBlobVersion = eigenDAThresholdRegistry.nextBlobVersion();
+        if (blobInclusionInfo.blobCertificate.blobHeader.version >= nextBlobVersion) {
+            return (StatusCode.INVALID_BLOB_VERSION, abi.encode(blobInclusionInfo.blobCertificate.blobHeader.version));
+        }
+
         (err, errParams) = checkSecurityParams(
-            // TODO: need to make sure the version is valid, otherwise this would result in a 0 
-            // codingRate which will divide by 0 in checkSecurityParams
             eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
@@ -217,9 +223,10 @@ library EigenDACertVerificationLib {
     ) internal pure returns (StatusCode err, bytes memory errParams) {
         // In order to not revert, we need gamma > 0 and codingRate > 0.
         // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
-        // TODO: need to figure out how to deal with codingRate = 0. Return errocode? use default value?
-        // if user sets codingRate to a non-existent version... will return codingRate=0. This is a 400!
-        // so we want to return 
+        // We also assume that the blobParams passed are from a valid version.
+        // Thus, dividing by codingRate below will only panic if codingRate of a proper initialized version is 0,
+        // which is either a configuration bug, or a malicious attack. In both cases, we cannot tell whether the
+        // cert is valid or invalid, so it is ok to panic and let social consensus intervene (put a human debugger in the loop).
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
@@ -422,7 +429,7 @@ library EigenDACertVerificationLib {
             // errParams contains the revert reason
             revert SignatureVerificationCallRevert(errParams);
         } else {
-            // TODO: add EMPTY_BLOB_QUORUMS, UNORDERED_OR_DUPLICATE_QUORUMS, GREATER_THAN_256_QUORUMS
+            // TODO: add EMPTY_BLOB_QUORUMS, UNORDERED_OR_DUPLICATE_QUORUMS, GREATER_THAN_256_QUORUMS, INVALID_BLOB_VERSION
             revert("Unknown error code");
         }
     }
