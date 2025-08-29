@@ -20,6 +20,8 @@ type paymentVault struct {
 	paymentVaultBinding *bindings.ContractPaymentVault
 }
 
+var _ payments.PaymentVault = &paymentVault{}
+
 // NewPaymentVault creates a new PaymentVault instance
 func NewPaymentVault(
 	logger logging.Logger,
@@ -89,4 +91,3 @@ func (pv *paymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	}
 	return pricePerSymbol, nil
 }
-
