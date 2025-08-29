@@ -35,6 +35,12 @@
       "startBlock": 1168409
     }
   },
+  "hoodi": {
+    "EigenDAServiceManager": {
+      "address": "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764",
+      "startBlock": 8153008
+    }
+  },
   "sepolia": {
     "EigenDAServiceManager": {
       "address": "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764",
