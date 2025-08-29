@@ -48,19 +48,27 @@ I ran the test for 14 days. The first 7 days (i.e. 168 hours) were spent ramping
 
 | | |
 |---|---|
-| ![Disk Footprint](data/disk-footprint.png) | ![Key Count](data/key-count.png) |
-| ![Bytes Written / Second](data/bytes-written-second.png) | ![Keys Written / Second](data/keys-written-second.png) |
-| ![Flushes / Second](data/flushes-second.png) | ![Write Latency](data/write-latency.png) |
-| ![Flush Latency](data/flush-latency.png) | ![Segment Flush Latency](data/segment-flush-latency.png) |
-| ![Keymap Flush Latency](data/keymap-flush-latency.png) | ![GC Latency](data/gc-latency.png) |
-| ![Bytes Read / Second](data/bytes-read-second.png) | ![Keys Read / Second](data/keys-read-second.png) |
-| ![Read Latency](data/read-latency.png) | ![Cache Hits / Second](data/cache-hits-second.png) |
-| ![Cache Misses / Second](data/cache-misses-second.png) | ![Cache Miss Latency](data/cache-miss-latency.png) |
-| ![Memory](data/memory.png) | ![CPU Seconds](data/cpu-seconds.png) |
+| ![Disk Footprint](data/disk-footprint.webp) | ![Key Count](data/key-count.webp) |
+| ![Bytes Written / Second](data/bytes-written-second.webp) | ![Keys Written / Second](data/keys-written-second.webp) |
+| ![Flushes / Second](data/flushes-second.webp) | ![Write Latency](data/write-latency.webp) |
+| ![Flush Latency](data/flush-latency.webp) | ![Segment Flush Latency](data/segment-flush-latency.webp) |
+| ![Keymap Flush Latency](data/keymap-flush-latency.webp) | ![GC Latency](data/gc-latency.webp) |
+| ![Bytes Read / Second](data/bytes-read-second.webp) | ![Keys Read / Second](data/keys-read-second.webp) |
+| ![Read Latency](data/read-latency.webp) | ![Cache Hits / Second](data/cache-hits-second.webp) |
+| ![Cache Misses / Second](data/cache-misses-second.webp) | ![Cache Miss Latency](data/cache-miss-latency.webp) |
+| ![Memory](data/memory.webp) | ![CPU Seconds](data/cpu-seconds.webp) |
 
 # Notes and Observations
 
-## Is the benchmark open source?
+## Clean Bill of Health
+
+The test completed successfully with no errors. All metrics reported healthy values. There were no signs of 
+performance degradation or resource leaks over the course of the test. Although read latency and memory use did
+increase slightly over time, I suspect this can be explained by the growth in size of the keymap (i.e. an internal
+LevelDB instance used for tracking metadata). Once the size of the data reached a steady state, this minor growth
+in read latency and memory appeared to flatten out and enter a steady state as well.
+
+## Is the benchmark code available?
 
 Yes! To run this benchmark yourself, follow the following steps:
 
@@ -70,17 +78,9 @@ Yes! To run this benchmark yourself, follow the following steps:
   - this will create the LittDB CLI binary at `./eigenda/litt/bin/litt`
   - you can install this CLI by making sure this binary is on your bash PATH, or you can invoke it directly
 - create a benchmark config file
-    - the above example is a good starting point
-    - a complete list of config options can be found at https://github.com/Layr-Labs/eigenda/blob/master/litt/benchmark/config/benchmark_config.go
+  - the above example is a good starting point
+  - a complete list of config options can be found at https://github.com/Layr-Labs/eigenda/blob/master/litt/benchmark/config/benchmark_config.go
 - `litt benchmark /path/to/benchmark_config.json`
-
-## Clean Bill of Health
-
-The test completed successfully with no errors. All metrics reported healthy values. There were no signs of 
-performance degradation or resource leaks over the course of the test. Although read latency and memory use did
-increase slightly over time, I suspect this can be explained by the growth in size of the keymap (i.e. an internal
-LevelDB instance used for tracking metadata). Once the size of the data reached a steady state, this minor growth
-in read latency and memory appeared to flatten out and enter a steady state as well.
 
 ## Why OCI?
 
