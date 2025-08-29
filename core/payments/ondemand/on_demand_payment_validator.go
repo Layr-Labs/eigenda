@@ -2,7 +2,6 @@ package ondemand
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -17,11 +16,8 @@ type OnDemandPaymentValidator struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked
 	ledgerCache *OnDemandLedgerCache
-	// Provides access to the values stored in the PaymentVault contract and update notifications
-	vaultMonitor *OnDemandVaultMonitor
 }
 
-// NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
 func NewOnDemandPaymentValidator(
 	ctx context.Context,
 	logger logging.Logger,
@@ -35,25 +31,15 @@ func NewOnDemandPaymentValidator(
 	// interval for checking for payment updates
 	updateInterval time.Duration,
 ) (*OnDemandPaymentValidator, error) {
-	if paymentVault == nil {
-		return nil, errors.New("paymentVault cannot be nil")
-	}
-
-	if updateInterval <= 0 {
-		return nil, errors.New("updateInterval must be > 0")
-	}
-
-	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, maxLedgers, paymentVault, dynamoClient, onDemandTableName)
+	ledgerCache, err := NewOnDemandLedgerCache(
+		ctx, logger, maxLedgers, paymentVault, updateInterval, dynamoClient, onDemandTableName)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger cache: %w", err)
 	}
 
-	vaultMonitor := NewOnDemandVaultMonitor(ctx, logger, paymentVault, ledgerCache, updateInterval)
-
 	return &OnDemandPaymentValidator{
-		logger:       logger,
-		ledgerCache:  ledgerCache,
-		vaultMonitor: vaultMonitor,
+		logger:      logger,
+		ledgerCache: ledgerCache,
 	}, nil
 }
 
@@ -80,7 +66,7 @@ func (pv *OnDemandPaymentValidator) Debit(
 
 // Stop stops the background vault monitoring thread
 func (pv *OnDemandPaymentValidator) Stop() {
-	if pv.vaultMonitor != nil {
-		pv.vaultMonitor.Stop()
+	if pv.ledgerCache != nil {
+		pv.ledgerCache.Stop()
 	}
 }

@@ -3,10 +3,12 @@ package ondemand
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Checks for updates to the PaymentVault contract, and updates ledgers with the new state
@@ -14,10 +16,12 @@ type OnDemandVaultMonitor struct {
 	logger logging.Logger
 	// fetches data from the PaymentVault
 	paymentVault payments.PaymentVault
-	// the ledgers that need to be updated
-	ledgers UpdatableOnDemandLedgers
 	// how frequently to fetch state from the PaymentVault to check for updates
 	updateInterval time.Duration
+	// function to get accounts that need to be updated
+	getAccountsToUpdate func() []gethcommon.Address
+	// function to update the total deposit for an account
+	updateTotalDeposit func(accountID gethcommon.Address, newTotalDeposit *big.Int) error
 	// cancels the periodic update routine
 	cancelFunc context.CancelFunc
 }
@@ -27,17 +31,19 @@ func NewOnDemandVaultMonitor(
 	ctx context.Context,
 	logger logging.Logger,
 	paymentVault payments.PaymentVault,
-	ledgers UpdatableOnDemandLedgers,
 	updateInterval time.Duration,
+	getAccountsToUpdate func() []gethcommon.Address,
+	updateTotalDeposit func(accountID gethcommon.Address, newTotalDeposit *big.Int) error,
 ) *OnDemandVaultMonitor {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 
 	monitor := &OnDemandVaultMonitor{
-		logger:         logger,
-		paymentVault:   paymentVault,
-		ledgers:        ledgers,
-		updateInterval: updateInterval,
-		cancelFunc:     cancel,
+		logger:              logger,
+		paymentVault:        paymentVault,
+		updateInterval:      updateInterval,
+		getAccountsToUpdate: getAccountsToUpdate,
+		updateTotalDeposit:  updateTotalDeposit,
+		cancelFunc:          cancel,
 	}
 
 	go monitor.runUpdateLoop(ctxWithCancel)
@@ -50,7 +56,7 @@ func (vm *OnDemandVaultMonitor) Stop() {
 
 // Fetches the latest state from the PaymentVault, and updates the ledgers with it
 func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error {
-	accountIDs := vm.ledgers.GetAccountsToUpdate()
+	accountIDs := vm.getAccountsToUpdate()
 	if len(accountIDs) == 0 {
 		return nil
 	}
@@ -73,7 +79,7 @@ func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error 
 
 	for i, newDeposit := range newDeposits {
 		accountID := accountIDs[i]
-		err := vm.ledgers.UpdateTotalDeposit(accountID, newDeposit)
+		err := vm.updateTotalDeposit(accountID, newDeposit)
 		if err != nil {
 			vm.logger.Errorf("update total deposit for account %v failed: %v", accountID.Hex(), err)
 		}
