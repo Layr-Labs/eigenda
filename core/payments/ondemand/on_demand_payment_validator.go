@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
@@ -41,11 +41,7 @@ type OnDemandPaymentValidator struct {
 	// on-chain.
 	paymentVaultParams PaymentVaultParams
 	// Provides access to the values stored in the PaymentVault contract and update notifications
-	paymentVaultState OnDemandPaymentVaultState
-
-	// Background update configuration
-	updateInterval time.Duration
-	cancelFunc     context.CancelFunc
+	onDemandPaymentVault *OnDemandVaultMonitor
 	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
 	dynamoClient *dynamodb.Client
 	// the name of the dynamo table where on-demand payment information is stored
@@ -54,25 +50,27 @@ type OnDemandPaymentValidator struct {
 
 // NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
 func NewOnDemandPaymentValidator(
+	ctx context.Context,
 	logger logging.Logger,
 	// the maximum number of OnDemandLedger entries to be kept in the LRU cache
 	maxLedgers int,
 	paymentVaultParams PaymentVaultParams,
-	// provides access to on-demand payment state and update notifications
-	paymentVaultState OnDemandPaymentVaultState,
+	// provides access to payment vault contract
+	paymentVault *vault.PaymentVault,
 	dynamoClient *dynamodb.Client,
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,
 	// interval for checking for payment updates
 	updateInterval time.Duration,
 ) (*OnDemandPaymentValidator, error) {
-	if paymentVaultState == nil {
-		return nil, errors.New("paymentVaultState cannot be nil")
+	if paymentVault == nil {
+		return nil, errors.New("paymentVault cannot be nil")
 	}
 
 	if updateInterval <= 0 {
 		return nil, errors.New("updateInterval must be > 0")
 	}
+
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
 		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
@@ -91,15 +89,41 @@ func NewOnDemandPaymentValidator(
 		return nil, errors.New("on demand table name cannot be empty")
 	}
 
-	return &OnDemandPaymentValidator{
+	validator := &OnDemandPaymentValidator{
 		logger:             logger,
 		ledgers:            cache,
 		paymentVaultParams: paymentVaultParams,
-		paymentVaultState:  paymentVaultState,
-		updateInterval:     updateInterval,
 		dynamoClient:       dynamoClient,
 		onDemandTableName:  onDemandTableName,
-	}, nil
+	}
+
+	// Create callback for this validator instance
+	callback := validator.CreateUpdateCallback()
+
+	// Create vault state with the callback - it will auto-start background monitoring
+	onDemandPaymentVault := NewOnDemandVaultMonitor(ctx, logger, paymentVault, callback, updateInterval)
+	validator.onDemandPaymentVault = onDemandPaymentVault
+
+	return validator, nil
+}
+
+// CreateUpdateCallback creates a callback function for handling payment updates
+// This method is exported so that external code can create vault states with the proper callback
+func (pv *OnDemandPaymentValidator) CreateUpdateCallback() onDemandPaymentUpdateCallback {
+	return func(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+		ledger, exists := pv.ledgers.Get(accountID)
+		if !exists {
+			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
+			// account ever makes an on-demand dispersal
+			return nil
+		}
+
+		err := ledger.UpdateTotalDeposits(newTotalDeposit)
+		if err != nil {
+			return fmt.Errorf("update total deposit for account %v: %w", accountID.Hex(), err)
+		}
+		return nil
+	}
 }
 
 // Debit validates an on-demand payment for a blob dispersal
@@ -141,7 +165,7 @@ func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 		return ledger, nil
 	}
 
-	onDemandPayment, err := pv.paymentVaultState.GetOnDemandPaymentByAccount(ctx, accountID)
+	onDemandPayment, err := pv.onDemandPaymentVault.GetTotalDeposit(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
 	}
@@ -153,7 +177,7 @@ func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
-		onDemandPayment.CumulativePayment,
+		onDemandPayment,
 		big.NewInt(int64(pv.paymentVaultParams.PricePerSymbol)),
 		pv.paymentVaultParams.MinNumSymbols,
 		cumulativePaymentStore,
@@ -164,71 +188,4 @@ func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 
 	pv.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
-}
-
-// Start starts the background update thread
-func (pv *OnDemandPaymentValidator) Start(ctx context.Context) {
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-	pv.cancelFunc = cancel
-
-	go pv.runUpdateLoop(ctxWithCancel)
-}
-
-// Stop stops the background update thread
-func (pv *OnDemandPaymentValidator) Stop() {
-	if pv.cancelFunc != nil {
-		pv.cancelFunc()
-	}
-}
-
-// Runs the background update loop, to periodically consume updates made to the PaymentVault
-//
-// TODO(litt3): Replace periodic polling with event-driven updates from PaymentVault contract
-func (pv *OnDemandPaymentValidator) runUpdateLoop(ctx context.Context) {
-	ticker := time.NewTicker(pv.updateInterval)
-	defer ticker.Stop()
-
-	pv.logger.Info("Starting OnDemandPaymentValidator background update thread", "updateInterval", pv.updateInterval)
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := pv.performUpdates(ctx); err != nil {
-				pv.logger.Error("perform on-demand payment updates", "error", err)
-			}
-		case <-ctx.Done():
-			pv.logger.Info("OnDemandPaymentValidator background update thread stopped")
-			return
-		}
-	}
-}
-
-// performUpdates fetches and applies updates that have been made to the payment vault
-func (pv *OnDemandPaymentValidator) performUpdates(ctx context.Context) error {
-	updates, err := pv.paymentVaultState.RefreshOnDemandPayments(ctx)
-	if err != nil {
-		return fmt.Errorf("refresh on-demand payments: %w", err)
-	}
-
-	var result *multierror.Error
-	for _, update := range updates {
-		ledger, exists := pv.ledgers.Get(update.AccountAddress)
-		if !exists {
-			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
-			// account ever makes an on-demand dispersal
-			continue
-		}
-
-		err := ledger.UpdateTotalDeposits(update.NewTotalDeposit)
-		if err != nil {
-			result = multierror.Append(
-				result, fmt.Errorf("update total deposit for account %v: %w", update.AccountAddress.Hex(), err))
-			continue
-		}
-	}
-
-	if err := result.ErrorOrNil(); err != nil {
-		return fmt.Errorf("update total deposits: %w", err)
-	}
-	return nil
 }
