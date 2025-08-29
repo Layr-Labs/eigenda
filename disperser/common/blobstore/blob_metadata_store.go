@@ -210,11 +210,18 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 }
 
 func (s *BlobMetadataStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, batchIndexName, "BatchHeaderHash = :batch_header_hash", commondynamodb.ExpressionValues{
-		":batch_header_hash": &types.AttributeValueMemberB{
-			Value: batchHeaderHash[:],
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		IndexName:              aws.String(batchIndexName),
+		KeyConditionExpression: aws.String("BatchHeaderHash = :batch_header_hash"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":batch_header_hash": &types.AttributeValueMemberB{
+				Value: batchHeaderHash[:],
+			},
 		},
-	})
+		ConsistentRead: aws.Bool(true),
+	}
+	items, err := s.dynamoDBClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
 		return nil, err
 	}
