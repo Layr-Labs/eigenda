@@ -7,19 +7,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type OnDemandVaultMonitor struct {
 	logger         logging.Logger
-	paymentVault   *vault.PaymentVault
+	paymentVault   payments.PaymentVault
 	totalDeposits  map[gethcommon.Address]*big.Int
 	lock           sync.Mutex
 	updateCallback onDemandPaymentUpdateCallback
 
-	// Background update configuration
 	updateInterval time.Duration
 	cancelFunc     context.CancelFunc
 }
@@ -30,18 +29,25 @@ type OnDemandVaultMonitor struct {
 type onDemandPaymentUpdateCallback func(accountID gethcommon.Address, newTotalDeposit *big.Int) error
 
 // NewOnDemandVaultMonitor creates a new OnDemandVaultMonitor and immediately starts background monitoring
-func NewOnDemandVaultMonitor(ctx context.Context, logger logging.Logger, paymentVault *vault.PaymentVault, updateCallback onDemandPaymentUpdateCallback, updateInterval time.Duration) *OnDemandVaultMonitor {
+func NewOnDemandVaultMonitor(
+	ctx context.Context,
+	logger logging.Logger,
+	paymentVault payments.PaymentVault,
+	updateCallback onDemandPaymentUpdateCallback,
+	updateInterval time.Duration,
+) *OnDemandVaultMonitor {
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+
 	monitor := &OnDemandVaultMonitor{
 		logger:         logger,
 		paymentVault:   paymentVault,
 		totalDeposits:  make(map[gethcommon.Address]*big.Int),
 		updateCallback: updateCallback,
 		updateInterval: updateInterval,
+		cancelFunc:     cancel,
 	}
-	
-	// Auto-start the background monitoring thread
-	monitor.Start(ctx)
-	
+
+	go monitor.runUpdateLoop(ctxWithCancel)
 	return monitor
 }
 
@@ -59,42 +65,28 @@ func (vs *OnDemandVaultMonitor) RefreshTotalDeposits(ctx context.Context) error 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	newOnDemandPayments, err := vs.paymentVault.GetTotalDeposits(ctx, accountIDs)
+	newDeposits, err := vs.paymentVault.GetTotalDeposits(ctx, accountIDs)
 	if err != nil {
-		return fmt.Errorf("get on-demand payments: %w", err)
+		return fmt.Errorf("get total deposits: %w", err)
 	}
 
-	err = vs.processUpdates(newOnDemandPayments)
-	if err != nil {
-		return fmt.Errorf("process payment updates: %w", err)
+	if len(newDeposits) != len(accountIDs) {
+		return fmt.Errorf("deposit count mismatch: got %d deposits for %d accounts", len(newDeposits), len(accountIDs))
 	}
 
-	vs.totalDeposits = newOnDemandPayments
-	return nil
-}
+	for i, newDeposit := range newDeposits {
+		accountID := accountIDs[i]
+		oldDeposit := vs.totalDeposits[accountID]
 
-// processUpdates compares old and new payments to detect changes
-// and invokes the callback for accounts with payment changes
-func (vs *OnDemandVaultMonitor) processUpdates(
-	updates map[gethcommon.Address]*big.Int,
-) error {
-	for accountID, newValue := range updates {
-		oldValue, exists := vs.totalDeposits[accountID]
-		if !exists {
-			vs.logger.Errorf("received an unrequested value for account %v. This shouldn't be possible",
-				accountID.Hex())
-			continue
+		if oldDeposit.Cmp(newDeposit) != 0 {
+			err := vs.updateCallback(accountID, newDeposit)
+			if err != nil {
+				vs.logger.Error("update callback failed", "error", err, "accountID", accountID.Hex())
+				continue
+			}
 		}
 
-		if oldValue.Cmp(newValue) == 0 {
-			// no update necessary, since new value is the same as the old
-			continue
-		}
-
-		err := vs.updateCallback(accountID, newValue)
-		if err != nil {
-			return fmt.Errorf("update callback for account %v: %w", accountID.Hex(), err)
-		}
+		vs.totalDeposits[accountID] = newDeposit
 	}
 
 	return nil
@@ -114,19 +106,9 @@ func (vs *OnDemandVaultMonitor) GetTotalDeposit(ctx context.Context, accountID g
 	return onDemandPayment, nil
 }
 
-// Start starts the background update thread
-func (vs *OnDemandVaultMonitor) Start(ctx context.Context) {
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-	vs.cancelFunc = cancel
-
-	go vs.runUpdateLoop(ctxWithCancel)
-}
-
 // Stop stops the background update thread
 func (vs *OnDemandVaultMonitor) Stop() {
-	if vs.cancelFunc != nil {
-		vs.cancelFunc()
-	}
+	vs.cancelFunc()
 }
 
 // runUpdateLoop runs the background update loop to periodically consume updates made to the PaymentVault

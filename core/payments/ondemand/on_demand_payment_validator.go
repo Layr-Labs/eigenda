@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -56,7 +56,7 @@ func NewOnDemandPaymentValidator(
 	maxLedgers int,
 	paymentVaultParams PaymentVaultParams,
 	// provides access to payment vault contract
-	paymentVault *vault.PaymentVault,
+	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
 	// the name of the dynamo table where on-demand payment information is stored
 	onDemandTableName string,
@@ -188,4 +188,11 @@ func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 
 	pv.ledgers.Add(accountID, newLedger)
 	return newLedger, nil
+}
+
+// Stop stops the background vault monitoring thread
+func (pv *OnDemandPaymentValidator) Stop() {
+	if pv.onDemandPaymentVault != nil {
+		pv.onDemandPaymentVault.Stop()
+	}
 }

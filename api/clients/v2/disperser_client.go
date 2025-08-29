@@ -12,7 +12,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -64,7 +64,7 @@ type disperserClient struct {
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
-	clientLedger            *payments.ClientLedger
+	clientLedger            *clientledger.ClientLedger
 	metrics                 metrics.DispersalMetricer
 }
 
@@ -96,7 +96,7 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
-	clientLedger *payments.ClientLedger,
+	clientLedger *clientledger.ClientLedger,
 	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
 	if config == nil {

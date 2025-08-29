@@ -3,20 +3,21 @@ package vault
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
-	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// PaymentVault provides access to payment vault contract operations
-type PaymentVault struct {
-	ethClient           common.EthClient
+// Provides access to PaymentVault contract
+type paymentVault struct {
 	logger              logging.Logger
-	paymentVaultBinding *paymentvault.ContractPaymentVault
+	paymentVaultBinding *bindings.ContractPaymentVault
 }
 
 // NewPaymentVault creates a new PaymentVault instance
@@ -24,48 +25,36 @@ func NewPaymentVault(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	paymentVaultAddress gethcommon.Address,
-) (*PaymentVault, error) {
+) (payments.PaymentVault, error) {
 	if ethClient == nil {
 		return nil, errors.New("ethClient cannot be nil")
 	}
 
-	paymentVaultBinding, err := paymentvault.NewContractPaymentVault(paymentVaultAddress, ethClient)
+	paymentVaultBinding, err := bindings.NewContractPaymentVault(paymentVaultAddress, ethClient)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new contract payment vault: %w", err)
 	}
 
-	return &PaymentVault{
-		ethClient:           ethClient,
-		logger:              logger.With("component", "PaymentVault"),
+	return &paymentVault{
+		logger:              logger,
 		paymentVaultBinding: paymentVaultBinding,
 	}, nil
 }
 
-// GetTotalDeposits retrieves on-demand payment information for multiple accounts
-func (pv *PaymentVault) GetTotalDeposits(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*big.Int, error) {
-	if pv.paymentVaultBinding == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-	paymentsMap := make(map[gethcommon.Address]*big.Int)
-	payments, err := pv.paymentVaultBinding.GetOnDemandTotalDeposits(&bind.CallOpts{
-		Context: ctx}, accountIDs)
+// Retrieves total deposit information for multiple accounts
+func (pv *paymentVault) GetTotalDeposits(
+	ctx context.Context,
+	accountIDs []gethcommon.Address,
+) ([]*big.Int, error) {
+	totalDeposits, err := pv.paymentVaultBinding.GetOnDemandTotalDeposits(&bind.CallOpts{Context: ctx}, accountIDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get on demand total deposits eth call: %w", err)
 	}
 
-	// since payments are returned in the same order as the accountIDs, we can directly map them
-	for i, payment := range payments {
-		if payment.Cmp(big.NewInt(0)) == 0 {
-			pv.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i])
-			continue
-		}
-		paymentsMap[accountIDs[i]] = payment
-	}
-
-	return paymentsMap, nil
+	return totalDeposits, nil
 }
 
-func (pv *PaymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+func (pv *paymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	if pv.paymentVaultBinding == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
@@ -82,13 +71,12 @@ func (pv *PaymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommo
 }
 
 // GetGlobalSymbolsPerSecond retrieves the global symbols per second parameter
-func (pv *PaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
 	if pv.paymentVaultBinding == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
 	globalSymbolsPerSecond, err := pv.paymentVaultBinding.GlobalSymbolsPerPeriod(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
+		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
@@ -97,13 +85,12 @@ func (pv *PaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumb
 }
 
 // GetGlobalRatePeriodInterval retrieves the global rate period interval parameter
-func (pv *PaymentVault) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (pv *paymentVault) GetGlobalRatePeriodInterval(ctx context.Context) (uint64, error) {
 	if pv.paymentVaultBinding == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
 	globalRateBinInterval, err := pv.paymentVaultBinding.GlobalRatePeriodInterval(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
+		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
@@ -112,13 +99,12 @@ func (pv *PaymentVault) GetGlobalRatePeriodInterval(ctx context.Context, blockNu
 }
 
 // GetMinNumSymbols retrieves the minimum number of symbols parameter
-func (pv *PaymentVault) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
 	if pv.paymentVaultBinding == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
 	minNumSymbols, err := pv.paymentVaultBinding.MinNumSymbols(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
+		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
@@ -127,13 +113,12 @@ func (pv *PaymentVault) GetMinNumSymbols(ctx context.Context, blockNumber uint32
 }
 
 // GetPricePerSymbol retrieves the price per symbol parameter
-func (pv *PaymentVault) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (pv *paymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	if pv.paymentVaultBinding == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
 	pricePerSymbol, err := pv.paymentVaultBinding.PricePerSymbol(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
+		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
@@ -142,25 +127,15 @@ func (pv *PaymentVault) GetPricePerSymbol(ctx context.Context, blockNumber uint3
 }
 
 // GetReservationWindow retrieves the reservation window parameter
-func (pv *PaymentVault) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (pv *paymentVault) GetReservationWindow(ctx context.Context) (uint64, error) {
 	if pv.paymentVaultBinding == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
 	reservationWindow, err := pv.paymentVaultBinding.ReservationPeriodInterval(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
+		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
 	}
 	return reservationWindow, nil
-}
-
-// GetCurrentBlockNumber retrieves the current block number from the blockchain
-func (pv *PaymentVault) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
-	blockNumber, err := pv.ethClient.BlockNumber(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(blockNumber), nil
 }
