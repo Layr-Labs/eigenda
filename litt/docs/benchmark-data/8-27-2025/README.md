@@ -70,7 +70,7 @@ in read latency and memory appeared to flatten out and enter a steady state as w
 
 ## Is the benchmark code available?
 
-Yes! To run this benchmark yourself, follow the following steps:
+Yes! To run this benchmark yourself, do the following:
 
 - install golang 1.24
 - `git clone https://github.com/Layr-Labs/eigenda.git`
