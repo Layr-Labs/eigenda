@@ -86,6 +86,45 @@ Yes! To run this benchmark yourself, follow the following steps:
 
 It's cheap.
 
+## What's the current write bottleneck?
+
+The write throughput observed during this test vastly exceeds what we need, so I didn't spend much time attempting to
+further optimize the write throughput.
+
+I suspect the write bottleneck is one of two things:
+
+- the benchmark utility itself
+- some sort of OCI limitation based on the VM shape
+
+When I was running this benchmark with a single disk, I observed slightly faster write throughput. If the bottleneck
+was the capacity of the disks themselves, I would expect that adding more disks would increase the write throughput.
+Additionally, the observed write throughput is well below the theoretical maximum of the disks (even when running with 
+a single disk).
+
+It's plausible that there is some other cause for the current write bottleneck. As of now, I've not collected
+sufficient data to determine the exact cause.
+
+## Memory Use
+
+It's important to point out that the benchmark allocates a fixed size 1 GB memory buffer. Although the system was using
+~2 GB of memory, the actual memory use of the DB itself was at most only half of that.
+
+In a production environment, LittDB can use a lot of memory depending on cache configuration. But modulo caching,
+the baseline memory needed for a high capacity LittDB instance is quite low (under 1 GB).
+
+## Garbage Collection Overhead
+
+One of the major problems with other DB's I've tested with the EigenDA workload is garbage collection. This test
+demonstrates that LittDB garbage collection is exceptionally fast and efficient. Garbage collection runs once
+per 5 minutes, and takes 100-200ms to complete.
+
+## Data Validation
+
+A feature of this benchmark is that when it reads data, it validates that the data read is correct. During the span
+of this two week benchmark, no data corruption was detected. Note that since the write rate was much larger than
+the read rate, only a small fraction of the data written was actually read and validated. But if there was systemic
+and large scale data corruption, it is very likely that the random sampling would have detected it.
+
 ## Further Work
 
 ### Test Length
