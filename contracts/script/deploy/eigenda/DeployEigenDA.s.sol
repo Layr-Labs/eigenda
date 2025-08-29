@@ -34,6 +34,7 @@ import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IService
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifierRouter} from "src/integrations/cert/router/EigenDACertVerifierRouter.sol";
 
 import {MockStakeRegistry} from "test/mock/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "test/mock/MockRegistryCoordinator.sol";
@@ -275,14 +276,13 @@ contract DeployEigenDA is Script {
 
         impl[AddressDirectoryConstants.RELAY_REGISTRY_NAME] = address(new EigenDARelayRegistry());
         upgrade(
-            AddressDirectoryConstants.RELAY_REGISTRY_NAME,
-            abi.encodeCall(EigenDARelayRegistry.initialize, (cfg.initialOwner()))
+            AddressDirectoryConstants.RELAY_REGISTRY_NAME, abi.encodeCall(EigenDARelayRegistry.initialize, (msg.sender))
         );
 
         impl[AddressDirectoryConstants.DISPERSER_REGISTRY_NAME] = address(new EigenDADisperserRegistry());
         upgrade(
             AddressDirectoryConstants.DISPERSER_REGISTRY_NAME,
-            abi.encodeCall(EigenDADisperserRegistry.initialize, (cfg.initialOwner()))
+            abi.encodeCall(EigenDADisperserRegistry.initialize, (msg.sender))
         );
 
         impl[AddressDirectoryConstants.PAYMENT_VAULT_NAME] = address(new PaymentVault());
@@ -317,13 +317,53 @@ contract DeployEigenDA is Script {
             )
         );
 
+        address routerImpl = address(new EigenDACertVerifierRouter());
+        address[] memory certVerifiers = new address[](1);
+
+        certVerifiers[0] = directory.getAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME);
+
+        directory.addAddress(
+            AddressDirectoryConstants.CERT_VERIFIER_ROUTER_NAME,
+            address(
+                new TransparentUpgradeableProxy(
+                    routerImpl,
+                    proxyAdmin,
+                    abi.encodeWithSelector(
+                        EigenDACertVerifierRouter.initialize.selector,
+                        cfg.initialOwner(),
+                        new uint32[](1), // equivalent to [0]
+                        certVerifiers
+                    )
+                )
+            )
+        );
+
         ProxyAdmin(proxyAdmin).transferOwnership(cfg.initialOwner());
         EigenDAAccessControl accessControl =
             EigenDAAccessControl(directory.getAddress(AddressDirectoryConstants.ACCESS_CONTROL_NAME));
-        accessControl.grantRole(accessControl.DEFAULT_ADMIN_ROLE(), cfg.initialOwner());
-        accessControl.grantRole(AccessControlConstants.OWNER_ROLE, cfg.initialOwner());
-        accessControl.revokeRole(AccessControlConstants.OWNER_ROLE, msg.sender);
-        accessControl.revokeRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender);
+
+        for (uint256 i; i < cfg.dispersers().length; i++) {
+            IEigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
+                .setDisperserInfo(uint32(i), DATypesV2.DisperserInfo(cfg.dispersers()[i]));
+        }
+
+        for (uint256 i; i < cfg.relayInfos().length; i++) {
+            IEigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).addRelayInfo(
+                cfg.relayInfos()[i]
+            );
+        }
+
+        if (msg.sender != cfg.initialOwner()) {
+            accessControl.grantRole(accessControl.DEFAULT_ADMIN_ROLE(), cfg.initialOwner());
+            accessControl.grantRole(AccessControlConstants.OWNER_ROLE, cfg.initialOwner());
+            accessControl.revokeRole(AccessControlConstants.OWNER_ROLE, msg.sender);
+            accessControl.revokeRole(accessControl.DEFAULT_ADMIN_ROLE(), msg.sender);
+            EigenDADisperserRegistry(directory.getAddress(AddressDirectoryConstants.DISPERSER_REGISTRY_NAME))
+                .transferOwnership(cfg.initialOwner());
+            EigenDARelayRegistry(directory.getAddress(AddressDirectoryConstants.RELAY_REGISTRY_NAME)).transferOwnership(
+                cfg.initialOwner()
+            );
+        }
 
         vm.stopBroadcast();
     }

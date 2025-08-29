@@ -1,7 +1,7 @@
 ### CORE ###
 
 # This address gets all privileges at the end of the deployment.
-initialOwner = "0x574EB466fAC9150Db82844CEc185789b93F3c62E"
+initialOwner = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
 
 # Parameters shared across various deployed contracts
 [initParams.shared]
@@ -13,7 +13,7 @@ initialPausedStatus = 0
 # Parameters for the pauser registry contract
 [initParams.core.pauserRegistry]
 pausers = []
-unpauser = "0x574EB466fAC9150Db82844CEc185789b93F3c62E"
+unpauser = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
 
 ### MIDDLEWARE ###
 
@@ -67,7 +67,7 @@ globalRatePeriodInterval = 30
 
 # Parameters for the rewards initiator contract
 [initParams.eigenDA.serviceManager]
-rewardsInitiator = "0x574EB466fAC9150Db82844CEc185789b93F3c62E"
+rewardsInitiator = "0xF33Fd9bD25a2cb421F7071A785f5De64FD2b617f"
 batchConfirmers = ["0x3aaabc5361fa6fcd4ac4623253a709a2e476577b"]
 
 # Parameters for the cert verifier
@@ -75,3 +75,11 @@ batchConfirmers = ["0x3aaabc5361fa6fcd4ac4623253a709a2e476577b"]
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
+
+[initParams.eigenDA.disperser]
+dispersers = ["0x34200f3326bfa13df47fdbe39e51a0df5512aa22"]
+
+[initParams.eigenDA.relay]
+relays = [
+    { relayAddress = "0xa3f41f215e06de8439e9f8b767976647de8c44cc" , relayURL = "relay-0-testnet-hoodi.eigenda.xyz"}
+]
