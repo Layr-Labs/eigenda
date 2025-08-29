@@ -50,92 +50,43 @@ func (pv *paymentVault) GetTotalDeposits(
 	if err != nil {
 		return nil, fmt.Errorf("get on demand total deposits eth call: %w", err)
 	}
-
 	return totalDeposits, nil
 }
 
+// Retrieves total deposit information for a single account
 func (pv *paymentVault) GetTotalDeposit(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
-	if pv.paymentVaultBinding == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-	onDemandPayment, err := pv.paymentVaultBinding.GetOnDemandTotalDeposit(&bind.CallOpts{
-		Context: ctx,
-	}, accountID)
+	onDemandPayment, err := pv.paymentVaultBinding.GetOnDemandTotalDeposit(&bind.CallOpts{Context: ctx}, accountID)
 	if err != nil {
-		return nil, err
-	}
-	if onDemandPayment.Cmp(big.NewInt(0)) == 0 {
-		return nil, errors.New("ondemand payment does not exist for given account")
+		return nil, fmt.Errorf("get on demand total deposit for account %v eth call: %w", accountID.Hex(), err)
 	}
 	return onDemandPayment, nil
 }
 
-// GetGlobalSymbolsPerSecond retrieves the global symbols per second parameter
+// Retrieves the global symbols per second parameter
+// TODO: is this actually per second?
 func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
-	if pv.paymentVaultBinding == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	globalSymbolsPerSecond, err := pv.paymentVaultBinding.GlobalSymbolsPerPeriod(&bind.CallOpts{
-		Context: ctx,
-	})
+	globalSymbolsPerSecond, err := pv.paymentVaultBinding.GlobalSymbolsPerPeriod(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("global symbols per period eth call: %w", err)
 	}
 	return globalSymbolsPerSecond, nil
 }
 
-// GetGlobalRatePeriodInterval retrieves the global rate period interval parameter
-func (pv *paymentVault) GetGlobalRatePeriodInterval(ctx context.Context) (uint64, error) {
-	if pv.paymentVaultBinding == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	globalRateBinInterval, err := pv.paymentVaultBinding.GlobalRatePeriodInterval(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return 0, err
-	}
-	return globalRateBinInterval, nil
-}
-
-// GetMinNumSymbols retrieves the minimum number of symbols parameter
+// Retrieves the minimum number of symbols parameter
 func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
-	if pv.paymentVaultBinding == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	minNumSymbols, err := pv.paymentVaultBinding.MinNumSymbols(&bind.CallOpts{
-		Context: ctx,
-	})
+	minNumSymbols, err := pv.paymentVaultBinding.MinNumSymbols(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("min num symbols eth call: %w", err)
 	}
 	return minNumSymbols, nil
 }
 
 // GetPricePerSymbol retrieves the price per symbol parameter
 func (pv *paymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
-	if pv.paymentVaultBinding == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	pricePerSymbol, err := pv.paymentVaultBinding.PricePerSymbol(&bind.CallOpts{
-		Context: ctx,
-	})
+	pricePerSymbol, err := pv.paymentVaultBinding.PricePerSymbol(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("price per symbol eth call: %w", err)
 	}
 	return pricePerSymbol, nil
 }
 
-// GetReservationWindow retrieves the reservation window parameter
-func (pv *paymentVault) GetReservationWindow(ctx context.Context) (uint64, error) {
-	if pv.paymentVaultBinding == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	reservationWindow, err := pv.paymentVaultBinding.ReservationPeriodInterval(&bind.CallOpts{
-		Context: ctx,
-	})
-	if err != nil {
-		return 0, err
-	}
-	return reservationWindow, nil
-}

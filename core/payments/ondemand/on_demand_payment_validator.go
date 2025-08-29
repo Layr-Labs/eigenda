@@ -33,13 +33,8 @@ type OnDemandPaymentValidator struct {
 	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
 	// to add them to the cache.
 	ledgerCreationLock sync.Mutex
-	// global payment parameters from the PaymentVault
-	//
-	// TODO(litt3): there is currently no consideration for updates that may be made to these parameters. The strategy
-	// used by the old metering logic wasn't actually safe: updates to the global payment params must be made
-	// deterministically based on RBN. This logic should be implemented before updates to these parameters are made
-	// on-chain.
-	paymentVaultParams PaymentVaultParams
+	// Provides access to payment vault contract for fetching parameters when needed
+	paymentVault payments.PaymentVault
 	// Provides access to the values stored in the PaymentVault contract and update notifications
 	onDemandPaymentVault *OnDemandVaultMonitor
 	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
@@ -54,7 +49,6 @@ func NewOnDemandPaymentValidator(
 	logger logging.Logger,
 	// the maximum number of OnDemandLedger entries to be kept in the LRU cache
 	maxLedgers int,
-	paymentVaultParams PaymentVaultParams,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
@@ -90,11 +84,11 @@ func NewOnDemandPaymentValidator(
 	}
 
 	validator := &OnDemandPaymentValidator{
-		logger:             logger,
-		ledgers:            cache,
-		paymentVaultParams: paymentVaultParams,
-		dynamoClient:       dynamoClient,
-		onDemandTableName:  onDemandTableName,
+		logger:            logger,
+		ledgers:           cache,
+		paymentVault:      paymentVault,
+		dynamoClient:      dynamoClient,
+		onDemandTableName: onDemandTableName,
 	}
 
 	// Create callback for this validator instance
@@ -175,11 +169,21 @@ func (pv *OnDemandPaymentValidator) getOrCreateLedger(
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
 
+	pricePerSymbol, err := pv.paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	minNumSymbols, err := pv.paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
 		onDemandPayment,
-		big.NewInt(int64(pv.paymentVaultParams.PricePerSymbol)),
-		pv.paymentVaultParams.MinNumSymbols,
+		big.NewInt(int64(pricePerSymbol)),
+		minNumSymbols,
 		cumulativePaymentStore,
 	)
 	if err != nil {
