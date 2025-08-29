@@ -147,6 +147,7 @@ func TestRandomDequeOperations(t *testing.T) {
 			_, err = deque.Get(0)
 			require.Error(t, err)
 			_, err = deque.Get(rand.Uint64())
+			require.Error(t, err)
 			_, err = deque.GetFromBack(0)
 			require.Error(t, err)
 			_, err = deque.GetFromBack(rand.Uint64())

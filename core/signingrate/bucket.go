@@ -87,16 +87,16 @@ func NewBucketFromProto(
 	pb *validator.SigningRateBucket,
 ) *Bucket {
 
-	startTime := time.Unix(int64(pb.StartTimestamp), 0)
-	endTime := time.Unix(int64(pb.EndTimestamp), 0)
+	startTime := time.Unix(int64(pb.GetStartTimestamp()), 0)
+	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
 
 	validatorInfo := make(map[core.OperatorID]*SigningRate)
 	statusMap := make(map[core.OperatorID]ValidatorStatus)
 	lastStatusUpdate := make(map[core.OperatorID]time.Time)
 
-	for _, info := range pb.ValidatorSigningRates {
+	for _, info := range pb.GetValidatorSigningRates() {
 		var id core.OperatorID
-		copy(id[:], info.Id)
+		copy(id[:], info.GetId())
 		validatorInfo[id] = NewSigningRateFromProtobuf(info)
 		lastStatusUpdate[id] = startTime
 	}
@@ -215,6 +215,12 @@ func (b *Bucket) getValidator(id core.OperatorID, now time.Time) *SigningRate {
 		info = b.newValidator(id, now, Down)
 	}
 	return info
+}
+
+// Get the signing rate info for a validator if it is registered, or nil if it is not.
+func (b *Bucket) getValidatorIfExists(id core.OperatorID) (signingRate *SigningRate, exists bool) {
+	signingRate, exists = b.validatorInfo[id]
+	return signingRate, exists
 }
 
 // Add a new validator to the set of validators tracked by this bucket.

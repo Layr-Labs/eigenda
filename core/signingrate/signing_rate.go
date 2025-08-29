@@ -49,13 +49,13 @@ func NewSigningRate(id core.OperatorID) *SigningRate {
 // NewSigningRateFromProtobuf creates a new SigningRate instance from a protobuf representation.
 func NewSigningRateFromProtobuf(proto *validator.ValidatorSigningRate) *SigningRate {
 	return &SigningRate{
-		id:              (core.OperatorID)(proto.Id),
-		signedBatches:   proto.SignedBatches,
-		unsignedBatches: proto.UnsignedBatches,
-		signedBytes:     proto.SignedBytes,
-		unsignedBytes:   proto.UnsignedBytes,
-		signingLatency:  proto.SigningLatency,
-		uptime:          proto.Uptime,
+		id:              (core.OperatorID)(proto.GetId()),
+		signedBatches:   proto.GetSignedBatches(),
+		unsignedBatches: proto.GetUnsignedBatches(),
+		signedBytes:     proto.GetSignedBytes(),
+		unsignedBytes:   proto.GetUnsignedBytes(),
+		signingLatency:  proto.GetSigningLatency(),
+		uptime:          proto.GetUptime(),
 		cachedProtobuf:  proto,
 	}
 }

@@ -211,6 +211,20 @@ func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err 
 	return previousValue, nil
 }
 
+// Set an element indexed from the last thing in the deque, replacing the existing value, which is returned.
+// Equivalent to Set(Size() - 1 - index, value). // TODO test this
+func (s *RandomAccessDeque[T]) SetFromBack(index uint64, value T) (previousValue T, err error) {
+	if index >= s.size {
+		var zero T
+		return zero, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+	}
+
+	previousValue, err = s.Set(s.size-1-index, value)
+	enforce.NilError(err, "Set failed, this should never happen if size check passes")
+
+	return previousValue, nil
+}
+
 // Clear all elements from the deque. Reclaims space in the underlying array.
 //
 // O(1)
@@ -227,8 +241,16 @@ func (s *RandomAccessDeque[T]) Clear() {
 //
 // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
+	return s.IteratorFrom(0)
+}
+
+// Get an iterator over the elements in the deque, from the specified index to back. It is not safe to get an iterator,
+// modify the deque, and then use the iterator again.
+//
+// O(1) to call this method, O(1) per iteration step. // TODO test
+func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) func(yield func(int, T) bool) {
 	return func(yield func(int, T) bool) {
-		for i := uint64(0); i < s.size; i++ {
+		for i := index; i < s.size; i++ {
 			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
@@ -242,8 +264,16 @@ func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
 //
 // // O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(int, T) bool) {
+	return s.ReverseIteratorFrom(s.size - 1)
+}
+
+// Get an iterator over the elements in the deque, from the specified index to front. It is not safe to get an iterator,
+// modify the deque, and then use the iterator again.
+//
+// O(1) to call this method, O(1) per iteration step. // TODO test
+func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) func(yield func(int, T) bool) {
 	return func(yield func(int, T) bool) {
-		for i := s.size; i > 0; i-- {
+		for i := index; i > 0; i-- {
 			value, err := s.Get(i - 1)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
@@ -270,4 +300,62 @@ func (s *RandomAccessDeque[T]) resizeForInsertion() {
 	s.data = newData
 	s.startIndex = 0
 	s.endIndex = s.size
+}
+
+// TODO test
+
+// Perform a binary search in the deque for an element matching the compare function. Assumes that
+// the deque is sorted according to the same compare function. If an exact match can't be found,
+// returns the index of the location where the value would be inserted if it were inserted in the proper location.
+//
+// The compare function `compare(a V, b T) int` should return:
+//   - negative value if a < b
+//   - zero if a == b
+//   - positive value if a > b
+//
+// If the deque is not sorted or if the ordering is not a total ordering, the return value is undefined.
+func BinarySearchInOrderedDeque[V any, T any](
+	deque *RandomAccessDeque[T],
+	value V,
+	compare func(a V, b T) int) (index uint64, exact bool) {
+
+	if deque.size == 0 {
+		return 0, false
+	}
+
+	// Index is the external index in the deque, from 0 to size-1, not indices as they
+	// appear in the underlying array.
+	left := uint64(0)
+	right := deque.size - 1
+	var targetIndex uint64
+
+	for left <= right {
+
+		targetIndex = (right - left) / 2
+		target, err := deque.Get(targetIndex)
+		enforce.NilError(err, "Get failed, this should never happen with valid indices")
+
+		cmp := compare(value, target)
+
+		if cmp == 0 {
+			// We've found an exact match.
+			return targetIndex, true
+		} else if cmp < 0 {
+			// value < target, search left half
+			//
+			//      value is here
+			//  |-----------------------|-----------------------|
+			// left                   target                  right
+			right = targetIndex - 1
+		} else {
+			// value > target, search right half
+			//
+			//                               value is here
+			//  |-----------------------|-----------------------|
+			// left                   target                  right
+			left = targetIndex + 1
+		}
+	}
+
+	return targetIndex, false
 }

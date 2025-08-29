@@ -10,8 +10,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// TODO don't use time.Now()
-
 // Tracks signing rates for validators and serves queries about signing rates.
 type SigningRateTracker interface {
 
@@ -29,13 +27,13 @@ type SigningRateTracker interface {
 	// Data is returned in chronological order.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetSigningRateDump(startTime time.Time, now time.Time) []*validator.SigningRateBucket
+	GetSigningRateDump(startTime time.Time, now time.Time) ([]*validator.SigningRateBucket, error)
 
 	// Returns a list of buckets that have not yet been flushed to persistent storage.
 	// Buckets are in chronological order.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetUnflushedBuckets() []*validator.SigningRateBucket
+	GetUnflushedBuckets(time time.Time) ([]*validator.SigningRateBucket, error)
 
 	// Report that a validator has successfully signed a batch of the given size.
 	ReportSuccess(
@@ -51,6 +49,14 @@ type SigningRateTracker interface {
 		id core.OperatorID,
 		batchSize uint64,
 	)
+
+	// Update a bucket, overwriting an existing bucket with the same start time if it is present. Should
+	// only be used to update the last bucket in the store. Data is ignored if the bucket won't be the
+	// last bucket.
+	//
+	// This operation doesn't mark a bucket as unflushed. A bucket is only marked as unflushed when it is modified,
+	// not when it is provided whole-sale from an external source.
+	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket)
 
 	// Close the store and free any associated resources.
 	Close()
@@ -81,13 +87,10 @@ type signingRateTracker struct {
 //   - signingRateDatabase: The database to use for storing historical signing rate information.
 //   - timespan: The amount of time to keep in memory. Queries are only supported for this timespan.
 //   - bucketSpan: The duration of each bucket.
-//   - flushPeriod: How often to flush in-memory data to the database. If the process is shut down/crashes, any data
-//     not yet flushed to the database may be lost.
 func NewSigningRateTracker(
 	logger logging.Logger,
 	timespan time.Duration,
 	bucketSpan time.Duration,
-	buckets []*Bucket,
 ) (SigningRateTracker, error) {
 
 	store := &signingRateTracker{
@@ -95,11 +98,6 @@ func NewSigningRateTracker(
 		buckets:    common.NewRandomAccessDeque[*Bucket](0),
 		timespan:   timespan,
 		bucketSpan: bucketSpan,
-	}
-
-	// Load old buckets.
-	for _, bucket := range buckets {
-		store.buckets.PushBack(bucket)
 	}
 
 	return store, nil
@@ -117,14 +115,14 @@ func (s *signingRateTracker) ReportSuccess(
 	signingLatency time.Duration,
 ) {
 
-	bucket := s.getMutableBucket()
+	bucket := s.getMutableBucket(now)
 	bucket.ReportSuccess(now, id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
 }
 
 // Report that a validator has failed to sign a batch of the given size.
 func (s *signingRateTracker) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
-	bucket := s.getMutableBucket()
+	bucket := s.getMutableBucket(now)
 	bucket.ReportFailure(now, id, batchSize)
 	s.markUnflushed(bucket)
 }
@@ -134,41 +132,125 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
-	return nil, nil // TODO
-}
 
-func (s *signingRateTracker) GetSigningRateDump(startTime time.Time, now time.Time) []*validator.SigningRateBucket {
-	buckets := make([]*validator.SigningRateBucket, 0, s.buckets.Size())
-
-	for i := uint64(0); i < s.buckets.Size(); i++ {
-		bucket, err := s.buckets.Get(i)
-		enforce.NilError(err, "should be impossible with valid index")
-		proto := bucket.ToProtobuf(now)
-		buckets = append(buckets, proto)
+	comparator := func(timestamp time.Time, bucket *Bucket) int {
+		if bucket.startTimestamp.Before(timestamp) {
+			return -1
+		} else if bucket.startTimestamp.After(timestamp) {
+			return 1
+		}
+		return 0
 	}
 
-	// No need to sort, s.buckets is always in chronological order.
+	startIndex, exact := common.BinarySearchInOrderedDeque(s.buckets, startTime, comparator)
 
-	return buckets
+	if !exact && startIndex > 0 {
+		// We didn't find the bucket with the exact start time, so round backwards to the previous bucket.
+		startIndex--
+	}
+
+	totalSigningRate := &validator.ValidatorSigningRate{
+		Id: operatorID,
+	}
+
+	for _, bucket := range s.buckets.IteratorFrom(startIndex) {
+		if bucket.startTimestamp.After(endTime) {
+			break
+		}
+
+		signingRate, exists := bucket.getValidatorIfExists(core.OperatorID(operatorID))
+		if !exists {
+			// No info for validator during this bucket, skip it.
+			continue
+		}
+
+		totalSigningRate.SignedBatches += signingRate.SignedBatches()
+		totalSigningRate.UnsignedBatches += signingRate.UnsignedBatches()
+		totalSigningRate.SignedBytes += signingRate.SignedBytes()
+		totalSigningRate.UnsignedBytes += signingRate.UnsignedBytes()
+		totalSigningRate.SigningLatency += signingRate.SigningLatency()
+		totalSigningRate.Uptime += signingRate.Uptime()
+	}
+
+	return totalSigningRate, nil
 }
 
-func (s *signingRateTracker) GetUnflushedBuckets() []*validator.SigningRateBucket {
+func (s *signingRateTracker) GetSigningRateDump(
+	startTime time.Time,
+	now time.Time,
+) ([]*validator.SigningRateBucket, error) {
+
+	buckets := make([]*validator.SigningRateBucket, 0, s.buckets.Size())
+
+	// Iterate backwards. In general, dump requests will only be used to fetch recent data, so
+	// we should optimize the case where we are requesting a few buckets from the end of the deque.
+	for _, bucket := range s.buckets.ReverseIterator() {
+		if bucket.EndTimestamp().Before(startTime) {
+			// This bucket is too old, skip it and stop iterating.
+			break
+		}
+		buckets = append(buckets, bucket.ToProtobuf(now))
+	}
+
+	// We iterated in reverse, so reverse again to get chronological ordering.
+	for i, j := 0, len(buckets)-1; i < j; i, j = i+1, j-1 {
+		buckets[i], buckets[j] = buckets[j], buckets[i]
+	}
+
+	return buckets, nil
+}
+
+func (s *signingRateTracker) GetUnflushedBuckets(now time.Time) ([]*validator.SigningRateBucket, error) {
 	buckets := make([]*validator.SigningRateBucket, 0, len(s.unflushedBuckets))
 
 	for _, bucket := range s.unflushedBuckets {
-		proto := bucket.ToProtobuf(time.Now())
+		proto := bucket.ToProtobuf(now)
 		buckets = append(buckets, proto)
 	}
 
 	sortValidatorSigningRateBuckets(buckets)
 
-	return buckets
+	return buckets, nil
+}
+
+func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
+	convertedBucket := NewBucketFromProto(s.logger, bucket)
+
+	if s.buckets.Size() == 0 {
+		s.buckets.PushBack(convertedBucket)
+		return
+	}
+
+	previousBucket, err := s.buckets.PeekBack()
+	enforce.NilError(err, "should be impossible with a non-empty deque")
+
+	if previousBucket.startTimestamp.Equal(convertedBucket.startTimestamp) {
+		// We have a bucket with the same start time, replace it.
+		_, err := s.buckets.SetFromBack(0, convertedBucket)
+		enforce.NilError(err, "should be impossible with a valid index")
+		return
+	}
+
+	if previousBucket.startTimestamp.Before(convertedBucket.startTimestamp) {
+		// This method should not be used to add buckets out of order.
+		// In theory, if the controller loses a large amount of history (i.e. hours), it could try to
+		// send out of date old buckets to fill in the gap. Scream about this in the logs, but
+		// no need to bring things crashing down over it.
+		s.logger.Errorf(
+			"Attempted to add bucket with start time %v after last bucket with start time %v, ignoring",
+			convertedBucket.startTimestamp, previousBucket.startTimestamp)
+		return
+	}
+
+	// Add the new bucket to the end of the list.
+	s.buckets.PushBack(convertedBucket)
+
+	// Now is as good a time as any to do garbage collection.
+	s.garbageCollectBuckets(now)
 }
 
 // Get the bucket that is currently being written to. This is always the latest bucket.
-func (s *signingRateTracker) getMutableBucket() *Bucket {
-
-	now := time.Now()
+func (s *signingRateTracker) getMutableBucket(now time.Time) *Bucket {
 
 	if s.buckets.Size() == 0 {
 		// Create the first bucket.
@@ -187,15 +269,15 @@ func (s *signingRateTracker) getMutableBucket() *Bucket {
 
 		// Now is a good time to do garbage collection. As long as bucket size remains fixed, we should be removing
 		// one bucket for each new bucket we add once we reach steady state.
-		s.garbageCollectBuckets()
+		s.garbageCollectBuckets(now)
 	}
 
 	return bucket
 }
 
 // Remove old buckets that are outside the configured timespan.
-func (s *signingRateTracker) garbageCollectBuckets() {
-	cutoff := time.Now().Add(-s.timespan)
+func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
+	cutoff := now.Add(-s.timespan)
 
 	for s.buckets.Size() > 0 {
 		bucket, err := s.buckets.PeekFront()
