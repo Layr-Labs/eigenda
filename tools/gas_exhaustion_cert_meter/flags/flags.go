@@ -5,7 +5,7 @@ import (
 
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
-	altdaflags "github.com/Layr-Labs/eigenda/tools/altdacommitment_parser/flags"
+	altdacommitflags "github.com/Layr-Labs/eigenda/tools/altdacommitment_parser/flags"
 	"github.com/urfave/cli"
 )
 
@@ -41,7 +41,7 @@ for the exact values getting set by this flag. Permitted EigenDANetwork values i
 var requiredFlags = []cli.Flag{
 	NetworkFlag,
 	EthRpcUrlFlag,
-	altdaflags.CertHexFlag,
+	altdacommitflags.CertHexFlag,
 }
 
 var optionalFlags = []cli.Flag{}
