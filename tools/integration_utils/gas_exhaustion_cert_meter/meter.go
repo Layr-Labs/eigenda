@@ -10,15 +10,43 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/tools/integration_utils/altdacommitment_parser"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/urfave/cli"
 
 	gnarkbn254 "github.com/consensys/gnark-crypto/ecc/bn254"
 
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 )
+
+func RunMeterer(ctx *cli.Context) error {
+	config, err := NewConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
+
+	// Read and decode the certificate file
+	prefix, versionedCert, err := altdacommitment_parser.ParseAltDACommitmentFromHex(config.CertHexString)
+	if err != nil {
+		return fmt.Errorf("failed to parse cert hex string: %w", err)
+	}
+
+	altdacommitment_parser.DisplayPrefixInfo(prefix)
+
+	cert, err := altdacommitment_parser.ParseCertificateData(versionedCert)
+	if err != nil {
+		return fmt.Errorf("failed to parse versioned cert: %w", err)
+	}
+
+	if err = EstimateGas(config, *cert); err != nil {
+		return fmt.Errorf("gas estimation failed: %w", err)
+	}
+
+	return nil
+}
 
 // EstimateGas calculates the worst-case gas cost for verifying an EigenDA V3 certificate.
 // It simulates a scenario where all operators are non-signers, requiring maximum verification work.

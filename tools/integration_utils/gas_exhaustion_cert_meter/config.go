@@ -9,7 +9,7 @@ import (
 	blsapkregistry "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	contractIEigenDADirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
-	"github.com/Layr-Labs/eigenda/tools/gas_exhaustion_cert_meter/flags"
+	"github.com/Layr-Labs/eigenda/tools/integration_utils/flags"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,7 +17,6 @@ import (
 	"github.com/urfave/cli"
 
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
-	altdaflags "github.com/Layr-Labs/eigenda/tools/altdacommitment_parser/flags"
 )
 
 type Config struct {
@@ -57,7 +56,7 @@ func GetAddressByName(
 
 func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 
-	rpcURL := ctx.GlobalString(flags.EthRpcUrlFlag.Name)
+	rpcURL := ctx.String(flags.EthRpcUrlFlag.Name)
 	ethContext := context.Background()
 	client, err := ethclient.DialContext(ethContext, rpcURL)
 	if err != nil {
@@ -118,7 +117,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		CertVerifierCaller:      certVerifierCaller,
 		RegistryCoordinatorAddr: registryCoordinatorAddr,
 		CertVerifierAddr:        v3CertVerifierAddr,
-		CertHexString:           ctx.GlobalString(altdaflags.CertHexFlag.Name),
+		CertHexString:           ctx.String(flags.CertHexFlag.Name),
 		Logger:                  logger,
 		Ctx:                     ethContext,
 	}, nil
