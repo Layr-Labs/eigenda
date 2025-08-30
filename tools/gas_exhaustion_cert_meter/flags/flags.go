@@ -5,6 +5,7 @@ import (
 
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
+	altdaflags "github.com/Layr-Labs/eigenda/tools/altdacommitment_parser/flags"
 	"github.com/urfave/cli"
 )
 
@@ -29,13 +30,6 @@ for the exact values getting set by this flag. Permitted EigenDANetwork values i
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_NETWORK"),
 	}
-	CertRlpFileFlag = cli.StringFlag{
-		Name: common.PrefixFlag(FlagPrefix, "cert-rlp-file"),
-		Usage: "Path to the RLP-encoded EigenDA V3 certificate file. " +
-			"Examples: ./data/cert_v3.mainnet.rlp, ./data/cert_v3.sepolia.rlp",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "CERT_RLP_FILE"),
-	}
 	EthRpcUrlFlag = &cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eth-rpc-url"),
 		Usage:    "Ethereum RPC URL",
@@ -46,8 +40,8 @@ for the exact values getting set by this flag. Permitted EigenDANetwork values i
 
 var requiredFlags = []cli.Flag{
 	NetworkFlag,
-	CertRlpFileFlag,
 	EthRpcUrlFlag,
+	altdaflags.CertHexFlag,
 }
 
 var optionalFlags = []cli.Flag{}

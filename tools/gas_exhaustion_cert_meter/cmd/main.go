@@ -6,9 +6,10 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/tools/altdacommitment_parser"
 	"github.com/Layr-Labs/eigenda/tools/gas_exhaustion_cert_meter"
 	"github.com/Layr-Labs/eigenda/tools/gas_exhaustion_cert_meter/flags"
-	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/urfave/cli"
 )
 
@@ -45,17 +46,18 @@ func RunMeterer(ctx *cli.Context) error {
 	}
 
 	// Read and decode the certificate file
-	data, err := os.ReadFile(config.CertPath)
+	parseResult, err := altdacommitment_parser.ParseCertFromHex(config.CertHexString)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to read certificate file %s: %w\nHint: Use an RLP-serialized EigenDA V3 certificate "+
-				"(examples: ./data/cert_v3.mainnet.rlp, ./data/cert_v3.sepolia.rlp)",
-			config.CertPath, err)
+		return fmt.Errorf("failed to parse cert hex string: %w", err)
 	}
 
+	altdacommitment_parser.DisplayCommitmentInfo(parseResult.Commitment)
+
 	var certV3 coretypes.EigenDACertV3
-	if err = rlp.DecodeBytes(data, &certV3); err != nil {
-		return fmt.Errorf("failed to decode certificate as RLP: %w", err)
+	if parseResult.CertV2 != nil {
+		certV3 = *parseResult.CertV2.ToV3()
+	} else {
+		certV3 = *parseResult.CertV3
 	}
 
 	if err = gas_exhaustion_cert_meter.EstimateGas(config, certV3); err != nil {
