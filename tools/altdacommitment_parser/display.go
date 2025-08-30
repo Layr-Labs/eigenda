@@ -8,19 +8,33 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+// versionByteString returns a string representation of the version byte for display
+func versionByteString(v certs.VersionByte) string {
+	switch v {
+	case certs.V0VersionByte:
+		return "EigenDA V1"
+	case certs.V1VersionByte:
+		return "EigenDA V2 Legacy"
+	case certs.V2VersionByte:
+		return "EigenDA V2 with V3 Cert"
+	default:
+		return fmt.Sprintf("Unknown (0x%02x)", byte(v))
+	}
+}
+
 // DisplayCommitmentInfo displays the parsed commitment structure information
-func DisplayCommitmentInfo(parsed *ParsedCommitment) {
-	fmt.Printf("Decoded hex string to binary (%d bytes)\n", len(parsed.OriginalData))
+func DisplayCommitmentInfo(parsed *PrefixMetadata) {
+	fmt.Printf("Decoded hex string to binary (%d bytes)\n", parsed.OriginalSize)
 	fmt.Printf("Commitment Structure Analysis:\n")
 	fmt.Printf("  Mode: %s\n", parsed.Mode)
-	fmt.Printf("  Total Size: %d bytes\n", len(parsed.OriginalData))
 
 	if parsed.CommitTypeByte != nil {
-		fmt.Printf("  Commit Type Byte: 0x%02x\n", *parsed.CommitTypeByte)
+		fmt.Printf("  Commitment Type Byte: 0x%02x\n", *parsed.CommitTypeByte)
 	}
 	if parsed.DALayerByte != nil {
 		fmt.Printf("  DA Layer Byte: 0x%02x", *parsed.DALayerByte)
@@ -29,49 +43,31 @@ func DisplayCommitmentInfo(parsed *ParsedCommitment) {
 		}
 		fmt.Printf("\n")
 	}
-	if parsed.VersionByte != nil {
-		fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(*parsed.VersionByte), parsed.VersionByte.String())
-	}
-	fmt.Printf("  Certificate Data Size: %d bytes\n\n", len(parsed.CertificateData))
+	versionByte := parsed.CertVersion
+	fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(versionByte), versionByteString(versionByte))
+	fmt.Printf("  Total Size: %d bytes\n", parsed.OriginalSize)
 }
 
-// displayCertificateData displays the parsed certificate data
-func DisplayCertificateData(result *ParseResult) error {
+// DisplayCertificateData displays the parsed certificate data
+func DisplayCertificateData(parsed *PrefixMetadata, certV3 *coretypes.EigenDACertV3) {
 	// Determine expected certificate version based on version byte
 	var expectedVersion string
-	if result.Commitment.VersionByte != nil {
-		switch *result.Commitment.VersionByte {
-		case V0VersionByte:
-			expectedVersion = "V1/V2"
-		case V1VersionByte:
-			expectedVersion = "V2"
-		case V2VersionByte:
-			expectedVersion = "V2/V3"
-		}
+	switch parsed.CertVersion {
+	case certs.V0VersionByte:
+		expectedVersion = "V1/V2"
+	case certs.V1VersionByte:
+		expectedVersion = "V2"
+	case certs.V2VersionByte:
+		expectedVersion = "V2/V3"
 	}
 
-	// Display the certificate based on version
-	if result.Version == "V3" && result.CertV3 != nil {
-		fmt.Printf("Successfully parsed as EigenDA Certificate V3")
-		if expectedVersion != "" {
-			fmt.Printf(" (Expected: %s)", expectedVersion)
-		}
-		fmt.Printf("\n\n")
-		displayCertV3(result.CertV3)
-		return nil
+	// Display the certificate (always V3 format)
+	fmt.Printf("Successfully parsed as EigenDA Certificate V3")
+	if expectedVersion != "" {
+		fmt.Printf(" (Expected: %s)", expectedVersion)
 	}
-
-	if result.Version == "V2" && result.CertV2 != nil {
-		fmt.Printf("Successfully parsed as EigenDA Certificate V2")
-		if expectedVersion != "" {
-			fmt.Printf(" (Expected: %s)", expectedVersion)
-		}
-		fmt.Printf("\n\n")
-		displayCertV2(result.CertV2)
-		return nil
-	}
-
-	return fmt.Errorf("no valid certificate found in parse result")
+	fmt.Printf("\n\n")
+	displayCertV3(certV3)
 }
 
 // displayCertV3 creates a nicely formatted table display for V3 certificates
@@ -184,97 +180,6 @@ func displayCertV3(cert *coretypes.EigenDACertV3) {
 		AutoMerge:      true,
 		AutoMergeAlign: text.AlignCenter,
 	})
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"Signed Quorum Numbers", formatByteSlice(cert.SignedQuorumNumbers)})
-
-	t.Render()
-}
-
-// displayCertV2 creates a nicely formatted table display for V2 certificates
-func displayCertV2(cert *coretypes.EigenDACertV2) {
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(table.StyleDefault)
-	t.Style().Title.Align = text.AlignCenter
-
-	// Set column widths to ensure consistent display with truncated long numbers
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMax: 30, WidthMin: 30}, // Field column - fixed 30 characters
-		{Number: 2, WidthMax: 80},               // Value column - back to 80 chars with truncation handling
-	})
-
-	// Main certificate info
-	t.SetTitle("EigenDA Certificate V2 Details")
-	t.AppendHeader(table.Row{"Field", "Value"})
-
-	// Similar structure but for V2 types
-	// Note: V2 and V3 have very similar structure, main difference is in the type bindings
-
-	// Blob Inclusion Info
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"BLOB INCLUSION INFO", ""})
-	t.AppendSeparator()
-
-	blobCert := &cert.BlobInclusionInfo.BlobCertificate
-	t.AppendRow(table.Row{"Blob Index", fmt.Sprintf("%d", cert.BlobInclusionInfo.BlobIndex)})
-	t.AppendRow(table.Row{"Inclusion Proof", formatByteSlice(cert.BlobInclusionInfo.InclusionProof)})
-
-	// Blob Header
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"BLOB HEADER", ""})
-	t.AppendSeparator()
-
-	blobHeader := &blobCert.BlobHeader
-	t.AppendRow(table.Row{"Version", fmt.Sprintf("%d", blobHeader.Version)})
-	t.AppendRow(table.Row{"Quorum Numbers", formatByteSlice(blobHeader.QuorumNumbers)})
-	t.AppendRow(table.Row{"Payment Header Hash", formatByteArray32(blobHeader.PaymentHeaderHash)})
-
-	// Commitment details
-	commitment := &blobHeader.Commitment
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"BLOB COMMITMENT", ""})
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"Commitment X", formatBigInt(commitment.Commitment.X)})
-	t.AppendRow(table.Row{"Commitment Y", formatBigInt(commitment.Commitment.Y)})
-	t.AppendRow(table.Row{"Length Commitment X", formatBigIntArray(commitment.LengthCommitment.X)})
-	t.AppendRow(table.Row{"Length Commitment Y", formatBigIntArray(commitment.LengthCommitment.Y)})
-	t.AppendRow(table.Row{"Length Proof X", formatBigIntArray(commitment.LengthProof.X)})
-	t.AppendRow(table.Row{"Length Proof Y", formatBigIntArray(commitment.LengthProof.Y)})
-	t.AppendRow(table.Row{"Length", fmt.Sprintf("%d", commitment.Length)})
-
-	// Blob certificate signature and relay keys
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"BLOB CERTIFICATE", ""})
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"Signature", formatByteSlice(blobCert.Signature)})
-	t.AppendRow(table.Row{"Relay Keys", formatUint32Slice(blobCert.RelayKeys)})
-
-	// Batch Header
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"BATCH HEADER", ""})
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"Batch Root", formatByteArray32(cert.BatchHeader.BatchRoot)})
-	t.AppendRow(table.Row{"Reference Block Number", fmt.Sprintf("%d", cert.BatchHeader.ReferenceBlockNumber)})
-
-	// Non-Signer Stakes and Signature
-	nonSigner := &cert.NonSignerStakesAndSignature
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"NON-SIGNER STAKES & SIGNATURE", ""})
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"Non-Signer Quorum Bitmap Indices", formatUint32Slice(nonSigner.NonSignerQuorumBitmapIndices)})
-	t.AppendRow(table.Row{"Non-Signer Pubkeys Count", fmt.Sprintf("%d", len(nonSigner.NonSignerPubkeys))})
-	t.AppendRow(table.Row{"Quorum APKs Count", fmt.Sprintf("%d", len(nonSigner.QuorumApks))})
-	t.AppendRow(table.Row{"APK G2 X", formatBigIntArray(nonSigner.ApkG2.X)})
-	t.AppendRow(table.Row{"APK G2 Y", formatBigIntArray(nonSigner.ApkG2.Y)})
-	t.AppendRow(table.Row{"Sigma X", formatBigInt(nonSigner.Sigma.X)})
-	t.AppendRow(table.Row{"Sigma Y", formatBigInt(nonSigner.Sigma.Y)})
-	t.AppendRow(table.Row{"Quorum APK Indices", formatUint32Slice(nonSigner.QuorumApkIndices)})
-	t.AppendRow(table.Row{"Total Stake Indices", formatUint32Slice(nonSigner.TotalStakeIndices)})
-	t.AppendRow(table.Row{"Non-Signer Stake Indices", formatUint32SliceSlice(nonSigner.NonSignerStakeIndices)})
-
-	// Signed Quorum Numbers
-	t.AppendSeparator()
-	t.AppendRow(table.Row{"SIGNED QUORUM NUMBERS", ""})
 	t.AppendSeparator()
 	t.AppendRow(table.Row{"Signed Quorum Numbers", formatByteSlice(cert.SignedQuorumNumbers)})
 

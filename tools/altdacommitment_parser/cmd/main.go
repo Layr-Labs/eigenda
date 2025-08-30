@@ -44,14 +44,20 @@ func ParseCert(ctx *cli.Context) error {
 // and prints a nicely formatted display of its contents to stdout
 func ParseCertFromHex(hexString string) error {
 	// Use the parser library to parse the certificate
-	result, err := ParseCertFromHex(hexString)
+	commitment, versionedCert, err := altdacommitment_parser.ParseCertFromHex(hexString)
 	if err != nil {
-		return fmt.Errorf("failed to parse certificate: %w", err)
+		return fmt.Errorf("failed to parse cert prefix: %w", err)
 	}
 
 	// Display the parsed commitment information
-	altdacommitment_parser.DisplayCommitmentInfo(result.Commitment)
+	altdacommitment_parser.DisplayCommitmentInfo(commitment)
+
+	certV3, err := altdacommitment_parser.ParseCertificateData(versionedCert)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate data: %w", err)
+	}
 
 	// Display the certificate data
-	return altdacommitment_parser.DisplayCertificateData(result)
+	altdacommitment_parser.DisplayCertificateData(commitment, certV3)
+	return nil
 }
