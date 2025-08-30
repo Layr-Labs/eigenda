@@ -63,7 +63,6 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		return nil, fmt.Errorf("dial Ethereum node at %s: %w", rpcURL, err)
 	}
 
-<<<<<<< HEAD
 	networkString := ctx.String(flags.NetworkFlag.Name)
 	eigenDANetwork, err := proxycommon.EigenDANetworkFromString(networkString)
 	if err != nil {
@@ -71,9 +70,6 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 	}
 
 	directoryAddress := gethcommon.HexToAddress(eigenDANetwork.GetEigenDADirectory())
-=======
-	directoryAddress := gethcommon.HexToAddress(ctx.GlobalString(flags.EigenDADirectoryFlag.Name))
->>>>>>> 189bf7f4 (a gas meter for the worst case scenario when no one signs)
 
 	operatorStateRetrieverAddr, err := GetAddressByName(
 		ethContext, client, directoryAddress, "OPERATOR_STATE_RETRIEVER")
@@ -96,11 +92,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD
 	opStateRetrCaller, err := opstateretriever.NewContractOperatorStateRetrieverCaller(
-=======
-	oStateRetrCaller, err := opstateretriever.NewContractOperatorStateRetrieverCaller(
->>>>>>> 189bf7f4 (a gas meter for the worst case scenario when no one signs)
 		operatorStateRetrieverAddr, client)
 	if err != nil {
 		logger.Error("Failed to fetch OperatorStateRetriever contract", "err", err)
@@ -120,11 +112,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 
 	return &Config{
 		EthClient:               client,
-<<<<<<< HEAD
 		OpStateRetrCaller:       opStateRetrCaller,
-=======
-		OpStateRetrCaller:       oStateRetrCaller,
->>>>>>> 189bf7f4 (a gas meter for the worst case scenario when no one signs)
 		BLSApkRegistryCaller:    blsApkRegistryCaller,
 		CertVerifierCaller:      certVerifierCaller,
 		RegistryCoordinatorAddr: registryCoordinatorAddr,
