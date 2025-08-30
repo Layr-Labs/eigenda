@@ -219,5 +219,4 @@ func (m *metrics) logMetrics() {
 		common.CommaOMatic(flushCount),
 		common.PrettyPrintTime(averageFlushLatency),
 		common.PrettyPrintTime(m.longestFlushDuration.Load()))
-
 }

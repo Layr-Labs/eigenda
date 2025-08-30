@@ -211,7 +211,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 				},
 				Action: pushCommand,
 			},
-			{ // TODO test in preprod
+			{ // TODO (cody.littley) test in preprod
 				Name: "sync",
 				Usage: "Periodically run 'litt push' to keep a remote backup in sync with local data. " +
 					"Optionally calls 'litt prune' remotely to manage data retention.",
@@ -246,6 +246,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Path to the SSH private key file for authentication.",
 						Value:   "~/.ssh/id_rsa",
 					},
+					knownHostsFlag,
 					&cli.BoolFlag{
 						Name:    "no-gc",
 						Aliases: []string{"n"},
@@ -288,7 +289,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Value:   300,
 					},
 				},
-				Action: nil, // syncCommand, // TODO this will be added in a follow up PR
+				Action: syncCommand,
 			},
 			{
 				Name:      "unlock",
