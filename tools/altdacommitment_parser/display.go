@@ -27,8 +27,8 @@ func versionByteString(v certs.VersionByte) string {
 	}
 }
 
-// DisplayCommitmentInfo displays the parsed commitment structure information
-func DisplayCommitmentInfo(parsed *PrefixMetadata) {
+// DisplayPrefixInfo displays the parsed commitment structure information
+func DisplayPrefixInfo(parsed *PrefixMetadata) {
 	fmt.Printf("Decoded hex string to binary (%d bytes)\n", parsed.OriginalSize)
 	fmt.Printf("Commitment Structure Analysis:\n")
 	fmt.Printf("  Mode: %s\n", parsed.Mode)
@@ -45,33 +45,10 @@ func DisplayCommitmentInfo(parsed *PrefixMetadata) {
 	}
 	versionByte := parsed.CertVersion
 	fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(versionByte), versionByteString(versionByte))
-	fmt.Printf("  Total Size: %d bytes\n", parsed.OriginalSize)
-}
-
-// DisplayCertificateData displays the parsed certificate data
-func DisplayCertificateData(parsed *PrefixMetadata, certV3 *coretypes.EigenDACertV3) {
-	// Determine expected certificate version based on version byte
-	var expectedVersion string
-	switch parsed.CertVersion {
-	case certs.V0VersionByte:
-		expectedVersion = "V1/V2"
-	case certs.V1VersionByte:
-		expectedVersion = "V2"
-	case certs.V2VersionByte:
-		expectedVersion = "V2/V3"
-	}
-
-	// Display the certificate (always V3 format)
-	fmt.Printf("Successfully parsed as EigenDA Certificate V3")
-	if expectedVersion != "" {
-		fmt.Printf(" (Expected: %s)", expectedVersion)
-	}
-	fmt.Printf("\n\n")
-	displayCertV3(certV3)
 }
 
 // displayCertV3 creates a nicely formatted table display for V3 certificates
-func displayCertV3(cert *coretypes.EigenDACertV3) {
+func DisplayCertificateData(cert *coretypes.EigenDACertV3) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleDefault)
@@ -79,7 +56,7 @@ func displayCertV3(cert *coretypes.EigenDACertV3) {
 
 	// Set column widths to ensure consistent display with truncated long numbers
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMax: 30, WidthMin: 30}, // Field column - fixed 30 characters
+		{Number: 1, WidthMax: 35, WidthMin: 35}, // Field column - fixed 35 characters
 		{Number: 2, WidthMax: 80},               // Value column - back to 80 chars with truncation handling
 	})
 

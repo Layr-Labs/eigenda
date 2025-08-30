@@ -25,32 +25,25 @@ func main() {
 		"remove the '1' prefix byte from calldata before parsing."
 	app.Usage = "altdacommitment_parser --hex <hex-encoded-cert-string>"
 	app.Flags = flags.Flags
-	app.Action = ParseCert
+	app.Action = ParseCertFromHex
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func ParseCert(ctx *cli.Context) error {
-	hexString := ctx.String("hex")
-	if hexString == "" {
-		return fmt.Errorf("hex string is required")
-	}
-
-	return ParseCertFromHex(hexString)
-}
-
 // ParseCertFromHex parses an EigenDA certificate from a hex-encoded RLP string
 // and prints a nicely formatted display of its contents to stdout
-func ParseCertFromHex(hexString string) error {
+func ParseCertFromHex(ctx *cli.Context) error {
+	hexString := ctx.GlobalString(flags.CertHexFlag.Name)
+
 	// Use the parser library to parse the certificate
-	commitment, versionedCert, err := altdacommitment_parser.ParseCertFromHex(hexString)
+	prefix, versionedCert, err := altdacommitment_parser.ParseCertFromHex(hexString)
 	if err != nil {
 		return fmt.Errorf("failed to parse cert prefix: %w", err)
 	}
 
-	// Display the parsed commitment information
-	altdacommitment_parser.DisplayCommitmentInfo(commitment)
+	// Display the parsed prfix information
+	altdacommitment_parser.DisplayPrefixInfo(prefix)
 
 	certV3, err := altdacommitment_parser.ParseCertificateData(versionedCert)
 	if err != nil {
@@ -58,6 +51,6 @@ func ParseCertFromHex(hexString string) error {
 	}
 
 	// Display the certificate data
-	altdacommitment_parser.DisplayCertificateData(commitment, certV3)
+	altdacommitment_parser.DisplayCertificateData(certV3)
 	return nil
 }

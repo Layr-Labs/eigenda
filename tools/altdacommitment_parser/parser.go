@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// PrefixMetadata holds the parsed commitment information
+// PrefixMetadata holds the parsed prefix information
 type PrefixMetadata struct {
 	Mode           commitments.CommitmentMode
 	CommitTypeByte *byte
@@ -20,7 +20,7 @@ type PrefixMetadata struct {
 	OriginalSize   int
 }
 
-// ParseCertFromHex parses an EigenDA certificate from a hex-encoded RLP string
+// ParseCertFromHex parses an prefix and certificate from a hex-encoded RLP string
 func ParseCertFromHex(hexString string) (*PrefixMetadata, *certs.VersionedCert, error) {
 	// Process the hex string to get binary data
 	data, err := processHexString(hexString)
@@ -32,7 +32,7 @@ func ParseCertFromHex(hexString string) (*PrefixMetadata, *certs.VersionedCert, 
 		return nil, nil, fmt.Errorf("empty data")
 	}
 
-	// Step 1: Determine commitment mode
+	// determine commitment mode
 	mode, err := determineCommitmentMode(data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine commitment mode: %w", err)
@@ -42,6 +42,7 @@ func ParseCertFromHex(hexString string) (*PrefixMetadata, *certs.VersionedCert, 
 	var versionedCert certs.VersionedCert
 	var prefix PrefixMetadata
 	prefix.Mode = mode
+	// length of binary data on L1
 	prefix.OriginalSize = len(data)
 	switch mode {
 	case commitments.StandardCommitmentMode:
@@ -96,26 +97,39 @@ func processHexString(hexString string) ([]byte, error) {
 	return data, nil
 }
 
-// determineCommitmentMode uses RLP validation to distinguish between Standard and Optimism Generic modes
+// determineCommitmentMode uses RLP validation to distinguish between [commitments.StandardCommitmentMode]
+// and [commitments.OptimismGenericCommitmentMode]. The standard commitment with cert version 1 and Optimism
+// Generic Commitment produce a leading byte 1.
+// Without asking user to indicate the type, we use the following test for which commitment a serialized altda
+// commitment belongs. In RLP spec, https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp/.
+// By RLP decode, a standard commitment cannot possibly have a leading 0 in its rlp encoded data, unless the data
+// to be serialized contains a single byte.
 func determineCommitmentMode(data []byte) (commitments.CommitmentMode, error) {
-	if len(data) == 0 {
-		return "", fmt.Errorf("empty data")
+	// for the smaller standard commitment, we assume it must have at least 3 bytes. Which is pretty reasonable
+	// given the size of a cert is far greater than 3.
+	// standard commitment = [version_byte][rlp_certificate]. Size of 3 eliminates the case which rlp_certificate
+	// is a single byte and therefore rlp_certificate cannot start with 0 byte. Given this case is elimniated,
+	// the data must either be a [commitments.OptimismGenericCommitmentMode] or a incorrect altda commitment
+	if len(data) <= 3 {
+		return "", fmt.Errorf("insufficient data")
+	}
+
+	if commitments.OPCommitmentByte(data[0]) == commitments.OPKeccak256CommitmentByte {
+		return "", fmt.Errorf("OP Keccak commitment not supported for not containing altda commitment")
 	}
 
 	// First, try to parse as Standard mode: [version_byte][rlp_certificate]
-	if len(data) > 1 {
-		if isValidRLP(data[1:]) {
-			return commitments.StandardCommitmentMode, nil
-		}
+	if isValidRLP(data[1:]) {
+		return commitments.StandardCommitmentMode, nil
 	}
 
 	// If Standard mode RLP validation failed, check for Optimism Generic mode
 	// Optimism Generic: [0x01][da_layer_byte][version_byte][rlp_certificate]
-	if len(data) >= 3 && isValidRLP(data[3:]) {
+	if isValidRLP(data[3:]) {
 		return commitments.OptimismGenericCommitmentMode, nil
 	} else {
 		// If we can't determine the mode conclusively
-		return "", fmt.Errorf("cannot determine commitment mode")
+		return "", fmt.Errorf("cannot determine commitment mode for a data of size %v", len(data))
 	}
 }
 

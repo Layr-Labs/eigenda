@@ -29,7 +29,7 @@ func main() {
 		"  - RLP-serialized EigenDA certificate file\n" +
 		"  - Example certificates available: ./data/cert_v3.mainnet.rlp.hex, ./data/cert_v3.sepolia.rlp.hex\n\n" +
 		"EXAMPLE:\n" +
-		"  gas-exhaustion-cert-meter --eigenda-directory 0x... --hex ..." +
+		"  gas-exhaustion-cert-meter --eigenda-directory 0x... --cert-hex ..." +
 		"  --eth-rpc-url ..."
 	app.Flags = flags.Flags
 	app.Action = RunMeterer
@@ -50,7 +50,7 @@ func RunMeterer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to parse cert hex string: %w", err)
 	}
 
-	altdacommitment_parser.DisplayCommitmentInfo(prefix)
+	altdacommitment_parser.DisplayPrefixInfo(prefix)
 
 	cert, err := altdacommitment_parser.ParseCertificateData(versionedCert)
 
