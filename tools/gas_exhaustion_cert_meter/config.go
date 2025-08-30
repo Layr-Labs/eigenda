@@ -17,6 +17,7 @@ import (
 	"github.com/urfave/cli"
 
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	altdaflags "github.com/Layr-Labs/eigenda/tools/altdacommitment_parser/flags"
 )
 
 type Config struct {
@@ -32,7 +33,7 @@ type Config struct {
 
 	Ctx context.Context
 
-	CertPath string
+	CertHexString string
 }
 
 func GetAddressByName(
@@ -117,7 +118,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		CertVerifierCaller:      certVerifierCaller,
 		RegistryCoordinatorAddr: registryCoordinatorAddr,
 		CertVerifierAddr:        v3CertVerifierAddr,
-		CertPath:                ctx.GlobalString(flags.CertRlpFileFlag.Name),
+		CertHexString:           ctx.GlobalString(altdaflags.CertHexFlag.Name),
 		Logger:                  logger,
 		Ctx:                     ethContext,
 	}, nil
