@@ -28,21 +28,21 @@ func DisplayAltDACommitmentFromHex(ctx *cli.Context) error {
 	hexString := ctx.String(flags.CertHexFlag.Name)
 
 	// Use the parser library to parse the certificate
-	prefix, versionedCert, err := altdacommitment_parser.ParseAltDACommitmentFromHex(hexString)
+	prefix, versionedCert, err := ParseAltDACommitmentFromHex(hexString)
 	if err != nil {
 		return fmt.Errorf("failed to parse cert prefix: %w", err)
 	}
 
 	// Display the parsed prefix information
-	altdacommitment_parser.DisplayPrefixInfo(prefix)
+	DisplayPrefixInfo(prefix)
 
-	certV3, err := altdacommitment_parser.ParseCertificateData(versionedCert)
+	certV3, err := ParseCertificateData(versionedCert)
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate data: %w", err)
 	}
 
 	// Display the certificate data
-	altdacommitment_parser.DisplayCertificateData(certV3)
+	DisplayCertificateData(certV3)
 	return nil
 }
 
