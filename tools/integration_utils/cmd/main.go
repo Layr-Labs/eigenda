@@ -45,13 +45,7 @@ func main() {
 		{
 			Name: "gas-exhaustion-cert-meter",
 			Usage: "Estimates gas costs for verifying EigenDA certificates " +
-				"when all operators are non-signers (worst case)\n\n" +
-				"REQUIREMENTS:\n" +
-				"  - RLP-serialized EigenDA certificate file\n" +
-				"  - Example certificates available: ./data/cert_v3.mainnet.rlp.hex, ./data/cert_v3.sepolia.rlp.hex\n\n" +
-				"EXAMPLE:\n" +
-				"  gas-exhaustion-cert-meter --eigenda-directory 0x... --cert-hex ..." +
-				"  --eth-rpc-url ...",
+				"when all operators are non-signers (worst case)\n\n",
 			Description: "Gas estimation tool for EigenDA certificate verification in worst-case scenarios",
 			Flags:       flags.GasExhaustionCertMeterFlags,
 			Action:      gas_exhaustion_cert_meter.RunMeterer,
