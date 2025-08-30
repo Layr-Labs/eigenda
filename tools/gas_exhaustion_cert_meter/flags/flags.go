@@ -1,6 +1,9 @@
 package flags
 
 import (
+	"fmt"
+
+	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
@@ -12,11 +15,19 @@ const (
 
 var (
 	/* Required Flags*/
-	EigenDADirectoryFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA directory contract, which points to all other EigenDA contract addresses.",
+	NetworkFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "eigenda-network"),
+		Usage: fmt.Sprintf(`The EigenDA network that is being used. 
+See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
+for the exact values getting set by this flag. Permitted EigenDANetwork values include 
+%s, %s, %s, & %s.`,
+			proxycommon.MainnetEigenDANetwork,
+			proxycommon.HoleskyTestnetEigenDANetwork,
+			proxycommon.HoleskyPreprodEigenDANetwork,
+			proxycommon.SepoliaTestnetEigenDANetwork,
+		),
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_DIRECTORY"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_NETWORK"),
 	}
 	CertRlpFileFlag = cli.StringFlag{
 		Name: common.PrefixFlag(FlagPrefix, "cert-rlp-file"),
@@ -34,7 +45,7 @@ var (
 )
 
 var requiredFlags = []cli.Flag{
-	EigenDADirectoryFlag,
+	NetworkFlag,
 	CertRlpFileFlag,
 	EthRpcUrlFlag,
 }

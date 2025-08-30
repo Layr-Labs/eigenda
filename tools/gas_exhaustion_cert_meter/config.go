@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/common"
 	blsapkregistry "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	contractIEigenDADirectory "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDADirectory"
@@ -62,7 +63,13 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		return nil, fmt.Errorf("dial Ethereum node at %s: %w", rpcURL, err)
 	}
 
-	directoryAddress := gethcommon.HexToAddress(ctx.GlobalString(flags.EigenDADirectoryFlag.Name))
+	networkString := ctx.String(flags.NetworkFlag.Name)
+	eigenDANetwork, err := proxycommon.EigenDANetworkFromString(networkString)
+	if err != nil {
+		return nil, fmt.Errorf("parse eigenDANetwork: %w", err)
+	}
+
+	directoryAddress := gethcommon.HexToAddress(eigenDANetwork.GetEigenDADirectory())
 
 	operatorStateRetrieverAddr, err := GetAddressByName(
 		ethContext, client, directoryAddress, "OPERATOR_STATE_RETRIEVER")
@@ -85,7 +92,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 		return nil, err
 	}
 
-	oStateRetrCaller, err := opstateretriever.NewContractOperatorStateRetrieverCaller(
+	opStateRetrCaller, err := opstateretriever.NewContractOperatorStateRetrieverCaller(
 		operatorStateRetrieverAddr, client)
 	if err != nil {
 		logger.Error("Failed to fetch OperatorStateRetriever contract", "err", err)
@@ -105,7 +112,7 @@ func ReadConfig(ctx *cli.Context, logger logging.Logger) (*Config, error) {
 
 	return &Config{
 		EthClient:               client,
-		OpStateRetrCaller:       oStateRetrCaller,
+		OpStateRetrCaller:       opStateRetrCaller,
 		BLSApkRegistryCaller:    blsApkRegistryCaller,
 		CertVerifierCaller:      certVerifierCaller,
 		RegistryCoordinatorAddr: registryCoordinatorAddr,
