@@ -53,6 +53,9 @@ func RunMeterer(ctx *cli.Context) error {
 	altdacommitment_parser.DisplayPrefixInfo(prefix)
 
 	cert, err := altdacommitment_parser.ParseCertificateData(versionedCert)
+	if err != nil {
+		return fmt.Errorf("failed to parse versioned cert: %w", err)
+	}
 
 	if err = gas_exhaustion_cert_meter.EstimateGas(config, *cert); err != nil {
 		return fmt.Errorf("gas estimation failed: %w", err)
