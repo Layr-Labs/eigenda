@@ -56,6 +56,7 @@ where
     }
 }
 
+// TODO: should I invert coords here? I'm not a fan of this inversion, points would be out of curve
 impl FromExt<G1Affine> for G1Point {
     fn from_ext(affine: G1Affine) -> Self {
         match affine.xy() {
@@ -69,17 +70,23 @@ impl FromExt<G1Affine> for G1Point {
 }
 
 impl FromExt<G2Affine> for G2Point {
+    /// EigenDA points are represented as [imaginary, real]
+    ///
+    /// `ark_bn254` points are represented as [real, imaginary]
+    ///
+    /// This conversion takes care of correctly mapping one to the other
     fn from_ext(affine: G2Affine) -> Self {
         match affine.xy() {
             Some((x, y)) => G2Point {
-                x: vec![convert::fq_to_uint(x.c0), convert::fq_to_uint(x.c1)],
-                y: vec![convert::fq_to_uint(y.c0), convert::fq_to_uint(y.c1)],
+                x: vec![convert::fq_to_uint(x.c1), convert::fq_to_uint(x.c0)],
+                y: vec![convert::fq_to_uint(y.c1), convert::fq_to_uint(y.c0)],
             },
             None => G2Point::default_ext(),
         }
     }
 }
 
+// TODO: should I invert coords here? I'm not a fan of this inversion, points would be out of curve
 impl FromExt<G1Point> for G1Affine {
     fn from_ext(point: G1Point) -> G1Affine {
         if point.x.is_zero() && point.y.is_zero() {
@@ -97,6 +104,11 @@ impl FromExt<G1Point> for G1Affine {
 }
 
 impl FromExt<G2Point> for G2Affine {
+    /// EigenDA points are represented as [imaginary, real]
+    ///
+    /// `ark_bn254` points are represented as [real, imaginary]
+    ///
+    /// This conversion takes care of correctly mapping one to the other
     fn from_ext(point: G2Point) -> Self {
         if point.x[0].is_zero()
             && point.y[0].is_zero()
@@ -106,10 +118,10 @@ impl FromExt<G2Point> for G2Affine {
             return G2Affine::identity();
         }
 
-        let x_c0_bytes: [u8; 32] = point.x[0].to_be_bytes();
-        let x_c1_bytes: [u8; 32] = point.x[1].to_be_bytes();
-        let y_c0_bytes: [u8; 32] = point.y[0].to_be_bytes();
-        let y_c1_bytes: [u8; 32] = point.y[1].to_be_bytes();
+        let x_c0_bytes: [u8; 32] = point.x[1].to_be_bytes();
+        let x_c1_bytes: [u8; 32] = point.x[0].to_be_bytes();
+        let y_c0_bytes: [u8; 32] = point.y[1].to_be_bytes();
+        let y_c1_bytes: [u8; 32] = point.y[0].to_be_bytes();
 
         let x_c0 = Fq::from_be_bytes_mod_order(&x_c0_bytes);
         let x_c1 = Fq::from_be_bytes_mod_order(&x_c1_bytes);

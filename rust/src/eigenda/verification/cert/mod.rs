@@ -9,18 +9,19 @@ pub mod hash;
 mod signature;
 pub mod types;
 
-use core::iter::once;
-
 use crate::eigenda::cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
+use alloy_primitives::keccak256;
 use alloy_sol_types::SolValue;
 use ark_bn254::{G1Affine, G2Affine};
+use tracing::instrument;
 
 use crate::eigenda::verification::cert::{
     error::CertVerificationError::{self, *},
-    hash::{HashExt, keccak_v256},
+    hash::HashExt,
     types::{NonSigner, Quorum, Storage, conversions::IntoExt, solidity::SecurityThresholds},
 };
 
+#[derive(Clone, Debug)]
 pub struct CertVerificationInputs {
     pub batch_header: BatchHeaderV2,
     pub blob_inclusion_info: BlobInclusionInfo,
@@ -31,6 +32,7 @@ pub struct CertVerificationInputs {
     pub storage: Storage,
 }
 
+#[instrument]
 pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
     let CertVerificationInputs {
         batch_header,
@@ -45,20 +47,19 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
     let Storage {
         quorum_count,
         current_block,
-        stale_stakes_forbidden,
-        min_withdrawal_delay_blocks,
         quorum_bitmap_history,
         operator_stake_history,
         total_stake_history,
         apk_history,
-        quorum_update_block_number,
         relay_key_to_relay_address,
         versioned_blob_params,
+        #[cfg(feature = "stale-stakes-forbidden")]
+        staleness,
     } = storage;
 
     let blob_certificate = blob_inclusion_info.blob_certificate.hash_ext();
     let encoded = blob_certificate.abi_encode_packed();
-    let leaf_node = keccak_v256(once(encoded));
+    let leaf_node = keccak256(&encoded);
     check::leaf_node_belongs_to_merkle_tree(
         leaf_node,
         batch_header.batch_root.into(),
@@ -79,7 +80,10 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
             .non_signer_quorum_bitmap_indices
             .len(),
     ];
-    check::non_zero_equal_lengths(&lengths)?;
+
+    check::equal_lengths(&lengths).unwrap();
+
+    check::not_empty(&signed_quorum_numbers)?;
 
     let lengths = [
         signed_quorum_numbers.len(),
@@ -90,14 +94,16 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
             .non_signer_stake_indices
             .len(),
     ];
-    check::non_zero_equal_lengths(&lengths)?;
 
-    if stale_stakes_forbidden {
+    check::equal_lengths(&lengths).unwrap();
+
+    #[cfg(feature = "stale-stakes-forbidden")]
+    if staleness.stale_stakes_forbidden {
         check::quorums_last_updated_after_most_recent_stale_block(
             &signed_quorum_numbers,
             batch_header.reference_block_number,
-            quorum_update_block_number,
-            min_withdrawal_delay_blocks,
+            staleness.quorum_update_block_number,
+            staleness.min_withdrawal_delay_blocks,
         )?;
     }
 
@@ -200,23 +206,6 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         )
         .collect::<Result<Vec<_>, _>>()?;
 
-    let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
-
-    let msg_hash = batch_header.hash_ext();
-    let apk_g2: G2Affine = non_signer_stakes_and_signature.apk_g2.into_ext();
-    let sigma: G1Affine = non_signer_stakes_and_signature.sigma.into_ext();
-
-    if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
-        return Err(SignatureVerificationFailed);
-    }
-
-    let pk_hashes = non_signers
-        .iter()
-        .map(|non_signer| non_signer.pk_hash)
-        .collect::<Vec<_>>();
-    let _signatory_record_hash =
-        hash::signature_record(batch_header.reference_block_number, &pk_hashes);
-
     check::relay_keys_are_set(
         &blob_inclusion_info.blob_certificate.relay_keys,
         &relay_key_to_relay_address,
@@ -238,29 +227,43 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
 
     check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorum_numbers)?;
 
+    let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
+
+    let msg_hash = batch_header.hash_ext();
+    let apk_g2: G2Affine = non_signer_stakes_and_signature.apk_g2.into_ext();
+    let sigma: G1Affine = non_signer_stakes_and_signature.sigma.into_ext();
+
+    if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
+        return Err(SignatureVerificationFailed);
+    }
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use core::iter::once;
-
-    use crate::eigenda::cert::{
-        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo, G1Point,
-        NonSignerStakesAndSignature,
+    use crate::eigenda::{
+        cert::{
+            BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
+            G1Point, NonSignerStakesAndSignature,
+        },
+        verification::cert::hash::keccak256_many,
     };
-    use alloy_primitives::{B256, Bytes, aliases::U96};
+    use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
     use hashbrown::HashMap;
+
+    #[cfg(feature = "stale-stakes-forbidden")]
+    use crate::eigenda::verification::cert::types::Staleness;
 
     use crate::eigenda::verification::cert::{
         CertVerificationInputs,
         bitmap::{Bitmap, BitmapError::*},
         convert,
         error::CertVerificationError::*,
-        hash::{HashExt, keccak_v256},
+        hash::{HashExt, TruncHash},
         types::{
             Storage,
             conversions::{DefaultExt, IntoExt},
@@ -323,9 +326,14 @@ mod tests {
             .non_signer_pubkeys
             .clear();
 
+        inputs
+            .non_signer_stakes_and_signature
+            .non_signer_quorum_bitmap_indices
+            .clear();
+
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, EmptyVec);
+        assert_eq!(err, SignatureVerificationFailed);
     }
 
     #[test]
@@ -339,12 +347,19 @@ mod tests {
         assert_eq!(err, EmptyVec);
     }
 
+    #[cfg(feature = "stale-stakes-forbidden")]
     #[test]
     fn stale_stakes_forbidden() {
         let mut inputs = success_inputs();
 
-        inputs.storage.stale_stakes_forbidden = true;
-        inputs.storage.quorum_update_block_number.insert(0, 41);
+        inputs.storage.staleness.stale_stakes_forbidden = true;
+        inputs
+            .storage
+            .staleness
+            .quorum_update_block_number
+            .insert(0, 41);
+
+        inputs.storage.staleness.min_withdrawal_delay_blocks = 1;
 
         let err = verify(inputs).unwrap_err();
 
@@ -353,6 +368,7 @@ mod tests {
             StaleQuorum {
                 last_updated_at_block: 41,
                 most_recent_stale_block: 41,
+                window: 1,
             }
         );
     }
@@ -368,7 +384,7 @@ mod tests {
 
         let err = verify(inputs).unwrap_err();
 
-        assert_eq!(err, CertApkDoesNotEqualStorageApk);
+        assert!(matches!(err, CertApkDoesNotEqualStorageApk { .. }));
     }
 
     #[test]
@@ -803,16 +819,11 @@ mod tests {
             .map(|(quorum, apk)| {
                 let apk_hash = convert::point_to_hash(&apk.into_ext());
                 let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
+                let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
                 let update = Update::new(41, 43, apk_trunc_hash).unwrap();
                 let history = HashMap::from([(0, update)]);
                 (quorum, History(history))
             })
-            .collect();
-
-        let quorum_update_block_number = signed_quorum_numbers
-            .clone()
-            .into_iter()
-            .map(|quorum| (quorum, 42))
             .collect();
 
         let relay_key_to_relay_address = HashMap::from([(42, [42u8; 20].into())]);
@@ -826,18 +837,32 @@ mod tests {
             },
         )]);
 
+        #[cfg(feature = "stale-stakes-forbidden")]
+        let staleness = {
+            let quorum_update_block_number = signed_quorum_numbers
+                .clone()
+                .into_iter()
+                .map(|quorum| (quorum, 42))
+                .collect();
+
+            Staleness {
+                stale_stakes_forbidden: true,
+                min_withdrawal_delay_blocks: 10,
+                quorum_update_block_number,
+            }
+        };
+
         let storage = Storage {
             quorum_count: u8::MAX,
             current_block: 43,
-            stale_stakes_forbidden: false,
-            min_withdrawal_delay_blocks: 1,
             quorum_bitmap_history,
             operator_stake_history,
             total_stake_history,
             apk_history,
-            quorum_update_block_number,
             relay_key_to_relay_address,
             versioned_blob_params,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            staleness,
         };
 
         let required_quorum_numbers: Bytes = [0, 2].into();
@@ -865,10 +890,10 @@ mod tests {
             .blob_certificate
             .hash_ext()
             .abi_encode_packed();
-        let left_child = keccak_v256(once(encoded));
+        let left_child = keccak256(&encoded);
 
         let right_sibling = [42u8; 32].into();
-        let batch_root = keccak_v256([left_child, right_sibling].into_iter());
+        let batch_root = keccak256_many(&[left_child, right_sibling]);
 
         let batch_header = BatchHeaderV2 {
             batch_root: batch_root.into(),

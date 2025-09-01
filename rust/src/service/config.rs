@@ -52,8 +52,8 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The `relayKeyToInfo` mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `relay_key_to_relay_address`
-    pub eigen_da_relay_registry: Address,
+    /// The `relayKeyToInfo` mapping is read from it
+    pub relay_registry: Address,
 
     /// # Ethereum description
     ///
@@ -61,8 +61,8 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The `versionedBlobParams` mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `versioned_blob_params`
-    pub eigen_da_threshold_registry: Address,
+    /// The `versionedBlobParams` mapping is read from it
+    pub threshold_registry: Address,
 
     /// # Ethereum description
     ///
@@ -74,31 +74,23 @@ pub struct EigenDaContracts {
     /// # Details
     ///
     /// The quorumCount variable is read from it. See [eigenda_cert_verifier::types::Storage]'s `quorum_count`
-    /// The _operatorBitmapHistory mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `operator_bitmap_history`
-    /// The quorumUpdateBlockNumber mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `quorum_update_block_number`
+    /// The _operatorBitmapHistory mapping is read from it
+    /// The quorumUpdateBlockNumber mapping is read from it
     pub registry_coordinator: Address,
 
     /// # Ethereum description
     ///
-    /// Used for checking BLS aggregate signatures from the operators of a `BLSRegistry`.
+    /// Primary entrypoint for procuring services from EigenDA.
+    /// This contract is used for:
+    /// - initializing the data store by the disperser
+    /// - confirming the data store by the disperser with inferred aggregated signatures of the quorum
+    /// - freezing operators as the result of various "challenges"
     ///
     /// # Details
     ///
-    /// The staleStakesForbidden variable is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `stale_stakes_forbidden`
-    pub bls_signature_checker: Address,
-
-    /// # Ethereum description
-    ///
-    /// This is the contract for delegation in EigenLayer. The main functionalities of this contract are
-    ///   - enabling anyone to register as an operator in EigenLayer
-    ///   - allowing operators to specify parameters related to stakers who delegate to them
-    ///   - enabling any staker to delegate its stake to the operator of its choice (a given staker can only delegate to a single operator at a time)
-    ///   - enabling a staker to undelegate its assets from the operator it is delegated to (performed as part of the withdrawal process, initiated through the StrategyManager)
-    ///
-    /// # Details
-    ///
-    /// The minWithdrawalDelayBlocks variable is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `min_withdrawal_delay_blocks`
-    pub delegation_manager: Address,
+    /// The staleStakesForbidden variable is read from it
+    #[cfg(feature = "stale-stakes-forbidden")]
+    pub service_manager: Address,
 
     /// # Ethereum description
     ///
@@ -106,7 +98,7 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The apkHistory mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `apk_history`
+    /// The apkHistory mapping is read from it
     pub bls_apk_registry: Address,
 
     /// # Ethereum description
@@ -121,8 +113,8 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The _totalStakeHistory mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `total_stake_history`
-    /// The operatorStakeHistory mapping is read from it. See [crate::eigenda::verification::cert::types::Storage]'s `operator_stake_history`
+    /// The _totalStakeHistory mapping is read from it
+    /// The operatorStakeHistory mapping is read from it
     pub stake_registry: Address,
 
     /// # Ethereum description
@@ -133,9 +125,23 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The quorumNumbersRequiredV2 variable is read from it. See [crate::eigenda::verification::cert::CertVerificationInputs]'s `required_quorum_numbers`
-    /// The securityThresholdsV2 variable is read from it. See [crate::eigenda::verification::cert::CertVerificationInputs]'s `security_thresholds`
-    pub eigen_da_cert_verifier: Address,
+    /// The quorumNumbersRequiredV2 variable is read from it
+    /// The securityThresholdsV2 variable is read from it
+    pub cert_verifier: Address,
+
+    /// # Ethereum description
+    ///
+    /// This is the contract for delegation in EigenLayer. The main functionalities of this contract are
+    /// - enabling anyone to register as an operator in EigenLayer
+    /// - allowing operators to specify parameters related to stakers who delegate to them
+    /// - enabling any staker to delegate its stake to the operator of its choice (a given staker can only delegate to a single operator at a time)
+    /// - enabling a staker to undelegate its assets from the operator it is delegated to (performed as part of the withdrawal process, initiated through the StrategyManager)
+    ///
+    /// # Details
+    ///
+    /// The minWithdrawalDelayBlocks variable is read from it
+    #[cfg(feature = "stale-stakes-forbidden")]
+    pub delegation_manager: Address,
 }
 
 impl EigenDaContracts {
@@ -143,24 +149,21 @@ impl EigenDaContracts {
     ///
     /// Instructions on how they were retrieved:
     /// * https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses
+    ///
+    /// Except for `delegation_manager` taken from:
+    /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/mainnet.json
     pub fn mainnet() -> Self {
         Self {
-            // RELAY_REGISTRY
-            eigen_da_relay_registry: address!("0xD160e6C1543f562fc2B0A5bf090aED32640Ec55B"),
-            // THRESHOLD_REGISTRY
-            eigen_da_threshold_registry: address!("0xdb4c89956eEa6F606135E7d366322F2bDE609F15"),
-            // REGISTRY_COORDINATOR
+            relay_registry: address!("0xD160e6C1543f562fc2B0A5bf090aED32640Ec55B"),
+            threshold_registry: address!("0xdb4c89956eEa6F606135E7d366322F2bDE609F15"),
             registry_coordinator: address!("0x0BAAc79acD45A023E19345c352d8a7a83C4e5656"),
-            // SERVICE_MANAGER
-            bls_signature_checker: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
-            // SERVICE_MANAGER
-            delegation_manager: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
-            // BLS_APK_REGISTRY
+            #[cfg(feature = "stale-stakes-forbidden")]
+            service_manager: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
             bls_apk_registry: address!("0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505"),
-            // STAKE_REGISTRY
             stake_registry: address!("0x006124Ae7976137266feeBFb3F4D2BE4C073139D"),
-            // CERT_VERIFIER
-            eigen_da_cert_verifier: address!("0x61692e93b6B045c444e942A91EcD1527F23A3FB7"),
+            cert_verifier: address!("0x61692e93b6B045c444e942A91EcD1527F23A3FB7"),
+            #[cfg(feature = "stale-stakes-forbidden")]
+            delegation_manager: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
         }
     }
 
@@ -168,24 +171,22 @@ impl EigenDaContracts {
     ///
     /// Instructions on how they were retrieved:
     /// * https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses
+    ///
+    /// Except for `delegation_manager` taken from:
+    /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/holesky.json
     pub fn holesky() -> Self {
         Self {
-            // RELAY_REGISTRY
-            eigen_da_relay_registry: address!("0xaC8C6C7Ee7572975454E2f0b5c720f9E74989254"),
-            // THRESHOLD_REGISTRY
-            eigen_da_threshold_registry: address!("0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1"),
-            // REGISTRY_COORDINATOR
+            relay_registry: address!("0xaC8C6C7Ee7572975454E2f0b5c720f9E74989254"),
+            threshold_registry: address!("0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1"),
             registry_coordinator: address!("0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"),
-            // SERVICE_MANAGER
-            bls_signature_checker: address!("0xD4A7E1Bd8015057293f0D0A557088c286942e84b"),
-            // SERVICE_MANAGER
-            delegation_manager: address!("0xD4A7E1Bd8015057293f0D0A557088c286942e84b"),
-            // BLS_APK_REGISTRY
+            #[cfg(feature = "stale-stakes-forbidden")]
+            service_manager: address!("0xD4A7E1Bd8015057293f0D0A557088c286942e84b"),
             bls_apk_registry: address!("0x066cF95c1bf0927124DFB8B02B401bc23A79730D"),
-            // STAKE_REGISTRY
             stake_registry: address!("0xBDACD5998989Eec814ac7A0f0f6596088AA2a270"),
-            // CERT_VERIFIER
-            eigen_da_cert_verifier: address!("0x036bB27A1F03350bDcccF344b497Ef22604006a3"),
+            // CERT_VERIFIER (also available: CERT_VERIFIER_V1, CERT_VERIFIER_V2)
+            cert_verifier: address!("0x036bB27A1F03350bDcccF344b497Ef22604006a3"),
+            #[cfg(feature = "stale-stakes-forbidden")]
+            delegation_manager: address!("0xA44151489861Fe9e3055d95adC98FbD462B948e7"),
         }
     }
 }

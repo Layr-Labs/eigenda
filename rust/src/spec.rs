@@ -14,17 +14,22 @@ use sov_rollup_interface::{
     da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
     sov_universal_wallet::UniversalWallet,
 };
+use tracing::instrument;
+
+#[cfg(feature = "stale-stakes-forbidden")]
+use crate::eigenda::extraction::{
+    MinWithdrawalDelayBlocksExtractor, QuorumUpdateBlockNumberExtractor,
+    StaleStakesForbiddenExtractor,
+};
 
 use crate::{
     eigenda::{
         cert::StandardCommitment,
         extraction::{
-            ApkHistoryExtractor, DataDecoder, MinWithdrawalDelayBlocksExtractor,
-            OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
-            QuorumNumbersRequiredV2Extractor, QuorumUpdateBlockNumberExtractor,
+            ApkHistoryExtractor, DataDecoder, OperatorBitmapHistoryExtractor,
+            OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
             RelayKeyToRelayInfoExtractor, SecurityThresholdsV2Extractor,
-            StaleStakesForbiddenExtractor, TotalStakeHistoryExtractor,
-            VersionedBlobParamsExtractor,
+            TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
         },
         verification::cert::{
             CertVerificationInputs, error::CertVerificationError, types::Storage,
@@ -387,49 +392,31 @@ pub struct AncestorMetadata {
 /// reference block. It also contains proofs used to verify the data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AncestorStateData {
-    eigen_da_relay_registry: AccountProof,
-    eigen_da_threshold_registry: AccountProof,
-    registry_coordinator: AccountProof,
-    bls_signature_checker: AccountProof,
-    delegation_manager: AccountProof,
-    bls_apk_registry: AccountProof,
-    stake_registry: AccountProof,
-    eigen_da_cert_verifier: AccountProof,
+    pub relay_registry: AccountProof,
+    pub threshold_registry: AccountProof,
+    pub registry_coordinator: AccountProof,
+    #[cfg(feature = "stale-stakes-forbidden")]
+    pub service_manager: AccountProof,
+    pub bls_apk_registry: AccountProof,
+    pub stake_registry: AccountProof,
+    pub cert_verifier: AccountProof,
+    #[cfg(feature = "stale-stakes-forbidden")]
+    pub delegation_manager: AccountProof,
 }
 
 impl AncestorStateData {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        eigen_da_relay_registry: AccountProof,
-        eigen_da_threshold_registry: AccountProof,
-        registry_coordinator: AccountProof,
-        bls_signature_checker: AccountProof,
-        delegation_manager: AccountProof,
-        bls_apk_registry: AccountProof,
-        stake_registry: AccountProof,
-        eigen_da_cert_verifier: AccountProof,
-    ) -> Self {
-        Self {
-            eigen_da_relay_registry,
-            eigen_da_threshold_registry,
-            registry_coordinator,
-            bls_signature_checker,
-            delegation_manager,
-            bls_apk_registry,
-            stake_registry,
-            eigen_da_cert_verifier,
-        }
-    }
-
+    #![allow(clippy::result_large_err)]
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
-        self.eigen_da_relay_registry.verify(state_root)?;
-        self.eigen_da_threshold_registry.verify(state_root)?;
+        self.relay_registry.verify(state_root)?;
+        self.threshold_registry.verify(state_root)?;
         self.registry_coordinator.verify(state_root)?;
-        self.bls_signature_checker.verify(state_root)?;
-        self.delegation_manager.verify(state_root)?;
+        #[cfg(feature = "stale-stakes-forbidden")]
+        self.service_manager.verify(state_root)?;
         self.bls_apk_registry.verify(state_root)?;
         self.stake_registry.verify(state_root)?;
-        self.eigen_da_cert_verifier.verify(state_root)?;
+        self.cert_verifier.verify(state_root)?;
+        #[cfg(feature = "stale-stakes-forbidden")]
+        self.delegation_manager.verify(state_root)?;
 
         Ok(())
     }
@@ -438,21 +425,14 @@ impl AncestorStateData {
     ///
     /// NOTE: The data extracted is not verified. To verify the data, ensure
     /// that the [`AncestorStateData::verify`] is called.
+    #[instrument(skip_all)]
     pub fn extract(
         &self,
         cert: &StandardCommitment,
         current_block: u32,
     ) -> Result<CertVerificationInputs, CertVerificationError> {
-        // TODO: can we make the association (to contract) type safe?
-
         let quorum_count = QuorumCountExtractor::new(cert)
             .decode_data(&self.registry_coordinator.storage_proofs)?;
-
-        let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new(cert)
-            .decode_data(&self.bls_signature_checker.storage_proofs)?;
-
-        let min_withdrawal_delay_blocks = MinWithdrawalDelayBlocksExtractor::new(cert)
-            .decode_data(&self.delegation_manager.storage_proofs)?;
 
         let quorum_bitmap_history = OperatorBitmapHistoryExtractor::new(cert)
             .decode_data(&self.registry_coordinator.storage_proofs)?;
@@ -466,34 +446,50 @@ impl AncestorStateData {
         let apk_history =
             ApkHistoryExtractor::new(cert).decode_data(&self.bls_apk_registry.storage_proofs)?;
 
-        let quorum_update_block_number = QuorumUpdateBlockNumberExtractor::new(cert)
-            .decode_data(&self.registry_coordinator.storage_proofs)?;
-
         let relay_key_to_relay_address = RelayKeyToRelayInfoExtractor::new(cert)
-            .decode_data(&self.eigen_da_relay_registry.storage_proofs)?;
+            .decode_data(&self.relay_registry.storage_proofs)?;
 
         let versioned_blob_params = VersionedBlobParamsExtractor::new(cert)
-            .decode_data(&self.eigen_da_threshold_registry.storage_proofs)?;
+            .decode_data(&self.threshold_registry.storage_proofs)?;
+
+        #[cfg(feature = "stale-stakes-forbidden")]
+        let staleness = {
+            use crate::eigenda::verification::cert::types::Staleness;
+
+            let stale_stakes_forbidden = StaleStakesForbiddenExtractor::new(cert)
+                .decode_data(&self.service_manager.storage_proofs)?;
+
+            let min_withdrawal_delay_blocks = MinWithdrawalDelayBlocksExtractor::new(cert)
+                .decode_data(&self.delegation_manager.storage_proofs)?;
+
+            let quorum_update_block_number = QuorumUpdateBlockNumberExtractor::new(cert)
+                .decode_data(&self.registry_coordinator.storage_proofs)?;
+
+            Staleness {
+                stale_stakes_forbidden,
+                min_withdrawal_delay_blocks,
+                quorum_update_block_number,
+            }
+        };
 
         let storage = Storage {
             quorum_count,
             current_block,
-            stale_stakes_forbidden,
-            min_withdrawal_delay_blocks,
             quorum_bitmap_history,
             operator_stake_history,
             total_stake_history,
             apk_history,
-            quorum_update_block_number,
             relay_key_to_relay_address,
             versioned_blob_params,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            staleness,
         };
 
         let security_thresholds = SecurityThresholdsV2Extractor::new(cert)
-            .decode_data(&self.eigen_da_cert_verifier.storage_proofs)?;
+            .decode_data(&self.cert_verifier.storage_proofs)?;
 
         let required_quorum_numbers = QuorumNumbersRequiredV2Extractor::new(cert)
-            .decode_data(&self.eigen_da_cert_verifier.storage_proofs)?;
+            .decode_data(&self.cert_verifier.storage_proofs)?;
 
         let inputs = CertVerificationInputs {
             batch_header: cert.batch_header_v2().clone(),

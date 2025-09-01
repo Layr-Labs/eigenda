@@ -271,9 +271,9 @@ pub struct BlobCommitment {
 impl BlobCommitment {
     pub fn to_sol(&self) -> solidity::BlobCommitment {
         solidity::BlobCommitment {
-            commitment: self.commitment.to_sol(),
-            lengthCommitment: self.length_commitment.to_sol(),
-            lengthProof: self.length_proof.to_sol(),
+            commitment: (&self.commitment).into(),
+            lengthCommitment: (&self.length_commitment).into(),
+            lengthProof: (&self.length_proof).into(),
             length: self.length,
         }
     }
@@ -286,11 +286,11 @@ pub struct G1Point {
     pub y: U256,
 }
 
-impl G1Point {
-    pub fn to_sol(&self) -> solidity::G1Point {
+impl From<&G1Point> for solidity::G1Point {
+    fn from(value: &G1Point) -> Self {
         solidity::G1Point {
-            X: self.x,
-            Y: self.y,
+            X: value.x,
+            Y: value.y,
         }
     }
 }
@@ -302,15 +302,15 @@ pub struct G2Point {
     pub y: Vec<U256>,
 }
 
-impl G2Point {
-    pub fn to_sol(&self) -> solidity::G2Point {
+impl From<&G2Point> for solidity::G2Point {
+    fn from(value: &G2Point) -> solidity::G2Point {
         let mut x = [U256::default(); 2];
-        x[0] = self.x[0];
-        x[1] = self.x[1];
+        x[0] = value.x[0];
+        x[1] = value.x[1];
 
         let mut y = [U256::default(); 2];
-        y[0] = self.y[0];
-        y[1] = self.y[1];
+        y[0] = value.y[0];
+        y[1] = value.y[1];
 
         solidity::G2Point { X: x, Y: y }
     }

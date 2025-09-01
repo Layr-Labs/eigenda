@@ -32,8 +32,9 @@ pub mod serde_bincode_compat {
     /// Bincode-compatible [`super::EthereumTypedTransaction`] serde implementation.
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
-    /// ```rust
-    /// use alloy_consensus::{serde_bincode_compat, EthereumTypedTransaction};
+    /// ```ignore
+    /// use sov_eigenda_adapter::serde_bincode_compat;
+    /// use alloy_consensus::EthereumTypedTransaction;
     /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
@@ -121,8 +122,9 @@ pub mod serde_bincode_compat {
     /// Bincode-compatible [`super::EthereumTxEnvelope`] serde implementation.
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
-    /// ```rust
-    /// use alloy_consensus::{serde_bincode_compat, EthereumTxEnvelope};
+    /// ```ignore
+    /// use sov_eigenda_adapter::serde_bincode_compat;
+    /// use alloy_consensus::EthereumTxEnvelope;
     /// use serde::{de::DeserializeOwned, Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///

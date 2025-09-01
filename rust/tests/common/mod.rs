@@ -1,4 +1,5 @@
 pub mod proxy;
+pub mod tracing;
 
 use std::str::FromStr;
 

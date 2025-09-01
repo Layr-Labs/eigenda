@@ -3,8 +3,7 @@ use alloy_sol_types::SolValue;
 
 /// Generate a simple storage key from a slot number: keccak256(abi.encode(slot))
 pub fn simple_slot_key(slot: u64) -> StorageKey {
-    let slot = U256::from(slot);
-    keccak256(slot.abi_encode())
+    U256::from(slot).into()
 }
 
 /// Generate storage key for a mapping: keccak256(abi.encode(key, slot))

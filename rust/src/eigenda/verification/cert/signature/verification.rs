@@ -6,10 +6,7 @@ use ark_ec::{
 };
 use ark_ff::{AdditiveGroup, PrimeField};
 
-use crate::eigenda::verification::cert::{
-    convert,
-    hash::{self},
-};
+use crate::eigenda::verification::cert::{convert, hash::keccak256_many};
 
 /// Verifies the `sigma` signature over `msg_hash` by the (`apk_g1`, `apk_g2`) pubkey
 /// by checking e(sigma + apk_g1 * gamma, -G2) * e(msg_hash + G1 * gamma, apk_g2) == 1
@@ -45,20 +42,17 @@ fn compute_gamma(
     let (apk_g2_x, apk_g2_y) = apk_g2.xy()?;
     let (sigma_x, sigma_y) = sigma.xy()?;
 
-    let gamma = hash::keccak_v256(
-        [
-            &msg_hash,
-            &convert::fq_to_bytes_be(apk_g1_x),
-            &convert::fq_to_bytes_be(apk_g1_y),
-            &convert::fq_to_bytes_be(apk_g2_x.c0),
-            &convert::fq_to_bytes_be(apk_g2_x.c1),
-            &convert::fq_to_bytes_be(apk_g2_y.c0),
-            &convert::fq_to_bytes_be(apk_g2_y.c1),
-            &convert::fq_to_bytes_be(sigma_x),
-            &convert::fq_to_bytes_be(sigma_y),
-        ]
-        .into_iter(),
-    );
+    let gamma = keccak256_many(&[
+        msg_hash.as_slice(),
+        &convert::fq_to_bytes_be(apk_g1_x),
+        &convert::fq_to_bytes_be(apk_g1_y),
+        &convert::fq_to_bytes_be(apk_g2_x.c0),
+        &convert::fq_to_bytes_be(apk_g2_x.c1),
+        &convert::fq_to_bytes_be(apk_g2_y.c0),
+        &convert::fq_to_bytes_be(apk_g2_y.c1),
+        &convert::fq_to_bytes_be(sigma_x),
+        &convert::fq_to_bytes_be(sigma_y),
+    ]);
 
     let gamma = Fr::from_be_bytes_mod_order(&*gamma);
     Some(gamma)

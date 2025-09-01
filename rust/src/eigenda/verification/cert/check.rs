@@ -1,12 +1,13 @@
-use crate::eigenda::cert::G1Point;
+use crate::eigenda::{cert::G1Point, verification::cert::hash::keccak256_many};
 use alloy_primitives::{Address, B256, Bytes, aliases::U96};
 use hashbrown::HashMap;
+use tracing::{Level, instrument};
 
 use crate::eigenda::verification::cert::{
     bitmap::{Bitmap, bit_indices_to_bitmap},
     convert,
     error::CertVerificationError::{self, *},
-    hash::{TruncatedB256, keccak_v256},
+    hash::TruncHash,
     types::{
         BlockNumber, NonSigner, Quorum, QuorumNumber, RelayKey, Version,
         history::History,
@@ -16,17 +17,25 @@ use crate::eigenda::verification::cert::{
 
 const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol
 
-pub fn non_zero_equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
-    match lengths.first() {
-        None | Some(0) => Err(EmptyVec),
-        Some(first) => lengths
-            .iter()
-            .all(|length| length == first)
-            .then_some(())
-            .ok_or(UnequalLengths),
-    }
+#[instrument(level = Level::DEBUG, skip_all)]
+pub fn equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
+    let Some(first) = lengths.first() else {
+        return Err(EmptyVec);
+    };
+
+    lengths
+        .iter()
+        .all(|length| length == first)
+        .then_some(())
+        .ok_or(UnequalLengths)
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
+pub fn not_empty<T>(slice: &[T]) -> Result<(), CertVerificationError> {
+    (!slice.is_empty()).then_some(()).ok_or(EmptyVec)
+}
+
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn non_signers_strictly_sorted_by_hash(
     non_signers: &[NonSigner],
 ) -> Result<(), CertVerificationError> {
@@ -38,6 +47,8 @@ pub fn non_signers_strictly_sorted_by_hash(
         .ok_or(NotStrictlySortedByHash)
 }
 
+#[cfg(feature = "stale-stakes-forbidden")]
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn quorums_last_updated_after_most_recent_stale_block(
     signed_quorums: &[QuorumNumber],
     reference_block: BlockNumber,
@@ -54,16 +65,18 @@ pub fn quorums_last_updated_after_most_recent_stale_block(
         is_recent.then_some(()).ok_or(StaleQuorum {
             last_updated_at_block,
             most_recent_stale_block,
+            window,
         })
     })
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn cert_apks_equal_storage_apks(
     signed_quorums: &[QuorumNumber],
     reference_block: BlockNumber,
     apk_for_each_quorum: &[G1Point],
     apk_index_for_each_quorum: Vec<BlockNumber>,
-    apk_history: HashMap<QuorumNumber, History<TruncatedB256>>,
+    apk_history: HashMap<QuorumNumber, History<TruncHash>>,
 ) -> Result<(), CertVerificationError> {
     signed_quorums
         .iter()
@@ -71,7 +84,8 @@ pub fn cert_apks_equal_storage_apks(
         .zip(apk_index_for_each_quorum)
         .try_for_each(|((signed_quorum, cert_apk), apk_index)| {
             let cert_apk_hash = convert::point_to_hash(cert_apk);
-            let cert_apk_trunc_hash = &cert_apk_hash[..24];
+            let cert_apk_trunc_hash: [u8; 24] = cert_apk_hash[..24].try_into().unwrap();
+            let cert_apk_trunc_hash: TruncHash = cert_apk_trunc_hash.into();
 
             let storage_apk_trunc_hash = apk_history
                 .get(signed_quorum)
@@ -81,10 +95,14 @@ pub fn cert_apks_equal_storage_apks(
 
             (cert_apk_trunc_hash == storage_apk_trunc_hash)
                 .then_some(())
-                .ok_or(CertApkDoesNotEqualStorageApk)
+                .ok_or(CertApkDoesNotEqualStorageApk {
+                    cert_apk_trunc_hash,
+                    storage_apk_trunc_hash,
+                })
         })
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn relay_keys_are_set(
     relay_keys: &[RelayKey],
     relay_key_to_relay_address: &HashMap<RelayKey, Address>,
@@ -100,6 +118,7 @@ pub fn relay_keys_are_set(
     })
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn security_assumptions_are_met(
     version: Version,
     versioned_blob_params: &HashMap<Version, VersionedBlobParams>,
@@ -164,6 +183,7 @@ pub fn security_assumptions_are_met(
     Ok(())
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn confirmed_quorums_contain_blob_quorums(
     confirmation_threshold: u8,
     quorums: &[Quorum],
@@ -199,6 +219,7 @@ pub fn confirmed_quorums_contain_blob_quorums(
         .ok_or(ConfirmedQuorumsDoNotContainBlobQuorums)
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn blob_quorums_contain_required_quorums(
     blob_quorums: &Bytes,
     required_quorums: &Bytes,
@@ -216,6 +237,7 @@ fn contains(container: Bitmap, contained: Bitmap) -> bool {
     container & contained == contained
 }
 
+#[instrument(level = Level::DEBUG, skip_all)]
 pub fn leaf_node_belongs_to_merkle_tree(
     leaf_node: B256,
     expected_root: B256,
@@ -227,6 +249,7 @@ pub fn leaf_node_belongs_to_merkle_tree(
         return Err(MerkleProofLengthNotMultipleOf32Bytes(proof_len));
     }
 
+    // will only fail when proof_depth exceeds u32::MAX
     let sibling_path = Bitmap::new([sibling_path as usize, 0, 0, 0]);
 
     let proof_depth = proof.len() / 32;
@@ -247,7 +270,7 @@ pub fn leaf_node_belongs_to_merkle_tree(
             true => (sibling_node, current_node),
             false => (current_node, sibling_node),
         };
-        let parent_node = keccak_v256([left_node, right_node].into_iter());
+        let parent_node = keccak256_many(&[left_node, right_node]);
         current_node = parent_node;
     }
 
@@ -258,39 +281,53 @@ pub fn leaf_node_belongs_to_merkle_tree(
 }
 
 #[cfg(test)]
-mod test_non_zero_equal_lengths {
+mod test_equal_lengths_and_not_empty {
     use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
 
     #[test]
-    fn non_zero_equal_lengths_success() {
-        assert!(check::non_zero_equal_lengths(&[42, 42, 42, 42]).is_ok());
+    fn equal_lengths_success() {
+        let result = check::equal_lengths(&[42, 42, 42, 42]);
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
     fn different_lengths_where_none_is_zero() {
-        let err = check::non_zero_equal_lengths(&[42, 43, 44, 45]).unwrap_err();
+        let err = check::equal_lengths(&[42, 43, 44, 45]).unwrap_err();
         assert_eq!(err, UnequalLengths);
     }
 
     #[test]
     fn first_length_zero_but_otherwise_equal_lengths() {
-        let err = check::non_zero_equal_lengths(&[0, 42, 42, 42]).unwrap_err();
-        assert_eq!(err, EmptyVec);
+        let err = check::equal_lengths(&[0, 42, 42, 42]).unwrap_err();
+        assert_eq!(err, UnequalLengths);
     }
 
     #[test]
     fn all_lengths_zero() {
-        let err = check::non_zero_equal_lengths(&[0, 0, 0, 0]).unwrap_err();
-        assert_eq!(err, EmptyVec);
+        let result = check::equal_lengths(&[0, 0, 0, 0]);
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
     fn some_length_zero_but_otherwise_equal_lengths() {
-        let err = check::non_zero_equal_lengths(&[42, 42, 0, 42]).unwrap_err();
+        let err = check::equal_lengths(&[42, 42, 0, 42]).unwrap_err();
         assert_eq!(err, UnequalLengths);
+    }
+
+    #[test]
+    fn not_empty_failure() {
+        let err = check::not_empty::<u8>(&[]).unwrap_err();
+        assert_eq!(err, EmptyVec);
+    }
+
+    #[test]
+    fn not_empty_success() {
+        let result = check::not_empty(&[42]);
+        assert_eq!(result, Ok(()));
     }
 }
 
+#[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_non_signers_strictly_sorted_by_hash {
     use crate::eigenda::verification::cert::{
@@ -344,6 +381,7 @@ mod test_non_signers_strictly_sorted_by_hash {
     }
 }
 
+#[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_quorums_last_updated_after_most_recent_stale_block {
     use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
@@ -395,6 +433,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
             StaleQuorum {
                 last_updated_at_block: 40,
                 most_recent_stale_block: 41,
+                window,
             }
         );
     }
@@ -424,6 +463,7 @@ mod test_quorums_last_updated_after_most_recent_stale_block {
             StaleQuorum {
                 last_updated_at_block: 41,
                 most_recent_stale_block: 41,
+                window,
             }
         );
     }
@@ -476,7 +516,7 @@ mod test_cert_apks_equal_storage_apks {
     use crate::eigenda::verification::cert::{
         check, convert,
         error::CertVerificationError::*,
-        hash::TruncatedB256,
+        hash::TruncHash,
         types::{
             BlockNumber,
             conversions::IntoExt,
@@ -488,7 +528,8 @@ mod test_cert_apks_equal_storage_apks {
     fn cert_apk_equal_storage_apk() {
         let apk = (G1Projective::generator() * Fr::from(42)).into_affine();
         let apk_hash = convert::point_to_hash(&apk.into_ext());
-        let apk_trunc_hash: TruncatedB256 = apk_hash[..24].try_into().unwrap();
+        let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
+        let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
 
         let signed_quorums = [0];
         let reference_block = 42;
@@ -516,7 +557,8 @@ mod test_cert_apks_equal_storage_apks {
         let cert_apk = (G1Projective::generator() * Fr::from(42)).into_affine();
         let storage_apk = (G1Projective::generator() * Fr::from(43)).into_affine();
         let storage_apk_hash = convert::point_to_hash(&storage_apk.into_ext());
-        let storage_apk_trunc_hash: TruncatedB256 = storage_apk_hash[..24].try_into().unwrap();
+        let storage_apk_trunc_hash: [u8; 24] = storage_apk_hash[..24].try_into().unwrap();
+        let storage_apk_trunc_hash: TruncHash = storage_apk_trunc_hash.into();
 
         let signed_quorums = [0];
         let reference_block = 42;
@@ -537,7 +579,17 @@ mod test_cert_apks_equal_storage_apks {
         )
         .unwrap_err();
 
-        assert_eq!(err, CertApkDoesNotEqualStorageApk);
+        let cert_apk_hash = convert::point_to_hash(&cert_apk.into_ext());
+        let cert_apk_trunc_hash: [u8; 24] = cert_apk_hash[..24].try_into().unwrap();
+        let cert_apk_trunc_hash = cert_apk_trunc_hash.into();
+
+        assert_eq!(
+            err,
+            CertApkDoesNotEqualStorageApk {
+                cert_apk_trunc_hash,
+                storage_apk_trunc_hash,
+            }
+        );
     }
 
     #[test]
@@ -1018,7 +1070,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
     use alloy_primitives::FixedBytes;
 
     use crate::eigenda::verification::cert::{
-        check, error::CertVerificationError::*, hash::keccak_v256,
+        check, error::CertVerificationError::*, hash::keccak256_many,
     };
 
     #[test]
@@ -1029,7 +1081,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let left_child: FixedBytes<32> = [1; 32].into();
         let right_sibling: FixedBytes<32> = [2; 32].into();
-        let expected_root: FixedBytes<32> = keccak_v256([left_child, right_sibling].into_iter());
+        let expected_root: FixedBytes<32> = keccak256_many(&[left_child, right_sibling]);
 
         let proof = right_sibling.into();
 
@@ -1050,7 +1102,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let right_child: FixedBytes<32> = [2; 32].into();
         let left_sibling: FixedBytes<32> = [1; 32].into();
-        let expected_root: FixedBytes<32> = keccak_v256([left_sibling, right_child].into_iter());
+        let expected_root: FixedBytes<32> = keccak256_many(&[left_sibling, right_child]);
 
         let proof = left_sibling.into();
 
@@ -1075,8 +1127,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let right_sibling: FixedBytes<32> = [2; 32].into();
         let right_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak_v256([left_child, right_sibling].into_iter());
-        let expected_root = keccak_v256([parent, right_pibling].into_iter());
+        let parent = keccak256_many(&[left_child, right_sibling]);
+        let expected_root = keccak256_many(&[parent, right_pibling]);
 
         let proof = [&right_sibling[..], &right_pibling[..]].concat().into();
 
@@ -1100,8 +1152,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_sibling: FixedBytes<32> = [1; 32].into();
         let right_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak_v256([right_child, left_sibling].into_iter());
-        let expected_root = keccak_v256([parent, right_pibling].into_iter());
+        let parent = keccak256_many(&[right_child, left_sibling]);
+        let expected_root = keccak256_many(&[parent, right_pibling]);
 
         let proof = [&left_sibling[..], &right_pibling[..]].concat().into();
 
@@ -1126,8 +1178,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let right_sibling: FixedBytes<32> = [2; 32].into();
         let left_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak_v256([left_child, right_sibling].into_iter());
-        let expected_root = keccak_v256([left_pibling, parent].into_iter());
+        let parent = keccak256_many(&[left_child, right_sibling]);
+        let expected_root = keccak256_many(&[left_pibling, parent]);
 
         let proof = [&right_sibling[..], &left_pibling[..]].concat().into();
 
@@ -1152,8 +1204,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_sibling: FixedBytes<32> = [1; 32].into();
         let left_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak_v256([left_sibling, right_child].into_iter());
-        let expected_root = keccak_v256([left_pibling, parent].into_iter());
+        let parent = keccak256_many(&[left_sibling, right_child]);
+        let expected_root = keccak256_many(&[left_pibling, parent]);
 
         let proof = [&left_sibling[..], &left_pibling[..]].concat().into();
 
@@ -1181,9 +1233,9 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_pibling: FixedBytes<32> = [3; 32].into();
         let right_grandparent: FixedBytes<32> = [4; 32].into();
 
-        let right_parent = keccak_v256([left_child, right_sibling].into_iter());
-        let left_grandparent = keccak_v256([left_pibling, right_parent].into_iter());
-        let expected_root = keccak_v256([left_grandparent, right_grandparent].into_iter());
+        let right_parent = keccak256_many(&[left_child, right_sibling]);
+        let left_grandparent = keccak256_many(&[left_pibling, right_parent]);
+        let expected_root = keccak256_many(&[left_grandparent, right_grandparent]);
 
         let proof = [
             &right_sibling[..],
@@ -1261,7 +1313,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_child: FixedBytes<32> = [1; 32].into();
         let correct_right_sibling: FixedBytes<32> = [2; 32].into();
         let wrong_right_sibling: FixedBytes<32> = [3; 32].into();
-        let expected_root = keccak_v256([left_child, correct_right_sibling].into_iter());
+        let expected_root = keccak256_many(&[left_child, correct_right_sibling]);
 
         let proof = wrong_right_sibling.into();
         // path: ... 0000 0000
@@ -1281,7 +1333,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let left_child: FixedBytes<32> = [1; 32].into();
         let right_sibling: FixedBytes<32> = [2; 32].into();
-        let expected_root = keccak_v256([left_child, right_sibling].into_iter());
+        let expected_root = keccak256_many(&[left_child, right_sibling]);
 
         let proof = right_sibling.into();
         // path: ... 0000 0001 (should be 0000 0000)
@@ -1304,7 +1356,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         for i in 0..=255u8 {
             let right_sibling_node = [i; 32].into();
-            left_current_node = keccak_v256([left_current_node, right_sibling_node].into_iter());
+            left_current_node = keccak256_many(&[left_current_node, right_sibling_node]);
             proof.extend_from_slice(right_sibling_node.as_ref());
         }
 

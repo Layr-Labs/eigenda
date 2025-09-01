@@ -8,7 +8,7 @@ use hashbrown::HashMap;
 
 use crate::eigenda::verification::cert::{
     bitmap::Bitmap,
-    hash::TruncatedB256,
+    hash::TruncHash,
     types::{history::History, solidity::VersionedBlobParams},
 };
 
@@ -23,17 +23,22 @@ pub struct Storage {
     // number of quorums initialized in the RegistryCoordinator
     pub quorum_count: u8,
     pub current_block: BlockNumber,
-    pub stale_stakes_forbidden: bool,
-    pub min_withdrawal_delay_blocks: BlockNumber,
-
-    pub quorum_update_block_number: HashMap<QuorumNumber, BlockNumber>,
     pub relay_key_to_relay_address: HashMap<RelayKey, Address>,
     pub versioned_blob_params: HashMap<Version, VersionedBlobParams>,
-
     pub quorum_bitmap_history: HashMap<B256, History<Bitmap>>,
-    pub apk_history: HashMap<QuorumNumber, History<TruncatedB256>>,
+    pub apk_history: HashMap<QuorumNumber, History<TruncHash>>,
     pub total_stake_history: HashMap<QuorumNumber, History<Stake>>,
     pub operator_stake_history: HashMap<B256, HashMap<QuorumNumber, History<Stake>>>,
+    #[cfg(feature = "stale-stakes-forbidden")]
+    pub staleness: Staleness,
+}
+
+#[cfg(feature = "stale-stakes-forbidden")]
+#[derive(Default, Debug, Clone)]
+pub struct Staleness {
+    pub stale_stakes_forbidden: bool,
+    pub min_withdrawal_delay_blocks: BlockNumber,
+    pub quorum_update_block_number: HashMap<QuorumNumber, BlockNumber>,
 }
 
 #[derive(Default, Debug, Clone)]

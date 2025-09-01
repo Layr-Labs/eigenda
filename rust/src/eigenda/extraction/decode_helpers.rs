@@ -7,14 +7,17 @@ use crate::eigenda::{
 };
 
 /// Find a storage proof by key and return error if missing
-pub fn find_required_proof<'a>(
+pub fn find_required_proof<'a, T>(
     proofs: &'a [StorageProof],
     key: &StorageKey,
-    variable_name: &'static str,
-) -> Result<&'a StorageProof, CertExtractionError> {
+    variable_name: T,
+) -> Result<&'a StorageProof, CertExtractionError>
+where
+    T: std::fmt::Display,
+{
     use CertExtractionError::*;
 
-    find_proof(proofs, key).ok_or(MissingStorageProof(variable_name))
+    find_proof(proofs, key).ok_or_else(|| MissingStorageProof(variable_name.to_string()))
 }
 
 /// Find a storage proof by key
@@ -29,13 +32,4 @@ pub fn create_update<T: Copy + std::fmt::Debug>(
     value: T,
 ) -> Result<Update<T>, HistoryError> {
     Update::new(update_block, next_update_block, value)
-}
-
-/// Remove trailing zeros from a byte slice
-pub fn trim_trailing_zeros(bytes: &[u8]) -> &[u8] {
-    let mut end = bytes.len();
-    while end > 0 && bytes[end - 1] == 0 {
-        end -= 1;
-    }
-    &bytes[..end]
 }

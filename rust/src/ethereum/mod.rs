@@ -3,11 +3,13 @@ pub mod provider;
 pub mod tx;
 
 use alloy_consensus::{EthereumTxEnvelope, Transaction, TxEip4844};
+use tracing::instrument;
 
 use crate::{eigenda::cert::StandardCommitment, spec::AncestorMetadata};
 
 /// Extract certificate from the transaction. Return None if no parsable
 /// certificate exists.
+#[instrument(skip_all)]
 pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<StandardCommitment> {
     let eip4844_tx = tx.as_eip1559()?;
     let raw_cert = eip4844_tx.tx().input();
@@ -18,6 +20,7 @@ pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<Standar
 /// Get the [`AncestorMetadata`] for the specific referenced block. The
 /// `ancestors` are expected to be a contiguous chain of ancestors preceding the
 /// `current_height`.
+#[instrument(skip_all, fields(block_height = current_height))]
 pub fn get_ancestor(
     ancestors: &[AncestorMetadata],
     current_height: u64,
@@ -48,7 +51,6 @@ pub mod tests {
 
     use alloy_provider::{RootProvider, ext::AnvilApi};
     use alloy_rpc_types::anvil::MineOptions;
-
     use testcontainers::{
         ContainerAsync, Image,
         core::{ContainerPort, WaitFor},

@@ -1,3 +1,5 @@
+#![cfg(feature = "native")]
+
 mod common;
 
 use sov_eigenda_adapter::spec::BlobWithSender;
@@ -10,6 +12,8 @@ use crate::common::{proxy::start_proxy, setup_adapter};
 
 #[tokio::test]
 async fn submit_extract_verify_e2e() {
+    common::tracing::init_tracing();
+
     let (proxy_url, _proxy_container) = start_proxy().await.unwrap();
     let (service, verifier) = setup_adapter(proxy_url).await.unwrap();
 

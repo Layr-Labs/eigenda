@@ -7,7 +7,7 @@ use crate::eigenda::verification::cert::types::BlockNumber;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum HistoryError {
-    #[error("Element ({0}) not in interval {0}")]
+    #[error("Element ({0}) not in interval {1}")]
     ElementNotInInterval(String, String),
 
     #[error("Degenerate interval {0}")]
@@ -33,7 +33,7 @@ impl<T: Copy + std::fmt::Debug> History<T> {
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Update<T: Copy + std::fmt::Debug> {
-    interval: Interval<BlockNumber>,
+    interval: Interval,
     value: T,
 }
 
@@ -62,22 +62,26 @@ impl<T: Copy + std::fmt::Debug> Update<T> {
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-pub(crate) struct Interval<T: PartialOrd + Display> {
-    left_inclusive: T,
-    right_exclusive: T,
+pub(crate) struct Interval {
+    left_inclusive: BlockNumber,
+    right_exclusive: BlockNumber,
 }
 
-impl<T: PartialOrd + Display> Display for Interval<T> {
+impl Display for Interval {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}, {})", self.left_inclusive, self.right_exclusive)
     }
 }
 
-impl<T: PartialOrd + Display> Interval<T> {
-    pub fn new(left_inclusive: T, right_exclusive: T) -> Result<Self, HistoryError> {
+impl Interval {
+    pub fn new(
+        left_inclusive: BlockNumber,
+        right_exclusive: BlockNumber,
+    ) -> Result<Self, HistoryError> {
         use HistoryError::*;
 
-        let is_valid = left_inclusive < right_exclusive;
+        // special case `right_exclusive == 0` is allowed
+        let is_valid = (left_inclusive < right_exclusive) || right_exclusive == 0;
         let interval = Self {
             left_inclusive,
             right_exclusive,
@@ -88,8 +92,9 @@ impl<T: PartialOrd + Display> Interval<T> {
         }
     }
 
-    pub fn contains(&self, element: T) -> bool {
-        element >= self.left_inclusive && element < self.right_exclusive
+    pub fn contains(&self, element: BlockNumber) -> bool {
+        element >= self.left_inclusive
+            && (self.right_exclusive == 0 || element < self.right_exclusive)
     }
 }
 

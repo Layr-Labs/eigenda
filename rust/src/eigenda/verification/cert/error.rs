@@ -4,6 +4,7 @@ use crate::eigenda::{
     extraction::CertExtractionError,
     verification::cert::{
         bitmap::BitmapError,
+        hash::TruncHash,
         types::{RelayKey, history::HistoryError},
     },
 };
@@ -22,12 +23,14 @@ pub enum CertVerificationError {
     #[error("Expected pubkeys to be sorted by their hashes")]
     NotStrictlySortedByHash,
 
+    #[cfg(feature = "stale-stakes-forbidden")]
     #[error(
         "Stale quorum, last updated at block {last_updated_at_block} should be greater than most recent stale block {most_recent_stale_block}"
     )]
     StaleQuorum {
         last_updated_at_block: u32,
         most_recent_stale_block: u32,
+        window: u32,
     },
 
     #[error("Signature verification failed")]
@@ -39,8 +42,13 @@ pub enum CertVerificationError {
     #[error("Missing signer entry")]
     MissingSignerEntry,
 
-    #[error("Certificate quorum apk not equal to storage quorum apk")]
-    CertApkDoesNotEqualStorageApk,
+    #[error(
+        "Certificate apk truncated hash {cert_apk_trunc_hash} not equal to storage apk truncated hash {storage_apk_trunc_hash}"
+    )]
+    CertApkDoesNotEqualStorageApk {
+        cert_apk_trunc_hash: TruncHash,
+        storage_apk_trunc_hash: TruncHash,
+    },
 
     #[error("Unexpected unequal lengths")]
     UnequalLengths,

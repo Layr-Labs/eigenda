@@ -2,6 +2,7 @@ pub mod blob;
 pub mod cert;
 
 use sov_rollup_interface::da::BlockHeaderTrait;
+use tracing::instrument;
 
 use crate::{
     eigenda::{
@@ -39,6 +40,7 @@ pub fn verify_cert_recency(
 /// Certificate validation
 ///
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation
+#[instrument(skip_all, fields(block_height = header.height()))]
 pub fn verify_cert(
     header: &EthereumBlockHeader,
     ancestor: &AncestorMetadata,
@@ -58,6 +60,7 @@ pub fn verify_cert(
 /// Blob validation against the certificate
 ///
 /// https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation
+#[instrument(skip_all)]
 pub fn verify_blob(cert: &StandardCommitment, blob: &[u8]) -> Result<(), BlobVerificationError> {
     let blob_commitment = &cert
         .blob_inclusion_info()
@@ -76,8 +79,10 @@ mod tests {
 
     /// Helper function to create a mock EthereumBlockHeader with a given height
     fn create_mock_header(height: u64) -> EthereumBlockHeader {
-        let mut header = Header::default();
-        header.number = height;
+        let header = Header {
+            number: height,
+            ..Default::default()
+        };
         EthereumBlockHeader::from(header)
     }
 

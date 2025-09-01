@@ -327,17 +327,17 @@ impl EigenDaService {
         block_height: u64,
         cert: &StandardCommitment,
     ) -> Result<AncestorStateData, EigenDaServiceError> {
-        let keys = contract::EigenDaRelayRegistry::storage_keys(cert);
-        let eigen_da_relay_registry_fut = self
+        let keys = contract::RelayRegistry::storage_keys(cert);
+        let relay_registry_fut = self
             .ethereum
-            .get_proof(self.contracts.eigen_da_relay_registry, keys)
+            .get_proof(self.contracts.relay_registry, keys)
             .number(block_height)
             .into_future();
 
         let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
-        let eigen_da_threshold_registry_fut = self
+        let threshold_registry_fut = self
             .ethereum
-            .get_proof(self.contracts.eigen_da_threshold_registry, keys)
+            .get_proof(self.contracts.threshold_registry, keys)
             .number(block_height)
             .into_future();
 
@@ -348,19 +348,14 @@ impl EigenDaService {
             .number(block_height)
             .into_future();
 
-        let keys = contract::BlsSignatureChecker::storage_keys(cert);
-        let bls_signature_checker_fut = self
-            .ethereum
-            .get_proof(self.contracts.bls_signature_checker, keys)
-            .number(block_height)
-            .into_future();
-
-        let keys = contract::DelegationManager::storage_keys(cert);
-        let delegation_manager_fut = self
-            .ethereum
-            .get_proof(self.contracts.delegation_manager, keys)
-            .number(block_height)
-            .into_future();
+        #[cfg(feature = "stale-stakes-forbidden")]
+        let service_manager_fut = {
+            let keys = contract::ServiceManager::storage_keys(cert);
+            self.ethereum
+                .get_proof(self.contracts.service_manager, keys)
+                .number(block_height)
+                .into_future()
+        };
 
         let keys = contract::BlsApkRegistry::storage_keys(cert);
         let bls_apk_registry_fut = self
@@ -377,45 +372,71 @@ impl EigenDaService {
             .into_future();
 
         let keys = contract::EigenDaCertVerifier::storage_keys(cert);
-        let eigen_da_cert_verifier_fut = self
+        let cert_verifier_fut = self
             .ethereum
-            .get_proof(self.contracts.eigen_da_cert_verifier, keys)
+            .get_proof(self.contracts.cert_verifier, keys)
             .number(block_height)
             .into_future();
 
+        #[cfg(feature = "stale-stakes-forbidden")]
+        let delegation_manager_fut = {
+            let keys = contract::DelegationManager::storage_keys(cert);
+            self.ethereum
+                .get_proof(self.contracts.delegation_manager, keys)
+                .number(block_height)
+                .into_future()
+        };
+
         let responses = try_join_all([
-            eigen_da_relay_registry_fut,
-            eigen_da_threshold_registry_fut,
+            relay_registry_fut,
+            threshold_registry_fut,
             registry_coordinator_fut,
-            bls_signature_checker_fut,
-            delegation_manager_fut,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            service_manager_fut,
             bls_apk_registry_fut,
             stake_registry_fut,
-            eigen_da_cert_verifier_fut,
+            cert_verifier_fut,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            delegation_manager_fut,
         ])
         .await?;
 
+        #[cfg(feature = "stale-stakes-forbidden")]
         let [
-            eigen_da_relay_registry,
-            eigen_da_threshold_registry,
+            relay_registry,
+            threshold_registry,
             registry_coordinator,
-            bls_signature_checker,
-            delegation_manager,
+            service_manager,
             bls_apk_registry,
             stake_registry,
-            eigen_da_cert_verifier,
+            cert_verifier,
+            delegation_manager,
         ]: [EIP1186AccountProofResponse; 8] = responses.try_into().expect("Expected 8 elements");
 
-        Ok(AncestorStateData::new(
-            AccountProof::from(eigen_da_relay_registry),
-            AccountProof::from(eigen_da_threshold_registry),
-            AccountProof::from(registry_coordinator),
-            AccountProof::from(bls_signature_checker),
-            AccountProof::from(delegation_manager),
-            AccountProof::from(bls_apk_registry),
-            AccountProof::from(stake_registry),
-            AccountProof::from(eigen_da_cert_verifier),
-        ))
+        #[cfg(not(feature = "stale-stakes-forbidden"))]
+        let [
+            relay_registry,
+            threshold_registry,
+            registry_coordinator,
+            bls_apk_registry,
+            stake_registry,
+            cert_verifier,
+        ]: [EIP1186AccountProofResponse; 6] = responses.try_into().expect("Expected 6 elements");
+
+        let ancestor_data = AncestorStateData {
+            relay_registry: AccountProof::from(relay_registry),
+            threshold_registry: AccountProof::from(threshold_registry),
+            registry_coordinator: AccountProof::from(registry_coordinator),
+            #[cfg(feature = "stale-stakes-forbidden")]
+            service_manager: AccountProof::from(service_manager),
+            bls_apk_registry: AccountProof::from(bls_apk_registry),
+            stake_registry: AccountProof::from(stake_registry),
+            cert_verifier: AccountProof::from(cert_verifier),
+            #[cfg(feature = "stale-stakes-forbidden")]
+            delegation_manager: AccountProof::from(delegation_manager),
+        };
+
+        Ok(ancestor_data)
     }
 }
 

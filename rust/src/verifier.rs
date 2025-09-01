@@ -7,6 +7,7 @@ use sov_rollup_interface::da::{
     BlobReaderTrait, BlockHeaderTrait, DaSpec, DaVerifier, RelevantBlobs, RelevantProofs,
 };
 use thiserror::Error;
+use tracing::instrument;
 
 use crate::{
     eigenda::verification::{
@@ -21,6 +22,7 @@ use crate::{
 
 /// Errors that may occur when verifying with the [`EigenDaVerifier`].
 #[derive(Debug, Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum VerifierError {
     #[error(transparent)]
     CompletenessError(#[from] CompletenessProofError),
@@ -40,6 +42,8 @@ pub struct EigenDaVerifier {
 }
 
 impl EigenDaVerifier {
+    #![allow(clippy::result_large_err)]
+    #[instrument(skip_all, fields(block_height = block_header.height()))]
     pub fn verify_transactions(
         &self,
         block_header: &EthereumBlockHeader,
@@ -80,6 +84,7 @@ impl DaVerifier for EigenDaVerifier {
         }
     }
 
+    #[instrument(skip_all, fields(block_height = block_header.height()))]
     fn verify_relevant_tx_list(
         &self,
         block_header: &<Self::Spec as DaSpec>::BlockHeader,
@@ -158,6 +163,7 @@ impl EigenDaCompletenessProof {
     ///   - the header is not a direct descendant of the ancestry chain
     ///   - state data of the specific ancestor is incorrect
     ///   - recomputed transaction_root is different from the root in the header
+    #[allow(clippy::result_large_err)]
     pub fn verify(
         self,
         header: &EthereumBlockHeader,
@@ -269,6 +275,7 @@ impl EigenDaInclusionProof {
 
     /// Verify that the proof holds transactions extracted from all transactions
     /// within given namespace, no more, no less.
+    #[instrument(skip_all)]
     fn verify_transactions(
         &self,
         namespace: NamespaceId,
@@ -314,6 +321,7 @@ impl EigenDaInclusionProof {
     /// data blob. The transactions with an invalid certificates are ignored. If
     /// there is a single transaction with the valid certificate but invalid or
     /// missing data blob, the proof fails.
+    #[instrument(skip_all, fields(block_height = header.height()))]
     fn verify_certs_and_blobs(
         &self,
         header: &EthereumBlockHeader,
@@ -391,6 +399,7 @@ impl EigenDaInclusionProof {
     ///   - provided sender is different from the one in the proven transaction
     ///   - provided hash is different from the hash of the proven transaction
     ///   - provided blob data is different from the blob retrieved and proven to be part of the transaction
+    #[instrument(skip_all, fields(block_height = header.height()))]
     pub fn verify(
         &self,
         header: &EthereumBlockHeader,
