@@ -514,17 +514,18 @@ mod tests {
     use std::str::FromStr;
 
     use sov_rollup_interface::sov_universal_wallet::schema::Schema;
+    use test_strategy::proptest;
 
-    use crate::spec::{EthereumAddress, EthereumHash};
+    use crate::spec::EthereumAddress;
 
-    const ADDRESS: &str = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-    const HASH: &str = "0x1234567890123456789012345678901234567890123456789012345678901234";
-
-    // TODO: Add more tests and cleanup. Maybe even use proptest.
+    const ADDR_1: &str = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+    const ADDR_2: &str = "0x1234567890123456789012345678901234567890";
 
     #[test]
     fn test_ethereum_address_schema() {
-        let address = EthereumAddress::from_str(ADDRESS).unwrap();
+        let raw_address_str = ADDR_1;
+        let address = EthereumAddress::from_str(raw_address_str).unwrap();
+
         let schema = Schema::of_single_type::<EthereumAddress>().unwrap();
 
         let borsh_bytes = borsh::to_vec(&address).unwrap();
@@ -532,55 +533,95 @@ mod tests {
         assert_eq!(deserialized, address);
 
         let displayed_from_schema = schema.display(0, &borsh_bytes).unwrap();
-
-        let lowercase_address = ADDRESS.to_lowercase();
-        assert_eq!(&displayed_from_schema, &lowercase_address);
+        assert_eq!(&displayed_from_schema, &raw_address_str.to_lowercase());
     }
 
     #[test]
     fn test_address_display_from_string() {
-        let address = EthereumAddress::from_str(ADDRESS).unwrap();
-        let output = format!("{}", address);
-        assert_eq!(ADDRESS, output);
+        let raw_address_str = ADDR_1;
+        let address = EthereumAddress::from_str(raw_address_str).unwrap();
+        let output = format!("{address}");
+        assert_eq!(raw_address_str, output);
     }
 
     #[test]
-    fn test_ethereum_address_try_from() {
-        let bytes = hex::decode(&ADDRESS[2..]).unwrap();
-        let address = EthereumAddress::try_from(bytes.as_slice()).unwrap();
-        assert_eq!(address.to_string(), ADDRESS);
+    fn test_from_string_for_registering() {
+        let raw_address_str = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+        let address = EthereumAddress::from_str(raw_address_str).unwrap();
+        let raw_bytes = address.as_ref().to_vec();
+        let expected_bytes = vec![
+            0xf3, 0x9f, 0xd6, 0xe5, 0x1a, 0xad, 0x88, 0xf6, 0xf4, 0xce, 0x6a, 0xb8, 0x82, 0x72,
+            0x79, 0xcf, 0xff, 0xb9, 0x22, 0x66,
+        ];
+
+        assert_eq!(expected_bytes, raw_bytes);
     }
 
     #[test]
-    fn test_ethereum_address_as_ref() {
-        let address = EthereumAddress::from_str(ADDRESS).unwrap();
-        let bytes: &[u8] = address.as_ref();
-        assert_eq!(bytes.len(), 20); // Ethereum addresses are 20 bytes
-        assert_eq!(hex::encode(bytes), ADDRESS[2..].to_lowercase());
+    fn test_address_display_try_vec() {
+        let raw_address_str = ADDR_2;
+        let raw_address: Vec<u8> = hex::decode(&raw_address_str[2..]).unwrap();
+        let address = EthereumAddress::try_from(&raw_address[..]).unwrap();
+        let output = format!("{address}");
+        assert_eq!(raw_address_str, output);
     }
 
     #[test]
-    fn test_ethereum_address_invalid_input() {
-        // Test invalid length
-        let result = EthereumAddress::from_str("0x1234");
-        assert!(result.is_err());
+    fn test_from_str_and_from_slice_same() {
+        let raw_address_str = ADDR_2;
+        let raw_address_bytes = hex::decode(&raw_address_str[2..]).unwrap();
 
-        // Test invalid hex
-        let result = EthereumAddress::from_str("0xg39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
-        assert!(result.is_err());
+        let address_from_str = EthereumAddress::from_str(raw_address_str).unwrap();
+        let address_from_slice = EthereumAddress::try_from(raw_address_bytes.as_slice()).unwrap();
+
+        assert_eq!(address_from_str, address_from_slice);
     }
 
-    #[test]
-    fn test_ethereum_hash_serialization() {
-        let ethereum_hash = EthereumHash::from_str(HASH).unwrap();
-        let serde_serialized = serde_json::to_string(&ethereum_hash).unwrap();
-        let serde_deserialized: EthereumHash = serde_json::from_str(&serde_serialized).unwrap();
+    #[proptest]
+    fn validate_json_schema(input: EthereumAddress) {
+        let schema = serde_json::to_value(schemars::schema_for!(EthereumAddress)).unwrap();
+        let json = serde_json::to_value(input).unwrap();
 
-        assert_eq!(ethereum_hash, serde_deserialized);
+        jsonschema::validate(&schema, &json)
+            .map_err(|e| e.kind)
+            .unwrap()
+    }
 
-        let borsh_serialized = borsh::to_vec(&ethereum_hash).unwrap();
-        let borsh_deserialized: EthereumHash = borsh::from_slice(&borsh_serialized).unwrap();
+    #[proptest]
+    fn ord_invariants(values: [EthereumAddress; 3]) {
+        reltester::ord(&values[0], &values[1], &values[2]).unwrap();
+    }
 
-        assert_eq!(ethereum_hash, borsh_deserialized);
+    #[proptest]
+    fn hash_invariants(values: [EthereumAddress; 2]) {
+        reltester::hash(&values[0], &values[1]).unwrap();
+    }
+
+    #[proptest]
+    fn test_try_from_any_slice(#[any(proptest::sample::size_range(0..100).lift())] input: Vec<u8>) {
+        let _ = EthereumAddress::try_from(&input[..]);
+    }
+
+    #[proptest]
+    fn test_from_str_anything(#[strategy("\\PC*")] input: String) {
+        let _ = EthereumAddress::from_str(&input);
+    }
+
+    #[proptest]
+    fn test_from_str_hex_addresses(#[strategy("0x[a-fA-F0-9]{40}")] input: String) {
+        let result = EthereumAddress::from_str(&input);
+        if let Ok(address) = result {
+            let output = format!("{address}");
+            assert_eq!(input, output);
+        }
+    }
+
+    #[proptest]
+    fn test_try_from_bytes(input: [u8; 20]) {
+        let hex_str = format!("0x{}", hex::encode(input));
+        let address_from_bytes = EthereumAddress::try_from(input.as_slice()).unwrap();
+        let output = format!("{address_from_bytes}");
+
+        assert_eq!(hex_str, output.to_lowercase());
     }
 }

@@ -14,8 +14,6 @@ use sov_rollup_interface::da::DaVerifier;
 
 pub static SEQUENCER_SIGNER: &str =
     "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83";
-
-// TODO: Change to custom addresses. These are from the dev net. The keys are known to public.
 pub static ROLLUP_BATCH_NAMESPACE: &str = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 pub static ROLLUP_PROOF_NAMESPACE: &str = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
 pub static CERT_RECENCY_WINDOW: u64 = 3200;

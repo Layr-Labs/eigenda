@@ -468,3 +468,410 @@ impl EigenDaInclusionProof {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spec::EthereumBlockHeader;
+    use alloy_consensus::{EthereumTxEnvelope, Header, SignableTransaction, TxEip1559, TxEnvelope};
+    use alloy_primitives::{TxKind, address};
+    use alloy_signer::Signature;
+    use bytes::Bytes;
+    use std::str::FromStr;
+
+    fn create_test_header(
+        number: u64,
+        parent_hash: B256,
+        transactions_root: B256,
+    ) -> EthereumBlockHeader {
+        let mut header = Header::default();
+        header.number = number;
+        header.parent_hash = parent_hash;
+        header.transactions_root = transactions_root;
+        header.timestamp = 1234567890;
+        EthereumBlockHeader::from(header)
+    }
+
+    fn create_test_transaction_with_blob() -> TransactionWithBlob {
+        let mut tx_data = TxEip1559::default();
+        tx_data.to = TxKind::Call(address!("0x1234567890123456789012345678901234567890"));
+
+        let signature = Signature::from_str(
+            "0xaa231fbe0ed2b5418e6ba7c19bee2522852955ec50996c02a2fe3e71d30ddaf1645baf4823fea7cb4fcc7150842493847cfb6a6d63ab93e8ee928ee3f61f503500"
+        ).expect("could not parse 0x-prefixed signature");
+        let tx_signed = tx_data.into_signed(signature);
+        let tx = EthereumTxEnvelope::Eip1559(tx_signed);
+        TransactionWithBlob {
+            tx,
+            blob: Some(Bytes::from(b"test blob data".to_vec())),
+        }
+    }
+
+    fn create_test_ancestor(number: u64, parent_hash: B256) -> AncestorMetadata {
+        let header = create_test_header(number, parent_hash, B256::default());
+        AncestorMetadata { header, data: None }
+    }
+
+    #[test]
+    fn test_completeness_proof_new() {
+        let ancestors = vec![create_test_ancestor(1, B256::default())];
+        let transactions = vec![create_test_transaction_with_blob()];
+
+        let proof = EigenDaCompletenessProof::new(ancestors.clone(), transactions.clone());
+
+        assert_eq!(proof.ancestors, ancestors);
+        assert_eq!(proof.transactions, transactions);
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_empty() {
+        let header = create_test_header(
+            1,
+            B256::default(),
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+        let proof = EigenDaCompletenessProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header);
+        assert!(result.is_ok());
+        let (transactions, ancestors) = result.unwrap();
+        assert!(transactions.is_empty());
+        assert!(ancestors.is_empty());
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_incorrect_ancestry() {
+        let parent_hash = B256::from_slice(&[1; 32]);
+        let wrong_parent_hash = B256::from_slice(&[2; 32]);
+
+        let ancestor1 = create_test_ancestor(1, B256::default());
+        let ancestor2 = create_test_ancestor(2, wrong_parent_hash);
+
+        let ancestors = vec![ancestor1, ancestor2];
+        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
+        let header = create_test_header(
+            3,
+            parent_hash,
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+
+        let result = proof.verify(&header);
+        assert!(matches!(
+            result,
+            Err(CompletenessProofError::IncorrectAncestry)
+        ));
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_merkle_root_mismatch() {
+        let header = create_test_header(1, B256::default(), B256::from_slice(&[1; 32]));
+        let transaction = create_test_transaction_with_blob();
+        let proof = EigenDaCompletenessProof::new(vec![], vec![transaction]);
+
+        let result = proof.verify(&header);
+        assert!(matches!(
+            result,
+            Err(CompletenessProofError::MerkleRootMismatch(_, _))
+        ));
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_valid_single_ancestor() {
+        let ancestor = create_test_ancestor(1, B256::default());
+        let ancestor_hash = ancestor.header.hash().into();
+
+        let header = create_test_header(
+            2,
+            ancestor_hash,
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+        let proof = EigenDaCompletenessProof::new(vec![ancestor.clone()], vec![]);
+
+        let (transactions, ancestors) = proof.verify(&header).unwrap();
+        assert!(transactions.is_empty());
+        assert_eq!(ancestors.len(), 1);
+    }
+
+    #[test]
+    fn test_inclusion_proof_new() {
+        let transactions = vec![create_test_transaction_with_blob()];
+        let proof = EigenDaInclusionProof::new(transactions.clone());
+
+        assert_eq!(proof.transactions, transactions);
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_empty() {
+        let proof = EigenDaInclusionProof::new(vec![]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_not_proven() {
+        let transaction = create_test_transaction_with_blob();
+        let proof = EigenDaInclusionProof::new(vec![transaction]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[]);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::NotProvenTransaction(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_proof_incomplete() {
+        let proven_tx = create_test_transaction_with_blob();
+        let proof = EigenDaInclusionProof::new(vec![]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[proven_tx]);
+        dbg!(&result);
+        assert!(matches!(result, Err(InclusionProofError::ProofIncomplete)));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_empty_proof_and_transactions() {
+        let header = create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let proof = EigenDaInclusionProof::new(vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], &[], 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_valid_ancestry_chain() {
+        let ancestor1 = create_test_ancestor(1, B256::default());
+        let ancestor1_hash = ancestor1.header.hash().0;
+        let ancestor2 = create_test_ancestor(2, ancestor1_hash);
+        let ancestor2_hash = ancestor2.header.hash().0;
+
+        let ancestors = vec![ancestor1.clone(), ancestor2.clone()];
+        let header = create_test_header(
+            3,
+            ancestor2_hash,
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
+
+        let result = proof.verify(&header);
+        assert!(result.is_ok());
+        let (transactions, ancestors) = result.unwrap();
+        assert!(transactions.is_empty());
+        assert_eq!(ancestors.len(), 2);
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_parent_not_ancestor() {
+        let ancestor = create_test_ancestor(1, B256::default());
+        let wrong_parent_hash = B256::from_slice(&[99; 32]);
+
+        let ancestors = vec![ancestor];
+        let header = create_test_header(
+            2,
+            wrong_parent_hash,
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
+
+        let result = proof.verify(&header);
+        assert!(matches!(
+            result,
+            Err(CompletenessProofError::IncorrectAncestry)
+        ));
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_with_valid_transactions() {
+        let transaction = create_test_transaction_with_blob();
+        let transactions = vec![transaction.clone()];
+        let tx_refs = vec![transaction.tx.clone()];
+        let tx_root = calculate_transaction_root(&tx_refs);
+
+        let header = create_test_header(1, B256::default(), tx_root);
+        let proof = EigenDaCompletenessProof::new(vec![], transactions.clone());
+
+        let result = proof.verify(&header);
+        assert!(result.is_ok());
+        let (verified_transactions, ancestors) = result.unwrap();
+        assert_eq!(verified_transactions.len(), 1);
+        assert!(ancestors.is_empty());
+        assert_eq!(verified_transactions, transactions);
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_missing_blob_error() {
+        let header = create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let blob_sender =
+            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender =
+            BlobWithSender::new(blob_sender, EthereumHash::from(tx_hash), Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_incorrect_sender() {
+        let header = create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let wrong_sender =
+            EthereumAddress::from_str("0x9876543210987654321098765432109876543210").unwrap();
+        let blob_with_sender =
+            BlobWithSender::new(wrong_sender, EthereumHash::from(tx_hash), Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_incorrect_hash() {
+        let header = create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let wrong_hash = B256::from_slice(&[99; 32]);
+        let sender =
+            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender =
+            BlobWithSender::new(sender, EthereumHash::from(wrong_hash), Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_data_length_mismatch() {
+        let header = create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let sender =
+            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let long_data = Bytes::from(vec![1u8; 1000]);
+        let blob_with_sender = BlobWithSender::new(sender, EthereumHash::from(tx_hash), long_data);
+
+        let proof = EigenDaInclusionProof::new(vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_completeness_proof_verify_broken_ancestry_middle() {
+        let ancestor1 = create_test_ancestor(1, B256::default());
+        let ancestor1_hash = ancestor1.header.hash().0;
+        let wrong_hash = B256::from_slice(&[99; 32]);
+        let ancestor2 = create_test_ancestor(2, ancestor1_hash);
+        let ancestor3 = create_test_ancestor(3, wrong_hash);
+
+        let ancestors = vec![ancestor1, ancestor2, ancestor3];
+        let header = create_test_header(
+            4,
+            B256::default(),
+            calculate_transaction_root::<TxEnvelope>(&[]),
+        );
+        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
+
+        let result = proof.verify(&header);
+        assert!(matches!(
+            result,
+            Err(CompletenessProofError::IncorrectAncestry)
+        ));
+    }
+
+    #[test]
+    fn test_eigenda_verifier_new() {
+        use crate::spec::RollupParams;
+
+        let batch_namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let proof_namespace =
+            NamespaceId::from_str("0x9876543210987654321098765432109876543210").unwrap();
+        let cert_recency_window = 100;
+
+        let params = RollupParams {
+            rollup_batch_namespace: batch_namespace,
+            rollup_proof_namespace: proof_namespace,
+            cert_recency_window,
+        };
+
+        let verifier = EigenDaVerifier::new(params);
+
+        assert_eq!(verifier.batch_namespace, batch_namespace);
+        assert_eq!(verifier.proof_namespace, proof_namespace);
+        assert_eq!(verifier.cert_recency_window, cert_recency_window);
+    }
+
+    #[test]
+    fn test_verifier_error_display() {
+        let completeness_error = CompletenessProofError::IncorrectAncestry;
+        let verifier_error = VerifierError::CompletenessError(completeness_error);
+
+        let error_string = format!("{}", verifier_error);
+        assert!(error_string.contains("Incorrect ancestry chain"));
+    }
+
+    #[test]
+    fn test_completeness_proof_error_display() {
+        let error = CompletenessProofError::IncorrectAncestry;
+        let error_string = format!("{}", error);
+        assert_eq!(error_string, "Incorrect ancestry chain");
+
+        let hash1 = B256::from_slice(&[1; 32]);
+        let hash2 = B256::from_slice(&[2; 32]);
+        let merkle_error = CompletenessProofError::MerkleRootMismatch(hash1, hash2);
+        let merkle_string = format!("{}", merkle_error);
+        assert!(merkle_string.contains("Recomputed merkle root"));
+    }
+
+    #[test]
+    fn test_inclusion_proof_error_display() {
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let error = InclusionProofError::NotProvenTransaction(tx_hash);
+        let error_string = format!("{}", error);
+        assert!(error_string.contains("wasn't part of the completeness proof"));
+
+        let missing_error = InclusionProofError::AncestorMissing(42);
+        let missing_string = format!("{}", missing_error);
+        assert!(missing_string.contains("Ancestor missing, height(42)"));
+
+        let incomplete_error = InclusionProofError::ProofIncomplete;
+        let incomplete_string = format!("{}", incomplete_error);
+        assert!(incomplete_string.contains("some relevant transactions are missing"));
+    }
+}

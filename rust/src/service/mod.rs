@@ -4,6 +4,7 @@ use std::{future::ready, ops::Not, str::FromStr, time::Duration};
 
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
+use alloy_primitives::TxHash;
 use alloy_provider::{DynProvider, Provider};
 use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction, TransactionRequest};
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
@@ -133,14 +134,11 @@ impl EigenDaService {
             th_hash = %da_transaction_id,
             "Certificate was submitted to Ethereum"
         );
-
-        // TODO: Check how should the blob_hash be actually computed. Is it ok
-        // to use the transaction id?
         let blob_hash = HexHash::new(da_transaction_id.into());
 
         Ok(SubmitBlobReceipt {
             blob_hash,
-            da_transaction_id,
+            da_transaction_id: EthereumHash::from(da_transaction_id),
         })
     }
 
@@ -149,7 +147,7 @@ impl EigenDaService {
         &self,
         certificate: &StandardCommitment,
         namespace: NamespaceId,
-    ) -> Result<EthereumHash, EigenDaServiceError> {
+    ) -> Result<TxHash, EigenDaServiceError> {
         let bytes = certificate.to_rlp_bytes();
 
         let tx = TransactionRequest::default()
@@ -161,7 +159,8 @@ impl EigenDaService {
             .with_input(bytes);
 
         let transaction = self.ethereum.send_transaction(tx).await?;
-        Ok(transaction.tx_hash().to_owned().into())
+
+        Ok(*transaction.tx_hash())
     }
 
     async fn process_transactions_with_metadata(
