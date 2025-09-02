@@ -23,12 +23,12 @@ var (
 		Aliases: []string{"f"},
 		Usage:   "Force the operation without prompting for confirmation.",
 	}
-	knownHostsFileFlag = &cli.StringSliceFlag{
+	knownHostsFileFlag = &cli.StringFlag{
 		Name:     "known-hosts",
 		Aliases:  []string{"k"},
 		Usage:    "Path to a file containing known hosts for SSH connections.",
 		Required: false,
-		Value:    cli.NewStringSlice("~/.ssh/known_hosts"),
+		Value:    "~/.ssh/known_hosts",
 	}
 )
 
