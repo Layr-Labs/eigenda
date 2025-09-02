@@ -113,6 +113,22 @@ func NewOnDemandLedgerCache(
 }
 
 // Retrieves an existing OnDemandLedger for the given account, or creates a new one if it doesn't exist
+//
+// Note: there exists a potential race condition with the access pattern of this method:
+// 1. A ledger is retrieved from the cache
+// 2. A large amount of activity (or a small configured cache size) causes the ledger to be evicted from the cache
+// before the ledger operation has been completed
+// 3. A different caller tries to retrieve the ledger for that account, gets a cache miss, and constructs a new instance
+//
+// With this sequence of events, there could be multiple existing ledger instances for the same account. The
+// underlying cumulative payment store isn't designed to function with multiple instantiated ledger structs, so the
+// operation of one instance would overwrite the operation of the other. Practically, this would mean that the user
+// would get one free dispersal. The multiple instance problem would resolve itself after a single operation, since
+// the LRU cache can only maintain a single instance, and the other instance would be destroyed.
+//
+// It is very unlikely for this race condition to take place if the cache has been configured with a sane size. Given
+// the low probability of the occurrence, and the low severity of the race condition, we are not addressing it right
+// now to avoid the complexity of the potential workarounds.
 func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcommon.Address) (*OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
