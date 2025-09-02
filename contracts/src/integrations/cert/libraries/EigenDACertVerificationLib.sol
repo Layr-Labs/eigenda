@@ -55,7 +55,7 @@ library EigenDACertVerificationLib {
     /// @param blobQuorumsBitmap The bitmap of blob quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap);
 
-    /// @notice Thrown when certificate decoding fails
+    /// @notice Thrown when certificate decoding from bytes into struct fails
     error CertDecodeRevert();
 
     /// @notice Thrown when the external call to the signature verifier reverts
