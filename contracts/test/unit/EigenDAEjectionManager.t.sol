@@ -29,17 +29,21 @@ contract EigenDAEjectionManagerTest is Test {
     EigenDAEjectionManager ejectionManager;
     ERC20Mintable token;
 
-    uint256 constant DEPOSIT_AMOUNT = 1e18;
+    uint256 constant DEPOSIT_BASE_FEE_MULTIPLIER = 7;
     uint256 constant CANCEL_EJECTION_WITHOUT_SIG_GAS_REFUND = 39128;
     uint256 constant CANCEL_EJECTION_WITH_SIG_GAS_REFUND = 70000;
+    uint256 constant BASE_FEE = 10;
+    uint256 constant EXPECTED_DEPOSIT = BASE_FEE * DEPOSIT_BASE_FEE_MULTIPLIER * CANCEL_EJECTION_WITH_SIG_GAS_REFUND;
     /// TODO: PLACEHOLDER UNTIL GAS COST FOR SIGNATURES IS KNOWN
 
     function setUp() public {
+        vm.fee(BASE_FEE);
         token = new ERC20Mintable("TestToken", "TTK");
         accessControl = new EigenDAAccessControl(address(this));
         directory = new EigenDADirectory();
         directory.initialize(address(accessControl));
-        ejectionManager = new EigenDAEjectionManager(address(token), DEPOSIT_AMOUNT, address(directory), 2, 1);
+        ejectionManager =
+            new EigenDAEjectionManager(address(token), DEPOSIT_BASE_FEE_MULTIPLIER, address(directory), 39128, 70000);
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, address(this));
         directory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(ejectionManager));
         directory.addAddress(AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME, address(this));
@@ -54,11 +58,11 @@ contract EigenDAEjectionManagerTest is Test {
     function testStartEjection(address caller, address ejectee) public {
         accessControl.grantRole(AccessControlConstants.EJECTOR_ROLE, caller);
         vm.assume(caller != address(0) && ejectee != address(0) && caller != ejectee);
-        token.mint(caller, DEPOSIT_AMOUNT);
+        token.mint(caller, EXPECTED_DEPOSIT);
 
         vm.startPrank(caller);
-        token.approve(address(ejectionManager), DEPOSIT_AMOUNT);
-        ejectionManager.addEjectorBalance(DEPOSIT_AMOUNT);
+        token.approve(address(ejectionManager), EXPECTED_DEPOSIT);
+        ejectionManager.addEjectorBalance(EXPECTED_DEPOSIT);
 
         vm.expectEmit(true, true, true, true);
         emit EigenDAEjectionLib.EjectionStarted(
@@ -66,7 +70,8 @@ contract EigenDAEjectionManagerTest is Test {
             caller,
             "0x", // quorums (empty for this test)
             uint64(block.timestamp),
-            uint64(block.timestamp + ejectionManager.ejectionDelay())
+            uint64(block.timestamp + ejectionManager.ejectionDelay()),
+            EXPECTED_DEPOSIT
         );
 
         ejectionManager.startEjection(ejectee, "0x");

@@ -6,7 +6,12 @@ import {EigenDAEjectionStorage} from "src/periphery/ejection/libraries/EigenDAEj
 
 library EigenDAEjectionLib {
     event EjectionStarted(
-        address operator, address ejector, bytes quorums, uint64 timestampStarted, uint64 ejectionTime
+        address operator,
+        address ejector,
+        bytes quorums,
+        uint64 timestampStarted,
+        uint64 ejectionTime,
+        uint256 depositAmount
     );
 
     event EjectionCancelled(address operator);
@@ -30,25 +35,26 @@ library EigenDAEjectionLib {
     }
 
     /// @notice Starts an ejection process for an operator.
-    function startEjection(address operator, address ejector, bytes memory quorums) internal {
-        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
+    function startEjection(address operator, address ejector, bytes memory quorums, uint256 depositAmount) internal {
+        EigenDAEjectionTypes.Ejectee storage ejectee = s().ejectionParams[operator];
 
-        require(operatorParams.proceedingTime == 0, "Ejection already in progress");
-        require(operatorParams.lastProceedingInitiated + s().cooldown <= block.timestamp, "Ejection cooldown not met");
+        require(ejectee.params.proceedingTime == 0, "Ejection already in progress");
+        require(ejectee.lastProceedingInitiated + s().cooldown <= block.timestamp, "Ejection cooldown not met");
 
-        operatorParams.ejector = ejector;
-        operatorParams.quorums = quorums;
-        operatorParams.proceedingTime = uint64(block.timestamp) + s().delay;
-        operatorParams.lastProceedingInitiated = uint64(block.timestamp);
+        ejectee.params.ejector = ejector;
+        ejectee.params.quorums = quorums;
+        ejectee.params.proceedingTime = uint64(block.timestamp) + s().delay;
+        ejectee.params.depositAmount = depositAmount;
+        ejectee.lastProceedingInitiated = uint64(block.timestamp);
         emit EjectionStarted(
-            operator, ejector, quorums, operatorParams.lastProceedingInitiated, operatorParams.proceedingTime
+            operator, ejector, quorums, ejectee.lastProceedingInitiated, ejectee.params.proceedingTime, depositAmount
         );
     }
 
     /// @notice Cancels an ejection process for an operator.
     function cancelEjection(address operator) internal {
-        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
-        require(operatorParams.proceedingTime > 0, "No ejection in progress");
+        EigenDAEjectionTypes.Ejectee storage ejectee = s().ejectionParams[operator];
+        require(ejectee.params.proceedingTime > 0, "No ejection in progress");
 
         deleteEjection(operator);
         emit EjectionCancelled(operator);
@@ -56,11 +62,11 @@ library EigenDAEjectionLib {
 
     /// @notice Completes an ejection process for an operator.
     function completeEjection(address operator, bytes memory quorums) internal {
-        require(quorumsEqual(s().ejectionParams[operator].quorums, quorums), "Quorums do not match");
-        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
-        require(operatorParams.proceedingTime > 0, "No proceeding in progress");
+        require(quorumsEqual(s().ejectionParams[operator].params.quorums, quorums), "Quorums do not match");
+        EigenDAEjectionTypes.Ejectee storage ejectee = s().ejectionParams[operator];
+        require(ejectee.params.proceedingTime > 0, "No proceeding in progress");
 
-        require(block.timestamp >= operatorParams.proceedingTime, "Proceeding not yet due");
+        require(block.timestamp >= ejectee.params.proceedingTime, "Proceeding not yet due");
 
         deleteEjection(operator);
         emit EjectionCompleted(operator, quorums);
@@ -69,10 +75,11 @@ library EigenDAEjectionLib {
     /// @notice Helper function to clear an ejection.
     /// @dev The lastProceedingInitiated field is not cleared to allow cooldown enforcement.
     function deleteEjection(address operator) internal {
-        EigenDAEjectionTypes.EjectionParams storage operatorParams = s().ejectionParams[operator];
-        operatorParams.ejector = address(0);
-        operatorParams.quorums = hex"";
-        operatorParams.proceedingTime = 0;
+        EigenDAEjectionTypes.Ejectee storage ejectee = s().ejectionParams[operator];
+        ejectee.params.ejector = address(0);
+        ejectee.params.quorums = hex"";
+        ejectee.params.proceedingTime = 0;
+        ejectee.params.depositAmount = 0;
     }
 
     /// @notice Adds to the ejector's balance for ejection processes.
@@ -94,7 +101,15 @@ library EigenDAEjectionLib {
     /// @notice Returns the address of the ejector for a given operator.
     /// @dev If the address is zero, it means no ejection is in progress.
     function getEjector(address operator) internal view returns (address ejector) {
-        return s().ejectionParams[operator].ejector;
+        return s().ejectionParams[operator].params.ejector;
+    }
+
+    function getDepositAmount(address operator) internal view returns (uint256 depositAmount) {
+        return s().ejectionParams[operator].params.depositAmount;
+    }
+
+    function lastProceedingInitiated(address operator) internal view returns (uint64) {
+        return s().ejectionParams[operator].lastProceedingInitiated;
     }
 
     /// @notice Compares two quorums to see if they are equal.
@@ -103,7 +118,7 @@ library EigenDAEjectionLib {
     }
 
     function ejectionParams(address operator) internal view returns (EigenDAEjectionTypes.EjectionParams storage) {
-        return s().ejectionParams[operator];
+        return s().ejectionParams[operator].params;
     }
 
     /// @return The amount of time that must elapse from initialization before an ejection can be completed.

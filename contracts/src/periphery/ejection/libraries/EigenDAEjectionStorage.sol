@@ -9,7 +9,7 @@ library EigenDAEjectionStorage {
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 
     struct Layout {
-        mapping(address => EigenDAEjectionTypes.EjectionParams) ejectionParams;
+        mapping(address => EigenDAEjectionTypes.Ejectee) ejectionParams;
         mapping(address => uint256) ejectorBalance;
         uint64 delay;
         uint64 cooldown;
