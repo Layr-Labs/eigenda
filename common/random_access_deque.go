@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/Layr-Labs/eigenda/common/enforce"
 )
@@ -240,46 +241,74 @@ func (s *RandomAccessDeque[T]) Clear() {
 // modify the deque, and then use the iterator again.
 //
 // O(1) to call this method, O(1) per iteration step.
-func (s *RandomAccessDeque[T]) Iterator() func(yield func(int, T) bool) {
-	return s.IteratorFrom(0)
+func (s *RandomAccessDeque[T]) Iterator() func(yield func(uint64, T) bool) {
+	if s.size == 0 {
+		return func(yield func(uint64, T) bool) {
+			// no-op
+		}
+	}
+
+	iterator, err := s.IteratorFrom(0)
+	enforce.NilError(err, "IteratorFrom failed, this should never happen")
+
+	return iterator
 }
 
 // Get an iterator over the elements in the deque, from the specified index to back. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
 //
-// O(1) to call this method, O(1) per iteration step. // TODO test
-func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) func(yield func(int, T) bool) {
-	return func(yield func(int, T) bool) {
+// O(1) to call this method, O(1) per iteration step.
+func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) (func(yield func(uint64, T) bool), error) {
+
+	if index >= s.size {
+		return nil, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+	}
+
+	return func(yield func(uint64, T) bool) {
 		for i := index; i < s.size; i++ {
 			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
-			yield(int(i), value)
+			yield(i, value)
 		}
-	}
+	}, nil
 }
 
 // Get an iterator over the elements in the deque, from back to front. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
 //
 // // O(1) to call this method, O(1) per iteration step.
-func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(int, T) bool) {
-	return s.ReverseIteratorFrom(s.size - 1)
+func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(uint64, T) bool) {
+	if s.size == 0 {
+		return func(yield func(uint64, T) bool) {
+			// no-op
+		}
+	}
+
+	iterator, err := s.ReverseIteratorFrom(s.size - 1)
+	enforce.NilError(err, "ReverseIteratorFrom failed, this should never happen")
+
+	return iterator
 }
 
 // Get an iterator over the elements in the deque, from the specified index to front. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
 //
-// O(1) to call this method, O(1) per iteration step. // TODO test
-func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) func(yield func(int, T) bool) {
-	return func(yield func(int, T) bool) {
-		for i := index; i > 0; i-- {
-			value, err := s.Get(i - 1)
+// O(1) to call this method, O(1) per iteration step.
+func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) (func(yield func(uint64, T) bool), error) {
+
+	if index >= s.size {
+		return nil, fmt.Errorf("index %d out of bounds (size %d)", index, s.size)
+	}
+
+	return func(yield func(uint64, T) bool) {
+		for i := index; i != math.MaxUint64; i-- {
+			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
-			yield(int(i-1), value)
+			yield(i, value)
 		}
-	}
+	}, nil
 }
 
 // Resize the underlying array to accommodate at least one more insertion. Preserves existing elements.
@@ -302,8 +331,6 @@ func (s *RandomAccessDeque[T]) resizeForInsertion() {
 	s.endIndex = s.size
 }
 
-// TODO test
-
 // Perform a binary search in the deque for an element matching the compare function. Assumes that
 // the deque is sorted according to the same compare function. If an exact match can't be found,
 // returns the index of the location where the value would be inserted if it were inserted in the proper location.
@@ -313,7 +340,9 @@ func (s *RandomAccessDeque[T]) resizeForInsertion() {
 //   - zero if a == b
 //   - positive value if a > b
 //
-// If the deque is not sorted or if the ordering is not a total ordering, the return value is undefined.
+// If the deque is not sorted or if the ordering is not a total ordering, the return value is undefined. This function
+// is not defined as a method on RandomAccessDeque due to this fact. Not all RandomAccessDeque instances will be sorted,
+// and so this function is not always valid to call.
 func BinarySearchInOrderedDeque[V any, T any](
 	deque *RandomAccessDeque[T],
 	value V,
@@ -329,9 +358,8 @@ func BinarySearchInOrderedDeque[V any, T any](
 	right := deque.size - 1
 	var targetIndex uint64
 
-	for left <= right {
-
-		targetIndex = (right - left) / 2
+	for left < right {
+		targetIndex = left + (right-left)/2
 		target, err := deque.Get(targetIndex)
 		enforce.NilError(err, "Get failed, this should never happen with valid indices")
 
@@ -357,5 +385,16 @@ func BinarySearchInOrderedDeque[V any, T any](
 		}
 	}
 
-	return targetIndex, false
+	element, err := deque.Get(left)
+	enforce.NilError(err, "Get failed, this should never happen with valid indices")
+	cmp := compare(value, element)
+	if cmp == 0 {
+		// We've found an exact match.
+		return left, true
+	} else if cmp < 0 {
+		// value < element, so missing value should go to the left of it
+		return left, false
+	}
+	// value > element, so missing value should go to the right of it
+	return left + 1, false
 }

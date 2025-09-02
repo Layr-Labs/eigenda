@@ -199,10 +199,10 @@ func TestRandomDequeOperations(t *testing.T) {
 			// Iterate forwards
 			expectedIndex := 0
 			for index, value := range deque.Iterator() {
-				require.Equal(t, expectedIndex, index)
+				require.Equal(t, uint64(expectedIndex), index)
 				expectedIndex++
 
-				require.True(t, index < expectedData.Size())
+				require.True(t, index < uint64(expectedData.Size()))
 
 				require.Equal(t, expectedArray[index], value)
 			}
@@ -211,14 +211,170 @@ func TestRandomDequeOperations(t *testing.T) {
 			// Iterate backwards
 			expectedIndex = expectedData.Size() - 1
 			for index, value := range deque.ReverseIterator() {
-				require.Equal(t, expectedIndex, index)
+				require.Equal(t, uint64(expectedIndex), index)
 				expectedIndex--
-
-				require.True(t, index >= 0)
 
 				require.Equal(t, expectedArray[index], value)
 			}
 			require.Equal(t, -1, expectedIndex, "backward iteration count mismatch")
+
+			// Iterate forwards from a random index.
+			if expectedSize == 0 {
+				_, err := deque.IteratorFrom(0)
+				require.Error(t, err)
+				_, err = deque.IteratorFrom(1234)
+				require.Error(t, err)
+			} else {
+				expectedIndex = 0
+				if expectedData.Size() > 1 {
+					expectedIndex = rand.Intn(expectedData.Size() - 1)
+				}
+				iterator, err := deque.IteratorFrom(uint64(expectedIndex))
+				require.NoError(t, err)
+				for index, value := range iterator {
+					require.Equal(t, uint64(expectedIndex), index)
+					expectedIndex++
+
+					require.Equal(t, expectedArray[index], value)
+				}
+				require.Equal(t, expectedSize, uint64(expectedIndex),
+					"forward from-index iteration count mismatch")
+			}
+
+			// Iterate backwards from a random index.
+			if expectedSize == 0 {
+				_, err := deque.ReverseIteratorFrom(0)
+				require.Error(t, err)
+				_, err = deque.ReverseIteratorFrom(1234)
+				require.Error(t, err)
+			} else {
+				expectedIndex = expectedData.Size() - 1
+				if expectedData.Size() > 1 {
+					expectedIndex = rand.Intn(expectedData.Size() - 1)
+				}
+				iterator, err := deque.ReverseIteratorFrom(uint64(expectedIndex))
+				require.NoError(t, err)
+				for index, value := range iterator {
+					require.Equal(t, uint64(expectedIndex), index)
+					expectedIndex--
+
+					require.Equal(t, expectedArray[index], value)
+				}
+				require.Equal(t, -1, expectedIndex, "backward from-index iteration count mismatch")
+			}
 		}
+	}
+}
+
+func TestBinarySearchInDeque(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	deque := common.NewRandomAccessDeque[int](rand.Uint64Range(0, 8))
+	comparator := func(a int, b int) int {
+		if a < b {
+			return -1
+		} else if a > b {
+			return 1
+		}
+		return 0
+	}
+
+	///////////////////////////
+	// Special case: size 0
+
+	target := rand.Int()
+	index, exact := common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.False(t, exact)
+	// Expected insertion index is 0
+	require.Equal(t, uint64(0), index)
+
+	///////////////////////////
+	// Special case: size 1
+
+	value := rand.Intn(100)
+	deque.PushBack(value)
+
+	// Look for a non-existent smaller value
+	target = value - 1
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.False(t, exact)
+	// Expected insertion index right before the only element, i.e. 0
+	require.Equal(t, uint64(0), index)
+
+	// Look for the existing value
+	target = value
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.True(t, exact)
+	require.Equal(t, uint64(0), index)
+
+	// Look for a non-existent larger value
+	target = value + 1
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.False(t, exact)
+	// Expected insertion index right after the only element, i.e. 1
+	require.Equal(t, uint64(1), index)
+
+	///////////////////////////
+	// Large size
+
+	// Search for the left-most value
+	target, err := deque.PeekFront()
+	require.NoError(t, err)
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.True(t, exact)
+	require.Equal(t, uint64(0), index)
+
+	// Search for something smaller than the left-most value
+	target = target - rand.IntRange(1, 100)
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.False(t, exact)
+	require.Equal(t, uint64(0), index)
+
+	// Search for the right-most value
+	target, err = deque.PeekBack()
+	require.NoError(t, err)
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.True(t, exact)
+	require.Equal(t, deque.Size()-1, index)
+
+	// Search for something larger than the right-most value
+	target = target + rand.IntRange(1, 100)
+	index, exact = common.BinarySearchInOrderedDeque(deque, target, comparator)
+	require.False(t, exact)
+	require.Equal(t, deque.Size(), index)
+
+	// Add a bunch of random values (in sorted order). To simplify this test, don't use contiguous values.
+	for i := 0; i < 1000; i++ {
+		previousValue, err := deque.PeekBack()
+		require.NoError(t, err)
+
+		deque.PushBack(rand.IntRange(previousValue+5, previousValue+100))
+	}
+
+	// Search for randomly chosen values
+	for i := 0; i < 10; i++ {
+		expectedIndex := rand.Uint64Range(0, deque.Size())
+		target, err := deque.Get(expectedIndex)
+		require.NoError(t, err)
+
+		foundIndex, exact := common.BinarySearchInOrderedDeque(deque, target, comparator)
+		require.True(t, exact)
+		require.Equal(t, expectedIndex, foundIndex)
+	}
+
+	// Search for values that don't exist
+	for i := 0; i < 10; i++ {
+		expectedIndex := rand.Uint64Range(1, deque.Size())
+		leftBound, err := deque.Get(expectedIndex - 1)
+		require.NoError(t, err)
+		rightBound, err := deque.Get(expectedIndex)
+		require.NoError(t, err)
+
+		// Pick a target value between leftBound and rightBound
+		target = rand.IntRange(leftBound+1, rightBound)
+
+		foundIndex, exact := common.BinarySearchInOrderedDeque(deque, target, comparator)
+		require.False(t, exact)
+		require.Equal(t, expectedIndex, foundIndex)
 	}
 }
