@@ -24,7 +24,7 @@ For each Ethereum block, the service:
 2. Extracts EigenDA certificates from relevant transactions
 3. Retrieves blob data from EigenDA proxy using certificate information
 4. Gathers Ethereum state proofs for all contracts needed for certificate verification
-5. Constructs ancestor metadata with state data for referenced blocks
+5. Retrieves state data needed for certificate verification.
 6. Packages everything into completeness and inclusion proofs for the verifier
 
 The service handles retries, caching, and rate limiting for both Ethereum and EigenDA interactions.
@@ -49,7 +49,7 @@ Completeness verification ensures all transactions belonging to the rollup names
 
 1. **Transaction Root Verification**: Computing the merkle root of all provided transactions and comparing against the Ethereum block's transaction root
 2. **Namespace Filtering**: Identifying all transactions targeting the rollup's namespace addresses (batch and proof namespaces)
-3. **Ancestry Validation**: Verifying the chain of ancestor blocks to ensure certificate reference blocks are valid
+3. **Certificate state Validation**: Verifying the states used to verify the certificates are valid
 
 #### Checking _inclusion_ of the data
 

@@ -13,10 +13,10 @@ use crate::{
     eigenda::verification::{
         blob::error::BlobVerificationError, verify_blob, verify_cert, verify_cert_recency,
     },
-    ethereum::{extract_certificate, get_ancestor},
+    ethereum::extract_certificate,
     spec::{
-        AncestorMetadata, BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
-        EthereumHash, NamespaceId, TransactionWithBlob,
+        BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash,
+        NamespaceId, TransactionWithBlob,
     },
 };
 
@@ -54,7 +54,7 @@ impl EigenDaVerifier {
     ) -> Result<(), VerifierError> {
         // Verify completeness proof, proving that all transactions in a
         // specified set are in the block
-        let (proven_transactions, proven_ancestors) = completeness_proof.verify(block_header)?;
+        let proven_transactions = completeness_proof.verify(block_header)?;
 
         // Verify that the provided `relevant_blobs` are the only ones that
         // contain rollup data, and that they are correctly build from the block
@@ -62,7 +62,6 @@ impl EigenDaVerifier {
             block_header,
             namespace,
             &proven_transactions,
-            &proven_ancestors,
             blobs_with_senders,
             self.cert_recency_window,
         )?;
@@ -118,9 +117,6 @@ impl DaVerifier for EigenDaVerifier {
 /// Errors that may occur when verifying the [`EigenDaCompletenessProof`].
 #[derive(Debug, Error)]
 pub enum CompletenessProofError {
-    #[error("Incorrect ancestry chain")]
-    IncorrectAncestry,
-
     #[error("Recomputed merkle root ({0}) doesn't match the one in header ({1})")]
     MerkleRootMismatch(B256, B256),
 
@@ -130,74 +126,38 @@ pub enum CompletenessProofError {
 
 /// A proof of completeness of the transactions in the block.
 ///
-/// This proof holds all the transactions from the block, in order. It also
-/// holds ancestors which are guaranteed to be contiguous and represent a direct
-/// ancestor chain of the block.
+/// This proof holds all the transactions from the block, in order.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EigenDaCompletenessProof {
-    ancestors: Vec<AncestorMetadata>,
     transactions: Vec<TransactionWithBlob>,
 }
 
 impl EigenDaCompletenessProof {
     /// Create a new completeness proof.
-    pub fn new(ancestors: Vec<AncestorMetadata>, transactions: Vec<TransactionWithBlob>) -> Self {
-        Self {
-            ancestors,
-            transactions,
-        }
+    pub fn new(transactions: Vec<TransactionWithBlob>) -> Self {
+        Self { transactions }
     }
 
     /// Verify that the proof holds the complete list of transactions for the
-    /// block. Also verify that the ancestors in the proof represent the correct
-    /// ancestry chain and the block is a direct descendant.
+    /// block. Also verify that the certificate states are are correct.
     ///
     /// Upon success, the proof returns a vector of transactions that were
-    /// proven to represent a whole transaction set of a specific block. It also
-    /// returns a verified ancestor chain.
+    /// proven to represent a whole transaction set of a specific block.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
-    ///   - ancestry chain is not continuous
-    ///   - the header is not a direct descendant of the ancestry chain
-    ///   - state data of the specific ancestor is incorrect
+    ///   - Certificate state data is incorrect
     ///   - recomputed transaction_root is different from the root in the header
     #[allow(clippy::result_large_err)]
     pub fn verify(
         self,
         header: &EthereumBlockHeader,
-    ) -> Result<(Vec<TransactionWithBlob>, Vec<AncestorMetadata>), CompletenessProofError> {
-        // Iterate through the ancestors and check their parent/child
-        // relationships. If the direct ancestry is not valid, the error is
-        // returned. In case when we have no ancestors the `last_ancestor` is None.
-        let last_ancestor = self.ancestors.iter().try_fold(
-            None,
-            |parent: Option<&AncestorMetadata>, maybe_child| {
-                // If there is no parent to check against, we set the ancestry as valid
-                let valid_ancestry = parent
-                    .map(|parent| parent.header.is_parent(&maybe_child.header))
-                    .unwrap_or(true);
-
-                if valid_ancestry {
-                    Ok(Some(maybe_child))
-                } else {
-                    Err(CompletenessProofError::IncorrectAncestry)
-                }
-            },
-        )?;
-
-        // Check if last ancestor is our actual parent
-        if let Some(ancestor) = last_ancestor
-            && !ancestor.header.is_parent(header)
-        {
-            return Err(CompletenessProofError::IncorrectAncestry);
-        }
-
-        // Validate the data state of the ancestor blocks
-        for ancestor in &self.ancestors {
-            if let Some(data) = &ancestor.data {
-                data.verify(ancestor.header.as_ref().state_root)?;
+    ) -> Result<Vec<TransactionWithBlob>, CompletenessProofError> {
+        // Validate the certificate states against the state_root in the header
+        for tx in &self.transactions {
+            if let Some(cert_state) = &tx.cert_state {
+                cert_state.verify(header.as_ref().state_root)?;
             }
         }
 
@@ -215,7 +175,7 @@ impl EigenDaCompletenessProof {
             ));
         }
 
-        Ok((self.transactions, self.ancestors))
+        Ok(self.transactions)
     }
 }
 
@@ -225,8 +185,8 @@ pub enum InclusionProofError {
     #[error("Transaction ({0}) in proof wasn't part of the completeness proof")]
     NotProvenTransaction(B256),
 
-    #[error("Ancestor missing, height({0})")]
-    AncestorMissing(u64),
+    #[error("Certificate state is missing for transaction ({0})")]
+    CertStateMissing(B256),
 
     #[error("Proof incomplete, some relevant transactions are missing")]
     ProofIncomplete,
@@ -325,7 +285,6 @@ impl EigenDaInclusionProof {
     fn verify_certs_and_blobs(
         &self,
         header: &EthereumBlockHeader,
-        proven_ancestors: &[AncestorMetadata],
         cert_recency_window: u64,
     ) -> impl Iterator<Item = Result<(EthereumHash, EthereumAddress, Bytes), InclusionProofError>>
     {
@@ -335,9 +294,12 @@ impl EigenDaInclusionProof {
         // transactions with the invalid certificates. If the certificate is
         // valid but the data blob is not, return a proof error. If both are
         // valid, construct a validated blob with sender.
-        self.transactions
-            .iter()
-            .flat_map(move |TransactionWithBlob { tx, blob }| {
+        self.transactions.iter().flat_map(
+            move |TransactionWithBlob {
+                      tx,
+                      blob,
+                      cert_state,
+                  }| {
                 // Skipping malformed cert
                 let cert = extract_certificate(tx)?;
 
@@ -347,14 +309,13 @@ impl EigenDaInclusionProof {
                     return None;
                 }
 
-                let Some(ancestor) =
-                    get_ancestor(proven_ancestors, header.height(), referenced_height)
-                else {
-                    return Some(Err(InclusionProofError::AncestorMissing(referenced_height)));
+                // State should be set, so we can verify the cert
+                let Some(state) = cert_state.as_ref() else {
+                    return Some(Err(InclusionProofError::CertStateMissing(*tx.hash())));
                 };
 
                 // Skipping invalid cert
-                if verify_cert(header, ancestor, &cert).is_err() {
+                if verify_cert(header, state, &cert).is_err() {
                     return None;
                 }
 
@@ -374,7 +335,8 @@ impl EigenDaInclusionProof {
                 let hash = EthereumHash::from(*tx.hash());
                 let sender = EthereumAddress::from(sender);
                 Some(Ok((hash, sender, blob.clone())))
-            })
+            },
+        )
     }
 
     /// Verify that the given `blobs_with_senders` list form a complete set of
@@ -405,15 +367,13 @@ impl EigenDaInclusionProof {
         header: &EthereumBlockHeader,
         namespace: NamespaceId,
         proven_transactions: &[TransactionWithBlob],
-        proven_ancestors: &[AncestorMetadata],
         blobs_with_senders: &[BlobWithSender],
         cert_recency_window: u64,
     ) -> Result<(), InclusionProofError> {
         // Verify transactions contained by the proof
         self.verify_transactions(namespace, proven_transactions)?;
         // Verify certificates and blobs
-        let mut valid_proven_blobs =
-            self.verify_certs_and_blobs(header, proven_ancestors, cert_recency_window);
+        let mut valid_proven_blobs = self.verify_certs_and_blobs(header, cert_recency_window);
 
         let mut blobs_with_senders = blobs_with_senders.iter();
 
@@ -513,22 +473,16 @@ mod tests {
         TransactionWithBlob {
             tx,
             blob: Some(Bytes::from(b"test blob data".to_vec())),
+            cert_state: None,
         }
-    }
-
-    fn create_test_ancestor(number: u64, parent_hash: B256) -> AncestorMetadata {
-        let header = create_test_header(number, parent_hash, B256::default());
-        AncestorMetadata { header, data: None }
     }
 
     #[test]
     fn test_completeness_proof_new() {
-        let ancestors = vec![create_test_ancestor(1, B256::default())];
         let transactions = vec![create_test_transaction_with_blob()];
 
-        let proof = EigenDaCompletenessProof::new(ancestors.clone(), transactions.clone());
+        let proof = EigenDaCompletenessProof::new(transactions.clone());
 
-        assert_eq!(proof.ancestors, ancestors);
         assert_eq!(proof.transactions, transactions);
     }
 
@@ -539,66 +493,25 @@ mod tests {
             B256::default(),
             calculate_transaction_root::<TxEnvelope>(&[]),
         );
-        let proof = EigenDaCompletenessProof::new(vec![], vec![]);
+        let proof = EigenDaCompletenessProof::new(vec![]);
 
         let result = proof.verify(&header);
         assert!(result.is_ok());
-        let (transactions, ancestors) = result.unwrap();
+        let transactions = result.unwrap();
         assert!(transactions.is_empty());
-        assert!(ancestors.is_empty());
-    }
-
-    #[test]
-    fn test_completeness_proof_verify_incorrect_ancestry() {
-        let parent_hash = B256::from_slice(&[1; 32]);
-        let wrong_parent_hash = B256::from_slice(&[2; 32]);
-
-        let ancestor1 = create_test_ancestor(1, B256::default());
-        let ancestor2 = create_test_ancestor(2, wrong_parent_hash);
-
-        let ancestors = vec![ancestor1, ancestor2];
-        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
-        let header = create_test_header(
-            3,
-            parent_hash,
-            calculate_transaction_root::<TxEnvelope>(&[]),
-        );
-
-        let result = proof.verify(&header);
-        assert!(matches!(
-            result,
-            Err(CompletenessProofError::IncorrectAncestry)
-        ));
     }
 
     #[test]
     fn test_completeness_proof_verify_merkle_root_mismatch() {
         let header = create_test_header(1, B256::default(), B256::from_slice(&[1; 32]));
         let transaction = create_test_transaction_with_blob();
-        let proof = EigenDaCompletenessProof::new(vec![], vec![transaction]);
+        let proof = EigenDaCompletenessProof::new(vec![transaction]);
 
         let result = proof.verify(&header);
         assert!(matches!(
             result,
             Err(CompletenessProofError::MerkleRootMismatch(_, _))
         ));
-    }
-
-    #[test]
-    fn test_completeness_proof_verify_valid_single_ancestor() {
-        let ancestor = create_test_ancestor(1, B256::default());
-        let ancestor_hash = ancestor.header.hash().into();
-
-        let header = create_test_header(
-            2,
-            ancestor_hash,
-            calculate_transaction_root::<TxEnvelope>(&[]),
-        );
-        let proof = EigenDaCompletenessProof::new(vec![ancestor.clone()], vec![]);
-
-        let (transactions, ancestors) = proof.verify(&header).unwrap();
-        assert!(transactions.is_empty());
-        assert_eq!(ancestors.len(), 1);
     }
 
     #[test]
@@ -641,7 +554,6 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
 
         let result = proof.verify_transactions(namespace, &[proven_tx]);
-        dbg!(&result);
         assert!(matches!(result, Err(InclusionProofError::ProofIncomplete)));
     }
 
@@ -652,50 +564,8 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
         let proof = EigenDaInclusionProof::new(vec![]);
 
-        let result = proof.verify(&header, namespace, &[], &[], &[], 100);
+        let result = proof.verify(&header, namespace, &[], &[], 100);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_completeness_proof_verify_valid_ancestry_chain() {
-        let ancestor1 = create_test_ancestor(1, B256::default());
-        let ancestor1_hash = ancestor1.header.hash().0;
-        let ancestor2 = create_test_ancestor(2, ancestor1_hash);
-        let ancestor2_hash = ancestor2.header.hash().0;
-
-        let ancestors = vec![ancestor1.clone(), ancestor2.clone()];
-        let header = create_test_header(
-            3,
-            ancestor2_hash,
-            calculate_transaction_root::<TxEnvelope>(&[]),
-        );
-        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
-
-        let result = proof.verify(&header);
-        assert!(result.is_ok());
-        let (transactions, ancestors) = result.unwrap();
-        assert!(transactions.is_empty());
-        assert_eq!(ancestors.len(), 2);
-    }
-
-    #[test]
-    fn test_completeness_proof_verify_parent_not_ancestor() {
-        let ancestor = create_test_ancestor(1, B256::default());
-        let wrong_parent_hash = B256::from_slice(&[99; 32]);
-
-        let ancestors = vec![ancestor];
-        let header = create_test_header(
-            2,
-            wrong_parent_hash,
-            calculate_transaction_root::<TxEnvelope>(&[]),
-        );
-        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
-
-        let result = proof.verify(&header);
-        assert!(matches!(
-            result,
-            Err(CompletenessProofError::IncorrectAncestry)
-        ));
     }
 
     #[test]
@@ -706,13 +576,11 @@ mod tests {
         let tx_root = calculate_transaction_root(&tx_refs);
 
         let header = create_test_header(1, B256::default(), tx_root);
-        let proof = EigenDaCompletenessProof::new(vec![], transactions.clone());
+        let proof = EigenDaCompletenessProof::new(transactions.clone());
 
         let result = proof.verify(&header);
         assert!(result.is_ok());
-        let (verified_transactions, ancestors) = result.unwrap();
-        assert_eq!(verified_transactions.len(), 1);
-        assert!(ancestors.is_empty());
+        let verified_transactions = result.unwrap();
         assert_eq!(verified_transactions, transactions);
     }
 
@@ -730,7 +598,7 @@ mod tests {
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
-        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
         assert!(matches!(
             result,
             Err(InclusionProofError::IrrelevantBlob(_))
@@ -751,7 +619,7 @@ mod tests {
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
-        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
         assert!(matches!(
             result,
             Err(InclusionProofError::IrrelevantBlob(_))
@@ -772,7 +640,7 @@ mod tests {
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
-        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
         assert!(matches!(
             result,
             Err(InclusionProofError::IrrelevantBlob(_))
@@ -793,33 +661,10 @@ mod tests {
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
-        let result = proof.verify(&header, namespace, &[], &[], &[blob_with_sender], 100);
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
         assert!(matches!(
             result,
             Err(InclusionProofError::IrrelevantBlob(_))
-        ));
-    }
-
-    #[test]
-    fn test_completeness_proof_verify_broken_ancestry_middle() {
-        let ancestor1 = create_test_ancestor(1, B256::default());
-        let ancestor1_hash = ancestor1.header.hash().0;
-        let wrong_hash = B256::from_slice(&[99; 32]);
-        let ancestor2 = create_test_ancestor(2, ancestor1_hash);
-        let ancestor3 = create_test_ancestor(3, wrong_hash);
-
-        let ancestors = vec![ancestor1, ancestor2, ancestor3];
-        let header = create_test_header(
-            4,
-            B256::default(),
-            calculate_transaction_root::<TxEnvelope>(&[]),
-        );
-        let proof = EigenDaCompletenessProof::new(ancestors, vec![]);
-
-        let result = proof.verify(&header);
-        assert!(matches!(
-            result,
-            Err(CompletenessProofError::IncorrectAncestry)
         ));
     }
 
@@ -847,20 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verifier_error_display() {
-        let completeness_error = CompletenessProofError::IncorrectAncestry;
-        let verifier_error = VerifierError::CompletenessError(completeness_error);
-
-        let error_string = format!("{}", verifier_error);
-        assert!(error_string.contains("Incorrect ancestry chain"));
-    }
-
-    #[test]
     fn test_completeness_proof_error_display() {
-        let error = CompletenessProofError::IncorrectAncestry;
-        let error_string = format!("{}", error);
-        assert_eq!(error_string, "Incorrect ancestry chain");
-
         let hash1 = B256::from_slice(&[1; 32]);
         let hash2 = B256::from_slice(&[2; 32]);
         let merkle_error = CompletenessProofError::MerkleRootMismatch(hash1, hash2);
@@ -874,10 +706,6 @@ mod tests {
         let error = InclusionProofError::NotProvenTransaction(tx_hash);
         let error_string = format!("{}", error);
         assert!(error_string.contains("wasn't part of the completeness proof"));
-
-        let missing_error = InclusionProofError::AncestorMissing(42);
-        let missing_string = format!("{}", missing_error);
-        assert!(missing_string.contains("Ancestor missing, height(42)"));
 
         let incomplete_error = InclusionProofError::ProofIncomplete;
         let incomplete_string = format!("{}", incomplete_error);

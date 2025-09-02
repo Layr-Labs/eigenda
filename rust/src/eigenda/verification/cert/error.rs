@@ -14,9 +14,6 @@ pub enum CertVerificationError {
     #[error("The recency window was missed, inclusion_height ({0}), recency height ({1})")]
     RecencyWindowMissed(u64, u64),
 
-    #[error("Ancestor data missing")]
-    AncestorDataMissing,
-
     #[error("Reference block {0} must precede current block {1}")]
     ReferenceBlockDoesNotPrecedeCurrentBlock(u32, u32),
 

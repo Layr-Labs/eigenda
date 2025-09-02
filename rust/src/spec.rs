@@ -135,18 +135,6 @@ impl FromStr for NamespaceId {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthereumBlockHeader(Header);
 
-impl EthereumBlockHeader {
-    /// The function checks if **this** [`EthereumBlockHeader`] is a direct
-    /// parent to the [`EthereumBlockHeader`] passed as an argument.
-    ///
-    /// Note: The relationship is checked by hashing this header and checking it
-    /// against the parent_hash of `maybe_child`.
-    pub fn is_parent(&self, maybe_child: &EthereumBlockHeader) -> bool {
-        let our_hash = self.0.hash_slow();
-        maybe_child.0.parent_hash == our_hash
-    }
-}
-
 impl From<Header> for EthereumBlockHeader {
     fn from(header: Header) -> Self {
         Self(header)
@@ -365,33 +353,27 @@ impl BlobReaderTrait for BlobWithSender {
     }
 }
 
-/// Struct that holds an Ethereum transaction with an actual blob
-/// persisted to EigenDA
+/// Struct that holds an Ethereum transaction. If the transaction contains a
+/// certificate. Then the [`TransactionWithBlob`] also contains a
+/// [`CertificateStateData`] used to verify the included certificate. If the
+/// certificate is valid, then it should also contain a data blob that was
+/// persisted to the EigenDA.
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
     /// The transaction that holds a certificate.
     #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
     pub tx: EthereumTxEnvelope<TxEip4844>,
+    /// Data used to verify the certificate.
+    pub cert_state: Option<CertificateStateData>,
     /// The blob persisted to the EigenDA.
     pub blob: Option<Bytes>,
 }
 
-/// Data tracked for the specific ancestor.
+/// Contains data needed to validate the certificate. It also contains proofs
+/// used to verify the data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AncestorMetadata {
-    // Header for the ancestor block.
-    pub header: EthereumBlockHeader,
-    // The data needed to validate the certificate referencing this ancestor.
-    // It's `Some` only in cases when we have a certificate that references this
-    // ancestor.
-    pub data: Option<AncestorStateData>,
-}
-
-/// Contains data needed to validate the certificate using the ancestor as the
-/// reference block. It also contains proofs used to verify the data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AncestorStateData {
+pub struct CertificateStateData {
     pub relay_registry: AccountProof,
     pub threshold_registry: AccountProof,
     pub registry_coordinator: AccountProof,
@@ -404,7 +386,7 @@ pub struct AncestorStateData {
     pub delegation_manager: AccountProof,
 }
 
-impl AncestorStateData {
+impl CertificateStateData {
     #![allow(clippy::result_large_err)]
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
         self.relay_registry.verify(state_root)?;
@@ -421,10 +403,10 @@ impl AncestorStateData {
         Ok(())
     }
 
-    /// Extract the data that this ancestor contains.
+    /// Extract the data.
     ///
     /// NOTE: The data extracted is not verified. To verify the data, ensure
-    /// that the [`AncestorStateData::verify`] is called.
+    /// that the [`CertificateStateData::verify`] is called.
     #[instrument(skip_all)]
     pub fn extract(
         &self,
