@@ -138,7 +138,7 @@ library EigenDACertVerificationLib {
         }
 
         // We validate that the cert's blob_version is valid. Otherwise the getBlobParams call below
-        // would return a codingRate=0 which will cause a divide by 0 in checkSecurityParams.
+        // would return a codingRate=0 which will cause a divide by 0 error in checkSecurityParams.
         uint16 nextBlobVersion = eigenDAThresholdRegistry.nextBlobVersion();
         if (blobInclusionInfo.blobCertificate.blobHeader.version >= nextBlobVersion) {
             return (StatusCode.INVALID_BLOB_VERSION, abi.encode(blobInclusionInfo.blobCertificate.blobHeader.version));
