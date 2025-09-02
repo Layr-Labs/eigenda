@@ -16,6 +16,7 @@ const (
 	g1FileName         = "g1.point"
 	g2FileName         = "g2.point"
 	g2TrailingFileName = "g2.trailing.point"
+	g2PowerOf2FileName = "g2.point.powerOf2"
 )
 
 // DownloadSRSFiles implements the CLI command for downloading SRS files and generating hash file
@@ -94,9 +95,33 @@ func DownloadSRSFiles(config DownloaderConfig) error {
 		return err
 	}
 
+	// Download g2.point.powerOf2 if requested
+	if config.includePowerOf2 {
+		g2PowerOf2URL, err := constructURLPath(config.baseURL, g2PowerOf2FileName)
+		if err != nil {
+			return fmt.Errorf("construct g2.point.powerOf2 URL: %w", err)
+		}
+
+		g2PowerOf2TotalSize, err := getRemoteFileSize(g2PowerOf2URL)
+		if err != nil {
+			return fmt.Errorf("get remote file size for g2.point.powerOf2: %w", err)
+		}
+		fmt.Printf("Total remote g2.point.powerOf2 size: %d bytes\n", g2PowerOf2TotalSize)
+
+		fmt.Printf("Downloading g2.point.powerOf2 (full file: %d bytes)...\n", g2PowerOf2TotalSize)
+		if err := downloadFile(
+			g2PowerOf2URL,
+			filepath.Join(config.outputDir, g2PowerOf2FileName),
+			0,
+			g2PowerOf2TotalSize-1,
+		); err != nil {
+			return err
+		}
+	}
+
 	fmt.Println("Calculating hashes for downloaded files...")
 
-	srsHashFile, err := newSrsHashFile(config.blobSizeBytes, config.outputDir)
+	srsHashFile, err := newSrsHashFile(config.blobSizeBytes, config.outputDir, config.includePowerOf2)
 	if err != nil {
 		return fmt.Errorf("new SRS hash file: %w", err)
 	}
