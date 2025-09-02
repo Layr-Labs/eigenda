@@ -44,35 +44,29 @@ library EigenDACertVerificationLib {
     /// @param blobQuorumsBitmap The bitmap of blob quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap);
 
-    /// @notice Decodes a certificate from bytes to an EigenDACertV3
-    function decodeCert(bytes calldata data) internal pure returns (CT.EigenDACertV3 memory cert) {
-        return abi.decode(data, (CT.EigenDACertV3));
-    }
-
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
-    /// @param certBytes The certificate bytes
+    /// @param daCert The EigenDA certificate
     /// @param securityThresholds The security thresholds to verify against
     /// @param requiredQuorumNumbers The required quorum numbers
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
-        bytes calldata certBytes,
+        CT.EigenDACertV3 memory daCert,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        CT.EigenDACertV3 memory cert = decodeCert(certBytes);
         checkDACertV2(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
-            cert.batchHeader,
-            cert.blobInclusionInfo,
-            cert.nonSignerStakesAndSignature,
+            daCert.batchHeader,
+            daCert.blobInclusionInfo,
+            daCert.nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers,
-            cert.signedQuorumNumbers
+            daCert.signedQuorumNumbers
         );
     }
 

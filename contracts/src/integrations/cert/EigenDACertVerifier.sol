@@ -16,6 +16,7 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 import {IEigenDASemVer} from "src/core/interfaces/IEigenDASemVer.sol";
 
 import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libraries/EigenDACertVerificationLib.sol";
+import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol";
 
 contract EigenDACertVerifier is
     IEigenDACertVerifier,
@@ -63,11 +64,26 @@ contract EigenDACertVerifier is
         _quorumNumbersRequired = initQuorumNumbersRequired;
     }
 
+    /// @notice Decodes a certificate from bytes to an EigenDACertV3
+    /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert.
+    function decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV3));
+    }
+
     /// @inheritdoc IEigenDACertVerifierBase
     /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
     /// TODO: we should return (uint8, bytes) instead and include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        try this.checkDACertReverts(abiEncodedCert) {
+        CT.EigenDACertV3 memory daCert;
+        // We try catch this here because decoding error would appear as a Panic,
+        // which we consider bugs in the try/catch for the checkDACertReverts call below.
+        try this.decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory _daCert) {
+            daCert = _daCert;
+        } catch {
+            return uint8(StatusCode.INVALID_CERT);
+        }
+
+        try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
         } catch Error(string memory /*reason*/) {
             // This matches any require(..., "string reason") revert that is pre custom errors,
@@ -95,13 +111,13 @@ contract EigenDACertVerifier is
     }
 
     /// @notice Check a DA cert's validity
-    /// @param abiEncodedCert The ABI encoded certificate. Any cert verifier should decode this ABI encoding based on the certificate version.
+    /// @param daCert The EigenDA certificate
     /// @dev This function will revert if the certificate is invalid.
-    function checkDACertReverts(bytes calldata abiEncodedCert) external view {
+    function checkDACertReverts(CT.EigenDACertV3 calldata daCert) external view {
         CertLib.checkDACert(
             _eigenDAThresholdRegistry,
             _eigenDASignatureVerifier,
-            abiEncodedCert,
+            daCert,
             _securityThresholds,
             _quorumNumbersRequired
         );
