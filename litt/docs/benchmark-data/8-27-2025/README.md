@@ -131,7 +131,7 @@ and large scale data corruption, it is very likely that the random sampling woul
 
 The intended use case of the DB requires continuous uptime over months or years. This test was only 2 weeks long, so
 it's possible that issues could arise over longer time periods. The length of this test was limited by cost 
-considerations,
+considerations.
 
 ## Read Workload
 
