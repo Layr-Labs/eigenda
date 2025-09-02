@@ -90,3 +90,43 @@ func (pv *paymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	}
 	return pricePerSymbol, nil
 }
+
+// Retrieves reservation information for multiple accounts
+func (pv *paymentVault) GetReservations(
+	ctx context.Context,
+	accountIDs []gethcommon.Address,
+) ([]*bindings.IPaymentVaultReservation, error) {
+	reservations, err := pv.paymentVaultBinding.GetReservations(&bind.CallOpts{Context: ctx}, accountIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get reservations eth call: %w", err)
+	}
+
+	result := make([]*bindings.IPaymentVaultReservation, len(reservations))
+	for i, reservation := range reservations {
+		// symbolsPerSecond > 0 indicates an active reservation
+		if reservation.SymbolsPerSecond == 0 {
+			result[i] = nil
+			continue
+		}
+
+		result[i] = &reservation
+	}
+	return result, nil
+}
+
+// Retrieves reservation information for a single account
+func (pv *paymentVault) GetReservation(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*bindings.IPaymentVaultReservation, error) {
+	reservation, err := pv.paymentVaultBinding.GetReservation(&bind.CallOpts{Context: ctx}, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation for account %v eth call: %w", accountID.Hex(), err)
+	}
+
+	if reservation.SymbolsPerSecond == 0 {
+		return nil, nil
+	}
+
+	return &reservation, nil
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -26,4 +27,12 @@ type PaymentVault interface {
 
 	// Retrieves the price per symbol (in wei) for on-demand payments.
 	GetPricePerSymbol(ctx context.Context) (uint64, error)
+
+	// Retrieves reservation information for multiple accounts.
+	// Returns reservations in same order as accountIDs. Returns nil for accounts with no reservation.
+	GetReservations(ctx context.Context, accountIDs []gethcommon.Address) ([]*bindings.IPaymentVaultReservation, error)
+
+	// Retrieves reservation information for a single account.
+	// Returns nil if the account has no reservation.
+	GetReservation(ctx context.Context, accountID gethcommon.Address) (*bindings.IPaymentVaultReservation, error)
 }
