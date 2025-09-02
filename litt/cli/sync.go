@@ -242,6 +242,12 @@ func (s *syncEngine) sync() {
 		s.logger.Errorf("Failed to create SSH session to %s@%s port %d: %v", s.user, s.host, s.port, err)
 		return
 	}
+	defer func() {
+		err = sshSession.Close()
+		if err != nil {
+			s.logger.Errorf("Failed to close SSH session: %v", err)
+		}
+	}()
 	stdout, stderr, err := sshSession.Exec(command)
 	if s.verbose {
 		s.logger.Infof("prune stdout: %s", stdout)
