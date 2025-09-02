@@ -249,6 +249,7 @@ library EigenDACertVerificationLib {
      * @notice Checks quorum signatures and builds a bitmap of confirmed quorums
      * @param signatureVerifier The signature verifier contract
      * @param batchHashRoot The hash of the batch header
+     * signedQuorumNumbers must contain the quorums that have been aggregated in nonSignerStakesAndSignature.sigma (which is the signature over the batchHashRoot).
      * @param signedQuorumNumbers The signed quorum numbers
      * @param referenceBlockNumber The reference block number
      * @param nonSignerStakesAndSignature The non-signer stakes and signature
@@ -265,6 +266,9 @@ library EigenDACertVerificationLib {
         DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (StatusCode err, bytes memory errParams, uint256 confirmedQuorumsBitmap) {
+        // TODO: check that RBN < block.number
+        // TODO: add assert that registryCoordinator.quorumCount() > signedQuorumNumbers (but we don't have access to registryCoord here..!)
+        // TODO: deal with staleStakesForbidden state
         try signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         ) returns (DATypesV1.QuorumStakeTotals memory quorumStakeTotals, bytes32) {
