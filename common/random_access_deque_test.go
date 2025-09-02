@@ -27,6 +27,14 @@ func TestRandomDequeOperations(t *testing.T) {
 
 	deque := common.NewRandomAccessDeque[int](initialSize)
 
+	// Iterating an empty deque should work as expected
+	for _, _ = range deque.Iterator() {
+		t.Fail()
+	}
+	for _, _ = range deque.ReverseIterator() {
+		t.Fail()
+	}
+
 	// Use a linked list library we trust to verify correctness. The linked list can't do O(1) index access, but we can
 	// work around that in the test code.
 	expectedData := doublylinkedlist.New()
@@ -103,8 +111,8 @@ func TestRandomDequeOperations(t *testing.T) {
 
 				expectedSize--
 			}
-		} else {
-			// ~10% chance
+		} else if choice < 0.95 {
+			// ~5% chance
 			// set a random index
 
 			if expectedSize == 0 {
@@ -127,6 +135,34 @@ func TestRandomDequeOperations(t *testing.T) {
 				expectedData.Set(index, newValue)
 
 				oldValue, err := deque.Set(uint64(index), newValue)
+				require.NoError(t, err)
+
+				require.Equal(t, expectedOldValue, oldValue)
+			}
+		} else {
+			// ~5% chance
+			// set a random index from the back
+
+			if expectedSize == 0 {
+				_, err := deque.SetFromBack(0, rand.Int())
+				require.Error(t, err)
+				_, err = deque.SetFromBack(rand.Uint64(), rand.Int())
+				require.Error(t, err)
+			} else {
+				index := 0
+				if expectedSize > 2 {
+					index = rand.Intn(int(expectedSize - 1))
+				}
+
+				newValue := rand.Int()
+
+				// This is O(2 * n)... hard to test this efficiently without a trusted reference implementation
+				// that supports O(1) index access. ;(
+				expectedOldValue, ok := expectedData.Get(index)
+				require.True(t, ok)
+				expectedData.Set(index, newValue)
+
+				oldValue, err := deque.SetFromBack(expectedSize-uint64(index)-1, newValue)
 				require.NoError(t, err)
 
 				require.Equal(t, expectedOldValue, oldValue)

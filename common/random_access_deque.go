@@ -213,7 +213,7 @@ func (s *RandomAccessDeque[T]) Set(index uint64, value T) (previousValue T, err 
 }
 
 // Set an element indexed from the last thing in the deque, replacing the existing value, which is returned.
-// Equivalent to Set(Size() - 1 - index, value). // TODO test this
+// Equivalent to Set(Size() - 1 - index, value).
 func (s *RandomAccessDeque[T]) SetFromBack(index uint64, value T) (previousValue T, err error) {
 	if index >= s.size {
 		var zero T
