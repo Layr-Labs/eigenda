@@ -269,22 +269,12 @@ library EigenDACertVerificationLib {
         // TODO: check that RBN < block.number
         // TODO: add assert that registryCoordinator.quorumCount() > signedQuorumNumbers (but we don't have access to registryCoord here..!)
         // TODO: deal with staleStakesForbidden state
+
+        DATypesV1.QuorumStakeTotals memory quorumStakeTotals;
         try signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
-        ) returns (DATypesV1.QuorumStakeTotals memory quorumStakeTotals, bytes32) {
-            confirmedQuorumsBitmap = 0;
-
-            // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
-            for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
-                if (
-                    quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
-                        >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
-                ) {
-                    confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
-                }
-            }
-
-            return (StatusCode.SUCCESS, "", confirmedQuorumsBitmap);
+        ) returns (DATypesV1.QuorumStakeTotals memory _quorumStakeTotals, bytes32) {
+            quorumStakeTotals = _quorumStakeTotals;
         } catch Error(string memory reason) {
             // This would match any require(..., "string reason") revert that is pre custom errors,
             // which earlier versions of BLSSignatureChecker used, and might still be deployed. See:
@@ -304,6 +294,19 @@ library EigenDACertVerificationLib {
             // TODO: make sure that this doesn't catch failing asserts, panics, or other low-level evm reverts like out of gas.
             return (StatusCode.SIGNATURE_VERIFICATION_CALL_REVERT, reason, 0);
         }
+
+        confirmedQuorumsBitmap = 0;
+        // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
+        for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
+            if (
+                quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
+                    >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
+            ) {
+                confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
+            }
+        }
+
+        return (StatusCode.SUCCESS, "", confirmedQuorumsBitmap);
     }
 
     /**
