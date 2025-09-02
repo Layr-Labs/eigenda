@@ -74,14 +74,18 @@ func NewReservationLedgerCache(
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
 		func(accountAddress gethcommon.Address, reservationLedger *ReservationLedger) {
-			if reservationLedger.leakyBucket.currentFillLevel > 0 {
-				// TODO: not threadsafe, fix it
-				// TODO: would it make sense to double the cache size if this happens??
+			isEmpty, err := reservationLedger.IsBucketEmpty(timeSource())
+			if err != nil {
+				logger.Errorf("failed to check if bucket is empty for account %s: %v", accountAddress.Hex(), err)
+			}
+
+			if !isEmpty {
 				logger.Errorf("evicted account %s from LRU reservation ledger cache, but the underlying leaky bucket "+
 					"wasn't empty! You must increase the ReservationLedgerCache LRU cache size", accountAddress.Hex())
-			} else {
-				logger.Infof("evicted account %s from LRU reservation ledger cache", accountAddress.Hex())
+				return
 			}
+
+			logger.Infof("evicted account %s from LRU reservation ledger cache", accountAddress.Hex())
 		},
 	)
 	if err != nil {
