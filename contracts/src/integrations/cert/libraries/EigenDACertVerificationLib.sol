@@ -67,11 +67,11 @@ library EigenDACertVerificationLib {
     enum StatusCode {
         NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
-        INCLUSION_PROOF_NOT_MULTIPLE_32, // Merkle inclusion proof not right length
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
         REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
+        INCLUSION_PROOF_NOT_MULTIPLE_32, // Merkle inclusion proof not right length
         EMPTY_BLOB_QUORUMS, // Certificate quorums are empty.
         UNORDERED_OR_DUPLICATE_QUORUMS, // Quorum numbers are not ordered, or contain duplicates
         GREATER_THAN_256_QUORUMS, // Quorum numbers exceed 256
