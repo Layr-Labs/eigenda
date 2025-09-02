@@ -147,9 +147,5 @@ func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, n
 		return nil
 	}
 
-	currentDeposit := ledger.GetTotalDeposits()
-	if currentDeposit.Cmp(newTotalDeposit) != 0 {
-		return ledger.UpdateTotalDeposits(newTotalDeposit)
-	}
-	return nil
+	return ledger.UpdateTotalDeposits(newTotalDeposit)
 }

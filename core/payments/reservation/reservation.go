@@ -64,16 +64,11 @@ func NewReservation(
 
 // Creates a Reservation from contract binding data
 func NewReservationFromBindings(bindingReservation *bindings.IPaymentVaultReservation) (*Reservation, error) {
-	quorumIDs := make([]core.QuorumID, len(bindingReservation.QuorumNumbers))
-	for i, quorumNumber := range bindingReservation.QuorumNumbers {
-		quorumIDs[i] = core.QuorumID(quorumNumber)
-	}
-
 	return NewReservation(
 		bindingReservation.SymbolsPerSecond,
 		time.Unix(int64(bindingReservation.StartTimestamp), 0),
 		time.Unix(int64(bindingReservation.EndTimestamp), 0),
-		quorumIDs,
+		bindingReservation.QuorumNumbers,
 	)
 }
 
@@ -112,4 +107,36 @@ func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 	}
 
 	return nil
+}
+
+// Checks if two Reservation instances are equal
+// TODO: write tests for this
+func (r *Reservation) Equal(other *Reservation) bool {
+	if other == nil {
+		return false
+	}
+
+	if r.symbolsPerSecond != other.symbolsPerSecond {
+		return false
+	}
+
+	if !r.startTime.Equal(other.startTime) {
+		return false
+	}
+
+	if !r.endTime.Equal(other.endTime) {
+		return false
+	}
+
+	if len(r.permittedQuorumIDs) != len(other.permittedQuorumIDs) {
+		return false
+	}
+
+	for quorumID := range r.permittedQuorumIDs {
+		if _, exists := other.permittedQuorumIDs[quorumID]; !exists {
+			return false
+		}
+	}
+
+	return true
 }

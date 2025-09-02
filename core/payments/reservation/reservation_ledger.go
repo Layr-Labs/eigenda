@@ -114,19 +114,15 @@ func (rl *ReservationLedger) IsBucketEmpty(now time.Time) (bool, error) {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	fillLevel, err := rl.leakyBucket.CheckFillLevel(now)
-	if err != nil {
-		return false, fmt.Errorf("check fill level: %w", err)
-	}
-
-	return fillLevel <= 0, nil
+	return rl.leakyBucket.CheckFillLevel(now) <= 0, nil
 }
 
 // UpdateReservation updates the reservation parameters and recreates the leaky bucket
 //
-// This method completely replaces the current reservation with a new one. The leaky bucket
-// is recreated with the new parameters, but preserves the current bucket state by starting
-// with the same fill level as the previous bucket had at the update time.
+// This method replaces the current reservation with a new one if the new reservation differs from the old.
+//
+// When an update occurs, the leaky bucket is recreated with the new parameters, but the old bucket
+// state is preserved by starting the new bucket with the same fill level as the old.
 //
 // Returns an error if:
 //   - newReservation is nil
@@ -140,6 +136,11 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
+	if rl.config.reservation.Equal(newReservation) {
+		// if the reservation didn't change, there isn't anything to do
+		return nil
+	}
+
 	// Create new config with the updated reservation
 	newConfig := ReservationLedgerConfig{
 		reservation:            *newReservation,
@@ -148,40 +149,21 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 		bucketCapacityDuration: rl.config.bucketCapacityDuration,
 	}
 
-	// Get current bucket state to preserve fill level during transition
-	// Note: We can't directly call leak() as it's private, so we'll use the current state
-	// This means there might be some imprecision if significant time has passed since the last operation
-	oldCapacity := rl.leakyBucket.bucketCapacity
-	currentFillLevel := rl.leakyBucket.currentFillLevel
+	previousFillLevel := rl.leakyBucket.CheckFillLevel(now)
 
-	// Create new leaky bucket
 	newLeakyBucket, err := NewLeakyBucket(
 		newConfig.reservation.symbolsPerSecond,
 		newConfig.bucketCapacityDuration,
-		false, // start empty - we'll set the fill level below
+		false, // fill level is explicitly set below
 		newConfig.overfillBehavior,
 		now,
 	)
 	if err != nil {
-		return fmt.Errorf("create new leaky bucket: %w", err)
+		return fmt.Errorf("new leaky bucket: %w", err)
 	}
 
-	// Preserve the fill level proportionally if the bucket capacity changed
-	newCapacity := newLeakyBucket.bucketCapacity
-	var newFillLevel float64
-	if oldCapacity > 0 {
-		// Scale the current fill level proportionally to the new capacity
-		// This maintains the same relative "fullness" of the bucket
-		newFillLevel = (currentFillLevel * newCapacity) / oldCapacity
-		if newFillLevel > newCapacity {
-			newFillLevel = newCapacity
-		}
-	}
+	newLeakyBucket.currentFillLevel = previousFillLevel
 
-	// Set the new fill level directly in the bucket
-	newLeakyBucket.currentFillLevel = newFillLevel
-
-	// Update the ledger with new config and bucket
 	rl.config = newConfig
 	rl.leakyBucket = newLeakyBucket
 

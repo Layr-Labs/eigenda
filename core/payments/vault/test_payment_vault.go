@@ -168,7 +168,10 @@ func (t *TestPaymentVault) GetReservations(
 	return result, nil
 }
 
-func (t *TestPaymentVault) GetReservation(ctx context.Context, accountID gethcommon.Address) (*bindings.IPaymentVaultReservation, error) {
+func (t *TestPaymentVault) GetReservation(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*bindings.IPaymentVaultReservation, error) {
 	if res, exists := t.reservations[accountID]; exists {
 		return res, nil
 	}

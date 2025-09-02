@@ -126,17 +126,11 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 // Gets the current fill level of the bucket
 //
 // Use a time source that includes monotonic time for best results.
-//
-// Returns the current fill level and nil on success.
-// Returns 0 and [TimeMovedBackwardError] if input time is before previous leak time (only possible if monotonic time
-// isn't used).
-func (lb *LeakyBucket) CheckFillLevel(now time.Time) (float64, error) {
-	err := lb.leak(now)
-	if err != nil {
-		return 0, fmt.Errorf("leak: %w", err)
-	}
+func (lb *LeakyBucket) CheckFillLevel(now time.Time) float64 {
+	// even if there is an error, we still want to just return whatever the current fill level is
+	_ = lb.leak(now)
 
-	return lb.currentFillLevel, nil
+	return lb.currentFillLevel
 }
 
 // Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
