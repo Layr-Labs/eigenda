@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Tracks signing rates for validators and serves queries about signing rates.
@@ -80,6 +81,9 @@ type signingRateTracker struct {
 	// The duration of each bucket. Buckets loaded from storage may have different spans, but new buckets will
 	// always have this span.
 	bucketSpan time.Duration
+
+	// Metrics about signing rates.
+	metrics *SigningRateMetrics
 }
 
 // Create a new SigningRateTracker.
@@ -91,6 +95,7 @@ func NewSigningRateTracker(
 	logger logging.Logger,
 	timespan time.Duration,
 	bucketSpan time.Duration,
+	registry *prometheus.Registry,
 ) (SigningRateTracker, error) {
 
 	store := &signingRateTracker{
@@ -98,6 +103,7 @@ func NewSigningRateTracker(
 		buckets:    common.NewRandomAccessDeque[*Bucket](0),
 		timespan:   timespan,
 		bucketSpan: bucketSpan,
+		metrics:    NewSigningRateMetrics(registry),
 	}
 
 	return store, nil
@@ -118,6 +124,7 @@ func (s *signingRateTracker) ReportSuccess(
 	bucket := s.getMutableBucket(now)
 	bucket.ReportSuccess(now, id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
+	s.metrics.ReportSuccess(id, batchSize, signingLatency)
 }
 
 // Report that a validator has failed to sign a batch of the given size.
@@ -125,6 +132,7 @@ func (s *signingRateTracker) ReportFailure(now time.Time, id core.OperatorID, ba
 	bucket := s.getMutableBucket(now)
 	bucket.ReportFailure(now, id, batchSize)
 	s.markUnflushed(bucket)
+	s.metrics.ReportFailure(id, batchSize)
 }
 
 func (s *signingRateTracker) GetValidatorSigningRate(
