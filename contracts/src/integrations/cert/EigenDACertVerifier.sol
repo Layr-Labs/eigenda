@@ -37,6 +37,17 @@ contract EigenDACertVerifier is
     uint8 internal constant MINOR_VERSION = 0;
     uint8 internal constant PATCH_VERSION = 0;
 
+    /// @notice Status codes for certificate verification results
+    enum StatusCode {
+        NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
+        SUCCESS, // Verification succeeded
+        INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
+        SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
+        BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
+        REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
+        INVALID_CERT // Certificate is invalid, due to some low level library revert having been caught
+    }
+
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
         IEigenDASignatureVerifier initEigenDASignatureVerifier,
@@ -53,15 +64,47 @@ contract EigenDACertVerifier is
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
+    /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
+    /// TODO: we should return (uint8, bytes) instead and include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        (CertLib.StatusCode status,) = CertLib.checkDACert(
+        try this.checkDACertReverts(abiEncodedCert) {
+            return uint8(StatusCode.SUCCESS);
+        } catch Error(string memory /*reason*/) {
+            // This matches any require(..., "string reason") revert that is pre custom errors,
+            // which many of our current eigenlayer-middleware dependencies like the BLSSignatureChecker still use. See:
+            // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
+            return uint8(StatusCode.INVALID_CERT);
+        } catch Panic(uint errorCode) {
+            // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.)
+            // We pattern match these only to 
+            revert(string(abi.encode("panic", errorCode)));
+        } catch (bytes memory reason) {
+            if (reason.length < 4) {
+                // We re-throw any non custom-error that was caught here. For example,
+                // low-level evm reverts such as out-of-gas don't return any data.
+                // See https://rareskills.io/post/try-catch-solidity#gdvnie-9-what-gets-returned-during-an-out-of-gas?
+                // These generally mean there is a bug in our implementation, which should be addressed by a human debugger.
+                // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
+                // a maliciously constructed cert.
+                revert(string(reason));
+            }
+            // Any revert here is from custom errors coming from a failed require(..., SomeCustomError()) statement.
+            // This mean that the cert is invalid.
+            return uint8(StatusCode.INVALID_CERT);
+        }
+    }
+
+    /// @notice Check a DA cert's validity
+    /// @param abiEncodedCert The ABI encoded certificate. Any cert verifier should decode this ABI encoding based on the certificate version.
+    /// @dev This function will revert if the certificate is invalid.
+    function checkDACertReverts(bytes calldata abiEncodedCert) external view {
+        CertLib.checkDACert(
             _eigenDAThresholdRegistry,
             _eigenDASignatureVerifier,
             abiEncodedCert,
             _securityThresholds,
             _quorumNumbersRequired
         );
-        return uint8(status);
     }
 
     /// @inheritdoc IEigenDACertVerifier

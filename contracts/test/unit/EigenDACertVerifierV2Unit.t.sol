@@ -6,6 +6,7 @@ import {EigenDACertVerificationLib as CertLib} from "src/integrations/cert/libra
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDACertTypes} from "src/integrations/cert/EigenDACertTypes.sol";
+import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -43,7 +44,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
-        assertEq(res, uint8(CertLib.StatusCode.INVALID_INCLUSION_PROOF));
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_INCLUSION_PROOF));
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
