@@ -387,7 +387,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClientV2,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 
 	if err != nil {
 		return err
@@ -417,7 +418,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 
 	return err
 }

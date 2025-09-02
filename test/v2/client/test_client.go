@@ -313,7 +313,8 @@ func NewTestClient(
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
 	}
@@ -350,7 +351,8 @@ func NewTestClient(
 		logger,
 		*validatorPayloadRetrieverConfig,
 		retrievalClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}

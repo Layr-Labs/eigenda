@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -44,8 +45,6 @@ import (
 	geth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 )
 
 // BuildManagers builds separate cert and keccak managers
@@ -317,6 +316,8 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("get registryCoordinator: %w", err)
 	}
 
+	retrievalMetrics := metrics_v2.NewRetrievalMetrics(registry)
+
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range config.ClientConfigV2.RetrieversToEnable {
 		switch retrieverType {
@@ -327,7 +328,7 @@ func buildEigenDAV2Backend(
 				return nil, fmt.Errorf("get relay registry address: %w", err)
 			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr)
+				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -337,7 +338,7 @@ func buildEigenDAV2Backend(
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
 				log, config.ClientConfigV2, ethClient,
 				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
-				kzgVerifier, kzgProver.Srs.G1)
+				kzgVerifier, kzgProver.Srs.G1, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -475,6 +476,7 @@ func buildRelayPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
 	relayRegistryAddr geth_common.Address,
+	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
 	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddr)
 	if err != nil {
@@ -487,7 +489,8 @@ func buildRelayPayloadRetriever(
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		clientConfigV2.RelayPayloadRetrieverCfg,
 		relayClient,
-		g1Srs)
+		g1Srs,
+		metrics)
 	if err != nil {
 		return nil, fmt.Errorf("new relay payload retriever: %w", err)
 	}
@@ -532,6 +535,7 @@ func buildValidatorPayloadRetriever(
 	eigenDAServiceManagerAddr geth_common.Address,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
+	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
 	ethReader, err := eth.NewReader(
 		log,
@@ -559,6 +563,7 @@ func buildValidatorPayloadRetriever(
 		clientConfigV2.ValidatorPayloadRetrieverCfg,
 		retrievalClient,
 		g1Srs,
+		metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new validator payload retriever: %w", err)

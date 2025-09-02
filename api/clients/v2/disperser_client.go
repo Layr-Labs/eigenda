@@ -357,7 +357,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	// be more aggressive with client side reversions in such cases?
 	successfulDispersal = true
 
-	c.metrics.RecordBlobSizeBytes(uint(len(data)))
+	c.metrics.RecordBlobSizeBytes(len(data))
 
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
 }
