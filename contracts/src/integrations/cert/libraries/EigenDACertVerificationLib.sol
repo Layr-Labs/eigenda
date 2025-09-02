@@ -166,7 +166,13 @@ library EigenDACertVerificationLib {
             return (err, errParams);
         }
 
-        // Verify blob quorums are a subset of confirmed quorums
+        // The different quorums are related by:
+        // requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
+        // confirmedQuorums is the list of quorums that have both been signed, and meet the threshold requirements.
+        // We now make sure that that two other relationships are true.
+
+        // Verify blobQuorums ⊆ confirmedQuorums.
+        // blobQuorums are those requested in the blobHeader dispersed by the client.
         uint256 blobQuorumsBitmap;
         (err, errParams, blobQuorumsBitmap) =
             checkBlobQuorumsSubset(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap);
@@ -174,7 +180,8 @@ library EigenDACertVerificationLib {
             return (err, errParams);
         }
 
-        // Verify required quorums are a subset of blob quorums
+        // Verify requiredQuorums ⊆ blobQuorums.
+        // requiredQuorums are those required by the CertVerifier contract.
         return checkRequiredQuorumsSubset(requiredQuorumNumbers, blobQuorumsBitmap);
     }
 
