@@ -2,12 +2,13 @@ package ondemand
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -39,13 +40,10 @@ type OnDemandLedgerCache struct {
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
 	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
-	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
-	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
-	// to add them to the cache.
-	//
-	// This lock is intentionally more restrictive than it needs to be, for the sake of simplicity. It could be
-	// converted to an account-based lock instead of a global creation lock, if it ever becomes a bottleneck.
-	ledgerCreationLock sync.Mutex
+	// is to make sure that only one caller is constructing a new OnDemandLedger at a time for a specific account.
+	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
+	// new object for the same account key, and try to add them to the cache.
+	ledgerCreationLock *common.IndexLock
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
 	vaultMonitor *OnDemandVaultMonitor
 }
@@ -88,12 +86,13 @@ func NewOnDemandLedgerCache(
 	}
 
 	ledgerCache := &OnDemandLedgerCache{
-		cache:             cache,
-		paymentVault:      paymentVault,
-		dynamoClient:      dynamoClient,
-		onDemandTableName: onDemandTableName,
-		pricePerSymbol:    new(big.Int).SetUint64(pricePerSymbol),
-		minNumSymbols:     minNumSymbols,
+		cache:              cache,
+		paymentVault:       paymentVault,
+		dynamoClient:       dynamoClient,
+		onDemandTableName:  onDemandTableName,
+		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols:      minNumSymbols,
+		ledgerCreationLock: common.NewIndexLock(256),
 	}
 
 	// Create the vault monitor with callback functions
@@ -135,9 +134,10 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 		return ledger, nil
 	}
 
-	// Slow path: acquire lock and check again
-	c.ledgerCreationLock.Lock()
-	defer c.ledgerCreationLock.Unlock()
+	// Slow path: acquire per-account lock and check again
+	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
+	c.ledgerCreationLock.Lock(accountIndex)
+	defer c.ledgerCreationLock.Unlock(accountIndex)
 
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
