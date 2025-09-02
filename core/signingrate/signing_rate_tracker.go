@@ -171,7 +171,6 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 		totalSigningRate.SignedBytes += signingRate.SignedBytes()
 		totalSigningRate.UnsignedBytes += signingRate.UnsignedBytes()
 		totalSigningRate.SigningLatency += signingRate.SigningLatency()
-		totalSigningRate.Uptime += signingRate.Uptime()
 	}
 
 	return totalSigningRate, nil
@@ -266,7 +265,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *Bucket {
 	if now.After(bucket.EndTimestamp()) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
-		bucket = NewBucket(s.logger, now, s.bucketSpan, bucket.GetOnlineValidators()...)
+		bucket = NewBucket(s.logger, now, s.bucketSpan)
 		s.buckets.PushBack(bucket)
 
 		// Now is a good time to do garbage collection. As long as bucket size remains fixed, we should be removing

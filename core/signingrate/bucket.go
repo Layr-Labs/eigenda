@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -12,13 +11,6 @@ import (
 // ValidatorStatus represents whether a validator is considered to be "up" or "down". This is from the perspective
 // of the signing rate tracker, and may not reflect the actual status of the validator.
 type ValidatorStatus bool
-
-const (
-	// The status of a validator that we consider to be "up".
-	Up ValidatorStatus = true
-	// The status of a validator that we consider to be "down".
-	Down ValidatorStatus = false
-)
 
 // TODO unit test
 // TODO: periodic logging of validators with bad signing rates
@@ -39,16 +31,6 @@ type Bucket struct {
 	// assumed that the validator has been Down for the entire duration of the bucket.
 	validatorInfo map[core.OperatorID]*SigningRate
 
-	// For each validator, whether we think that validator is Up or Down.
-	// If a validator is not present in this map, it can be assumed that it has been "down" for the entire duration
-	// of the bucket. This field is ignored when a bucket is immutable, since it's only
-	// a tool for tracking state while the bucket is being written to.
-	statusMap map[core.OperatorID]ValidatorStatus
-
-	// For each validator, the timestamp when its entry in the statusMap last changed. If a validator is not present
-	// in this map, it can be assumed that the validator has been down for the entire duration of the bucket.
-	lastStatusUpdate map[core.OperatorID]time.Time
-
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
 	cachedProtobuf *validator.SigningRateBucket
 }
@@ -59,23 +41,14 @@ func NewBucket(
 	logger logging.Logger,
 	startTime time.Time,
 	span time.Duration,
-	onlineValidators ...core.OperatorID,
 ) *Bucket {
 
 	validatorInfo := make(map[core.OperatorID]*SigningRate)
-	statusMap := make(map[core.OperatorID]ValidatorStatus)
-	lastStatusUpdate := make(map[core.OperatorID]time.Time)
 	bucket := &Bucket{
-		logger:           logger,
-		startTimestamp:   startTime,
-		endTimestamp:     startTime.Add(span),
-		validatorInfo:    validatorInfo,
-		statusMap:        statusMap,
-		lastStatusUpdate: lastStatusUpdate,
-	}
-
-	for _, id := range onlineValidators {
-		bucket.newValidator(id, startTime, Up)
+		logger:         logger,
+		startTimestamp: startTime,
+		endTimestamp:   startTime.Add(span),
+		validatorInfo:  validatorInfo,
 	}
 
 	return bucket
@@ -91,23 +64,18 @@ func NewBucketFromProto(
 	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
 
 	validatorInfo := make(map[core.OperatorID]*SigningRate)
-	statusMap := make(map[core.OperatorID]ValidatorStatus)
-	lastStatusUpdate := make(map[core.OperatorID]time.Time)
 
 	for _, info := range pb.GetValidatorSigningRates() {
 		var id core.OperatorID
 		copy(id[:], info.GetId())
 		validatorInfo[id] = NewSigningRateFromProtobuf(info)
-		lastStatusUpdate[id] = startTime
 	}
 
 	return &Bucket{
-		logger:           logger,
-		startTimestamp:   startTime,
-		endTimestamp:     endTime,
-		validatorInfo:    validatorInfo,
-		statusMap:        statusMap,
-		lastStatusUpdate: lastStatusUpdate,
+		logger:         logger,
+		startTimestamp: startTime,
+		endTimestamp:   endTime,
+		validatorInfo:  validatorInfo,
 	}
 }
 
@@ -158,10 +126,7 @@ func (b *Bucket) ReportSuccess(
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
-
-	info := b.getValidator(id, now)
-
-	b.handleStatusChange(now, id, Up)
+	info := b.getValidator(id)
 
 	info.IncrementSignedBatches()
 	info.AddSignedBytes(batchSize)
@@ -175,10 +140,7 @@ func (b *Bucket) ReportSuccess(
 //
 // If the validator was previously Up, it will be marked as Down.
 func (b *Bucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
-
-	info := b.getValidator(id, now)
-
-	b.handleStatusChange(now, id, Down)
+	info := b.getValidator(id)
 
 	info.IncrementSignedBatches()
 	info.AddUnsignedBytes(batchSize)
@@ -197,22 +159,11 @@ func (b *Bucket) EndTimestamp() time.Time {
 	return b.endTimestamp
 }
 
-// Fetch a list of validator IDs that are currently considered to be Up.
-func (b *Bucket) GetOnlineValidators() []core.OperatorID {
-	ids := make([]core.OperatorID, 0, len(b.statusMap))
-	for id, status := range b.statusMap {
-		if status == Up {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // Get the signing rate info for a validator, creating a new entry if necessary.
-func (b *Bucket) getValidator(id core.OperatorID, now time.Time) *SigningRate {
+func (b *Bucket) getValidator(id core.OperatorID) *SigningRate {
 	info, exists := b.validatorInfo[id]
 	if !exists {
-		info = b.newValidator(id, now, Down)
+		info = b.newValidator(id)
 	}
 	return info
 }
@@ -224,54 +175,8 @@ func (b *Bucket) getValidatorIfExists(id core.OperatorID) (signingRate *SigningR
 }
 
 // Add a new validator to the set of validators tracked by this bucket.
-func (b *Bucket) newValidator(
-	id core.OperatorID,
-	now time.Time,
-	status ValidatorStatus) *SigningRate {
-
+func (b *Bucket) newValidator(id core.OperatorID) *SigningRate {
 	signingRate := NewSigningRate(id)
 	b.validatorInfo[id] = signingRate
-	b.statusMap[id] = status
-	b.lastStatusUpdate[id] = now
-
 	return signingRate
-}
-
-// Handle a change in the status of a validator. This is a no-op if the status has not changed.
-func (b *Bucket) handleStatusChange(now time.Time, id core.OperatorID, newStatus ValidatorStatus) {
-	currentStatus, ok := b.statusMap[id]
-	enforce.True(ok, "validator %v not found in status map", id)
-
-	if currentStatus == newStatus {
-		// no change in status
-		return
-	}
-
-	defer func() {
-		b.lastStatusUpdate[id] = now
-	}()
-
-	if newStatus == Up {
-		// Transition from Down to Up
-		b.statusMap[id] = Up
-
-		// No need to record the amount of time the validator spent Down, since we only track Uptime.
-		// It's simple enough to infer Downtime from Uptime and the total duration of the bucket.
-		return
-	}
-
-	// Transition from Up to Down
-	b.statusMap[id] = Down
-
-	// Record the amount of time the validator spent Up.
-	lastUpdateTime, ok := b.lastStatusUpdate[id]
-	enforce.True(ok, "validator %v not found in last status map", id)
-	if now.Before(lastUpdateTime) {
-		b.logger.Errorf("clock went backwards: now=%v, lastUpdateTime=%v", now, lastUpdateTime)
-		return
-	}
-	nanosecondsUp := now.Sub(lastUpdateTime).Nanoseconds()
-	info, ok := b.validatorInfo[id]
-	enforce.True(ok, "validator %v not found in validator info map", id)
-	info.AddUptime(uint64(nanosecondsUp))
 }

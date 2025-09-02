@@ -27,11 +27,6 @@ message ValidatorSigningRate {
   // Only batches that are signed are considered (i.e. if the validator does not succeed in signing a batch,
   // the time spend in the attempt is not counted).
   uint64 signing_latency = 6;
-
-  // The number of nanoseconds that the validator is considered "up" by the disperser. When a validator successfully
-  // signs for a batch, it is considered "up" until it misses a batch. This number can be used to differentiate
-  // between a validator that occasionally misses batches, and one that is fully offline or malfunctioning.
-  uint64 uptime = 7;
 }
 
 // Signing rate information about validators during a particular time bucket.

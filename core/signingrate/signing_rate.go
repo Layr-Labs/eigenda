@@ -30,11 +30,6 @@ type SigningRate struct {
 	// the time spend in the attempt is not counted).
 	signingLatency uint64
 
-	// The number of nanoseconds that the validator is considered "up" by the disperser. When a validator successfully
-	// signs for a batch, it is considered "up" until it misses a batch. This number can be used to differentiate
-	// between a validator that occasionally misses batches, and one that is fully offline or malfunctioning.
-	uptime uint64
-
 	// A cached protobuf representation of this signing rate. Set to nil whenever the signing rate is modified.
 	cachedProtobuf *validator.ValidatorSigningRate
 }
@@ -55,7 +50,6 @@ func NewSigningRateFromProtobuf(proto *validator.ValidatorSigningRate) *SigningR
 		signedBytes:     proto.GetSignedBytes(),
 		unsignedBytes:   proto.GetUnsignedBytes(),
 		signingLatency:  proto.GetSigningLatency(),
-		uptime:          proto.GetUptime(),
 		cachedProtobuf:  proto,
 	}
 }
@@ -121,17 +115,6 @@ func (s *SigningRate) AddSigningLatency(latency uint64) {
 	s.cachedProtobuf = nil
 }
 
-// Uptime returns the number of nanoseconds that the validator is considered "up" by the disperser.
-func (s *SigningRate) Uptime() uint64 {
-	return s.uptime
-}
-
-// AddUptime adds the given number of nanoseconds to the uptime of the validator.
-func (s *SigningRate) AddUptime(uptime uint64) {
-	s.uptime += uptime
-	s.cachedProtobuf = nil
-}
-
 // ToProtobuf returns a protobuf representation of this signing rate. The protobuf is read safe even if
 // this SigningRate object is modified concurrently.
 func (s *SigningRate) ToProtobuf() *validator.ValidatorSigningRate {
@@ -146,7 +129,6 @@ func (s *SigningRate) ToProtobuf() *validator.ValidatorSigningRate {
 		SignedBytes:     s.signedBytes,
 		UnsignedBytes:   s.unsignedBytes,
 		SigningLatency:  s.signingLatency,
-		Uptime:          s.uptime,
 	}
 	return s.cachedProtobuf
 }
