@@ -33,6 +33,7 @@ contract EigenDACertVerifier is
     IEigenDASemVer
 {
     error InvalidSecurityThresholds();
+    error InvalidQuorumNumbersRequired(uint256 length);
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
 
@@ -65,6 +66,9 @@ contract EigenDACertVerifier is
     ) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
+        }
+        if (initQuorumNumbersRequired.length == 0 || initQuorumNumbersRequired.length > 256) {
+            revert InvalidQuorumNumbersRequired(initQuorumNumbersRequired.length);
         }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
