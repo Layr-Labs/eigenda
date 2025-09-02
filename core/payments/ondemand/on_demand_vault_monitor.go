@@ -98,7 +98,7 @@ func (vm *OnDemandVaultMonitor) runUpdateLoop(ctx context.Context) {
 	ticker := time.NewTicker(vm.updateInterval)
 	defer ticker.Stop()
 
-	vm.logger.Infof("Starting OnDemandPaymentVault background update thread with updateInterval %v", vm.updateInterval)
+	vm.logger.Debugf("Starting OnDemandPaymentVault background update thread with updateInterval %v", vm.updateInterval)
 
 	for {
 		select {
