@@ -234,6 +234,25 @@ func checkForOnDemandSupport(quorumsToCheck []core.QuorumID) error {
 	return nil
 }
 
+// Updates the total deposits for this ledger
+//
+// Note: this function intentionally doesn't assert that total deposits strictly increases. While that will generally
+// be the case, it could theoretically happen that a reorg could cause this value to decrease.
+func (odl *OnDemandLedger) UpdateTotalDeposits(newTotalDeposits *big.Int) error {
+	if newTotalDeposits == nil {
+		return errors.New("newTotalDeposits cannot be nil")
+	}
+	if newTotalDeposits.Sign() < 0 {
+		return fmt.Errorf("newTotalDeposits cannot be negative, got %s", newTotalDeposits.String())
+	}
+
+	odl.lock.Lock()
+	defer odl.lock.Unlock()
+
+	odl.totalDeposits.Set(newTotalDeposits)
+	return nil
+}
+
 // Computes the on demand cost of a number of symbols
 func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
 	billableSymbols := uint64(symbolCount)

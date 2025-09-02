@@ -454,6 +454,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_RESPECT_LOCKS"),
 	}
+	LittMinimumFlushIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-minimum-flush-interval"),
+		Usage:    "The minimum interval between LittDB flushes, ignored if 0",
+		Required: false,
+		Value:    100 * time.Millisecond,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_MINIMUM_FLUSH_INTERVAL"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool.",
@@ -665,6 +672,7 @@ var optionalFlags = []cli.Flag{
 	LittDBWriteCacheSizeFractionFlag,
 	LittDBReadCacheSizeFractionFlag,
 	LittDBStoragePathsFlag,
+	LittMinimumFlushIntervalFlag,
 	GetChunksHotCacheReadLimitMBFlag,
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,

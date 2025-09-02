@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -69,7 +70,8 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		g1Srs)
+		g1Srs,
+		metrics.NoopRetrievalMetrics)
 
 	require.NotNil(t, client)
 	require.NoError(t, err)

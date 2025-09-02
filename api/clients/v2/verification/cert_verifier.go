@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
 	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	certVerifierV2Binding "github.com/Layr-Labs/eigenda/contracts/bindings/v2/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -20,9 +21,10 @@ import (
 // The V3 cert verifier contract is located at:
 // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/EigenDACertVerifier.sol
 type CertVerifier struct {
-	logger          logging.Logger
-	ethClient       common.EthClient
-	addressProvider clients.CertVerifierAddressProvider
+	logger            logging.Logger
+	ethClient         common.EthClient
+	addressProvider   clients.CertVerifierAddressProvider
+	v2VerifierBinding *certVerifierV2Binding.ContractEigenDACertVerifier
 
 	// maps contract address to a ContractEigenDACertVerifierCaller object
 	verifierCallers sync.Map
@@ -41,9 +43,10 @@ func NewCertVerifier(
 	certVerifierAddressProvider clients.CertVerifierAddressProvider,
 ) (*CertVerifier, error) {
 	return &CertVerifier{
-		logger:          logger,
-		ethClient:       ethClient,
-		addressProvider: certVerifierAddressProvider,
+		logger:            logger,
+		ethClient:         ethClient,
+		addressProvider:   certVerifierAddressProvider,
+		v2VerifierBinding: certVerifierV2Binding.NewContractEigenDACertVerifier(),
 	}, nil
 }
 
@@ -61,9 +64,9 @@ func (cv *CertVerifier) CheckDACert(
 	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
 	//       with future reference timestamp change which deprecates the reference block number
 	//       used for quorum stake check-pointing.
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
+	certVerifierAddr, err := cv.addressProvider.GetCertVerifierAddress(ctx, certV3.ReferenceBlockNumber())
 	if err != nil {
-		return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
+		return &CertVerifierInternalError{Msg: "get verifier address", Err: err}
 	}
 
 	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
@@ -71,17 +74,33 @@ func (cv *CertVerifier) CheckDACert(
 		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
 	}
 
-	// TODO: determine if there's any merit in passing call options to impose better determinism and
-	// safety on the operation
-	result, err := certVerifierCaller.CheckDACert(
-		&bind.CallOpts{Context: ctx},
-		certBytes,
-	)
+	// TODO(ethenotethan): determine if there's any merit in passing call context
+	// options (e.g, block number) to impose better determinism and safety on the simulation
+	// call
+
+	callMsgBytes, err := cv.v2VerifierBinding.TryPackCheckDACert(certBytes)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "pack checkDACert call", Err: err}
+	}
+
+	// TODO(ethenoethan): understand the best mechanisms for determining if the call ran into an
+	// out-of-gas exception. Furthermore it's worth exploring whether an eth_simulateV1 rpc call
+	// would provide better granularity and coverage while ensuring existing performance guarantees
+	// see: https://www.quicknode.com/docs/ethereum/eth_simulateV1
+	returnData, err := cv.ethClient.CallContract(ctx, ethereum.CallMsg{
+		To:   &certVerifierAddr,
+		Data: callMsgBytes,
+	}, nil)
 	if err != nil {
 		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
-	// 3 - Cast result to structured enum type and check for success
+	result, err := cv.v2VerifierBinding.UnpackCheckDACert(returnData)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "unpack checkDACert return data", Err: err}
+	}
+
+	// 3 - Cast result to structured enum type and check for not success status codes
 	verifyResultCode := CheckDACertStatusCode(result)
 	if verifyResultCode == StatusNullError {
 		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
@@ -188,23 +207,6 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	cv.requiredQuorums.Store(certVerifierAddress, quorumNumbersRequired)
 
 	return quorumNumbersRequired, nil
-}
-
-// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifier that corresponds to the input reference
-// block number.
-//
-// This method caches ContractEigenDACertVerifier instances, since their construction requires acquiring a lock
-// and parsing json, and is therefore non-trivially expensive.
-func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
-	ctx context.Context,
-	referenceBlockNumber uint64,
-) (*certVerifierBinding.ContractEigenDACertVerifier, error) {
-	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("get cert verifier address: %w", err)
-	}
-
-	return cv.getVerifierCallerFromAddress(certVerifierAddress)
 }
 
 // getVerifierCallerFromAddress returns a ContractEigenDACertVerifier that corresponds to the input contract

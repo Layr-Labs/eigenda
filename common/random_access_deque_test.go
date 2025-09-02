@@ -207,6 +207,7 @@ func TestRandomDequeOperations(t *testing.T) {
 			require.Equal(t, expected, actual)
 		}
 
+		// nolint:nestif
 		if i%1000 == 0 {
 			// Once in a while, verify the entire contents of the deque. It's expensive to do this in every iteration.
 
