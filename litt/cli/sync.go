@@ -68,10 +68,10 @@ func syncCommand(ctx *cli.Context) error {
 	maxAgeSeconds := ctx.Uint64("max-age")
 	remoteLittBinary := ctx.String("litt-binary")
 
-	knownHosts := ctx.String(knownHostsFlag.Name)
-	knownHosts, err = util.SanitizePath(knownHosts)
+	knownHostsFile := ctx.String(knownHostsFileFlag.Name)
+	knownHostsFile, err = util.SanitizePath(knownHostsFile)
 	if err != nil {
-		return fmt.Errorf("invalid known hosts path: %s", knownHostsFlag.Name)
+		return fmt.Errorf("invalid known hosts path: %s", knownHostsFileFlag.Name)
 	}
 
 	return newSyncEngine(
@@ -83,7 +83,7 @@ func syncCommand(ctx *cli.Context) error {
 		host,
 		port,
 		keyPath,
-		knownHosts,
+		knownHostsFile,
 		deleteAfterTransfer,
 		true,
 		threads,
@@ -105,7 +105,7 @@ type syncEngine struct {
 	host                string
 	port                uint64
 	keyPath             string
-	knownHosts          string
+	knownHostsFile      string
 	deleteAfterTransfer bool
 	fsync               bool
 	threads             uint64
@@ -126,7 +126,7 @@ func newSyncEngine(
 	host string,
 	port uint64,
 	keyPath string,
-	knownHosts string,
+	knownHostsFile string,
 	deleteAfterTransfer bool,
 	fsync bool,
 	threads uint64,
@@ -149,7 +149,7 @@ func newSyncEngine(
 		host:                host,
 		port:                port,
 		keyPath:             keyPath,
-		knownHosts:          knownHosts,
+		knownHostsFile:      knownHostsFile,
 		deleteAfterTransfer: deleteAfterTransfer,
 		fsync:               fsync,
 		threads:             threads,
@@ -208,7 +208,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
-		s.knownHosts,
+		s.knownHostsFile,
 		s.deleteAfterTransfer,
 		s.fsync,
 		s.threads,
@@ -236,7 +236,7 @@ func (s *syncEngine) sync() {
 		s.host,
 		s.port,
 		s.keyPath,
-		s.knownHosts,
+		s.knownHostsFile,
 		s.verbose)
 	if err != nil {
 		s.logger.Errorf("Failed to create SSH session to %s@%s port %d: %v", s.user, s.host, s.port, err)

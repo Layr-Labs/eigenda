@@ -23,7 +23,7 @@ var (
 		Aliases: []string{"f"},
 		Usage:   "Force the operation without prompting for confirmation.",
 	}
-	knownHostsFlag = &cli.StringSliceFlag{
+	knownHostsFileFlag = &cli.StringSliceFlag{
 		Name:     "known-hosts",
 		Aliases:  []string{"k"},
 		Usage:    "Path to a file containing known hosts for SSH connections.",
@@ -179,7 +179,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "SSH port to connect to the remote host.",
 						Value:   22,
 					},
-					knownHostsFlag,
+					knownHostsFileFlag,
 					&cli.StringFlag{
 						Name:    "key",
 						Aliases: []string{"i"},
@@ -246,7 +246,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Path to the SSH private key file for authentication.",
 						Value:   "~/.ssh/id_rsa",
 					},
-					knownHostsFlag,
+					knownHostsFileFlag,
 					&cli.BoolFlag{
 						Name:    "no-gc",
 						Aliases: []string{"n"},
