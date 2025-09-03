@@ -27,7 +27,7 @@ ABIGEN_V1_CONTRACTS=(
   "DelegationManager"
   "BitmapUtils"
   "OperatorStateRetriever"
-  "RegistryCoordinator"
+  "EigenDARegistryCoordinator"
   "BLSApkRegistry"
   "IIndexRegistry"
   "StakeRegistry"
