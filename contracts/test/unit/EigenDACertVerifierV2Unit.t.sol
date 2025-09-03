@@ -44,7 +44,9 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
         uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
-        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_INCLUSION_PROOF));
+        // TODO: after we modify checkDACert to return bytes, check that accompanying bytes are error signature
+        // for InvalidInclusionProof error.
+        assertEq(res, uint8(EigenDACertVerifier.StatusCode.INVALID_CERT));
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
