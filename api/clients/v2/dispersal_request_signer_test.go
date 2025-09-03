@@ -32,12 +32,11 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3, kms"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"kms"},
+		})
 		require.NoError(t, err)
 	}
 }

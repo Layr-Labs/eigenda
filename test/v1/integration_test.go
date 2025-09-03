@@ -244,16 +244,11 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	if deployLocalStack {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb", "kms"}
-		cfg.Port = localStackPort
-		cfg.Host = "0.0.0.0"
-
 		var err error
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localStackPort,
+		})
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())

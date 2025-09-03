@@ -624,12 +624,11 @@ func setup() {
 	}
 
 	if deployLocalStack {
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+		})
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -638,7 +637,7 @@ func setup() {
 		// Deploy resources using the testbed DeployResources function
 		logger := testutils.GetLogger()
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,

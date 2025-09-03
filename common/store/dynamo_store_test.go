@@ -48,12 +48,13 @@ func setup(_ *testing.M) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		// Create LocalStack configuration
-		lsConfig := testbed.DefaultLocalStackConfig()
-
 		// Start LocalStack container
 		var err error
-		localStackContainer, err = testbed.NewLocalStackContainer(ctx, lsConfig)
+		localStackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localStackPort,
+			Services:       []string{"dynamodb"},
+		})
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())

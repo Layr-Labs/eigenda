@@ -145,19 +145,18 @@ func localstack(ctx *cli.Context) error {
 	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cfg := testbed.DefaultLocalStackConfig()
-	cfg.Services = []string{"s3", "dynamodb", "kms"}
-	cfg.Port = ctx.String(localstackFlagName)
-	cfg.Host = "0.0.0.0"
-
-	_, err := testbed.NewLocalStackContainer(context, cfg)
+	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       ctx.String(localstackFlagName),
+		Services:       []string{"s3", "dynamodb", "kms"},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
 	if ctx.Bool(deployResourcesFlagName) {
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", ctx.String(localstackFlagName)),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: metadataTableNameV2,

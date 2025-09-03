@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
@@ -21,10 +22,12 @@ import (
 )
 
 var (
-	templateName string
-	testName     string
-	graphUrl     string
-	testConfig   *deploy.Config
+	localstackContainer *testbed.LocalStackContainer
+	localstackPort      = "4570"
+	templateName        string
+	testName            string
+	graphUrl            string
+	testConfig          *deploy.Config
 )
 
 func init() {
@@ -50,6 +53,17 @@ func setup() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
+
+	fmt.Println("Starting localstack")
+	var err error
+	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"dynamodb"},
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Starting anvil")
 	testConfig.StartAnvil()
@@ -79,6 +93,9 @@ func setup() {
 }
 
 func teardown() {
+	fmt.Println("Stopping localstack")
+	_ = localstackContainer.Terminate(context.Background())
+
 	fmt.Println("Stopping anvil")
 	testConfig.StopAnvil()
 

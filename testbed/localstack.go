@@ -13,47 +13,55 @@ import (
 
 const (
 	LocalStackImage = "localstack/localstack:latest"
+	LocalStackPort  = "4566/tcp"
 )
 
-// LocalStackConfig configures the LocalStack AWS simulation container
-type LocalStackConfig struct {
-	Enabled  bool     `json:"enabled"`
-	Services []string `json:"services"` // AWS services to enable: s3, dynamodb, kms, secretsmanager
-	Region   string   `json:"region"`
-	Debug    bool     `json:"debug"`
-	Port     string   `json:"port"` // Optional: specify a fixed host port (e.g., "4570")
-	Host     string   `json:"host"` // Optional: specify a fixed host (e.g., "0.0.0.0")
+// LocalStackOptions configures the LocalStack AWS simulation container
+type LocalStackOptions struct {
+	ExposeHostPort bool     // If true, binds container port 4566 to host port (default: 4570)
+	HostPort       string   // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
+	Services       []string // AWS services to enable (defaults to s3, dynamodb, kms)
+	Region         string   // AWS region (defaults to us-east-1)
+	Debug          bool     // Enable debug logging
 }
 
 // LocalStackContainer wraps the official LocalStack testcontainers module
 type LocalStackContainer struct {
 	container *localstack.LocalStackContainer
-	config    LocalStackConfig
+	options   LocalStackOptions
 	endpoint  string
 }
 
-// NewLocalStackContainer creates and starts a new LocalStack container
-func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*LocalStackContainer, error) {
-	if !config.Enabled {
-		return nil, fmt.Errorf("localstack container is disabled in config")
+// NewLocalStackContainer creates and starts a new LocalStack container with default options
+func NewLocalStackContainer(ctx context.Context) (*LocalStackContainer, error) {
+	return NewLocalStackContainerWithOptions(ctx, LocalStackOptions{})
+}
+
+// NewLocalStackContainerWithOptions creates and starts a new LocalStack container with custom options
+func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptions) (*LocalStackContainer, error) {
+	// Set defaults
+	if len(opts.Services) == 0 {
+		opts.Services = []string{"s3", "dynamodb", "kms"}
+	}
+	if opts.Region == "" {
+		opts.Region = "us-east-1"
 	}
 
-	var opts []testcontainers.ContainerCustomizer
-	env := buildLocalStackEnv(config)
-	opts = append(opts, testcontainers.WithEnv(env))
+	var customizers []testcontainers.ContainerCustomizer
+	env := buildLocalStackEnv(opts)
+	customizers = append(customizers, testcontainers.WithEnv(env))
 
-	// If port is specified, bind to specific host port
-	if config.Port != "" {
-		hostIP := "0.0.0.0"
-		hostPort := config.Port
-		if config.Host != "" {
-			hostIP = config.Host
+	// Add host port binding if requested
+	if opts.ExposeHostPort {
+		hostPort := opts.HostPort
+		if hostPort == "" {
+			hostPort = "4570" // Default to 4570 for LocalStack (similar to Anvil using 8545)
 		}
-		opts = append(opts, testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+		customizers = append(customizers, testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
 			hc.PortBindings = nat.PortMap{
-				"4566/tcp": []nat.PortBinding{
+				LocalStackPort: []nat.PortBinding{
 					{
-						HostIP:   hostIP,
+						HostIP:   "0.0.0.0",
 						HostPort: hostPort,
 					},
 				},
@@ -62,34 +70,27 @@ func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*Loca
 	}
 
 	// Start the container using the official module
-	container, err := localstack.Run(ctx, LocalStackImage, opts...)
+	container, err := localstack.Run(ctx, LocalStackImage, customizers...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
-	// Get the endpoint immediately after container starts
-	var endpoint string
-	if config.Port != "" && config.Host != "" {
-		// Use the specified host and port for consistency
-		endpoint = fmt.Sprintf("http://%s:%s", config.Host, config.Port)
-	} else {
-		// Use dynamically assigned host and port
-		host, err := container.Host(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get host: %w", err)
-		}
-
-		mappedPort, err := container.MappedPort(ctx, "4566")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get mapped port: %w", err)
-		}
-
-		endpoint = fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
+	// Get the endpoint
+	host, err := container.Host(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
+
+	mappedPort, err := container.MappedPort(ctx, "4566")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mapped port: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 
 	return &LocalStackContainer{
 		container: container,
-		config:    config,
+		options:   opts,
 		endpoint:  endpoint,
 	}, nil
 }
@@ -106,12 +107,12 @@ func (ls *LocalStackContainer) InternalEndpoint() string {
 
 // Region returns the configured AWS region
 func (ls *LocalStackContainer) Region() string {
-	return ls.config.Region
+	return ls.options.Region
 }
 
 // Services returns the list of enabled AWS services
 func (ls *LocalStackContainer) Services() []string {
-	return ls.config.Services
+	return ls.options.Services
 }
 
 // GetServiceEndpoint returns the endpoint for a specific AWS service
@@ -125,7 +126,7 @@ func (ls *LocalStackContainer) GetAWSConfig() map[string]string {
 	return map[string]string{
 		"AWS_ACCESS_KEY_ID":     "test",
 		"AWS_SECRET_ACCESS_KEY": "test",
-		"AWS_DEFAULT_REGION":    ls.config.Region,
+		"AWS_DEFAULT_REGION":    ls.options.Region,
 		"AWS_ENDPOINT_URL":      ls.Endpoint(),
 	}
 }
@@ -142,15 +143,15 @@ func (ls *LocalStackContainer) Terminate(ctx context.Context) error {
 }
 
 // buildLocalStackEnv constructs environment variables for LocalStack
-func buildLocalStackEnv(config LocalStackConfig) map[string]string {
+func buildLocalStackEnv(opts LocalStackOptions) map[string]string {
 	env := map[string]string{
-		"SERVICES":            strings.Join(config.Services, ","),
-		"DEFAULT_REGION":      config.Region,
+		"SERVICES":            strings.Join(opts.Services, ","),
+		"DEFAULT_REGION":      opts.Region,
 		"HOSTNAME_EXTERNAL":   "localhost",
 		"DISABLE_CORS_CHECKS": "1",
 	}
 
-	if config.Debug {
+	if opts.Debug {
 		env["DEBUG"] = "1"
 		env["LS_LOG"] = "debug"
 	}
@@ -158,11 +159,13 @@ func buildLocalStackEnv(config LocalStackConfig) map[string]string {
 	return env
 }
 
-// DefaultLocalStackConfig returns a default LocalStack configuration
-func DefaultLocalStackConfig() LocalStackConfig {
-	return LocalStackConfig{
-		Enabled:  true,
-		Services: []string{"s3", "dynamodb", "kms", "secretsmanager"},
+// Deprecated: Use LocalStackOptions instead
+type LocalStackConfig = LocalStackOptions
+
+// Deprecated: Use NewLocalStackContainerWithOptions instead
+func DefaultLocalStackConfig() LocalStackOptions {
+	return LocalStackOptions{
+		Services: []string{"s3", "dynamodb", "kms"},
 		Region:   "us-east-1",
 		Debug:    false,
 	}

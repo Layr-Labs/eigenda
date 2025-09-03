@@ -127,17 +127,14 @@ var _ = BeforeSuite(func() {
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-
-			cfg := testbed.DefaultLocalStackConfig()
-			cfg.Services = []string{"s3", "dynamodb", "kms"}
-			cfg.Port = localStackPort
-			cfg.Host = "0.0.0.0"
-
-			localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+				ExposeHostPort: true,
+				HostPort:       localStackPort,
+			})
 			Expect(err).To(BeNil())
 
 			deployConfig := testbed.DeployResourcesConfig{
-				LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 				MetadataTableName:   metadataTableName,
 				BucketTableName:     bucketTableName,
 				V2MetadataTableName: metadataTableNameV2,
