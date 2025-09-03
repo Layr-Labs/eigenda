@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/testbed"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
@@ -40,10 +41,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/peer"
@@ -53,8 +52,7 @@ var (
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
-	dockertestPool      *dockertest.Pool
-	dockertestResource  *dockertest.Resource
+	localstackContainer *testbed.LocalStackContainer
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
@@ -64,7 +62,7 @@ var (
 	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
-	localStackPort   = "4569"
+	localstackPort   = "4569"
 	allowlistFile    *os.File
 	testMaxBlobSize  = 2 * 1024 * 1024
 	mockCommitment   = encoding.BlobCommitments{}
@@ -618,22 +616,36 @@ func setup() {
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	if deployLocalStack {
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
 		}
 
-	}
+		// Deploy resources using the testbed DeployResources function
+		deployConfig := testbed.DeployResourcesConfig{
+			LocalStackEndpoint:  localstackContainer.Endpoint(),
+			MetadataTableName:   metadataTableName,
+			BucketTableName:     bucketTableName,
+			V2MetadataTableName: v2MetadataTableName,
+		}
 
-	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName, v2MetadataTableName)
-	if err != nil {
-		teardown()
-		panic("failed to deploy AWS resources")
+		err = testbed.DeployResources(context.Background(), deployConfig)
+		if err != nil {
+			teardown()
+			panic("failed to deploy AWS resources: " + err.Error())
+		}
 	}
 
 	transactor := &mock.MockWriter{}
@@ -710,8 +722,11 @@ func setup() {
 }
 
 func teardown() {
-	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack && localstackContainer != nil {
+		ctx := context.Background()
+		if err := localstackContainer.Terminate(ctx); err != nil {
+			fmt.Printf("Failed to terminate localstack container: %v\n", err)
+		}
 	}
 	if allowlistFile != nil {
 		_ = os.Remove(allowlistFile.Name())
@@ -725,7 +740,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 	s3Client, err := s3.NewClient(context.Background(), awsConfig, logger)
 	if err != nil {
