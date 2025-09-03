@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
@@ -36,6 +37,7 @@ func init() {
 }
 
 var (
+	anvilContainer                 *testbed.AnvilContainer
 	testConfig                     *deploy.Config
 	templateName                   string
 	testName                       string
@@ -57,7 +59,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
 	rootPath := "../../../"
 
 	if testName == "" {
@@ -78,7 +80,13 @@ func setup(m *testing.M) {
 	}
 
 	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
+	var err error
+	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Deploying experiment")
 	testConfig.DeployExperiment()
@@ -87,8 +95,7 @@ func setup(m *testing.M) {
 func teardown() {
 	if testConfig != nil {
 		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
-		testConfig.StopGraphNode()
+		_ = anvilContainer.Terminate(context.Background())
 	}
 }
 
