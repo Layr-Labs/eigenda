@@ -60,7 +60,7 @@ func pushCommand(ctx *cli.Context) error {
 		return fmt.Errorf("invalid key path: %s", keyPath)
 	}
 
-	knownHosts := ctx.String(knownHostsFlag.Name)
+	knownHosts := ctx.String(knownHostsFileFlag.Name)
 
 	deleteAfterTransfer := !ctx.Bool("no-gc")
 	threads := ctx.Uint64("threads")
