@@ -84,6 +84,8 @@ contract EigenDACertVerifier is
 
     /// @inheritdoc IEigenDACertVerifierBase
     /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
+    /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will 
+    /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
     /// TODO: we should return (uint8, bytes) instead and include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
         CT.EigenDACertV3 memory daCert;
