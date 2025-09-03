@@ -124,7 +124,7 @@ func TestInfrequentFlushes(t *testing.T) {
 	require.True(t, duration < minimumFlushTime,
 		"Expected third flush to take less than %v, took %v", minimumFlushTime, duration)
 	require.Equal(t, uint64(3), flushCount.Load())
-	
+
 	ok, _ := errorMonitor.IsOk()
 	require.True(t, ok)
 	errorMonitor.Shutdown()
