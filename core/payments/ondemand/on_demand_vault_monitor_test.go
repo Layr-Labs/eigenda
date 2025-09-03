@@ -43,7 +43,8 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 
 // tests basic vault monitor behavior
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	logger := testutils.GetLogger()
 	updateInterval := 1 * time.Millisecond
 	address := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -67,7 +68,6 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 		func() []gethcommon.Address { return []gethcommon.Address{address} },
 		updateTotalDeposit,
 	)
-	defer monitor.Stop()
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 

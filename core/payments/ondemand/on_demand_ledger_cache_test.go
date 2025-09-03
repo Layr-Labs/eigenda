@@ -44,7 +44,8 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 }
 
 func TestLRUCacheEvictionAndReload(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tableName := createPaymentTable(t, "TestLRUCacheEvictionAndReload")
 	defer deleteTable(t, tableName)
 
@@ -70,7 +71,6 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
-	defer ledgerCache.Stop()
 
 	// Get ledger for account A and perform a debit
 	ledgerA, err := ledgerCache.GetOrCreate(ctx, accountA)

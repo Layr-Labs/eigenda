@@ -190,10 +190,3 @@ func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, n
 	}
 	return nil
 }
-
-// Stop stops the background vault monitoring thread
-func (c *OnDemandLedgerCache) Stop() {
-	if c.vaultMonitor != nil {
-		c.vaultMonitor.Stop()
-	}
-}

@@ -63,10 +63,3 @@ func (pv *OnDemandPaymentValidator) Debit(
 
 	return nil
 }
-
-// Stop stops the background vault monitoring thread
-func (pv *OnDemandPaymentValidator) Stop() {
-	if pv.ledgerCache != nil {
-		pv.ledgerCache.Stop()
-	}
-}

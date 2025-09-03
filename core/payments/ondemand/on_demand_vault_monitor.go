@@ -23,8 +23,6 @@ type OnDemandVaultMonitor struct {
 	getAccountsToUpdate func() []gethcommon.Address
 	// function to update the total deposit for an account
 	updateTotalDeposit func(accountID gethcommon.Address, newTotalDeposit *big.Int) error
-	// cancels the periodic update routine
-	cancelFunc context.CancelFunc
 }
 
 // Creates a new OnDemandVaultMonitor and starts a routine to periodically check for updates
@@ -40,23 +38,16 @@ func NewOnDemandVaultMonitor(
 		return nil, errors.New("updateInterval must be > 0")
 	}
 
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-
 	monitor := &OnDemandVaultMonitor{
 		logger:              logger,
 		paymentVault:        paymentVault,
 		updateInterval:      updateInterval,
 		getAccountsToUpdate: getAccountsToUpdate,
 		updateTotalDeposit:  updateTotalDeposit,
-		cancelFunc:          cancel,
 	}
 
-	go monitor.runUpdateLoop(ctxWithCancel)
+	go monitor.runUpdateLoop(ctx)
 	return monitor, nil
-}
-
-func (vm *OnDemandVaultMonitor) Stop() {
-	vm.cancelFunc()
 }
 
 // Fetches the latest state from the PaymentVault, and updates the ledgers with it
