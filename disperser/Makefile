@@ -57,9 +57,9 @@ run_encoder: build_encoder
 	./bin/encoder \
 	--disperser-encoder.grpc-port 34000 \
   --disperser-encoder.metrics-http-port 9109 \
-  --kzg.g1-path ../inabox/resources/kzg/g1.point \
-  --kzg.g2-path ../inabox/resources/kzg/g2.point \
-  --kzg.cache-path ../inabox/resources/kzg/SRSTables \
+  --kzg.g1-path ../resources/srs/g1.point \
+  --kzg.g2-path ../resources/srs/g2.point \
+  --kzg.cache-path ../resources/srs/SRSTables \
   --kzg.srs-order 3000 \
   --kzg.num-workers 12 \
   --disperser-encoder.log.level-std debug \
