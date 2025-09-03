@@ -40,8 +40,6 @@ func NewRandomAccessDeque[T any](initialCapacity uint64) *RandomAccessDeque[T] {
 
 	return &RandomAccessDeque[T]{
 		data:            make([]T, initialCapacity),
-		startIndex:      0,
-		endIndex:        0,
 		initialCapacity: initialCapacity,
 	}
 }
@@ -269,7 +267,9 @@ func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) (func(yield func(uint6
 			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
-			yield(i, value)
+			if !yield(i, value) {
+				return
+			}
 		}
 	}, nil
 }
@@ -277,7 +277,7 @@ func (s *RandomAccessDeque[T]) IteratorFrom(index uint64) (func(yield func(uint6
 // Get an iterator over the elements in the deque, from back to front. It is not safe to get an iterator,
 // modify the deque, and then use the iterator again.
 //
-// // O(1) to call this method, O(1) per iteration step.
+// O(1) to call this method, O(1) per iteration step.
 func (s *RandomAccessDeque[T]) ReverseIterator() func(yield func(uint64, T) bool) {
 	if s.size == 0 {
 		return func(yield func(uint64, T) bool) {
@@ -306,7 +306,9 @@ func (s *RandomAccessDeque[T]) ReverseIteratorFrom(index uint64) (func(yield fun
 			value, err := s.Get(i)
 			enforce.NilError(err, "Get failed, did you modify the deque while iterating?!?")
 
-			yield(i, value)
+			if !yield(i, value) {
+				return
+			}
 		}
 	}, nil
 }
@@ -374,7 +376,11 @@ func BinarySearchInOrderedDeque[V any, T any](
 			//      value is here
 			//  |-----------------------|-----------------------|
 			// left                   target                  right
-			right = targetIndex - 1
+			if targetIndex == 0 {
+				right = 0
+			} else {
+				right = targetIndex - 1
+			}
 		} else {
 			// value > target, search right half
 			//
