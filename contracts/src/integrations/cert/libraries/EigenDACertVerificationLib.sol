@@ -44,13 +44,19 @@ library EigenDACertVerificationLib {
     /// @param blobQuorumsBitmap The bitmap of blob quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap);
 
+    /// @notice Thrown when the blob version is invalid (doesn't exist in the ThresholdRegistry contract)
+    /// @param blobVersion The invalid blob version
+    /// @param nextBlobVersion The next blob version (valid versions need to be less than this number)
+    error InvalidBlobVersion(uint16 blobVersion, uint16 nextBlobVersion);
+
     /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
     /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
     /// @param eigenDAThresholdRegistry The threshold registry contract
     /// @param eigenDASignatureVerifier The signature verifier contract
     /// @param daCert The EigenDA certificate
     /// @param securityThresholds The security thresholds to verify against
-    /// @param requiredQuorumNumbers The required quorum numbers
+    /// Callers should ensure that the requiredQuorumNumbers passed are non-empty if needed.
+    /// @param requiredQuorumNumbers The required quorum numbers. Can be empty if not required.
     function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier eigenDASignatureVerifier,
@@ -94,7 +100,8 @@ library EigenDACertVerificationLib {
         checkBlobInclusion(batchHeader, blobInclusionInfo);
 
         checkSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
+            eigenDAThresholdRegistry,
+            blobInclusionInfo.blobCertificate.blobHeader.version,
             securityThresholds
         );
 
@@ -139,13 +146,30 @@ library EigenDACertVerificationLib {
 
     /**
      * @notice Checks the security parameters for a blob cert
-     * @param blobParams The blob params to verify
+     * @param eigenDAThresholdRegistry The threshold registry contract
+     * @param blobVersion The blob version to verify
      * @param securityThresholds The security thresholds to verify against
+     * @dev Checks the invariant `numChunks * (1 - 100/gamma/codingRate) >= maxNumOperators`
      */
     function checkSecurityParams(
-        DATypesV1.VersionedBlobParams memory blobParams,
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        uint16 blobVersion,
         DATypesV1.SecurityThresholds memory securityThresholds
-    ) internal pure {
+    ) internal view {
+        // We validate that the cert's blob_version is valid. Otherwise the getBlobParams call below
+        // would return a codingRate=0 which will cause a divide by 0 error below.
+        uint16 nextBlobVersion = eigenDAThresholdRegistry.nextBlobVersion();
+        if (blobVersion >= nextBlobVersion) {
+            revert InvalidBlobVersion(blobVersion, nextBlobVersion);
+        }
+        DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVersion);
+
+        // In order to prevent divide by 0 panic, we need gamma > 0 and codingRate > 0.
+        // We assume here that the CertVerifier constructor checked that confirmationThreshold > adversaryThreshold.
+        // We also checked above that the blobParams are from a valid version.
+        // Thus, dividing by codingRate below will only panic if codingRate of a proper initialized version is 0,
+        // which is either a configuration bug, or a malicious attack. In both cases, we cannot tell whether the
+        // cert is valid or invalid, so it is ok to panic and let social consensus intervene (put a human debugger in the loop).
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
