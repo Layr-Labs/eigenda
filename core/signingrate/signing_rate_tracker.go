@@ -70,10 +70,10 @@ type signingRateTracker struct {
 	logger logging.Logger
 
 	// Signing data storage, split up into buckets for each time interval. Buckets are stored in chronological order.
-	buckets *common.RandomAccessDeque[*Bucket]
+	buckets *common.RandomAccessDeque[*SigningRateBucket]
 
 	// Buckets that have not yet been flushed to storage. Keyed by the bucket's start time.
-	unflushedBuckets map[time.Time]*Bucket
+	unflushedBuckets map[time.Time]*SigningRateBucket
 
 	// The length of time to keep loaded in memory.
 	timespan time.Duration
@@ -100,7 +100,7 @@ func NewSigningRateTracker(
 
 	store := &signingRateTracker{
 		logger:     logger,
-		buckets:    common.NewRandomAccessDeque[*Bucket](0),
+		buckets:    common.NewRandomAccessDeque[*SigningRateBucket](0),
 		timespan:   timespan,
 		bucketSpan: bucketSpan,
 		metrics:    NewSigningRateMetrics(registry),
@@ -141,7 +141,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
 
-	comparator := func(timestamp time.Time, bucket *Bucket) int {
+	comparator := func(timestamp time.Time, bucket *SigningRateBucket) int {
 		if bucket.startTimestamp.Before(timestamp) {
 			return -1
 		} else if bucket.startTimestamp.After(timestamp) {
@@ -259,7 +259,7 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 }
 
 // Get the bucket that is currently being written to. This is always the latest bucket.
-func (s *signingRateTracker) getMutableBucket(now time.Time) *Bucket {
+func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket {
 
 	if s.buckets.Size() == 0 {
 		// Create the first bucket.
@@ -304,6 +304,6 @@ func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
 }
 
 // Mark a bucket as needing to be flushed to storage.
-func (s *signingRateTracker) markUnflushed(bucket *Bucket) {
+func (s *signingRateTracker) markUnflushed(bucket *SigningRateBucket) {
 	s.unflushedBuckets[bucket.startTimestamp] = bucket
 }

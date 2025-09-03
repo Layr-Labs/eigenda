@@ -8,17 +8,10 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// ValidatorStatus represents whether a validator is considered to be "up" or "down". This is from the perspective
-// of the signing rate tracker, and may not reflect the actual status of the validator.
-type ValidatorStatus bool
-
-// TODO unit test
-// TODO: periodic logging of validators with bad signing rates
-
-// A Bucket for tracking signing rates. A bucket holds information about signing rates for a specific time interval.
+// A SigningRateBucket for tracking signing rates. A bucket holds information about signing rates for a specific time interval.
 // Roughly correlates to the validator.SigningRateBucket protobuf message, but also includes extra data structures
 // to help with tracking state while the bucket is being written to.
-type Bucket struct {
+type SigningRateBucket struct {
 	logger logging.Logger
 
 	// The timestamp when data could have first been added to this bucket.
@@ -29,22 +22,22 @@ type Bucket struct {
 
 	// Signing rate info for each validator in this bucket. If a validator is not present in this map, it can be
 	// assumed that the validator has been Down for the entire duration of the bucket.
-	validatorInfo map[core.OperatorID]*SigningRate
+	validatorInfo map[core.OperatorID]*ValidatorSigningRate
 
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
 	cachedProtobuf *validator.SigningRateBucket
 }
 
-// Create a new empty Bucket. If provided with validator IDs, then those validators will be initialized as Up.
+// Create a new empty SigningRateBucket. If provided with validator IDs, then those validators will be initialized as Up.
 // Any validator not provided to the constructor will be assumed to be Down until it is reported as Up.
 func NewBucket(
 	logger logging.Logger,
 	startTime time.Time,
 	span time.Duration,
-) *Bucket {
+) *SigningRateBucket {
 
-	validatorInfo := make(map[core.OperatorID]*SigningRate)
-	bucket := &Bucket{
+	validatorInfo := make(map[core.OperatorID]*ValidatorSigningRate)
+	bucket := &SigningRateBucket{
 		logger:         logger,
 		startTimestamp: startTime,
 		endTimestamp:   startTime.Add(span),
@@ -54,16 +47,16 @@ func NewBucket(
 	return bucket
 }
 
-// Parse a Bucket from its protobuf representation.
+// Parse a SigningRateBucket from its protobuf representation.
 func NewBucketFromProto(
 	logger logging.Logger,
 	pb *validator.SigningRateBucket,
-) *Bucket {
+) *SigningRateBucket {
 
 	startTime := time.Unix(int64(pb.GetStartTimestamp()), 0)
 	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
 
-	validatorInfo := make(map[core.OperatorID]*SigningRate)
+	validatorInfo := make(map[core.OperatorID]*ValidatorSigningRate)
 
 	for _, info := range pb.GetValidatorSigningRates() {
 		var id core.OperatorID
@@ -71,7 +64,7 @@ func NewBucketFromProto(
 		validatorInfo[id] = NewSigningRateFromProtobuf(info)
 	}
 
-	return &Bucket{
+	return &SigningRateBucket{
 		logger:         logger,
 		startTimestamp: startTime,
 		endTimestamp:   endTime,
@@ -79,13 +72,13 @@ func NewBucketFromProto(
 	}
 }
 
-// Convert this Bucket to its protobuf representation.
+// Convert this SigningRateBucket to its protobuf representation.
 //
 // If now is nil, then the EndTimestamp will be set to the last time that data was added to this bucket.
 // If now is non-nil, then the EndTimestamp will be set to now. In general, a non-nil value for now should
 // be provided when getting information about a bucket that is currently being written to, and nil should
 // be provided when getting information about bucket in the past that is no longer being written to.
-func (b *Bucket) ToProtobuf(now time.Time) *validator.SigningRateBucket {
+func (b *SigningRateBucket) ToProtobuf(now time.Time) *validator.SigningRateBucket {
 	if b.cachedProtobuf != nil {
 		return b.cachedProtobuf
 	}
@@ -120,7 +113,7 @@ func (b *Bucket) ToProtobuf(now time.Time) *validator.SigningRateBucket {
 // Report that a validator has successfully signed a batch of the given size.
 //
 // If the validator was previously Down, it will be marked as Up.
-func (b *Bucket) ReportSuccess(
+func (b *SigningRateBucket) ReportSuccess(
 	now time.Time,
 	id core.OperatorID,
 	batchSize uint64,
@@ -139,7 +132,7 @@ func (b *Bucket) ReportSuccess(
 // Report that a validator has failed to sign a batch of the given size.
 //
 // If the validator was previously Up, it will be marked as Down.
-func (b *Bucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
+func (b *SigningRateBucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
 	info := b.getValidator(id)
 
 	info.IncrementSignedBatches()
@@ -150,17 +143,17 @@ func (b *Bucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint
 }
 
 // Get the start timestamp of this bucket.
-func (b *Bucket) StartTimestamp() time.Time {
+func (b *SigningRateBucket) StartTimestamp() time.Time {
 	return b.startTimestamp
 }
 
 // Get the end timestamp of this bucket.
-func (b *Bucket) EndTimestamp() time.Time {
+func (b *SigningRateBucket) EndTimestamp() time.Time {
 	return b.endTimestamp
 }
 
 // Get the signing rate info for a validator, creating a new entry if necessary.
-func (b *Bucket) getValidator(id core.OperatorID) *SigningRate {
+func (b *SigningRateBucket) getValidator(id core.OperatorID) *ValidatorSigningRate {
 	info, exists := b.validatorInfo[id]
 	if !exists {
 		info = b.newValidator(id)
@@ -169,13 +162,13 @@ func (b *Bucket) getValidator(id core.OperatorID) *SigningRate {
 }
 
 // Get the signing rate info for a validator if it is registered, or nil if it is not.
-func (b *Bucket) getValidatorIfExists(id core.OperatorID) (signingRate *SigningRate, exists bool) {
+func (b *SigningRateBucket) getValidatorIfExists(id core.OperatorID) (signingRate *ValidatorSigningRate, exists bool) {
 	signingRate, exists = b.validatorInfo[id]
 	return signingRate, exists
 }
 
 // Add a new validator to the set of validators tracked by this bucket.
-func (b *Bucket) newValidator(id core.OperatorID) *SigningRate {
+func (b *SigningRateBucket) newValidator(id core.OperatorID) *ValidatorSigningRate {
 	signingRate := NewSigningRate(id)
 	b.validatorInfo[id] = signingRate
 	return signingRate

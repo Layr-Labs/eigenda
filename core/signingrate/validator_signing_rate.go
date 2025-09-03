@@ -5,11 +5,11 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// SigningRate records information about validator signing rate during a time period.
+// ValidatorSigningRate records information about validator signing rate during a time period.
 //
 // This struct mirrors the validator.ValidatorSigningRate protobuf message. Although it's generally not good practice
 // to mirror protobufs when not necessary, in this case it is needed in order to attach methods to the object.
-type SigningRate struct {
+type ValidatorSigningRate struct {
 	// The unique identifier of the validator (i.e. the operator ID).
 	id core.OperatorID
 
@@ -34,16 +34,16 @@ type SigningRate struct {
 	cachedProtobuf *validator.ValidatorSigningRate
 }
 
-// NewSigningRate creates a new SigningRate instance.
-func NewSigningRate(id core.OperatorID) *SigningRate {
-	return &SigningRate{
+// NewSigningRate creates a new ValidatorSigningRate instance.
+func NewSigningRate(id core.OperatorID) *ValidatorSigningRate {
+	return &ValidatorSigningRate{
 		id: id,
 	}
 }
 
-// NewSigningRateFromProtobuf creates a new SigningRate instance from a protobuf representation.
-func NewSigningRateFromProtobuf(proto *validator.ValidatorSigningRate) *SigningRate {
-	return &SigningRate{
+// NewSigningRateFromProtobuf creates a new ValidatorSigningRate instance from a protobuf representation.
+func NewSigningRateFromProtobuf(proto *validator.ValidatorSigningRate) *ValidatorSigningRate {
+	return &ValidatorSigningRate{
 		id:              (core.OperatorID)(proto.GetId()),
 		signedBatches:   proto.GetSignedBatches(),
 		unsignedBatches: proto.GetUnsignedBatches(),
@@ -55,69 +55,69 @@ func NewSigningRateFromProtobuf(proto *validator.ValidatorSigningRate) *SigningR
 }
 
 // ID returns the unique identifier of the validator.
-func (s *SigningRate) ID() core.OperatorID {
+func (s *ValidatorSigningRate) ID() core.OperatorID {
 	return s.id
 }
 
 // SignedBatches returns the number of batches signed by the validator during the period.
-func (s *SigningRate) SignedBatches() uint64 {
+func (s *ValidatorSigningRate) SignedBatches() uint64 {
 	return s.signedBatches
 }
 
 // Add one to the number of batches signed by the validator during the period.
-func (s *SigningRate) IncrementSignedBatches() {
+func (s *ValidatorSigningRate) IncrementSignedBatches() {
 	s.signedBatches++
 	s.cachedProtobuf = nil
 }
 
 // UnsignedBatches returns the number of batches unsigned by the validator during the period.
-func (s *SigningRate) UnsignedBatches() uint64 {
+func (s *ValidatorSigningRate) UnsignedBatches() uint64 {
 	return s.unsignedBatches
 }
 
 // Add one to the number of batches unsigned by the validator during the period.
-func (s *SigningRate) IncrementUnsignedBatches() {
+func (s *ValidatorSigningRate) IncrementUnsignedBatches() {
 	s.unsignedBatches++
 	s.cachedProtobuf = nil
 }
 
 // SignedBytes returns the total number of bytes signed during the period.
-func (s *SigningRate) SignedBytes() uint64 {
+func (s *ValidatorSigningRate) SignedBytes() uint64 {
 	return s.signedBytes
 }
 
 // AddSignedBytes adds the given number of bytes to the total number of bytes signed during the period.
-func (s *SigningRate) AddSignedBytes(bytes uint64) {
+func (s *ValidatorSigningRate) AddSignedBytes(bytes uint64) {
 	s.signedBytes += bytes
 	s.cachedProtobuf = nil
 }
 
 // UnsignedBytes returns the total number of bytes unsigned during the period.
-func (s *SigningRate) UnsignedBytes() uint64 {
+func (s *ValidatorSigningRate) UnsignedBytes() uint64 {
 	return s.unsignedBytes
 }
 
-func (s *SigningRate) AddUnsignedBytes(bytes uint64) {
+func (s *ValidatorSigningRate) AddUnsignedBytes(bytes uint64) {
 	s.unsignedBytes += bytes
 	s.cachedProtobuf = nil
 }
 
 // SigningLatency returns the sum of the time spent by the validator waiting for signing requests to be processed,
 // in nanoseconds.
-func (s *SigningRate) SigningLatency() uint64 {
+func (s *ValidatorSigningRate) SigningLatency() uint64 {
 	return s.signingLatency
 }
 
 // AddSigningLatency adds the given number of nanoseconds to the sum of the time spent by the validator waiting
 // for signing requests to be processed.
-func (s *SigningRate) AddSigningLatency(latency uint64) {
+func (s *ValidatorSigningRate) AddSigningLatency(latency uint64) {
 	s.signingLatency += latency
 	s.cachedProtobuf = nil
 }
 
 // ToProtobuf returns a protobuf representation of this signing rate. The protobuf is read safe even if
-// this SigningRate object is modified concurrently.
-func (s *SigningRate) ToProtobuf() *validator.ValidatorSigningRate {
+// this ValidatorSigningRate object is modified concurrently.
+func (s *ValidatorSigningRate) ToProtobuf() *validator.ValidatorSigningRate {
 	if s.cachedProtobuf != nil {
 		return s.cachedProtobuf
 	}
