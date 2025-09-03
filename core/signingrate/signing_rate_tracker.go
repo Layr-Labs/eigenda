@@ -28,13 +28,13 @@ type SigningRateTracker interface {
 	// Data is returned in chronological order.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetSigningRateDump(startTime time.Time, now time.Time) ([]*validator.SigningRateBucket, error)
+	GetSigningRateDump(startTime time.Time) ([]*validator.SigningRateBucket, error)
 
 	// Returns a list of buckets that have not yet been flushed to persistent storage.
 	// Buckets are in chronological order.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetUnflushedBuckets(time time.Time) ([]*validator.SigningRateBucket, error)
+	GetUnflushedBuckets() ([]*validator.SigningRateBucket, error)
 
 	// Report that a validator has successfully signed a batch of the given size.
 	ReportSuccess(
@@ -122,7 +122,7 @@ func (s *signingRateTracker) ReportSuccess(
 ) {
 
 	bucket := s.getMutableBucket(now)
-	bucket.ReportSuccess(now, id, batchSize, signingLatency)
+	bucket.ReportSuccess(id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
 	s.metrics.ReportSuccess(id, batchSize, signingLatency)
 }
@@ -130,7 +130,7 @@ func (s *signingRateTracker) ReportSuccess(
 // Report that a validator has failed to sign a batch of the given size.
 func (s *signingRateTracker) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
 	bucket := s.getMutableBucket(now)
-	bucket.ReportFailure(now, id, batchSize)
+	bucket.ReportFailure(id, batchSize)
 	s.markUnflushed(bucket)
 	s.metrics.ReportFailure(id, batchSize)
 }
@@ -186,7 +186,6 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 
 func (s *signingRateTracker) GetSigningRateDump(
 	startTime time.Time,
-	now time.Time,
 ) ([]*validator.SigningRateBucket, error) {
 
 	buckets := make([]*validator.SigningRateBucket, 0, s.buckets.Size())
@@ -200,7 +199,7 @@ func (s *signingRateTracker) GetSigningRateDump(
 			// This bucket is too old, skip it and stop iterating.
 			break
 		}
-		buckets = append(buckets, bucket.ToProtobuf(now))
+		buckets = append(buckets, bucket.ToProtobuf())
 	}
 
 	// We iterated in reverse, so reverse again to get chronological ordering.
@@ -211,11 +210,11 @@ func (s *signingRateTracker) GetSigningRateDump(
 	return buckets, nil
 }
 
-func (s *signingRateTracker) GetUnflushedBuckets(now time.Time) ([]*validator.SigningRateBucket, error) {
+func (s *signingRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBucket, error) {
 	buckets := make([]*validator.SigningRateBucket, 0, len(s.unflushedBuckets))
 
 	for _, bucket := range s.unflushedBuckets {
-		proto := bucket.ToProtobuf(now)
+		proto := bucket.ToProtobuf()
 		buckets = append(buckets, proto)
 	}
 
@@ -225,7 +224,7 @@ func (s *signingRateTracker) GetUnflushedBuckets(now time.Time) ([]*validator.Si
 }
 
 func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
-	convertedBucket := NewBucketFromProto(s.logger, bucket)
+	convertedBucket := NewBucketFromProto(bucket)
 
 	if s.buckets.Size() == 0 {
 		s.buckets.PushBack(convertedBucket)
@@ -265,7 +264,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 
 	if s.buckets.Size() == 0 {
 		// Create the first bucket.
-		newBucket := NewBucket(s.logger, now, s.bucketSpan)
+		newBucket := NewBucket(now, s.bucketSpan)
 		s.buckets.PushBack(newBucket)
 	}
 
@@ -275,7 +274,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 	if now.After(bucket.EndTimestamp()) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
-		bucket = NewBucket(s.logger, now, s.bucketSpan)
+		bucket = NewBucket(now, s.bucketSpan)
 		s.buckets.PushBack(bucket)
 
 		// Now is a good time to do garbage collection. As long as bucket size remains fixed, we should be removing

@@ -49,7 +49,6 @@ type getValidatorSigningRateResponse struct {
 // a request to invoke GetSigningRateDump
 type getSigningRateDumpRequest struct {
 	startTime  time.Time
-	now        time.Time
 	responseCh chan *getSigningRateDumpResponse
 }
 
@@ -61,7 +60,6 @@ type getSigningRateDumpResponse struct {
 
 // a request to invoke GetUnflushedBuckets
 type getUnflushedBucketsRequest struct {
-	now        time.Time
 	responseCh chan *getUnflushedBucketsResponse
 }
 
@@ -138,12 +136,10 @@ func (t *threadsafeSigningRateTracker) GetValidatorSigningRate(
 
 func (t *threadsafeSigningRateTracker) GetSigningRateDump(
 	startTime time.Time,
-	now time.Time,
 ) ([]*validator.SigningRateBucket, error) {
 
 	request := &getSigningRateDumpRequest{
 		startTime:  startTime,
-		now:        now,
 		responseCh: make(chan *getSigningRateDumpResponse, 1),
 	}
 
@@ -163,10 +159,9 @@ func (t *threadsafeSigningRateTracker) GetSigningRateDump(
 	}
 }
 
-func (t *threadsafeSigningRateTracker) GetUnflushedBuckets(now time.Time) ([]*validator.SigningRateBucket, error) {
+func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBucket, error) {
 
 	request := &getUnflushedBucketsRequest{
-		now:        now,
 		responseCh: make(chan *getUnflushedBucketsResponse, 1),
 	}
 
@@ -268,7 +263,7 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 				}
 
 			case *getSigningRateDumpRequest:
-				result, err := t.base.GetSigningRateDump(typedRequest.startTime, typedRequest.now)
+				result, err := t.base.GetSigningRateDump(typedRequest.startTime)
 				response := &getSigningRateDumpResponse{
 					result: result,
 					err:    err,
@@ -283,7 +278,7 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 				t.base.UpdateLastBucket(typedRequest.now, typedRequest.bucket)
 
 			case *getUnflushedBucketsRequest:
-				result, err := t.base.GetUnflushedBuckets(typedRequest.now)
+				result, err := t.base.GetUnflushedBuckets()
 				response := &getUnflushedBucketsResponse{
 					result: result,
 					err:    err,
