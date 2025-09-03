@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/urfave/cli/v2"
 )
 
@@ -139,14 +142,27 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 }
 
 func localstack(ctx *cli.Context) error {
+	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	pool, _, err := deploy.StartDockertestWithLocalstackContainer(ctx.String(localstackFlagName))
+	cfg := testbed.DefaultLocalStackConfig()
+	cfg.Services = []string{"s3", "dynamodb", "kms"}
+	cfg.Port = ctx.String(localstackFlagName)
+	cfg.Host = "0.0.0.0"
+
+	localstackContainer, err := testbed.NewLocalStackContainer(context, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
 	if ctx.Bool(deployResourcesFlagName) {
-		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName, metadataTableNameV2)
+		deployConfig := testbed.DeployResourcesConfig{
+			LocalStackEndpoint:  localstackContainer.Endpoint(),
+			MetadataTableName:   metadataTableName,
+			BucketTableName:     bucketTableName,
+			V2MetadataTableName: metadataTableNameV2,
+		}
+		return testbed.DeployResources(context, deployConfig)
 	}
 
 	return nil

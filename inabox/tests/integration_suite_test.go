@@ -31,6 +31,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -38,7 +39,6 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/ory/dockertest/v3"
 )
 
 /*
@@ -53,10 +53,9 @@ var (
 	testName          string
 	inMemoryBlobStore bool
 
-	testConfig         *deploy.Config
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	localStackPort     string
+	testConfig          *deploy.Config
+	localstackContainer *testbed.LocalStackContainer
+	localStackPort      string
 
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
@@ -118,12 +117,24 @@ var _ = BeforeSuite(func() {
 		if !inMemoryBlobStore {
 			fmt.Println("Using shared Blob Store")
 			localStackPort = "4570"
-			pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-			Expect(err).To(BeNil())
-			dockertestPool = pool
-			dockertestResource = resource
+			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelFunc()
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
+			cfg := testbed.DefaultLocalStackConfig()
+			cfg.Services = []string{"s3", "dynamodb", "kms"}
+			cfg.Port = localStackPort
+			cfg.Host = "0.0.0.0"
+
+			localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+			Expect(err).To(BeNil())
+
+			deployConfig := testbed.DeployResourcesConfig{
+				LocalStackEndpoint:  localstackContainer.Endpoint(),
+				MetadataTableName:   metadataTableName,
+				BucketTableName:     bucketTableName,
+				V2MetadataTableName: metadataTableNameV2,
+			}
+			err = testbed.DeployResources(ctx, deployConfig)
 			Expect(err).To(BeNil())
 		} else {
 			fmt.Println("Using in-memory Blob Store")
@@ -438,6 +449,9 @@ var _ = AfterSuite(func() {
 		fmt.Println("Stopping graph node")
 		testConfig.StopGraphNode()
 
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		if localstackContainer != nil {
+			fmt.Println("Stopping localstack container")
+			localstackContainer.Terminate(context.Background())
+		}
 	}
 })

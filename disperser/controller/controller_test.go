@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {

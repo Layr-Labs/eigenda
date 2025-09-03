@@ -27,9 +27,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ory/dockertest/v3"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -79,9 +78,8 @@ var (
 	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
 	handleBatchLivenessChan = make(chan time.Time, 1)
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	clientConfig       commonaws.ClientConfig
+	localstackContainer *testbed.LocalStackContainer
+	clientConfig        commonaws.ClientConfig
 
 	deployLocalStack bool
 	localStackPort   = "4565"
@@ -247,8 +245,16 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	if deployLocalStack {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb", "kms"}
+		cfg.Port = localStackPort
+		cfg.Host = "0.0.0.0"
+
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -716,7 +722,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 }
 
 func teardown() {
-	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack && localstackContainer != nil {
+		localstackContainer.Terminate(context.Background())
 	}
 }
