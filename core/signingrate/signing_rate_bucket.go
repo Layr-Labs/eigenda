@@ -1,6 +1,7 @@
 package signingrate
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -25,18 +26,26 @@ type SigningRateBucket struct {
 	cachedProtobuf *validator.SigningRateBucket
 }
 
-// Create a new empty SigningRateBucket. If provided with validator IDs, then those validators will be initialized as Up.
-// Any validator not provided to the constructor will be assumed to be Down until it is reported as Up.
-func NewSigningRateBucket(startTime time.Time, span time.Duration) *SigningRateBucket {
+// Create a new empty SigningRateBucket.
+func NewSigningRateBucket(startTime time.Time, span time.Duration) (*SigningRateBucket, error) {
+	startTimestamp, err := bucketStartTimestamp(span, startTime)
+	if err != nil {
+		return nil, fmt.Errorf("error creating signing rate bucket: %w", err)
+	}
+
+	endTimestamp, err := bucketEndTimestamp(span, startTime)
+	if err != nil {
+		return nil, fmt.Errorf("error creating signing rate bucket: %w", err)
+	}
 
 	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 	bucket := &SigningRateBucket{
-		startTimestamp: startTime,
-		endTimestamp:   startTime.Add(span),
+		startTimestamp: startTimestamp,
+		endTimestamp:   endTimestamp,
 		validatorInfo:  validatorInfo,
 	}
 
-	return bucket
+	return bucket, nil
 }
 
 // Parse a SigningRateBucket from its protobuf representation.
@@ -121,14 +130,19 @@ func (b *SigningRateBucket) ReportFailure(id core.OperatorID, batchSize uint64) 
 	b.cachedProtobuf = nil
 }
 
-// Get the start timestamp of this bucket.
+// Get the start timestamp of this bucket (inclusive).
 func (b *SigningRateBucket) StartTimestamp() time.Time {
 	return b.startTimestamp
 }
 
-// Get the end timestamp of this bucket.
+// Get the end timestamp of this bucket (exclusive).
 func (b *SigningRateBucket) EndTimestamp() time.Time {
 	return b.endTimestamp
+}
+
+// Returns true if the given time is contained within this bucket. Start time is inclusive, end time is exclusive.
+func (b *SigningRateBucket) Contains(t time.Time) bool {
+	return !t.Before(b.startTimestamp) && t.Before(b.endTimestamp)
 }
 
 // Get the signing rate info for a validator, creating a new entry if necessary. Is not a deep copy.

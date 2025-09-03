@@ -50,7 +50,8 @@ func TestProtoConversion(t *testing.T) {
 	})
 
 	span := rand.DurationRange(time.Second, time.Hour)
-	bucket := NewSigningRateBucket(rand.Time(), span)
+	bucket, err := NewSigningRateBucket(rand.Time(), span)
+	require.NoError(t, err)
 
 	for _, validatorID := range validatorIDs {
 		bucket.validatorInfo[validatorID] = &validator.ValidatorSigningRate{
@@ -122,7 +123,8 @@ func TestReporting(t *testing.T) {
 	}
 
 	span := rand.DurationRange(time.Second, time.Hour)
-	bucket := NewSigningRateBucket(rand.Time(), span)
+	bucket, err := NewSigningRateBucket(rand.Time(), span)
+	require.NoError(t, err)
 
 	// Simulate a bunch of random reports.
 	for i := 0; i < 10_000; i++ {
@@ -170,3 +172,7 @@ func TestCloneValidatorSigningRate(t *testing.T) {
 	clone := cloneValidatorSigningRate(signingRate)
 	require.True(t, areSigningRatesEqual(signingRate, clone))
 }
+
+// TODO
+//  - timestamp alignment
+//  - contains

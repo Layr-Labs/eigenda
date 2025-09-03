@@ -60,7 +60,6 @@ func validateTracker(
 			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 		}
 	}
-
 }
 
 func randomOperationsTest(
@@ -92,7 +91,9 @@ func randomOperationsTest(
 	startTime := rand.Time()
 	endTime := startTime.Add(testSpan)
 	currentTime := startTime
-	expectedBuckets = append(expectedBuckets, NewSigningRateBucket(startTime, bucketSpan))
+	bucket, err := NewSigningRateBucket(startTime, bucketSpan)
+	require.NoError(t, err)
+	expectedBuckets = append(expectedBuckets, bucket)
 
 	// verify before we've added any data
 	validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
@@ -103,9 +104,10 @@ func randomOperationsTest(
 		validatorID := validatorIDs[validatorIndex]
 
 		expectedBucket := expectedBuckets[len(expectedBuckets)-1]
-		if !currentTime.Before(expectedBucket.endTimestamp) {
+		if !expectedBucket.Contains(currentTime) {
 			// We've moved into a new bucket.
-			expectedBucket = NewSigningRateBucket(currentTime, bucketSpan)
+			expectedBucket, err = NewSigningRateBucket(currentTime, bucketSpan)
+			require.NoError(t, err)
 			expectedBuckets = append(expectedBuckets, expectedBucket)
 		}
 
@@ -144,7 +146,8 @@ func TestRandomOperations(t *testing.T) {
 
 	t.Run("signingRateTracker", func(t *testing.T) {
 		t.Parallel()
-		tracker := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
 		randomOperationsTest(t, tracker, timeSpan, bucketSpan)
 	})
 

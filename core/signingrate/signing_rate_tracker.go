@@ -1,6 +1,7 @@
 package signingrate
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -101,7 +102,11 @@ func NewSigningRateTracker(
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
 	registry *prometheus.Registry,
-) SigningRateTracker {
+) (SigningRateTracker, error) {
+
+	if timeSpan.Seconds() < 1 {
+		return nil, fmt.Errorf("time span must be at least one second, got %s", timeSpan)
+	}
 
 	store := &signingRateTracker{
 		logger:           logger,
@@ -112,7 +117,7 @@ func NewSigningRateTracker(
 		metrics:          NewSigningRateMetrics(registry),
 	}
 
-	return store
+	return store, nil
 }
 
 func (s *signingRateTracker) Close() {
@@ -265,22 +270,26 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 	s.garbageCollectBuckets(now)
 }
 
+// TODO write a test that checks what happens when time goes backwards
+
 // Get the bucket that is currently being written to. This is always the latest bucket.
 func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket {
 
 	if s.buckets.Size() == 0 {
 		// Create the first bucket.
-		newBucket := NewSigningRateBucket(now, s.bucketSpan)
+		newBucket, err := NewSigningRateBucket(now, s.bucketSpan)
+		enforce.NilError(err, "should be impossible with a valid bucket span")
 		s.buckets.PushBack(newBucket)
 	}
 
 	bucket, err := s.buckets.PeekBack()
 	enforce.NilError(err, "should be impossible with a non-empty deque")
 
-	if !now.Before(bucket.EndTimestamp()) {
+	if !bucket.Contains(now) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
-		bucket = NewSigningRateBucket(now, s.bucketSpan)
+		bucket, err = NewSigningRateBucket(now, s.bucketSpan)
+		enforce.NilError(err, "should be impossible with a valid bucket span")
 		s.buckets.PushBack(bucket)
 
 		// Now is a good time to do garbage collection. As long as bucket size remains fixed, we should be removing
