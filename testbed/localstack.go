@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
 )
@@ -19,6 +21,8 @@ type LocalStackConfig struct {
 	Services []string `json:"services"` // AWS services to enable: s3, dynamodb, kms, secretsmanager
 	Region   string   `json:"region"`
 	Debug    bool     `json:"debug"`
+	Port     string   `json:"port"`     // Optional: specify a fixed host port (e.g., "4570")
+	Host     string   `json:"host"`     // Optional: specify a fixed host (e.g., "0.0.0.0")
 }
 
 // LocalStackContainer wraps the official LocalStack testcontainers module
@@ -38,6 +42,25 @@ func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*Loca
 	env := buildLocalStackEnv(config)
 	opts = append(opts, testcontainers.WithEnv(env))
 
+	// If port is specified, bind to specific host port
+	if config.Port != "" {
+		hostIP := "0.0.0.0"
+		hostPort := config.Port
+		if config.Host != "" {
+			hostIP = config.Host
+		}
+		opts = append(opts, testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+			hc.PortBindings = nat.PortMap{
+				"4566/tcp": []nat.PortBinding{
+					{
+						HostIP:   hostIP,
+						HostPort: hostPort,
+					},
+				},
+			}
+		}))
+	}
+
 	// Start the container using the official module
 	container, err := localstack.Run(ctx, LocalStackImage, opts...)
 	if err != nil {
@@ -45,17 +68,24 @@ func NewLocalStackContainer(ctx context.Context, config LocalStackConfig) (*Loca
 	}
 
 	// Get the endpoint immediately after container starts
-	host, err := container.Host(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get host: %w", err)
-	}
+	var endpoint string
+	if config.Port != "" && config.Host != "" {
+		// Use the specified host and port for consistency
+		endpoint = fmt.Sprintf("http://%s:%s", config.Host, config.Port)
+	} else {
+		// Use dynamically assigned host and port
+		host, err := container.Host(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get host: %w", err)
+		}
 
-	mappedPort, err := container.MappedPort(ctx, "4566")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get mapped port: %w", err)
-	}
+		mappedPort, err := container.MappedPort(ctx, "4566")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mapped port: %w", err)
+		}
 
-	endpoint := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
+		endpoint = fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
+	}
 
 	return &LocalStackContainer{
 		container: container,

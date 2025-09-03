@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -18,194 +17,203 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	bucket = "eigen-test"
-)
-
 var (
-	// Shared LocalStack container and client for all tests
-	sharedLocalStackContainer *testbed.LocalStackContainer
-	sharedLocalStackClient    s3.Client
+	localstackContainer *testbed.LocalStackContainer
 )
 
-// TestMain sets up and tears down shared resources for all tests
-func TestMain(m *testing.M) {
-	deployLocalStack := os.Getenv("DEPLOY_LOCALSTACK") != "false"
+const (
+	bucket         = "eigen-test"
+	localstackPort = "4570"
+)
+
+type clientBuilder struct {
+	// This method is called at the beginning of the test.
+	start func() error
+	// This method is called to build a new client.
+	build func() (s3.Client, error)
+	// This method is called at the end of the test when all operations are done.
+	finish func() error
+}
+
+var clientBuilders = []*clientBuilder{
+	{
+		start: func() error {
+			return nil
+		},
+		build: func() (s3.Client, error) {
+			return mock.NewS3Client(), nil
+		},
+		finish: func() error {
+			return nil
+		},
+	},
+	{
+		start: func() error {
+			return setupLocalstack()
+		},
+		build: func() (s3.Client, error) {
+
+			logger, err := common.NewLogger(common.DefaultLoggerConfig())
+			if err != nil {
+				return nil, err
+			}
+
+			config := aws.DefaultClientConfig()
+			config.EndpointURL = localstackContainer.Endpoint()
+			config.Region = "us-east-1"
+
+			err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+			if err != nil {
+				return nil, err
+			}
+			err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
+			if err != nil {
+				return nil, err
+			}
+
+			client, err := s3.NewClient(context.Background(), *config, logger)
+			if err != nil {
+				return nil, err
+			}
+
+			err = client.CreateBucket(context.Background(), bucket)
+			if err != nil {
+				return nil, err
+			}
+
+			return client, nil
+		},
+		finish: func() error {
+			teardownLocalstack()
+			return nil
+		},
+	},
+}
+
+func setupLocalstack() error {
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		// Setup shared LocalStack container
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		var err error
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3"}
+		cfg.Port = localstackPort // Use consistent port
+		cfg.Host = "0.0.0.0"      // Bind to all interfaces
 
-		lsConfig := testbed.LocalStackConfig{
-			Enabled:  true,
-			Services: []string{"s3"},
-			Region:   "us-east-1",
-			Debug:    false,
-		}
-
-		container, err := testbed.NewLocalStackContainer(ctx, lsConfig)
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
-			log.Fatalf("Failed to start shared LocalStack: %v", err)
+			teardownLocalstack()
+			return err
 		}
-		sharedLocalStackContainer = container
-
-		// Setup shared S3 client
-		logger, err := common.NewLogger(common.DefaultLoggerConfig())
-		if err != nil {
-			container.Terminate(context.Background())
-			log.Fatalf("Failed to create logger: %v", err)
-		}
-
-		config := *aws.DefaultClientConfig()
-		config.EndpointURL = container.Endpoint()
-		config.Region = "us-east-1"
-
-		os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
-		os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
-
-		client, err := s3.NewClient(context.Background(), config, logger)
-		if err != nil {
-			container.Terminate(context.Background())
-			log.Fatalf("Failed to create S3 client: %v", err)
-		}
-
-		err = client.CreateBucket(context.Background(), bucket)
-		if err != nil {
-			container.Terminate(context.Background())
-			log.Fatalf("Failed to create bucket: %v", err)
-		}
-
-		sharedLocalStackClient = client
 	}
-
-	// Run tests
-	exitCode := m.Run()
-
-	// Cleanup
-	if sharedLocalStackContainer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		sharedLocalStackContainer.Terminate(ctx)
-	}
-
-	os.Exit(exitCode)
+	return nil
 }
 
-// testClientSetup represents a test client with optional cleanup
-type testClientSetup struct {
-	name   string
-	client s3.Client
-}
+func teardownLocalstack() {
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
-// setupMockClient creates a mock S3 client for testing
-func setupMockClient() *testClientSetup {
-	return &testClientSetup{
-		name:   "mock",
-		client: mock.NewS3Client(),
+	if deployLocalStack {
+		localstackContainer.Terminate(context.Background())
 	}
 }
 
-// setupLocalStackClient returns the shared LocalStack S3 client for testing
-func setupLocalStackClient(_ *testing.T) *testClientSetup {
-	if sharedLocalStackClient == nil {
-		return nil // LocalStack is disabled or not initialized
+func RandomOperationsTest(t *testing.T, client s3.Client) {
+	numberToWrite := 100
+	expectedData := make(map[string][]byte)
+
+	fragmentSize := rand.Intn(1000) + 1000
+	for i := 0; i < numberToWrite; i++ {
+		key := tu.RandomString(10)
+		fragmentMultiple := rand.Float64() * 10
+		dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
+		data := tu.RandomBytes(dataSize)
+		expectedData[key] = data
+		err := client.FragmentedUploadObject(context.Background(), bucket, key, data, fragmentSize)
+		assert.NoError(t, err)
 	}
 
-	return &testClientSetup{
-		name:   "localstack",
-		client: sharedLocalStackClient,
-	}
-}
+	// Read back the data
+	for key, expected := range expectedData {
+		data, err := client.FragmentedDownloadObject(context.Background(), bucket, key, len(expected), fragmentSize)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, data)
 
-// getAllTestClients returns all available test clients
-func getAllTestClients(t *testing.T) []*testClientSetup {
-	clients := []*testClientSetup{
-		setupMockClient(),
+		// List the objects
+		objects, err := client.ListObjects(context.Background(), bucket, key)
+		assert.NoError(t, err)
+		numFragments := math.Ceil(float64(len(expected)) / float64(fragmentSize))
+		assert.Len(t, objects, int(numFragments))
+		totalSize := int64(0)
+		for _, object := range objects {
+			totalSize += object.Size
+		}
+		assert.Equal(t, int64(len(expected)), totalSize)
 	}
 
-	if localStackClient := setupLocalStackClient(t); localStackClient != nil {
-		clients = append(clients, localStackClient)
-	}
-
-	return clients
+	// Attempt to list non-existent objects
+	objects, err := client.ListObjects(context.Background(), bucket, "nonexistent")
+	assert.NoError(t, err)
+	assert.Len(t, objects, 0)
 }
 
 func TestRandomOperations(t *testing.T) {
 	tu.InitializeRandom()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
 
-	for _, setup := range getAllTestClients(t) {
-		t.Run(setup.name, func(t *testing.T) {
-			numberToWrite := 100
-			expectedData := make(map[string][]byte)
+		client, err := builder.build()
+		assert.NoError(t, err)
+		RandomOperationsTest(t, client)
 
-			fragmentSize := rand.Intn(1000) + 1000
-			for i := 0; i < numberToWrite; i++ {
-				key := tu.RandomString(10)
-				fragmentMultiple := rand.Float64() * 10
-				dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
-				data := tu.RandomBytes(dataSize)
-				expectedData[key] = data
-				err := setup.client.FragmentedUploadObject(context.Background(), bucket, key, data, fragmentSize)
-				assert.NoError(t, err)
-			}
-
-			// Read back the data
-			for key, expected := range expectedData {
-				data, err := setup.client.FragmentedDownloadObject(context.Background(), bucket, key, len(expected), fragmentSize)
-				assert.NoError(t, err)
-				assert.Equal(t, expected, data)
-
-				// List the objects
-				objects, err := setup.client.ListObjects(context.Background(), bucket, key)
-				assert.NoError(t, err)
-				numFragments := math.Ceil(float64(len(expected)) / float64(fragmentSize))
-				assert.Len(t, objects, int(numFragments))
-				totalSize := int64(0)
-				for _, object := range objects {
-					totalSize += object.Size
-				}
-				assert.Equal(t, int64(len(expected)), totalSize)
-			}
-
-			// Attempt to list non-existent objects
-			objects, err := setup.client.ListObjects(context.Background(), bucket, "nonexistent")
-			assert.NoError(t, err)
-			assert.Len(t, objects, 0)
-		})
+		err = builder.finish()
+		assert.NoError(t, err)
 	}
 }
 
 func TestReadNonExistentValue(t *testing.T) {
 	tu.InitializeRandom()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
 
-	for _, setup := range getAllTestClients(t) {
-		t.Run(setup.name, func(t *testing.T) {
-			_, err := setup.client.FragmentedDownloadObject(context.Background(), bucket, "nonexistent", 1000, 1000)
-			assert.Error(t, err)
-			randomKey := tu.RandomString(10)
-			_, err = setup.client.FragmentedDownloadObject(context.Background(), bucket, randomKey, 0, 0)
-			assert.Error(t, err)
-		})
+		client, err := builder.build()
+		assert.NoError(t, err)
+		_, err = client.FragmentedDownloadObject(context.Background(), bucket, "nonexistent", 1000, 1000)
+		assert.Error(t, err)
+		randomKey := tu.RandomString(10)
+		_, err = client.FragmentedDownloadObject(context.Background(), bucket, randomKey, 0, 0)
+		assert.Error(t, err)
+
+		err = builder.finish()
+		assert.NoError(t, err)
 	}
 }
 
 func TestHeadObject(t *testing.T) {
 	tu.InitializeRandom()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
 
-	for _, setup := range getAllTestClients(t) {
-		t.Run(setup.name, func(t *testing.T) {
-			key := tu.RandomString(10)
-			err := setup.client.UploadObject(context.Background(), bucket, key, []byte("test"))
-			assert.NoError(t, err)
-			size, err := setup.client.HeadObject(context.Background(), bucket, key)
-			assert.NoError(t, err)
-			assert.NotNil(t, size)
-			assert.Equal(t, int64(4), *size)
+		client, err := builder.build()
+		assert.NoError(t, err)
 
-			size, err = setup.client.HeadObject(context.Background(), bucket, "nonexistent")
-			assert.ErrorIs(t, err, s3.ErrObjectNotFound)
-			assert.Nil(t, size)
-		})
+		key := tu.RandomString(10)
+		err = client.UploadObject(context.Background(), bucket, key, []byte("test"))
+		assert.NoError(t, err)
+		size, err := client.HeadObject(context.Background(), bucket, key)
+		assert.NoError(t, err)
+		assert.NotNil(t, size)
+		assert.Equal(t, int64(4), *size)
+
+		size, err = client.HeadObject(context.Background(), bucket, "nonexistent")
+		assert.ErrorIs(t, err, s3.ErrObjectNotFound)
+		assert.Nil(t, size)
+
+		err = builder.finish()
+		assert.NoError(t, err)
 	}
 }
