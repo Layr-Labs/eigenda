@@ -180,6 +180,9 @@ library EigenDACertVerificationLib {
 
     /**
      * @notice Checks the security parameters for a blob cert
+     * @dev Verifies that the security condition 
+     *      (confirmationThreshold - adversaryThreshold > reconstructionThreshold) 
+     *      holds. If the inequality fails, the blob is considered insecure.
      * @param blobParams The blob params to verify
      * @param securityThresholds The security thresholds to verify against
      * @return err Error code (SUCCESS if verification succeeded)
