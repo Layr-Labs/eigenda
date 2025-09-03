@@ -16,18 +16,16 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 )
 
 var (
-	dockertestPool           *dockertest.Pool
-	dockertestResource       *dockertest.Resource
+	localstackContainer      *testbed.LocalStackContainer
 	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
 	accountID1               gethcommon.Address
@@ -41,7 +39,7 @@ var (
 	mt                       *meterer.Meterer
 
 	deployLocalStack           bool
-	localStackPort             = "4566"
+	localstackPort             = "4566"
 	paymentChainState          = &mock.MockOnchainPaymentState{}
 	ondemandTableName          = "ondemand_meterer"
 	reservationTableName       = "reservations_meterer"
@@ -58,12 +56,19 @@ func TestMain(m *testing.M) {
 func setup(_ *testing.M) {
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -81,7 +86,7 @@ func setup(_ *testing.M) {
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
@@ -170,7 +175,7 @@ func setup(_ *testing.M) {
 
 func teardown() {
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		localstackContainer.Terminate(context.Background())
 	}
 }
 
