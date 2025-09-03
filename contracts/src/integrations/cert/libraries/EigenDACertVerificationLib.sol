@@ -115,12 +115,9 @@ library EigenDACertVerificationLib {
             securityThresholds
         );
 
-        // Verify blob quorums are a subset of confirmed quorums
-        uint256 blobQuorumsBitmap =
-            checkBlobQuorumsSubset(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap);
-
-        // Verify required quorums are a subset of blob quorums
-        return checkRequiredQuorumsSubset(requiredQuorumNumbers, blobQuorumsBitmap);
+        // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
+        // checkSignaturesAndBuildConfirmedQuorums checked the last inequality. We now verify the other two.
+        checkQuorumSubsets(requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap);
     }
 
     /**
@@ -217,29 +214,17 @@ library EigenDACertVerificationLib {
     }
 
     /**
-     * @notice Checks that blob quorums are a subset of confirmed quorums
-     * @param blobQuorumNumbers The blob quorum numbers
-     * @param confirmedQuorumsBitmap The bitmap of confirmed quorums
-     * @return blobQuorumsBitmap The bitmap of blob quorums
+     * @notice Checks that requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums
+     * @param requiredQuorumNumbers The required quorum numbers
+     * @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
+     * @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
      */
-    function checkBlobQuorumsSubset(bytes memory blobQuorumNumbers, uint256 confirmedQuorumsBitmap)
-        internal
-        pure
-        returns (uint256 blobQuorumsBitmap)
-    {
-        blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
+    function checkQuorumSubsets(bytes memory requiredQuorumNumbers, bytes memory blobQuorumNumbers, uint256 confirmedQuorumsBitmap) internal pure {
+        uint256 blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
         if (!BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);
         }
-        return blobQuorumsBitmap;
-    }
 
-    /**
-     * @notice Checks that required quorums are a subset of blob quorums
-     * @param requiredQuorumNumbers The required quorum numbers
-     * @param blobQuorumsBitmap The bitmap of blob quorums
-     */
-    function checkRequiredQuorumsSubset(bytes memory requiredQuorumNumbers, uint256 blobQuorumsBitmap) internal pure {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
         if (!BitmapUtils.isSubsetOf(requiredQuorumsBitmap, blobQuorumsBitmap)) {
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
