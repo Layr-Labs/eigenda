@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
@@ -35,14 +34,12 @@ func TestMain(m *testing.M) {
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		deployLocalStack = true
 		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"dynamodb"}
 		cfg.Port = localstackPort
 		cfg.Host = "0.0.0.0"
 
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		if err != nil {
 			_ = localstackContainer.Terminate(context.Background())
 			panic("failed to start localstack container: " + err.Error())

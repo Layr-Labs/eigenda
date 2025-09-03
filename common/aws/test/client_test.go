@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -96,14 +95,12 @@ func setupLocalstack() error {
 
 	if deployLocalStack {
 		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"s3"}
 		cfg.Port = localstackPort
 		cfg.Host = "0.0.0.0"
 
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		if err != nil {
 			teardownLocalstack()
 			return err

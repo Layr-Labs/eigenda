@@ -158,14 +158,12 @@ func setup(m *testing.M) {
 	}
 	if deployLocalStack {
 		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"dynamodb"}
 		cfg.Port = localstackPort
 		cfg.Host = "0.0.0.0"
 
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())

@@ -21,8 +21,8 @@ type LocalStackConfig struct {
 	Services []string `json:"services"` // AWS services to enable: s3, dynamodb, kms, secretsmanager
 	Region   string   `json:"region"`
 	Debug    bool     `json:"debug"`
-	Port     string   `json:"port"`     // Optional: specify a fixed host port (e.g., "4570")
-	Host     string   `json:"host"`     // Optional: specify a fixed host (e.g., "0.0.0.0")
+	Port     string   `json:"port"` // Optional: specify a fixed host port (e.g., "4570")
+	Host     string   `json:"host"` // Optional: specify a fixed host (e.g., "0.0.0.0")
 }
 
 // LocalStackContainer wraps the official LocalStack testcontainers module

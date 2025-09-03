@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -59,13 +58,11 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"s3, dynamodb"}
 		cfg.Port = localstackPort
 		cfg.Host = "0.0.0.0"
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		require.NoError(t, err)
 	}
 

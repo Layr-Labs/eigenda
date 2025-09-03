@@ -10,11 +10,11 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // DeployResourcesConfig holds configuration for deploying AWS resources
@@ -60,7 +60,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 
 	// Create metadata table
 	if config.MetadataTableName != "" {
-		_, err := test_utils.CreateTable(ctx, cfg, config.MetadataTableName, 
+		_, err := test_utils.CreateTable(ctx, cfg, config.MetadataTableName,
 			blobstore.GenerateTableSchema(config.MetadataTableName, 10, 10))
 		if err != nil {
 			return fmt.Errorf("failed to create metadata table %s: %w", config.MetadataTableName, err)
@@ -81,7 +81,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	// Create v2 tables if specified
 	if config.V2MetadataTableName != "" {
 		fmt.Println("Creating v2 tables")
-		
+
 		// Create v2 metadata table
 		_, err := test_utils.CreateTable(ctx, cfg, config.V2MetadataTableName,
 			blobstorev2.GenerateTableSchema(config.V2MetadataTableName, 10, 10))
@@ -102,7 +102,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 // createS3Bucket creates the S3 bucket using the AWS SDK
 func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 	bucketName := "test-eigenda-blobstore"
-	
+
 	// Create AWS SDK config with custom endpoint resolver
 	customResolver := awssdk.EndpointResolverWithOptionsFunc(
 		func(service, region string, options ...interface{}) (awssdk.Endpoint, error) {
@@ -123,7 +123,7 @@ func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 		awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretAccessKey, "")),
 	}
-	
+
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
@@ -138,7 +138,7 @@ func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 	_, err = s3Client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: &bucketName,
 	})
-	
+
 	if err == nil {
 		fmt.Printf("Bucket %s already exists\n", bucketName)
 		return nil
@@ -148,7 +148,7 @@ func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 	createBucketConfig := &s3.CreateBucketInput{
 		Bucket: &bucketName,
 	}
-	
+
 	// Only add LocationConstraint for non us-east-1 regions
 	if cfg.Region != "us-east-1" {
 		createBucketConfig.CreateBucketConfiguration = &types.CreateBucketConfiguration{

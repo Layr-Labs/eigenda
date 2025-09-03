@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
@@ -33,14 +32,12 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"s3, kms"}
 		cfg.Port = localstackPort
 		cfg.Host = "0.0.0.0"
 
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		require.NoError(t, err)
 	}
 }
