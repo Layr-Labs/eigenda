@@ -104,9 +104,9 @@ func init() {
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 	config := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
