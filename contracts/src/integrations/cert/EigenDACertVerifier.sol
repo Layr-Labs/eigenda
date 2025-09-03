@@ -51,11 +51,15 @@ contract EigenDACertVerifier is
     enum StatusCode {
         NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
-        INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
-        SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
-        BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
-        REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
-        INVALID_CERT // Certificate is invalid, due to some low level library revert having been caught
+        // The below 4 status codes are kept for backwards compatibility, but are no longer used.
+        // We previously had plans to have more granular error codes, but decided this was not necessary,
+        // and the only signal useful to offchain is to separate certs into: success, invalid (400), and bugs (500).
+        UNUSED_HISTORICAL_INVALID_INCLUSION_PROOF,
+        UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
+        UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
+        UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
+        INVALID_CERT, // Certificate is invalid, due to some low level library revert having been caught
+        BUG // Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
     }
 
     constructor(
@@ -84,7 +88,7 @@ contract EigenDACertVerifier is
 
     /// @inheritdoc IEigenDACertVerifierBase
     /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
-    /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will 
+    /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
     /// TODO: we should return (uint8, bytes) instead and include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
@@ -97,6 +101,10 @@ contract EigenDACertVerifier is
             return uint8(StatusCode.INVALID_CERT);
         }
 
+        // The try catch below is used to filter certs into 3 status codes:
+        // 1. success
+        // 2. invalid cert (any failing require statement; we assume all require statements return either a string or custom error)
+        // 3. bug (everything else, including solidity panics and low-level evm reverts)
         try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
         } catch Error(string memory /*reason*/) {
@@ -104,19 +112,21 @@ contract EigenDACertVerifier is
             // which many of our current eigenlayer-middleware dependencies like the BLSSignatureChecker still use. See:
             // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
             return uint8(StatusCode.INVALID_CERT);
-        } catch Panic(uint errorCode) {
-            // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.)
-            // We pattern match these only to 
-            revert(string(abi.encode("panic", errorCode)));
+        } catch Panic(uint /*errorCode*/) {
+            // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.),
+            // which means a bug or misconfiguration of the CertVerifier contract itself.
+            return uint8(StatusCode.BUG);
         } catch (bytes memory reason) {
-            if (reason.length < 4) {
-                // We re-throw any non custom-error that was caught here. For example,
-                // low-level evm reverts such as out-of-gas don't return any data.
-                // See https://rareskills.io/post/try-catch-solidity#gdvnie-9-what-gets-returned-during-an-out-of-gas?
-                // These generally mean there is a bug in our implementation, which should be addressed by a human debugger.
+            if (reason.length == 0) {
+                // This matches low-level evm reverts like out-of-gas or stack too few values.
+                // See https://rareskills.io/post/try-catch-solidity for more info.
+                //
                 // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
                 // a maliciously constructed cert.
-                revert(string(reason));
+                return uint8(StatusCode.BUG);
+            } else if (reason.length < 4) {
+                // Don't think this is possible...
+                return uint8(StatusCode.BUG);
             }
             // Any revert here is from custom errors coming from a failed require(..., SomeCustomError()) statement.
             // This mean that the cert is invalid.
