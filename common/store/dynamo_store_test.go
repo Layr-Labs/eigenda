@@ -24,7 +24,7 @@ var (
 	localStackContainer *testbed.LocalStackContainer
 
 	deployLocalStack bool
-	localStackPort   = "4566"
+	localStackPort   = "4572"
 
 	dynamoClient     dynamodb.Client
 	dynamoParamStore common.KVStore[common.RateBucketParams]

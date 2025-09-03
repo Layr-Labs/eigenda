@@ -150,14 +150,14 @@ func localstack(ctx *cli.Context) error {
 	cfg.Port = ctx.String(localstackFlagName)
 	cfg.Host = "0.0.0.0"
 
-	localstackContainer, err := testbed.NewLocalStackContainer(context, cfg)
+	_, err := testbed.NewLocalStackContainer(context, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
 	if ctx.Bool(deployResourcesFlagName) {
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  localstackContainer.Endpoint(),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: metadataTableNameV2,

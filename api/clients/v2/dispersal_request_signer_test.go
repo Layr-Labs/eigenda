@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	localstackPort = "4570"
-	localstackHost = "http://0.0.0.0:4570"
+	localstackPort = "4579"
+	localstackHost = "http://0.0.0.0:4579"
 	region         = "us-east-1"
 )
 
@@ -60,7 +60,7 @@ func TestRequestSigning(t *testing.T) {
 
 	keyManager := kms.New(kms.Options{
 		Region:       region,
-		BaseEndpoint: aws.String(localstackContainer.Endpoint()),
+		BaseEndpoint: aws.String(localstackHost),
 	})
 
 	for i := 0; i < 10; i++ {

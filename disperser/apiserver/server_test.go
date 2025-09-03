@@ -62,7 +62,7 @@ var (
 	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
-	localstackPort   = "4569"
+	localstackPort   = "4576"
 	allowlistFile    *os.File
 	testMaxBlobSize  = 2 * 1024 * 1024
 	mockCommitment   = encoding.BlobCommitments{}
@@ -635,7 +635,7 @@ func setup() {
 
 		// Deploy resources using the testbed DeployResources function
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  localstackContainer.Endpoint(),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,

@@ -32,7 +32,7 @@ var (
 	logger = testutils.GetLogger()
 
 	deployLocalStack    bool
-	localstackPort      = "4571"
+	localstackPort      = "4580"
 	localstackContainer *testbed.LocalStackContainer
 
 	s3Client          s3.Client

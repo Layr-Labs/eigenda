@@ -132,10 +132,11 @@ func (ls *LocalStackContainer) GetAWSConfig() map[string]string {
 
 // Terminate stops and removes the container
 func (ls *LocalStackContainer) Terminate(ctx context.Context) error {
-	if ls.container != nil {
-		if err := ls.container.Terminate(ctx); err != nil {
-			return fmt.Errorf("failed to terminate LocalStack container: %w", err)
-		}
+	if ls == nil || ls.container == nil {
+		return nil
+	}
+	if err := ls.container.Terminate(ctx); err != nil {
+		return fmt.Errorf("failed to terminate LocalStack container: %w", err)
 	}
 	return nil
 }

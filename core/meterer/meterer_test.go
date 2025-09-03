@@ -39,7 +39,7 @@ var (
 	mt                       *meterer.Meterer
 
 	deployLocalStack           bool
-	localstackPort             = "4566"
+	localstackPort             = "4575"
 	paymentChainState          = &mock.MockOnchainPaymentState{}
 	ondemandTableName          = "ondemand_meterer"
 	reservationTableName       = "reservations_meterer"

@@ -23,7 +23,8 @@ var (
 
 const (
 	bucket         = "eigen-test"
-	localstackPort = "4570"
+	localstackPort = "4578"
+	localstackHost = "http://0.0.0.0:4578"
 )
 
 type clientBuilder struct {
@@ -59,7 +60,7 @@ var clientBuilders = []*clientBuilder{
 			}
 
 			config := aws.DefaultClientConfig()
-			config.EndpointURL = localstackContainer.Endpoint()
+			config.EndpointURL = localstackHost
 			config.Region = "us-east-1"
 
 			err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")

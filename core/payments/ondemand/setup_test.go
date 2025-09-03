@@ -18,7 +18,7 @@ import (
 
 const (
 	// used if DEPLOY_LOCALSTACK != "false"
-	defaultLocalstackPort = "4566"
+	defaultLocalstackPort = "4573"
 )
 
 var (

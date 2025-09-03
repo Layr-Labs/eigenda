@@ -67,7 +67,7 @@ var (
 	logger = testutils.GetLogger()
 
 	// Local stack
-	localstackPort      = "4566"
+	localstackPort      = "4574"
 	localstackContainer *testbed.LocalStackContainer
 	deployLocalStack    bool
 

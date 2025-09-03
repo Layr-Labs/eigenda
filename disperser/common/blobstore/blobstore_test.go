@@ -114,7 +114,7 @@ func setup(_ *testing.M) {
 }
 
 func teardown() {
-	if deployLocalStack {
+	if deployLocalStack && localstackContainer != nil {
 		_ = localstackContainer.Terminate(context.Background())
 	}
 }

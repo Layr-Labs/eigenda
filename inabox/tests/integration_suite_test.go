@@ -129,7 +129,7 @@ var _ = BeforeSuite(func() {
 			Expect(err).To(BeNil())
 
 			deployConfig := testbed.DeployResourcesConfig{
-				LocalStackEndpoint:  localstackContainer.Endpoint(),
+				LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
 				MetadataTableName:   metadataTableName,
 				BucketTableName:     bucketTableName,
 				V2MetadataTableName: metadataTableNameV2,
