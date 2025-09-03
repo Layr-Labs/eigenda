@@ -100,9 +100,7 @@ library EigenDACertVerificationLib {
         checkBlobInclusion(batchHeader, blobInclusionInfo);
 
         checkSecurityParams(
-            eigenDAThresholdRegistry,
-            blobInclusionInfo.blobCertificate.blobHeader.version,
-            securityThresholds
+            eigenDAThresholdRegistry, blobInclusionInfo.blobCertificate.blobHeader.version, securityThresholds
         );
 
         // Verify signatures and build confirmed quorums bitmap
@@ -117,7 +115,9 @@ library EigenDACertVerificationLib {
 
         // The different quorums are related by: requiredQuorums ⊆ blobQuorums ⊆ confirmedQuorums ⊆ signedQuorums
         // checkSignaturesAndBuildConfirmedQuorums checked the last inequality. We now verify the other two.
-        checkQuorumSubsets(requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap);
+        checkQuorumSubsets(
+            requiredQuorumNumbers, blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
+        );
     }
 
     /**
@@ -133,7 +133,9 @@ library EigenDACertVerificationLib {
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
 
-        bool isValid = Merkle.verifyInclusionKeccak(blobInclusionInfo.inclusionProof, rootHash, encodedBlobHash, blobInclusionInfo.blobIndex);
+        bool isValid = Merkle.verifyInclusionKeccak(
+            blobInclusionInfo.inclusionProof, rootHash, encodedBlobHash, blobInclusionInfo.blobIndex
+        );
 
         if (!isValid) {
             revert InvalidInclusionProof(blobInclusionInfo.blobIndex, encodedBlobHash, rootHash);
@@ -218,7 +220,11 @@ library EigenDACertVerificationLib {
      * @param blobQuorumNumbers The blob quorum numbers, which are the quorums requested in the blobHeader part of the dispersal
      * @param confirmedQuorumsBitmap The bitmap of confirmed quorums, which are signed quorums that meet the confirmationThreshold
      */
-    function checkQuorumSubsets(bytes memory requiredQuorumNumbers, bytes memory blobQuorumNumbers, uint256 confirmedQuorumsBitmap) internal pure {
+    function checkQuorumSubsets(
+        bytes memory requiredQuorumNumbers,
+        bytes memory blobQuorumNumbers,
+        uint256 confirmedQuorumsBitmap
+    ) internal pure {
         uint256 blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
         if (!BitmapUtils.isSubsetOf(blobQuorumsBitmap, confirmedQuorumsBitmap)) {
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);

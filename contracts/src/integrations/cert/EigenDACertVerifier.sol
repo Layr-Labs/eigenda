@@ -60,6 +60,7 @@ contract EigenDACertVerifier is
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
         INVALID_CERT, // Certificate is invalid, due to some low level library revert having been caught
         BUG // Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
+
     }
 
     constructor(
@@ -107,12 +108,12 @@ contract EigenDACertVerifier is
         // 3. bug (everything else, including solidity panics and low-level evm reverts)
         try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
-        } catch Error(string memory /*reason*/) {
+        } catch Error(string memory) /*reason*/ {
             // This matches any require(..., "string reason") revert that is pre custom errors,
             // which many of our current eigenlayer-middleware dependencies like the BLSSignatureChecker still use. See:
             // https://github.com/Layr-Labs/eigenlayer-middleware/blob/fe5834371caed60c1d26ab62b5519b0cbdcb42fa/src/BLSSignatureChecker.sol#L96
             return uint8(StatusCode.INVALID_CERT);
-        } catch Panic(uint /*errorCode*/) {
+        } catch Panic(uint256) /*errorCode*/ {
             // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.),
             // which means a bug or misconfiguration of the CertVerifier contract itself.
             return uint8(StatusCode.BUG);
@@ -139,11 +140,7 @@ contract EigenDACertVerifier is
     /// @dev This function will revert if the certificate is invalid.
     function checkDACertReverts(CT.EigenDACertV3 calldata daCert) external view {
         CertLib.checkDACert(
-            _eigenDAThresholdRegistry,
-            _eigenDASignatureVerifier,
-            daCert,
-            _securityThresholds,
-            _quorumNumbersRequired
+            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, daCert, _securityThresholds, _quorumNumbersRequired
         );
     }
 
