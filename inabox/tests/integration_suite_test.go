@@ -117,15 +117,13 @@ var _ = BeforeSuite(func() {
 		if !inMemoryBlobStore {
 			fmt.Println("Using shared Blob Store")
 			localStackPort = "4570"
-			ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancelFunc()
 
 			cfg := testbed.DefaultLocalStackConfig()
 			cfg.Services = []string{"s3", "dynamodb", "kms"}
 			cfg.Port = localStackPort
 			cfg.Host = "0.0.0.0"
 
-			localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+			localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 			Expect(err).To(BeNil())
 
 			deployConfig := testbed.DeployResourcesConfig{
@@ -134,7 +132,7 @@ var _ = BeforeSuite(func() {
 				BucketTableName:     bucketTableName,
 				V2MetadataTableName: metadataTableNameV2,
 			}
-			err = testbed.DeployResources(ctx, deployConfig)
+			err = testbed.DeployResources(context.Background(), deployConfig)
 			Expect(err).To(BeNil())
 		} else {
 			fmt.Println("Using in-memory Blob Store")
