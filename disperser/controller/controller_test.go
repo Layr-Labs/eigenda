@@ -40,7 +40,6 @@ var (
 
 	s3Client          s3.Client
 	dynamoClient      dynamodb.Client
-	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
 
 	UUID              = uuid.New()
@@ -109,7 +108,6 @@ func setup(m *testing.M) {
 		teardown()
 		panic("failed to create s3 bucket: " + err.Error())
 	}
-	blobStore = blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))

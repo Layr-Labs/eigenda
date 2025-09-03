@@ -15,7 +15,7 @@ clean:
 
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
-	cd ../.. && BUILD_TAG=dev docker buildx bake proxy --load
+	cd ../.. && docker buildx bake proxy --load
 
 run-memstore-server: build
 	./bin/eigenda-proxy --memstore.enabled --metrics.enabled  --storage.backends-to-enable v2
@@ -53,9 +53,6 @@ test-fuzz:
 benchmark:
 	go test -benchmem -run=^$ -bench . ./test/benchmark -test.parallel 4
 
-.PHONY: lint
-lint:
-	golangci-lint run
 
 .PHONY: format
 format:
@@ -66,8 +63,11 @@ format:
 ## calls --help on binary and routes output to file while ignoring dynamic fields specific
 ## to indivdual builds (e.g, version)
 gen-static-help-output: build
-	@echo "Storing binary output to docs/help_out.txt"
+	@echo "Storing proxy help output to docs/help_out.txt"
+# removes the VERSION line which makes the output non-deterministic (changes with each commit)
 	@./bin/eigenda-proxy --help | sed '/^VERSION:/ {N;d;}' > docs/help_out.txt
+	@echo "Storing proxy metrics output to docs/metrics_out.txt"
+	@./bin/eigenda-proxy doc metrics > docs/metrics_out.txt
 
 mocks:
 	@echo "generating go mocks..."
@@ -80,4 +80,4 @@ op-devnet-allocs:
 deps:
 	mise install
 
-.PHONY: build clean docker-build test lint format benchmark deps mocks
+.PHONY: build clean docker-build test format benchmark deps mocks

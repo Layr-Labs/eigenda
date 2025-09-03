@@ -75,4 +75,15 @@ type Config struct {
 
 	// PprofHttpPort is the port that the pprof HTTP server listens on
 	PprofHttpPort int
+
+	// The maximum permissible age of a GRPC connection before it is closed. If zero, then the server will not close
+	// connections based on age.
+	MaxConnectionAge time.Duration
+
+	// When the server closes a connection due to MaxConnectionAgeSeconds, it will wait for this grace period before
+	// forcibly closing the connection. This allows in-flight requests to complete.
+	MaxConnectionAgeGrace time.Duration
+
+	// MaxIdleConnectionAge is the maximum time a connection can be idle before it is closed.
+	MaxIdleConnectionAge time.Duration
 }

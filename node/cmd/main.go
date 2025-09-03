@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/memory"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/urfave/cli"
@@ -50,6 +49,9 @@ func main() {
 }
 
 func NodeMain(ctx *cli.Context) error {
+
+	// TODO (cody.littley): pull all business logic in this function into the NewNode() constructor.
+
 	log.Println("Initializing Node")
 	config, err := node.NewConfig(ctx)
 	if err != nil {
@@ -59,14 +61,6 @@ func NodeMain(ctx *cli.Context) error {
 	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		return err
-	}
-
-	if config.GCSafetyBufferSizeGB > 0 {
-		safetyBuffer := uint64(config.GCSafetyBufferSizeGB * float64(units.GiB))
-		err = memory.SetGCMemorySafetyBuffer(logger, safetyBuffer)
-		if err != nil {
-			return fmt.Errorf("failed to set memory limit: %w", err)
-		}
 	}
 
 	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProviders...)
@@ -92,13 +86,29 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
-	reader, err := coreeth.NewReader(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	contractDirectory, err := directory.NewContractDirectory(
+		context.Background(),
+		logger,
+		client,
+		gethcommon.HexToAddress(config.EigenDADirectory))
 	if err != nil {
-		return fmt.Errorf("cannot create eth.Reader: %w", err)
+		return fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+	if err != nil {
+		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
+	}
+
+	eigenDAServiceManagerAddress, err :=
+		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
+	node, err := node.NewNode(context.Background(), reg, config, contractDirectory, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
@@ -109,11 +119,18 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	// Creates the GRPC server.
-
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
+
+	reader, err := coreeth.NewReader(
+		logger,
+		client,
+		operatorStateRetrieverAddress.Hex(),
+		eigenDAServiceManagerAddress.Hex())
+	if err != nil {
+		return fmt.Errorf("cannot create eth.Reader: %w", err)
+	}
 
 	var serverV2 *nodegrpc.ServerV2
 	if config.EnableV2 {

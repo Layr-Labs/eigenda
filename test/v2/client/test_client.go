@@ -9,20 +9,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	metricsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
+	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/store"
+	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
@@ -46,20 +54,21 @@ const (
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	config                      *TestClientConfig
-	payloadClientConfig         *clients.PayloadClientConfig
+	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
-	disperserClient             clients.DisperserClient
+	disperserClient             clientsv2.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
 	validatorClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	proxyWrapper                *ProxyWrapper
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
-	certBuilder                 *clients.CertBuilder
+	certBuilder                 *clientsv2.CertBuilder
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -68,6 +77,7 @@ type TestClient struct {
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
+	ctx context.Context,
 	logger logging.Logger,
 	metrics *testClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
@@ -135,13 +145,22 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
 	}
 
-	disperserConfig := &clients.DisperserClientConfig{
-		Hostname:          config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", config.DisperserPort),
-		UseSecureGrpcFlag: true,
+	disperserConfig := &clientsv2.DisperserClientConfig{
+		Hostname:                 config.DisperserHostname,
+		Port:                     fmt.Sprintf("%d", config.DisperserPort),
+		UseSecureGrpcFlag:        true,
+		DisperserConnectionCount: config.DisperserConnectionCount,
 	}
 
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
+	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
+	disperserClient, err := clientsv2.NewDisperserClient(
+		logger,
+		disperserConfig,
+		signer,
+		kzgProver,
+		accountant,
+		metricsv2.NoopDispersalMetrics,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
@@ -166,12 +185,27 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
+	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
+	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, contractDirectoryAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OperatorStateRetriever address from contract directory: %w", err)
+	}
+
+	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ServiceManager address from contract directory: %w", err)
+	}
+
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		config.EigenDADirectory,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
@@ -186,7 +220,7 @@ func NewTestClient(
 	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
 	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
 	//  options.
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
+	payloadClientConfig := clientsv2.GetDefaultPayloadClientConfig()
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,
@@ -200,7 +234,10 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
+	certBuilder, err := clientsv2.NewCertBuilder(logger,
+		operatorStateRetrieverAddress,
+		ethReader.GetRegistryCoordinatorAddress(),
+		ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}
@@ -245,6 +282,7 @@ func NewTestClient(
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
+		ConnectionPoolSize: config.RelayConnectionCount,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
@@ -274,7 +312,8 @@ func NewTestClient(
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
 	}
@@ -311,7 +350,8 @@ func NewTestClient(
 		logger,
 		*validatorPayloadRetrieverConfig,
 		retrievalClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
@@ -334,6 +374,59 @@ func NewTestClient(
 		onlyDownloadClientConfig,
 		validatorClientMetrics)
 
+	proxyWrapper, err := NewProxyWrapper(context.Background(), logger,
+		&proxyconfig.AppConfig{
+			SecretConfig: proxycommon.SecretConfigV2{
+				SignerPaymentKey: privateKey,
+				EthRPCURL:        ethRPCUrls[0],
+			},
+			ServerConfig: proxyserver.Config{
+				Host:        "localhost",
+				Port:        config.ProxyPort,
+				EnabledAPIs: []string{"admin"},
+			},
+			MetricsServerConfig: proxymetrics.Config{
+				Enabled: false, // TODO (cody.littley) enable proxy metrics
+			},
+			StoreBuilderConfig: builder.Config{
+				StoreConfig: store.Config{
+					BackendsToEnable: []proxycommon.EigenDABackend{proxycommon.V2EigenDABackend},
+					DispersalBackend: proxycommon.V2EigenDABackend,
+					AsyncPutWorkers:  32,
+				},
+				ClientConfigV2: proxycommon.ClientConfigV2{
+					DisperserClientCfg: clientsv2.DisperserClientConfig{
+						Hostname:          config.DisperserHostname,
+						Port:              fmt.Sprintf("%d", config.DisperserPort),
+						UseSecureGrpcFlag: true,
+					},
+					PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
+						PayloadClientConfig:    *payloadClientConfig,
+						DisperseBlobTimeout:    5 * time.Minute,
+						BlobCompleteTimeout:    5 * time.Minute,
+						BlobStatusPollInterval: 1 * time.Second,
+						ContractCallTimeout:    5 * time.Second,
+					},
+					RelayPayloadRetrieverCfg: payloadretrieval.RelayPayloadRetrieverConfig{
+						PayloadClientConfig: *payloadClientConfig,
+						RelayTimeout:        5 * time.Second,
+					},
+					PutTries:                           3,
+					MaxBlobSizeBytes:                   16 * units.MiB,
+					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
+					EigenDADirectory:                   contractDirectoryAddress.Hex(),
+					RetrieversToEnable: []proxycommon.RetrieverType{
+						proxycommon.RelayRetrieverType,
+						proxycommon.ValidatorRetrieverType,
+					},
+				},
+				KzgConfig: *kzgConfig,
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create proxy wrapper: %w", err)
+	}
+
 	return &TestClient{
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
@@ -352,6 +445,7 @@ func NewTestClient(
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
 		metrics:                     metrics,
+		proxyWrapper:                proxyWrapper,
 	}, nil
 }
 
@@ -432,7 +526,7 @@ func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
 }
 
 // GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() clients.DisperserClient {
+func (c *TestClient) GetDisperserClient() clientsv2.DisperserClient {
 	return c.disperserClient
 }
 
@@ -472,7 +566,7 @@ func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
 }
 
 // GetCertBuilder returns the test client's cert builder.
-func (c *TestClient) GetCertBuilder() *clients.CertBuilder {
+func (c *TestClient) GetCertBuilder() *clientsv2.CertBuilder {
 	return c.certBuilder
 }
 
@@ -489,17 +583,20 @@ func (c *TestClient) GetMetricsRegistry() *prometheus.Registry {
 // Stop stops the test client.
 func (c *TestClient) Stop() {
 	c.metrics.stop()
+	if c.proxyWrapper != nil {
+		if err := c.proxyWrapper.Stop(); err != nil {
+			c.logger.Errorf("failed to stop proxy wrapper: %v", err)
+		}
+	}
 }
 
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
 // it back from the relays and the validators.
 func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) error {
-	start := time.Now()
 	eigenDACert, err := c.DispersePayload(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
-	c.metrics.reportCertificationTime(time.Since(start))
 
 	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
@@ -516,8 +613,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
-	payloadBytesFromRelayRetriever := payloadFromRelayRetriever.Serialize()
-	if !bytes.Equal(payload, payloadBytesFromRelayRetriever) {
+	if !bytes.Equal(payload, payloadFromRelayRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -526,8 +622,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
-	payloadBytesFromValidatorRetriever := payloadFromValidatorRetriever.Serialize()
-	if !bytes.Equal(payload, payloadBytesFromValidatorRetriever) {
+	if !bytes.Equal(payload, payloadFromValidatorRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -541,7 +636,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
-		*blobKey,
+		blobKey,
 		eigenDAV3Cert.RelayKeys(),
 		payload,
 		uint32(blobLengthSymbols),
@@ -570,20 +665,75 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	return nil
 }
 
+// Similar to DisperseAndVerify, but uses the proxy instead of using the clients directly.
+func (c *TestClient) DisperseAndVerifyWithProxy(ctx context.Context, payload []byte) error {
+	cert, err := c.DispersePayloadWithProxy(ctx, payload)
+	if err != nil {
+		return fmt.Errorf("failed to disperse payload with proxy: %w", err)
+	}
+
+	_, err = c.ReadPayloadWithProxy(ctx, cert, payload, 0)
+	if err != nil {
+		return fmt.Errorf("failed to read payload with proxy: %w", err)
+	}
+
+	return nil
+}
+
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (cert coretypes.EigenDACert, err error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
+	c.metrics.startOperation("dispersal")
 
-	payload := coretypes.NewPayload(payloadBytes)
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
 
-	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
+	defer func() {
+		c.metrics.endOperation("dispersal")
+		if err == nil {
+			c.metrics.reportDispersalSuccess()
+			c.metrics.reportDispersalTime(time.Since(start))
+		} else {
+			c.metrics.reportDispersalFailure()
+		}
+	}()
+
+	payload := coretypes.Payload(payloadBytes)
+	cert, err = c.GetPayloadDisperser().SendPayload(ctx, payload)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload, %s", err)
 	}
 
-	c.metrics.reportDispersalTime(time.Since(start))
+	return cert, nil
+}
+
+// DispersePayloadWithProxy sends a payload to the proxy wrapper, which then disperses it to EigenDA. Returns the cert
+// in byte format, since that's what the proxy returns.
+func (c *TestClient) DispersePayloadWithProxy(ctx context.Context, payloadBytes []byte) (cert []byte, err error) {
+	if c.proxyWrapper == nil {
+		return nil, fmt.Errorf("proxy wrapper not initialized")
+	}
+	c.logger.Debugf("Dispersing payload of length %d with proxy", len(payloadBytes))
+
+	start := time.Now()
+	c.metrics.startOperation("dispersal")
+
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	defer func() {
+		c.metrics.endOperation("dispersal")
+		if err == nil {
+			c.metrics.reportDispersalTime(time.Since(start))
+			c.metrics.reportDispersalSuccess()
+		} else {
+			c.metrics.reportDispersalFailure()
+		}
+	}()
+
+	cert, err = c.proxyWrapper.SendPayload(ctx, payloadBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send payload via proxy: %w", err)
+	}
 
 	return cert, nil
 }
@@ -601,6 +751,7 @@ func (c *TestClient) ReadBlobFromRelays(
 
 	for _, relayID := range relayKeys {
 		err := c.ReadBlobFromRelay(ctx, key, relayID, expectedPayload, blobLengthSymbols, timeout)
+
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay %d: %w", relayID, err)
 		}
@@ -619,34 +770,44 @@ func (c *TestClient) ReadBlobFromRelay(
 	timeout time.Duration,
 ) error {
 
-	start := time.Now()
-
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+
+	c.metrics.startOperation("relay_read")
+	start := time.Now()
+
+	defer func() {
+		c.metrics.endOperation("relay_read")
+		if err == nil {
+			c.metrics.reportRelayReadSuccess()
+			c.metrics.reportRelayReadTime(time.Since(start), relayKey)
+		} else {
+			c.metrics.reportRelayReadFailure()
+		}
+	}()
+
 	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relay: %w", err)
 	}
-
-	c.metrics.reportRelayReadTime(time.Since(start), relayKey)
 
 	blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize blob: %w", err)
 	}
 
-	payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	payloadFromRelay, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 	if err != nil {
 		return fmt.Errorf("failed to decode blob: %w", err)
 	}
 
-	payloadBytesFromRelay := payload.Serialize()
-
-	if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
+	if !bytes.Equal(payloadFromRelay, expectedPayload) {
 		return fmt.Errorf("payloads do not match")
 	}
 
@@ -662,7 +823,8 @@ func (c *TestClient) ReadBlobFromValidators(
 	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
-	validateAndDecode bool) error {
+	validateAndDecode bool,
+) error {
 
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -670,11 +832,28 @@ func (c *TestClient) ReadBlobFromValidators(
 		defer cancel()
 	}
 
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+
+	c.metrics.startOperation("validator_read")
+	start := time.Now()
+
+	defer func() {
+		c.metrics.endOperation("validator_read")
+		if err == nil {
+			if validateAndDecode {
+				// Only report timing if we actually do the full operation. Skip report if we only download the blob.
+				c.metrics.reportValidatorReadTime(time.Since(start))
+			}
+			c.metrics.reportValidatorReadSuccess()
+		} else {
+			c.metrics.reportValidatorReadFailure()
+		}
+	}()
+
 	if validateAndDecode {
-
-		start := time.Now()
-
-		retrievedBlobBytes, err := c.validatorClient.GetBlob(
+		var retrievedBlobBytes []byte
+		retrievedBlobBytes, err = c.validatorClient.GetBlob(
 			ctx,
 			header,
 			uint64(referenceBlockNumber))
@@ -682,30 +861,27 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		// Since retrieval is now agnostic to quorum ID, we default quorumID parameters to zero.
-		quorumID := core.QuorumID(0)
-		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
-
 		blobLengthSymbols := uint32(header.BlobCommitments.Length)
-		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+		var blob *coretypes.Blob
+		blob, err = coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
 
-		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+		var retrievedPayload coretypes.Payload
+		retrievedPayload, err = blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to convert blob to payload: %w", err)
 		}
 
-		payloadBytes := retrievedPayload.Serialize()
-		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
+		if !bytes.Equal(retrievedPayload, expectedPayloadBytes) {
 			return fmt.Errorf("payloads do not match")
 		}
 	} else {
 
 		// Just download the blob without validating or decoding. Don't report timing metrics for this operation.
 
-		_, err := c.onlyDownloadValidatorClient.GetBlob(
+		_, err = c.onlyDownloadValidatorClient.GetBlob(
 			ctx,
 			header,
 			uint64(referenceBlockNumber))
@@ -715,4 +891,69 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	return nil
+}
+
+// ReadPayloadWithProxy reads a payload from the proxy wrapper and compares it to the expected payload bytes.
+// The timeout is ignored if zero. If the proxy wrapper is not enabled, this method returns an error.
+func (c *TestClient) ReadPayloadWithProxy(
+	ctx context.Context,
+	cert []byte,
+	expectedPayloadBytes []byte,
+	timeout time.Duration,
+) ([]byte, error) {
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	// Important: don't redefine err. It's used by the deferred function to report success or failure.
+	var err error
+
+	start := time.Now()
+	c.metrics.startOperation("proxy_read")
+
+	defer func() {
+		c.metrics.endOperation("proxy_read")
+		if err == nil {
+			c.metrics.reportProxyReadSuccess()
+			c.metrics.reportProxyReadTime(time.Since(start))
+		} else {
+			c.metrics.reportProxyReadFailure()
+		}
+	}()
+
+	var data []byte
+	data, err = c.proxyWrapper.GetPayload(ctx, cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read payload from proxy: %w", err)
+	}
+
+	if !bytes.Equal(data, expectedPayloadBytes) {
+		return nil, fmt.Errorf("read payload does not match expected payload")
+	}
+
+	return data, nil
+}
+
+// GetProxyWrapper returns the proxy wrapper. If the proxy wrapper is not enabled, this method returns an error.
+func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
+	if c.proxyWrapper == nil {
+		return nil, fmt.Errorf("proxy wrapper is not enabled in the test client configuration")
+	}
+	return c.proxyWrapper, nil
+}
+
+func (c *TestClient) EstimateGasAndReportCheckDACert(
+	ctx context.Context,
+	eigenDAV3Cert *coretypes.EigenDACertV3,
+) (uint64, error) {
+	gas, err := c.certVerifier.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate gas for CheckDACert call: %w", err)
+	}
+
+	c.metrics.reportEstimateGasCheckDACert(gas)
+	return gas, nil
 }

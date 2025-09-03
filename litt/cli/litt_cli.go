@@ -2,10 +2,34 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
+)
+
+// TODO (cody.littley): convert all commands to use flags stored in these variables
+var (
+	srcFlag = &cli.StringSliceFlag{
+		Name:     "src",
+		Aliases:  []string{"s"},
+		Usage:    "Source paths where the DB data is found, at least one is required.",
+		Required: true,
+	}
+	forceFlag = &cli.BoolFlag{
+		Name:    "force",
+		Aliases: []string{"f"},
+		Usage:   "Force the operation without prompting for confirmation.",
+	}
+	knownHostsFileFlag = &cli.StringFlag{
+		Name:     "known-hosts",
+		Aliases:  []string{"k"},
+		Usage:    "Path to a file containing known hosts for SSH connections.",
+		Required: false,
+		Value:    "~/.ssh/known_hosts",
+	}
 )
 
 // buildCliParser creates a command line parser for the LittDB CLI tool.
@@ -19,8 +43,19 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 				Aliases: []string{"d"},
 				Usage:   "Enable debug mode. Program will pause for a debugger to attach.",
 			},
+			&cli.BoolFlag{
+				Name:    "pprof",
+				Aliases: []string{"p"},
+				Usage:   "Starts a pprof server for profiling.",
+			},
+			&cli.IntFlag{
+				Name:    "pprof-port",
+				Aliases: []string{"P"},
+				Usage:   "Port for the pprof server.",
+				Value:   6060,
+			},
 		},
-		Before: buildHandleDebugMode(logger),
+		Before: buildBeforeAction(logger),
 		Commands: []*cli.Command{
 			{
 				Name:      "ls",
@@ -34,7 +69,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // lsCommand, // TODO this will be added in a follow up PR
+				Action: lsCommand,
 			},
 			{
 				Name: "table-info",
@@ -50,7 +85,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // tableInfoCommand, // TODO this will be added in a follow up PR
+				Action: tableInfoCommand,
 			},
 			{
 				Name:  "rebase",
@@ -81,7 +116,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Reduces the verbosity of the output.",
 					},
 				},
-				Action: nil, // rebaseCommand, // TODO this will be added in a follow up PR
+				Action: rebaseCommand,
 			},
 			{
 				Name:      "benchmark",
@@ -115,7 +150,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Required: true,
 					},
 				},
-				Action: nil, // pruneCommand, // TODO this will be added in a follow up PR
+				Action: pruneCommand,
 			},
 			{
 				Name:  "push",
@@ -144,6 +179,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "SSH port to connect to the remote host.",
 						Value:   22,
 					},
+					knownHostsFileFlag,
 					&cli.StringFlag{
 						Name:    "key",
 						Aliases: []string{"i"},
@@ -173,9 +209,9 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Value:   0,
 					},
 				},
-				Action: nil, // pushCommand, // TODO this will be added in a follow up PR
+				Action: pushCommand,
 			},
-			{ // TODO test in preprod
+			{ // TODO (cody.littley) test in preprod
 				Name: "sync",
 				Usage: "Periodically run 'litt push' to keep a remote backup in sync with local data. " +
 					"Optionally calls 'litt prune' remotely to manage data retention.",
@@ -210,6 +246,7 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Usage:   "Path to the SSH private key file for authentication.",
 						Value:   "~/.ssh/id_rsa",
 					},
+					knownHostsFileFlag,
 					&cli.BoolFlag{
 						Name:    "no-gc",
 						Aliases: []string{"n"},
@@ -252,32 +289,67 @@ func buildCLIParser(logger logging.Logger) *cli.App {
 						Value:   300,
 					},
 				},
-				Action: nil, // syncCommand, // TODO this will be added in a follow up PR
+				Action: syncCommand,
+			},
+			{
+				Name:      "unlock",
+				Usage:     "Manually delete LittDB lock files. Dangerous if used improperly, use with caution.",
+				ArgsUsage: "--src <path1> ... --src <pathN> [--force]",
+				Flags: []cli.Flag{
+					srcFlag,
+					forceFlag,
+				},
+				Action: unlockCommand,
 			},
 		},
 	}
 	return app
 }
 
-// Builds a function that is executed if the --debug flag is set. Causes the program to halt until ENTER is pressed.
-func buildHandleDebugMode(logger logging.Logger) func(*cli.Context) error {
-
-	// This double nesting is required in order to bind this method to a logger, while still conforming to the
-	// interface expected by urfave/cli.
+// Builds a function that is called before any command is executed.
+func buildBeforeAction(logger logging.Logger) func(*cli.Context) error {
 	return func(ctx *cli.Context) error {
-		debugModeEnabled := ctx.Bool("debug")
+		handleDebugMode(ctx, logger)
 
-		if !debugModeEnabled {
-			return nil
+		err := handlePProfMode(ctx, logger)
+		if err != nil {
+			return fmt.Errorf("failed to start pprof: %w", err)
 		}
-
-		pid := os.Getpid()
-		logger.Infof("Waiting for debugger to attach (pid: %d).\n", pid)
-
-		logger.Infof("Press Enter to continue...")
-		reader := bufio.NewReader(os.Stdin)
-		_, _ = reader.ReadString('\n') // block until newline is read
 
 		return nil
 	}
+}
+
+// If debug mode is enabled, this function will block until the user presses Enter.
+func handleDebugMode(ctx *cli.Context, logger logging.Logger) {
+	debugModeEnabled := ctx.Bool("debug")
+	if !debugModeEnabled {
+		return
+	}
+
+	pid := os.Getpid()
+	logger.Infof("Waiting for debugger to attach (pid: %d).\n", pid)
+
+	logger.Infof("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n') // block until newline is read
+}
+
+// If pprof is enabled, this function starts the pprof server.
+func handlePProfMode(ctx *cli.Context, logger logging.Logger) error {
+	pprofEnabled := ctx.Bool("pprof")
+	if !pprofEnabled {
+		return nil
+	}
+
+	pprofPort := ctx.Int("pprof-port")
+	if pprofPort <= 0 || pprofPort > 65535 {
+		return fmt.Errorf("invalid pprof port: %d", pprofPort)
+	}
+
+	logger.Infof("pprof enabled on port %d", pprofPort)
+	profiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", pprofPort), logger)
+	go profiler.Start()
+
+	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -69,7 +70,8 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		g1Srs)
+		g1Srs,
+		metrics.NoopRetrievalMetrics)
 
 	require.NotNil(t, client)
 	require.NoError(t, err)
@@ -90,7 +92,7 @@ func buildBlobAndCert(
 ) (core.BlobKey, []byte, *coretypes.EigenDACertV3) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
+	blob, err := coretypes.Payload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
 	require.NoError(t, err)
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)
@@ -154,7 +156,7 @@ func buildCertFromBlobBytes(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	return *blobKey, eigenDACert
+	return blobKey, eigenDACert
 }
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
@@ -388,7 +390,8 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) - 1
+	// Divide by 2 because length must be a power of 2.
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) / 2
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(blobBytes, nil).Once()
 
@@ -471,7 +474,7 @@ func TestCommitmentVerifiesButBlobToPayloadFails(t *testing.T) {
 	relayKeys[0] = tester.Random.Uint32()
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
+	blob, err := coretypes.Payload(payloadBytes).ToBlob(tester.PayloadPolynomialForm())
 	require.NoError(t, err)
 	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)

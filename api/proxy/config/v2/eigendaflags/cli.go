@@ -27,17 +27,16 @@ var (
 	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
 		"cert-verifier-router-or-immutable-verifier-addr",
 	)
-	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
-	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
-	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
-	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
-	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
-	NetworkFlagName                   = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
+	EigenDADirectoryFlagName        = withFlagPrefix("eigenda-directory")
+	RelayTimeoutFlagName            = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName        = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName     = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
+	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
+	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
+	NetworkFlagName                 = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
+	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
 )
 
 func withFlagPrefix(s string) string {
@@ -111,23 +110,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name: CertVerifierRouterOrImmutableVerifierAddrFlagName,
-			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier contract. " +
-				"Required for performing eth_calls to verify EigenDA certificates.",
+			Usage: "Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier (V3 or above) contract. " +
+				"Required for performing eth_calls to verify EigenDA certificates, as well as fetching " +
+				"required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes).",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     ServiceManagerAddrFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     BLSOperatorStateRetrieverFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
 			Category: category,
 			Required: false,
 		},
@@ -190,14 +176,13 @@ loaded into memory for KZG commitments. Example units: '15MiB', '4Kib'.`,
 		},
 		&cli.StringFlag{
 			Name: NetworkFlagName,
-			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
-default values for %s, %s, and %s. If all of these fields are explicitly configured, the
-network flag may be omitted. If some or all of these fields are configured, and the network
-is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, %s, %s, & %s.`,
-				DisperserFlagName,
-				ServiceManagerAddrFlagName,
-				BLSOperatorStateRetrieverFlagName,
+			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, 
+to configure default values for different EigenDA contracts and disperser URL. 
+See https://github.com/Layr-Labs/eigenda/blob/master/api/proxy/common/eigenda_network.go
+for the exact values getting set by this flag. All of those values can also be manually
+set via their respective flags, and take precedence over the default values set by the network flag.
+If all of those other flags are manually configured, the network flag may be omitted. 
+Permitted EigenDANetwork values include %s, %s, %s, & %s.`,
 				common.MainnetEigenDANetwork,
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork,
@@ -216,6 +201,14 @@ This check is optional and will be skipped when set to 0.`,
 			Value:    0,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
+		},
+		&cli.Uint64Flag{
+			Name:     RelayConnectionPoolSizeFlagName,
+			Usage:    "Number of gRPC connections to maintain to each relay.",
+			Value:    1,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "RELAY_CONNECTION_POOL_SIZE")},
+			Category: category,
+			Required: false,
 		},
 	}
 }
@@ -244,30 +237,15 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 
 	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
 	if eigenDADirectory == "" {
-		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		if networkString == "" {
+			return common.ClientConfigV2{},
+				fmt.Errorf("either EigenDA Directory contract address or EigenDANetwork enum must be specified")
 		}
-	}
-
-	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
-	if serviceManagerAddress == "" {
-		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
+		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
 		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+			return common.ClientConfigV2{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
-	}
-
-	blsOperatorStateRetrieverAddress := ctx.String(BLSOperatorStateRetrieverFlagName)
-	if blsOperatorStateRetrieverAddress == "" {
-		blsOperatorStateRetrieverAddress, err = eigenDANetwork.GetBLSOperatorStateRetrieverAddress()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				`BLS operator state retriever address wasn't specified, and failed to get it from the
-							specified network : %w`, err)
-		}
+		eigenDADirectory = eigenDANetwork.GetEigenDADirectory()
 	}
 
 	return common.ClientConfigV2{
@@ -285,12 +263,11 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 			common.RelayRetrieverType,
 			common.ValidatorRetrieverType,
 		},
-		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
-		EigenDAServiceManagerAddr:          serviceManagerAddress,
 		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
+		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
 	}, nil
 }
 
@@ -331,7 +308,6 @@ func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperser
 
 func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error) {
 	disperserAddressString := ctx.String(DisperserFlagName)
-
 	if disperserAddressString == "" {
 		networkString := ctx.String(NetworkFlagName)
 		if networkString == "" {
@@ -344,10 +320,7 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 			return clients_v2.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
 
-		disperserAddressString, err = eigenDANetwork.GetDisperserAddress()
-		if err != nil {
-			return clients_v2.DisperserClientConfig{}, fmt.Errorf("get disperser address: %w", err)
-		}
+		disperserAddressString = eigenDANetwork.GetDisperserAddress()
 	}
 
 	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)

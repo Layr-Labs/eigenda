@@ -2,8 +2,6 @@ package certs
 
 import (
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // Version byte that prefixes serialized EigenDACert to identify their type.
@@ -47,18 +45,4 @@ func NewVersionedCert(serializedCert []byte, certVersion VersionByte) VersionedC
 // Encode adds a commitment type prefix self describing the commitment.
 func (c VersionedCert) Encode() []byte {
 	return append([]byte{byte(c.Version)}, c.SerializedCert...)
-}
-
-// ToCoreCertType converts the VersionedCert to a coretypes.CertificateVersion.
-func (c VersionedCert) ToCoreCertType() (coretypes.CertificateVersion, error) {
-	switch c.Version {
-	case V0VersionByte:
-		return coretypes.VersionTwoCert, fmt.Errorf("EigenDA V1 certs are not supported in coretypes")
-	case V1VersionByte:
-		return coretypes.VersionTwoCert, nil
-	case V2VersionByte:
-		return coretypes.VersionThreeCert, nil
-	default:
-		return 0, fmt.Errorf("unsupported version byte %d", c.Version)
-	}
 }

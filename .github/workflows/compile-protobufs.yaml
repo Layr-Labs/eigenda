@@ -6,6 +6,9 @@ on:
   pull_request:
   merge_group:
 
+env:
+  MISE_VERSION: 2024.12.14
+
 jobs:
   golangci:
     name: Compile Protobufs
@@ -13,6 +16,11 @@ jobs:
     steps:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+      # https://github.com/jdx/mise-action/releases/tag/v2.4.4
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true #only install buf -- needed by `make protoc` command

@@ -5,6 +5,7 @@ import (
 	"path"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/docker/go-units"
 )
 
 // TestClientConfig is the configuration for the test client.
@@ -33,14 +34,8 @@ type TestClientConfig struct {
 	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA address directory, where all contract addresses are stored
-	//
-	// Currently the EigenDA address directory is just used to look up BLSOperatorStateRetrieverAddr and EigenDAServiceManagerAddr.
-	// In a later PR, ensure all addresses are populated into the directory, and use it for all contract address lookups.
-	EigenDADirectory string
-	// The contract address for the EigenDA BLS operator state retriever
-	BLSOperatorStateRetrieverAddr string
-	// The contract address for the EigenDA service manager
-	EigenDAServiceManagerAddr string
+	ContractDirectoryAddress string
+	// The contract address for the OperatorStateRetriever
 	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
 	//
 	// If this value is not set, that tests utilizing it will be skipped
@@ -65,10 +60,32 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
-	// The size of the thread pool for read operations on the relay.
+	// The size of the thread pool for read operations.
 	ValidatorReadConnectionPoolSize int
 	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
+	// The number of connections to open for each relay.
+	RelayConnectionCount uint
+	// The number of connections to open for each disperser.
+	DisperserConnectionCount uint
+	// The port to use for the proxy.
+	ProxyPort int
+}
+
+// DefaultTestClientConfig returns a default configuration for the test client. Sets default values for fields
+// where default values make sense.
+func DefaultTestClientConfig() *TestClientConfig {
+	return &TestClientConfig{
+		DisperserPort:                   443,
+		MaxBlobSize:                     16 * units.MiB,
+		SRSOrder:                        268435456,
+		MetricsPort:                     9101,
+		ValidatorReadConnectionPoolSize: 100,
+		ValidatorReadComputePoolSize:    20,
+		ProxyPort:                       1234,
+		RelayConnectionCount:            8,
+		DisperserConnectionCount:        8,
+	}
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.

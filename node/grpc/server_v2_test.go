@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/gammazero/workerpool"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -59,12 +60,11 @@ var (
 )
 
 type testComponents struct {
-	server         *grpc.ServerV2
-	node           *node.Node
-	store          *nodemock.MockStoreV2
-	validator      *coremockv2.MockShardValidator
-	relayClient    *clientsmock.MockRelayClient
-	blacklistStore *nodemock.MockBlacklistStore
+	server      *grpc.ServerV2
+	node        *node.Node
+	store       *nodemock.MockStoreV2
+	validator   *coremockv2.MockShardValidator
+	relayClient *clientsmock.MockRelayClient
 }
 
 func newTestComponents(t *testing.T, config *node.Config) *testComponents {
@@ -91,24 +91,28 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	val := coremockv2.NewMockShardValidator()
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
 
+	operatorStateCache := operatorstate.NewMockOperatorStateCache()
+	operatorState, err := chainState.GetOperatorState(t.Context(), 100, []core.QuorumID{0, 1, 2})
+	require.NoError(t, err)
+	operatorStateCache.SetOperatorState(t.Context(), 100, operatorState)
+
 	s := nodemock.NewMockStoreV2()
-	blacklistStore := nodemock.NewMockBlacklistStore(nil)
 	relay := clientsmock.NewRelayClient()
 	var atomicRelayClient atomic.Value
 	atomicRelayClient.Store(relay)
 	node := &node.Node{
-		Config:         config,
-		Logger:         logger,
-		KeyPair:        keyPair,
-		BLSSigner:      signer,
-		Metrics:        metrics,
-		ValidatorStore: s,
-		BlacklistStore: blacklistStore,
-		ChainState:     chainState,
-		ValidatorV2:    val,
-		RelayClient:    atomicRelayClient,
-		DownloadPool:   workerpool.New(1),
-		ValidationPool: workerpool.New(1),
+		Config:             config,
+		Logger:             logger,
+		KeyPair:            keyPair,
+		BLSSigner:          signer,
+		Metrics:            metrics,
+		ValidatorStore:     s,
+		ChainState:         chainState,
+		ValidatorV2:        val,
+		RelayClient:        atomicRelayClient,
+		DownloadPool:       workerpool.New(1),
+		ValidationPool:     workerpool.New(1),
+		OperatorStateCache: operatorStateCache,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
@@ -126,12 +130,11 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 	require.NoError(t, err)
 	return &testComponents{
-		server:         server,
-		node:           node,
-		store:          s,
-		blacklistStore: blacklistStore,
-		validator:      val,
-		relayClient:    relay,
+		server:      server,
+		node:        node,
+		store:       s,
+		validator:   val,
+		relayClient: relay,
 	}
 }
 

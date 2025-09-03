@@ -202,9 +202,10 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
 		Value:    1,
 	}
-	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever",
+	OperatorStateRetrieverAddrFlag = cli.StringFlag{
+		Name: common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
+		Usage: "[Deprecated: use EigenDADirectory instead] Address of the OperatorStateRetriever contract. " +
+			"Note that the contract no longer uses the BLS prefix.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
 	}
@@ -329,6 +330,28 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 		Value:    5 * time.Minute,
 	}
+	MaxConnectionAgeFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "max-connection-age"),
+		Usage: "Maximum age of a gRPC connection before it is closed. " +
+			"If zero, then the server will not close connections based on age.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_SECONDS"),
+		Value:    5 * time.Minute,
+	}
+	MaxConnectionAgeGraceFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-connection-age-grace"),
+		Usage:    "Grace period after MaxConnectionAge before the connection is forcibly closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONNECTION_AGE_GRACE_SECONDS"),
+		Value:    30 * time.Second,
+	}
+	MaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-idle-connection-age"),
+		Usage:    "Maximum time a connection can be idle before it is closed.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_IDLE_CONNECTION_AGE_SECONDS"),
+		Value:    time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -379,8 +402,11 @@ var optionalFlags = []cli.Flag{
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverAddrFlag,
+	OperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	MaxConnectionAgeFlag,
+	MaxConnectionAgeGraceFlag,
+	MaxIdleConnectionAgeFlag,
 }
 
 var Flags []cli.Flag

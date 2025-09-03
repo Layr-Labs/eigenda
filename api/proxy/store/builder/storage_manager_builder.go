@@ -1,3 +1,4 @@
+//nolint:funlen // builder functions are expected to be long.
 package builder
 
 import (
@@ -11,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	metrics_v2 "github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -25,14 +27,15 @@ import (
 	memstore_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/v2"
 	eigenda_v2 "github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
-	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/redis"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
+	"github.com/prometheus/client_golang/prometheus"
 
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -44,19 +47,17 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// BuildStoreManager is the main builder for proxy's store.
-// It builds all the different store clients, and injects them into
-// a new store manager, which it returns when successful.
-func BuildStoreManager(
+// BuildManagers builds separate cert and keccak managers
+func BuildManagers(
 	ctx context.Context,
 	log logging.Logger,
 	metrics metrics.Metricer,
 	config Config,
 	secrets common.SecretConfigV2,
-) (*store.Manager, error) {
+	registry *prometheus.Registry,
+) (*store.EigenDAManager, *store.KeccakManager, error) {
 	var err error
 	var s3Store *s3.Store
-	var redisStore *redis.Store
 	var eigenDAV1Store common.EigenDAV1Store
 	var eigenDAV2Store common.EigenDAV2Store
 
@@ -64,15 +65,7 @@ func BuildStoreManager(
 		log.Info("Using S3 storage backend")
 		s3Store, err = s3.NewStore(config.S3Config)
 		if err != nil {
-			return nil, err
-		}
-	}
-
-	if config.RedisConfig.Endpoint != "" {
-		log.Info("Using Redis storage backend")
-		redisStore, err = redis.NewStore(&config.RedisConfig)
-		if err != nil {
-			return nil, err
+			return nil, nil, fmt.Errorf("new S3 store: %w", err)
 		}
 	}
 
@@ -80,9 +73,9 @@ func BuildStoreManager(
 	v2Enabled := slices.Contains(config.StoreConfig.BackendsToEnable, common.V2EigenDABackend)
 
 	if config.StoreConfig.DispersalBackend == common.V2EigenDABackend && !v2Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
+		return nil, nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
 	} else if config.StoreConfig.DispersalBackend == common.V1EigenDABackend && !v1Enabled {
-		return nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
+		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
 	var kzgVerifier *kzgverifier.Verifier
@@ -100,7 +93,7 @@ func BuildStoreManager(
 
 		kzgVerifier, err = kzgverifier.NewVerifier(&kzgConfig, nil)
 		if err != nil {
-			return nil, fmt.Errorf("new kzg verifier: %w", err)
+			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 		}
 	}
 
@@ -108,20 +101,20 @@ func BuildStoreManager(
 		log.Info("Building EigenDA v1 storage backend")
 		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
 		if err != nil {
-			return nil, fmt.Errorf("build v1 backend: %w", err)
+			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
 		}
 	}
 
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
-		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier)
+		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
 		if err != nil {
-			return nil, fmt.Errorf("build v2 backend: %w", err)
+			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
 		}
 	}
 
-	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store, redisStore)
-	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store, redisStore)
+	fallbacks := buildSecondaries(config.StoreConfig.FallbackTargets, s3Store)
+	caches := buildSecondaries(config.StoreConfig.CacheTargets, s3Store)
 	secondary := secondary.NewSecondaryManager(log, metrics, caches, fallbacks, config.StoreConfig.WriteOnCacheMiss)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
@@ -137,21 +130,29 @@ func BuildStoreManager(
 		"eigenda_v1", eigenDAV1Store != nil,
 		"eigenda_v2", eigenDAV2Store != nil,
 		"s3", s3Store != nil,
-		"redis", redisStore != nil,
 		"read_fallback", len(fallbacks) > 0,
 		"caching", len(caches) > 0,
 		"async_secondary_writes", (secondary.Enabled() && config.StoreConfig.AsyncPutWorkers > 0),
 		"verify_v1_certs", config.VerifierConfigV1.VerifyCerts,
 	)
 
-	return store.NewManager(
+	certMgr, err := store.NewEigenDAManager(
 		eigenDAV1Store,
 		eigenDAV2Store,
-		s3Store,
 		log,
 		secondary,
 		config.StoreConfig.DispersalBackend,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("new eigenda manager: %w", err)
+	}
+
+	keccakMgr, err := store.NewKeccakManager(s3Store, log)
+	if err != nil {
+		return nil, nil, fmt.Errorf("new keccak manager: %w", err)
+	}
+
+	return certMgr, keccakMgr, nil
 }
 
 // buildSecondaries ... Creates a slice of secondary targets used for either read
@@ -159,18 +160,12 @@ func BuildStoreManager(
 func buildSecondaries(
 	targets []string,
 	s3Store common.SecondaryStore,
-	redisStore *redis.Store,
 ) []common.SecondaryStore {
 	stores := make([]common.SecondaryStore, len(targets))
 
 	for i, target := range targets {
 		//nolint:exhaustive // TODO: implement additional secondaries
 		switch common.StringToBackendType(target) {
-		case common.RedisBackendType:
-			if redisStore == nil {
-				panic(fmt.Sprintf("Redis backend not configured: %s", target))
-			}
-			stores[i] = redisStore
 		case common.S3BackendType:
 			if s3Store == nil {
 				panic(fmt.Sprintf("S3 backend not configured: %s", target))
@@ -209,6 +204,7 @@ func buildEigenDAV2Backend(
 	config Config,
 	secrets common.SecretConfigV2,
 	kzgVerifier *kzgverifier.Verifier,
+	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
@@ -269,11 +265,6 @@ func buildEigenDAV2Backend(
 			return nil, fmt.Errorf("build router address provider: %w", err)
 		}
 	}
-
-	ethReader, err := buildEthReader(log, config.ClientConfigV2, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("build eth reader: %w", err)
-	}
 	certVerifier, err := verification.NewCertVerifier(
 		log,
 		ethClient,
@@ -283,13 +274,61 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
+	if !isRouter {
+		// We call GetCertVersion to ensure that the cert verifier is of a supported version. See
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/interfaces/IVersionedEigenDACertVerifier.sol#L12
+		// https://github.com/Layr-Labs/eigenda/blob/d0a14fa44/contracts/src/integrations/cert/EigenDACertVerifier.sol#L79
+		// We pass in block 0 because a static certVerifierAddress provider is used when not using a router,
+		// so the block number is not relevant.
+		certVersion, err := certVerifier.GetCertVersion(ctx, 0)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to eth-call certVersion(), meaning that you either have network problems with your eth node, or "+
+					"%s is not a CertVerifier version >= V3, which is required by this version of proxy: %w",
+				routerOrImmutableVerifierAddr.Hex(), err)
+		}
+		// Note that we also support certV2s, just not V2 CertVerifiers.
+		// This is because we transform certV2s into certV3s and verified using the CertVerifierV3 contract.
+		// However, the serialization logic, as well as some functions needed during the dispersal path (eg. requiredQuorums),
+		// are only compatible/available with CertVerifier V3, hence the requirement here.
+		if certVersion != 3 {
+			return nil, fmt.Errorf("this version of proxy is only compatible with CertVerifier V3 : cert verifier at address %s is version %d",
+				routerOrImmutableVerifierAddr.Hex(), certVersion)
+		}
+	}
+
+	var eigenDAServiceManagerAddr, operatorStateRetrieverAddr geth_common.Address
+	contractDirectory, err := directory.NewContractDirectory(ctx, log, ethClient,
+		geth_common.HexToAddress(config.ClientConfigV2.EigenDADirectory))
+	if err != nil {
+		return nil, fmt.Errorf("new contract directory: %w", err)
+	}
+	eigenDAServiceManagerAddr, err = contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("get eigenDAServiceManagerAddr: %w", err)
+	}
+	operatorStateRetrieverAddr, err = contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("get OperatorStateRetriever addr: %w", err)
+	}
+	registryCoordinator, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("get registryCoordinator: %w", err)
+	}
+
+	retrievalMetrics := metrics_v2.NewRetrievalMetrics(registry)
+
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range config.ClientConfigV2.RetrieversToEnable {
 		switch retrieverType {
 		case common.RelayRetrieverType:
 			log.Info("Initializing relay payload retriever")
+			relayRegistryAddr, err := contractDirectory.GetContractAddress(ctx, directory.RelayRegistry)
+			if err != nil {
+				return nil, fmt.Errorf("get relay registry address: %w", err)
+			}
 			relayPayloadRetriever, err := buildRelayPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, ethReader.GetRelayRegistryAddress())
+				log, config.ClientConfigV2, ethClient, kzgProver.Srs.G1, relayRegistryAddr, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -297,7 +336,9 @@ func buildEigenDAV2Backend(
 		case common.ValidatorRetrieverType:
 			log.Info("Initializing validator payload retriever")
 			validatorPayloadRetriever, err := buildValidatorPayloadRetriever(
-				log, config.ClientConfigV2, ethClient, ethReader, kzgVerifier, kzgProver.Srs.G1)
+				log, config.ClientConfigV2, ethClient,
+				operatorStateRetrieverAddr, eigenDAServiceManagerAddr,
+				kzgVerifier, kzgProver.Srs.G1, retrievalMetrics)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -320,7 +361,9 @@ func buildEigenDAV2Backend(
 		ethClient,
 		kzgProver,
 		certVerifier,
-		ethReader,
+		operatorStateRetrieverAddr,
+		registryCoordinator,
+		registry,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build payload disperser: %w", err)
@@ -432,9 +475,10 @@ func buildRelayPayloadRetriever(
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
-	relayRegistryAddress geth_common.Address,
+	relayRegistryAddr geth_common.Address,
+	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
-	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddress)
+	relayClient, err := buildRelayClient(log, clientConfigV2, ethClient, relayRegistryAddr)
 	if err != nil {
 		return nil, fmt.Errorf("build relay client: %w", err)
 	}
@@ -445,7 +489,8 @@ func buildRelayPayloadRetriever(
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		clientConfigV2.RelayPayloadRetrieverCfg,
 		relayClient,
-		g1Srs)
+		g1Srs,
+		metrics)
 	if err != nil {
 		return nil, fmt.Errorf("new relay payload retriever: %w", err)
 	}
@@ -469,6 +514,7 @@ func buildRelayClient(
 		// we should never expect a message greater than our allowed max blob size.
 		// 10% of max blob size is added for additional safety
 		MaxGRPCMessageSize: uint(clientConfigV2.MaxBlobSizeBytes + (clientConfigV2.MaxBlobSizeBytes / 10)),
+		ConnectionPoolSize: clientConfigV2.RelayConnectionPoolSize,
 	}
 
 	relayClient, err := relay.NewRelayClient(relayCfg, log, relayURLProvider)
@@ -485,10 +531,21 @@ func buildValidatorPayloadRetriever(
 	log logging.Logger,
 	clientConfigV2 common.ClientConfigV2,
 	ethClient common_eigenda.EthClient,
-	ethReader *eth.Reader,
+	operatorStateRetrieverAddr geth_common.Address,
+	eigenDAServiceManagerAddr geth_common.Address,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
+	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
+	ethReader, err := eth.NewReader(
+		log,
+		ethClient,
+		operatorStateRetrieverAddr.String(),
+		eigenDAServiceManagerAddr.String(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reader: %w", err)
+	}
 	chainState := eth.NewChainState(ethReader, ethClient)
 
 	retrievalClient := client_validator.NewValidatorClient(
@@ -506,30 +563,13 @@ func buildValidatorPayloadRetriever(
 		clientConfigV2.ValidatorPayloadRetrieverCfg,
 		retrievalClient,
 		g1Srs,
+		metrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new validator payload retriever: %w", err)
 	}
 
 	return validatorRetriever, nil
-}
-
-func buildEthReader(log logging.Logger,
-	clientConfigV2 common.ClientConfigV2,
-	ethClient common_eigenda.EthClient,
-) (*eth.Reader, error) {
-	ethReader, err := eth.NewReader(
-		log,
-		ethClient,
-		clientConfigV2.EigenDADirectory,
-		clientConfigV2.BLSOperatorStateRetrieverAddr,
-		clientConfigV2.EigenDAServiceManagerAddr,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	return ethReader, nil
 }
 
 func buildPayloadDisperser(
@@ -540,18 +580,33 @@ func buildPayloadDisperser(
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
-	ethReader *eth.Reader,
+	operatorStateRetrieverAddr geth_common.Address,
+	registryCoordinatorAddr geth_common.Address,
+	registry *prometheus.Registry,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("build local signer: %w", err)
 	}
 
+	accountId, err := signer.GetAccountID()
+	if err != nil {
+		return nil, fmt.Errorf("error getting account ID: %w", err)
+	}
+
+	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
+	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
+
+	// The accountant is populated lazily by disperserClient.PopulateAccountant
+	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+
 	disperserClient, err := clients_v2.NewDisperserClient(
+		log,
 		&clientConfigV2.DisperserClientCfg,
 		signer,
 		kzgProver,
-		nil,
+		accountant,
+		dispersalMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
@@ -568,12 +623,7 @@ func buildPayloadDisperser(
 	}
 
 	certBuilder, err := clients_v2.NewCertBuilder(
-		log,
-		geth_common.HexToAddress(clientConfigV2.BLSOperatorStateRetrieverAddr),
-		ethReader.GetRegistryCoordinatorAddress(),
-		ethClient,
-	)
-
+		log, operatorStateRetrieverAddr, registryCoordinatorAddr, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("new cert builder: %w", err)
 	}
@@ -585,7 +635,7 @@ func buildPayloadDisperser(
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
-		nil)
+		registry)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ethereum-optimism/optimism/op-service/metrics"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -99,11 +99,6 @@ func NewEmulatedMetricer() *EmulatedMetricer {
 
 var _ Metricer = NewEmulatedMetricer()
 
-// Document ... noop
-func (n *EmulatedMetricer) Document() []metrics.DocumentedMetric {
-	return nil
-}
-
 // RecordInfo ... noop
 func (n *EmulatedMetricer) RecordInfo(_ string) {
 }
@@ -130,4 +125,9 @@ func (n *EmulatedMetricer) RecordSecondaryRequest(x string, y string) func(statu
 			panic(err)
 		}
 	}
+}
+
+// Document ... noop
+func (n *EmulatedMetricer) Document() []metrics.DocumentedMetric {
+	return []metrics.DocumentedMetric{}
 }

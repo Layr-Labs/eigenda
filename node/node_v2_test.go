@@ -45,7 +45,11 @@ func TestDownloadBundles(t *testing.T) {
 	})
 	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op0)
 	require.NoError(t, err)
-	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state, nil)
+
+	_, relayRequests, err := c.node.DetermineChunkLocations(batch, state, nil)
+	require.NoError(t, err)
+
+	blobShards, rawBundles, err := c.node.DownloadChunksFromRelays(ctx, batch, relayRequests, nil)
 	require.NoError(t, err)
 	require.Len(t, blobShards, 3)
 	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)
@@ -82,7 +86,11 @@ func TestDownloadBundlesFail(t *testing.T) {
 	})
 	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
 	require.NoError(t, err)
-	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state, nil)
+
+	_, relayRequests, err := c.node.DetermineChunkLocations(batch, state, nil)
+	require.NoError(t, err)
+
+	blobShards, rawBundles, err := c.node.DownloadChunksFromRelays(ctx, batch, relayRequests, nil)
 	require.Error(t, err)
 	require.Nil(t, blobShards)
 	require.Nil(t, rawBundles)
@@ -117,7 +125,11 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 
 	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
 	require.NoError(t, err)
-	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state, nil)
+
+	_, relayRequests, err := c.node.DetermineChunkLocations(batch, state, nil)
+	require.NoError(t, err)
+
+	blobShards, rawBundles, err := c.node.DownloadChunksFromRelays(ctx, batch, relayRequests, nil)
 	require.NoError(t, err)
 	require.Len(t, blobShards, 3)
 	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)

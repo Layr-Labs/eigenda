@@ -41,7 +41,7 @@ jobs:
           else
             COLOR="danger"
             STATUS_EMOJI="❌"
-            MENTION="@here "
+            MENTION="<@da-oncall> "
           fi
 
           PAYLOAD=$(jq -n \

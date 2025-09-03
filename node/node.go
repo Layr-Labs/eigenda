@@ -18,10 +18,15 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -57,6 +62,9 @@ var (
 	}
 )
 
+// TODO (cody.littley): refactor all exported fields in this struct to private fields and ensure that all interaction
+//  is mediated by methods.
+
 type Node struct {
 	Config                  *Config
 	Logger                  logging.Logger
@@ -64,7 +72,6 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
-	BlacklistStore          BlacklistStore
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
@@ -92,34 +99,64 @@ type Node struct {
 	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
 	// QuorumCount is the number of quorums in the network.
 	QuorumCount atomic.Uint32
+
+	// Used to limit the maximum amount of memory used to serve StoreChunks() gRPC requests.
+	StoreChunksSemaphore *semaphore.Weighted
+
+	// Looks up operator state and maintains a cache of recently used operator states.
+	OperatorStateCache operatorstate.OperatorStateCache
 }
 
 // NewNode creates a new Node with the provided config.
+// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
+	ctx context.Context,
 	reg *prometheus.Registry,
 	config *Config,
+	contractDirectory *directory.ContractDirectory,
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
+	err := configureMemoryLimits(nodeLogger, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure memory limits: %w", err)
+	}
+
 	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
 	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
-	err := os.MkdirAll(config.DbPath, os.ModePerm)
+	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
 
-	chainID, err := client.ChainID(context.Background())
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainID: %w", err)
 	}
 
+	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
+	}
+
+	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err :=
+		contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BLSOperatorStateRetriever address from contract directory: %w", err)
+	}
+
 	// Create Transactor
-	tx, err := eth.NewWriter(logger, client, config.EigenDADirectory, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, operatorStateRetrieverAddress.Hex(), serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
@@ -161,7 +198,7 @@ func NewNode(
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
 		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
-		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
+		staleMeasure, err := tx.GetBlockStaleMeasure(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get BLOCK_STALE_MEASURE: %w", err)
 		}
@@ -171,7 +208,7 @@ func NewNode(
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
 		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
-		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
+		storeDuration, err := tx.GetStoreDurationBlocks(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 		}
@@ -190,28 +227,7 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	// If EigenDADirectory is provided, use it to get service manager addresses
-	// Otherwise, use the provided address (legacy support; will be removed as a breaking change)
-	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
-	if config.EigenDADirectory != "" && gethcommon.IsHexAddress(config.EigenDADirectory) {
-		addressReader, err := eth.NewEigenDADirectoryReader(config.EigenDADirectory, client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create address directory reader: %w", err)
-		}
-		eigenDAServiceManagerAddr, err = addressReader.GetServiceManagerAddress()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get service manager address from EigenDADirectory: %w", err)
-		}
-		if config.EigenDAServiceManagerAddr != "" && eigenDAServiceManagerAddr.String() != config.EigenDAServiceManagerAddr {
-			return nil, fmt.Errorf("EigenDAServiceManagerAddr passed in as config (%v) does not match the one retrieved from EigenDADirectory (%v)",
-				config.EigenDADirectory, eigenDAServiceManagerAddr.Hex())
-		}
-	} else {
-		logger.Warn("EigenDADirectory is not set or is not a valid address, using provided EigenDAServiceManagerAddr. "+
-			"This is deprecated and will be removed in a future release. Please switch to using EigenDADirectory.",
-			"EigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "EigenDADirectory", config.EigenDADirectory)
-	}
-	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(eigenDAServiceManagerAddr, client)
+	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(serviceManagerAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
@@ -231,7 +247,7 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(),
+		"contractDirectoryAddress", config.EigenDADirectory,
 		"blockStaleMeasure", blockStaleMeasure,
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
@@ -248,13 +264,23 @@ func NewNode(
 	}
 	validationPool := workerpool.New(validationPoolSize)
 
+	storeChunksSemaphore := semaphore.NewWeighted(int64(config.StoreChunksBufferSizeBytes))
+
+	operatorStateCache, err := operatorstate.NewOperatorStateCache(
+		client,
+		cst,
+		registryCoordinatorAddress,
+		config.operatorStateCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
+	}
+
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		BlacklistStore:          nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
@@ -265,6 +291,8 @@ func NewNode(
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
 		ValidationPool:          validationPool,
+		StoreChunksSemaphore:    storeChunksSemaphore,
+		OperatorStateCache:      operatorStateCache,
 	}
 
 	if !config.EnableV2 {
@@ -273,7 +301,6 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
 		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
@@ -291,7 +318,8 @@ func NewNode(
 			UseSecureGrpcFlag:  config.RelayUseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
-			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
+			MaxGRPCMessageSize: config.RelayMaxMessageSize,
+			ConnectionPoolSize: config.RelayConnectionPoolSize,
 		}
 
 		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
@@ -306,11 +334,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 
-		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block number: %w", err)
 		}
-		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
@@ -319,6 +347,107 @@ func NewNode(
 
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
+}
+
+// configureMemoryLimits configures the memory limits for the Node. Updates derived values in the Config struct,
+// and also modifies the GC safety buffer size.
+//
+// All memory limits used by the validator should be configured within this function. This enables us to validate that
+// the total allocated memory does not exceed the maximum available memory.
+func configureMemoryLimits(logger logging.Logger, config *Config) error {
+
+	maxMemory, err := memory.GetMaximumAvailableMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get maximum available memory: %w", err)
+	}
+
+	totalAllocated := uint64(0)
+
+	config.GCSafetyBufferSizeBytes, err = computeMemoryPoolSize(
+		logger,
+		"GC Safety Buffer",
+		config.GCSafetyBufferSizeBytes,
+		config.GCSafetyBufferSizeFraction,
+		maxMemory)
+	if err != nil {
+		return fmt.Errorf("failed to compute size: %w", err)
+	}
+	err = memory.SetGCMemorySafetyBuffer(config.GCSafetyBufferSizeBytes)
+	if err != nil {
+		return fmt.Errorf("failed to set GC memory safety buffer: %w", err)
+	}
+	totalAllocated += config.GCSafetyBufferSizeBytes
+
+	if config.EnableV2 {
+		config.LittDBReadCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB read cache",
+			config.LittDBReadCacheSizeBytes,
+			config.LittDBReadCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBReadCacheSizeBytes
+
+		config.LittDBWriteCacheSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"LittDB write cache",
+			config.LittDBWriteCacheSizeBytes,
+			config.LittDBWriteCacheSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.LittDBWriteCacheSizeBytes
+
+		config.StoreChunksBufferSizeBytes, err = computeMemoryPoolSize(
+			logger,
+			"StoreChunks Buffer",
+			config.StoreChunksBufferSizeBytes,
+			config.StoreChunksBufferSizeFraction,
+			maxMemory)
+		if err != nil {
+			return fmt.Errorf("failed to compute size: %w", err)
+		}
+		totalAllocated += config.StoreChunksBufferSizeBytes
+	}
+
+	if totalAllocated > maxMemory {
+		return fmt.Errorf("total memory allocated (%d bytes) "+
+			"exceeds maximum available memory (%d bytes)", totalAllocated, maxMemory)
+	}
+
+	bytesRemaining := maxMemory - totalAllocated
+	logger.Infof("Total unallocated memory: %s", common.PrettyPrintBytes(bytesRemaining))
+
+	return nil
+}
+
+// Compute the size of a memory pool.
+func computeMemoryPoolSize(
+	logger logging.Logger,
+	poolName string,
+	constantSizeInBytes uint64,
+	fraction float64,
+	maxMemory uint64) (uint64, error) {
+
+	if constantSizeInBytes > 0 {
+		logger.Infof("%s is configured to use %s memory",
+			poolName, common.PrettyPrintBytes(constantSizeInBytes))
+		return constantSizeInBytes, nil
+	}
+
+	// If the constant size is not set, calculate the size based on the fraction of the maximum memory.
+	if fraction < 0.0 || fraction > 1.0 {
+		return 0, fmt.Errorf("fraction for %s must be between 0.0 and 1.0, got: %f", poolName, fraction)
+	}
+
+	poolSize := uint64(fraction * float64(maxMemory))
+	logger.Infof("%s is configured to use %0.2f%% of %s available memory (%s).",
+		poolName, fraction*100.0, common.PrettyPrintBytes(maxMemory), common.PrettyPrintBytes(poolSize))
+
+	return poolSize, nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -72,7 +73,7 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config := &TestClientConfig{}
+	config := DefaultTestClientConfig()
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
@@ -135,7 +136,7 @@ func GetClient(configPath string) (*TestClient, error) {
 		}
 	}
 
-	client, err := NewTestClient(logger, metrics, testConfig)
+	client, err := NewTestClient(context.Background(), logger, metrics, testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test client: %w", err)
 	}
