@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	// used if DEPLOY_LOCALSTACK != "false"
-	defaultLocalStackPort = "4566"
+	defaultLocalstackPort = "4566"
 )
 
 var (
@@ -27,31 +27,36 @@ var (
 
 // TestMain sets up Localstack/Dynamo for all tests in the ondemand package and tears down after.
 func TestMain(m *testing.M) {
-	localStackPort := defaultLocalStackPort
+	localstackPort := defaultLocalstackPort
 
-	var dockertestPool *dockertest.Pool
-	var dockertestResource *dockertest.Resource
+	var localstackContainer *testbed.LocalStackContainer
 	var deployLocalStack bool
 
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		deployLocalStack = true
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
-		if err != nil {
-			deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
 
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
+		if err != nil {
+			localstackContainer.Terminate(context.Background())
 			panic("failed to start localstack container: " + err.Error())
 		}
 	} else {
 		// localstack is already deployed
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	awsConfig := aws.Config{
@@ -78,7 +83,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		localstackContainer.Terminate(context.Background())
 	}
 	os.Exit(code)
 }
@@ -93,16 +98,16 @@ func createPaymentTable(t *testing.T, tableName string) string {
 	fullTableName := fmt.Sprintf("%s_%d", tableName, randomSuffix)
 
 	// Create local client config for table creation
-	localStackPort := defaultLocalStackPort
+	localstackPort := defaultLocalstackPort
 	if os.Getenv("DEPLOY_LOCALSTACK") == "false" {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)
