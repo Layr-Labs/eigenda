@@ -451,7 +451,7 @@ var _ = AfterSuite(func() {
 
 		if localstackContainer != nil {
 			fmt.Println("Stopping localstack container")
-			localstackContainer.Terminate(context.Background())
+			_ = localstackContainer.Terminate(context.Background())
 		}
 	}
 })

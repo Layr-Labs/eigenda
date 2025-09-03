@@ -146,7 +146,7 @@ func TestMain(m *testing.M) {
 
 func teardown() {
 	if deployLocalStack {
-		localstackContainer.Terminate(context.Background())
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 

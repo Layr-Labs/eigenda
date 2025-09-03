@@ -723,6 +723,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 func teardown() {
 	if deployLocalStack && localstackContainer != nil {
-		localstackContainer.Terminate(context.Background())
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }

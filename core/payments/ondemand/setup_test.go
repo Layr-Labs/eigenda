@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 
 		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
-			localstackContainer.Terminate(context.Background())
+			_ = localstackContainer.Terminate(context.Background())
 			panic("failed to start localstack container: " + err.Error())
 		}
 	} else {
@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 	if deployLocalStack {
-		localstackContainer.Terminate(context.Background())
+		_ = localstackContainer.Terminate(context.Background())
 	}
 	os.Exit(code)
 }

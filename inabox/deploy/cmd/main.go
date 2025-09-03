@@ -162,7 +162,7 @@ func localstack(ctx *cli.Context) error {
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: metadataTableNameV2,
 		}
-		return testbed.DeployResources(context, deployConfig)
+		return fmt.Errorf("failed to deploy resources: %w", testbed.DeployResources(context, deployConfig))
 	}
 
 	return nil

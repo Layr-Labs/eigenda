@@ -189,7 +189,8 @@ func createPaymentTables(cfg aws.ClientConfig, prefix string) error {
 }
 
 // DeployResourcesWithContainer is a convenience function that uses a LocalStackContainer
-func DeployResourcesWithContainer(ctx context.Context, container *LocalStackContainer, config DeployResourcesConfig) error {
+func DeployResourcesWithContainer(ctx context.Context,
+	container *LocalStackContainer, config DeployResourcesConfig) error {
 	// Override the endpoint with the container's endpoint
 	config.LocalStackEndpoint = container.Endpoint()
 	return DeployResources(ctx, config)

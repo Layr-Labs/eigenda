@@ -121,7 +121,7 @@ func teardownLocalstack() {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		localstackContainer.Terminate(context.Background())
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 
