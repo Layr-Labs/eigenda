@@ -338,7 +338,8 @@ func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTota
 	if err != nil {
 		return fmt.Errorf("update total deposits: %w", err)
 	}
-	// TODO: add metric for total deposits
+
+	cl.accountantMetricer.RecordOnDemandTotalDeposits(cl.accountID.Hex(), newTotalDeposit)
 
 	return nil
 }

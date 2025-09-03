@@ -17,6 +17,8 @@ var (
 
 type AccountantMetricer interface {
 	RecordCumulativePayment(accountID string, wei *big.Int)
+	RecordOnDemandTotalDeposits(accountID string, wei *big.Int)
+
 	RecordReservationPayment(accountID string, remainingCapacity float64)
 	RecordReservationBucketCapacity(accountID string, bucketSize float64)
 
@@ -24,7 +26,9 @@ type AccountantMetricer interface {
 }
 
 type AccountantMetrics struct {
-	CumulativePayment            *prometheus.GaugeVec
+	CumulativePayment     *prometheus.GaugeVec
+	OnDemandTotalDeposits *prometheus.GaugeVec
+
 	ReservationRemainingCapacity *prometheus.GaugeVec
 	ReservationBucketCapacity    *prometheus.GaugeVec
 
@@ -44,6 +48,14 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
 			Help:      "Current cumulative payment balance (gwei)",
+		}, []string{
+			"account_id",
+		}),
+		OnDemandTotalDeposits: factory.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "ondemand_total_deposits",
+			Namespace: namespace,
+			Subsystem: accountantSubsystem,
+			Help:      "Total on-demand deposits available (gwei)",
 		}, []string{
 			"account_id",
 		}),
@@ -77,6 +89,12 @@ func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.I
 	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
+func (m *AccountantMetrics) RecordOnDemandTotalDeposits(accountID string, wei *big.Int) {
+	gwei := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(gweiFactor))
+	gweiFloat64, _ := gwei.Float64()
+	m.OnDemandTotalDeposits.WithLabelValues(accountID).Set(gweiFloat64)
+}
+
 func (m *AccountantMetrics) RecordReservationPayment(accountID string, remainingCapacity float64) {
 	m.ReservationRemainingCapacity.WithLabelValues(accountID).Set(remainingCapacity)
 }
@@ -95,6 +113,9 @@ type noopAccountantMetricer struct {
 var NoopAccountantMetrics AccountantMetricer = new(noopAccountantMetricer)
 
 func (n *noopAccountantMetricer) RecordCumulativePayment(_ string, _ *big.Int) {
+}
+
+func (n *noopAccountantMetricer) RecordOnDemandTotalDeposits(_ string, _ *big.Int) {
 }
 
 func (n *noopAccountantMetricer) RecordReservationPayment(_ string, _ float64) {
