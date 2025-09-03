@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments"
 )
 
 // Tracks usage of a single account reservation
@@ -81,10 +82,12 @@ func (rl *ReservationLedger) Debit(
 		return false, 0, fmt.Errorf("check time: %w", err)
 	}
 
+	billableSymbols := payments.CalculateBillableSymbols(symbolCount, rl.config.minNumSymbols)
+
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	success, err := rl.leakyBucket.Fill(now, symbolCount)
+	success, err := rl.leakyBucket.Fill(now, billableSymbols)
 	if err != nil {
 		return false, 0, fmt.Errorf("fill: %w", err)
 	}
@@ -103,10 +106,12 @@ func (rl *ReservationLedger) Debit(
 //
 // Returns the remaining capacity in the bucket after the revert operation.
 func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (float64, error) {
+	billableSymbols := payments.CalculateBillableSymbols(symbolCount, rl.config.minNumSymbols)
+
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	err := rl.leakyBucket.RevertFill(now, symbolCount)
+	err := rl.leakyBucket.RevertFill(now, billableSymbols)
 	if err != nil {
 		return 0, fmt.Errorf("revert fill: %w", err)
 	}

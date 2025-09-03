@@ -546,7 +546,7 @@ func buildReservationLedger(t *testing.T) *reservation.ReservationLedger {
 	require.NoError(t, err)
 
 	reservationLedgerConfig, err := reservation.NewReservationLedgerConfig(
-		*res, false, reservation.OverfillOncePermitted, time.Minute)
+		*res, 1, false, reservation.OverfillOncePermitted, time.Minute)
 	require.NotNil(t, reservationLedgerConfig)
 	require.NoError(t, err)
 

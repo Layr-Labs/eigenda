@@ -19,7 +19,7 @@ type TestPaymentVault struct {
 
 	// Global parameters
 	globalSymbolsPerSecond uint64
-	minNumSymbols          uint64
+	minNumSymbols          uint32
 	PricePerSymbol         uint64
 
 	// Error injection for testing error paths
@@ -58,7 +58,7 @@ func (t *TestPaymentVault) SetGlobalSymbolsPerSecond(value uint64) {
 }
 
 // SetMinNumSymbols sets the minimum number of symbols parameter
-func (t *TestPaymentVault) SetMinNumSymbols(value uint64) {
+func (t *TestPaymentVault) SetMinNumSymbols(value uint32) {
 	t.minNumSymbols = value
 }
 
@@ -130,7 +130,7 @@ func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint6
 }
 
 // GetMinNumSymbols retrieves the minimum number of symbols parameter
-func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
+func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	if t.getMinNumSymbolsErr != nil {
 		return 0, t.getMinNumSymbolsErr
 	}

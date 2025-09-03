@@ -23,7 +23,11 @@ type PaymentVault interface {
 
 	// Retrieves the minimum billable size for all dispersals.
 	// Dispersals are rounded up to the nearest multiple of this value for accounting.
-	GetMinNumSymbols(ctx context.Context) (uint64, error)
+	//
+	// This value is stored as a uint64 on-chain, but we return it as a uint32 from this interface. Blob size is
+	// a number of symbols represented by a uint32, so having a minimum symbol count defined as a uint64 complicates
+	// comparisons further downstream.
+	GetMinNumSymbols(ctx context.Context) (uint32, error)
 
 	// Retrieves the price per symbol (in wei) for on-demand payments.
 	GetPricePerSymbol(ctx context.Context) (uint64, error)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -74,12 +75,17 @@ func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, 
 }
 
 // Retrieves the minimum number of symbols parameter
-func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
+func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	minNumSymbols, err := pv.paymentVaultBinding.MinNumSymbols(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, fmt.Errorf("min num symbols eth call: %w", err)
 	}
-	return minNumSymbols, nil
+
+	if minNumSymbols > math.MaxUint32 {
+		return 0, fmt.Errorf("min num symbols > math.MaxUint32: this is nonsensically large, and cannot be handled")
+	}
+
+	return uint32(minNumSymbols), nil
 }
 
 // GetPricePerSymbol retrieves the price per symbol parameter

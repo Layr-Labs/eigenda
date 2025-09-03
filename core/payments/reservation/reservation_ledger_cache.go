@@ -39,6 +39,8 @@ type ReservationLedgerCache struct {
 	overfillBehavior OverfillBehavior
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration
+	// minimum number of symbols to bill, from the PaymentVault
+	minNumSymbols uint32
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
 	// The lru.Cache object itself is threadsafe, as are the ReservationLedger values contained in the cache. This lock
@@ -92,6 +94,11 @@ func NewReservationLedgerCache(
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
 
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
 	return &ReservationLedgerCache{
 		logger:               logger,
 		cache:                cache,
@@ -99,6 +106,7 @@ func NewReservationLedgerCache(
 		timeSource:           timeSource,
 		overfillBehavior:     overfillBehavior,
 		bucketCapacityPeriod: bucketCapacityPeriod,
+		minNumSymbols:        minNumSymbols,
 		ledgerCreationLock:   common.NewIndexLock(256),
 	}, nil
 }
@@ -138,6 +146,7 @@ func (c *ReservationLedgerCache) GetOrCreate(
 
 	reservationLedgerConfig, err := NewReservationLedgerConfig(
 		*reservationObj,
+		c.minNumSymbols,
 		// start empty, to err on the side of permitting more throughput instead of less
 		false,
 		c.overfillBehavior,
