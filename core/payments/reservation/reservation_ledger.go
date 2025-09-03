@@ -176,3 +176,11 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 
 	return nil
 }
+
+// Returns the total bucket capacity in symbols
+func (rl *ReservationLedger) GetBucketCapacity() float64 {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	return rl.leakyBucket.bucketCapacity
+}

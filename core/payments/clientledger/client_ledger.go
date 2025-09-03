@@ -320,6 +320,8 @@ func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReser
 		return fmt.Errorf("update reservation: %w", err)
 	}
 
+	cl.accountantMetricer.RecordReservationBucketCapacity(cl.accountID.Hex(), cl.reservationLedger.GetBucketCapacity())
+
 	return nil
 }
 
@@ -336,6 +338,7 @@ func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTota
 	if err != nil {
 		return fmt.Errorf("update total deposits: %w", err)
 	}
+	// TODO: add metric for total deposits
 
 	return nil
 }
