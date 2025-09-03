@@ -135,7 +135,6 @@ library EigenDACertVerificationLib {
 
         bool isValid = Merkle.verifyInclusionKeccak(blobInclusionInfo.inclusionProof, rootHash, encodedBlobHash, blobInclusionInfo.blobIndex);
 
-        // require(isValid, InvalidInclusionProof(blobInclusionInfo.blobIndex, encodedBlobHash, rootHash));
         if (!isValid) {
             revert InvalidInclusionProof(blobInclusionInfo.blobIndex, encodedBlobHash, rootHash);
         }
