@@ -91,7 +91,7 @@ func (pv *ReservationPaymentValidator) Debit(
 	}
 
 	now := pv.timeSource()
-	success, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
+	success, _, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
 	if err != nil {
 		return fmt.Errorf("debit reservation payment: %w", err)
 	}

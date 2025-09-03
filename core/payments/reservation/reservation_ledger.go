@@ -46,15 +46,16 @@ func NewReservationLedger(
 
 // Debit the reservation with a number of symbols.
 //
-// Returns (true, nil) if the reservation has enough capacity to perform the debit.
-// Returns (false, nil) if the bucket lacks capacity to permit the fill.
-// Returns (false, error) if an error occurs. Possible errors include:
+// Returns (true, remainingCapacity, nil) if the reservation has enough capacity to perform the debit.
+// Returns (false, remainingCapacity, nil) if the bucket lacks capacity to permit the fill.
+// Returns (false, 0, error) if an error occurs. Possible errors include:
 //   - [QuorumNotPermittedError]: one or more of the requested quorums are not permitted by the reservation
 //   - [TimeOutOfRangeError]: the dispersal time is outside the reservation's valid time range
 //   - [TimeMovedBackwardError]: current time is before a previously observed time (only possible if input time
 //     instances don't included monotonic timestamps)
 //   - Generic errors for all other unexpected behavior
 //
+// The remainingCapacity is the amount of space left in the bucket after the operation (in symbols).
 // If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
 // failed debit doesn't count against the meter.
 func (rl *ReservationLedger) Debit(
@@ -68,16 +69,16 @@ func (rl *ReservationLedger) Debit(
 	symbolCount uint32,
 	// the quorums being dispersed to
 	quorums []core.QuorumID,
-) (bool, error) {
+) (bool, float64, error) {
 
 	err := rl.config.reservation.CheckQuorumsPermitted(quorums)
 	if err != nil {
-		return false, fmt.Errorf("check quorums permitted: %w", err)
+		return false, 0, fmt.Errorf("check quorums permitted: %w", err)
 	}
 
 	err = rl.config.reservation.CheckTime(dispersalTime)
 	if err != nil {
-		return false, fmt.Errorf("check time: %w", err)
+		return false, 0, fmt.Errorf("check time: %w", err)
 	}
 
 	rl.lock.Lock()
@@ -85,10 +86,12 @@ func (rl *ReservationLedger) Debit(
 
 	success, err := rl.leakyBucket.Fill(now, symbolCount)
 	if err != nil {
-		return false, fmt.Errorf("fill: %w", err)
+		return false, 0, fmt.Errorf("fill: %w", err)
 	}
 
-	return success, nil
+	remainingCapacity := rl.leakyBucket.GetRemainingCapacity()
+
+	return success, remainingCapacity, nil
 }
 
 // Credit the reservation with a number of symbols. This method "undoes" a previous debit, following a failed dispersal.
@@ -97,16 +100,20 @@ func (rl *ReservationLedger) Debit(
 // "refunds" the amount of symbols that were originally debited. Since the leaky bucket backing the reservation can't
 // get emptier than "empty", it may be the case that only a portion of the debit is reverted, with the final capacity
 // being clamped to 0.
-func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) error {
+//
+// Returns the remaining capacity in the bucket after the revert operation.
+func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (float64, error) {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
 	err := rl.leakyBucket.RevertFill(now, symbolCount)
 	if err != nil {
-		return fmt.Errorf("revert fill: %w", err)
+		return 0, fmt.Errorf("revert fill: %w", err)
 	}
 
-	return nil
+	remainingCapacity := rl.leakyBucket.GetRemainingCapacity()
+
+	return remainingCapacity, nil
 }
 
 // Checks if the underlying leaky bucket is empty.
