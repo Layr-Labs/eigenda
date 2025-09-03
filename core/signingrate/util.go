@@ -20,3 +20,14 @@ func sortValidatorSigningRate(rates []*validator.ValidatorSigningRate) {
 		return bytes.Compare(rates[i].GetId(), rates[j].GetId()) < 0
 	})
 }
+
+// Performs a deep copy of a ValidatorSigningRate.
+func cloneValidatorSigningRate(info *validator.ValidatorSigningRate) *validator.ValidatorSigningRate {
+	return &validator.ValidatorSigningRate{
+		Id:             info.GetId(),
+		SignedBatches:  info.GetSignedBatches(),
+		SignedBytes:    info.GetSignedBytes(),
+		UnsignedBytes:  info.GetUnsignedBytes(),
+		SigningLatency: info.GetSigningLatency(),
+	}
+}

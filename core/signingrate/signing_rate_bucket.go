@@ -22,7 +22,7 @@ type SigningRateBucket struct {
 
 	// Signing rate info for each validator in this bucket. If a validator is not present in this map, it can be
 	// assumed that the validator has been Down for the entire duration of the bucket.
-	validatorInfo map[core.OperatorID]*ValidatorSigningRate
+	validatorInfo map[core.OperatorID]*validator.ValidatorSigningRate
 
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
 	cachedProtobuf *validator.SigningRateBucket
@@ -36,7 +36,7 @@ func NewBucket(
 	span time.Duration,
 ) *SigningRateBucket {
 
-	validatorInfo := make(map[core.OperatorID]*ValidatorSigningRate)
+	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 	bucket := &SigningRateBucket{
 		logger:         logger,
 		startTimestamp: startTime,
@@ -56,12 +56,12 @@ func NewBucketFromProto(
 	startTime := time.Unix(int64(pb.GetStartTimestamp()), 0)
 	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
 
-	validatorInfo := make(map[core.OperatorID]*ValidatorSigningRate)
+	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 
 	for _, info := range pb.GetValidatorSigningRates() {
 		var id core.OperatorID
 		copy(id[:], info.GetId())
-		validatorInfo[id] = NewSigningRateFromProtobuf(info)
+		validatorInfo[id] = info
 	}
 
 	return &SigningRateBucket{
@@ -78,6 +78,8 @@ func NewBucketFromProto(
 // If now is non-nil, then the EndTimestamp will be set to now. In general, a non-nil value for now should
 // be provided when getting information about a bucket that is currently being written to, and nil should
 // be provided when getting information about bucket in the past that is no longer being written to.
+//
+// The resulting protobuf is a deep copy, and is therefore threadsafe to use concurrently with this SigningRateBucket.
 func (b *SigningRateBucket) ToProtobuf(now time.Time) *validator.SigningRateBucket {
 	if b.cachedProtobuf != nil {
 		return b.cachedProtobuf
@@ -96,7 +98,7 @@ func (b *SigningRateBucket) ToProtobuf(now time.Time) *validator.SigningRateBuck
 
 	validatorSigningRates := make([]*validator.ValidatorSigningRate, 0, len(b.validatorInfo))
 	for _, info := range b.validatorInfo {
-		validatorSigningRates = append(validatorSigningRates, info.ToProtobuf())
+		validatorSigningRates = append(validatorSigningRates, cloneValidatorSigningRate(info))
 	}
 
 	// Sort for deterministic output. Not strictly necessary, but sometimes nice to have.
@@ -121,9 +123,9 @@ func (b *SigningRateBucket) ReportSuccess(
 ) {
 	info := b.getValidator(id)
 
-	info.IncrementSignedBatches()
-	info.AddSignedBytes(batchSize)
-	info.AddSigningLatency(uint64(signingLatency.Nanoseconds()))
+	info.SignedBatches += 1
+	info.SignedBytes += batchSize
+	info.SigningLatency += uint64(signingLatency.Nanoseconds())
 
 	b.endTimestamp = now
 	b.cachedProtobuf = nil
@@ -135,8 +137,8 @@ func (b *SigningRateBucket) ReportSuccess(
 func (b *SigningRateBucket) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
 	info := b.getValidator(id)
 
-	info.IncrementSignedBatches()
-	info.AddUnsignedBytes(batchSize)
+	info.SignedBatches += 1
+	info.UnsignedBytes += batchSize
 
 	b.endTimestamp = now
 	b.cachedProtobuf = nil
@@ -153,7 +155,7 @@ func (b *SigningRateBucket) EndTimestamp() time.Time {
 }
 
 // Get the signing rate info for a validator, creating a new entry if necessary.
-func (b *SigningRateBucket) getValidator(id core.OperatorID) *ValidatorSigningRate {
+func (b *SigningRateBucket) getValidator(id core.OperatorID) *validator.ValidatorSigningRate {
 	info, exists := b.validatorInfo[id]
 	if !exists {
 		info = b.newValidator(id)
@@ -162,14 +164,19 @@ func (b *SigningRateBucket) getValidator(id core.OperatorID) *ValidatorSigningRa
 }
 
 // Get the signing rate info for a validator if it is registered, or nil if it is not.
-func (b *SigningRateBucket) getValidatorIfExists(id core.OperatorID) (signingRate *ValidatorSigningRate, exists bool) {
+func (b *SigningRateBucket) getValidatorIfExists(
+	id core.OperatorID,
+) (signingRate *validator.ValidatorSigningRate, exists bool) {
+
 	signingRate, exists = b.validatorInfo[id]
 	return signingRate, exists
 }
 
 // Add a new validator to the set of validators tracked by this bucket.
-func (b *SigningRateBucket) newValidator(id core.OperatorID) *ValidatorSigningRate {
-	signingRate := NewSigningRate(id)
+func (b *SigningRateBucket) newValidator(id core.OperatorID) *validator.ValidatorSigningRate {
+	signingRate := &validator.ValidatorSigningRate{
+		Id: id[:],
+	}
 	b.validatorInfo[id] = signingRate
 	return signingRate
 }

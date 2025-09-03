@@ -174,11 +174,11 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 			continue
 		}
 
-		totalSigningRate.SignedBatches += signingRate.SignedBatches()
-		totalSigningRate.UnsignedBatches += signingRate.UnsignedBatches()
-		totalSigningRate.SignedBytes += signingRate.SignedBytes()
-		totalSigningRate.UnsignedBytes += signingRate.UnsignedBytes()
-		totalSigningRate.SigningLatency += signingRate.SigningLatency()
+		totalSigningRate.SignedBatches += signingRate.GetSignedBatches()
+		totalSigningRate.UnsignedBatches += signingRate.GetUnsignedBatches()
+		totalSigningRate.SignedBytes += signingRate.GetSignedBytes()
+		totalSigningRate.UnsignedBytes += signingRate.GetUnsignedBytes()
+		totalSigningRate.SigningLatency += signingRate.GetSigningLatency()
 	}
 
 	return totalSigningRate, nil
@@ -193,6 +193,8 @@ func (s *signingRateTracker) GetSigningRateDump(
 
 	// Iterate backwards. In general, dump requests will only be used to fetch recent data, so
 	// we should optimize the case where we are requesting a few buckets from the end of the deque.
+	// Wost case scenario, we iterate the entire deque. If we do that, we are about to transmit the contents
+	// of the deque over a network connection. And so in that case, the cost of iteration doesn't really matter.
 	for _, bucket := range s.buckets.ReverseIterator() {
 		if bucket.EndTimestamp().Before(startTime) {
 			// This bucket is too old, skip it and stop iterating.
