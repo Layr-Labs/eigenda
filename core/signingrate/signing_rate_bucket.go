@@ -27,7 +27,7 @@ type SigningRateBucket struct {
 
 // Create a new empty SigningRateBucket. If provided with validator IDs, then those validators will be initialized as Up.
 // Any validator not provided to the constructor will be assumed to be Down until it is reported as Up.
-func NewBucket(startTime time.Time, span time.Duration) *SigningRateBucket {
+func NewSigningRateBucket(startTime time.Time, span time.Duration) *SigningRateBucket {
 
 	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 	bucket := &SigningRateBucket{

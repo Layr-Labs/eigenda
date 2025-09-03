@@ -50,7 +50,7 @@ func TestProtoConversion(t *testing.T) {
 	})
 
 	span := rand.DurationRange(time.Second, time.Hour)
-	bucket := NewBucket(rand.Time(), span)
+	bucket := NewSigningRateBucket(rand.Time(), span)
 
 	for _, validatorID := range validatorIDs {
 		bucket.validatorInfo[validatorID] = &validator.ValidatorSigningRate{
@@ -122,7 +122,7 @@ func TestReporting(t *testing.T) {
 	}
 
 	span := rand.DurationRange(time.Second, time.Hour)
-	bucket := NewBucket(rand.Time(), span)
+	bucket := NewSigningRateBucket(rand.Time(), span)
 
 	// Simulate a bunch of random reports.
 	for i := 0; i < 10_000; i++ {

@@ -55,6 +55,11 @@ type SigningRateTracker interface {
 	// only be used to update the last bucket in the store. Data is ignored if the bucket won't be the
 	// last bucket.
 	//
+	// The intended use of this method is to set up a SigningRateTracker that mirrors a remote SigningRateTracker.
+	// The remote tracker is the source of truth, and this local tracker is just a cache. Periodically, get data
+	// from the remote tracker using GetSigningRateDump(), and then insert the data returned into this tracker using
+	// UpdateLastBucket().
+	//
 	// This operation doesn't mark a bucket as unflushed. A bucket is only marked as unflushed when it is modified,
 	// not when it is provided whole-sale from an external source.
 	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket)
@@ -76,7 +81,7 @@ type signingRateTracker struct {
 	unflushedBuckets map[time.Time]*SigningRateBucket
 
 	// The length of time to keep loaded in memory.
-	timespan time.Duration
+	timeSpan time.Duration
 
 	// The duration of each bucket. Buckets loaded from storage may have different spans, but new buckets will
 	// always have this span.
@@ -89,24 +94,25 @@ type signingRateTracker struct {
 // Create a new SigningRateTracker.
 //
 //   - signingRateDatabase: The database to use for storing historical signing rate information.
-//   - timespan: The amount of time to keep in memory. Queries are only supported for this timespan.
+//   - timeSpan: The amount of time to keep in memory. Queries are only supported for this timeSpan.
 //   - bucketSpan: The duration of each bucket.
 func NewSigningRateTracker(
 	logger logging.Logger,
-	timespan time.Duration,
+	timeSpan time.Duration,
 	bucketSpan time.Duration,
 	registry *prometheus.Registry,
-) (SigningRateTracker, error) {
+) SigningRateTracker {
 
 	store := &signingRateTracker{
-		logger:     logger,
-		buckets:    common.NewRandomAccessDeque[*SigningRateBucket](0),
-		timespan:   timespan,
-		bucketSpan: bucketSpan,
-		metrics:    NewSigningRateMetrics(registry),
+		logger:           logger,
+		buckets:          common.NewRandomAccessDeque[*SigningRateBucket](0),
+		timeSpan:         timeSpan,
+		bucketSpan:       bucketSpan,
+		unflushedBuckets: make(map[time.Time]*SigningRateBucket),
+		metrics:          NewSigningRateMetrics(registry),
 	}
 
-	return store, nil
+	return store
 }
 
 func (s *signingRateTracker) Close() {
@@ -264,7 +270,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 
 	if s.buckets.Size() == 0 {
 		// Create the first bucket.
-		newBucket := NewBucket(now, s.bucketSpan)
+		newBucket := NewSigningRateBucket(now, s.bucketSpan)
 		s.buckets.PushBack(newBucket)
 	}
 
@@ -274,7 +280,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 	if now.After(bucket.EndTimestamp()) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
-		bucket = NewBucket(now, s.bucketSpan)
+		bucket = NewSigningRateBucket(now, s.bucketSpan)
 		s.buckets.PushBack(bucket)
 
 		// Now is a good time to do garbage collection. As long as bucket size remains fixed, we should be removing
@@ -285,9 +291,9 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 	return bucket
 }
 
-// Remove old buckets that are outside the configured timespan.
+// Remove old buckets that are outside the configured timeSpan.
 func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
-	cutoff := now.Add(-s.timespan)
+	cutoff := now.Add(-s.timeSpan)
 
 	for s.buckets.Size() > 0 {
 		bucket, err := s.buckets.PeekFront()
