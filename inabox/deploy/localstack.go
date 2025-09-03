@@ -111,11 +111,11 @@ func DeployResources(
 	pool.MaxWait = 10 * time.Second
 	_, b, _, _ := runtime.Caller(0)
 	rootPath := filepath.Join(filepath.Dir(b), "../..")
-	changeDirectory(filepath.Join(rootPath, "inabox"))
+	scriptPath := filepath.Join(rootPath, "inabox", "create-s3-bucket.sh")
 	if err := pool.Retry(func() error {
 		fmt.Println("Creating S3 bucket")
 		return execCmd(
-			"./create-s3-bucket.sh",
+			scriptPath,
 			[]string{},
 			[]string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)},
 			true)

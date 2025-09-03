@@ -46,10 +46,10 @@ type testComponents struct {
 func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point.300000",
-		G2Path:          "../../inabox/resources/kzg/g2.point.300000",
-		G2PowerOf2Path:  "../../inabox/resources/kzg/g2.point.300000.powerOf2",
-		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		G2PowerOf2Path:  "../../resources/srs/g2.point.powerOf2",
+		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

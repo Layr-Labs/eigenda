@@ -37,10 +37,10 @@ func setup() {
 	log.Println("Setting up suite")
 
 	kzgConfig = &kzg.KzgConfig{
-		G1Path:          "../../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../../inabox/resources/kzg/g2.point",
-		G2PowerOf2Path:  "../../../inabox/resources/kzg/g2.point.powerOf2",
-		CacheDir:        "../../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../../resources/srs/g1.point",
+		G2Path:          "../../../resources/srs/g2.point",
+		G2PowerOf2Path:  "../../../resources/srs/g2.point.powerOf2",
+		CacheDir:        "../../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 2900,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
