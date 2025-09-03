@@ -277,7 +277,7 @@ func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket 
 	bucket, err := s.buckets.PeekBack()
 	enforce.NilError(err, "should be impossible with a non-empty deque")
 
-	if now.After(bucket.EndTimestamp()) {
+	if !now.Before(bucket.EndTimestamp()) {
 		// The current bucket's time span has elapsed, create a new bucket.
 
 		bucket = NewSigningRateBucket(now, s.bucketSpan)

@@ -122,9 +122,9 @@ type SigningRateBucket struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The start time of the bucket in seconds since Unix epoch.
+	// The start time of the bucket in seconds since Unix epoch, inclusive.
 	StartTimestamp uint64 `protobuf:"varint,1,opt,name=start_timestamp,json=startTimestamp,proto3" json:"start_timestamp,omitempty"`
-	// The end time of the bucket in seconds since Unix epoch.
+	// The end time of the bucket in seconds since Unix epoch, exclusive.
 	EndTimestamp uint64 `protobuf:"varint,2,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
 	// The signing rates of individual validators during the bucket period.
 	ValidatorSigningRates []*ValidatorSigningRate `protobuf:"bytes,3,rep,name=validator_signing_rates,json=validatorSigningRates,proto3" json:"validator_signing_rates,omitempty"`

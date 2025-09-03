@@ -155,3 +155,18 @@ func TestReporting(t *testing.T) {
 		require.Equal(t, expectedLatency[validatorID], signingRate.GetSigningLatency())
 	}
 }
+
+func TestCloneValidatorSigningRate(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	signingRate := &validator.ValidatorSigningRate{
+		Id:             rand.Bytes(32),
+		SignedBatches:  rand.Uint64(),
+		SignedBytes:    rand.Uint64(),
+		UnsignedBytes:  rand.Uint64(),
+		SigningLatency: rand.Uint64(),
+	}
+
+	clone := cloneValidatorSigningRate(signingRate)
+	require.True(t, areSigningRatesEqual(signingRate, clone))
+}

@@ -66,8 +66,8 @@ func validateTracker(
 func randomOperationsTest(
 	t *testing.T,
 	tracker SigningRateTracker,
-	bucketSpan time.Duration,
 	timeSpan time.Duration,
+	bucketSpan time.Duration,
 ) {
 	defer tracker.Close()
 	rand := random.NewTestRandom()
@@ -105,9 +105,7 @@ func randomOperationsTest(
 		expectedBucket := expectedBuckets[len(expectedBuckets)-1]
 		if !currentTime.Before(expectedBucket.endTimestamp) {
 			// We've moved into a new bucket.
-
-			newBucketStart := expectedBucket.endTimestamp
-			expectedBucket = NewSigningRateBucket(newBucketStart, bucketSpan)
+			expectedBucket = NewSigningRateBucket(currentTime, bucketSpan)
 			expectedBuckets = append(expectedBuckets, expectedBucket)
 		}
 
@@ -126,7 +124,7 @@ func randomOperationsTest(
 		}
 
 		currentTime = currentTime.Add(time.Second)
-		if currentTime.After(endTime) {
+		if !currentTime.Before(endTime) {
 			// Do one last validation at the end of the test.
 			validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
 		}

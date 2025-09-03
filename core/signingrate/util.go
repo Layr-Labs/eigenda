@@ -24,10 +24,11 @@ func sortValidatorSigningRate(rates []*validator.ValidatorSigningRate) {
 // Performs a deep copy of a ValidatorSigningRate.
 func cloneValidatorSigningRate(info *validator.ValidatorSigningRate) *validator.ValidatorSigningRate {
 	return &validator.ValidatorSigningRate{
-		Id:             info.GetId(),
-		SignedBatches:  info.GetSignedBatches(),
-		SignedBytes:    info.GetSignedBytes(),
-		UnsignedBytes:  info.GetUnsignedBytes(),
-		SigningLatency: info.GetSigningLatency(),
+		Id:              info.GetId(),
+		SignedBatches:   info.GetSignedBatches(),
+		SignedBytes:     info.GetSignedBytes(),
+		UnsignedBatches: info.GetUnsignedBatches(),
+		UnsignedBytes:   info.GetUnsignedBytes(),
+		SigningLatency:  info.GetSigningLatency(),
 	}
 }

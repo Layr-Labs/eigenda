@@ -32,10 +32,10 @@ message ValidatorSigningRate {
 // Signing rate information about validators during a particular time bucket.
 message SigningRateBucket {
 
-  // The start time of the bucket in seconds since Unix epoch.
+  // The start time of the bucket in seconds since Unix epoch, inclusive.
   uint64 start_timestamp = 1;
 
-  // The end time of the bucket in seconds since Unix epoch.
+  // The end time of the bucket in seconds since Unix epoch, exclusive.
   uint64 end_timestamp = 2;
 
   // The signing rates of individual validators during the bucket period.
