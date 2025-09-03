@@ -99,8 +99,8 @@ func setupLocalstack() error {
 		defer cancel()
 		cfg := testbed.DefaultLocalStackConfig()
 		cfg.Services = []string{"s3"}
-		cfg.Port = localstackPort // Use consistent port
-		cfg.Host = "0.0.0.0"      // Bind to all interfaces
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
 
 		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
