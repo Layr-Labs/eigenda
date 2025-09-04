@@ -207,9 +207,9 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 // makeTestEncodingComponents makes a prover and verifier for KZG
 func makeTestEncodingComponents() (encoding.Prover, encoding.Verifier, error) {
 	config := &kzg.KzgConfig{
-		G1Path:          "../../../../inabox/resources/kzg/g1.point.300000",
-		G2Path:          "../../../../inabox/resources/kzg/g2.point.300000",
-		CacheDir:        "../../../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../../../resources/srs/g1.point",
+		G2Path:          "../../../../resources/srs/g2.point",
+		CacheDir:        "../../../../resources/srs/SRSTables",
 		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
