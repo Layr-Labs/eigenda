@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const g1Path = "../../../../inabox/resources/kzg/g1.point"
+const g1Path = "../../../../resources/srs/g1.point"
 
 // computeSrsNumber computes the number of SRS elements that need to be loaded for a message of given byte count
 func computeSrsNumber(byteCount int) uint64 {

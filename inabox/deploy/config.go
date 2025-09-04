@@ -515,7 +515,7 @@ func (env *Config) genService(compose testbed, name, image, envFile string, port
 		"volumes": []string{
 			env.Path + ":/data",
 			env.rootPath + "/inabox/secrets:/secrets",
-			env.rootPath + "/inabox/resources:/resources",
+			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
 			"host.docker.internal:host-gateway",
@@ -536,7 +536,7 @@ func (env *Config) genNodeService(compose testbed, name, image, envFile string, 
 		"volumes": []string{
 			env.Path + ":/data",
 			env.rootPath + "/inabox/secrets:/secrets",
-			env.rootPath + "/inabox/resources:/resources",
+			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
 			"host.docker.internal:host-gateway",

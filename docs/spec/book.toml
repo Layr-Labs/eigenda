@@ -1,5 +1,5 @@
 [book]
-authors = ["Samuel Laferriere"]
+authors = ["Samuel Laferriere", "Bowen Xue", "Ethen Pociask"]
 language = "en"
 multilingual = false
 src = "src"
@@ -7,6 +7,8 @@ title = "EigenDA Spec"
 
 [output.html]
 mathjax-support = true
+git-repository-url = "https://github.com/Layr-Labs/eigenda"
+additional-css = ["last-changed.css"]  # for styling footer
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [preprocessor]
@@ -17,3 +19,10 @@ additional-js = ["mermaid.min.js", "mermaid-init.js"]
 # See https://github.com/badboy/mdbook-mermaid for more information.
 # This requires the mdbook-mermaid crate to be installed.
 command = "mdbook-mermaid"
+
+[preprocessor.last-changed]
+# Preprocesses the mdbook to add a page's last change date and a link to the gh commit on every page.
+# It adds a "Last change" footer which is defined in "last-changed.css".
+# See https://github.com/badboy/mdbook-last-changed for more information.
+# This requires the mdbook-last-changed crate to be installed.
+renderer = ["html"]
