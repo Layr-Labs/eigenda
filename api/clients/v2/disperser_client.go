@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -35,24 +35,22 @@ type DisperserClientConfig struct {
 type DisperserClient interface {
 	// Close closes the grpc connection to the disperser server.
 	Close() error
-	// DisperseBlob disperses a blob with the given data, blob version, and quorums.
+	// Disperses a blob with the given data, blob version, and quorums.
 	DisperseBlob(
 		ctx context.Context,
 		data []byte,
 		blobVersion corev2.BlobVersion,
-		quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
-	// DisperseBlobWithProbe is similar to DisperseBlob, but also takes a SequenceProbe to capture metrics.
-	// If the probe is nil, no metrics are captured.
-	DisperseBlobWithProbe(
-		ctx context.Context,
-		data []byte,
-		blobVersion corev2.BlobVersion,
 		quorums []core.QuorumID,
-		probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error)
+		// if nil, no metrics are captured
+		probe *common.SequenceProbe,
+		// if nil, will be constructed with the legacy accountant
+		paymentMetadata *core.PaymentMetadata) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	// GetBlobStatus returns the status of a blob with the given blob key.
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	// GetBlobCommitment returns the blob commitment for a given blob payload.
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
+	// GetPaymentState returns the payment state of the disperser client
+	GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error)
 }
 type disperserClient struct {
 	logger                  logging.Logger
@@ -64,7 +62,6 @@ type disperserClient struct {
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
 	initOnceAccountantError error
-	clientLedger            *clientledger.ClientLedger
 	metrics                 metrics.DispersalMetricer
 }
 
@@ -96,7 +93,6 @@ func NewDisperserClient(
 	signer corev2.BlobRequestSigner,
 	prover encoding.Prover,
 	accountant *Accountant,
-	clientLedger *clientledger.ClientLedger,
 	metrics metrics.DispersalMetricer,
 ) (*disperserClient, error) {
 	if config == nil {
@@ -136,14 +132,13 @@ func NewDisperserClient(
 	}
 
 	return &disperserClient{
-		logger:       logger,
-		config:       config,
-		signer:       signer,
-		clientPool:   clientPool,
-		prover:       prover,
-		accountant:   accountant,
-		clientLedger: clientLedger,
-		metrics:      metrics,
+		logger:     logger,
+		config:     config,
+		signer:     signer,
+		clientPool: clientPool,
+		prover:     prover,
+		accountant: accountant,
+		metrics:    metrics,
 	}, nil
 }
 
@@ -178,25 +173,16 @@ func (c *disperserClient) Close() error {
 	return nil
 }
 
+// Disperses a blob with the given data, blob version, and quorums.
 func (c *disperserClient) DisperseBlob(
 	ctx context.Context,
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-	return c.DisperseBlobWithProbe(ctx, data, blobVersion, quorums, nil)
-}
-
-// DisperseBlobWithProbe disperses a blob with the given data, blob version, and quorums. If sequenceProbe is not nil,
-// the probe is used to capture metrics during the dispersal process.
-func (c *disperserClient) DisperseBlobWithProbe(
-	ctx context.Context,
-	data []byte,
-	blobVersion corev2.BlobVersion,
-	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
+	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
+	paymentMetadata *core.PaymentMetadata,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
@@ -209,39 +195,24 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		}
 	}
 
+	if paymentMetadata == nil && c.accountant == nil {
+		return nil, [32]byte{}, errors.New("either payment metadata or accountant must be non nil")
+	}
+
+	if paymentMetadata != nil && c.accountant != nil {
+		return nil, [32]byte{}, errors.New("if payment metadata is non nil, then the legacy accountant must be nil")
+	}
+
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
 
-	var paymentMetadata *core.PaymentMetadata
-	var err error
-	successfulDispersal := false
-
-	//nolint:nestif // this is only triggering because there is old and new payment logic bundled into a single if
-	// statement. There's no use spending effort to decrease the complexity, since the old payment logic will soon
-	// go away entirely
-	if c.clientLedger != nil {
-		probe.SetStage("debit")
-		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
-		if err != nil {
-			return nil, [32]byte{}, fmt.Errorf("debit: %w", err)
-		}
-
-		defer func() {
-			if successfulDispersal {
-				return
-			}
-
-			err := c.clientLedger.RevertDebit(ctx, paymentMetadata, uint32(symbolLength))
-			if err != nil {
-				c.logger.Errorf("revert debit failed: %v", err)
-			}
-		}()
-	} else {
+	if paymentMetadata == nil {
+		// we are using the legacy payment system
 		probe.SetStage("acquire_accountant_lock")
 		c.accountantLock.Lock()
 
 		probe.SetStage("accountant")
 
-		err = c.initOncePopulateAccountant(ctx)
+		err := c.initOncePopulateAccountant(ctx)
 		if err != nil {
 			c.accountantLock.Unlock()
 			return nil, [32]byte{}, api.NewErrorFailover(err)
@@ -265,7 +236,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe.SetStage("verify_field_element")
 
 	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
+	_, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf(
 			"encountered an error to convert a 32-bytes into a valid field element, "+
@@ -348,13 +319,6 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
 	}
-
-	// Mark the dispersal as successful so the defer doesn't revert the debit
-	//
-	// TODO before merge: spend more time considering in what cases this should be true vs false
-	// For example, are there some blob status returns that mean the disperser didn't do accounting? Could we
-	// be more aggressive with client side reversions in such cases?
-	successfulDispersal = true
 
 	c.metrics.RecordBlobSizeBytes(len(data))
 

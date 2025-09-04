@@ -72,7 +72,7 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, clients.ErrZeroSymbols.Error())
 }
@@ -150,7 +150,7 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of a blob containing all 0s
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
 	require.NoError(t, err)
 }
 
@@ -510,7 +510,6 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 		signer,
 		nil,
 		accountant,
-		nil,
 		metrics.NoopDispersalMetrics,
 	)
 	require.NoError(t, err)
@@ -527,7 +526,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

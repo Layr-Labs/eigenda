@@ -159,7 +159,6 @@ func NewTestClient(
 		signer,
 		kzgProver,
 		accountant,
-		nil,
 		metricsv2.NoopDispersalMetrics,
 	)
 	if err != nil {
@@ -259,6 +258,7 @@ func NewTestClient(
 		blockMon,
 		certBuilder,
 		certVerifier,
+		nil,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
