@@ -73,8 +73,6 @@ func PrettyPrintTime(nanoseconds uint64) string {
 	return prettyPrintUnit(nanoseconds, timeSteps)
 }
 
-// TODO write unit tests for this
-
 // CommaOMatic converts any integer type to a string with thousands separators.
 func CommaOMatic[T constraints.Integer](value T) string {
 	s := fmt.Sprintf("%d", value) // works for both signed and unsigned

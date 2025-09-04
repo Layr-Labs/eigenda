@@ -172,7 +172,3 @@ func TestCloneValidatorSigningRate(t *testing.T) {
 	clone := cloneValidatorSigningRate(signingRate)
 	require.True(t, areSigningRatesEqual(signingRate, clone))
 }
-
-// TODO
-//  - timestamp alignment
-//  - contains

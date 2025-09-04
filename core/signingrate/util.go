@@ -35,8 +35,6 @@ func cloneValidatorSigningRate(info *validator.ValidatorSigningRate) *validator.
 	}
 }
 
-// TODO test these methods!
-
 // Given a timestamp, finds the start timestamp of the bucket that contains that timestamp (inclusive).
 // The "primary key" of a bucket is the start timestamp, so this function effectively maps an arbitrary timestamp
 // to the key of the bucket that contains data for this timestamp.
