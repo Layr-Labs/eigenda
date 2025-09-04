@@ -2,11 +2,13 @@ package reservation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Checks for updates to the PaymentVault contract, and updates ledgers with the new state
@@ -14,12 +16,12 @@ type ReservationVaultMonitor struct {
 	logger logging.Logger
 	// fetches data from the PaymentVault
 	paymentVault payments.PaymentVault
-	// the ledgers that need to be updated
-	ledgers UpdatableReservationLedgers
 	// how frequently to fetch state from the PaymentVault to check for updates
 	updateInterval time.Duration
-	// cancels the periodic update routine
-	cancelFunc context.CancelFunc
+	// function to get accounts that need to be updated
+	getAccountsToUpdate func() []gethcommon.Address
+	// function to update the reservation for an account
+	updateReservation func(accountID gethcommon.Address, newReservation *Reservation) error
 }
 
 // Creates a new ReservationVaultMonitor and starts a routine to periodically check for updates
@@ -27,30 +29,29 @@ func NewReservationVaultMonitor(
 	ctx context.Context,
 	logger logging.Logger,
 	paymentVault payments.PaymentVault,
-	ledgers UpdatableReservationLedgers,
 	updateInterval time.Duration,
-) *ReservationVaultMonitor {
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-
-	monitor := &ReservationVaultMonitor{
-		logger:         logger,
-		paymentVault:   paymentVault,
-		ledgers:        ledgers,
-		updateInterval: updateInterval,
-		cancelFunc:     cancel,
+	getAccountsToUpdate func() []gethcommon.Address,
+	updateReservation func(accountID gethcommon.Address, newReservation *Reservation) error,
+) (*ReservationVaultMonitor, error) {
+	if updateInterval <= 0 {
+		return nil, errors.New("updateInterval must be > 0")
 	}
 
-	go monitor.runUpdateLoop(ctxWithCancel)
-	return monitor
-}
+	monitor := &ReservationVaultMonitor{
+		logger:              logger,
+		paymentVault:        paymentVault,
+		updateInterval:      updateInterval,
+		getAccountsToUpdate: getAccountsToUpdate,
+		updateReservation:   updateReservation,
+	}
 
-func (vm *ReservationVaultMonitor) Stop() {
-	vm.cancelFunc()
+	go monitor.runUpdateLoop(ctx)
+	return monitor, nil
 }
 
 // Fetches the latest state from the PaymentVault, and updates the ledgers with it
 func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) error {
-	accountIDs := vm.ledgers.GetAccountsToUpdate()
+	accountIDs := vm.getAccountsToUpdate()
 	if len(accountIDs) == 0 {
 		return nil
 	}
@@ -74,6 +75,7 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 
 	for i, newReservationData := range newReservations {
 		accountID := accountIDs[i]
+		// TODO: whatabaout a reservation that becomes nil???
 		// Skip if no reservation exists (nil means account has no active reservation)
 		if newReservationData == nil {
 			continue
@@ -85,7 +87,7 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 			continue
 		}
 
-		err = vm.ledgers.UpdateReservation(accountID, newReservation)
+		err = vm.updateReservation(accountID, newReservation)
 		if err != nil {
 			vm.logger.Errorf("update reservation for account %v failed: %v", accountID.Hex(), err)
 		}

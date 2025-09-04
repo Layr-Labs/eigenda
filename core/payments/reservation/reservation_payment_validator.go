@@ -16,8 +16,6 @@ type ReservationPaymentValidator struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked
 	ledgerCache *ReservationLedgerCache
-	// Provides access to the values stored in the PaymentVault contract
-	vaultMonitor *ReservationVaultMonitor
 	timeSource   func() time.Time
 }
 
@@ -61,18 +59,16 @@ func NewReservationPaymentValidator(
 		timeSource,
 		overfillBehavior,
 		bucketCapacityPeriod,
+		updateInterval,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger cache: %w", err)
 	}
 
-	vaultMonitor := NewReservationVaultMonitor(ctx, logger, paymentVault, ledgerCache, updateInterval)
-
 	return &ReservationPaymentValidator{
-		logger:       logger,
-		ledgerCache:  ledgerCache,
-		vaultMonitor: vaultMonitor,
-		timeSource:   timeSource,
+		logger:      logger,
+		ledgerCache: ledgerCache,
+		timeSource:  timeSource,
 	}, nil
 }
 
@@ -103,9 +99,3 @@ func (pv *ReservationPaymentValidator) Debit(
 	return nil
 }
 
-// Stops the background vault monitoring thread
-func (pv *ReservationPaymentValidator) Stop() {
-	if pv.vaultMonitor != nil {
-		pv.vaultMonitor.Stop()
-	}
-}

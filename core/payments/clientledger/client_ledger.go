@@ -46,8 +46,6 @@ type ClientLedger struct {
 	onDemandMonitor    *ondemand.OnDemandVaultMonitor
 }
 
-var _ reservation.UpdatableReservationLedgers = (*ClientLedger)(nil)
-
 // Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
 	ctx context.Context,
@@ -108,8 +106,14 @@ func NewClientLedger(
 
 	var err error
 	if clientLedger.reservationLedger != nil {
-		clientLedger.reservationMonitor = reservation.NewReservationVaultMonitor(
-			ctx, logger, paymentVault, clientLedger, updateInterval)
+		clientLedger.reservationMonitor, err = reservation.NewReservationVaultMonitor(
+			ctx, 
+			logger, 
+			paymentVault, 
+			updateInterval,
+			clientLedger.GetAccountsToUpdate,
+			clientLedger.UpdateReservation)
+		enforce.NilError(err, "new reservation vault monitor")
 	}
 
 	if clientLedger.onDemandLedger != nil {
@@ -297,19 +301,12 @@ func (cl *ClientLedger) RevertDebit(
 	return nil
 }
 
-// Stops the background vault monitoring threads
-func (cl *ClientLedger) Stop() {
-	if cl.reservationMonitor != nil {
-		cl.reservationMonitor.Stop()
-	}
-}
 
 // Returns the single account being tracked by this client ledger
 func (cl *ClientLedger) GetAccountsToUpdate() []gethcommon.Address {
 	return []gethcommon.Address{cl.accountID}
 }
 
-// Implements reservation.UpdatableReservationLedgers
 // Updates the reservation for the client's account
 func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReservation *reservation.Reservation) error {
 	if accountID != cl.accountID {
@@ -328,7 +325,6 @@ func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReser
 	return nil
 }
 
-// Implements ondemand.UpdatableOnDemandLedgers
 // Updates the total deposit for the client's account
 func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
 	if accountID != cl.accountID {

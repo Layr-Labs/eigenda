@@ -207,7 +207,6 @@ func TestReservationOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		// first dispersal is permitted, even though it overfills bucket
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
@@ -242,7 +241,6 @@ func TestReservationOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		// First debit to establish a time baseline
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
@@ -271,7 +269,6 @@ func TestReservationOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		require.Panics(t, func() {
 			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
@@ -292,7 +289,6 @@ func TestReservationOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		require.Panics(t, func() {
 			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
@@ -315,7 +311,6 @@ func TestOnDemandOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
@@ -340,7 +335,6 @@ func TestOnDemandOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		require.Panics(t, func() {
 			_, _ = clientLedger.Debit(context.Background(), 1001, []core.QuorumID{0, 1})
@@ -361,7 +355,6 @@ func TestOnDemandOnly(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		require.Panics(t, func() {
 			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
@@ -384,7 +377,6 @@ func TestReservationAndOnDemand(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		// First debit uses all reservation capacity
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
@@ -421,7 +413,6 @@ func TestReservationAndOnDemand(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		// First debit to establish a time baseline
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
@@ -451,7 +442,6 @@ func TestReservationAndOnDemand(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		// First debit uses all reservation capacity
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
@@ -479,7 +469,6 @@ func TestReservationAndOnDemand(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		require.Panics(t, func() {
 			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
@@ -502,7 +491,6 @@ func TestRevertDebit(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
@@ -527,7 +515,6 @@ func TestRevertDebit(t *testing.T) {
 			time.Second,
 		)
 		require.NotNil(t, clientLedger)
-		defer clientLedger.Stop()
 
 		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)

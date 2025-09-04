@@ -48,9 +48,9 @@ type ReservationLedgerCache struct {
 	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
 	// new object for the same account key, and try to add them to the cache.
 	ledgerCreationLock *common.IndexLock
+	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
+	vaultMonitor *ReservationVaultMonitor
 }
-
-var _ UpdatableReservationLedgers = &ReservationLedgerCache{}
 
 func NewReservationLedgerCache(
 	ctx context.Context,
@@ -60,6 +60,7 @@ func NewReservationLedgerCache(
 	timeSource func() time.Time,
 	overfillBehavior OverfillBehavior,
 	bucketCapacityPeriod time.Duration,
+	updateInterval time.Duration,
 ) (*ReservationLedgerCache, error) {
 	if paymentVault == nil {
 		return nil, errors.New("payment vault must be non-nil")
@@ -99,7 +100,7 @@ func NewReservationLedgerCache(
 		return nil, fmt.Errorf("get min num symbols: %w", err)
 	}
 
-	return &ReservationLedgerCache{
+	ledgerCache := &ReservationLedgerCache{
 		logger:               logger,
 		cache:                cache,
 		paymentVault:         paymentVault,
@@ -108,7 +109,22 @@ func NewReservationLedgerCache(
 		bucketCapacityPeriod: bucketCapacityPeriod,
 		minNumSymbols:        minNumSymbols,
 		ledgerCreationLock:   common.NewIndexLock(256),
-	}, nil
+	}
+
+	// Create the vault monitor with callback functions
+	ledgerCache.vaultMonitor, err = NewReservationVaultMonitor(
+		ctx,
+		logger,
+		paymentVault,
+		updateInterval,
+		ledgerCache.GetAccountsToUpdate,
+		ledgerCache.UpdateReservation,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation vault monitor: %w", err)
+	}
+
+	return ledgerCache, nil
 }
 
 // GetOrCreate retrieves an existing ReservationLedger for the given account, or creates a new one if it doesn't exist
