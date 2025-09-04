@@ -44,11 +44,7 @@ func validateTrackerDump(
 	// Find the index of the first expected bucket that ends after the cutoff time. This should align
 	// with the first bucket in dumpedBuckets.
 	indexOffset := 0
-	for {
-		if expectedBuckets[indexOffset].endTimestamp.Unix() > cutoffTime.Unix() {
-			// We've found the first bucket that ends after the cutoff time.
-			break
-		}
+	for expectedBuckets[indexOffset].endTimestamp.Unix() <= cutoffTime.Unix() {
 		indexOffset++
 	}
 
