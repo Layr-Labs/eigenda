@@ -188,10 +188,17 @@ func (c *ReservationLedgerCache) GetAccountsToUpdate() []gethcommon.Address {
 }
 
 // UpdateReservation updates the reservation for an account if different from current value
+// If newReservation is nil, the account is removed from the cache
 func (c *ReservationLedgerCache) UpdateReservation(accountID gethcommon.Address, newReservation *Reservation) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
 		// Account was evicted from cache or never existed, nothing to update
+		return nil
+	}
+
+	if newReservation == nil {
+		c.cache.Remove(accountID)
+		c.logger.Debugf("Removed account %s from cache due to nil reservation", accountID.Hex())
 		return nil
 	}
 

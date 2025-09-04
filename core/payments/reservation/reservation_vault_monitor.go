@@ -75,9 +75,11 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 
 	for i, newReservationData := range newReservations {
 		accountID := accountIDs[i]
-		// TODO: whatabaout a reservation that becomes nil???
-		// Skip if no reservation exists (nil means account has no active reservation)
 		if newReservationData == nil {
+			err := vm.updateReservation(accountID, nil)
+			if err != nil {
+				vm.logger.Errorf("update nil reservation for account %v failed: %v", accountID.Hex(), err)
+			}
 			continue
 		}
 
