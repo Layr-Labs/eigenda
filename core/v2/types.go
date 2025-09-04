@@ -430,6 +430,8 @@ type DispersalResponse struct {
 	Signature [32]byte
 	// Error is the error message if the dispersal failed
 	Error string
+	// Status indicates per-operator dispersal outcome: "signed", "failed", or "missed".
+	Status string
 }
 
 const (
