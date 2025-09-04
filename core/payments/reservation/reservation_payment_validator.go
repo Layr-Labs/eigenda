@@ -35,20 +35,8 @@ func NewReservationPaymentValidator(
 	// interval for checking for payment updates
 	updateInterval time.Duration,
 ) (*ReservationPaymentValidator, error) {
-	if paymentVault == nil {
-		return nil, errors.New("paymentVault cannot be nil")
-	}
-
 	if timeSource == nil {
 		return nil, errors.New("timeSource cannot be nil")
-	}
-
-	if updateInterval <= 0 {
-		return nil, errors.New("updateInterval must be > 0")
-	}
-
-	if bucketCapacityPeriod <= 0 {
-		return nil, errors.New("bucketCapacityPeriod must be > 0")
 	}
 
 	ledgerCache, err := NewReservationLedgerCache(
