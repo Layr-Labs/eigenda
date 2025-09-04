@@ -87,7 +87,7 @@ contract CertVerifierDeployerV2 is Script, Test {
             revert("quorumNumbersRequired must be in size range (0, 256]");
         }
 
-        if (defaultSecurityThresholds.adversaryThreshold > defaultSecurityThresholds.confirmationThreshold) {
+        if (defaultSecurityThresholds.adversaryThreshold >= defaultSecurityThresholds.confirmationThreshold) {
             revert("adversaryThreshold cannot be greter than the confirmationThreshold");
         }
 
