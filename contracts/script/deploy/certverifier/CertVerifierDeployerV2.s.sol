@@ -50,7 +50,8 @@ contract CertVerifierDeployerV2 is Script, Test {
         // 2 - read dependency contract addresses from EigenDA Directory namespaced resolution
         //     contract and ensure that addresses are correct w.r.t their intended interfaces
 
-        address eigenDAServiceManager = IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME);
+        address eigenDAServiceManager =
+            IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME);
         if (eigenDAServiceManager == address(0)) {
             revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
         }
@@ -63,7 +64,8 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         // 2.b - assume we can read the blob params at version index 0 and that the struct
         //       is initialized
-        address eigenDAThresholdRegistry = IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME);
+        address eigenDAThresholdRegistry =
+            IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME);
         if (eigenDAThresholdRegistry == address(0)) {
             revert("EigenDAThresholdRegistry contract address not set in provided EigenDADirectory contract");
         }
