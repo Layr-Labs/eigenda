@@ -177,15 +177,6 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		logger.Info("Registering blob versions and relays")
-		testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-		logger.Info("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient, logger)
-		if err != nil {
-			panic(err)
-		}
-
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 

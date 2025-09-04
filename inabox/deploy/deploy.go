@@ -219,6 +219,34 @@ func (env *Config) DeployExperiment() {
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
 
+	// Register blob versions, relays, and disperser keypair
+	if env.EigenDA.Deployer != "" && env.IsEigenDADeployed() {
+		loggerConfig := common.DefaultLoggerConfig()
+		logger, err := common.NewLogger(loggerConfig)
+		if err != nil {
+			log.Printf("could not create logger for registration: %v", err)
+		} else {
+			ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+				RPCURLs:          []string{env.Deployers[0].RPC},
+				PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
+				NumConfirmations: 0,
+				NumRetries:       3,
+			}, gcommon.Address{}, logger)
+			if err != nil {
+				log.Printf("could not create eth client for registration: %v", err)
+			} else {
+				fmt.Println("Registering blob versions and relays")
+				env.RegisterBlobVersionAndRelays(ethClient)
+
+				fmt.Println("Registering disperser keypair")
+				err = env.RegisterDisperserKeypair(ethClient)
+				if err != nil {
+					log.Printf("could not register disperser keypair: %v", err)
+				}
+			}
+		}
+	}
+
 	fmt.Println("Test environment has successfully deployed!")
 }
 
