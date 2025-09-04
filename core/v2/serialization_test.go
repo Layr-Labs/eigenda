@@ -52,8 +52,8 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// e2fc52cb6213041838c20164eac05a7660b741518d5c14060e47c89ed3dd175b has verified in solidity  with chisel
-	assert.Equal(t, "e2fc52cb6213041838c20164eac05a7660b741518d5c14060e47c89ed3dd175b", blobKey.Hex())
+	// 3e1669312e6af52b75300f738bc5a32d92f760cad98394822a040366ff007520 has verified in solidity  with chisel
+	assert.Equal(t, "3e1669312e6af52b75300f738bc5a32d92f760cad98394822a040366ff007520", blobKey.Hex())
 
 	// same blob key should be generated for the blob header with shuffled quorum numbers
 	bh2 := v2.BlobHeader{
@@ -126,8 +126,8 @@ func TestBlobCertHash(t *testing.T) {
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
 
-	// 932dd5724ce1d7ecd076bd8e7423562005701053b3751cf65a7dd8d25e737484 has verified in solidity with chisel
-	assert.Equal(t, "932dd5724ce1d7ecd076bd8e7423562005701053b3751cf65a7dd8d25e737484", hex.EncodeToString(hash[:]))
+	// 39c834c1a19a2362fd81d66315cb8787196c38d71543457ea0b4b18c2c87bd42 has verified in solidity with chisel
+	assert.Equal(t, "39c834c1a19a2362fd81d66315cb8787196c38d71543457ea0b4b18c2c87bd42", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
