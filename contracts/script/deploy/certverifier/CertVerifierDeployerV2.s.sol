@@ -11,6 +11,7 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {IEigenDADirectory} from "src/core/interfaces/IEigenDADirectory.sol";
+import {AddressDirectoryConstants} from "src/core/libraries/v3/address-directory/AddressDirectoryConstants.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
@@ -32,9 +33,6 @@ contract CertVerifierDeployerV2 is Script, Test {
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
-    string directoryServiceManagerKey = "SERVICE_MANAGER";
-    string directoryThresholdRegistryKey = "THRESHOLD_REGISTRY";
-
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1 - ingest JSON config file as string and extract dependency fields used for
         //     EigenDACertVerifier constructor params
@@ -52,7 +50,7 @@ contract CertVerifierDeployerV2 is Script, Test {
         // 2 - read dependency contract addresses from EigenDA Directory namespaced resolution
         //     contract and ensure that addresses are correct w.r.t their intended interfaces
 
-        address eigenDAServiceManager = IEigenDADirectory(eigenDADirectory).getAddress(directoryServiceManagerKey);
+        address eigenDAServiceManager = IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME);
         if (eigenDAServiceManager == address(0)) {
             revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
         }
@@ -65,7 +63,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         // 2.b - assume we can read the blob params at version index 0 and that the struct
         //       is initialized
-        address eigenDAThresholdRegistry = IEigenDADirectory(eigenDADirectory).getAddress(directoryThresholdRegistryKey);
+        address eigenDAThresholdRegistry = IEigenDADirectory(eigenDADirectory).getAddress(AddressDirectoryConstants.THRESHOLD_REGISTRY_NAME);
         if (eigenDAThresholdRegistry == address(0)) {
             revert("EigenDAThresholdRegistry contract address not set in provided EigenDADirectory contract");
         }
@@ -87,7 +85,7 @@ contract CertVerifierDeployerV2 is Script, Test {
         }
 
         if (defaultSecurityThresholds.adversaryThreshold >= defaultSecurityThresholds.confirmationThreshold) {
-            revert("adversaryThreshold cannot be greter than the confirmationThreshold");
+            revert("adversaryThreshold cannot be greater than the confirmationThreshold");
         }
 
         // 4 - broadcast single deploy tx which constructs the immutable EigenDACertVerifier contract
