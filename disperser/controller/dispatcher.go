@@ -307,11 +307,11 @@ func (d *Dispatcher) HandleBatch(
 						RespondedAt:      uint64(time.Now().UnixNano()),
 						Signature:        sig.Bytes(),
 						Error:            "",
+						Status:           "signed",
 					})
 					if storeErr != nil {
 						d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
 					}
-
 					sigChan <- core.SigningMessage{
 						Signature:       sig,
 						Operator:        opID,
@@ -341,6 +341,7 @@ func (d *Dispatcher) HandleBatch(
 					RespondedAt:      uint64(time.Now().UnixNano()),
 					Signature:        [32]byte{}, // all zero sig for failed dispersal
 					Error:            lastErr.Error(),
+					Status:           "failed",
 				})
 				if storeErr != nil {
 					d.logger.Error("failed to store a failed dispersal response", "err", storeErr)
@@ -454,6 +455,32 @@ func (d *Dispatcher) HandleSignatures(
 	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
 	if err != nil {
 		return fmt.Errorf("update batch status: %w", err)
+	}
+
+	// After updating batch status, persist per-operator "missed" responses for non-signers.
+	for opID := range batchData.OperatorState.IndexedOperators {
+		if _, ok := finalAttestation.SignerMap[opID]; ok {
+			continue
+		}
+		req := &corev2.DispersalRequest{
+			OperatorID:      opID,
+			OperatorAddress: gethcommon.Address{},
+			Socket:          batchData.OperatorState.IndexedOperators[opID].Socket,
+			DispersedAt:     uint64(time.Now().UnixNano()),
+			BatchHeader:     *batchData.Batch.BatchHeader,
+		}
+		_ = d.blobMetadataStore.PutDispersalRequest(ctx, req)
+		if err := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
+			DispersalRequest: req,
+			RespondedAt:      uint64(time.Now().UnixNano()),
+			Signature:        [32]byte{},
+			Error:            "operator did not sign within attestation window",
+			Status:           "missed",
+		}); err != nil {
+			if !errors.Is(err, blobstore.ErrAlreadyExists) {
+				d.logger.Error("failed to store missed dispersal response", "err", err, "operator", opID.Hex())
+			}
+		}
 	}
 
 	// Track attestation metrics
