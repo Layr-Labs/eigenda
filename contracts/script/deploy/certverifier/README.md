@@ -8,8 +8,7 @@ To set up the deployment, a config json should be placed in the `config/` folder
 
 ```json
 {
-    "eigenDAServiceManager": "0x...",
-    "eigenDAThresholdRegistry": "0x...",
+    "eigenDADirectory": "0x...",
 
     "defaultSecurityThresholds": {
         "0_confirmationThreshold": 55,
@@ -20,7 +19,7 @@ To set up the deployment, a config json should be placed in the `config/` folder
 }
 ```
 
-Three sample configs are provided in the `config/` folder for preprod and testnet environments on holesky as well as testnet environment on sepolia.
+One sample config is provided in the `config/` folder for Sepolia testnet environment.
 
 ### Deployment
 
@@ -56,7 +55,7 @@ To set up the deployment, a config json should be placed in the `config/v1/` fol
 }
 ```
 
-Sample configs are provided in the `config/v1/` folder for sepolia and holesky environments.
+Sample configs are provided in the `config/v1/` folder for sepolia environment.
 
 ### Deployment
 
