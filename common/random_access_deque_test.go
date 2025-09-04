@@ -188,7 +188,6 @@ func TestRandomDequeOperations(t *testing.T) {
 			require.Error(t, err)
 			_, err = deque.GetFromBack(rand.Uint64())
 			require.Error(t, err)
-			require.Error(t, err)
 			_, err = deque.Set(0, rand.Int())
 			require.Error(t, err)
 			_, err = deque.Set(rand.Uint64(), rand.Int())
@@ -414,4 +413,31 @@ func TestBinarySearchInDeque(t *testing.T) {
 		require.False(t, exact)
 		require.Equal(t, expectedIndex, foundIndex)
 	}
+}
+
+func TestBinarySearchUnderflowBug(t *testing.T) {
+	// This test demonstrates the uint64 underflow bug in BinarySearchInOrderedDeque
+	// when searching for a value smaller than the first element in a 2-element deque
+
+	deque := common.NewRandomAccessDeque[int](10)
+	deque.PushBack(10)
+	deque.PushBack(20)
+	// Deque now contains: [10, 20]
+
+	comparator := func(a int, b int) int {
+		if a < b {
+			return -1
+		} else if a > b {
+			return 1
+		}
+		return 0
+	}
+
+	// Search for value 5, which is smaller than all elements
+	// This should return index=0, exact=false (insertion point before first element)
+	index, exact := common.BinarySearchInOrderedDeque(deque, 5, comparator)
+
+	// Expected: value 5 should be inserted at index 0
+	require.False(t, exact, "Should not find exact match for 5")
+	require.Equal(t, uint64(0), index, "Value 5 should be inserted at index 0")
 }
