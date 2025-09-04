@@ -219,8 +219,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	// statement. There's no use spending effort to decrease the complexity, since the old payment logic will soon
 	// go away entirely
 	if c.clientLedger != nil {
-		// TODO: set probe stages
-		// TODO: make sure you use min symbols
+		probe.SetStage("debit")
 		paymentMetadata, err = c.clientLedger.Debit(ctx, uint32(symbolLength), quorums)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("debit: %w", err)
