@@ -1,4 +1,4 @@
-package payments
+package clientledger
 
 // ClientLedgerMode represents the mode of operation for the client ledger, indicating which types of payment should
 // be active.
