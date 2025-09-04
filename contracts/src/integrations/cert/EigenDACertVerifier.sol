@@ -53,7 +53,7 @@ contract EigenDACertVerifier is
         UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
-        INVALID_CERT, // Certificate is invalid, due to some low level library revert having been caught
+        INVALID_CERT, // Certificate is invalid due to some revert from the verification library
         BUG // Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
 
     }
