@@ -13,24 +13,20 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
-
-	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/ory/dockertest/v3"
 )
 
 var (
 	logger = testutils.GetLogger()
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-
-	deployLocalStack bool
-	localStackPort   = "4571"
+	deployLocalStack    bool
+	localstackPort      = "4571"
+	localstackContainer *testbed.LocalStackContainer
 
 	s3Client                s3.Client
 	dynamoClient            dynamodb.Client
@@ -57,12 +53,17 @@ func setup(m *testing.M) {
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -73,7 +74,7 @@ func setup(m *testing.M) {
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
@@ -151,6 +152,6 @@ func setup(m *testing.M) {
 
 func teardown() {
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }

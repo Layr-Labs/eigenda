@@ -27,9 +27,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ory/dockertest/v3"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -66,7 +65,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -79,9 +77,8 @@ var (
 	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
 	handleBatchLivenessChan = make(chan time.Time, 1)
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	clientConfig       commonaws.ClientConfig
+	localstackContainer *testbed.LocalStackContainer
+	clientConfig        commonaws.ClientConfig
 
 	deployLocalStack bool
 	localStackPort   = "4565"
@@ -160,7 +157,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	transactor := &coremock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, transactor)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	batcherConfig := batcher.Config{
 		PullInterval:             5 * time.Second,
@@ -247,8 +244,16 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	if deployLocalStack {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb", "kms"}
+		cfg.Port = localStackPort
+		cfg.Host = "0.0.0.0"
+
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -499,12 +504,12 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		1: numOperators,
 		2: numOperators,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
 	logger := testutils.GetLogger()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)
 	go func() {
@@ -522,22 +527,22 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 		fmt.Println("Starting node")
 		err = op.Node.Start(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		fmt.Println("Starting server")
 		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	blob := mustMakeTestBlob()
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := store.StoreBlob(ctx, &blob, requestedAt)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	out := make(chan batcher.EncodingResultOrStatus)
 	err = dis.batcher.EncodingStreamer.RequestEncoding(context.Background(), out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = dis.batcher.EncodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	dis.batcher.EncodingStreamer.Pool.StopWait()
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
@@ -545,8 +550,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	dis.txnManager.On("ProcessTransaction").Return(nil)
 
 	err = dis.batcher.HandleSingleBatch(ctx)
-	assert.NoError(t, err)
-	assert.Greater(t, len(dis.txnManager.Requests), 0)
+	require.NoError(t, err)
+	require.Greater(t, len(dis.txnManager.Requests), 0)
 	// should be encoding 3 and 0
 	logData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000")
 	if err != nil {
@@ -567,17 +572,17 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		Err:      nil,
 		Metadata: dis.txnManager.Requests[len(dis.txnManager.Requests)-1].Metadata,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check that the blob was processed
 	metadata, err := store.GetBlobMetadata(ctx, metadataKey)
-	assert.NoError(t, err)
-	assert.Equal(t, metadataKey, metadata.GetBlobKey())
-	assert.Equal(t, disperser.Confirmed, metadata.BlobStatus)
+	require.NoError(t, err)
+	require.Equal(t, metadataKey, metadata.GetBlobKey())
+	require.Equal(t, disperser.Confirmed, metadata.BlobStatus)
 
 	isConfirmed, err := metadata.IsConfirmed()
-	assert.NoError(t, err)
-	assert.True(t, isConfirmed)
+	require.NoError(t, err)
+	require.True(t, isConfirmed)
 	batchHeaderHash := metadata.ConfirmationInfo.BatchHeaderHash[:]
 	txHash := gethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
 	topics := [][]gethcommon.Hash{
@@ -585,11 +590,11 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		{gethcommon.BytesToHash(batchHeaderHash)},
 	}
 	calldata, err := hex.DecodeString("7794965a000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000560000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c01b4136a161225e9cebe4e2c561148043b2fde423fc5b64e01d897d0fb7970a142d5474fb609bda1b747bdb5c47375d5819000e3c5cbc75baf55b19849410a2610de9c40eb95b49aca940e0bec6ae8b2868855a6324d04d864cbfa61128cf06a51c069e5a0c490c5a359086b0a3660c2ea2e4fb50722bec1ef593c5245413e4cd0a3c7e490348fb279ccb58f91a3bd494511c2ab0321e3922a0cd26012ef3133c043acb758e735db805d360196f3fc89a6395a4b174c19b981afb7f64c2b1193e0000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000026000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001170c867415fef7db6d88e37598228f43de085616a25939dacbb6b5900f680c7f1d582c9ea38023afb08f368ea93692d17946619d9cf5f3c4d7b3c0cff1a92dff0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	r, ok := new(big.Int).SetString("8ad2b300a012fb0e90dceb8b66fa564717a2d218ca0fd25f11a1875e0153d1d8", 16)
-	assert.True(t, ok)
+	require.True(t, ok)
 	s, ok := new(big.Int).SetString("1accb1e1c69fa07bd4237d92143275960b24eec780862a673d54ffaaa5e77f9b", 16)
-	assert.True(t, ok)
+	require.True(t, ok)
 	gethClient.On("TransactionByHash", txHash).Return(
 		types.NewTx(&types.DynamicFeeTx{
 			ChainID:    big.NewInt(1),
@@ -624,11 +629,11 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	}, nil)
 
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
 	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
 		SecurityParam: core.SecurityParam{
@@ -640,7 +645,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	}
 
 	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var indices []encoding.ChunkNumber
 	var chunks []*encoding.Frame
@@ -655,7 +660,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 			BlobIndex:       metadata.ConfirmationInfo.BlobIndex,
 			QuorumId:        uint32(0),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		actualCommitment := &encoding.G1Commitment{
 			X: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetX()),
 			Y: *new(fp.Element).SetBytes(headerReply.GetBlobHeader().GetCommitment().GetY()),
@@ -670,19 +675,21 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		actualLengthProof.Y.A0.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetYA0())
 		actualLengthProof.Y.A1.SetBytes(headerReply.GetBlobHeader().GetLengthProof().GetYA1())
 
-		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.Commitment, actualCommitment)
-		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthCommitment, &actualLengthCommitment)
-		assert.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthProof, &actualLengthProof)
-		assert.Equal(t, uint32(metadata.ConfirmationInfo.BlobCommitment.Length), headerReply.GetBlobHeader().GetLength())
-		assert.Len(t, headerReply.GetBlobHeader().GetQuorumHeaders(), 1)
-		assert.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())
-		assert.Equal(t, uint32(q0QuorumThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetConfirmationThreshold())
-		assert.Equal(t, uint32(q0AdversaryThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
-		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
+		require.Equal(t, metadata.ConfirmationInfo.BlobCommitment.Commitment, actualCommitment)
+		require.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthCommitment, &actualLengthCommitment)
+		require.Equal(t, metadata.ConfirmationInfo.BlobCommitment.LengthProof, &actualLengthProof)
+		require.Equal(t, uint32(metadata.ConfirmationInfo.BlobCommitment.Length), headerReply.GetBlobHeader().GetLength())
+		require.Len(t, headerReply.GetBlobHeader().GetQuorumHeaders(), 1)
+		require.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())
+		require.Equal(t, uint32(q0QuorumThreshold),
+			headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetConfirmationThreshold())
+		require.Equal(t, uint32(q0AdversaryThreshold),
+			headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
+		require.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
 			blobHeader, err = core.BlobHeaderFromProtobuf(headerReply.GetBlobHeader())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 
 		// check that chunks can be retrieved from operators
@@ -692,31 +699,31 @@ func TestDispersalAndRetrieval(t *testing.T) {
 			QuorumId:        uint32(0),
 		})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assignment, ok := assignments[op.Node.Config.ID]
-		assert.True(t, ok)
+		require.True(t, ok)
 		for _, data := range chunksReply.GetChunks() {
 			chunk, err := new(encoding.Frame).Deserialize(data)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			chunks = append(chunks, chunk)
 		}
-		assert.Len(t, chunksReply.GetChunks(), int(assignments[op.Node.Config.ID].NumChunks))
+		require.Len(t, chunksReply.GetChunks(), int(assignments[op.Node.Config.ID].NumChunks))
 		indices = append(indices, assignment.GetIndices()...)
 	}
 
 	encodingParams := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	recovered, err := v.Decode(chunks, indices, encodingParams, uint64(blobHeader.Length)*encoding.BYTES_PER_SYMBOL)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(recovered)
 
 	restored = bytes.TrimRight(restored, "\x00")
-	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
+	require.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 }
 
 func teardown() {
-	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack && localstackContainer != nil {
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }

@@ -95,7 +95,8 @@ docker-release-build:
 # Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
 # TODO: we should break these up into short and long unit-tests.
 unit-tests:
-	./test.sh
+	go clean -testcache
+	CI=true go test -short ./... -coverprofile=coverage.out
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common

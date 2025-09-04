@@ -27,23 +27,21 @@ import (
 	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	UUID               = uuid.New()
-	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	prover             *p.Prover
-	bucketName         = fmt.Sprintf("test-bucket-%v", UUID)
+	localstackContainer *testbed.LocalStackContainer
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	prover              *p.Prover
+	bucketName          = fmt.Sprintf("test-bucket-%v", UUID)
 )
 
 const (
@@ -60,7 +58,11 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3, dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		require.NoError(t, err)
 	}
 
@@ -98,7 +100,7 @@ func teardown() {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 
