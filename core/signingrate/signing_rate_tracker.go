@@ -33,7 +33,8 @@ type SigningRateTracker interface {
 	GetSigningRateDump(startTime time.Time) ([]*validator.SigningRateBucket, error)
 
 	// Returns a list of buckets that have not yet been flushed to persistent storage.
-	// Buckets are in chronological order.
+	// Buckets are in chronological order. Allows for an external process to periodically
+	// flush data in this tracker to persistent storage.
 	//
 	// Returned data threadsafe to read, but should not be modified.
 	GetUnflushedBuckets() ([]*validator.SigningRateBucket, error)
@@ -247,6 +248,7 @@ func (s *signingRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBuck
 		proto := bucket.ToProtobuf()
 		buckets = append(buckets, proto)
 	}
+	s.unflushedBuckets = make(map[time.Time]*SigningRateBucket)
 
 	sortValidatorSigningRateBuckets(buckets)
 

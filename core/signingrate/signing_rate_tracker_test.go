@@ -38,7 +38,7 @@ func validateTrackerDump(
 
 	// We shouldn't see any buckets that end before the cutoff time.
 	for _, bucket := range dumpedBuckets {
-		require.True(t, bucket.GetEndTimestamp() >= uint64(cutoffTime.Unix())) // TODO claude this is the assertion that fails on me
+		require.True(t, bucket.GetEndTimestamp() >= uint64(cutoffTime.Unix()))
 	}
 
 	// Find the index of the first expected bucket that ends after the cutoff time. This should align
@@ -175,7 +175,6 @@ func randomOperationsTest(
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
 ) {
-	defer tracker.Close()
 	rand := random.NewTestRandom()
 
 	validatorCount := rand.IntRange(1, 10)
@@ -238,12 +237,21 @@ func randomOperationsTest(
 				t, currentTime, expectedBuckets, validatorIDs, tracker, trackerClone, timeSpan, rand, false)
 		}
 
+		// There should be one unflushed bucket.
+		buckets, err := tracker.GetUnflushedBuckets()
+		require.NoError(t, err)
+		require.Equal(t, 1, len(buckets))
+		// Asking for unflushed buckets again should return none, since the first call marks them as flushed.
+		buckets, err = tracker.GetUnflushedBuckets()
+		require.NoError(t, err)
+		require.Equal(t, 0, len(buckets))
+
 		currentTime = nextTime
 	}
 }
 
 func TestRandomOperations(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -254,13 +262,15 @@ func TestRandomOperations(t *testing.T) {
 	timeSpan := bucketSpan * 100
 
 	t.Run("signingRateTracker", func(t *testing.T) {
-		//t.Parallel()
+		t.Parallel()
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
 		require.NoError(t, err)
+		defer tracker.Close()
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
 		require.NoError(t, err)
+		defer trackerClone.Close()
 
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
 	})
@@ -273,4 +283,118 @@ func TestRandomOperations(t *testing.T) {
 	//	randomOperationsTest(t, tracker, timeSpan, bucketSpan)
 	//})
 
+}
+
+func unflushedBucketsTest(
+	t *testing.T,
+	tracker SigningRateTracker,
+	timeSpan time.Duration,
+	bucketSpan time.Duration,
+) {
+	rand := random.NewTestRandom()
+
+	validatorCount := rand.IntRange(1, 10)
+	validatorIDs := make([]core.OperatorID, validatorCount)
+	for i := 0; i < validatorCount; i++ {
+		validatorIDs[i] = core.OperatorID(rand.Bytes(32))
+	}
+
+	testSpan := timeSpan * 2
+	totalBuckets := int(testSpan / bucketSpan)
+
+	expectedBuckets := make([]*SigningRateBucket, 0, totalBuckets)
+
+	// Each iteration, step forward in time by exactly one second.
+	startTime := rand.Time()
+	endTime := startTime.Add(testSpan)
+	currentTime := startTime
+	bucket, err := NewSigningRateBucket(startTime, bucketSpan)
+	require.NoError(t, err)
+	expectedBuckets = append(expectedBuckets, bucket)
+
+	// verify before we've added any data
+	validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, true)
+
+	for currentTime.Before(endTime) {
+		batchSize := rand.Uint64Range(1, 1000)
+		validatorIndex := rand.Intn(validatorCount)
+		validatorID := validatorIDs[validatorIndex]
+
+		expectedBucket := expectedBuckets[len(expectedBuckets)-1]
+		if !expectedBucket.Contains(currentTime) {
+			// We've moved into a new bucket.
+			expectedBucket, err = NewSigningRateBucket(currentTime, bucketSpan)
+			require.NoError(t, err)
+			expectedBuckets = append(expectedBuckets, expectedBucket)
+		}
+
+		if rand.Bool() {
+			latency := rand.DurationRange(time.Second, time.Hour)
+			tracker.ReportSuccess(currentTime, validatorID, batchSize, latency)
+			expectedBucket.ReportSuccess(validatorID, batchSize, latency)
+		} else {
+			tracker.ReportFailure(currentTime, validatorID, batchSize)
+			expectedBucket.ReportFailure(validatorID, batchSize)
+		}
+
+		// On average, validate once per bucket.
+		if rand.Float64() < 1.0/(bucketSpan.Seconds()) {
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, false)
+		}
+
+		nextTime := currentTime.Add(time.Second)
+		if !nextTime.Before(endTime) {
+			// Do one last validation at the end of the test.
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, false)
+		}
+
+		// Unlike TestRandomOperations, wait until the end of the test to look at unflushed buckets.
+
+		currentTime = nextTime
+	}
+
+	// Get unflushed buckets. This should exactly match expectedBuckets
+	// (i.e. it should have all data written during this test).
+	unflushedBuckets, err := tracker.GetUnflushedBuckets()
+	require.NoError(t, err)
+	require.Equal(t, len(expectedBuckets), len(unflushedBuckets))
+	for i, bucket := range unflushedBuckets {
+		expectedBucket := expectedBuckets[i]
+		require.Equal(t, int(uint64(expectedBucket.startTimestamp.Unix())), int(bucket.GetStartTimestamp()))
+		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), bucket.GetEndTimestamp())
+		for _, signingRate := range bucket.GetValidatorSigningRates() {
+			validatorID := core.OperatorID(signingRate.GetId())
+			expectedSigningRate := expectedBucket.validatorInfo[validatorID]
+			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
+		}
+	}
+
+	// There should no longer be any unflushed buckets.
+	unflushedBuckets, err = tracker.GetUnflushedBuckets()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(unflushedBuckets))
+}
+
+// Perform a bunch of random operations. At the end, request the unflushed buckets. We should see all data in the
+// proper order.
+func TestUnflushedBuckets(t *testing.T) {
+	t.Parallel()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	// The size of each bucket
+	bucketSpan := time.Minute
+	// The amount of time the tracker remembers data for
+	timeSpan := bucketSpan * 100
+
+	t.Run("signingRateTracker", func(t *testing.T) {
+		t.Parallel()
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
+		defer tracker.Close()
+
+		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan)
+	})
 }
