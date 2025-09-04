@@ -38,7 +38,7 @@ func validateTrackerDump(
 
 	// We shouldn't see any buckets that end before the cutoff time.
 	for _, bucket := range dumpedBuckets {
-		require.True(t, bucket.GetEndTimestamp() >= uint64(cutoffTime.Unix()))
+		require.True(t, bucket.GetEndTimestamp() >= uint64(cutoffTime.Unix())) // TODO claude this is the assertion that fails on me
 	}
 
 	// Find the index of the first expected bucket that ends after the cutoff time. This should align
@@ -79,7 +79,21 @@ func validateTracker(
 	tracker SigningRateTracker,
 	timeSpan time.Duration,
 	rand *random.TestRandom,
+	empty bool,
 ) {
+
+	// Check the start timestamp of the last bucket.
+	if empty {
+		// We should get a zero timestamp if no data has been added yet.
+		timestamp, err := tracker.GetLastBucketStartTime()
+		require.NoError(t, err)
+		require.True(t, timestamp.IsZero())
+	} else {
+		expectedTimestamp := expectedBuckets[len(expectedBuckets)-1].startTimestamp
+		actualTimestamp, err := tracker.GetLastBucketStartTime()
+		require.NoError(t, err)
+		require.Equal(t, expectedTimestamp, actualTimestamp)
+	}
 
 	// Dump entire tracker.
 	validateTrackerDump(t, now, expectedBuckets, tracker, timeSpan, time.Time{})
@@ -120,14 +134,49 @@ func validateTracker(
 	require.True(t, areSigningRatesEqual(expectedSigningRate, reportedSigningRate))
 }
 
+// Copy recent updates into the clone and validate that it matches the original.
+func validateTrackerClone(
+	t *testing.T,
+	now time.Time,
+	expectedBuckets []*SigningRateBucket,
+	validatorIDs []core.OperatorID,
+	tracker SigningRateTracker,
+	trackerClone SigningRateTracker,
+	timeSpan time.Duration,
+	rand *random.TestRandom,
+	empty bool,
+) {
+
+	// Only request data from the clone starting at the last bucket start time it knows about.
+	dumpStartTimestamp, err := trackerClone.GetLastBucketStartTime()
+	require.NoError(t, err)
+
+	dump, err := tracker.GetSigningRateDump(dumpStartTimestamp)
+	require.NoError(t, err)
+	for _, dumpedBucket := range dump {
+		trackerClone.UpdateLastBucket(now, dumpedBucket)
+	}
+
+	validateTracker(t, now, expectedBuckets, validatorIDs, trackerClone, timeSpan, rand, empty)
+
+	// The clone should never mark buckets as needing flushing.
+	buckets, err := trackerClone.GetUnflushedBuckets()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(buckets))
+}
+
+// This function performs a number of random operations on a tracker, and verifies that it provides the expected
+// information. It periodically clones the data to a "follower" tracker, and verifies that both trackers provide
+// the same information.
 func randomOperationsTest(
 	t *testing.T,
 	tracker SigningRateTracker,
+	trackerClone SigningRateTracker,
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
 ) {
 	defer tracker.Close()
-	rand := random.NewTestRandom() // Prints the seed once, which is useful for reproducing failures
+	rand := random.NewTestRandom()
 
 	validatorCount := rand.IntRange(1, 10)
 	validatorIDs := make([]core.OperatorID, validatorCount)
@@ -149,7 +198,8 @@ func randomOperationsTest(
 	expectedBuckets = append(expectedBuckets, bucket)
 
 	// verify before we've added any data
-	validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
+	validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, true)
+	validateTrackerClone(t, currentTime, expectedBuckets, validatorIDs, tracker, trackerClone, timeSpan, rand, true)
 
 	for currentTime.Before(endTime) {
 		batchSize := rand.Uint64Range(1, 1000)
@@ -175,13 +225,17 @@ func randomOperationsTest(
 
 		// On average, validate once per bucket.
 		if rand.Float64() < 1.0/(bucketSpan.Seconds()) {
-			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, false)
+			validateTrackerClone(
+				t, currentTime, expectedBuckets, validatorIDs, tracker, trackerClone, timeSpan, rand, false)
 		}
 
 		nextTime := currentTime.Add(time.Second)
 		if !nextTime.Before(endTime) {
 			// Do one last validation at the end of the test.
-			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand, false)
+			validateTrackerClone(
+				t, currentTime, expectedBuckets, validatorIDs, tracker, trackerClone, timeSpan, rand, false)
 		}
 
 		currentTime = nextTime
@@ -189,7 +243,7 @@ func randomOperationsTest(
 }
 
 func TestRandomOperations(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -200,10 +254,15 @@ func TestRandomOperations(t *testing.T) {
 	timeSpan := bucketSpan * 100
 
 	t.Run("signingRateTracker", func(t *testing.T) {
-		t.Parallel()
+		//t.Parallel()
+
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
 		require.NoError(t, err)
-		randomOperationsTest(t, tracker, timeSpan, bucketSpan)
+
+		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
+
+		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
 	})
 
 	//t.Run("threadsafeSigningRateTracker", func(t *testing.T) {

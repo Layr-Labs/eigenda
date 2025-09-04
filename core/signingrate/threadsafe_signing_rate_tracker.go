@@ -3,6 +3,7 @@ package signingrate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -32,64 +33,6 @@ type threadsafeSigningRateTracker struct {
 	requests chan any
 }
 
-// a request to invoke GetValidatorSigningRate
-type getValidatorSigningRateRequest struct {
-	operatorID []byte
-	startTime  time.Time
-	endTime    time.Time
-	responseCh chan *getValidatorSigningRateResponse
-}
-
-// holds a response to GetValidatorSigningRate
-type getValidatorSigningRateResponse struct {
-	result *validator.ValidatorSigningRate
-	err    error
-}
-
-// a request to invoke GetSigningRateDump
-type getSigningRateDumpRequest struct {
-	startTime  time.Time
-	responseCh chan *getSigningRateDumpResponse
-}
-
-// holds a response to GetSigningRateDump
-type getSigningRateDumpResponse struct {
-	result []*validator.SigningRateBucket
-	err    error
-}
-
-// a request to invoke GetUnflushedBuckets
-type getUnflushedBucketsRequest struct {
-	responseCh chan *getUnflushedBucketsResponse
-}
-
-// holds a response to GetUnflushedBuckets
-type getUnflushedBucketsResponse struct {
-	result []*validator.SigningRateBucket
-	err    error
-}
-
-// a request to invoke UpdateLastBucket
-type updateLastBucketRequest struct {
-	bucket *validator.SigningRateBucket
-	now    time.Time
-}
-
-// a request to invoke ReportSuccess
-type reportSuccessRequest struct {
-	now            time.Time
-	id             core.OperatorID
-	batchSize      uint64
-	signingLatency time.Duration
-}
-
-// a request to invoke ReportFailure
-type reportFailureRequest struct {
-	now       time.Time
-	id        core.OperatorID
-	batchSize uint64
-}
-
 func NewThreadsafeSigningRateTracker(base SigningRateTracker) SigningRateTracker {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -105,6 +48,20 @@ func NewThreadsafeSigningRateTracker(base SigningRateTracker) SigningRateTracker
 	return tracker
 }
 
+// a request to invoke GetValidatorSigningRate
+type getValidatorSigningRateRequest struct {
+	operatorID   []byte
+	startTime    time.Time
+	endTime      time.Time
+	responseChan chan *getValidatorSigningRateResponse
+}
+
+// holds a response to GetValidatorSigningRate
+type getValidatorSigningRateResponse struct {
+	result *validator.ValidatorSigningRate
+	err    error
+}
+
 func (t *threadsafeSigningRateTracker) GetValidatorSigningRate(
 	operatorID []byte,
 	startTime time.Time,
@@ -112,10 +69,10 @@ func (t *threadsafeSigningRateTracker) GetValidatorSigningRate(
 ) (*validator.ValidatorSigningRate, error) {
 
 	request := &getValidatorSigningRateRequest{
-		operatorID: operatorID,
-		startTime:  startTime,
-		endTime:    endTime,
-		responseCh: make(chan *getValidatorSigningRateResponse, 1),
+		operatorID:   operatorID,
+		startTime:    startTime,
+		endTime:      endTime,
+		responseChan: make(chan *getValidatorSigningRateResponse, 1),
 	}
 
 	// Send the request
@@ -129,9 +86,21 @@ func (t *threadsafeSigningRateTracker) GetValidatorSigningRate(
 	select {
 	case <-t.ctx.Done():
 		return nil, errors.New("signing rate tracker is shutting down")
-	case response := <-request.responseCh:
+	case response := <-request.responseChan:
 		return response.result, response.err
 	}
+}
+
+// a request to invoke GetSigningRateDump
+type getSigningRateDumpRequest struct {
+	startTime    time.Time
+	responseChan chan *getSigningRateDumpResponse
+}
+
+// holds a response to GetSigningRateDump
+type getSigningRateDumpResponse struct {
+	result []*validator.SigningRateBucket
+	err    error
 }
 
 func (t *threadsafeSigningRateTracker) GetSigningRateDump(
@@ -139,8 +108,8 @@ func (t *threadsafeSigningRateTracker) GetSigningRateDump(
 ) ([]*validator.SigningRateBucket, error) {
 
 	request := &getSigningRateDumpRequest{
-		startTime:  startTime,
-		responseCh: make(chan *getSigningRateDumpResponse, 1),
+		startTime:    startTime,
+		responseChan: make(chan *getSigningRateDumpResponse, 1),
 	}
 
 	// Send the request
@@ -154,15 +123,26 @@ func (t *threadsafeSigningRateTracker) GetSigningRateDump(
 	select {
 	case <-t.ctx.Done():
 		return nil, errors.New("signing rate tracker is shutting down")
-	case response := <-request.responseCh:
+	case response := <-request.responseChan:
 		return response.result, response.err
 	}
+}
+
+// a request to invoke GetUnflushedBuckets
+type getUnflushedBucketsRequest struct {
+	responseChan chan *getUnflushedBucketsResponse
+}
+
+// holds a response to GetUnflushedBuckets
+type getUnflushedBucketsResponse struct {
+	result []*validator.SigningRateBucket
+	err    error
 }
 
 func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBucket, error) {
 
 	request := &getUnflushedBucketsRequest{
-		responseCh: make(chan *getUnflushedBucketsResponse, 1),
+		responseChan: make(chan *getUnflushedBucketsResponse, 1),
 	}
 
 	// Send the request
@@ -176,9 +156,24 @@ func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.Signi
 	select {
 	case <-t.ctx.Done():
 		return nil, errors.New("signing rate tracker is shutting down")
-	case response := <-request.responseCh:
+	case response := <-request.responseChan:
 		return response.result, nil
 	}
+}
+
+// a request to invoke ReportSuccess
+type reportSuccessRequest struct {
+	now            time.Time
+	id             core.OperatorID
+	batchSize      uint64
+	signingLatency time.Duration
+}
+
+// a request to invoke ReportFailure
+type reportFailureRequest struct {
+	now       time.Time
+	id        core.OperatorID
+	batchSize uint64
 }
 
 func (t *threadsafeSigningRateTracker) ReportSuccess(
@@ -221,6 +216,12 @@ func (t *threadsafeSigningRateTracker) ReportFailure(
 	}
 }
 
+// a request to invoke UpdateLastBucket
+type updateLastBucketRequest struct {
+	bucket *validator.SigningRateBucket
+	now    time.Time
+}
+
 func (t *threadsafeSigningRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
 	request := &updateLastBucketRequest{
 		bucket: bucket,
@@ -231,6 +232,37 @@ func (t *threadsafeSigningRateTracker) UpdateLastBucket(now time.Time, bucket *v
 	case <-t.ctx.Done():
 		// things are being torn down, just drop the request
 	case t.requests <- request:
+	}
+}
+
+// a request to invoke GetLastBucketStartTime
+type getLastBucketStartTimeRequest struct {
+	responseChan chan *getLastBucketStartTimeResponse
+}
+
+type getLastBucketStartTimeResponse struct {
+	result time.Time
+	err    error
+}
+
+func (t *threadsafeSigningRateTracker) GetLastBucketStartTime() (time.Time, error) {
+	request := &getLastBucketStartTimeRequest{
+		responseChan: make(chan *getLastBucketStartTimeResponse, 1),
+	}
+
+	// Send the request
+	select {
+	case <-t.ctx.Done():
+		return time.Time{}, fmt.Errorf("signing rate tracker is shutting down")
+	case t.requests <- request:
+	}
+
+	// await the response
+	select {
+	case <-t.ctx.Done():
+		return time.Time{}, fmt.Errorf("signing rate tracker is shutting down")
+	case response := <-request.responseChan:
+		return response.result, response.err
 	}
 }
 
@@ -252,26 +284,16 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 					typedRequest.operatorID,
 					typedRequest.startTime,
 					typedRequest.endTime)
-				response := &getValidatorSigningRateResponse{
+				typedRequest.responseChan <- &getValidatorSigningRateResponse{
 					result: result,
 					err:    err,
-				}
-				select {
-				case <-t.ctx.Done():
-					return
-				case typedRequest.responseCh <- response:
 				}
 
 			case *getSigningRateDumpRequest:
 				result, err := t.base.GetSigningRateDump(typedRequest.startTime)
-				response := &getSigningRateDumpResponse{
+				typedRequest.responseChan <- &getSigningRateDumpResponse{
 					result: result,
 					err:    err,
-				}
-				select {
-				case <-t.ctx.Done():
-					return
-				case typedRequest.responseCh <- response:
 				}
 
 			case *updateLastBucketRequest:
@@ -279,14 +301,9 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 
 			case *getUnflushedBucketsRequest:
 				result, err := t.base.GetUnflushedBuckets()
-				response := &getUnflushedBucketsResponse{
+				typedRequest.responseChan <- &getUnflushedBucketsResponse{
 					result: result,
 					err:    err,
-				}
-				select {
-				case <-t.ctx.Done():
-					return
-				case typedRequest.responseCh <- response:
 				}
 
 			case *reportSuccessRequest:
@@ -298,6 +315,16 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 
 			case *reportFailureRequest:
 				t.base.ReportFailure(typedRequest.now, typedRequest.id, typedRequest.batchSize)
+
+			case *getLastBucketStartTimeRequest:
+				startTime, err := t.base.GetLastBucketStartTime()
+				typedRequest.responseChan <- &getLastBucketStartTimeResponse{
+					result: startTime,
+					err:    err,
+				}
+
+			default:
+				panic(fmt.Sprintf("unexpected request type: %T", typedRequest))
 			}
 		}
 	}

@@ -66,6 +66,10 @@ type SigningRateTracker interface {
 	// not when it is provided whole-sale from an external source.
 	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket)
 
+	// Get the start time of the last bucket in the store. If the store is empty, returns the zero time.
+	// Useful for determining how much data to request from a remote store when mirroring.
+	GetLastBucketStartTime() (time.Time, error)
+
 	// Close the store and free any associated resources.
 	Close()
 }
@@ -223,7 +227,7 @@ func (s *signingRateTracker) GetSigningRateDump(
 	// Wost case scenario, we iterate the entire deque. If we do that, we are about to transmit the contents
 	// of the deque over a network connection. And so in that case, the cost of iteration doesn't really matter.
 	for _, bucket := range s.buckets.ReverseIterator() {
-		if bucket.EndTimestamp().Before(startTime) {
+		if bucket.EndTimestamp().Before(startTime) || bucket.EndTimestamp().Equal(startTime) {
 			// This bucket is too old, skip it and stop iterating.
 			break
 		}
@@ -267,11 +271,9 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 		return
 	}
 
-	if previousBucket.startTimestamp.Before(convertedBucket.startTimestamp) {
+	if convertedBucket.startTimestamp.Before(previousBucket.startTimestamp) {
 		// This method should not be used to add buckets out of order.
-		// In theory, if the controller loses a large amount of history (i.e. hours), it could try to
-		// send out of date old buckets to fill in the gap. Scream about this in the logs, but
-		// no need to bring things crashing down over it.
+		// But no need to crash if it happens, just ignore the request.
 		s.logger.Errorf(
 			"Attempted to add bucket with start time %v after last bucket with start time %v, ignoring",
 			convertedBucket.startTimestamp, previousBucket.startTimestamp)
@@ -284,7 +286,14 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 	s.garbageCollectBuckets(now)
 }
 
-// TODO write a test that checks what happens when time goes backwards
+func (s *signingRateTracker) GetLastBucketStartTime() (time.Time, error) {
+	if s.buckets.Size() == 0 {
+		return time.Time{}, nil
+	}
+	bucket, err := s.buckets.PeekBack()
+	enforce.NilError(err, "should be impossible with a non-empty deque")
+	return bucket.startTimestamp, nil
+}
 
 // Get the bucket that is currently being written to. This is always the latest bucket.
 func (s *signingRateTracker) getMutableBucket(now time.Time) *SigningRateBucket {
