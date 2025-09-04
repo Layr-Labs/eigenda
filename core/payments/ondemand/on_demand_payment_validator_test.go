@@ -37,7 +37,6 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
-	defer paymentValidator.Stop()
 
 	// debit from account A
 	err = paymentValidator.Debit(ctx, accountA, uint32(50), []uint8{0})
@@ -74,7 +73,6 @@ func TestDebitInsufficientFunds(t *testing.T) {
 		time.Second,
 	)
 	require.NoError(t, err)
-	defer paymentValidator.Stop()
 
 	// Try to debit more than available funds (5000 wei / 1000 wei per symbol = 5 symbols max)
 	err = paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{0})

@@ -47,7 +47,6 @@ type ClientLedger struct {
 }
 
 var _ reservation.UpdatableReservationLedgers = (*ClientLedger)(nil)
-var _ ondemand.UpdatableOnDemandLedgers = (*ClientLedger)(nil)
 
 // Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
@@ -107,14 +106,21 @@ func NewClientLedger(
 		getNow:             getNow,
 	}
 
+	var err error
 	if clientLedger.reservationLedger != nil {
 		clientLedger.reservationMonitor = reservation.NewReservationVaultMonitor(
 			ctx, logger, paymentVault, clientLedger, updateInterval)
 	}
 
 	if clientLedger.onDemandLedger != nil {
-		clientLedger.onDemandMonitor = ondemand.NewOnDemandVaultMonitor(
-			ctx, logger, paymentVault, clientLedger, updateInterval)
+		clientLedger.onDemandMonitor, err = ondemand.NewOnDemandVaultMonitor(
+			ctx,
+			logger,
+			paymentVault,
+			updateInterval,
+			clientLedger.GetAccountsToUpdate,
+			clientLedger.UpdateTotalDeposit)
+		enforce.NilError(err, "new on demand vault monitor")
 	}
 
 	return clientLedger
@@ -295,9 +301,6 @@ func (cl *ClientLedger) RevertDebit(
 func (cl *ClientLedger) Stop() {
 	if cl.reservationMonitor != nil {
 		cl.reservationMonitor.Stop()
-	}
-	if cl.onDemandMonitor != nil {
-		cl.onDemandMonitor.Stop()
 	}
 }
 

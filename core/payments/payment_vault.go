@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 

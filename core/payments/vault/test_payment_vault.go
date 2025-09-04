@@ -14,9 +14,12 @@ type TestPaymentVault struct {
 	// Storage for individual account deposits
 	totalDeposits map[gethcommon.Address]*big.Int
 
+	// Storage for individual account reservations
+	reservations map[gethcommon.Address]*bindings.IPaymentVaultReservation
+
 	// Global parameters
 	globalSymbolsPerSecond uint64
-	minNumSymbols          uint64
+	minNumSymbols          uint32
 	PricePerSymbol         uint64
 }
 
@@ -25,6 +28,7 @@ var _ payments.PaymentVault = &TestPaymentVault{}
 func NewTestPaymentVault() *TestPaymentVault {
 	return &TestPaymentVault{
 		totalDeposits:          make(map[gethcommon.Address]*big.Int),
+		reservations:           make(map[gethcommon.Address]*bindings.IPaymentVaultReservation),
 		globalSymbolsPerSecond: 1000,
 		minNumSymbols:          1,
 		PricePerSymbol:         100,
@@ -43,7 +47,7 @@ func (t *TestPaymentVault) SetGlobalSymbolsPerSecond(value uint64) {
 	t.globalSymbolsPerSecond = value
 }
 
-func (t *TestPaymentVault) SetMinNumSymbols(value uint64) {
+func (t *TestPaymentVault) SetMinNumSymbols(value uint32) {
 	t.minNumSymbols = value
 }
 
@@ -74,7 +78,7 @@ func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint6
 	return t.globalSymbolsPerSecond, nil
 }
 
-func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
+func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	return t.minNumSymbols, nil
 }
 

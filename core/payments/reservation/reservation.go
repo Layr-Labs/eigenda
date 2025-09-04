@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
