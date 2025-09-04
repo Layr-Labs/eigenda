@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -24,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -113,9 +113,19 @@ var _ = BeforeSuite(func() {
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
+
+	var loggerConfig *common.LoggerConfig
+	if os.Getenv("CI") != "" {
+		loggerConfig = common.DefaultLoggerConfig()
+	} else {
+		loggerConfig = common.DefaultConsoleLoggerConfig()
+	}
+	logger, err = common.NewLogger(loggerConfig)
+	Expect(err).To(BeNil())
+
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
-			fmt.Println("Using shared Blob Store")
+			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
 
 			cfg := testbed.DefaultLocalStackConfig()
@@ -131,27 +141,24 @@ var _ = BeforeSuite(func() {
 				MetadataTableName:   metadataTableName,
 				BucketTableName:     bucketTableName,
 				V2MetadataTableName: metadataTableNameV2,
+				Logger:              logger,
 			}
 			err = testbed.DeployResources(context.Background(), deployConfig)
 			Expect(err).To(BeNil())
 		} else {
-			fmt.Println("Using in-memory Blob Store")
+			logger.Info("Using in-memory Blob Store")
 		}
 
-		fmt.Println("Starting anvil")
+		logger.Info("Starting anvil")
 		testConfig.StartAnvil()
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
-			fmt.Println("Starting graph node")
+			logger.Info("Starting graph node")
 			testConfig.StartGraphNode()
 		}
 
-		loggerConfig := common.DefaultLoggerConfig()
-		logger, err = common.NewLogger(loggerConfig)
-		Expect(err).To(BeNil())
-
-		fmt.Println("Deploying experiment")
+		logger.Info("Deploying experiment")
 		testConfig.DeployExperiment()
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
@@ -167,16 +174,16 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Registering blob versions and relays")
+		logger.Info("Registering blob versions and relays")
 		testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-		fmt.Println("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient)
+		logger.Info("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient, logger)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("Starting binaries")
+		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
@@ -184,7 +191,7 @@ var _ = BeforeSuite(func() {
 		err = setupRetrievalClients(testConfig)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Building client verification and interaction components")
+		logger.Info("Building client verification and interaction components")
 
 		certBuilder, err = clientsv2.NewCertBuilder(
 			logger,
@@ -438,17 +445,17 @@ var _ = AfterSuite(func() {
 			cancel()
 		}
 
-		fmt.Println("Stopping binaries")
+		logger.Info("Stopping binaries")
 		testConfig.StopBinaries()
 
-		fmt.Println("Stopping anvil")
+		logger.Info("Stopping anvil")
 		testConfig.StopAnvil()
 
-		fmt.Println("Stopping graph node")
+		logger.Info("Stopping graph node")
 		testConfig.StopGraphNode()
 
 		if localstackContainer != nil {
-			fmt.Println("Stopping localstack container")
+			logger.Info("Stopping localstack container")
 			_ = localstackContainer.Terminate(context.Background())
 		}
 	}

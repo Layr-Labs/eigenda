@@ -3,13 +3,16 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -23,14 +26,32 @@ type DeployResourcesConfig struct {
 	MetadataTableName   string
 	BucketTableName     string
 	V2MetadataTableName string
-	V2PaymentPrefix     string // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
-	Region              string // Optional: AWS region, defaults to "us-east-1"
-	AccessKey           string // Optional: AWS access key, defaults to "localstack"
-	SecretAccessKey     string // Optional: AWS secret key, defaults to "localstack"
+	V2PaymentPrefix     string          // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
+	Region              string          // Optional: AWS region, defaults to "us-east-1"
+	AccessKey           string          // Optional: AWS access key, defaults to "localstack"
+	SecretAccessKey     string          // Optional: AWS secret key, defaults to "localstack"
+	Logger              logging.Logger  // Optional: logger for output messages
 }
 
 // DeployResources creates AWS resources (S3 buckets and DynamoDB tables) on LocalStack
 func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
+	// Use a default logger if none provided
+	logger := config.Logger
+	if logger == nil {
+		loggerConfig := &common.LoggerConfig{
+			Format:       common.TextLogFormat,
+			OutputWriter: os.Stdout,
+		}
+		var err error
+		logger, err = common.NewLogger(loggerConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create logger: %w", err)
+		}
+	}
+
+	// Add component to logger
+	logger = logger.With("component", "DeployResources")
+
 	// Set defaults
 	if config.Region == "" {
 		config.Region = "us-east-1"
@@ -54,7 +75,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 	}
 
 	// Create S3 bucket
-	if err := createS3Bucket(ctx, cfg); err != nil {
+	if err := createS3Bucket(ctx, cfg, logger); err != nil {
 		return fmt.Errorf("failed to create S3 bucket: %w", err)
 	}
 
@@ -65,7 +86,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to create metadata table %s: %w", config.MetadataTableName, err)
 		}
-		fmt.Printf("Created metadata table: %s\n", config.MetadataTableName)
+		logger.Info("Created metadata table", "table", config.MetadataTableName)
 	}
 
 	// Create bucket table
@@ -75,12 +96,12 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to create bucket table %s: %w", config.BucketTableName, err)
 		}
-		fmt.Printf("Created bucket table: %s\n", config.BucketTableName)
+		logger.Info("Created bucket table", "table", config.BucketTableName)
 	}
 
 	// Create v2 tables if specified
 	if config.V2MetadataTableName != "" {
-		fmt.Println("Creating v2 tables")
+		logger.Info("Creating v2 tables")
 
 		// Create v2 metadata table
 		_, err := test_utils.CreateTable(ctx, cfg, config.V2MetadataTableName,
@@ -88,10 +109,10 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to create v2 metadata table %s: %w", config.V2MetadataTableName, err)
 		}
-		fmt.Printf("Created v2 metadata table: %s\n", config.V2MetadataTableName)
+		logger.Info("Created v2 metadata table", "table", config.V2MetadataTableName)
 
 		// Create payment related tables
-		if err := createPaymentTables(cfg, config.V2PaymentPrefix); err != nil {
+		if err := createPaymentTables(cfg, config.V2PaymentPrefix, logger); err != nil {
 			return fmt.Errorf("failed to create payment tables: %w", err)
 		}
 	}
@@ -100,7 +121,7 @@ func DeployResources(ctx context.Context, config DeployResourcesConfig) error {
 }
 
 // createS3Bucket creates the S3 bucket using the AWS SDK
-func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
+func createS3Bucket(ctx context.Context, cfg aws.ClientConfig, logger logging.Logger) error {
 	bucketName := "test-eigenda-blobstore"
 
 	// Create AWS SDK config with custom endpoint resolver
@@ -140,7 +161,7 @@ func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 	})
 
 	if err == nil {
-		fmt.Printf("Bucket %s already exists\n", bucketName)
+		logger.Info("Bucket already exists", "bucket", bucketName)
 		return nil
 	}
 
@@ -161,29 +182,29 @@ func createS3Bucket(ctx context.Context, cfg aws.ClientConfig) error {
 		return fmt.Errorf("failed to create bucket %s: %w", bucketName, err)
 	}
 
-	fmt.Printf("Created S3 bucket: %s\n", bucketName)
+	logger.Info("Created S3 bucket", "bucket", bucketName)
 	return nil
 }
 
 // createPaymentTables creates the payment-related tables
-func createPaymentTables(cfg aws.ClientConfig, prefix string) error {
+func createPaymentTables(cfg aws.ClientConfig, prefix string, logger logging.Logger) error {
 	// Create reservation table
 	if err := meterer.CreateReservationTable(cfg, prefix+"reservation"); err != nil {
 		return fmt.Errorf("failed to create reservation table: %w", err)
 	}
-	fmt.Printf("Created reservation table: %s\n", prefix+"reservation")
+	logger.Info("Created reservation table", "table", prefix+"reservation")
 
 	// Create on-demand table
 	if err := meterer.CreateOnDemandTable(cfg, prefix+"ondemand"); err != nil {
 		return fmt.Errorf("failed to create on-demand table: %w", err)
 	}
-	fmt.Printf("Created on-demand table: %s\n", prefix+"ondemand")
+	logger.Info("Created on-demand table", "table", prefix+"ondemand")
 
 	// Create global reservation table
 	if err := meterer.CreateGlobalReservationTable(cfg, prefix+"global_reservation"); err != nil {
 		return fmt.Errorf("failed to create global reservation table: %w", err)
 	}
-	fmt.Printf("Created global reservation table: %s\n", prefix+"global_reservation")
+	logger.Info("Created global reservation table", "table", prefix+"global_reservation")
 
 	return nil
 }
