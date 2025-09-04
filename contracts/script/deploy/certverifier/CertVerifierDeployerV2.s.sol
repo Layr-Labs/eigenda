@@ -19,10 +19,10 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 //forge script script/deploy/certverifier/CertVerifierDeployerV2.s.sol:CertVerifierDeployerV2 --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployerV2 is Script, Test {
     // CertVerifierDeployerV2 is a foundry deployment contract used for deploying EigenDACertVerifier contracts
-    // compatible with the EigenDA V2 protocol. 
-    // 
+    // compatible with the EigenDA V2 protocol.
+    //
     // There's loose correctness assumptions provided by the inabox testing framework which calls into this script
-    // for deploying a verifier which is used for testing the E2E correctness of the eigenda V2 client's 
+    // for deploying a verifier which is used for testing the E2E correctness of the eigenda V2 client's
     // dispersal, VERIFICATION, & retrieval logics
 
     address eigenDACertVerifier;
@@ -35,7 +35,6 @@ contract CertVerifierDeployerV2 is Script, Test {
     // TODO(ethenotethan): is it worth detecting if these keys exist in the directory?
     string directoryServiceManagerKey = "SERVICE_MANAGER";
     string directoryThresholdRegistryKey = "THRESHOLD_REGISTRY";
-
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         // 1 - ingest JSON config file as string and extract dependency fields used for
@@ -61,7 +60,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         // 2.a - assume we can read a batch number that's greater than zero
         uint32 batchNumber = IEigenDAServiceManager(eigenDAServiceManager).taskNumber();
-        if(batchNumber == 0) {
+        if (batchNumber == 0) {
             revert("Expected to have batch ID > 0 in EigenDAServiceManager contract storage");
         }
 
@@ -72,10 +71,13 @@ contract CertVerifierDeployerV2 is Script, Test {
             revert("EigenDAThresholdRegistry contract address cannot be nil");
         }
 
-        DATypesV1.VersionedBlobParams memory blobParams = IEigenDAThresholdRegistry(eigenDAThresholdRegistry).getBlobParams(0);
+        DATypesV1.VersionedBlobParams memory blobParams =
+            IEigenDAThresholdRegistry(eigenDAThresholdRegistry).getBlobParams(0);
 
         if (blobParams.codingRate == 0) {
-            revert("EigenDAThresholdRegistry contract should return blob params that have been initialized at version index 0");
+            revert(
+                "EigenDAThresholdRegistry contract should return blob params that have been initialized at version index 0"
+            );
         }
 
         // 3 - validate arbitrary user input for correctness
