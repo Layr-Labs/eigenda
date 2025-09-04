@@ -55,7 +55,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         address eigenDAServiceManager = IEigenDADirectory(eigenDADirectory).getAddress(directoryServiceManagerKey);
         if (eigenDAServiceManager == address(0)) {
-            revert("EigenDAServiceManager contract address cannot be nil");
+            revert("EigenDAServiceManager contract address not set in provided EigenDADirectory contract");
         }
 
         // 2.a - assume we can read a batch number that's greater than zero
