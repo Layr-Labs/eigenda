@@ -23,7 +23,7 @@ contract CertVerifierDeployerV2 is Script, Test {
     //
     // There's loose correctness assumptions provided by the inabox testing framework which calls into this script
     // for deploying a verifier which is used for testing the E2E correctness of the eigenda V2 client's
-    // dispersal, VERIFICATION, & retrieval logics
+    // dispersal, verification (which the deployed verifier is eth_call'd), & retrieval logics
 
     address eigenDACertVerifier;
 
@@ -32,7 +32,6 @@ contract CertVerifierDeployerV2 is Script, Test {
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
-    // TODO(ethenotethan): is it worth detecting if these keys exist in the directory?
     string directoryServiceManagerKey = "SERVICE_MANAGER";
     string directoryThresholdRegistryKey = "THRESHOLD_REGISTRY";
 
