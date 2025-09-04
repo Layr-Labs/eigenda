@@ -227,11 +227,24 @@ function start_detached {
 function stop_detached {
 
     pid_file="$testpath/pids"
-    pids=$(cat $pid_file)
-
-    kill_processes
-
-    rm -f $pid_file
+    
+    # Try to read PIDs from file if it exists
+    if [[ -f "$pid_file" ]]; then
+        pids=$(cat $pid_file)
+        kill_processes
+        rm -f $pid_file
+    fi
+    
+    # Force cleanup - kill any remaining processes by name
+    echo "Force cleaning up any remaining processes..."
+    pkill -f "churner/bin/server" || true
+    pkill -f "disperser/bin/server" || true
+    pkill -f "disperser/bin/encoder" || true
+    pkill -f "disperser/bin/batcher" || true
+    pkill -f "disperser/bin/controller" || true
+    pkill -f "relay/bin/relay" || true
+    pkill -f "node/bin/node" || true
+    pkill -f "retriever/bin/server" || true
 }
 
 function start_anvil {
@@ -301,6 +314,21 @@ EOF
         start_detached ${@:2} ;;
     stop)
         stop_detached ${@:2} ;;
+    force-stop)
+        echo "Force stopping all EigenDA processes..."
+        pkill -9 -f "churner/bin/server" || true
+        pkill -9 -f "disperser/bin/server" || true
+        pkill -9 -f "disperser/bin/encoder" || true
+        pkill -9 -f "disperser/bin/batcher" || true
+        pkill -9 -f "disperser/bin/controller" || true
+        pkill -9 -f "relay/bin/relay" || true
+        pkill -9 -f "node/bin/node" || true
+        pkill -9 -f "retriever/bin/server" || true
+        pkill -9 -f "anvil" || true
+        rm -f $testpath/pids
+        rm -f ./anvil.pid
+        echo "All processes force killed"
+        ;;
     start-anvil)
         start_anvil ${@:2} ;;
     stop-anvil)

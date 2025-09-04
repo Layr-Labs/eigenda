@@ -28,6 +28,9 @@ var (
 	testName            string
 	graphUrl            string
 	testConfig          *deploy.Config
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
 )
 
 func init() {
@@ -59,8 +62,20 @@ func setup() {
 	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
-		Services:       []string{"dynamodb"},
+		Services:       []string{"s3", "dynamodb", "kms"},
 	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Deploying LocalStack resources")
+	deployConfig := testbed.DeployResourcesConfig{
+		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
+		MetadataTableName:   metadataTableName,
+		BucketTableName:     bucketTableName,
+		V2MetadataTableName: metadataTableNameV2,
+	}
+	err = testbed.DeployResources(context.Background(), deployConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -87,6 +102,12 @@ func setup() {
 		panic(err)
 	}
 	testConfig.RegisterBlobVersionAndRelays(ethClient)
+
+	fmt.Println("Registering disperser keypair")
+	err = testConfig.RegisterDisperserKeypair(ethClient)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()
