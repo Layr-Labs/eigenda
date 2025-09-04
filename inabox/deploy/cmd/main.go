@@ -129,6 +129,9 @@ func getRunner(command string) func(ctx *cli.Context) error {
 }
 
 func chainInfra(ctx *cli.Context, config *deploy.Config) error {
+	// Disable Ryuk since we likely want to run the test for a long time
+	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+
 	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
@@ -147,6 +150,9 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 }
 
 func localstack(ctx *cli.Context) error {
+	// Disable Ryuk since we likely want to run the test for a long time
+	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+
 	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

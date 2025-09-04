@@ -268,13 +268,16 @@ function start_anvil {
 }
 
 function stop_anvil {
-
+    # Try to stop process-based anvil if PID file exists
     pid_file="./anvil.pid"
-    anvil_pid=$(cat $pid_file)
-
-    kill $anvil_pid
-
-    rm -f $pid_file
+    if [ -f "$pid_file" ]; then
+        anvil_pid=$(cat $pid_file)
+        kill $anvil_pid 2>/dev/null || true
+        rm -f $pid_file
+    fi
+    
+    # Stop Docker-based anvil containers by image name
+    docker ps -q --filter "ancestor=ghcr.io/foundry-rs/foundry" | xargs -r docker stop 2>/dev/null || true
 }
 
 function start_graph {
