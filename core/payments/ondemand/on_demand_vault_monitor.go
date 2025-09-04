@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"golang.org/x/sync/errgroup"
 )
 
 // Checks for updates to the PaymentVault contract, and updates ledgers with the new state
@@ -34,7 +32,6 @@ func NewOnDemandVaultMonitor(
 	paymentVault payments.PaymentVault,
 	updateInterval time.Duration,
 	getAccountsToUpdate func() []gethcommon.Address,
-	// Update the total deposit for an account. MUST be thread-safe, since it will be called from multiple goroutines
 	updateTotalDeposit func(accountID gethcommon.Address, newTotalDeposit *big.Int) error,
 ) (*OnDemandVaultMonitor, error) {
 	if updateInterval <= 0 {
@@ -76,32 +73,12 @@ func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error 
 		return fmt.Errorf("deposit count mismatch: got %d deposits for %d accounts", len(newDeposits), len(accountIDs))
 	}
 
-	group, _ := errgroup.WithContext(ctxWithTimeout)
-	group.SetLimit(runtime.GOMAXPROCS(0))
-	errorsChan := make(chan error, len(accountIDs))
-
 	for i, newDeposit := range newDeposits {
 		accountID := accountIDs[i]
-		deposit := newDeposit
-
-		group.Go(func() error {
-			if err := vm.updateTotalDeposit(accountID, deposit); err != nil {
-				errorsChan <- fmt.Errorf("update account %v: %w", accountID.Hex(), err)
-			}
-			return nil
-		})
-	}
-
-	_ = group.Wait()
-	close(errorsChan)
-
-	var joinedErr error
-	for err := range errorsChan {
-		joinedErr = errors.Join(joinedErr, err)
-	}
-
-	if joinedErr != nil {
-		return fmt.Errorf("update deposits: %w", joinedErr)
+		err := vm.updateTotalDeposit(accountID, newDeposit)
+		if err != nil {
+			vm.logger.Errorf("update total deposit for account %v failed: %v", accountID.Hex(), err)
+		}
 	}
 
 	return nil
