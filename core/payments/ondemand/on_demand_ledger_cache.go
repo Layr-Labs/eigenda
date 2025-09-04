@@ -2,11 +2,13 @@ package ondemand
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -15,8 +17,10 @@ import (
 )
 
 // Stores a collection of OnDemandLedgers in an LRU cache
+//
+// The OnDemandLedgers created and stored in this cache are backed by DynamoDB, so that on-demand payment usage is
+// persistent.
 type OnDemandLedgerCache struct {
-	logger logging.Logger
 	// A cache of the ledgers being tracked.
 	//
 	// Least recently used OnDemandLedger entries are removed if the cache gets above the configured size. Since
@@ -32,37 +36,27 @@ type OnDemandLedgerCache struct {
 	// price per symbol in wei, from the PaymentVault
 	pricePerSymbol *big.Int
 	// minimum number of symbols to bill, from the PaymentVault
-	minNumSymbols uint32
+	minNumSymbols uint64
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
 	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
-	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
-	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
-	// to add them to the cache.
-	//
-	// This lock is intentionally more restrictive than it needs to be, for the sake of simplicity. It could be
-	// converted to an account-based lock instead of a global creation lock, if it ever becomes a bottleneck.
-	ledgerCreationLock sync.Mutex
+	// is to make sure that only one caller is constructing a new OnDemandLedger at a time for a specific account.
+	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
+	// new object for the same account key, and try to add them to the cache.
+	ledgerCreationLock *common.IndexLock
+	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
+	vaultMonitor *OnDemandVaultMonitor
 }
-
-var _ UpdatableOnDemandLedgers = &OnDemandLedgerCache{}
 
 func NewOnDemandLedgerCache(
 	ctx context.Context,
 	logger logging.Logger,
 	maxLedgers int,
 	paymentVault payments.PaymentVault,
+	updateInterval time.Duration,
 	dynamoClient *dynamodb.Client,
 	onDemandTableName string,
 ) (*OnDemandLedgerCache, error) {
-	if paymentVault == nil {
-		return nil, errors.New("payment vault must be non-nil")
-	}
-
-	if dynamoClient == nil {
-		return nil, errors.New("dynamo client must be non-nil")
-	}
-
 	cache, err := lru.NewWithEvict(
 		maxLedgers,
 		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
@@ -71,6 +65,14 @@ func NewOnDemandLedgerCache(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
+	}
+
+	if paymentVault == nil {
+		return nil, errors.New("payment vault must be non-nil")
+	}
+
+	if dynamoClient == nil {
+		return nil, errors.New("dynamo client must be non-nil")
 	}
 
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
@@ -83,35 +85,67 @@ func NewOnDemandLedgerCache(
 		return nil, fmt.Errorf("get min num symbols: %w", err)
 	}
 
-	return &OnDemandLedgerCache{
-		logger:            logger,
-		cache:             cache,
-		paymentVault:      paymentVault,
-		dynamoClient:      dynamoClient,
-		onDemandTableName: onDemandTableName,
-		pricePerSymbol:    new(big.Int).SetUint64(pricePerSymbol),
-		minNumSymbols:     minNumSymbols,
-	}, nil
+	ledgerCache := &OnDemandLedgerCache{
+		cache:              cache,
+		paymentVault:       paymentVault,
+		dynamoClient:       dynamoClient,
+		onDemandTableName:  onDemandTableName,
+		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols:      minNumSymbols,
+		ledgerCreationLock: common.NewIndexLock(256),
+	}
+
+	// Create the vault monitor with callback functions
+	ledgerCache.vaultMonitor, err = NewOnDemandVaultMonitor(
+		ctx,
+		logger,
+		paymentVault,
+		updateInterval,
+		ledgerCache.GetAccountsToUpdate,
+		ledgerCache.UpdateTotalDeposit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new on-demand vault monitor: %w", err)
+	}
+
+	return ledgerCache, nil
 }
 
-// GetOrCreate retrieves an existing OnDemandLedger for the given account, or creates a new one if it doesn't exist
+// Retrieves an existing OnDemandLedger for the given account, or creates a new one if it doesn't exist
+//
+// Note: there exists a potential race condition with the access pattern of this method:
+// 1. A ledger is retrieved from the cache
+// 2. A large amount of activity (or a small configured cache size) causes the ledger to be evicted from the cache
+// before the ledger operation has been completed
+// 3. A different caller tries to retrieve the ledger for that account, gets a cache miss, and constructs a new instance
+//
+// With this sequence of events, there could be multiple existing ledger instances for the same account. The
+// underlying cumulative payment store isn't designed to function with multiple instantiated ledger structs, so the
+// operation of one instance would overwrite the operation of the other. Practically, this would mean that the user
+// would get one free dispersal. The multiple instance problem would resolve itself after a single operation, since
+// the LRU cache can only maintain a single instance, and the other instance would be destroyed.
+//
+// It is very unlikely for this race condition to take place if the cache has been configured with a sane size. Given
+// the low probability of the occurrence, and the low severity of the race condition, we are not addressing it right
+// now to avoid the complexity of the potential workarounds.
 func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcommon.Address) (*OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
 	}
 
-	// Slow path: acquire lock and check again
-	c.ledgerCreationLock.Lock()
-	defer c.ledgerCreationLock.Unlock()
+	// Slow path: acquire per-account lock and check again
+	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
+	c.ledgerCreationLock.Lock(accountIndex)
+	defer c.ledgerCreationLock.Unlock(accountIndex)
 
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
 	}
 
-	onDemandPayment, err := c.paymentVault.GetTotalDeposit(ctx, accountID)
+	totalDeposit, err := c.paymentVault.GetTotalDeposit(ctx, accountID)
 	if err != nil {
-		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
+		return nil, fmt.Errorf("get total deposit for account %v: %w", accountID.Hex(), err)
 	}
 
 	cumulativePaymentStore, err := NewCumulativePaymentStore(c.dynamoClient, c.onDemandTableName, accountID)
@@ -121,25 +155,28 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 
 	newLedger, err := OnDemandLedgerFromStore(
 		ctx,
-		onDemandPayment,
+		totalDeposit,
 		c.pricePerSymbol,
 		c.minNumSymbols,
 		cumulativePaymentStore,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
+		return nil, fmt.Errorf("create ledger from store: %w", err)
 	}
 
 	c.cache.Add(accountID, newLedger)
 	return newLedger, nil
 }
 
-// GetAccountsToUpdate returns all accounts currently being tracked in the cache
+// Returns all accounts currently being tracked in the cache
+//
+// This method is used to determine which values need to be fetched from the PaymentVault, when periodically
+// checking for updates.
 func (c *OnDemandLedgerCache) GetAccountsToUpdate() []gethcommon.Address {
 	return c.cache.Keys()
 }
 
-// UpdateTotalDeposit updates the total deposit for an account if different from current value
+// Updates the total deposit for an account
 func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
@@ -147,5 +184,9 @@ func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, n
 		return nil
 	}
 
-	return ledger.UpdateTotalDeposits(newTotalDeposit)
+	currentDeposit := ledger.GetTotalDeposits()
+	if currentDeposit.Cmp(newTotalDeposit) != 0 {
+		return ledger.UpdateTotalDeposits(newTotalDeposit)
+	}
+	return nil
 }

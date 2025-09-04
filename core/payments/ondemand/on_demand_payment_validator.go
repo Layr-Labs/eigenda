@@ -2,7 +2,6 @@ package ondemand
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -15,10 +14,29 @@ import (
 // OnDemandPaymentValidator validates on-demand payments for multiple accounts
 type OnDemandPaymentValidator struct {
 	logger logging.Logger
-	// A cache of the ledgers being tracked
-	ledgerCache *OnDemandLedgerCache
-	// Provides access to the values stored in the PaymentVault contract and update notifications
-	vaultMonitor *OnDemandVaultMonitor
+	// A cache of the ledgers being tracked.
+	//
+	// New OnDemandLedger entries are added to this cache as Debit requests are received from new accounts. Least
+	// recently used OnDemandLedger entries are removed if the cache gets above the configured size. Since on-demand
+	// payment data is stored in a persistent way, deleting an OnDemandLedger from memory doesn't result in data loss:
+	// it just means that a new OnDemandLedger object will need to be constructed if any future Debits must be handled
+	// from that account.
+	ledgers *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	// protects concurrent access to the ledgers cache during ledger creation
+	//
+	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock
+	// is to make sure that only one caller is constructing a new OnDemandLedger at a time. Otherwise, it would be
+	// possible for two separate callers to get a cache miss, create the new object for the same account key, and try
+	// to add them to the cache.
+	ledgerCreationLock sync.Mutex
+	// Provides access to the values stored in the PaymentVault contract.
+	//
+	// The state of this object is updated on a background thread.
+	onChainState meterer.OnchainPayment
+	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
+	dynamoClient *dynamodb.Client
+	// the name of the dynamo table where on-demand payment information is stored
+	onDemandTableName string
 }
 
 // NewOnDemandPaymentValidator creates a new OnDemandPaymentValidator with specified cache size
@@ -35,25 +53,33 @@ func NewOnDemandPaymentValidator(
 	// interval for checking for payment updates
 	updateInterval time.Duration,
 ) (*OnDemandPaymentValidator, error) {
-	if paymentVault == nil {
-		return nil, errors.New("paymentVault cannot be nil")
+	if onChainState == nil {
+		return nil, errors.New("onChainState cannot be nil")
 	}
-
-	if updateInterval <= 0 {
-		return nil, errors.New("updateInterval must be > 0")
-	}
-
-	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, maxLedgers, paymentVault, dynamoClient, onDemandTableName)
+	cache, err := lru.NewWithEvict(
+		maxLedgers,
+		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
+			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
+		},
+	)
 	if err != nil {
-		return nil, fmt.Errorf("new on-demand ledger cache: %w", err)
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
 
-	vaultMonitor := NewOnDemandVaultMonitor(ctx, logger, paymentVault, ledgerCache, updateInterval)
+	if dynamoClient == nil {
+		return nil, errors.New("dynamo client cannot be nil")
+	}
+
+	if onDemandTableName == "" {
+		return nil, errors.New("on demand table name cannot be empty")
+	}
 
 	return &OnDemandPaymentValidator{
-		logger:       logger,
-		ledgerCache:  ledgerCache,
-		vaultMonitor: vaultMonitor,
+		logger:            logger,
+		ledgers:           cache,
+		onChainState:      onChainState,
+		dynamoClient:      dynamoClient,
+		onDemandTableName: onDemandTableName,
 	}, nil
 }
 
@@ -78,9 +104,80 @@ func (pv *OnDemandPaymentValidator) Debit(
 	return nil
 }
 
-// Stop stops the background vault monitoring thread
-func (pv *OnDemandPaymentValidator) Stop() {
-	if pv.vaultMonitor != nil {
-		pv.vaultMonitor.Stop()
+// getOrCreateLedger gets an existing on-demand ledger from the cache, or creates a new one if it doesn't exist
+func (pv *OnDemandPaymentValidator) getOrCreateLedger(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*OnDemandLedger, error) {
+	// Fast path: check if ledger already exists in cache
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
+		return ledger, nil
 	}
+
+	// Slow path: acquire lock and check again
+	pv.ledgerCreationLock.Lock()
+	defer pv.ledgerCreationLock.Unlock()
+
+	if ledger, exists := pv.ledgers.Get(accountID); exists {
+		return ledger, nil
+	}
+
+	onDemandPayment, err := pv.onChainState.GetOnDemandPaymentByAccount(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get on-demand payment for account %v: %w", accountID.Hex(), err)
+	}
+
+	pricePerSymbol := big.NewInt(int64(pv.onChainState.GetPricePerSymbol()))
+	minNumSymbols := pv.onChainState.GetMinNumSymbols()
+
+	cumulativePaymentStore, err := NewCumulativePaymentStore(pv.dynamoClient, pv.onDemandTableName, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("new cumulative payment store: %w", err)
+	}
+
+	newLedger, err := OnDemandLedgerFromStore(
+		ctx,
+		onDemandPayment.CumulativePayment,
+		pricePerSymbol,
+		minNumSymbols,
+		cumulativePaymentStore,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create on-demand ledger: %w", err)
+	}
+
+	pv.ledgers.Add(accountID, newLedger)
+	return newLedger, nil
+}
+
+// UpdateTotalDeposits updates the total deposits for multiple accounts.
+//
+// Will attempt to make all updates, even if one update fails. A multierror is returned, describing any/all errors
+// that occurred during the updates.
+func (pv *OnDemandPaymentValidator) UpdateTotalDeposits(updates []TotalDepositUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	var result *multierror.Error
+	for _, update := range updates {
+		ledger, exists := pv.ledgers.Get(update.AccountAddress)
+		if !exists {
+			// if we aren't already tracking the account, there's nothing to do. we'll start tracking it if the
+			// account ever makes an on-demand dispersal
+			continue
+		}
+
+		err := ledger.UpdateTotalDeposits(update.NewTotalDeposit)
+		if err != nil {
+			result = multierror.Append(
+				result, fmt.Errorf("update total deposit for account %v: %w", update.AccountAddress.Hex(), err))
+			continue
+		}
+	}
+
+	if err := result.ErrorOrNil(); err != nil {
+		return fmt.Errorf("update total deposits: %w", err)
+	}
+	return nil
 }
