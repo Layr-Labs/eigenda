@@ -131,7 +131,8 @@ func (t *Reader) updateContractBindings(
 	}
 
 	contractIRegistryCoordinator, err := regcoordinator.NewContractEigenDARegistryCoordinator(
-		registryCoordinatorAddr, t.ethClient
+		registryCoordinatorAddr,
+		t.ethClient,
 	)
 	if err != nil {
 		t.logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
