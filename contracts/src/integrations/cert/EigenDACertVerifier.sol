@@ -20,12 +20,6 @@ import {EigenDACertTypes as CT} from "src/integrations/cert/EigenDACertTypes.sol
 
 /// @title EigenDACertVerifier
 /// @notice Verifies EigenDA certificates
-/// @dev This contract's checkDACert function is designed to be zk provable by risczero's Steel library,
-/// which does not support zk proving reverting calls: https://github.com/risc0/risc0-ethereum/issues/438.
-/// For this reason, we avoid using revert statements and instead return error codes.
-/// The only acceptable reverts are from bugs, such as contract misconfiguration, which require human intervention.
-/// This means invalid certs can easily be proven so by looking at the status code returned,
-/// which is also useful for optimistic rollup one step prover contracts.
 contract EigenDACertVerifier is
     IEigenDACertVerifier,
     IEigenDACertVerifierBase,
@@ -89,7 +83,11 @@ contract EigenDACertVerifier is
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
-    /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
+    /// @dev checkDACert is designed to be zk provable by risczero's Steel library,
+    /// which does not support zk proving reverting calls: https://github.com/risc0/risc0-ethereum/issues/438.
+    /// It try catches checkDACertReverts, and maps any reverts to status codes.
+    /// This means invalid certs can easily be proven so by looking at the status code returned,
+    /// which is also useful for optimistic rollup one step prover contracts.
     /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
     /// TODO(4.0.0): return (uint8, bytes) instead to include the revert reason.
