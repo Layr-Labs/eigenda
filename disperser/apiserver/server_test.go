@@ -273,7 +273,8 @@ func TestGetBlobStatus(t *testing.T) {
 	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().GetY()
 	require.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
 	require.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
-	require.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
+	require.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(),
+		uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
 
 	actualBlobQuorumParams := make([]*pb.BlobQuorumParam, len(securityParams))
 	quorumNumbers := make([]byte, len(securityParams))
@@ -293,7 +294,8 @@ func TestGetBlobStatus(t *testing.T) {
 	require.Equal(t, reply.GetInfo().GetBlobHeader().GetBlobQuorumParams(), actualBlobQuorumParams)
 
 	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchId(), confirmedMetadata.ConfirmationInfo.BatchID)
-	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(), confirmedMetadata.ConfirmationInfo.BlobIndex)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+		confirmedMetadata.ConfirmationInfo.BlobIndex)
 	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata(), &pb.BatchMetadata{
 		BatchHeader: &pb.BatchHeader{
 			BatchRoot:               confirmedMetadata.ConfirmationInfo.BatchRoot,
@@ -306,7 +308,8 @@ func TestGetBlobStatus(t *testing.T) {
 		ConfirmationBlockNumber: confirmedMetadata.ConfirmationInfo.ConfirmationBlockNumber,
 		BatchHeaderHash:         confirmedMetadata.ConfirmationInfo.BatchHeaderHash[:],
 	})
-	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetInclusionProof(), confirmedMetadata.ConfirmationInfo.BlobInclusionProof)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetInclusionProof(),
+		confirmedMetadata.ConfirmationInfo.BlobInclusionProof)
 	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetQuorumIndexes(), quorumIndexes)
 }
 
@@ -409,7 +412,9 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	// Try to retrieve the blob before it is confirmed
 	_, err = retrieveBlob(dispersalServer, requestID, 2)
 	require.NotNil(t, err)
-	require.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
+	require.Equal(t,
+		"rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index",
+		err.Error())
 
 }
 

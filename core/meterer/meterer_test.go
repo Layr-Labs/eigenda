@@ -269,7 +269,8 @@ func TestMetererReservations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-	require.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
+	require.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)),
+		item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 	require.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
@@ -348,7 +349,8 @@ func TestMetererOnDemand(t *testing.T) {
 	// test cumulative payment on-chain constraint
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
-	require.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
+	require.ErrorContains(t, err,
+		"invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))

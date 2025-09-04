@@ -681,8 +681,10 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		require.Equal(t, uint32(metadata.ConfirmationInfo.BlobCommitment.Length), headerReply.GetBlobHeader().GetLength())
 		require.Len(t, headerReply.GetBlobHeader().GetQuorumHeaders(), 1)
 		require.Equal(t, uint32(0), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetQuorumId())
-		require.Equal(t, uint32(q0QuorumThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetConfirmationThreshold())
-		require.Equal(t, uint32(q0AdversaryThreshold), headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
+		require.Equal(t, uint32(q0QuorumThreshold),
+			headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetConfirmationThreshold())
+		require.Equal(t, uint32(q0AdversaryThreshold),
+			headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetAdversaryThreshold())
 		require.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {

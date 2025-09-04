@@ -26,11 +26,11 @@ type DeployResourcesConfig struct {
 	MetadataTableName   string
 	BucketTableName     string
 	V2MetadataTableName string
-	V2PaymentPrefix     string          // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
-	Region              string          // Optional: AWS region, defaults to "us-east-1"
-	AccessKey           string          // Optional: AWS access key, defaults to "localstack"
-	SecretAccessKey     string          // Optional: AWS secret key, defaults to "localstack"
-	Logger              logging.Logger  // Optional: logger for output messages
+	V2PaymentPrefix     string         // Optional: prefix for v2 payment tables, defaults to "e2e_v2_"
+	Region              string         // Optional: AWS region, defaults to "us-east-1"
+	AccessKey           string         // Optional: AWS access key, defaults to "localstack"
+	SecretAccessKey     string         // Optional: AWS secret key, defaults to "localstack"
+	Logger              logging.Logger // Optional: logger for output messages
 }
 
 // DeployResources creates AWS resources (S3 buckets and DynamoDB tables) on LocalStack
