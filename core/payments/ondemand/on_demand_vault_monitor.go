@@ -73,6 +73,8 @@ func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error 
 		return fmt.Errorf("deposit count mismatch: got %d deposits for %d accounts", len(newDeposits), len(accountIDs))
 	}
 
+	// This loop could theoretically be parallelized, but none of the current use cases (either a cache, or an
+	// individual account) require it. Therefore, a loop is used for simplicity.
 	for i, newDeposit := range newDeposits {
 		accountID := accountIDs[i]
 		err := vm.updateTotalDeposit(accountID, newDeposit)
