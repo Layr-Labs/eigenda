@@ -82,6 +82,9 @@ func validateTracker(
 	empty bool,
 ) {
 
+	err := tracker.Flush()
+	require.NoError(t, err)
+
 	// Check the start timestamp of the last bucket.
 	if empty {
 		// We should get a zero timestamp if no data has been added yet.
@@ -146,6 +149,11 @@ func validateTrackerClone(
 	rand *random.TestRandom,
 	empty bool,
 ) {
+
+	err := tracker.Flush()
+	require.NoError(t, err)
+	err = trackerClone.Flush()
+	require.NoError(t, err)
 
 	// Only request data from the clone starting at the last bucket start time it knows about.
 	dumpStartTimestamp, err := trackerClone.GetLastBucketStartTime()
@@ -275,13 +283,19 @@ func TestRandomOperations(t *testing.T) {
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
 	})
 
-	//t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
-	//	t.Parallel()
-	//	tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
-	//	require.NoError(t, err)
-	//	tracker = NewThreadsafeSigningRateTracker(tracker)
-	//	randomOperationsTest(t, tracker, timeSpan, bucketSpan)
-	//})
+	t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
+		t.Parallel()
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
+		tracker = NewThreadsafeSigningRateTracker(tracker)
+
+		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
+		trackerClone = NewThreadsafeSigningRateTracker(trackerClone)
+
+		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
+	})
 
 }
 
@@ -353,6 +367,9 @@ func unflushedBucketsTest(
 		currentTime = nextTime
 	}
 
+	err = tracker.Flush()
+	require.NoError(t, err)
+
 	// Get unflushed buckets. This should exactly match expectedBuckets
 	// (i.e. it should have all data written during this test).
 	unflushedBuckets, err := tracker.GetUnflushedBuckets()
@@ -393,6 +410,17 @@ func TestUnflushedBuckets(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
 		require.NoError(t, err)
+		defer tracker.Close()
+
+		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan)
+	})
+
+	t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
+		t.Parallel()
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		require.NoError(t, err)
+		tracker = NewThreadsafeSigningRateTracker(tracker)
 		defer tracker.Close()
 
 		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan)

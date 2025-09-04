@@ -266,6 +266,30 @@ func (t *threadsafeSigningRateTracker) GetLastBucketStartTime() (time.Time, erro
 	}
 }
 
+// a request to invoke Flush
+type flushRequest struct {
+	responseChan chan error
+}
+
+func (t *threadsafeSigningRateTracker) Flush() error {
+	request := &flushRequest{
+		responseChan: make(chan error, 1),
+	}
+	// Send the request
+	select {
+	case <-t.ctx.Done():
+		return fmt.Errorf("signing rate tracker is shutting down")
+	case t.requests <- request:
+	}
+	// await the response
+	select {
+	case <-t.ctx.Done():
+		return fmt.Errorf("signing rate tracker is shutting down")
+	case err := <-request.responseChan:
+		return err
+	}
+}
+
 func (t *threadsafeSigningRateTracker) Close() {
 	t.cancel()
 }
@@ -322,6 +346,10 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 					result: startTime,
 					err:    err,
 				}
+
+			case *flushRequest:
+				err := t.base.Flush()
+				typedRequest.responseChan <- err
 
 			default:
 				panic(fmt.Sprintf("unexpected request type: %T", typedRequest))
