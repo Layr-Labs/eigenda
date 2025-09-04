@@ -43,8 +43,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/peer"
 )
 
@@ -78,20 +78,20 @@ func TestMain(m *testing.M) {
 func TestDisperseBlob(t *testing.T) {
 	data := make([]byte, 3*1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
 	status, _, key := disperseBlob(t, dispersalServer, data)
-	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, key)
+	require.Equal(t, status, pb.BlobStatus_PROCESSING)
+	require.NotNil(t, key)
 }
 
 func TestDisperseBlobAuth(t *testing.T) {
 
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
@@ -105,7 +105,7 @@ func TestDisperseBlobAuth(t *testing.T) {
 	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
 
 	err = <-errorChan
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -113,7 +113,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data1KiB = codec.ConvertByPaddingEmptyByte(data1KiB)
 
@@ -126,13 +126,13 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 2*time.Second, errorChan, false)
 
 	err = <-errorChan
-	assert.ErrorContains(t, err, "context deadline exceeded")
+	require.ErrorContains(t, err, "context deadline exceeded")
 
 	errorChan = make(chan error, 10)
 	simulateClient(t, signer, "0.0.0.0", data1KiB, []uint32{0}, 0, errorChan, false)
 
 	err = <-errorChan
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -151,7 +151,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
@@ -169,44 +169,44 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{1},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	reply, err := dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{},
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetResult(), pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, reply.GetRequestId())
+	require.NoError(t, err)
+	require.Equal(t, reply.GetResult(), pb.BlobStatus_PROCESSING)
+	require.NotNil(t, reply.GetRequestId())
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0}, nil).Twice()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	reply, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{1},
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, pb.BlobStatus_PROCESSING, reply.GetResult())
-	assert.NotNil(t, reply.GetRequestId())
+	require.NoError(t, err)
+	require.Equal(t, pb.BlobStatus_PROCESSING, reply.GetResult())
+	require.NotNil(t, reply.GetRequestId())
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil).Once()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{},
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
@@ -222,32 +222,32 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{2},
 	})
-	assert.ErrorContains(t, err, "custom_quorum_numbers must be in range [0, 1], but found 2")
+	require.ErrorContains(t, err, "custom_quorum_numbers must be in range [0, 1], but found 2")
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 0},
 	})
-	assert.ErrorContains(t, err, "custom_quorum_numbers must not contain duplicates")
+	require.ErrorContains(t, err, "custom_quorum_numbers must not contain duplicates")
 
 }
 
 func TestGetBlobStatus(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
 	status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
-	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, requestID)
+	require.Equal(t, status, pb.BlobStatus_PROCESSING)
+	require.NotNil(t, requestID)
 
 	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+	require.NoError(t, err)
+	require.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
 	// simulate blob confirmation
 	securityParams := []*core.SecurityParam{
@@ -267,13 +267,13 @@ func TestGetBlobStatus(t *testing.T) {
 	reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
+	require.NoError(t, err)
+	require.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
 	actualCommitX := reply.GetInfo().GetBlobHeader().GetCommitment().GetX()
 	actualCommitY := reply.GetInfo().GetBlobHeader().GetCommitment().GetY()
-	assert.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
-	assert.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
-	assert.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
+	require.Equal(t, actualCommitX, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.X.Marshal())
+	require.Equal(t, actualCommitY, confirmedMetadata.ConfirmationInfo.BlobCommitment.Commitment.Y.Marshal())
+	require.Equal(t, reply.GetInfo().GetBlobHeader().GetDataLength(), uint32(confirmedMetadata.ConfirmationInfo.BlobCommitment.Length))
 
 	actualBlobQuorumParams := make([]*pb.BlobQuorumParam, len(securityParams))
 	quorumNumbers := make([]byte, len(securityParams))
@@ -290,11 +290,11 @@ func TestGetBlobStatus(t *testing.T) {
 		quorumPercentSigned[i] = confirmedMetadata.ConfirmationInfo.QuorumResults[sp.QuorumID].PercentSigned
 		quorumIndexes[i] = byte(i)
 	}
-	assert.Equal(t, reply.GetInfo().GetBlobHeader().GetBlobQuorumParams(), actualBlobQuorumParams)
+	require.Equal(t, reply.GetInfo().GetBlobHeader().GetBlobQuorumParams(), actualBlobQuorumParams)
 
-	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchId(), confirmedMetadata.ConfirmationInfo.BatchID)
-	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(), confirmedMetadata.ConfirmationInfo.BlobIndex)
-	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata(), &pb.BatchMetadata{
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchId(), confirmedMetadata.ConfirmationInfo.BatchID)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBlobIndex(), confirmedMetadata.ConfirmationInfo.BlobIndex)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetBatchMetadata(), &pb.BatchMetadata{
 		BatchHeader: &pb.BatchHeader{
 			BatchRoot:               confirmedMetadata.ConfirmationInfo.BatchRoot,
 			QuorumNumbers:           quorumNumbers,
@@ -306,33 +306,33 @@ func TestGetBlobStatus(t *testing.T) {
 		ConfirmationBlockNumber: confirmedMetadata.ConfirmationInfo.ConfirmationBlockNumber,
 		BatchHeaderHash:         confirmedMetadata.ConfirmationInfo.BatchHeaderHash[:],
 	})
-	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetInclusionProof(), confirmedMetadata.ConfirmationInfo.BlobInclusionProof)
-	assert.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetQuorumIndexes(), quorumIndexes)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetInclusionProof(), confirmedMetadata.ConfirmationInfo.BlobInclusionProof)
+	require.Equal(t, reply.GetInfo().GetBlobVerificationProof().GetQuorumIndexes(), quorumIndexes)
 }
 
 func TestGetBlobDispersingStatus(t *testing.T) {
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
 	status, _, requestID := disperseBlob(t, dispersalServer, data)
-	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, requestID)
+	require.Equal(t, status, pb.BlobStatus_PROCESSING)
+	require.NotNil(t, requestID)
 	blobKey, err := disperser.ParseBlobKey(string(requestID))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = queue.MarkBlobDispersing(context.Background(), blobKey)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	meta, err := queue.GetBlobMetadata(context.Background(), blobKey)
-	assert.NoError(t, err)
-	assert.Equal(t, meta.BlobStatus, disperser.Dispersing)
+	require.NoError(t, err)
+	require.Equal(t, meta.BlobStatus, disperser.Dispersing)
 
 	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+	require.NoError(t, err)
+	require.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 }
 
 func TestRetrieveBlob(t *testing.T) {
@@ -341,23 +341,22 @@ func TestRetrieveBlob(t *testing.T) {
 		// Create random data
 		data := make([]byte, 1024)
 		_, err := rand.Read(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		data = codec.ConvertByPaddingEmptyByte(data)
 
 		// Disperse the random data
 		status, blobSize, requestID := disperseBlob(t, dispersalServer, data)
-		assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-		assert.NotNil(t, requestID)
+		require.Equal(t, status, pb.BlobStatus_PROCESSING)
+		require.NotNil(t, requestID)
 
 		reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 			RequestId: requestID,
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+		require.NoError(t, err)
+		require.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
-		fmt.Println("requestID", hex.EncodeToString(requestID))
-
+		t.Log("requestID", hex.EncodeToString(requestID))
 		// Simulate blob confirmation so that we can retrieve the blob
 		securityParams := []*core.SecurityParam{
 			{
@@ -376,14 +375,14 @@ func TestRetrieveBlob(t *testing.T) {
 		reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 			RequestId: requestID,
 		})
-		assert.NoError(t, err)
-		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
+		require.NoError(t, err)
+		require.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
 
 		// Retrieve the blob and compare it with the original data
 		retrieveData, err := retrieveBlob(dispersalServer, requestID, 1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, data, retrieveData)
+		require.Equal(t, data, retrieveData)
 	}
 
 }
@@ -392,32 +391,32 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	// Create random data
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
 	// Disperse the random data
 	status, _, requestID := disperseBlob(t, dispersalServer, data)
-	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
-	assert.NotNil(t, requestID)
+	require.Equal(t, status, pb.BlobStatus_PROCESSING)
+	require.NotNil(t, requestID)
 
 	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
+	require.NoError(t, err)
+	require.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
 	// Try to retrieve the blob before it is confirmed
 	_, err = retrieveBlob(dispersalServer, requestID, 2)
-	assert.NotNil(t, err)
-	assert.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
+	require.NotNil(t, err)
+	require.Equal(t, "rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index", err.Error())
 
 }
 
 func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 	data := make([]byte, 2*1024*1024+10)
 	_, err := rand.Read(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
@@ -433,9 +432,9 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 1},
 	})
-	assert.NotNil(t, err)
+	require.NotNil(t, err)
 	expectedErrMsg := fmt.Sprintf("rpc error: code = InvalidArgument desc = blob size cannot exceed %v Bytes", testMaxBlobSize)
-	assert.Equal(t, err.Error(), expectedErrMsg)
+	require.Equal(t, err.Error(), expectedErrMsg)
 }
 
 func TestParseAllowlist(t *testing.T) {
@@ -476,32 +475,32 @@ func TestParseAllowlist(t *testing.T) {
 ]
 	`)
 	err := fs.Parse([]string{"--auth.allowlist-file", allowlistFile.Name()})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	c := cli.NewContext(nil, fs, nil)
 	rateConfig, err := apiserver.ReadCLIConfig(c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Contains(t, rateConfig.Allowlist, "0.1.2.3")
-	assert.Contains(t, rateConfig.Allowlist, "5.5.5.5")
-	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(0))
-	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(1))
-	assert.NotContains(t, rateConfig.Allowlist["5.5.5.5"], uint8(0))
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Name, "eigenlabs")
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Throughput, uint32(1024))
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Name, "eigenlabs")
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].BlobRate, uint32(1e6))
-	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Throughput, uint32(1048576))
-	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Name, "foo")
-	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
-	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
+	require.Contains(t, rateConfig.Allowlist, "0.1.2.3")
+	require.Contains(t, rateConfig.Allowlist, "5.5.5.5")
+	require.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(0))
+	require.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(1))
+	require.NotContains(t, rateConfig.Allowlist["5.5.5.5"], uint8(0))
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Name, "eigenlabs")
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Throughput, uint32(1024))
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Name, "eigenlabs")
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].BlobRate, uint32(1e6))
+	require.Equal(t, rateConfig.Allowlist["0.1.2.3"][1].Throughput, uint32(1048576))
+	require.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Name, "foo")
+	require.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
+	require.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
 
 	// verify checksummed address is normalized to lowercase
-	assert.Contains(t, rateConfig.Allowlist, "0xcb14cfaac122e52024232583e7354589aede74ff")
-	assert.Contains(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
-	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
-	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
-	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
+	require.Contains(t, rateConfig.Allowlist, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	require.Contains(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	require.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	require.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	require.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func TestLoadAllowlistFromFile(t *testing.T) {
@@ -532,22 +531,22 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	`)
 	dispersalServer.LoadAllowlist()
 	al := dispersalServer.GetRateConfig().Allowlist
-	assert.Contains(t, al, "0.1.2.3")
-	assert.Contains(t, al, "5.5.5.5")
-	assert.Contains(t, al["0.1.2.3"], uint8(0))
-	assert.Contains(t, al["0.1.2.3"], uint8(1))
-	assert.Contains(t, al["5.5.5.5"], uint8(1))
-	assert.NotContains(t, al["5.5.5.5"], uint8(0))
-	assert.NotContains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
-	assert.Equal(t, al["0.1.2.3"][0].Name, "eigenlabs")
-	assert.Equal(t, al["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
-	assert.Equal(t, al["0.1.2.3"][0].Throughput, uint32(1024))
-	assert.Equal(t, al["0.1.2.3"][1].Name, "eigenlabs")
-	assert.Equal(t, al["0.1.2.3"][1].BlobRate, uint32(1e6))
-	assert.Equal(t, al["0.1.2.3"][1].Throughput, uint32(1048576))
-	assert.Equal(t, al["5.5.5.5"][1].Name, "foo")
-	assert.Equal(t, al["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
-	assert.Equal(t, al["5.5.5.5"][1].Throughput, uint32(4092))
+	require.Contains(t, al, "0.1.2.3")
+	require.Contains(t, al, "5.5.5.5")
+	require.Contains(t, al["0.1.2.3"], uint8(0))
+	require.Contains(t, al["0.1.2.3"], uint8(1))
+	require.Contains(t, al["5.5.5.5"], uint8(1))
+	require.NotContains(t, al["5.5.5.5"], uint8(0))
+	require.NotContains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	require.Equal(t, al["0.1.2.3"][0].Name, "eigenlabs")
+	require.Equal(t, al["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
+	require.Equal(t, al["0.1.2.3"][0].Throughput, uint32(1024))
+	require.Equal(t, al["0.1.2.3"][1].Name, "eigenlabs")
+	require.Equal(t, al["0.1.2.3"][1].BlobRate, uint32(1e6))
+	require.Equal(t, al["0.1.2.3"][1].Throughput, uint32(1048576))
+	require.Equal(t, al["5.5.5.5"][1].Name, "foo")
+	require.Equal(t, al["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
+	require.Equal(t, al["5.5.5.5"][1].Throughput, uint32(4092))
 
 	overwriteFile(t, allowlistFile, `
 [
@@ -576,35 +575,35 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	`)
 	dispersalServer.LoadAllowlist()
 	al = dispersalServer.GetRateConfig().Allowlist
-	assert.NotContains(t, al, "0.1.2.3")
-	assert.NotContains(t, al, "5.5.5.5")
-	assert.Contains(t, al, "0.0.0.0")
-	assert.Contains(t, al, "7.7.7.7")
-	assert.Contains(t, al["0.0.0.0"], uint8(0))
-	assert.Equal(t, al["0.0.0.0"][0].Name, "hello")
-	assert.Equal(t, al["0.0.0.0"][0].BlobRate, uint32(0.1*1e6))
-	assert.Equal(t, al["0.0.0.0"][0].Throughput, uint32(100))
+	require.NotContains(t, al, "0.1.2.3")
+	require.NotContains(t, al, "5.5.5.5")
+	require.Contains(t, al, "0.0.0.0")
+	require.Contains(t, al, "7.7.7.7")
+	require.Contains(t, al["0.0.0.0"], uint8(0))
+	require.Equal(t, al["0.0.0.0"][0].Name, "hello")
+	require.Equal(t, al["0.0.0.0"][0].BlobRate, uint32(0.1*1e6))
+	require.Equal(t, al["0.0.0.0"][0].Throughput, uint32(100))
 
-	assert.Contains(t, al["7.7.7.7"], uint8(1))
-	assert.Equal(t, al["7.7.7.7"][1].Name, "world")
-	assert.Equal(t, al["7.7.7.7"][1].BlobRate, uint32(1*1e6))
-	assert.Equal(t, al["7.7.7.7"][1].Throughput, uint32(1234))
+	require.Contains(t, al["7.7.7.7"], uint8(1))
+	require.Equal(t, al["7.7.7.7"][1].Name, "world")
+	require.Equal(t, al["7.7.7.7"][1].BlobRate, uint32(1*1e6))
+	require.Equal(t, al["7.7.7.7"][1].Throughput, uint32(1234))
 
 	// verify checksummed address is normalized to lowercase
-	assert.Contains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
-	assert.Contains(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
-	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
-	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
-	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
+	require.Contains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	require.Contains(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	require.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	require.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	require.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func overwriteFile(t *testing.T, f *os.File, content string) {
 	err := f.Truncate(0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = f.Seek(0, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = f.WriteString(content)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func setup() {
@@ -632,11 +631,13 @@ func setup() {
 		}
 
 		// Deploy resources using the testbed DeployResources function
+		logger := testutils.GetLogger()
 		deployConfig := testbed.DeployResourcesConfig{
 			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,
+			Logger:              logger,
 		}
 
 		err = testbed.DeployResources(context.Background(), deployConfig)
@@ -723,7 +724,8 @@ func teardown() {
 	if deployLocalStack && localstackContainer != nil {
 		ctx := context.Background()
 		if err := localstackContainer.Terminate(ctx); err != nil {
-			fmt.Printf("Failed to terminate localstack container: %v\n", err)
+			logger := testutils.GetLogger()
+			logger.Error("Failed to terminate localstack container", "error", err)
 		}
 	}
 	if allowlistFile != nil {
@@ -888,7 +890,7 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 		Data:                data,
 		CustomQuorumNumbers: []uint32{0, 1},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()
 }
 
@@ -917,11 +919,11 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	ctx := context.Background()
 
 	metadataKey, err := disperser.ParseBlobKey(string(requestID))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// simulate processing
 	err = queue.MarkBlobProcessing(ctx, metadataKey)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// simulate blob confirmation
 	batchHeaderHash := crypto.Keccak256Hash(requestID)
@@ -929,10 +931,10 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 	requestedAt := uint64(time.Now().Nanosecond())
 	var commitX, commitY fp.Element
 	_, err = commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = commitY.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	commitment := &encoding.G1Commitment{
 		X: commitX,
@@ -992,7 +994,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		},
 	}
 	updated, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return updated
 }

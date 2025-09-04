@@ -20,8 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -202,21 +202,21 @@ func TestMetererReservations(t *testing.T) {
 	// test not active reservation
 	header := createPaymentHeader(1, big.NewInt(0), accountID1)
 	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	assert.ErrorContains(t, err, "reservation not active")
+	require.ErrorContains(t, err, "reservation not active")
 
 	// test invalid quorom ID
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	assert.ErrorContains(t, err, "invalid quorum for reservation")
+	require.ErrorContains(t, err, "invalid quorum for reservation")
 
 	// small bin overflow for empty bin
 	header = createPaymentHeader(now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers, now)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// overwhelming bin overflow for empty bins
 	header = createPaymentHeader(now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers, now)
-	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
+	require.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
 	// test non-existent account
 	unregisteredUser, err := crypto.GenerateKey()
@@ -224,19 +224,19 @@ func TestMetererReservations(t *testing.T) {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 	header = createPaymentHeader(1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, time.Now())
-	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
+	require.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
 	// test inactive reservation
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID3)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0}, now)
-	assert.ErrorContains(t, err, "reservation not active")
+	require.ErrorContains(t, err, "reservation not active")
 
 	// test invalid reservation period
 	header = createPaymentHeader(now.UnixNano()-2*int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers, now)
-	assert.ErrorContains(t, err, "invalid reservation period for reservation")
+	require.ErrorContains(t, err, "invalid reservation period for reservation")
 
 	// test bin usage metering
 	symbolLength := uint64(20)
@@ -245,39 +245,39 @@ func TestMetererReservations(t *testing.T) {
 		reservationPeriod = meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mt.ChainPaymentState.GetReservationWindow())
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
 		})
-		assert.NotNil(t, item)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(requiredLength), symbolsCharged)
-		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		require.NotNil(t, item)
+		require.NoError(t, err)
+		require.Equal(t, uint64(requiredLength), symbolsCharged)
+		require.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
+		require.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
+		require.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 	symbolsCharged, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers, now)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(27), symbolsCharged)
+	require.NoError(t, err)
+	require.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
+	require.NoError(t, err)
+	require.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
+	require.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
-	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+	require.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1, quoromNumbers, now)
-	assert.ErrorContains(t, err, "bin has already been filled")
+	require.ErrorContains(t, err, "bin has already been filled")
 }
 
 func TestMetererOnDemand(t *testing.T) {
@@ -302,53 +302,53 @@ func TestMetererOnDemand(t *testing.T) {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 	header := createPaymentHeader(now.UnixNano(), big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
-	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
+	require.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
+	require.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
-	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
+	require.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
 	// No record for invalid payment
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1.Hex(),
 		}})
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	require.NoError(t, err)
+	require.Equal(t, 0, len(result))
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
 	symbolsCharged := mt.SymbolsCharged(symbolLength)
 	priceCharged := meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
-	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
+	require.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(102), symbolsCharged)
+	require.NoError(t, err)
+	require.Equal(t, uint64(102), symbolsCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	// Doesn't check for exact payment, checks for increment
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
 		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(102), symbolsCharged)
+		require.NoError(t, err)
+		require.Equal(t, uint64(102), symbolsCharged)
 	}
 
 	// test cumulative payment on-chain constraint
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
-	assert.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
+	require.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
@@ -357,39 +357,39 @@ func TestMetererOnDemand(t *testing.T) {
 	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
 	symbolsCharged = mt.SymbolsCharged(uint64(50))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(result))
 
 	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
 	symbolsCharged = mt.SymbolsCharged(uint64(30))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
-	assert.ErrorContains(t, err, "failed global rate limiting")
+	require.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(result))
 }
 
 func TestPaymentCharged(t *testing.T) {
@@ -434,7 +434,7 @@ func TestPaymentCharged(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := meterer.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
-			assert.Equal(t, tt.expected, result)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -486,7 +486,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 				ChainPaymentState: paymentChainState,
 			}
 			result := m.SymbolsCharged(tt.symbolLength)
-			assert.Equal(t, tt.expected, result)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }

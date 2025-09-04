@@ -15,7 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/testbed"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -108,14 +108,14 @@ func TestDynamoBucketStore(t *testing.T) {
 	}
 
 	p2, err := dynamoParamStore.GetItem(ctx, "testRetriever")
-	assert.Error(t, err)
-	assert.Nil(t, p2)
+	require.Error(t, err)
+	require.Nil(t, p2)
 
 	err = dynamoParamStore.UpdateItem(ctx, "testRetriever", p)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p2, err = dynamoParamStore.GetItem(ctx, "testRetriever")
 
-	assert.NoError(t, err)
-	assert.Equal(t, p, p2)
+	require.NoError(t, err)
+	require.Equal(t, p, p2)
 }

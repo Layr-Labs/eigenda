@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -211,7 +210,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -275,7 +274,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
