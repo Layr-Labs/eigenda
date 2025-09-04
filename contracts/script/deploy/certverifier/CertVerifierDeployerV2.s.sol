@@ -82,7 +82,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         // 3 - validate arbitrary user input for correctness
         //
-        //     these checks are done in constructor but saves some user some gas if caught here
+        //     these checks are done in constructor but saves user some gas if caught here
         if (quorumNumbersRequired.length == 0 || quorumNumbersRequired.length > 256) {
             revert("quorumNumbersRequired must be in size range (0, 256]");
         }
