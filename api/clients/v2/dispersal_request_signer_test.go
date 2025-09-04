@@ -2,74 +2,51 @@ package clients
 
 import (
 	"context"
-	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/auth"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
+	localstackContainer *testbed.LocalStackContainer
 )
 
 const (
-	localstackPort = "4570"
-	localstackHost = "http://0.0.0.0:4570"
+	localstackPort = "4579"
+	localstackHost = "http://0.0.0.0:4579"
 	region         = "us-east-1"
 )
 
 func setup(t *testing.T) {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
-	_, b, _, _ := runtime.Caller(0)
-	rootPath := filepath.Join(filepath.Dir(b), "../../..")
-	changeDirectory(filepath.Join(rootPath, "inabox"))
-
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3, kms"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		require.NoError(t, err)
 	}
-}
-
-func changeDirectory(path string) {
-	err := os.Chdir(path)
-	if err != nil {
-
-		currentDirectory, err := os.Getwd()
-		if err != nil {
-			log.Printf("Failed to get current directory. Error: %s", err)
-		}
-
-		log.Panicf("Failed to change directories. CWD: %s, Error: %s", currentDirectory, err)
-	}
-
-	newDir, err := os.Getwd()
-	if err != nil {
-		log.Panicf("Failed to get working directory. Error: %s", err)
-	}
-	log.Printf("Current Working Directory: %s\n", newDir)
 }
 
 func teardown() {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 

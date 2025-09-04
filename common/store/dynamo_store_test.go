@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,19 +14,17 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/store"
 	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
+	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/stretchr/testify/require"
 )
 
 var (
 	logger = testutils.GetLogger()
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
+	localStackContainer *testbed.LocalStackContainer
 
 	deployLocalStack bool
-	localStackPort   = "4566"
+	localStackPort   = "4572"
 
 	dynamoClient     dynamodb.Client
 	dynamoParamStore common.KVStore[common.RateBucketParams]
@@ -39,19 +38,32 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
-
+func setup(_ *testing.M) {
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	if deployLocalStack {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		// Create LocalStack configuration
+		lsConfig := testbed.DefaultLocalStackConfig()
+
+		// Start LocalStack container
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		localStackContainer, err = testbed.NewLocalStackContainer(ctx, lsConfig)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
+		}
+
+		// Extract port from the endpoint for compatibility with existing code
+		// The endpoint is in format "http://host:port", we need just the port
+		endpoint := localStackContainer.Endpoint()
+		if idx := strings.LastIndex(endpoint, ":"); idx != -1 {
+			localStackPort = endpoint[idx+1:]
 		}
 	}
 
@@ -78,8 +90,12 @@ func setup(m *testing.M) {
 }
 
 func teardown() {
-	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack && localStackContainer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := localStackContainer.Terminate(ctx); err != nil {
+			logger.Error("failed to terminate LocalStack container", "error", err)
+		}
 	}
 }
 
@@ -92,14 +108,14 @@ func TestDynamoBucketStore(t *testing.T) {
 	}
 
 	p2, err := dynamoParamStore.GetItem(ctx, "testRetriever")
-	assert.Error(t, err)
-	assert.Nil(t, p2)
+	require.Error(t, err)
+	require.Nil(t, p2)
 
 	err = dynamoParamStore.UpdateItem(ctx, "testRetriever", p)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p2, err = dynamoParamStore.GetItem(ctx, "testRetriever")
 
-	assert.NoError(t, err)
-	assert.Equal(t, p, p2)
+	require.NoError(t, err)
+	require.Equal(t, p, p2)
 }

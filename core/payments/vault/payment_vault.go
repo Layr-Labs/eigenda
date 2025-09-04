@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -114,7 +115,7 @@ func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, 
 }
 
 // Retrieves the minimum number of symbols parameter
-func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
+func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	callData, err := pv.paymentVaultBinding.TryPackMinNumSymbols()
 	if err != nil {
 		return 0, fmt.Errorf("pack MinNumSymbols call: %w", err)
@@ -133,7 +134,11 @@ func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
 		return 0, fmt.Errorf("unpack MinNumSymbols return data: %w", err)
 	}
 
-	return minNumSymbols, nil
+	if minNumSymbols > math.MaxUint32 {
+		return 0, fmt.Errorf("min num symbols > math.MaxUint32: this is nonsensically large, and cannot be handled")
+	}
+
+	return uint32(minNumSymbols), nil
 }
 
 // GetPricePerSymbol retrieves the price per symbol parameter
@@ -157,4 +162,70 @@ func (pv *paymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	}
 
 	return pricePerSymbol, nil
+}
+
+// Retrieves reservation information for multiple accounts
+func (pv *paymentVault) GetReservations(
+	ctx context.Context,
+	accountIDs []gethcommon.Address,
+) ([]*bindings.IPaymentVaultReservation, error) {
+	callData, err := pv.paymentVaultBinding.TryPackGetReservations(accountIDs)
+	if err != nil {
+		return nil, fmt.Errorf("pack GetReservations call: %w", err)
+	}
+
+	returnData, err := pv.ethClient.CallContract(ctx, ethereum.CallMsg{
+		To:   &pv.paymentVaultAddress,
+		Data: callData,
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get reservations eth call: %w", err)
+	}
+
+	reservations, err := pv.paymentVaultBinding.UnpackGetReservations(returnData)
+	if err != nil {
+		return nil, fmt.Errorf("unpack GetReservations return data: %w", err)
+	}
+
+	result := make([]*bindings.IPaymentVaultReservation, len(reservations))
+	for i, reservation := range reservations {
+		// symbolsPerSecond > 0 indicates an active reservation
+		if reservation.SymbolsPerSecond == 0 {
+			result[i] = nil
+			continue
+		}
+
+		result[i] = &reservation
+	}
+	return result, nil
+}
+
+// Retrieves reservation information for a single account
+func (pv *paymentVault) GetReservation(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*bindings.IPaymentVaultReservation, error) {
+	callData, err := pv.paymentVaultBinding.TryPackGetReservation(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("pack GetReservation call: %w", err)
+	}
+
+	returnData, err := pv.ethClient.CallContract(ctx, ethereum.CallMsg{
+		To:   &pv.paymentVaultAddress,
+		Data: callData,
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation for account %v eth call: %w", accountID.Hex(), err)
+	}
+
+	reservation, err := pv.paymentVaultBinding.UnpackGetReservation(returnData)
+	if err != nil {
+		return nil, fmt.Errorf("unpack GetReservation return data: %w", err)
+	}
+
+	if reservation.SymbolsPerSecond == 0 {
+		return nil, nil
+	}
+
+	return &reservation, nil
 }
