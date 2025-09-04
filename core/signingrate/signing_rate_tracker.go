@@ -156,10 +156,23 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
 
+	if endTime.Before(startTime) {
+		return nil, fmt.Errorf("end time %v is before start time %v", endTime, startTime)
+	}
+
+	if s.buckets.Size() == 0 {
+		// Special case: no data available.
+		return &validator.ValidatorSigningRate{
+			Id: operatorID,
+		}, nil
+	}
+
 	comparator := func(timestamp time.Time, bucket *SigningRateBucket) int {
-		if bucket.startTimestamp.Before(timestamp) {
+		unixTimestamp := timestamp.Unix()
+
+		if unixTimestamp < bucket.startTimestamp.Unix() {
 			return -1
-		} else if bucket.startTimestamp.After(timestamp) {
+		} else if unixTimestamp >= bucket.endTimestamp.Unix() {
 			return 1
 		}
 		return 0

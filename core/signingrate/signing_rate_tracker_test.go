@@ -1,30 +1,33 @@
 package signingrate
 
 import (
-	"bytes"
-	"sort"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/require"
 )
 
-// Validate information in the signing rate tracker against expected information.
-func validateTracker(
+// Do a dump of a tracker and validate the contents.
+func validateTrackerDump(
 	t *testing.T,
 	now time.Time,
 	expectedBuckets []*SigningRateBucket,
 	tracker SigningRateTracker,
 	timeSpan time.Duration,
+	dumpStart time.Time,
 ) {
-
-	cutoffTime := now.Add(-timeSpan)
+	gcThreshold := now.Add(-timeSpan)
+	cutoffTime := gcThreshold
+	if dumpStart.After(gcThreshold) {
+		cutoffTime = dumpStart
+	}
 
 	// Request all available buckets that are still before the cutoff time.
-	dumpedBuckets, err := tracker.GetSigningRateDump(time.Unix(0, 0))
+	dumpedBuckets, err := tracker.GetSigningRateDump(dumpStart)
 	require.NoError(t, err)
 
 	if len(dumpedBuckets) == 0 {
@@ -67,6 +70,56 @@ func validateTracker(
 	}
 }
 
+// Validate information in the signing rate tracker against expected information.
+func validateTracker(
+	t *testing.T,
+	now time.Time,
+	expectedBuckets []*SigningRateBucket,
+	validatorIDs []core.OperatorID,
+	tracker SigningRateTracker,
+	timeSpan time.Duration,
+	rand *random.TestRandom,
+) {
+
+	// Dump entire tracker.
+	validateTrackerDump(t, now, expectedBuckets, tracker, timeSpan, time.Time{})
+
+	// Choose a random cutoff time within the last timeSpan.
+	cutoffTime := now.Add(-time.Duration(rand.Float64Range(0, float64(timeSpan))))
+	validateTrackerDump(t, now, expectedBuckets, tracker, timeSpan, cutoffTime)
+
+	// For a random validator and a random time span, verify reported validator signing rates.
+	validatorIndex := rand.Intn(len(validatorIDs))
+	validatorID := validatorIDs[validatorIndex]
+	startTime := now.Add(-time.Duration(rand.Float64Range(0, float64(timeSpan))))
+	// intentionally allow endTime to be after now
+	endTime := startTime.Add(time.Duration(rand.Float64Range(0, float64(timeSpan))))
+
+	expectedSigningRate := &validator.ValidatorSigningRate{
+		Id: validatorID[:],
+	}
+	for _, bucket := range expectedBuckets {
+		if bucket.endTimestamp.Before(startTime) {
+			// This bucket is entirely before the requested time range.
+			continue
+		}
+		if bucket.startTimestamp.After(endTime) || bucket.startTimestamp.Equal(endTime) {
+			// This bucket is entirely after the requested time range.
+			break
+		}
+		expectedSigningRate.SignedBatches += bucket.validatorInfo[validatorID].GetSignedBatches()
+		expectedSigningRate.SignedBytes += bucket.validatorInfo[validatorID].GetSignedBytes()
+		expectedSigningRate.UnsignedBatches += bucket.validatorInfo[validatorID].GetUnsignedBatches()
+		expectedSigningRate.UnsignedBytes += bucket.validatorInfo[validatorID].GetUnsignedBytes()
+		expectedSigningRate.SigningLatency += bucket.validatorInfo[validatorID].GetSigningLatency()
+	}
+
+	reportedSigningRate, err := tracker.GetValidatorSigningRate(validatorID[:], startTime, endTime)
+	require.NoError(t, err)
+
+	require.True(t, areSigningRatesEqual(expectedSigningRate, reportedSigningRate))
+}
+
 func randomOperationsTest(
 	t *testing.T,
 	tracker SigningRateTracker,
@@ -74,18 +127,13 @@ func randomOperationsTest(
 	bucketSpan time.Duration,
 ) {
 	defer tracker.Close()
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandom() // Prints the seed once, which is useful for reproducing failures
 
 	validatorCount := rand.IntRange(1, 10)
 	validatorIDs := make([]core.OperatorID, validatorCount)
 	for i := 0; i < validatorCount; i++ {
 		validatorIDs[i] = core.OperatorID(rand.Bytes(32))
 	}
-
-	// Sort validator IDs. This is the expected ordering within the protobuf.
-	sort.Slice(validatorIDs, func(i, j int) bool {
-		return bytes.Compare(validatorIDs[i][:], validatorIDs[j][:]) < 0
-	})
 
 	testSpan := timeSpan * 2
 	totalBuckets := int(testSpan / bucketSpan)
@@ -101,7 +149,7 @@ func randomOperationsTest(
 	expectedBuckets = append(expectedBuckets, bucket)
 
 	// verify before we've added any data
-	validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
+	validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
 
 	for currentTime.Before(endTime) {
 		batchSize := rand.Uint64Range(1, 1000)
@@ -127,13 +175,13 @@ func randomOperationsTest(
 
 		// On average, validate once per bucket.
 		if rand.Float64() < 1.0/(bucketSpan.Seconds()) {
-			validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
 		}
 
 		nextTime := currentTime.Add(time.Second)
 		if !nextTime.Before(endTime) {
 			// Do one last validation at the end of the test.
-			validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
+			validateTracker(t, currentTime, expectedBuckets, validatorIDs, tracker, timeSpan, rand)
 		}
 
 		currentTime = nextTime
@@ -158,10 +206,10 @@ func TestRandomOperations(t *testing.T) {
 		randomOperationsTest(t, tracker, timeSpan, bucketSpan)
 	})
 
-	// TODO: we will need a flush operation to make this work...
 	//t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
 	//	t.Parallel()
-	//	tracker := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+	//	tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+	//	require.NoError(t, err)
 	//	tracker = NewThreadsafeSigningRateTracker(tracker)
 	//	randomOperationsTest(t, tracker, timeSpan, bucketSpan)
 	//})
