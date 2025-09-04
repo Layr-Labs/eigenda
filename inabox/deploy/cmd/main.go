@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
 
@@ -113,9 +114,11 @@ func getRunner(command string) func(ctx *cli.Context) error {
 		case chainCmdName:
 			return chainInfra(ctx, config)
 		case localstackCmdName:
-			return localstack(ctx)
+			return localstack(ctx, config)
 		case expCmdName:
-			config.DeployExperiment()
+			if err := config.DeployExperiment(); err != nil {
+				return fmt.Errorf("failed to deploy experiment: %w", err)
+			}
 		case generateEnvCmdName:
 			config.GenerateAllVariables()
 		case allCmdName:
@@ -130,11 +133,15 @@ func getRunner(command string) func(ctx *cli.Context) error {
 
 func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 	// Disable Ryuk since we likely want to run the test for a long time
-	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
+		return fmt.Errorf("failed to set environment variable: %w", err)
+	}
 
+	logger := config.GetLogger()
 	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
+		Logger:         logger,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start anvil container: %w", err)
@@ -149,17 +156,25 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
 }
 
-func localstack(ctx *cli.Context) error {
+func localstack(ctx *cli.Context, config *deploy.Config) error {
 	// Disable Ryuk since we likely want to run the test for a long time
-	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
+		return fmt.Errorf("failed to set environment variable: %w", err)
+	}
 
 	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	var logger logging.Logger
+	if config != nil {
+		logger = config.GetLogger()
+	}
 
 	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       ctx.String(localstackFlagName),
 		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start localstack container: %w", err)
@@ -187,7 +202,7 @@ func all(ctx *cli.Context, config *deploy.Config) error {
 		return err
 	}
 
-	err = localstack(ctx)
+	err = localstack(ctx, config)
 	if err != nil {
 		return err
 	}

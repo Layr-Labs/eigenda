@@ -57,13 +57,14 @@ func setup() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
-
-	fmt.Println("Starting localstack")
+	logger := testConfig.GetLogger()
+	logger.Info("Starting localstack")
 	var err error
 	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
 		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
 	})
 	if err != nil {
 		panic(err)
@@ -75,13 +76,14 @@ func setup() {
 		MetadataTableName:   metadataTableName,
 		BucketTableName:     bucketTableName,
 		V2MetadataTableName: metadataTableNameV2,
+		Logger:              logger,
 	}
 	err = testbed.DeployResources(context.Background(), deployConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Starting anvil")
+	logger.Info("Starting anvil")
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
@@ -90,11 +92,13 @@ func setup() {
 		panic(err)
 	}
 
-	fmt.Println("Starting graph node")
+	logger.Info("Starting graph node")
 	testConfig.StartGraphNode()
 
-	fmt.Println("Deploying experiment")
-	testConfig.DeployExperiment()
+	logger.Info("Deploying experiment")
+	if err := testConfig.DeployExperiment(); err != nil {
+		panic(err)
+	}
 
 	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 	pk = strings.TrimPrefix(pk, "0x")
@@ -110,27 +114,28 @@ func setup() {
 	}
 	testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-	fmt.Println("Registering disperser keypair")
+	logger.Info("Registering disperser keypair")
 	err = testConfig.RegisterDisperserKeypair(ethClient)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("Starting binaries")
+	logger.Info("Starting binaries")
 	testConfig.StartBinaries()
 }
 
 func teardown() {
-	fmt.Println("Stopping localstack")
+	logger := testConfig.GetLogger()
+	logger.Info("Stopping localstack")
 	_ = localstackContainer.Terminate(context.Background())
 
-	fmt.Println("Stopping anvil")
+	logger.Info("Stopping anvil")
 	_ = anvilContainer.Terminate(context.Background())
 
-	fmt.Println("Stop graph node")
+	logger.Info("Stop graph node")
 	testConfig.StopGraphNode()
 
-	fmt.Println("Stop binaries")
+	logger.Info("Stop binaries")
 	testConfig.StopBinaries()
 }
 
@@ -141,7 +146,7 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger := testutils.GetLogger()
+	logger := testConfig.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
 		logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)

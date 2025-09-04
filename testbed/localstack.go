@@ -3,8 +3,10 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
@@ -18,11 +20,12 @@ const (
 
 // LocalStackOptions configures the LocalStack AWS simulation container
 type LocalStackOptions struct {
-	ExposeHostPort bool     // If true, binds container port 4566 to host port (default: 4570)
-	HostPort       string   // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
-	Services       []string // AWS services to enable (defaults to s3, dynamodb, kms)
-	Region         string   // AWS region (defaults to us-east-1)
-	Debug          bool     // Enable debug logging
+	ExposeHostPort bool           // If true, binds container port 4566 to host port (default: 4570)
+	HostPort       string         // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
+	Services       []string       // AWS services to enable (defaults to s3, dynamodb, kms)
+	Region         string         // AWS region (defaults to us-east-1)
+	Debug          bool           // Enable debug logging
+	Logger         logging.Logger // Logger for container operations (required)
 }
 
 // LocalStackContainer wraps the official LocalStack testcontainers module
@@ -30,15 +33,24 @@ type LocalStackContainer struct {
 	container *localstack.LocalStackContainer
 	options   LocalStackOptions
 	endpoint  string
+	logger    logging.Logger
 }
 
-// NewLocalStackContainer creates and starts a new LocalStack container with default options
+// NewLocalStackContainer creates and starts a new LocalStack container with a default noop logger
 func NewLocalStackContainer(ctx context.Context) (*LocalStackContainer, error) {
-	return NewLocalStackContainerWithOptions(ctx, LocalStackOptions{})
+	// Create a silent logger that discards all output
+	noopLogger := logging.NewTextSLogger(io.Discard, &logging.SLoggerOptions{})
+	return NewLocalStackContainerWithOptions(ctx, LocalStackOptions{
+		Logger: noopLogger,
+	})
 }
 
 // NewLocalStackContainerWithOptions creates and starts a new LocalStack container with custom options
 func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptions) (*LocalStackContainer, error) {
+	if opts.Logger == nil {
+		return nil, fmt.Errorf("logger is required in LocalStackOptions")
+	}
+	
 	// Set defaults
 	if len(opts.Services) == 0 {
 		opts.Services = []string{"s3", "dynamodb", "kms"}
@@ -47,7 +59,14 @@ func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptio
 		opts.Region = "us-east-1"
 	}
 
+	logger := opts.Logger
+	logger.Info("Starting LocalStack container", "services", opts.Services, "region", opts.Region)
+
 	var customizers []testcontainers.ContainerCustomizer
+	
+	// Add logger
+	customizers = append(customizers, testcontainers.WithLogger(newTestcontainersLogger(logger)))
+	
 	env := buildLocalStackEnv(opts)
 	customizers = append(customizers, testcontainers.WithEnv(env))
 
@@ -70,8 +89,10 @@ func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptio
 	}
 
 	// Start the container using the official module
+	logger.Debug("Creating LocalStack container with image", "image", LocalStackImage)
 	container, err := localstack.Run(ctx, LocalStackImage, customizers...)
 	if err != nil {
+		logger.Error("Failed to start LocalStack container", "error", err)
 		return nil, fmt.Errorf("failed to start localstack container: %w", err)
 	}
 
@@ -88,10 +109,13 @@ func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptio
 
 	endpoint := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 
+	logger.Info("LocalStack container started successfully", "endpoint", endpoint)
+
 	return &LocalStackContainer{
 		container: container,
 		options:   opts,
 		endpoint:  endpoint,
+		logger:    logger,
 	}, nil
 }
 
@@ -136,9 +160,12 @@ func (ls *LocalStackContainer) Terminate(ctx context.Context) error {
 	if ls == nil || ls.container == nil {
 		return nil
 	}
+	ls.logger.Info("Terminating LocalStack container")
 	if err := ls.container.Terminate(ctx); err != nil {
+		ls.logger.Error("Failed to terminate LocalStack container", "error", err)
 		return fmt.Errorf("failed to terminate LocalStack container: %w", err)
 	}
+	ls.logger.Debug("LocalStack container terminated successfully")
 	return nil
 }
 

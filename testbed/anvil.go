@@ -3,8 +3,10 @@ package testbed
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
@@ -20,21 +22,33 @@ const (
 type AnvilContainer struct {
 	container testcontainers.Container
 	rpcURL    string
+	logger    logging.Logger
 }
 
 // AnvilOptions configures the Anvil container
 type AnvilOptions struct {
-	ExposeHostPort bool   // If true, binds container port 8545 to host port 8545
-	HostPort       string // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
+	ExposeHostPort bool           // If true, binds container port 8545 to host port 8545
+	HostPort       string         // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
+	Logger         logging.Logger // Logger for container operations (required)
 }
 
-// NewAnvilContainer creates and starts a new Anvil container
+// NewAnvilContainer creates and starts a new Anvil container with a default noop logger
 func NewAnvilContainer(ctx context.Context) (*AnvilContainer, error) {
-	return NewAnvilContainerWithOptions(ctx, AnvilOptions{})
+	// Create a silent logger that discards all output
+	noopLogger := logging.NewTextSLogger(io.Discard, &logging.SLoggerOptions{})
+	return NewAnvilContainerWithOptions(ctx, AnvilOptions{
+		Logger: noopLogger,
+	})
 }
 
 // NewAnvilContainerWithOptions creates and starts a new Anvil container with custom options
 func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*AnvilContainer, error) {
+	if opts.Logger == nil {
+		return nil, fmt.Errorf("logger is required in AnvilOptions")
+	}
+	logger := opts.Logger
+	logger.Info("Starting Anvil container")
+
 	// Generate a unique container name using timestamp to avoid conflicts in parallel tests
 	uniqueName := fmt.Sprintf("anvil-%d", time.Now().UnixNano())
 
@@ -68,11 +82,17 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 		}
 	}
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	logger.Debug("Creating Anvil container", "image", AnvilImage, "name", uniqueName)
+
+	genericReq := testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
-	})
+		Logger:           newTestcontainersLogger(logger),
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, genericReq)
 	if err != nil {
+		logger.Error("Failed to start Anvil container", "error", err)
 		return nil, fmt.Errorf("failed to start anvil container: %w", err)
 	}
 
@@ -90,9 +110,12 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 
 	rpcURL := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 
+	logger.Info("Anvil container started successfully", "rpcURL", rpcURL)
+
 	return &AnvilContainer{
 		container: container,
 		rpcURL:    rpcURL,
+		logger:    logger,
 	}, nil
 }
 
@@ -106,8 +129,11 @@ func (ac *AnvilContainer) Terminate(ctx context.Context) error {
 	if ac == nil || ac.container == nil {
 		return nil
 	}
+	ac.logger.Info("Terminating Anvil container")
 	if err := ac.container.Terminate(ctx); err != nil {
+		ac.logger.Error("Failed to terminate Anvil container", "error", err)
 		return fmt.Errorf("failed to terminate Anvil container: %w", err)
 	}
+	ac.logger.Debug("Anvil container terminated successfully")
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 const (
@@ -20,44 +19,28 @@ const (
 	foundryImage = "ghcr.io/gakonst/foundry:nightly-90617a52e4873f0137aa05fd68624437db146b3f"
 )
 
-func readFile(name string) []byte {
+func readFile(name string) ([]byte, error) {
 	data, err := os.ReadFile(name)
 	if err != nil {
-		log.Panicf("Failed to read file. Error: %s", err)
+		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-
-	return data
+	return data, nil
 }
 
-func writeFile(name string, data []byte) {
-	err := os.WriteFile(name, data, 0644)
-	if err != nil {
-		log.Panicf("Failed to write file. Err: %s", err)
+func writeFile(name string, data []byte) error {
+	if err := os.WriteFile(name, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
 	}
-}
-
-// Reads and loads env map from a given file
-func ReadEnv(filename string) map[string]string {
-	err := godotenv.Load(filename)
-	if err != nil {
-		log.Panicf("Failed to load env file. Error: %s", err)
-	}
-
-	env, err := godotenv.Read(filename)
-	if err != nil {
-		log.Panicf("Failed to read env file. Error: %s", err)
-	}
-
-	return env
+	return nil
 }
 
 // Writes envMap to a file.
-func writeEnv(envMap map[string]string, filename string) {
-
+func writeEnv(envMap map[string]string, filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
-		log.Panicf("Failed to write experiment to env. Error: %s", err)
+		return fmt.Errorf("failed to create env file: %w", err)
 	}
+	defer func() { _ = f.Close() }()
 
 	for key, value := range envMap {
 		if value == "" {
@@ -65,42 +48,33 @@ func writeEnv(envMap map[string]string, filename string) {
 		}
 		_, err = fmt.Fprintf(f, "%v=%v\n", key, value)
 		if err != nil {
-			log.Panicf("Failed to write experiment to env. Error: %s", err)
+			return fmt.Errorf("failed to write experiment to env: %w", err)
 		}
 	}
-
-	// err := godotenv.Write(envMap, filename)
-
+	return nil
 }
 
 // Creates a directory if it doesn't exist.
-func createDirectory(name string) {
+func createDirectory(name string) error {
 	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(name, os.ModePerm)
 		if err != nil {
-			log.Panicf("Failed to create directory. Error: %s", err)
+			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
+	return nil
 }
 
 // Changes current working directory.
-func changeDirectory(path string) {
-	err := os.Chdir(path)
-	if err != nil {
-		log.Panicf("Failed to change directories. Error: %s", err)
+func changeDirectory(path string) error {
+	if err := os.Chdir(path); err != nil {
+		return fmt.Errorf("failed to change directory: %w", err)
 	}
-
-	newDir, err := os.Getwd()
-	if err != nil {
-		log.Panicf("Failed to get working directory. Error: %s", err)
-	}
-	log.Printf("Current Working Directory: %s\n", newDir)
+	return nil
 }
 
 // Execute yarn command
-func execYarnCmd(command string, args ...string) {
-	log.Printf("Executing yarn with command: %s", command)
-
+func execYarnCmd(command string, args ...string) error {
 	args = append([]string{command}, args...)
 	cmd := exec.Command("yarn", args...)
 
@@ -111,19 +85,14 @@ func execYarnCmd(command string, args ...string) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute yarn command (%s). Err: %s", command, err)
-	} else {
-		log.Print(out.String())
+		return fmt.Errorf("failed to execute yarn command: %w", err)
 	}
 
-	log.Print("yarn command ran successfully")
+	return nil
 }
 
 // Executes a forge script with a given rpc and private key
-func execForgeScript(script, privateKey string, deployer *ContractDeployer, extraArgs []string) {
-	log.Printf("Executing forge script with params %s, %s, %s", script, deployer.RPC, privateKey)
-
+func execForgeScript(script, privateKey string, deployer *ContractDeployer, extraArgs []string) error {
 	// Execute forge script
 	var cmd *exec.Cmd
 
@@ -160,21 +129,15 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
-	log.Println("Executing forge script with command: ", cmd.String())
 	err := cmd.Run()
 	if err != nil {
-		log.Panicf("Failed to execute forge script: %s\n Err: %s\n--- std out ---\n%s\n--- std err ---\n%s\n",
-			cmd, err, out.String(), stderr.String())
-	} else {
-		log.Print(out.String())
+		return fmt.Errorf("failed to execute forge script: %w", err)
 	}
 
-	log.Print("Forge script ran successfully!")
+	return nil
 }
 
-func execBashCmd(command string) {
-	log.Printf("Executing bash with command: %s", command)
-
+func execBashCmd(command string) error {
 	cmd := exec.Command("bash", "-c", command)
 
 	var out bytes.Buffer
@@ -184,17 +147,14 @@ func execBashCmd(command string) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute bash command. Err: %s", err)
-	} else {
-		log.Print(out.String())
+		return fmt.Errorf("failed to execute bash command: %w", err)
 	}
 
-	log.Printf("bash command succeeded with params: %s", cmd)
+	return nil
 }
 
 // Converts a private key to an address.
-func GetAddress(privateKey string) string {
+func GetAddress(logger logging.Logger, privateKey string) (string, error) {
 	cmd := exec.Command(
 		"cast", "wallet", "address",
 		"--private-key", privateKey)
@@ -206,37 +166,14 @@ func GetAddress(privateKey string) string {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
+		return "", fmt.Errorf("failed to execute cast wallet command: %w", err)
 	}
 
-	//log.Print("Cast wallet command ran successfully")
-	return strings.Trim(out.String(), "\n")
+	return strings.Trim(out.String(), "\n"), nil
 }
 
 // From the Foundry book: "Perform a call on an account without publishing a transaction."
-func CallContract(destination string, signature string, rpcUrl string) string {
-	cmd := exec.Command(
-		"cast", "call", destination, signature,
-		"--rpc-url", rpcUrl)
-
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
-	}
-
-	log.Print("Cast call command ran successfully")
-	return strings.Trim(out.String(), "\n")
-}
-
-// From the Foundry book: "Perform a call on an account without publishing a transaction."
-func GetLatestBlockNumber(rpcUrl string) int {
+func GetLatestBlockNumber(logger logging.Logger, rpcUrl string) (int, error) {
 	cmd := exec.Command("cast", "bn", "--rpc-url", rpcUrl)
 
 	var out bytes.Buffer
@@ -246,22 +183,18 @@ func GetLatestBlockNumber(rpcUrl string) int {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute cast wallet command. Err: %s", err)
+		return 0, fmt.Errorf("failed to execute cast bn command: %w", err)
 	}
 
-	log.Print("Cast bn command ran successfully")
 	blockNum, err := strconv.ParseInt(strings.Trim(out.String(), "\n"), 10, 0)
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed parse integer from blocknum string. Err: %s", err)
+		return 0, fmt.Errorf("failed to parse integer from blocknum string: %w", err)
 	}
-	return int(blockNum)
+	return int(blockNum), nil
 }
 
 // Create a new test directory and copy the template to it.
 func CreateNewTestDirectory(templateName, rootPath string) (string, error) {
-
 	// Get the current date time with format '+%dD-%mM-%YY-%HH-%MM-%SS'
 	testName := time.Now().Format("2006Y-01M-02D-15H-04M-05S")
 
@@ -314,6 +247,6 @@ func execCmd(name string, args []string, envVars []string, print bool) error {
 	if err != nil {
 		return fmt.Errorf("%s: %s", err.Error(), stderr.String())
 	}
-	fmt.Print(out.String())
+
 	return nil
 }

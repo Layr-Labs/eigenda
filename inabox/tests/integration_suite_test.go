@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -115,15 +114,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
-
-	var loggerConfig *common.LoggerConfig
-	if os.Getenv("CI") != "" {
-		loggerConfig = common.DefaultLoggerConfig()
-	} else {
-		loggerConfig = common.DefaultConsoleLoggerConfig()
-	}
-	logger, err = common.NewLogger(loggerConfig)
-	Expect(err).To(BeNil())
+	logger = testConfig.GetLogger()
 
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
@@ -132,6 +123,7 @@ var _ = BeforeSuite(func() {
 			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
+				Logger:         logger,
 			})
 			Expect(err).To(BeNil())
 
@@ -152,6 +144,7 @@ var _ = BeforeSuite(func() {
 		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 			ExposeHostPort: true,
 			HostPort:       "8545",
+			Logger:         logger,
 		})
 		Expect(err).To(BeNil())
 

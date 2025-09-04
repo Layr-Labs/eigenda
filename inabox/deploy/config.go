@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -15,7 +15,6 @@ import (
 )
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
-
 	for _, deployer := range env.Deployers {
 		if deployer.Name == name {
 			return deployer, true
@@ -45,22 +44,37 @@ func (env *Config) loadPrivateKeys() error {
 	addNames("retriever", 1)
 	addNames("relay", env.Services.Counts.NumRelays)
 
-	log.Println("service names:", names)
+	env.logger.Info("Service names", "names", names)
 
 	// Collect private keys from file
 	keyPath := "secrets"
 
 	// Read ECDSA private keys
-	fileData := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
+	fileData, err := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
+	if err != nil {
+		return err
+	}
+
 	ecdsaPks := strings.Split(string(fileData), "\n")
 	// Read ECDSA passwords
-	fileData = readFile(filepath.Join(keyPath, "ecdsa_keys/password.txt"))
+	fileData, err = readFile(filepath.Join(keyPath, "ecdsa_keys/password.txt"))
+	if err != nil {
+		return err
+	}
 	ecdsaPwds := strings.Split(string(fileData), "\n")
 	// Read BLS private keys
-	fileData = readFile(filepath.Join(keyPath, "bls_keys/private_key_hex.txt"))
+	fileData, err = readFile(filepath.Join(keyPath, "bls_keys/private_key_hex.txt"))
+	if err != nil {
+		return err
+	}
+
 	blsPks := strings.Split(string(fileData), "\n")
 	// Read BLS passwords
-	fileData = readFile(filepath.Join(keyPath, "bls_keys/password.txt"))
+	fileData, err = readFile(filepath.Join(keyPath, "bls_keys/password.txt"))
+	if err != nil {
+		return err
+	}
+
 	blsPwds := strings.Split(string(fileData), "\n")
 
 	if len(ecdsaPks) != len(blsPks) || len(blsPks) != len(ecdsaPwds) || len(ecdsaPwds) != len(blsPwds) {
@@ -402,7 +416,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		log.Fatalf("Could not generate key: %v", err)
+		env.logger.Fatal("Could not generate key", "error", err)
 	}
 
 	//String representation of n in base 32
@@ -584,17 +598,22 @@ func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile 
 	return
 }
 
-func (env *Config) getKey(name string) (key, address string) {
+func (env *Config) getKey(name string) (key, address string, err error) {
 	key = env.Pks.EcdsaMap[name].PrivateKey
-	log.Printf("name: %s, key: %v", name, key)
-	address = GetAddress(key)
-	return
+	env.logger.Debug("Getting key", "name", name, "key", key)
+	address, err = GetAddress(env.logger, key)
+	if err != nil {
+		env.logger.Error("Failed to get address", "error", err)
+		return "", "", fmt.Errorf("failed to get address: %w", err)
+	}
+
+	return key, address, nil
 }
 
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
-func (env *Config) GenerateAllVariables() {
+func (env *Config) GenerateAllVariables() error {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
@@ -602,8 +621,19 @@ func (env *Config) GenerateAllVariables() {
 	env.localstackRegion = "us-east-1"
 
 	// Create envs directory
-	createDirectory(env.Path + "/envs")
-	changeDirectory(env.rootPath + "/inabox")
+	if err := createDirectory(env.Path + "/envs"); err != nil {
+		return fmt.Errorf("failed to create envs directory: %w", err)
+	}
+
+	env.logger.Info("Changing directories", "path", env.rootPath+"/inabox")
+	if err := changeDirectory(env.rootPath + "/inabox"); err != nil {
+		return fmt.Errorf("failed to change directories: %w", err)
+	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
@@ -620,7 +650,9 @@ func (env *Config) GenerateAllVariables() {
 	port += 2
 	logPath, _, filename, envFile := env.getPaths(name)
 	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
-	writeEnv(churnerConfig.getEnvMap(), envFile)
+	if err := writeEnv(churnerConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Churner = churnerConfig
 	env.genService(
 		compose, name, churnerImage,
@@ -636,7 +668,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "dis0"
 	logPath, dbPath, filename, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
+	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
 	env.genService(
 		compose, name, disImage,
@@ -651,7 +685,9 @@ func (env *Config) GenerateAllVariables() {
 
 	// Convert key to address
 	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
+	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
 
 	env.genService(
@@ -669,12 +705,17 @@ func (env *Config) GenerateAllVariables() {
 
 		name := fmt.Sprintf("opr%v", i)
 		logPath, dbPath, filename, envFile := env.getPaths(name)
-		key, _ := env.getKey(name)
+		key, _, err := env.getKey(name)
+		if err != nil {
+			return fmt.Errorf("failed to get key for %s: %w", name, err)
+		}
 
 		// Convert key to address
 
 		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
-		writeEnv(operatorConfig.getEnvMap(), envFile)
+		if err := writeEnv(operatorConfig.getEnvMap(), envFile); err != nil {
+			return fmt.Errorf("failed to write env file: %w", err)
+		}
 		env.Operators = append(env.Operators, operatorConfig)
 
 		env.genNodeService(
@@ -685,9 +726,15 @@ func (env *Config) GenerateAllVariables() {
 	// Batcher
 	name = "batcher0"
 	logPath, _, filename, envFile = env.getPaths(name)
-	key, _ := env.getKey(name)
+	key, _, err := env.getKey(name)
+	if err != nil {
+		return fmt.Errorf("failed to get key for %s: %w", name, err)
+	}
+
 	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
-	writeEnv(batcherConfig.getEnvMap(), envFile)
+	if err := writeEnv(batcherConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Batcher = append(env.Batcher, batcherConfig)
 	env.genService(
 		compose, name, batcherImage,
@@ -698,7 +745,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "enc0"
 	_, _, filename, envFile = env.getPaths(name)
 	encoderConfig := env.generateEncoderVars(0, "34000")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
+	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Encoder = append(env.Encoder, encoderConfig)
 	env.genService(
 		compose, name, encoderImage,
@@ -708,7 +757,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "enc1"
 	_, _, filename, envFile = env.getPaths(name)
 	encoderConfig = env.generateEncoderV2Vars(0, "34001")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
+	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Encoder = append(env.Encoder, encoderConfig)
 	env.genService(
 		compose, name, encoderImage,
@@ -718,9 +769,12 @@ func (env *Config) GenerateAllVariables() {
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 
 		name := fmt.Sprintf("staker%v", i)
-		key, address := env.getKey(name)
+		key, address, err := env.getKey(name)
+		if err != nil {
+			return fmt.Errorf("failed to get key for %s: %w", name, err)
+		}
 
-		// Create staker paritipants
+		// Create staker participants
 		participant := Staker{
 			Address:    address,
 			PrivateKey: key[2:],
@@ -735,7 +789,9 @@ func (env *Config) GenerateAllVariables() {
 		port += 2
 		_, _, filename, envFile := env.getPaths(name)
 		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
-		writeEnv(relayConfig.getEnvMap(), envFile)
+		if err := writeEnv(relayConfig.getEnvMap(), envFile); err != nil {
+			return fmt.Errorf("failed to write env file: %w", err)
+		}
 		env.Relays = append(env.Relays, relayConfig)
 		env.genService(
 			compose, name, relayImage,
@@ -743,17 +799,25 @@ func (env *Config) GenerateAllVariables() {
 	}
 
 	name = "retriever0"
-	key, _ = env.getKey(name)
+	key, _, err = env.getKey(name)
+	if err != nil {
+		return fmt.Errorf("failed to get key for %s: %w", name, err)
+	}
+
 	logPath, _, _, envFile = env.getPaths(name)
 	retrieverConfig := env.generateRetrieverVars(0, key, graphUrl, logPath, fmt.Sprint(port+1))
-	writeEnv(retrieverConfig.getEnvMap(), envFile)
+	if err := writeEnv(retrieverConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Retriever = retrieverConfig
 
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
 	controllerConfig := env.generateControllerVars(0, graphUrl)
-	writeEnv(controllerConfig.getEnvMap(), envFile)
+	if err := writeEnv(controllerConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Controller = controllerConfig
 
 	if env.Environment.IsLocal() {
@@ -775,9 +839,13 @@ func (env *Config) GenerateAllVariables() {
 		// Write to compose file
 		composeYaml, err := yaml.Marshal(&compose)
 		if err != nil {
-			log.Panicf("Error: %s", err.Error())
+			return fmt.Errorf("error marshalling compose file: %w", err)
 		}
 
-		writeFile(composeFile, composeYaml)
+		if err := writeFile(composeFile, composeYaml); err != nil {
+			return fmt.Errorf("error writing compose file: %w", err)
+		}
 	}
+
+	return nil
 }

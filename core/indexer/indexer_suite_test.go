@@ -46,9 +46,10 @@ var _ = BeforeSuite(func() {
 
 		testConfig = deploy.NewTestConfig(testName, rootPath)
 		testConfig.Deployers[0].DeploySubgraphs = false
+		logger := testConfig.GetLogger()
 
 		if testConfig.Environment.IsLocal() {
-			fmt.Println("Starting anvil")
+			logger.Info("Starting anvil")
 			var err error
 			anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 				ExposeHostPort: true, // This will bind container port 8545 to host port 8545
@@ -57,8 +58,10 @@ var _ = BeforeSuite(func() {
 				panic(err)
 			}
 
-			fmt.Println("Deploying experiment")
-			testConfig.DeployExperiment()
+			logger.Info("Deploying experiment")
+			if err := testConfig.DeployExperiment(); err != nil {
+				panic(err)
+			}
 		}
 	}
 
