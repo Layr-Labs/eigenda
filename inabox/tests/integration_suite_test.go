@@ -49,6 +49,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
+	anvilContainer *testbed.AnvilContainer
+
 	templateName      string
 	testName          string
 	inMemoryBlobStore bool
@@ -147,7 +149,11 @@ var _ = BeforeSuite(func() {
 		}
 
 		logger.Info("Starting anvil")
-		testConfig.StartAnvil()
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+			ExposeHostPort: true,
+			HostPort:       "8545",
+		})
+		Expect(err).To(BeNil())
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
@@ -446,7 +452,7 @@ var _ = AfterSuite(func() {
 		testConfig.StopBinaries()
 
 		logger.Info("Stopping anvil")
-		testConfig.StopAnvil()
+		_ = anvilContainer.Terminate(context.Background())
 
 		logger.Info("Stopping graph node")
 		testConfig.StopGraphNode()

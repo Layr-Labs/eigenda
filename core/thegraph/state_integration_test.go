@@ -22,6 +22,7 @@ import (
 )
 
 var (
+	anvilContainer      *testbed.AnvilContainer
 	localstackContainer *testbed.LocalStackContainer
 	localstackPort      = "4570"
 	templateName        string
@@ -81,7 +82,13 @@ func setup() {
 	}
 
 	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
+	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		ExposeHostPort: true,
+		HostPort:       "8545",
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Starting graph node")
 	testConfig.StartGraphNode()
@@ -118,7 +125,7 @@ func teardown() {
 	_ = localstackContainer.Terminate(context.Background())
 
 	fmt.Println("Stopping anvil")
-	testConfig.StopAnvil()
+	_ = anvilContainer.Terminate(context.Background())
 
 	fmt.Println("Stop graph node")
 	testConfig.StopGraphNode()
@@ -127,8 +134,6 @@ func teardown() {
 	testConfig.StopBinaries()
 }
 
-// TODO: this test needs to be fixed, its currently broken and CI never runs it (see Makefile integration-tests-inabox target).
-// The inabox dependency fails to start for some reason that I don't understand.
 func TestIndexerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skip graph indexer integrations test in short mode")

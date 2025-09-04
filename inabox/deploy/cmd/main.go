@@ -129,8 +129,13 @@ func getRunner(command string) func(ctx *cli.Context) error {
 }
 
 func chainInfra(ctx *cli.Context, config *deploy.Config) error {
-
-	config.StartAnvil()
+	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		ExposeHostPort: true,
+		HostPort:       "8545",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start anvil container: %w", err)
+	}
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		fmt.Println("Starting graph node")

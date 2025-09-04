@@ -381,22 +381,6 @@ func (env *Config) StopBinaries() {
 	}
 }
 
-func (env *Config) StartAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{}, false) // printing output causes hang
-	if err != nil {
-		log.Panicf("Failed to start anvil. Err: %s", err)
-	}
-}
-
-func (env *Config) StopAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{}, true)
-	if err != nil {
-		log.Panicf("Failed to stop anvil. Err: %s", err)
-	}
-}
-
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 
