@@ -36,7 +36,7 @@ type OnDemandLedgerCache struct {
 	// price per symbol in wei, from the PaymentVault
 	pricePerSymbol *big.Int
 	// minimum number of symbols to bill, from the PaymentVault
-	minNumSymbols uint64
+	minNumSymbols uint32
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
 	// The lru.Cache object itself is threadsafe, as are the OnDemandLedger values contained in the cache. This lock

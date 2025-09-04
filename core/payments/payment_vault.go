@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -22,8 +23,20 @@ type PaymentVault interface {
 
 	// Retrieves the minimum billable size for all dispersals.
 	// Dispersals are rounded up to the nearest multiple of this value for accounting.
-	GetMinNumSymbols(ctx context.Context) (uint64, error)
+	//
+	// This value is stored as a uint64 on-chain, but we return it as a uint32 from this interface. Blob size is
+	// a number of symbols represented by a uint32, so having a minimum symbol count defined as a uint64 complicates
+	// comparisons further downstream.
+	GetMinNumSymbols(ctx context.Context) (uint32, error)
 
 	// Retrieves the price per symbol (in wei) for on-demand payments.
 	GetPricePerSymbol(ctx context.Context) (uint64, error)
+
+	// Retrieves reservation information for multiple accounts.
+	// Returns reservations in same order as accountIDs. Returns nil for accounts with no reservation.
+	GetReservations(ctx context.Context, accountIDs []gethcommon.Address) ([]*bindings.IPaymentVaultReservation, error)
+
+	// Retrieves reservation information for a single account.
+	// Returns nil if the account has no reservation.
+	GetReservation(ctx context.Context, accountID gethcommon.Address) (*bindings.IPaymentVaultReservation, error)
 }

@@ -31,7 +31,7 @@ type OnDemandLedger struct {
 	// price per symbol in wei
 	pricePerSymbol *big.Int
 	// minimum number of symbols to bill
-	minNumSymbols uint64
+	minNumSymbols uint32
 
 	// an optional store to back the cumulative payment for this account
 	//
@@ -58,7 +58,7 @@ func OnDemandLedgerFromStore(
 	// the price in wei per dispersed symbol
 	pricePerSymbol *big.Int,
 	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
-	minNumSymbols uint64,
+	minNumSymbols uint32,
 	// the DB store backing this ledger
 	cumulativePaymentStore *CumulativePaymentStore,
 ) (*OnDemandLedger, error) {
@@ -86,7 +86,7 @@ func OnDemandLedgerFromValue(
 	// the price in wei per dispersed symbol
 	pricePerSymbol *big.Int,
 	// the minimum billable number of symbols. any dispersal less than minNumSymbols will be billed as minNumSymbols
-	minNumSymbols uint64,
+	minNumSymbols uint32,
 	// the starting value for the cumulative payment
 	cumulativePayment *big.Int,
 ) (*OnDemandLedger, error) {
@@ -97,7 +97,7 @@ func OnDemandLedgerFromValue(
 func newOnDemandLedger(
 	totalDeposits *big.Int,
 	pricePerSymbol *big.Int,
-	minNumSymbols uint64,
+	minNumSymbols uint32,
 	cumulativePaymentStore *CumulativePaymentStore,
 	cumulativePayment *big.Int,
 ) (*OnDemandLedger, error) {
@@ -263,11 +263,11 @@ func (odl *OnDemandLedger) UpdateTotalDeposits(newTotalDeposits *big.Int) error 
 
 // Computes the on demand cost of a number of symbols
 func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
-	billableSymbols := uint64(symbolCount)
+	billableSymbols := symbolCount
 	if billableSymbols < odl.minNumSymbols {
 		billableSymbols = odl.minNumSymbols
 	}
 
-	billableSymbolsBig := new(big.Int).SetUint64(billableSymbols)
+	billableSymbolsBig := new(big.Int).SetUint64(uint64(billableSymbols))
 	return billableSymbolsBig.Mul(billableSymbolsBig, odl.pricePerSymbol)
 }
