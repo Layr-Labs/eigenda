@@ -1,5 +1,5 @@
 syntax = "proto3";
-package common;
+package validator;
 
 // TODO what package should this live in?
 
