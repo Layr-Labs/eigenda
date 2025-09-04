@@ -37,7 +37,7 @@ ensuring these transactions are both **complete** and **included**.
 ### Proving inclusion and completeness of rollups data
 
 EigenDA stores rollup data as blobs with associated certificates that prove the data's availability. Each certificate contains:
-- Batch metadata including reference block numbers
+- Batch metadata including a reference block number (RBN) at which to fetch state from (operator stake + pubkeys)
 - Blob inclusion proofs demonstrating the blob is part of the certified batch
 - BLS aggregate signatures from EigenDA operators attesting to data availability
 
