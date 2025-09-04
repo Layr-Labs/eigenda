@@ -12,20 +12,18 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
+	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
+	localstackContainer *testbed.LocalStackContainer
 )
 
 const (
-	localstackPort = "4570"
-	localstackHost = "http://0.0.0.0:4570"
 	bucket         = "eigen-test"
+	localstackPort = "4578"
+	localstackHost = "http://0.0.0.0:4578"
 )
 
 type clientBuilder struct {
@@ -97,8 +95,13 @@ func setupLocalstack() error {
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-		if err != nil && err.Error() == "container already exists" {
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		if err != nil {
 			teardownLocalstack()
 			return err
 		}
@@ -110,7 +113,7 @@ func teardownLocalstack() {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 
@@ -126,68 +129,64 @@ func RandomOperationsTest(t *testing.T, client s3.Client) {
 		data := tu.RandomBytes(dataSize)
 		expectedData[key] = data
 		err := client.FragmentedUploadObject(context.Background(), bucket, key, data, fragmentSize)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	// Read back the data
 	for key, expected := range expectedData {
 		data, err := client.FragmentedDownloadObject(context.Background(), bucket, key, len(expected), fragmentSize)
-		assert.NoError(t, err)
-		assert.Equal(t, expected, data)
+		require.NoError(t, err)
+		require.Equal(t, expected, data)
 
 		// List the objects
 		objects, err := client.ListObjects(context.Background(), bucket, key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		numFragments := math.Ceil(float64(len(expected)) / float64(fragmentSize))
-		assert.Len(t, objects, int(numFragments))
+		require.Len(t, objects, int(numFragments))
 		totalSize := int64(0)
 		for _, object := range objects {
 			totalSize += object.Size
 		}
-		assert.Equal(t, int64(len(expected)), totalSize)
+		require.Equal(t, int64(len(expected)), totalSize)
 	}
 
 	// Attempt to list non-existent objects
 	objects, err := client.ListObjects(context.Background(), bucket, "nonexistent")
-	assert.NoError(t, err)
-	assert.Len(t, objects, 0)
+	require.NoError(t, err)
+	require.Len(t, objects, 0)
 }
 
 func TestRandomOperations(t *testing.T) {
 	tu.InitializeRandom()
 	for _, builder := range clientBuilders {
 		err := builder.start()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client, err := builder.build()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		RandomOperationsTest(t, client)
 
 		err = builder.finish()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
-}
-
-func ReadNonExistentValueTest(t *testing.T, client s3.Client) {
-	_, err := client.FragmentedDownloadObject(context.Background(), bucket, "nonexistent", 1000, 1000)
-	assert.Error(t, err)
-	randomKey := tu.RandomString(10)
-	_, err = client.FragmentedDownloadObject(context.Background(), bucket, randomKey, 0, 0)
-	assert.Error(t, err)
 }
 
 func TestReadNonExistentValue(t *testing.T) {
 	tu.InitializeRandom()
 	for _, builder := range clientBuilders {
 		err := builder.start()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client, err := builder.build()
-		assert.NoError(t, err)
-		ReadNonExistentValueTest(t, client)
+		require.NoError(t, err)
+		_, err = client.FragmentedDownloadObject(context.Background(), bucket, "nonexistent", 1000, 1000)
+		require.Error(t, err)
+		randomKey := tu.RandomString(10)
+		_, err = client.FragmentedDownloadObject(context.Background(), bucket, randomKey, 0, 0)
+		require.Error(t, err)
 
 		err = builder.finish()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -195,24 +194,24 @@ func TestHeadObject(t *testing.T) {
 	tu.InitializeRandom()
 	for _, builder := range clientBuilders {
 		err := builder.start()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client, err := builder.build()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		key := tu.RandomString(10)
 		err = client.UploadObject(context.Background(), bucket, key, []byte("test"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		size, err := client.HeadObject(context.Background(), bucket, key)
-		assert.NoError(t, err)
-		assert.NotNil(t, size)
-		assert.Equal(t, int64(4), *size)
+		require.NoError(t, err)
+		require.NotNil(t, size)
+		require.Equal(t, int64(4), *size)
 
 		size, err = client.HeadObject(context.Background(), bucket, "nonexistent")
-		assert.ErrorIs(t, err, s3.ErrObjectNotFound)
-		assert.Nil(t, size)
+		require.ErrorIs(t, err, s3.ErrObjectNotFound)
+		require.Nil(t, size)
 
 		err = builder.finish()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }

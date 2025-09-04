@@ -29,8 +29,8 @@ func main() {
 /*
 func readpoints() {
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
@@ -63,8 +63,8 @@ func TestKzgRs() {
 	//fmt.Printf("    Data size(byte): %v\n", len(inputBytes))
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
+		G1Path:          "../../../resources/srs/g1.point",
+		G2Path:          "../../../resources/srs/g2.point",
 		CacheDir:        "SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,

@@ -15,21 +15,18 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
+	localstackContainer *testbed.LocalStackContainer
 )
 
 const (
-	localstackPort = "4570"
-	localstackHost = "http://0.0.0.0:4570"
+	localstackPort = "4577"
+	localstackHost = "http://0.0.0.0:4577"
 	bucket         = "eigen-test"
 )
 
@@ -102,8 +99,13 @@ func setupLocalstack() error {
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-		if err != nil && err.Error() == "container already exists" {
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		if err != nil {
 			teardownLocalstack()
 			return err
 		}
@@ -115,7 +117,7 @@ func teardownLocalstack() {
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 
@@ -208,7 +210,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -272,7 +274,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	cfg := encoding.DefaultConfig()
 	encoder, err := rs.NewEncoder(cfg)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
