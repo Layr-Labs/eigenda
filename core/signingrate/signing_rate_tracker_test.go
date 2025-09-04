@@ -40,19 +40,24 @@ func validateTracker(
 
 	// Find the index of the first expected bucket that ends after the cutoff time. This should align
 	// with the first bucket in dumpedBuckets.
-	index := 0
-	for ; expectedBuckets[index].endTimestamp.Unix() < cutoffTime.Unix(); index++ {
+	indexOffset := 0
+	for {
+		if expectedBuckets[indexOffset].endTimestamp.Unix() > cutoffTime.Unix() {
+			// We've found the first bucket that ends after the cutoff time.
+			break
+		}
+		indexOffset++
 	}
 
-	expectedDumpSize := len(expectedBuckets) - index
+	expectedDumpSize := len(expectedBuckets) - indexOffset
 	require.Equal(t, expectedDumpSize, len(dumpedBuckets))
 
 	// For each remaining bucket, the expected bucket should exactly match the dumped bucket.
-	for ; index < len(expectedBuckets); index++ {
-		expectedBucket := expectedBuckets[index]
+	for index := 0; index < len(expectedBuckets)-indexOffset; index++ {
+		expectedBucket := expectedBuckets[index+indexOffset]
 		dumpedBucket := dumpedBuckets[index]
 
-		require.Equal(t, uint64(expectedBucket.startTimestamp.Unix()), dumpedBucket.GetStartTimestamp())
+		require.Equal(t, int(uint64(expectedBucket.startTimestamp.Unix())), int(dumpedBucket.GetStartTimestamp()))
 		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), dumpedBucket.GetEndTimestamp())
 		for _, signingRate := range dumpedBucket.GetValidatorSigningRates() {
 			validatorID := core.OperatorID(signingRate.GetId())
@@ -125,11 +130,13 @@ func randomOperationsTest(
 			validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
 		}
 
-		currentTime = currentTime.Add(time.Second)
-		if !currentTime.Before(endTime) {
+		nextTime := currentTime.Add(time.Second)
+		if !nextTime.Before(endTime) {
 			// Do one last validation at the end of the test.
 			validateTracker(t, currentTime, expectedBuckets, tracker, timeSpan)
 		}
+
+		currentTime = nextTime
 	}
 }
 

@@ -1,6 +1,11 @@
 package common
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"golang.org/x/exp/constraints"
+)
 
 // the name of a unit step
 type unitStep struct {
@@ -68,21 +73,44 @@ func PrettyPrintTime(nanoseconds uint64) string {
 	return prettyPrintUnit(nanoseconds, timeSteps)
 }
 
-// CommaOMatic converts a number into string representation with commas for thousands, millions, etc.
-func CommaOMatic(value uint64) string {
-	stringifiedValue := fmt.Sprintf("%d", value)
-	digitCount := len(stringifiedValue)
-	if digitCount <= 3 {
-		return stringifiedValue
+// TODO write unit tests for this
+
+// CommaOMatic converts any integer type to a string with thousands separators.
+func CommaOMatic[T constraints.Integer](value T) string {
+	s := fmt.Sprintf("%d", value) // works for both signed and unsigned
+
+	// Handle negatives without disturbing digit grouping.
+	start := 0
+	if len(s) > 0 && s[0] == '-' {
+		start = 1
 	}
 
-	var result string
-	for i, c := range stringifiedValue {
-		if (digitCount-i)%3 == 0 && i != 0 {
-			result += ","
-		}
-		result += string(c)
+	n := len(s) - start
+	if n <= 3 {
+		return s
 	}
 
-	return result
+	var b strings.Builder
+	// + n/3 commas is a safe upper bound
+	b.Grow(len(s) + n/3)
+
+	// Preserve sign
+	if start == 1 {
+		b.WriteByte('-')
+	}
+
+	// First group may be 1–3 digits depending on length
+	first := n % 3
+	if first == 0 {
+		first = 3
+	}
+	b.WriteString(s[start : start+first])
+
+	// Write remaining groups as ,XYZ
+	for i := start + first; i < len(s); i += 3 {
+		b.WriteByte(',')
+		b.WriteString(s[i : i+3])
+	}
+
+	return b.String()
 }

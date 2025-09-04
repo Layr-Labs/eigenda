@@ -2,6 +2,7 @@ package signingrate
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -131,11 +132,12 @@ func (s *signingRateTracker) ReportSuccess(
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
-
 	bucket := s.getMutableBucket(now)
 	bucket.ReportSuccess(id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
 	s.metrics.ReportSuccess(id, batchSize, signingLatency)
+
+	s.garbageCollectBuckets(now)
 }
 
 // Report that a validator has failed to sign a batch of the given size.
@@ -144,6 +146,8 @@ func (s *signingRateTracker) ReportFailure(now time.Time, id core.OperatorID, ba
 	bucket.ReportFailure(id, batchSize)
 	s.markUnflushed(bucket)
 	s.metrics.ReportFailure(id, batchSize)
+
+	s.garbageCollectBuckets(now)
 }
 
 func (s *signingRateTracker) GetValidatorSigningRate(
@@ -214,9 +218,7 @@ func (s *signingRateTracker) GetSigningRateDump(
 	}
 
 	// We iterated in reverse, so reverse again to get chronological ordering.
-	for i, j := 0, len(buckets)-1; i < j; i, j = i+1, j-1 {
-		buckets[i], buckets[j] = buckets[j], buckets[i]
-	}
+	slices.Reverse(buckets)
 
 	return buckets, nil
 }
@@ -266,7 +268,6 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 	// Add the new bucket to the end of the list.
 	s.buckets.PushBack(convertedBucket)
 
-	// Now is as good a time as any to do garbage collection.
 	s.garbageCollectBuckets(now)
 }
 
@@ -308,7 +309,7 @@ func (s *signingRateTracker) garbageCollectBuckets(now time.Time) {
 		bucket, err := s.buckets.PeekFront()
 		enforce.NilError(err, "should be impossible with a non-empty deque")
 
-		if bucket.EndTimestamp().After(cutoff) {
+		if cutoff.Before(bucket.EndTimestamp()) {
 			// This bucket is new enough, so all later buckets will also be new enough.
 			break
 		}
