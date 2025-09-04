@@ -54,6 +54,7 @@ contract EigenDACertVerifier is
         // The below 4 status codes are kept for backwards compatibility, but are no longer used.
         // We previously had plans to have more granular error codes, but decided this was not necessary,
         // and the only signal useful to offchain is to separate certs into: success, invalid (400), and bugs (500).
+        // TODO(4.0.0): get rid of these
         UNUSED_HISTORICAL_INVALID_INCLUSION_PROOF,
         UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
@@ -91,7 +92,7 @@ contract EigenDACertVerifier is
     /// @dev This function try catches checkDACertReverts, and maps any reverts to status codes.
     /// @dev Make sure to call this at a block number that is > RBN, otherwise this function will
     /// return an INVALID_CERT status code because of a require in the BLSSignatureChecker library that we use.
-    /// TODO: we should return (uint8, bytes) instead and include the revert reason.
+    /// TODO(4.0.0): return (uint8, bytes) instead to include the revert reason.
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
         CT.EigenDACertV3 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
