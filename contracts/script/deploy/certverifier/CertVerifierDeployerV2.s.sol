@@ -68,7 +68,7 @@ contract CertVerifierDeployerV2 is Script, Test {
         //       is initialized
         address eigenDAThresholdRegistry = IEigenDADirectory(eigenDADirectory).getAddress(directoryThresholdRegistryKey);
         if (eigenDAThresholdRegistry == address(0)) {
-            revert("EigenDAThresholdRegistry contract address cannot be nil");
+            revert("EigenDAThresholdRegistry contract address not set in provided EigenDADirectory contract");
         }
 
         DATypesV1.VersionedBlobParams memory blobParams =
