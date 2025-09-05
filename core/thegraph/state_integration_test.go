@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -98,26 +97,6 @@ func setup() {
 
 	logger.Info("Deploying experiment")
 	if err := testConfig.DeployExperiment(); err != nil {
-		panic(err)
-	}
-
-	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: 0,
-		NumRetries:       1,
-	}, gethcommon.Address{}, logger)
-	if err != nil {
-		panic(err)
-	}
-	testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-	logger.Info("Registering disperser keypair")
-	err = testConfig.RegisterDisperserKeypair(ethClient)
-	if err != nil {
 		panic(err)
 	}
 
