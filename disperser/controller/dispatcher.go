@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -92,6 +93,9 @@ type Dispatcher struct {
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
 	batchMetadataManager metadata.BatchMetadataManager
+
+	// signingRateTracker keeps track of signing rates for validators.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 type batchData struct {
@@ -115,6 +119,7 @@ func NewDispatcher(
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -158,6 +163,7 @@ func NewDispatcher(
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
+		signingRateTracker:     signingRateTracker,
 	}, nil
 }
 

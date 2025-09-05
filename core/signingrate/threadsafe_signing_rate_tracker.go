@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -100,13 +99,13 @@ type getSigningRateDumpRequest struct {
 
 // holds a response to GetSigningRateDump
 type getSigningRateDumpResponse struct {
-	result []*controller.SigningRateBucket
+	result []*validator.SigningRateBucket
 	err    error
 }
 
 func (t *threadsafeSigningRateTracker) GetSigningRateDump(
 	startTime time.Time,
-) ([]*controller.SigningRateBucket, error) {
+) ([]*validator.SigningRateBucket, error) {
 
 	request := &getSigningRateDumpRequest{
 		startTime:    startTime,
@@ -136,11 +135,11 @@ type getUnflushedBucketsRequest struct {
 
 // holds a response to GetUnflushedBuckets
 type getUnflushedBucketsResponse struct {
-	result []*controller.SigningRateBucket
+	result []*validator.SigningRateBucket
 	err    error
 }
 
-func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*controller.SigningRateBucket, error) {
+func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBucket, error) {
 
 	request := &getUnflushedBucketsRequest{
 		responseChan: make(chan *getUnflushedBucketsResponse, 1),
@@ -222,11 +221,11 @@ func (t *threadsafeSigningRateTracker) ReportFailure(
 
 // a request to invoke UpdateLastBucket
 type updateLastBucketRequest struct {
-	bucket *controller.SigningRateBucket
+	bucket *validator.SigningRateBucket
 	now    time.Time
 }
 
-func (t *threadsafeSigningRateTracker) UpdateLastBucket(now time.Time, bucket *controller.SigningRateBucket) {
+func (t *threadsafeSigningRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
 	request := &updateLastBucketRequest{
 		bucket: bucket,
 		now:    now,

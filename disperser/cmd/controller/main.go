@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -240,6 +241,19 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
+	// TODO load signing rate info from dynamo
+	signingRateTracker, err := signingrate.NewSigningRateTracker(
+		logger,
+		21*24*time.Hour, // TODO flag
+		10*time.Minute,  // TODO flag
+		metricsRegistry)
+	if err != nil {
+		return fmt.Errorf("failed to initialize signing rate tracker: %w", err)
+	}
+	// TODO set up periodic pushing of data to dynamo
+
+	signingRateTracker = signingrate.NewThreadsafeSigningRateTracker(signingRateTracker)
+
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
 		blobMetadataStore,
@@ -253,6 +267,7 @@ func RunController(ctx *cli.Context) error {
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		signingRateTracker,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)

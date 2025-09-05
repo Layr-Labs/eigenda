@@ -68,18 +68,5 @@ message GetValidatorSigningRateDumpReply {
   // The signing rate data for all validators after the specified start time. If a too much data is requested
   // in a single request, the server may only send a partial dump. To get a full dump, call this RPC
   // multiple times, using the end_timestamp of the last bucket received as the start_timestamp of the next request.
-  repeated SigningRateBucket signing_rate_buckets = 1;
-}
-
-// Signing rate information about validators during a particular time bucket.
-message SigningRateBucket {
-
-  // The start time of the bucket in seconds since Unix epoch, inclusive.
-  uint64 start_timestamp = 1;
-
-  // The end time of the bucket in seconds since Unix epoch, exclusive.
-  uint64 end_timestamp = 2;
-
-  // The signing rates of individual validators during the bucket period.
-  repeated validator.ValidatorSigningRate validator_signing_rates = 3;
+  repeated validator.SigningRateBucket signing_rate_buckets = 1;
 }

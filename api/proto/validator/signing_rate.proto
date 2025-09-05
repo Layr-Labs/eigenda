@@ -1,8 +1,6 @@
 syntax = "proto3";
 package validator;
 
-// TODO what package should this live in?
-
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 
 // Records information about validator signing rate during a time period.
@@ -27,4 +25,17 @@ message ValidatorSigningRate {
   // Only batches that are signed are considered (i.e. if the validator does not succeed in signing a batch,
   // the time spend in the attempt is not counted).
   uint64 signing_latency = 6;
+}
+
+// Signing rate information about validators during a particular time bucket.
+message SigningRateBucket {
+
+  // The start time of the bucket in seconds since Unix epoch, inclusive.
+  uint64 start_timestamp = 1;
+
+  // The end time of the bucket in seconds since Unix epoch, exclusive.
+  uint64 end_timestamp = 2;
+
+  // The signing rates of individual validators during the bucket period.
+  repeated validator.ValidatorSigningRate validator_signing_rates = 3;
 }

@@ -4,10 +4,15 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+// It's unfortunate that this isn't "controller",
+// but at this point in time the effort to change the dashboards is extremely high.
+//
+// This is a duplicate definition to avoid an import cycle.
+const ControllerMetricsNamespace = "eigenda_dispatcher"
 
 // Encapsulates metrics about the signing rate of validators.
 type SigningRateMetrics struct {
@@ -28,7 +33,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	signedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_signed_batch_count",
 			Help:      "Total number of batches successfully signed by validators",
 		},
@@ -37,7 +42,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	signedByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_signed_byte_count",
 			Help:      "Total number of bytes successfully signed by validators",
 		},
@@ -46,7 +51,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	unsignedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_unsigned_batch_count",
 			Help:      "Total number of batches that validators failed to sign",
 		},
@@ -55,7 +60,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	unsignedByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_unsigned_byte_count",
 			Help:      "Total number of bytes that validators failed to sign",
 		},
@@ -64,7 +69,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	timeoutBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_timeout_batch_count",
 			Help:      "Total number of batches that validators failed to sign due to timeout",
 		},
@@ -73,7 +78,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	timeoutByteCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: controller.ControllerMetricsNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_timeout_byte_count",
 			Help:      "Total number of bytes that validators failed to sign due to timeout",
 		},
@@ -82,7 +87,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 
 	signingLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  controller.ControllerMetricsNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "validator_signing_latency_seconds",
 			Help:       "Latency for validators to sign batches",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},

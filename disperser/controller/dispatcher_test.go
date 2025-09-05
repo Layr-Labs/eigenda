@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -732,7 +733,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		prometheus.NewRegistry(),
 		beforeDispatch,
 		blobSet,
-		livenessChan)
+		livenessChan,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 	return &dispatcherComponents{
 		Dispatcher:           d,
