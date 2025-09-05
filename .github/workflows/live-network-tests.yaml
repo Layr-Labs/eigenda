@@ -3,7 +3,7 @@ name: Live Network Tests
 on:
   schedule:
     - cron: '0 6,18 * * *'   # Runs daily at 6 AM and 6 PM UTC
-  workflow_dispatch: {}         # Allow manual triggering
+  workflow_dispatch: {}      # Allow manual triggering
 
 env:
   MISE_VERSION: 2024.12.14
@@ -15,6 +15,7 @@ jobs:
       LIVE_TESTS: "true"
       LIVE_TEST_PREPROD_HOLESKY_KEY: ${{ secrets.LIVE_TEST_PREPROD_HOLESKY_KEY }}
       LIVE_TEST_TESTNET_HOLESKY_KEY: ${{ secrets.LIVE_TEST_TESTNET_HOLESKY_KEY }}
+      LIVE_TEST_TESTNET_SEPOLIA_KEY: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
