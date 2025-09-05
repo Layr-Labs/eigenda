@@ -6,11 +6,12 @@ import (
 	"sort"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 )
 
 // Sort buckets by start time. Modifies the input slice.
-func sortValidatorSigningRateBuckets(buckets []*validator.SigningRateBucket) {
+func sortValidatorSigningRateBuckets(buckets []*controller.SigningRateBucket) {
 	sort.Slice(buckets, func(i, j int) bool {
 		return buckets[i].GetStartTimestamp() < buckets[j].GetStartTimestamp()
 	})

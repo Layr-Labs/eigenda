@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/enforce"
@@ -157,9 +158,9 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 
 func (s *signingRateTracker) GetSigningRateDump(
 	startTime time.Time,
-) ([]*validator.SigningRateBucket, error) {
+) ([]*controller.SigningRateBucket, error) {
 
-	buckets := make([]*validator.SigningRateBucket, 0, s.buckets.Size())
+	buckets := make([]*controller.SigningRateBucket, 0, s.buckets.Size())
 
 	// Iterate backwards. In general, dump requests will only be used to fetch recent data, so
 	// we should optimize the case where we are requesting a few buckets from the end of the deque.
@@ -179,8 +180,8 @@ func (s *signingRateTracker) GetSigningRateDump(
 	return buckets, nil
 }
 
-func (s *signingRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBucket, error) {
-	buckets := make([]*validator.SigningRateBucket, 0, len(s.unflushedBuckets))
+func (s *signingRateTracker) GetUnflushedBuckets() ([]*controller.SigningRateBucket, error) {
+	buckets := make([]*controller.SigningRateBucket, 0, len(s.unflushedBuckets))
 
 	for _, bucket := range s.unflushedBuckets {
 		proto := bucket.ToProtobuf()
@@ -193,7 +194,7 @@ func (s *signingRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBuck
 	return buckets, nil
 }
 
-func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
+func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *controller.SigningRateBucket) {
 	convertedBucket := NewBucketFromProto(bucket)
 
 	if s.buckets.Size() == 0 {

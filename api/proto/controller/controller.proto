@@ -1,0 +1,85 @@
+syntax = "proto3";
+package controller;
+
+import "validator/signing_rate.proto";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
+
+// ControllerInternal is the internal API for the EigenDA Controller, to be used by trusted components within
+// the disperser (e.g. Relays, API servers, etc.).
+//
+// By intentional design, the controller should never expose any public gRPC API. The controller is a singleton,
+// and therefore doesn't have any good mechanism for scaling horizontally. Exposing public APIs would put
+// the controller at risk of becoming a bottleneck or a DOS target.
+//
+// Since this API is only for internal use, it is generally ok to make backwards incompatible changes
+// to the API, as long as all internal components are updated in lockstep.
+service ControllerInternal {
+
+  // GetValidatorSigningRate returns the signing rate of a validator during a time range.
+  rpc GetValidatorSigningRate(GetValidatorSigningRateRequest) returns (GetValidatorSigningRateReply) {}
+
+  // Request a dump of signing rate data for all validators after a specified start time.
+  rpc GetValidatorSigningRateDump(GetValidatorSigningRateDumpRequest) returns (GetValidatorSigningRateDumpReply) {}
+
+}
+
+// A request to get the signing rate of a validator during a time range. The time range of the returned data may not
+// exactly match the requested time range, as the data is aggregated into fixed size buckets.
+message GetValidatorSigningRateRequest {
+  // The unique identifier of the validator (i.e. the operator ID).
+  bytes validator_id = 1;
+  // The time range to query the signing rate for, in seconds since Unix epoch.
+  uint64 start_timestamp = 2;
+  // The end time of the range, in seconds since Unix epoch, exclusive.
+  uint64 end_timestamp = 3;
+  // The wall clock time of when this request was sent. Used to prevent signature replay attacks.
+  uint64 request_timestamp = 4;
+  // Signature of the hash of this request using the disperser's ECDSA key. Possibly overkill given that this
+  // RPC should live behind a firewall, but better safe than sorry.
+  bytes signature = 5;
+}
+
+// A reply containing the signing rate of a validator during a time range.
+message GetValidatorSigningRateReply {
+  // The start time of the range, in seconds since Unix epoch, inclusive. May be different from the requested start time
+  // (in order to align with bucket boundaries).
+  uint64 start_timestamp = 1;
+  // The end time of the range, in seconds since Unix epoch, exclusive. May be different from the requested end time
+  // (in order to align with bucket boundaries).
+  uint64 end_timestamp = 2;
+  // The signing rate of the validator during the time range.
+  validator.ValidatorSigningRate validator_signing_rate = 3;
+}
+
+// A request to get a dump of signing rate data for all validators after a specified start time.
+message GetValidatorSigningRateDumpRequest {
+  // Request all signing rate data starting from this time, in seconds since Unix epoch.
+  uint64 start_timestamp = 1;
+  // The wall clock time of when this request was sent. Used to prevent signature replay attacks.
+  uint64 request_timestamp = 2;
+  // Signature of the hash of this request using the disperser's ECDSA key. Possibly overkill given that this
+  // RPC should live behind a firewall, but better safe than sorry.
+  bytes signature = 3;
+}
+
+// A reply containing the signing rate data for all validators after a specified start time.
+message GetValidatorSigningRateDumpReply {
+  // The signing rate data for all validators after the specified start time. If a too much data is requested
+  // in a single request, the server may only send a partial dump. To get a full dump, call this RPC
+  // multiple times, using the end_timestamp of the last bucket received as the start_timestamp of the next request.
+  repeated SigningRateBucket signing_rate_buckets = 1;
+}
+
+// Signing rate information about validators during a particular time bucket.
+message SigningRateBucket {
+
+  // The start time of the bucket in seconds since Unix epoch, inclusive.
+  uint64 start_timestamp = 1;
+
+  // The end time of the bucket in seconds since Unix epoch, exclusive.
+  uint64 end_timestamp = 2;
+
+  // The signing rates of individual validators during the bucket period.
+  repeated validator.ValidatorSigningRate validator_signing_rates = 3;
+}

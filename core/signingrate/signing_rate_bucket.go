@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -23,7 +24,7 @@ type SigningRateBucket struct {
 	validatorInfo map[core.OperatorID]*validator.ValidatorSigningRate
 
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
-	cachedProtobuf *validator.SigningRateBucket
+	cachedProtobuf *controller.SigningRateBucket
 }
 
 // Create a new empty SigningRateBucket.
@@ -49,7 +50,7 @@ func NewSigningRateBucket(startTime time.Time, span time.Duration) (*SigningRate
 }
 
 // Parse a SigningRateBucket from its protobuf representation.
-func NewBucketFromProto(pb *validator.SigningRateBucket) *SigningRateBucket {
+func NewBucketFromProto(pb *controller.SigningRateBucket) *SigningRateBucket {
 
 	startTime := time.Unix(int64(pb.GetStartTimestamp()), 0)
 	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
@@ -77,7 +78,7 @@ func NewBucketFromProto(pb *validator.SigningRateBucket) *SigningRateBucket {
 // be provided when getting information about bucket in the past that is no longer being written to.
 //
 // The resulting protobuf is a deep copy, and is therefore threadsafe to use concurrently with this SigningRateBucket.
-func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
+func (b *SigningRateBucket) ToProtobuf() *controller.SigningRateBucket {
 	if b.cachedProtobuf != nil {
 		return b.cachedProtobuf
 	}
@@ -93,7 +94,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 	// Sort for deterministic output. Not strictly necessary, but sometimes nice to have.
 	sortValidatorSigningRate(validatorSigningRates)
 
-	b.cachedProtobuf = &validator.SigningRateBucket{
+	b.cachedProtobuf = &controller.SigningRateBucket{
 		StartTimestamp:        start,
 		EndTimestamp:          end,
 		ValidatorSigningRates: validatorSigningRates,

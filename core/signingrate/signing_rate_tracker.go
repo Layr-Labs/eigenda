@@ -3,6 +3,7 @@ package signingrate
 import (
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -24,14 +25,14 @@ type SigningRateTracker interface {
 	// Data is returned in chronological order.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetSigningRateDump(startTime time.Time) ([]*validator.SigningRateBucket, error)
+	GetSigningRateDump(startTime time.Time) ([]*controller.SigningRateBucket, error)
 
 	// Returns a list of buckets that have not yet been flushed to persistent storage.
 	// Buckets are in chronological order. Allows for an external process to periodically
 	// flush data in this tracker to persistent storage.
 	//
 	// Returned data threadsafe to read, but should not be modified.
-	GetUnflushedBuckets() ([]*validator.SigningRateBucket, error)
+	GetUnflushedBuckets() ([]*controller.SigningRateBucket, error)
 
 	// Report that a validator has successfully signed a batch of the given size.
 	ReportSuccess(
@@ -59,7 +60,7 @@ type SigningRateTracker interface {
 	//
 	// This operation doesn't mark a bucket as unflushed. A bucket is only marked as unflushed when it is modified,
 	// not when it is provided whole-sale from an external source.
-	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket)
+	UpdateLastBucket(now time.Time, bucket *controller.SigningRateBucket)
 
 	// Get the start time of the last bucket in the store. If the store is empty, returns the zero time.
 	// Useful for determining how much data to request from a remote store when mirroring.
