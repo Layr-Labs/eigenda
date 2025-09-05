@@ -14,7 +14,6 @@ jobs:
     env:
       LIVE_TESTS: "true"
       LIVE_TEST_PREPROD_HOLESKY_KEY: ${{ secrets.LIVE_TEST_PREPROD_HOLESKY_KEY }}
-      LIVE_TEST_TESTNET_HOLESKY_KEY: ${{ secrets.LIVE_TEST_TESTNET_HOLESKY_KEY }}
       LIVE_TEST_TESTNET_SEPOLIA_KEY: ${{ secrets.LIVE_TEST_TESTNET_SEPOLIA_KEY }}
     steps:
       - name: Checkout repository
