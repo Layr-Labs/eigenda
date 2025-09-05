@@ -35,7 +35,7 @@ contract EigenDACertVerifier is
 
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
-    // Each quorums part of this list MUST meet the confirmationThreshold defined in _securityThresholds
+    // Each quorum that is part of this list MUST meet the confirmationThreshold defined in _securityThresholds
     // in order for a cert to be considered valid.
     // Recommended default value is 0x0001 to require the ETH and EIGEN quorums to sign.
     bytes internal _quorumNumbersRequired;
@@ -45,7 +45,7 @@ contract EigenDACertVerifier is
     // because there is no way to distinguish out-of-gas errors from other low-level evm reverts in a try/catch...
     // See https://rareskills.io/post/try-catch-solidity#gdvnie-9-what-gets-returned-during-an-out-of-gas?
     // The main gas cost associated with verifying cert is the for loop that iterates on all non-signing operators.
-    // 
+    //
     // We recommend setting this to 15M gas for optimistic rollups that need the checkDACert call to be executed onchain
     // in the one step prover contract, to allow for some buffer room for other gas costs in the one step prover tx.
     // This is because Fusaka is introducing a 16,777,216 per-tx gas limit: https://eips.ethereum.org/EIPS/eip-7825
