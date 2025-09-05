@@ -312,7 +312,8 @@ func NewTestClient(
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
 	}
@@ -349,7 +350,8 @@ func NewTestClient(
 		logger,
 		*validatorPayloadRetrieverConfig,
 		retrievalClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
@@ -941,4 +943,17 @@ func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
 		return nil, fmt.Errorf("proxy wrapper is not enabled in the test client configuration")
 	}
 	return c.proxyWrapper, nil
+}
+
+func (c *TestClient) EstimateGasAndReportCheckDACert(
+	ctx context.Context,
+	eigenDAV3Cert *coretypes.EigenDACertV3,
+) (uint64, error) {
+	gas, err := c.certVerifier.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate gas for CheckDACert call: %w", err)
+	}
+
+	c.metrics.reportEstimateGasCheckDACert(gas)
+	return gas, nil
 }

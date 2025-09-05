@@ -45,9 +45,9 @@ func setup(m *testing.M) {
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
 func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	config := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

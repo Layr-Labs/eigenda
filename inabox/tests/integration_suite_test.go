@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -24,13 +25,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -38,7 +39,6 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/ory/dockertest/v3"
 )
 
 /*
@@ -53,10 +53,9 @@ var (
 	testName          string
 	inMemoryBlobStore bool
 
-	testConfig         *deploy.Config
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	localStackPort     string
+	testConfig          *deploy.Config
+	localstackContainer *testbed.LocalStackContainer
+	localStackPort      string
 
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
@@ -114,35 +113,52 @@ var _ = BeforeSuite(func() {
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
+
+	var loggerConfig *common.LoggerConfig
+	if os.Getenv("CI") != "" {
+		loggerConfig = common.DefaultLoggerConfig()
+	} else {
+		loggerConfig = common.DefaultConsoleLoggerConfig()
+	}
+	logger, err = common.NewLogger(loggerConfig)
+	Expect(err).To(BeNil())
+
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
-			fmt.Println("Using shared Blob Store")
+			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-			pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-			Expect(err).To(BeNil())
-			dockertestPool = pool
-			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
+			cfg := testbed.DefaultLocalStackConfig()
+			cfg.Services = []string{"s3", "dynamodb", "kms"}
+			cfg.Port = localStackPort
+			cfg.Host = "0.0.0.0"
+
+			localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+			Expect(err).To(BeNil())
+
+			deployConfig := testbed.DeployResourcesConfig{
+				LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+				MetadataTableName:   metadataTableName,
+				BucketTableName:     bucketTableName,
+				V2MetadataTableName: metadataTableNameV2,
+				Logger:              logger,
+			}
+			err = testbed.DeployResources(context.Background(), deployConfig)
 			Expect(err).To(BeNil())
 		} else {
-			fmt.Println("Using in-memory Blob Store")
+			logger.Info("Using in-memory Blob Store")
 		}
 
-		fmt.Println("Starting anvil")
+		logger.Info("Starting anvil")
 		testConfig.StartAnvil()
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
-			fmt.Println("Starting graph node")
+			logger.Info("Starting graph node")
 			testConfig.StartGraphNode()
 		}
 
-		loggerConfig := common.DefaultLoggerConfig()
-		logger, err = common.NewLogger(loggerConfig)
-		Expect(err).To(BeNil())
-
-		fmt.Println("Deploying experiment")
+		logger.Info("Deploying experiment")
 		testConfig.DeployExperiment()
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
@@ -158,16 +174,16 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Registering blob versions and relays")
+		logger.Info("Registering blob versions and relays")
 		testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-		fmt.Println("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient)
+		logger.Info("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient, logger)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("Starting binaries")
+		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
@@ -175,7 +191,7 @@ var _ = BeforeSuite(func() {
 		err = setupRetrievalClients(testConfig)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Building client verification and interaction components")
+		logger.Info("Building client verification and interaction components")
 
 		certBuilder, err = clientsv2.NewCertBuilder(
 			logger,
@@ -386,7 +402,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClientV2,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 
 	if err != nil {
 		return err
@@ -416,7 +433,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 
 	return err
 }
@@ -427,15 +445,18 @@ var _ = AfterSuite(func() {
 			cancel()
 		}
 
-		fmt.Println("Stopping binaries")
+		logger.Info("Stopping binaries")
 		testConfig.StopBinaries()
 
-		fmt.Println("Stopping anvil")
+		logger.Info("Stopping anvil")
 		testConfig.StopAnvil()
 
-		fmt.Println("Stopping graph node")
+		logger.Info("Stopping graph node")
 		testConfig.StopGraphNode()
 
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		if localstackContainer != nil {
+			logger.Info("Stopping localstack container")
+			_ = localstackContainer.Terminate(context.Background())
+		}
 	}
 })

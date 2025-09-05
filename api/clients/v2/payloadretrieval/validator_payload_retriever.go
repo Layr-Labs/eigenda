@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -23,6 +24,7 @@ type ValidatorPayloadRetriever struct {
 	config          ValidatorPayloadRetrieverConfig
 	retrievalClient validator.ValidatorClient
 	g1Srs           []bn254.G1Affine
+	metrics         metrics.RetrievalMetricer
 }
 
 var _ clients.PayloadRetriever = &ValidatorPayloadRetriever{}
@@ -33,6 +35,7 @@ func NewValidatorPayloadRetriever(
 	config ValidatorPayloadRetrieverConfig,
 	retrievalClient validator.ValidatorClient,
 	g1Srs []bn254.G1Affine,
+	metrics metrics.RetrievalMetricer,
 ) (*ValidatorPayloadRetriever, error) {
 	err := config.checkAndSetDefaults()
 	if err != nil {
@@ -44,6 +47,7 @@ func NewValidatorPayloadRetriever(
 		config:          config,
 		retrievalClient: retrievalClient,
 		g1Srs:           g1Srs,
+		metrics:         metrics,
 	}, nil
 }
 
@@ -74,6 +78,8 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		}
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
 	}
+
+	pr.metrics.RecordPayloadSizeBytes(len(payload))
 
 	return payload, nil
 }
