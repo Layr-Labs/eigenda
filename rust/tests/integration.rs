@@ -2,11 +2,25 @@
 
 mod common;
 
-use sov_eigenda_adapter::spec::BlobWithSender;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+};
+
+use anyhow::Ok;
+use bytes::Bytes;
+use rand::{Rng, RngCore};
+use sov_eigenda_adapter::{
+    service::EigenDaService,
+    spec::{BlobWithSender, EthereumBlockHeader},
+    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier},
+};
 use sov_rollup_interface::{
-    da::{BlobReaderTrait, DaVerifier, RelevantBlobs},
+    common::HexHash,
+    da::{BlobReaderTrait, DaVerifier, RelevantBlobs, RelevantProofs},
     node::da::DaService,
 };
+use tracing::info;
 
 use crate::common::{proxy::start_proxy, setup_adapter};
 
@@ -17,78 +31,126 @@ async fn submit_extract_verify_e2e() {
     let (proxy_url, _proxy_container) = start_proxy().await.unwrap();
     let (service, verifier) = setup_adapter(proxy_url).await.unwrap();
 
-    // Block header before we publish the rollup related tx
-    let mut latest_block_height = service
-        .get_head_block_header()
+    let mut rng = rand::thread_rng();
+    let blobs_size_range = 1024..2048;
+
+    let blobs = (0..5)
+        .map(|_| {
+            let size = rng.gen_range(blobs_size_range.clone());
+            let mut blob = vec![0u8; size];
+            rng.fill_bytes(&mut blob);
+            Bytes::from(blob)
+        })
+        .collect::<Vec<_>>();
+
+    let blobs_cumulative_size = blobs.iter().map(|b| b.len()).sum::<usize>();
+    info!(
+        "Going to submit {} blobs of total size {} bytes",
+        blobs.len(),
+        blobs_cumulative_size
+    );
+
+    check_blobs_roundtrip(&service, &verifier, &blobs)
         .await
-        .unwrap()
-        .as_ref()
-        .number;
+        .unwrap();
+}
 
-    // Post the rollup data to the network
-    let mut rollup_batches = vec![vec![123; 1024], vec![50; 512], vec![1; 2048], vec![0; 256]];
-    let mut rollup_proofs = vec![vec![200; 1536], vec![10; 1024], vec![3; 3072], vec![0; 128]];
+async fn check_blobs_roundtrip(
+    service: &EigenDaService,
+    verifier: &EigenDaVerifier,
+    blobs: &[Bytes],
+) -> anyhow::Result<()> {
+    let mut sent_blobs: HashMap<u64, HexHash> = HashMap::with_capacity(blobs.len());
+    let sender = service.get_signer().await;
 
-    for blob in &rollup_batches {
-        service.send_transaction(blob).await.await.unwrap().unwrap();
+    // Height at which we will start looking for blobs
+    let start_height = service.get_head_block_header().await?.as_ref().number;
+    // The height at which we will stop looking for blobs
+    let end_height = start_height + 10;
+
+    // Submit blobs
+    for blob in blobs {
+        let receipt = service.send_transaction(blob).await.await??;
+        let bytes_hash = hash_bytes(blob);
+
+        info!(
+            "Sent blob of size {} bytes hash {} blob hash {}",
+            blob.len(),
+            bytes_hash,
+            receipt.blob_hash
+        );
+
+        if sent_blobs.insert(bytes_hash, receipt.blob_hash).is_some() {
+            anyhow::bail!(
+                "Non unique blob {} size={}, test cannot be performed",
+                bytes_hash,
+                blob.len()
+            );
+        }
     }
-    for proof in &rollup_proofs {
-        service.send_proof(proof).await.await.unwrap().unwrap();
-    }
 
-    // Fail if blobs are not submitted in N blocks
-    let limit_height = latest_block_height + 10;
+    // Look for blobs in the blocks and process them
+    for height in start_height..=end_height {
+        let block = service.get_block_at(height).await?;
 
-    // Process blocks until we fetch all data
-    loop {
-        // Extract rollup data from the block
-        let block = service.get_block_at(latest_block_height).await.unwrap();
-        let mut blobs = service.extract_relevant_blobs(&block);
-        let proofs = service.get_extraction_proof(&block, &blobs).await;
+        let (mut blobs, proofs) = service.extract_relevant_blobs_with_proof(&block).await;
+        info!(
+            "Inspecting block {:?}. batch blobs: {} proof blobs: {}",
+            block.header,
+            blobs.batch_blobs.len(),
+            blobs.proof_blobs.len(),
+        );
 
-        // Simulate processing of data by the rollup
+        // Simulate processing of the blobs
         rollup_process_relevant_blobs(&mut blobs);
 
-        // Simulate we're sending this to zkvm
-        let header = risc0_zkvm::serde::to_vec(&block.header).unwrap();
-        let blobs = risc0_zkvm::serde::to_vec(&blobs).unwrap();
-        let proofs = risc0_zkvm::serde::to_vec(&proofs).unwrap();
+        // Verify relevant blobs against proofs
+        verify_relevant_blobs(&verifier, &block.header, &blobs, &proofs)?;
 
-        // Receive on zkvm side
-        let header = risc0_zkvm::serde::from_slice(&header).unwrap();
-        let blobs = risc0_zkvm::serde::from_slice(&blobs).unwrap();
-        let proofs = risc0_zkvm::serde::from_slice(&proofs).unwrap();
+        for batch in blobs.batch_blobs {
+            if batch.sender() != sender {
+                continue;
+            }
 
-        // Verify
-        verifier
-            .verify_relevant_tx_list(&header, &blobs, proofs)
-            .unwrap();
+            info!("Received batch hash: {}, height={}", batch.hash(), height);
+            let data = batch.verified_data();
+            let bytes_hash = hash_bytes(data);
 
-        // Remove verified blobs
-        let RelevantBlobs {
-            proof_blobs,
-            batch_blobs,
-        } = blobs;
-
-        for mut proof_blob in proof_blobs {
-            rollup_proofs.retain(|b| b != proof_blob.full_data());
-        }
-        for mut batch_blob in batch_blobs {
-            rollup_batches.retain(|b| b != batch_blob.full_data());
-        }
-
-        // Success. All blobs were persisted and verified
-        if rollup_batches.is_empty() && rollup_proofs.is_empty() {
-            break;
+            match sent_blobs.remove(&bytes_hash) {
+                None => {
+                    anyhow::bail!(
+                        "Received blob on height={} ethereum_hash={} bytes_hash={} len={} not found in sent blobs. Bug or there's another sender conflicting with the test.",
+                        block.header.as_ref().number,
+                        batch.hash(),
+                        bytes_hash,
+                        data.len(),
+                    );
+                }
+                Some(sent_blob_hash) => {
+                    if sent_blob_hash.0 != *batch.hash() {
+                        anyhow::bail!("Blob hashes do not match for the same blob data");
+                    }
+                }
+            }
         }
 
-        if limit_height == latest_block_height {
-            panic!("not all blobs were persisted to the chain");
+        if sent_blobs.is_empty() {
+            return Ok(());
         }
-
-        // Process next block
-        latest_block_height += 1;
     }
+
+    if !sent_blobs.is_empty() {
+        info!("Remaining blobs: {:?}", sent_blobs);
+        anyhow::bail!("Error: {} blobs were not received", sent_blobs.len());
+    }
+
+    Ok(())
+}
+
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn rollup_process_relevant_blobs(relevant_blobs: &mut RelevantBlobs<BlobWithSender>) {
@@ -106,4 +168,26 @@ fn rollup_process_relevant_blobs(relevant_blobs: &mut RelevantBlobs<BlobWithSend
     for proof in blob_iters.proof_blobs {
         read_full(proof);
     }
+}
+
+fn verify_relevant_blobs(
+    verifier: &EigenDaVerifier,
+    header: &EthereumBlockHeader,
+    blobs: &RelevantBlobs<BlobWithSender>,
+    proofs: &RelevantProofs<EigenDaInclusionProof, EigenDaCompletenessProof>,
+) -> anyhow::Result<()> {
+    // Simulate we're sending this to zkvm
+    let header = risc0_zkvm::serde::to_vec(header)?;
+    let blobs = risc0_zkvm::serde::to_vec(blobs)?;
+    let proofs = risc0_zkvm::serde::to_vec(proofs)?;
+
+    // Receive on zkvm side
+    let header = risc0_zkvm::serde::from_slice(&header)?;
+    let blobs = risc0_zkvm::serde::from_slice(&blobs)?;
+    let proofs = risc0_zkvm::serde::from_slice(&proofs)?;
+
+    // Verify
+    verifier.verify_relevant_tx_list(&header, &blobs, proofs)?;
+
+    Ok(())
 }

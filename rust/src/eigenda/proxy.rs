@@ -99,9 +99,7 @@ impl ProxyClient {
             };
 
             // Notification on each retry
-            let notify = |err: &reqwest::Error, dur: Duration| {
-                trace!(?request, ?dur, "eigenda proxy error: {err}")
-            };
+            let notify = |err: &reqwest::Error, dur: Duration| trace!(?request, ?dur, %err, "eigenda proxy error");
 
             operation
                 .retry(backoff)

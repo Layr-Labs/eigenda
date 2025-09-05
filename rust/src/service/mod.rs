@@ -10,6 +10,8 @@ use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction, TransactionR
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
+use backon::ExponentialBuilder;
+use backon::Retryable;
 use futures::future::try_join_all;
 use reth_trie_common::AccountProof;
 use serde::{Deserialize, Serialize};
@@ -118,11 +120,11 @@ impl EigenDaService {
         namespace: NamespaceId,
     ) -> Result<SubmitBlobReceipt<EthereumHash>, anyhow::Error> {
         // Submit blob to the EigenDA
-        let certificate = self.proxy.store_blob(blob).await?;
-        debug!(?certificate, "Certificate was received by EigenDa");
+        let cert = self.proxy.store_blob(blob).await?;
+        debug!(?cert, "Certificate was received by EigenDa");
 
         // Persist certificate to the ethereum
-        let da_transaction_id = self.submit_certificate(&certificate, namespace).await?;
+        let da_transaction_id = self.submit_certificate(&cert, namespace).await?;
         debug!(
             th_hash = %da_transaction_id,
             "Certificate was submitted to Ethereum"
@@ -135,25 +137,39 @@ impl EigenDaService {
         })
     }
 
-    /// Submit the certificate to the ethereum
+    /// Submit the certificate to the Ethereum network.
     async fn submit_certificate(
         &self,
-        certificate: &StandardCommitment,
+        cert: &StandardCommitment,
         namespace: NamespaceId,
     ) -> Result<TxHash, EigenDaServiceError> {
-        let bytes = certificate.to_rlp_bytes();
+        let cert = cert.to_rlp_bytes();
 
-        let tx = TransactionRequest::default()
-            // This is technically not needed. Because the `from` field is
-            // automatically filled with the signer's address. We are specifying
-            // it explicitly for the readability.
-            .with_from(self.sequencer_signer.address())
-            .with_to(namespace.into())
-            .with_input(bytes);
+        let backoff = ExponentialBuilder::default();
+        let operation = || async {
+            let tx: TransactionRequest = TransactionRequest::default()
+                // This is technically not needed. Because the `from` field is
+                // automatically filled with the signer's address. We are specifying
+                // it explicitly for the readability.
+                .with_from(self.sequencer_signer.address())
+                .with_to(namespace.into())
+                .with_input(cert.clone());
 
-        let transaction = self.ethereum.send_transaction(tx).await?;
+            self.ethereum.send_transaction(tx).await
+        };
 
-        Ok(*transaction.tx_hash())
+        // Notification on each retry
+        let notify = |err: &RpcError<TransportErrorKind>, dur: Duration| {
+            warn!(?dur, ?err, "Certificate submitting error")
+        };
+
+        let tx = operation
+            .retry(backoff)
+            .when(|err| err.is_error_resp())
+            .notify(notify)
+            .await?;
+
+        Ok(*tx.tx_hash())
     }
 
     async fn process_transactions_with_metadata(
@@ -399,8 +415,8 @@ impl DaService for EigenDaService {
                     continue;
                 }
                 Err(err) => {
-                    warn!(?err, "error occurred while getting the block");
-                    continue;
+                    error!(%height, ?err, "Error occurred while getting the block");
+                    return Err(err.into());
                 }
             }
         };

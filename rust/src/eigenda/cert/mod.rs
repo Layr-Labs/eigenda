@@ -44,7 +44,7 @@ impl StandardCommitment {
         Ok(Self(versioned_cert))
     }
 
-    pub fn to_rlp_bytes(&self) -> Vec<u8> {
+    pub fn to_rlp_bytes(&self) -> Bytes {
         let mut bytes = Vec::new();
         match &self.0 {
             EigenDAVersionedCert::V2(c) => {
@@ -57,7 +57,7 @@ impl StandardCommitment {
             }
         }
 
-        bytes
+        Bytes::from(bytes)
     }
 
     /// Get reference block used when constructing this certificate.
@@ -354,7 +354,7 @@ mod tests {
         let commitment = StandardCommitment::from_rlp_bytes(raw_commitment.as_slice()).unwrap();
         let raw_from_bytes = commitment.to_rlp_bytes();
 
-        assert_eq!(&raw_commitment, raw_from_bytes.as_slice());
+        assert_eq!(&raw_commitment, &raw_from_bytes);
     }
 
     #[test]

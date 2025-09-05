@@ -403,10 +403,10 @@ impl EigenDaInclusionProof {
                 };
 
             // Check if sender is the same
-            if sender != provided.sender {
+            if sender != provided.sender() {
                 return Err(InclusionProofError::IncorrectSender(
                     sender,
-                    provided.sender,
+                    provided.sender(),
                 ));
             }
 
@@ -443,7 +443,7 @@ mod tests {
     use super::*;
     use crate::spec::EthereumBlockHeader;
     use alloy_consensus::{EthereumTxEnvelope, Header, SignableTransaction, TxEip1559, TxEnvelope};
-    use alloy_primitives::{TxKind, address};
+    use alloy_primitives::{Address, TxKind, address};
     use alloy_signer::Signature;
     use bytes::Bytes;
     use std::str::FromStr;
@@ -595,10 +595,8 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
 
         let tx_hash = B256::from_slice(&[1; 32]);
-        let blob_sender =
-            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let blob_with_sender =
-            BlobWithSender::new(blob_sender, EthereumHash::from(tx_hash), Bytes::new());
+        let blob_sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender = BlobWithSender::new(blob_sender, tx_hash, Bytes::new());
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
@@ -616,10 +614,8 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
 
         let tx_hash = B256::from_slice(&[1; 32]);
-        let wrong_sender =
-            EthereumAddress::from_str("0x9876543210987654321098765432109876543210").unwrap();
-        let blob_with_sender =
-            BlobWithSender::new(wrong_sender, EthereumHash::from(tx_hash), Bytes::new());
+        let wrong_sender = Address::from_str("0x9876543210987654321098765432109876543210").unwrap();
+        let blob_with_sender = BlobWithSender::new(wrong_sender, tx_hash, Bytes::new());
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
@@ -637,10 +633,8 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
 
         let wrong_hash = B256::from_slice(&[99; 32]);
-        let sender =
-            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let blob_with_sender =
-            BlobWithSender::new(sender, EthereumHash::from(wrong_hash), Bytes::new());
+        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender = BlobWithSender::new(sender, wrong_hash, Bytes::new());
 
         let proof = EigenDaInclusionProof::new(vec![]);
 
@@ -658,10 +652,9 @@ mod tests {
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
 
         let tx_hash = B256::from_slice(&[1; 32]);
-        let sender =
-            EthereumAddress::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
         let long_data = Bytes::from(vec![1u8; 1000]);
-        let blob_with_sender = BlobWithSender::new(sender, EthereumHash::from(tx_hash), long_data);
+        let blob_with_sender = BlobWithSender::new(sender, tx_hash, long_data);
 
         let proof = EigenDaInclusionProof::new(vec![]);
 

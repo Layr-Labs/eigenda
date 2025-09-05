@@ -2,7 +2,7 @@ use std::{hash::Hash, str::FromStr};
 
 use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
 use alloy_eips::Typed2718;
-use alloy_primitives::{Address, AddressError, B256, FixedBytes, wrap_fixed_bytes};
+use alloy_primitives::{Address, AddressError, B256, FixedBytes, TxHash, wrap_fixed_bytes};
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
 use reth_trie_common::{AccountProof, proof::ProofVerificationError};
@@ -304,22 +304,18 @@ impl BorshDeserialize for EthereumHash {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlobWithSender {
     /// The address that submitted blob to the chain.
-    pub sender: EthereumAddress,
-    /// The ethereum transaction hash in which the blob was included.
-    pub tx_hash: EthereumHash,
+    pub sender: Address,
+    /// The Ethereum transaction hash in which the blob was included.
+    pub tx_hash: TxHash,
     /// The actual blob of bytes
     pub blob: CountedBufReader<Bytes>,
 }
 
 impl BlobWithSender {
-    pub fn new<Address, Hash>(sender: Address, tx_hash: Hash, blob: Bytes) -> Self
-    where
-        Address: Into<EthereumAddress>,
-        Hash: Into<EthereumHash>,
-    {
+    pub fn new(sender: Address, tx_hash: TxHash, blob: Bytes) -> Self {
         Self {
-            sender: sender.into(),
-            tx_hash: tx_hash.into(),
+            sender,
+            tx_hash,
             blob: CountedBufReader::new(blob),
         }
     }
@@ -327,15 +323,14 @@ impl BlobWithSender {
 
 impl BlobReaderTrait for BlobWithSender {
     type Address = EthereumAddress;
-
     type BlobHash = EthereumHash;
 
     fn sender(&self) -> Self::Address {
-        self.sender
+        EthereumAddress(self.sender)
     }
 
     fn hash(&self) -> Self::BlobHash {
-        self.tx_hash
+        EthereumHash(self.tx_hash)
     }
 
     fn verified_data(&self) -> &[u8] {
