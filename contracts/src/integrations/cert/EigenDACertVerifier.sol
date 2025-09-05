@@ -107,7 +107,9 @@ contract EigenDACertVerifier is
         // The try catch below is used to filter certs into 3 status codes:
         // 1. success
         // 2. invalid cert (any failing require statement; we assume all require statements return either a string or custom error)
-        // 3. bug (everything else, including solidity panics and low-level evm reverts)
+        // 3. internal error (everything else, including solidity panics and low-level evm reverts, basically anything unexpected)
+        // TODO(samlaf): certVerifier should be set with a maxGas param that will be passed here, to enforce deterministic behavior
+        // between different execution environments: EVM running onchain during optimistic rollup fraud proofs, zkVM, eth-call with higher gas limit.
         try this.checkDACertReverts(daCert) {
             return uint8(StatusCode.SUCCESS);
         } catch Error(string memory) /*reason*/ {
@@ -123,9 +125,6 @@ contract EigenDACertVerifier is
             if (reason.length == 0) {
                 // This matches low-level evm reverts like out-of-gas or stack too few values.
                 // See https://rareskills.io/post/try-catch-solidity for more info.
-                //
-                // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
-                // a maliciously constructed cert.
                 return uint8(StatusCode.INTERNAL_ERROR);
             } else if (reason.length < 4) {
                 // Don't think this is possible...
