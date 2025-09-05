@@ -19,15 +19,15 @@ import (
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -261,16 +261,9 @@ func (env *Config) GenerateDisperserKeypair() error {
 }
 
 // RegisterDisperserKeypair registers the disperser's public key on-chain.
-func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient, logger logging.Logger) error {
 
 	// Write the disperser's public key to on-chain storage
-
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		return fmt.Errorf("could not create logger: %v", err)
-	}
-
 	writer, err := eth.NewWriter(
 		logger,
 		ethClient,

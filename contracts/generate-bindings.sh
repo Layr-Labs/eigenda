@@ -18,6 +18,7 @@ abi_gen_v2="v2"
 
 ABIGEN_V2_CONTRACTS=(
   "EigenDACertVerifier"
+  "PaymentVault"
 )
 
 ABIGEN_V1_CONTRACTS=(
@@ -46,6 +47,7 @@ ABIGEN_V1_CONTRACTS=(
   "IEigenDARelayRegistry"
   "EigenDADisperserRegistry"
   "IEigenDADirectory"
+  "IEigenDAEjectionManager"
 )
 
 build_artifact_json_path() {
