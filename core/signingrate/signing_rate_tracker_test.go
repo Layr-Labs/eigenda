@@ -222,7 +222,7 @@ func randomOperationsTest(
 			tracker.ReportSuccess(currentTime, validatorID, batchSize, latency)
 			expectedBucket.ReportSuccess(validatorID, batchSize, latency)
 		} else {
-			tracker.ReportFailure(currentTime, validatorID, batchSize)
+			tracker.ReportFailure(currentTime, validatorID, batchSize, rand.Bool() /* just used for metrics */)
 			expectedBucket.ReportFailure(validatorID, batchSize)
 		}
 
@@ -343,7 +343,7 @@ func unflushedBucketsTest(
 			tracker.ReportSuccess(currentTime, validatorID, batchSize, latency)
 			expectedBucket.ReportSuccess(validatorID, batchSize, latency)
 		} else {
-			tracker.ReportFailure(currentTime, validatorID, batchSize)
+			tracker.ReportFailure(currentTime, validatorID, batchSize, rand.Bool() /* just used for metrics */)
 			expectedBucket.ReportFailure(validatorID, batchSize)
 		}
 

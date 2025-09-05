@@ -85,11 +85,16 @@ func (s *signingRateTracker) ReportSuccess(
 }
 
 // Report that a validator has failed to sign a batch of the given size.
-func (s *signingRateTracker) ReportFailure(now time.Time, id core.OperatorID, batchSize uint64) {
+func (s *signingRateTracker) ReportFailure(
+	now time.Time,
+	id core.OperatorID,
+	batchSize uint64,
+	timeout bool,
+) {
 	bucket := s.getMutableBucket(now)
 	bucket.ReportFailure(id, batchSize)
 	s.markUnflushed(bucket)
-	s.metrics.ReportFailure(id, batchSize)
+	s.metrics.ReportFailure(id, batchSize, timeout)
 
 	s.garbageCollectBuckets(now)
 }

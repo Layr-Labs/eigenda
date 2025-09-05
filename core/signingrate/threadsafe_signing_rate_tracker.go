@@ -175,6 +175,7 @@ type reportFailureRequest struct {
 	now       time.Time
 	id        core.OperatorID
 	batchSize uint64
+	timeout   bool
 }
 
 func (t *threadsafeSigningRateTracker) ReportSuccess(
@@ -203,11 +204,13 @@ func (t *threadsafeSigningRateTracker) ReportFailure(
 	now time.Time,
 	id core.OperatorID,
 	batchSize uint64,
+	timeout bool,
 ) {
 	request := &reportFailureRequest{
 		now:       now,
 		id:        id,
 		batchSize: batchSize,
+		timeout:   timeout,
 	}
 
 	select {
@@ -339,7 +342,7 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 					typedRequest.signingLatency)
 
 			case *reportFailureRequest:
-				t.base.ReportFailure(typedRequest.now, typedRequest.id, typedRequest.batchSize)
+				t.base.ReportFailure(typedRequest.now, typedRequest.id, typedRequest.batchSize, typedRequest.timeout)
 
 			case *getLastBucketStartTimeRequest:
 				startTime, err := t.base.GetLastBucketStartTime()
