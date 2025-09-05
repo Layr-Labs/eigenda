@@ -166,4 +166,8 @@ library InitParamsLib {
         }
         return quorumNumbersRequiredBytes;
     }
+
+    function certVerifierCheckDACertGasLimit(string memory configData) internal pure returns (uint32) {
+        return uint32(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.checkDACertGasLimit"));
+    }
 }
