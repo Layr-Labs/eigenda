@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -182,14 +183,11 @@ func computeNumFailed(batches []*BatchNonSigningInfo, operatorQuorumIntervals Op
 			// Note: avg number of quorums per operator is a small number, so use brute
 			// force here (otherwise, we can create a map to make it more efficient)
 			for _, operatorQuorum := range operatorQuorumIntervals.GetQuorums(op, b.ReferenceBlockNumber) {
-				for _, batchQuorum := range b.QuorumNumbers {
-					if operatorQuorum == batchQuorum {
-						if _, ok := numFailed[op]; !ok {
-							numFailed[op] = make(map[uint8]int)
-						}
-						numFailed[op][operatorQuorum]++
-						break
+				if slices.Contains(b.QuorumNumbers, operatorQuorum) {
+					if _, ok := numFailed[op]; !ok {
+						numFailed[op] = make(map[uint8]int)
 					}
+					numFailed[op][operatorQuorum]++
 				}
 			}
 		}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"slices"
 
 	"github.com/Layr-Labs/eigenda/api"
 	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
@@ -186,13 +187,7 @@ func (t *Writer) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point,
 
 	quorumNumbers := bitmapToBytesArray(quorumBitmap)
 	for _, quorumToDereg := range quorumIds {
-		found := false
-		for _, currentQuorum := range quorumNumbers {
-			if quorumToDereg == currentQuorum {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(quorumNumbers, quorumToDereg)
 		if !found {
 			return fmt.Errorf("operatorId %s is not registered in quorum %d at block %d", hex.EncodeToString(operatorId[:]), quorumToDereg, blockNumber)
 		}

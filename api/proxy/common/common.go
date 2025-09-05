@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -21,12 +22,7 @@ func ContainsDuplicates[P comparable](s []P) bool {
 }
 
 func Contains[P comparable](s []P, e P) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, e)
 }
 
 func ParseBytesAmount(s string) (uint64, error) {
