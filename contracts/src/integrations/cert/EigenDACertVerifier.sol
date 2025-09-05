@@ -56,7 +56,7 @@ contract EigenDACertVerifier is
 
     uint8 internal constant MAJOR_VERSION = 3;
     uint8 internal constant MINOR_VERSION = 1;
-    uint8 internal constant PATCH_VERSION = 0;
+    uint8 internal constant PATCH_VERSION = 1;
 
     /// @notice Status codes for certificate verification results
     /// @dev checkDACert calls are classified into: success (200), invalid_cert (400), and internal_error (500).
