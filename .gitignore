@@ -21,5 +21,3 @@ icicle/*
 
 # OSX specific
 .DS_Store
-
-**/test.log
