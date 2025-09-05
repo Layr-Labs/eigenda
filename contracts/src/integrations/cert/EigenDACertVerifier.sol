@@ -42,9 +42,10 @@ contract EigenDACertVerifier is
     uint8 internal constant PATCH_VERSION = 0;
 
     /// @notice Status codes for certificate verification results
+    /// @dev checkDACert calls are classified into: success (200), invalid_cert (400), and internal_error (500).
     enum StatusCode {
         NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
-        SUCCESS, // Verification succeeded
+        SUCCESS, // 200: Verification succeeded
         // The below 4 status codes are kept for backwards compatibility, but are no longer used.
         // We previously had plans to have more granular error codes, but decided this was not necessary,
         // and the only signal useful to offchain is to separate certs into: success, invalid (400), and bugs (500).
@@ -53,8 +54,8 @@ contract EigenDACertVerifier is
         UNUSED_HISTORICAL_SECURITY_ASSUMPTIONS_NOT_MET,
         UNUSED_HISTORICAL_BLOB_QUORUMS_NOT_SUBSET,
         UNUSED_HISTORICAL_REQUIRED_QUORUMS_NOT_SUBSET,
-        INVALID_CERT, // Certificate is invalid due to some revert from the verification library
-        BUG // Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
+        INVALID_CERT, // 400: Certificate is invalid due to some revert from the verification library
+        INTERNAL_ERROR // 500: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
 
     }
 
@@ -115,7 +116,7 @@ contract EigenDACertVerifier is
         } catch Panic(uint256) /*errorCode*/ {
             // This matches any panic (e.g. arithmetic overflow, division by zero, invalid array access, etc.),
             // which means a bug or misconfiguration of the CertVerifier contract itself.
-            return uint8(StatusCode.BUG);
+            return uint8(StatusCode.INTERNAL_ERROR);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
                 // This matches low-level evm reverts like out-of-gas or stack too few values.
@@ -123,10 +124,10 @@ contract EigenDACertVerifier is
                 //
                 // TODO: figure out whether we can programmatically deal with out of gas, since that might happen from
                 // a maliciously constructed cert.
-                return uint8(StatusCode.BUG);
+                return uint8(StatusCode.INTERNAL_ERROR);
             } else if (reason.length < 4) {
                 // Don't think this is possible...
-                return uint8(StatusCode.BUG);
+                return uint8(StatusCode.INTERNAL_ERROR);
             }
             // Any revert here is from custom errors coming from a failed require(..., SomeCustomError()) statement.
             // This mean that the cert is invalid.

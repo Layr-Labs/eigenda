@@ -6,6 +6,7 @@ package verification
 // https://github.com/Layr-Labs/eigenda/blob/1091f460ba762b84019389cbb82d9b04bb2c2bdb/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L48-L54
 type CheckDACertStatusCode uint8
 
+// Since v3.1.0 of the CertVerifier, checkDACert calls are classified into: success (200), invalid_cert (400), and internal_error (500).
 const (
 	// Introduced in CertVerifier v3.0.0.
 	// NULL_ERROR Unused status code. If this is returned, there is a bug in the code.
@@ -29,8 +30,8 @@ const (
 	// INVALID_CERT Certificate is invalid due to some revert from the onchain verification library
 	StatusInvalidCert
 	// Introduced in CertVerifier v3.1.0
-	// BUG Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
-	StatusBug
+	// INTERNAL_ERROR Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts.
+	StatusContractInternalError
 )
 
 // String returns a human-readable representation of the StatusCode.
@@ -50,8 +51,8 @@ func (s CheckDACertStatusCode) String() string {
 		return "Required quorums are not a subset of the blob quorums"
 	case StatusInvalidCert:
 		return "Invalid certificate: Certificate is invalid due to some revert from the verification library"
-	case StatusBug:
-		return "Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts."
+	case StatusContractInternalError:
+		return "Contract Internal error: Bug or misconfiguration in the CertVerifier contract itself. This includes solidity panics and evm reverts."
 	default:
 		return "Unknown status code"
 	}
