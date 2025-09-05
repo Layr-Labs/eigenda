@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
@@ -131,25 +132,38 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 			return e.client.PutBlob(ctx, value)
 		},
 		retry.RetryIf(func(err error) bool {
-			st, isGRPCError := status.FromError(err)
+			if err == nil {
+				// This should never happen since RetryIf function should only be called err != nil.
+				// But returning false since if no error happened... then don't need to retry,
+				// unless there's a bug in the RetryIf library...
+				return false
+			}
+			if errors.Is(err, &api.ErrorFailover{}) {
+				// Failover errors should be retried before failing over.
+				return true
+			}
+			grpcStatus, isGRPCError := status.FromError(err)
 			if !isGRPCError {
-				// api.ErrorFailover is returned, so we should retry
+				// This should never happen because PutBlob only returns ErrorFailover as a non grpc error.
+				e.log.Warn("Received non-grpc error, retrying", "err", err)
 				return true
 			}
 			//nolint:exhaustive // we only care about a few grpc error codes
-			switch st.Code() {
+			switch grpcStatus.Code() {
 			case codes.InvalidArgument:
-				// we don't retry 400 errors because there is no point,
-				// we are passing invalid data
+				// we don't retry 400 errors because there is no point, we are passing invalid data
+				e.log.Warn("Received InvalidArgument status code, not retrying", "err", err)
 				return false
 			case codes.ResourceExhausted:
-				// we retry on 429s because *can* mean we are being rate limited
+				// we retry on 429s because it *can* mean we are being rate limited
 				// we sleep 1 second... very arbitrarily, because we don't have more info.
 				// grpc error itself should return a backoff time,
 				// see https://github.com/Layr-Labs/eigenda/issues/845 for more details
+				e.log.Warn("Received ResourceExhausted status code, retrying after 1 second", "err", err)
 				time.Sleep(1 * time.Second)
 				return true
 			default:
+				e.log.Warn("Received gRPC error, retrying", "err", err, "code", grpcStatus.Code())
 				return true
 			}
 		}),
