@@ -1,4 +1,4 @@
-package reservation_test
+package reservation
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -19,13 +18,13 @@ func TestNewReservationPaymentValidatorInvalidParams(t *testing.T) {
 	ctx := context.Background()
 	testVault := vault.NewTestPaymentVault()
 
-	validator, err := reservation.NewReservationPaymentValidator(
+	validator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
 		testVault,
 		nil, // nil time source
-		reservation.OverfillOncePermitted,
+		OverfillOncePermitted,
 		10*time.Second,
 		time.Second,
 	)
@@ -62,13 +61,13 @@ func TestDebitMultipleAccounts(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
-	paymentValidator, err := reservation.NewReservationPaymentValidator(
+	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
 		testVault,
 		mockTimeSource,
-		reservation.OverfillOncePermitted,
+		OverfillOncePermitted,
 		10*time.Second,
 		time.Second,
 	)
@@ -107,13 +106,13 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
-	paymentValidator, err := reservation.NewReservationPaymentValidator(
+	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
 		testVault,
 		mockTimeSource,
-		reservation.OverfillOncePermitted,
+		OverfillOncePermitted,
 		1*time.Second,
 		time.Second,
 	)
@@ -140,13 +139,13 @@ func TestDebitNoReservation(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
-	paymentValidator, err := reservation.NewReservationPaymentValidator(
+	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
 		10,
 		testVault,
 		mockTimeSource,
-		reservation.OverfillOncePermitted,
+		OverfillOncePermitted,
 		10*time.Second,
 		time.Second,
 	)
