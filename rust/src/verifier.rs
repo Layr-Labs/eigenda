@@ -453,17 +453,21 @@ mod tests {
         parent_hash: B256,
         transactions_root: B256,
     ) -> EthereumBlockHeader {
-        let mut header = Header::default();
-        header.number = number;
-        header.parent_hash = parent_hash;
-        header.transactions_root = transactions_root;
-        header.timestamp = 1234567890;
+        let header = Header {
+            number,
+            parent_hash,
+            transactions_root,
+            timestamp: 1234567890,
+            ..Default::default()
+        };
         EthereumBlockHeader::from(header)
     }
 
     fn create_test_transaction_with_blob() -> TransactionWithBlob {
-        let mut tx_data = TxEip1559::default();
-        tx_data.to = TxKind::Call(address!("0x1234567890123456789012345678901234567890"));
+        let tx_data = TxEip1559 {
+            to: TxKind::Call(address!("0x1234567890123456789012345678901234567890")),
+            ..Default::default()
+        };
 
         let signature = Signature::from_str(
             "0xaa231fbe0ed2b5418e6ba7c19bee2522852955ec50996c02a2fe3e71d30ddaf1645baf4823fea7cb4fcc7150842493847cfb6a6d63ab93e8ee928ee3f61f503500"

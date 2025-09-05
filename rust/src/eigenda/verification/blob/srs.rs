@@ -4,7 +4,8 @@ use rust_kzg_bn254_prover::srs::SRS;
 
 // used in build.rs and tests
 #[allow(dead_code)]
-pub const POINTS_TO_LOAD: u32 = 1024;
+// TODO: what is the maximum blob size allowed? That is how many SRS points should be read?
+pub const POINTS_TO_LOAD: u32 = 4096;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct SerializableSRS {

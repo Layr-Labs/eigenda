@@ -172,7 +172,6 @@ pub fn aggregate(
             let missing_signatures = non_signer.quorum_bitmap_history & signed_quorums;
             let missing_signatures = missing_signatures.count_ones();
             let missing_signatures = Fr::from(missing_signatures as u64);
-            // TODO: benchmark then consider implementing `scalar_mul_tiny`
             non_signer.pk * missing_signatures
         })
         .sum::<G1Projective>();

@@ -9,13 +9,13 @@ pub enum BlobVerificationError {
     BlobTooSmallForHeader(u32),
 
     #[error("Blob is too small ({0} bytes), it can't hold header (32 bytes) + payload ({0} bytes)")]
-    BlobTooSmallForHeaderAndPayload(u32),
+    BlobTooSmallForHeaderAndPayload(usize),
 
     #[error("Blob length does not fit into a u32 variable: {0}")]
     BlobTooLarge(#[from] TryFromIntError),
 
     #[error("Blob with length {0} exceeds the certificate's commitment length of {1}")]
-    BlobLargerThanCommitmentLength(u32, u32),
+    BlobLargerThanCommitmentLength(usize, usize),
 
     #[error("Commitment length ({0}) not power of two")]
     CommitmentLengthNotPowerOfTwo(u32),

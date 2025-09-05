@@ -1,16 +1,5 @@
 //! Implementation of EigenDA blob verification as defined in
 //! [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
-//!
-//! # Header layout:
-//!
-//! offset:    0        1        2  3  4  5             6 .. 31
-//!         [0x00][version][  payload_len_be (u32)  ][   zeros…   ]  => 32 bytes total
-//!
-//! # Blob layout:
-//!
-//! [header: 32 bytes][payload: n bytes][padding: m bytes]
-
-// TODO: what is the maximum blob size allowed? That is how many SRS points should be read?
 
 pub mod error;
 pub mod srs;
@@ -28,7 +17,12 @@ use crate::eigenda::verification::{
     cert::types::conversions::IntoExt,
 };
 
-const HEADER_LEN: u32 = 32;
+const FIELD_ELEMENT_GUARD_BYTE: u8 = 0;
+const BYTES_PER_SYMBOL: usize = 32;
+const BYTES_PER_CHUNK: usize = BYTES_PER_SYMBOL - 1;
+const HEADER_SYMBOLS_LEN: usize = 1;
+const HEADER_BYTES_LEN: usize = HEADER_SYMBOLS_LEN * BYTES_PER_SYMBOL;
+const VERSION: u8 = 0;
 const SRS_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/srs.bin"));
 
 pub static SRS: LazyLock<SRS> = LazyLock::new(|| {
@@ -39,21 +33,20 @@ pub static SRS: LazyLock<SRS> = LazyLock::new(|| {
 
 /// Verifies that `blob` passes all the checks defined in
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
-pub fn verify(blob_commitment: &BlobCommitment, blob: &[u8]) -> Result<(), BlobVerificationError> {
-    use BlobVerificationError::*;
-
-    // TODO: check error shows the blob len
-    let blob_len = blob.len().try_into().map_err(BlobTooLarge)?;
+pub fn verify(
+    blob_commitment: &BlobCommitment,
+    payload: &[u8],
+) -> Result<(), BlobVerificationError> {
+    let blob = payload_into_blob(payload)?;
+    let blob_symbols_len = blob.len() / BYTES_PER_SYMBOL;
 
     let BlobCommitment {
         commitment, length, ..
     } = blob_commitment;
 
-    verify_blob_len_against_commitment_len(blob_len, *length)?;
+    verify_blob_symbols_len_against_commitment(blob_symbols_len, *length as usize)?;
     verify_commitment_len_is_power_of_two(*length)?;
-    let payload_len = verify_payload_not_greater_than_upper_bound(blob, blob_len)?;
-    verify_trailings_bytes_are_all_zero(blob, payload_len)?;
-    verify_kzg_commitment(blob, *commitment)?;
+    verify_kzg_commitment(&blob, *commitment)?;
 
     Ok(())
 }
@@ -64,16 +57,18 @@ pub fn verify(blob_commitment: &BlobCommitment, blob: &[u8]) -> Result<(), BlobV
 ///
 /// We don't check for equality (blob_len == commitment_len) because trailing 0x00s
 /// may have been removed in transmission and that's acceptable
-#[inline]
-fn verify_blob_len_against_commitment_len(
-    blob_len: u32,
-    commitment_len: u32,
+fn verify_blob_symbols_len_against_commitment(
+    blob_symbols_len: usize,
+    commitment_symbols_len: usize,
 ) -> Result<(), BlobVerificationError> {
     use BlobVerificationError::*;
 
-    (blob_len <= commitment_len)
+    (blob_symbols_len <= commitment_symbols_len)
         .then_some(())
-        .ok_or(BlobLargerThanCommitmentLength(blob_len, commitment_len))
+        .ok_or(BlobLargerThanCommitmentLength(
+            blob_symbols_len,
+            commitment_symbols_len,
+        ))
 }
 
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
@@ -83,17 +78,18 @@ fn verify_blob_len_against_commitment_len(
 ///
 /// Since 0 is not a power of two, verification 3. subsumes 2.
 #[inline]
-fn verify_commitment_len_is_power_of_two(commitment_len: u32) -> Result<(), BlobVerificationError> {
+fn verify_commitment_len_is_power_of_two(
+    commitment_symbols_len: u32,
+) -> Result<(), BlobVerificationError> {
     use BlobVerificationError::*;
 
-    commitment_len
+    commitment_symbols_len
         .is_power_of_two()
         .then_some(())
-        .ok_or(CommitmentLengthNotPowerOfTwo(commitment_len))
+        .ok_or(CommitmentLengthNotPowerOfTwo(commitment_symbols_len))
 }
 
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
-///
 /// 4. Verify that the payload length claimed in the encoded payload header is <= the
 ///    maximum permissible payload length, as calculated from the length in the
 ///    BlobCommitment
@@ -104,40 +100,6 @@ fn verify_commitment_len_is_power_of_two(commitment_len: u32) -> Result<(), Blob
 ///      encodedPayload. This presents an upper bound for payload length: e.g.
 ///      "If the payload were any bigger than x, then the process of converting it
 ///      to an encodedPayload would have yielded a blob of larger size than claimed"
-fn verify_payload_not_greater_than_upper_bound(
-    blob: &[u8],
-    blob_len: u32,
-) -> Result<u32, BlobVerificationError> {
-    use BlobVerificationError::*;
-
-    const NON_EMPTY_HEADER_LEN: usize = 6;
-    let first_chunk: &[u8; NON_EMPTY_HEADER_LEN] = blob
-        .first_chunk::<NON_EMPTY_HEADER_LEN>()
-        .ok_or(BlobTooSmallForHeader(blob_len))?;
-
-    const PAYLOAD_BYTE_LEN: usize = 4;
-    let be_bytes: [u8; PAYLOAD_BYTE_LEN] = [
-        first_chunk[2],
-        first_chunk[3],
-        first_chunk[4],
-        first_chunk[5],
-    ];
-    let payload_len = u32::from_be_bytes(be_bytes);
-
-    let payload_len_upper_bound = blob_len
-        .checked_sub(HEADER_LEN)
-        .ok_or(BlobTooSmallForHeader(blob_len))?;
-
-    (payload_len <= payload_len_upper_bound)
-        .then_some(payload_len)
-        .ok_or(PayloadLengthLargerThanUpperBound(
-            payload_len,
-            payload_len_upper_bound,
-        ))
-}
-
-/// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
-///
 /// 5. If the bytes received for the blob are longer than necessary to convey
 ///    the payload, as determined by the claimed payload length, then verify that
 ///    all extra bytes are 0x0
@@ -145,19 +107,86 @@ fn verify_payload_not_greater_than_upper_bound(
 ///   1. Due to how padding of a blob works, it's possible that there may be
 ///      trailing 0x0 bytes, but there shouldn't be any trailing bytes that aren't
 ///      equal to 0x0
-fn verify_trailings_bytes_are_all_zero(
-    blob: &[u8],
-    payload_len: u32,
-) -> Result<(), BlobVerificationError> {
-    use BlobVerificationError::*;
+///
+/// Requirements 4. and 5. are satisfied by construction
+fn payload_into_blob(payload: &[u8]) -> Result<Blob, BlobVerificationError> {
+    let header = construct_header(payload)?;
+    let header_bytes_len = header.len();
 
-    let offset = (HEADER_LEN + payload_len) as usize;
-    blob.get(offset..)
-        .ok_or(BlobTooSmallForHeaderAndPayload(payload_len))?
-        .iter()
-        .all(|&byte| byte == 0)
-        .then_some(())
-        .ok_or(NonZeroTrailingBytes)
+    let payload = pad_payload(payload);
+    let payload_bytes_len = payload.len();
+
+    let blob_symbols_len =
+        ((payload_bytes_len + header_bytes_len) / BYTES_PER_SYMBOL).next_power_of_two();
+    let blob_bytes_len = blob_symbols_len * BYTES_PER_SYMBOL;
+
+    let mut blob = vec![0; blob_bytes_len];
+    blob[..header_bytes_len].copy_from_slice(&header);
+    let from = header_bytes_len;
+    let to = header_bytes_len + payload_bytes_len;
+    blob[from..to].copy_from_slice(&payload);
+
+    Ok(Blob::new(&blob))
+}
+
+/// Constructs the blob header according to EigenDA specification.
+///
+/// The header is a 32-byte structure with the following format:
+/// - Byte 0: Field element guard byte (0x00)
+/// - Byte 1: Version byte (0x00)
+/// - Bytes 2-5: Payload length as big-endian u32
+/// - Bytes 6-31: Zero padding
+///
+/// # Arguments
+/// * `payload` - The payload data to encode in the header
+///
+/// # Returns
+/// * `Result<[u8; HEADER_BYTES_LEN], BlobVerificationError>` - The constructed header or an error if payload is too large
+fn construct_header(payload: &[u8]) -> Result<[u8; HEADER_BYTES_LEN], BlobVerificationError> {
+    let mut header = [0; HEADER_BYTES_LEN];
+    header[0] = FIELD_ELEMENT_GUARD_BYTE;
+    header[1] = VERSION;
+    let payload_len: u32 = payload.len().try_into()?;
+    header[2..6].copy_from_slice(&payload_len.to_be_bytes());
+    Ok(header)
+}
+
+/// Pads and encodes payload data into symbols for blob creation.
+///
+/// This function transforms raw payload data into a format suitable for EigenDA blob encoding
+/// by splitting it into chunks and adding field element guard bytes. Each 31-byte chunk of
+/// payload data becomes a 32-byte symbol with a guard byte prefix.
+///
+/// # Process
+/// 1. Divides payload into 31-byte chunks (BYTES_PER_CHUNK)
+/// 2. Pads the last chunk with zeros if needed
+/// 3. Converts each chunk into a 32-byte symbol by prepending a field element guard byte
+///
+/// # Arguments
+/// * `payload` - The raw payload data to pad and encode
+///
+/// # Returns
+/// * `Vec<u8>` - The padded and encoded payload as a vector of symbols
+fn pad_payload(payload: &[u8]) -> Vec<u8> {
+    let chunks = payload.len().div_ceil(BYTES_PER_CHUNK);
+
+    let chunk_bytes_len = chunks * BYTES_PER_CHUNK;
+    let mut src = Vec::with_capacity(chunk_bytes_len);
+    src.extend_from_slice(payload);
+    src.resize(chunk_bytes_len, 0u8);
+
+    let symbol_bytes_len = chunks * BYTES_PER_SYMBOL;
+    let mut dst = vec![0; symbol_bytes_len];
+
+    for (src, dst) in src
+        .chunks_exact(BYTES_PER_CHUNK)
+        .zip(dst.chunks_exact_mut(BYTES_PER_SYMBOL))
+    {
+        dst[0] = FIELD_ELEMENT_GUARD_BYTE;
+        dst[1..].copy_from_slice(src);
+    }
+
+    dst
 }
 
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
@@ -170,13 +199,12 @@ fn verify_trailings_bytes_are_all_zero(
 ///
 /// > the PR is still open so we don't have the data for option 2.
 fn verify_kzg_commitment(
-    blob: &[u8],
+    blob: &Blob,
     claimed_commitment: G1Point,
 ) -> Result<(), BlobVerificationError> {
     use BlobVerificationError::*;
 
-    let polynomial = Blob::new(blob).to_polynomial_coeff_form();
-    let computed_commitment = KZG::new().commit_coeff_form(&polynomial, &SRS)?;
+    let computed_commitment = KZG::new().commit_blob(blob, &SRS)?;
 
     let claimed_commitment: G1Affine = claimed_commitment.into_ext();
 
@@ -187,26 +215,52 @@ fn verify_kzg_commitment(
 
 #[cfg(test)]
 mod test {
-    use crate::eigenda::cert::{BlobCommitment, G1Point};
-    use ark_bn254::{G1Affine, G2Affine};
-    use rust_kzg_bn254_primitives::{blob::Blob, errors::KzgError};
-    use rust_kzg_bn254_prover::kzg::KZG;
+    use std::str::FromStr;
 
-    use crate::eigenda::verification::{
-        blob::{
-            SRS, error::BlobVerificationError::*, srs::POINTS_TO_LOAD, verify,
-            verify_blob_len_against_commitment_len, verify_commitment_len_is_power_of_two,
-            verify_kzg_commitment, verify_payload_not_greater_than_upper_bound,
-            verify_trailings_bytes_are_all_zero,
+    use ark_bn254::{Fq, G1Affine, G2Affine};
+    use rust_kzg_bn254_primitives::errors::KzgError;
+
+    use crate::eigenda::{
+        cert::{BlobCommitment, G1Point},
+        verification::{
+            blob::{
+                error::BlobVerificationError::*, payload_into_blob, srs::POINTS_TO_LOAD, verify,
+                verify_blob_symbols_len_against_commitment, verify_commitment_len_is_power_of_two,
+                verify_kzg_commitment,
+            },
+            cert::types::conversions::IntoExt,
         },
-        cert::types::conversions::IntoExt,
     };
 
     #[test]
-    fn verify_fails_when_blob_is_too_large() {
-        let mut blob = vec![42u8; u32::MAX as usize + 1]; // 4GB vec
-        let payload_len = 32u32.to_be_bytes();
-        blob[2..6].copy_from_slice(&payload_len);
+    fn verify_succeeds_with_known_commitment() {
+        let payload = [123; 512];
+
+        let known_commitment = G1Affine::new_unchecked(
+            Fq::from_str(
+                "14744258532267160547483505594354502788777214273862365248297251133183543768320",
+            )
+            .unwrap(),
+            Fq::from_str(
+                "14747463945321045950305747275042450369190644326153769248149140572576072465547",
+            )
+            .unwrap(),
+        )
+        .into_ext();
+
+        let blob_commitment = BlobCommitment {
+            commitment: known_commitment,
+            length_commitment: G2Affine::default().into_ext(),
+            length_proof: G2Affine::default().into_ext(),
+            length: 32 + 32,
+        };
+
+        assert_eq!(verify(&blob_commitment, &payload), Ok(()));
+    }
+
+    #[test]
+    fn verify_fails_when_payload_is_too_large() {
+        let payload = vec![42u8; u32::MAX as usize + 1]; // 4GB vec
 
         let blob_commitment = BlobCommitment {
             commitment: G1Affine::default().into_ext(),
@@ -215,42 +269,22 @@ mod test {
             length: Default::default(),
         };
 
-        let result = verify(&blob_commitment, &blob);
+        let result = verify(&blob_commitment, &payload);
         assert!(matches!(result, Err(BlobTooLarge(_))));
     }
 
     #[test]
-    fn verify_succeeds() {
-        let mut blob = [42u8; 64];
-        let payload_len = 32u32.to_be_bytes();
-        blob[2..6].copy_from_slice(&payload_len);
-
-        // reproduce the calculation, more flexible than hardcoding the commitment
-        let polynomial = Blob::new(&blob).to_polynomial_coeff_form();
-        let commitment = KZG::new().commit_coeff_form(&polynomial, &SRS).unwrap();
-
-        let blob_commitment = BlobCommitment {
-            commitment: commitment.into_ext(),
-            length_commitment: G2Affine::default().into_ext(),
-            length_proof: G2Affine::default().into_ext(),
-            length: 32 + 32,
-        };
-
-        assert_eq!(verify(&blob_commitment, &blob), Ok(()));
-    }
-
-    #[test]
-    fn test_verify_blob_len_against_commitment_len() {
-        assert_eq!(verify_blob_len_against_commitment_len(42, 43), Ok(()));
-        assert_eq!(verify_blob_len_against_commitment_len(42, 42), Ok(()));
+    fn test_verify_blob_symbols_len_against_commitment() {
+        assert_eq!(verify_blob_symbols_len_against_commitment(42, 43), Ok(()));
+        assert_eq!(verify_blob_symbols_len_against_commitment(42, 42), Ok(()));
         assert_eq!(
-            verify_blob_len_against_commitment_len(42, 41),
+            verify_blob_symbols_len_against_commitment(42, 41),
             Err(BlobLargerThanCommitmentLength(42, 41))
         );
     }
 
     #[test]
-    fn test_verify_commitment_len_is_power_of_two() {
+    fn test_verify_commitment_symbols_len_is_power_of_two() {
         assert_eq!(verify_commitment_len_is_power_of_two(0b1000), Ok(()));
         assert_eq!(
             verify_commitment_len_is_power_of_two(0b0111),
@@ -259,123 +293,17 @@ mod test {
     }
 
     #[test]
-    fn verify_payload_not_greater_than_upper_bound_when_payload_is_too_small() {
-        assert!(verify_payload_not_greater_than_upper_bound(&[0, 1, 2, 3, 4], 5).is_err());
-        assert!(verify_payload_not_greater_than_upper_bound(&[0, 1, 2, 3, 4, 5], 6).is_err());
-    }
-
-    #[test]
-    fn verify_payload_greater_than_upper_bound_fails_when_blob_shorter_than_header() {
-        let blob = &[42u8; 5];
-        let blob_len = blob.len() as u32;
-        assert_eq!(
-            verify_payload_not_greater_than_upper_bound(blob, blob_len),
-            Err(BlobTooSmallForHeader(blob_len))
-        );
-
-        let blob = &[42u8; 7];
-        let blob_len = blob.len() as u32;
-        assert_eq!(
-            verify_payload_not_greater_than_upper_bound(blob, blob_len),
-            Err(BlobTooSmallForHeader(blob_len))
-        );
-    }
-
-    #[test]
-    fn verify_payload_greater_than_upper_bound_fails_when_payload_len_larger_than_upper_bound() {
-        // We are claiming a payload length of 33 bytes
-        // The header alone occupies 32 bytes
-        // So a [u8; 64] blob can't possibly fit header + payload
-        let payload_len = 33u32.to_be_bytes();
-        let mut blob = [0u8; 64];
-        blob[2..6].copy_from_slice(&payload_len);
-        let blob_len = blob.len() as u32;
-        assert_eq!(
-            verify_payload_not_greater_than_upper_bound(&blob, blob_len),
-            Err(PayloadLengthLargerThanUpperBound(33, 32))
-        );
-    }
-
-    #[test]
-    fn verify_payload_greater_than_upper_bound_succeeds() {
-        // We are claiming a payload length of 32 bytes
-        // The header alone occupies 32 bytes
-        // So a [u8; 64] blob can exactly fit header + payload
-        let payload_len = 32u32.to_be_bytes();
-        let mut blob = [0u8; 64];
-        blob[2..6].copy_from_slice(&payload_len);
-        let blob_len = blob.len() as u32;
-        assert_eq!(
-            verify_payload_not_greater_than_upper_bound(&blob, blob_len),
-            Ok(32)
-        );
-    }
-
-    #[test]
-    fn verify_trailings_bytes_are_all_zero_fails_when_blob_smaller_than_payload() {
-        // We are claiming a payload length of 33 bytes
-        // The header alone occupies 32 bytes
-        // So a [u8; 64] blob can't possibly fit header + payload
-        let payload_len = 33u32;
-        let payload_len_bytes = payload_len.to_be_bytes();
-        let mut blob = [0u8; 64];
-        blob[2..6].copy_from_slice(&payload_len_bytes);
-        assert_eq!(
-            verify_trailings_bytes_are_all_zero(&blob, payload_len),
-            Err(BlobTooSmallForHeaderAndPayload(33))
-        );
-    }
-
-    #[test]
-    fn verify_trailings_bytes_are_all_zero_fails_when_trailing_bytes_not_all_zero() {
-        let payload_len = 32u32;
-        let payload_len_bytes = payload_len.to_be_bytes();
-        let mut blob = [1u8; 65]; // 1 trailing byte not equal to 1
-        blob[2..6].copy_from_slice(&payload_len_bytes);
-        assert_eq!(
-            verify_trailings_bytes_are_all_zero(&blob, payload_len),
-            Err(NonZeroTrailingBytes)
-        );
-    }
-
-    #[test]
-    fn verify_trailings_bytes_are_all_zero_succeeds() {
-        let payload_len = 32u32;
-        let payload_len_bytes = payload_len.to_be_bytes();
-        let mut blob = [0u8; 65]; // 1 trailing byte equal to 0
-        blob[2..6].copy_from_slice(&payload_len_bytes);
-        assert_eq!(
-            verify_trailings_bytes_are_all_zero(&blob, payload_len),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn verify_kzg_commitment_fails_when_blob_is_too_big_for_srs() {
+    fn verify_kzg_commitment_fails_when_payload_is_too_big_for_srs() {
         const LEN: usize = (POINTS_TO_LOAD as usize + 1) * 32;
-        let mut blob = [42u8; LEN];
-        let payload_len = (LEN as u32 - 32u32).to_be_bytes();
-        blob[2..6].copy_from_slice(&payload_len);
+        let payload = [42u8; LEN];
+        let blob = payload_into_blob(&payload).unwrap();
         let claimed_commitment: G1Point = G1Affine::default().into_ext();
+
         assert_eq!(
             verify_kzg_commitment(&blob, claimed_commitment),
             Err(WrapKzgError(KzgError::SerializationError(
                 "polynomial length is not correct".into()
             )))
         );
-    }
-
-    #[test]
-    fn verify_kzg_commitment_succeeds() {
-        let mut blob = [42u8; 42];
-        let payload_len = 10u32.to_be_bytes();
-        blob[2..6].copy_from_slice(&payload_len);
-
-        // reproduce the calculation, more flexible than hardcoding the commitment
-        let polynomial = Blob::new(&blob).to_polynomial_coeff_form();
-        let claimed_commitment = KZG::new().commit_coeff_form(&polynomial, &SRS).unwrap();
-        let claimed_commitment: G1Point = claimed_commitment.into_ext();
-
-        assert_eq!(verify_kzg_commitment(&blob, claimed_commitment), Ok(()));
     }
 }

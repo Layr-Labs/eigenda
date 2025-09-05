@@ -56,7 +56,6 @@ where
     }
 }
 
-// TODO: should I invert coords here? I'm not a fan of this inversion, points would be out of curve
 impl FromExt<G1Affine> for G1Point {
     fn from_ext(affine: G1Affine) -> Self {
         match affine.xy() {
@@ -86,7 +85,6 @@ impl FromExt<G2Affine> for G2Point {
     }
 }
 
-// TODO: should I invert coords here? I'm not a fan of this inversion, points would be out of curve
 impl FromExt<G1Point> for G1Affine {
     fn from_ext(point: G1Point) -> G1Affine {
         if point.x.is_zero() && point.y.is_zero() {
