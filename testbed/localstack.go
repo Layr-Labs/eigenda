@@ -175,15 +175,3 @@ func buildLocalStackEnv(opts LocalStackOptions) map[string]string {
 
 	return env
 }
-
-// Deprecated: Use LocalStackOptions instead
-type LocalStackConfig = LocalStackOptions
-
-// Deprecated: Use NewLocalStackContainerWithOptions instead
-func DefaultLocalStackConfig() LocalStackOptions {
-	return LocalStackOptions{
-		Services: []string{"s3", "dynamodb", "kms"},
-		Region:   "us-east-1",
-		Debug:    false,
-	}
-}

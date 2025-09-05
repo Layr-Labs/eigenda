@@ -22,17 +22,19 @@ import (
 )
 
 var (
-	logger              = testutils.GetLogger()
 	anvilContainer      *testbed.AnvilContainer
 	localstackContainer *testbed.LocalStackContainer
-	localstackPort      = "4570"
 	templateName        string
 	testName            string
 	graphUrl            string
 	testConfig          *deploy.Config
+
+	localstackPort      = "4570"
 	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
 	metadataTableNameV2 = "test-BlobMetadata-v2"
+
+	logger = testutils.GetLogger()
 )
 
 func init() {
@@ -124,10 +126,7 @@ func setup() {
 }
 
 func teardown() {
-	logger.Info("Stopping localstack")
 	_ = localstackContainer.Terminate(context.Background())
-
-	logger.Info("Stopping anvil")
 	_ = anvilContainer.Terminate(context.Background())
 
 	logger.Info("Stop graph node")

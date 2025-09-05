@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -30,6 +31,8 @@ var (
 	anvilContainer *testbed.AnvilContainer
 	templateName   string
 	testName       string
+
+	logger = testutils.GetLogger()
 )
 
 func TestMain(m *testing.M) {
@@ -64,6 +67,7 @@ func setup(_ *testing.M) {
 	var err error
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		Logger:         logger,
 	})
 	if err != nil {
 		panic(err)

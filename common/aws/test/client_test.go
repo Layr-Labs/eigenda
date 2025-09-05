@@ -10,14 +10,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger              = testutils.GetLogger()
+	logger              = tu.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 )
 

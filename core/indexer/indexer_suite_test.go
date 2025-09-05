@@ -3,9 +3,9 @@ package indexer_test
 import (
 	"context"
 	"flag"
-	"fmt"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/testbed"
 	. "github.com/onsi/ginkgo/v2"
@@ -46,13 +46,14 @@ var _ = BeforeSuite(func() {
 
 		testConfig = deploy.NewTestConfig(testName, rootPath)
 		testConfig.Deployers[0].DeploySubgraphs = false
-		logger := testConfig.GetLogger()
+		logger := testutils.GetLogger()
 
 		if testConfig.Environment.IsLocal() {
 			logger.Info("Starting anvil")
 			var err error
 			anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 				ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+				Logger:         logger,
 			})
 			if err != nil {
 				panic(err)
@@ -68,9 +69,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-
 	if !testing.Short() && testConfig.Environment.IsLocal() {
-		fmt.Println("Stopping anvil")
 		_ = anvilContainer.Terminate(context.Background())
 	}
 

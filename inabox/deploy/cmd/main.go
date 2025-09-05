@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	logger                  = testutils.GetLogger()
 	testNameFlagName        = "testname"
 	rootPathFlagName        = "root-path"
 	localstackFlagName      = "localstack-port"
@@ -30,6 +29,8 @@ var (
 	expCmdName         = "exp"
 	generateEnvCmdName = "env"
 	allCmdName         = "all"
+
+	logger = testutils.GetLogger()
 )
 
 func main() {

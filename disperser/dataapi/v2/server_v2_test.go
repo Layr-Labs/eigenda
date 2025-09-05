@@ -193,7 +193,9 @@ func setup(m *testing.M) {
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	metrics := dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), blobMetadataStore, "9001", logger)
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, logger, metrics)
+	testDataApiServerV2, err = serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger, metrics)
 	if err != nil {
 		teardown()
 		panic("failed to create v2 server: " + err.Error())
@@ -1463,7 +1465,10 @@ func TestFetchBatchFeed(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, logger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1940,7 +1945,10 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, logger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2236,7 +2244,10 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, logger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIcs, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)

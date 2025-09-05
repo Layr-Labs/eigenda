@@ -37,11 +37,13 @@ func init() {
 }
 
 var (
-	anvilContainer                 *testbed.AnvilContainer
-	testConfig                     *deploy.Config
-	templateName                   string
-	testName                       string
-	logger                         = testutils.GetLogger()
+	anvilContainer      *testbed.AnvilContainer
+	localstackContainer *testbed.LocalStackContainer
+	testConfig          *deploy.Config
+	templateName        string
+	testName            string
+
+	localstackPort                 = "4570"
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -49,6 +51,8 @@ var (
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	numRetries                     = 0
+
+	logger = testutils.GetLogger()
 )
 
 func TestMain(m *testing.M) {
@@ -79,10 +83,20 @@ func setup(_ *testing.M) {
 		return
 	}
 
-	fmt.Println("Starting anvil")
 	var err error
+	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		Logger:         logger,
 	})
 	if err != nil {
 		panic(err)

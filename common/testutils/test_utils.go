@@ -134,7 +134,8 @@ func RandomString(length int) string {
 //
 // The logger always includes source information and logs at debug level.
 //
-// TODO: Future improvements like writing the test output to a file and adding test metadata (e.g. test name) to log entries.
+// TODO: Future improvements like writing the test output to a file
+// and adding test metadata (e.g. test name) to log entries.
 func GetLogger() logging.Logger {
 	writer := io.Writer(os.Stdout)
 	inCI := os.Getenv("CI") != ""
@@ -146,10 +147,7 @@ func GetLogger() logging.Logger {
 		})
 	}
 
-	noColor := false
-	if os.Getenv("NO_COLOR") != "" {
-		noColor = true
-	}
+	noColor := os.Getenv("NO_COLOR") != ""
 	return logging.NewTextSLogger(writer, &logging.SLoggerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
