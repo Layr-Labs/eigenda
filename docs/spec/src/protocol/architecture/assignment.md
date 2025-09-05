@@ -12,6 +12,36 @@ The assignment module is implemented by the `AssignmentCoordinator` interface.
 
 ![image](../../assets/assignment-module.png)
 
+
+### Chunk Assignment Scheme Overview
+
+Our chunk assignment scheme (CAS) assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob. Given:
+
+- Blob encoding parameters $(c, \gamma, r)$ where $c$ is the total number of chunks, $\gamma$ is the coding rate, and $r$ is the reconstruction threshold
+- A set of $n$ validators with stakes $\eta_1, \eta_2, \ldots, \eta_n$, where $\sum_{i=1}^n \eta_i = 1$
+
+The assignment algorithm `GetAssignments` works as follows:
+
+1. **Initial allocation:** For each validator $i$, calculate the base number of chunks:  
+   $$
+   c'_i = \lceil \eta_i(c - n) \rceil
+   $$
+
+2. **Total initial assignment:** Compute  
+   $$
+   c' = \sum_{i=1}^n c'_i
+   $$
+
+3. **Sort validators:** Order validators deterministically and assign index $k_i$ to each validator $i$.
+
+4. **Final assignment:** The number of chunks assigned to validator $i$ is:  
+   $$
+   c_i = c'_i + \mathbb{I}_{k_i \leq c - c'}
+   $$
+   where $\mathbb{I}$ is the indicator function that adds one extra chunk to the first $c - c'$ validators to ensure the total number of assigned chunks equals $c$.
+
+
+
 ### Assignment Logic
 
 The standard assignment coordinator implements a very simple logic for determining the number of chunks per node and the chunk length, which we describe here.

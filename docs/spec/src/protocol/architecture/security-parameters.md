@@ -40,7 +40,7 @@ The Byzantine liveness and safety properties of a blob are specified by a collec
 
 ### How to Set the Confirmation Threshold
 
-In the BFT security model, the `SafetyThreshold` and `LivenessThreshold` are estimated by the client, where `SafetyThreshold` is the maximum stake controlled by an adversary that sign the certificate and refuse to serve the data and `SafetyThreshold` is the maximum stake controlled by an adversary that does not sign a certificate.
+In the BFT security model, the `SafetyThreshold` and `LivenessThreshold` are estimated by the client, where `SafetyThreshold` is the maximum stake controlled by an adversary that sign the certificate and fail to serve the data, and `SafetyThreshold` is the maximum stake controlled by an adversary that does not sign the certificates.
 
 The `ConfirmationThreshold` is set based on the following two criterias.
 
@@ -81,5 +81,7 @@ with the following mapping of notation in the doc and variables in the code:
 **2. Liveness Threshold**
 
 The `LivenessThreshold` does not show in the code, but it's something that the user should keep in mind if they want to change the default setting. We strongly recommend the user to set a `SafetyThreshold` >= 33%. 
+
+### System Default
 
 By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 13%, it gives a `SafetyThreshold` of 42% and a `LivenessThreshold` of 45%. 
