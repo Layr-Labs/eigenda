@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"hash/fnv"
@@ -283,12 +284,16 @@ func configureContainerSSHKey(ctx context.Context, cli *client.Client, container
 		return fmt.Errorf("failed to read public key: %w", err)
 	}
 
-	// Create an exec configuration to update the authorized_keys file
+	// Use base64 encoding to safely pass the SSH key content without shell escaping issues
+	// Base64 encoding ensures no shell metacharacters can cause problems
+	encodedKey := base64.StdEncoding.EncodeToString(publicKeyContent)
+
 	execConfig := container.ExecOptions{
 		Cmd: []string{
-			"sh", "-c", 
-			fmt.Sprintf("echo '%s' > /home/%s/.ssh/authorized_keys && chmod 600 /home/%s/.ssh/authorized_keys", 
-				strings.TrimSpace(string(publicKeyContent)), username, username),
+			"sh", "-c",
+			fmt.Sprintf(
+				"echo '%s' | base64 -d > /home/%s/.ssh/authorized_keys && chmod 600 /home/%s/.ssh/authorized_keys",
+				encodedKey, username, username),
 		},
 	}
 
@@ -298,24 +303,37 @@ func configureContainerSSHKey(ctx context.Context, cli *client.Client, container
 		return fmt.Errorf("failed to create exec instance: %w", err)
 	}
 
-	// Start the exec instance
-	err = cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{})
+	// Start the exec instance with Detach: false to ensure it blocks until completion
+	err = cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{
+		Detach: false, // Explicitly set to false to block until completion
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start exec instance: %w", err)
 	}
 
-	// Wait for the exec to complete
-	execInspect, err := cli.ContainerExecInspect(ctx, execIDResp.ID)
-	if err != nil {
-		return fmt.Errorf("failed to inspect exec instance: %w", err)
+	// With Detach: false, ContainerExecStart should block until completion.
+	// However, to be absolutely certain, we'll add a brief polling loop.
+	for i := 0; i < 10; i++ { // Max 10 attempts with 100ms intervals = 1 second max wait
+		execInspect, err := cli.ContainerExecInspect(ctx, execIDResp.ID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect exec instance: %w", err)
+		}
+
+		// If the command is no longer running, we can check the exit code
+		if !execInspect.Running {
+			// Check if the command was successful
+			if execInspect.ExitCode != 0 {
+				return fmt.Errorf("SSH key configuration command failed with exit code %d", execInspect.ExitCode)
+			}
+			return nil // Success!
+		}
+
+		// Brief sleep before checking again
+		time.Sleep(10 * time.Millisecond)
 	}
 
-	// Check if the command was successful
-	if execInspect.ExitCode != 0 {
-		return fmt.Errorf("SSH key configuration command failed with exit code %d", execInspect.ExitCode)
-	}
-
-	return nil
+	// If still running after polling, something is wrong
+	return fmt.Errorf("SSH key configuration command is still running after timeout")
 }
 
 // WaitForSSH waits for the SSH server to be ready
