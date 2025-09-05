@@ -8,24 +8,9 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
-
-// versionByteString returns a string representation of the version byte for display
-func versionByteString(v certs.VersionByte) string {
-	switch v {
-	case certs.V0VersionByte:
-		return "EigenDA V1"
-	case certs.V1VersionByte:
-		return "EigenDA V2 Legacy"
-	case certs.V2VersionByte:
-		return "EigenDA V2 with V3 Cert"
-	default:
-		return fmt.Sprintf("Unknown (0x%02x)", byte(v))
-	}
-}
 
 // DisplayPrefixInfo displays the parsed commitment structure information
 func DisplayPrefixInfo(parsed *PrefixMetadata) {
@@ -44,11 +29,11 @@ func DisplayPrefixInfo(parsed *PrefixMetadata) {
 		fmt.Printf("\n")
 	}
 	versionByte := parsed.CertVersion
-	fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(versionByte), versionByteString(versionByte))
+	fmt.Printf("  Version Byte: 0x%02x (%s)\n", byte(versionByte), versionByte.VersionByteString())
 }
 
-// displayCertV3 creates a nicely formatted table display for V3 certificates
-func DisplayCertificateData(cert *coretypes.EigenDACertV3) {
+// DisplayCertV3Data creates a nicely formatted table display for V3 certificates
+func DisplayCertV3Data(cert *coretypes.EigenDACertV3) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleDefault)
@@ -87,7 +72,7 @@ func DisplayCertificateData(cert *coretypes.EigenDACertV3) {
 	t.AppendSeparator()
 
 	blobHeader := &blobCert.BlobHeader
-	t.AppendRow(table.Row{"Version", fmt.Sprintf("%d", blobHeader.Version)})
+	t.AppendRow(table.Row{"Blob Params Version", fmt.Sprintf("%d", blobHeader.Version)})
 	t.AppendRow(table.Row{"Quorum Numbers", formatByteSlice(blobHeader.QuorumNumbers)})
 	t.AppendRow(table.Row{"Payment Header Hash", formatByteArray32(blobHeader.PaymentHeaderHash)})
 
@@ -116,7 +101,7 @@ func DisplayCertificateData(cert *coretypes.EigenDACertV3) {
 		AutoMergeAlign: text.AlignCenter,
 	})
 	t.AppendSeparator()
-	t.AppendRow(table.Row{"Signature", formatByteSlice(blobCert.Signature)})
+	t.AppendRow(table.Row{"Account ECDSA Signature", formatByteSlice(blobCert.Signature)})
 	t.AppendRow(table.Row{"Relay Keys", formatRelayKeys(blobCert.RelayKeys)})
 
 	// Batch Header
@@ -130,8 +115,8 @@ func DisplayCertificateData(cert *coretypes.EigenDACertV3) {
 	t.AppendRow(table.Row{"Batch Root", formatByteArray32(cert.BatchHeader.BatchRoot)})
 	t.AppendRow(table.Row{"Reference Block Number", fmt.Sprintf("%d", cert.BatchHeader.ReferenceBlockNumber)})
 
-	// Non-Signer Stakes and Signature
-	section = "NON-SIGNER STAKES & SIGNATURE"
+	// Non-Signer Stakes and BLS Signature
+	section = "NON-SIGNER STAKES & BLS SIGNATURE"
 	nonSigner := &cert.NonSignerStakesAndSignature
 	t.AppendSeparator()
 	t.AppendRow(table.Row{section, section}, table.RowConfig{

@@ -4,8 +4,8 @@ import "github.com/urfave/cli"
 
 var (
 	CertHexFlag = cli.StringFlag{
-		Name:     "cert-hex",
-		Usage:    "Hex-encoded RLP certificate string to parse (can include 0x prefix)",
+		Name:     "hex",
+		Usage:    "Hex-encoded RLP altda commitment string to parse (can include 0x prefix)",
 		Required: true,
 	}
 )

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/altdacommitment_parser"
+	"github.com/Layr-Labs/eigenda/tools/integration_utils/calldata_gas_estimator"
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/flags"
 	"github.com/Layr-Labs/eigenda/tools/integration_utils/gas_exhaustion_cert_meter"
 
@@ -41,6 +42,13 @@ func main() {
 				"remove the '1' prefix byte from calldata before parsing.",
 			Flags:  flags.ParserFlags,
 			Action: altdacommitment_parser.DisplayAltDACommitmentFromHex,
+		},
+		{
+			Name:        "calldata-gas-estimator",
+			Usage:       "Estimate EVM gas cost to send calldata containing AltDA commitment",
+			Description: "Estimate EVM gas cost to send calldata containing AltDA commitment",
+			Flags:       flags.CallDataGasEstimatorFlags,
+			Action:      calldata_gas_estimator.RunEstimator,
 		},
 		{
 			Name: "gas-exhaustion-cert-meter",

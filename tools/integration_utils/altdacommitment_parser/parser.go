@@ -22,7 +22,7 @@ type PrefixMetadata struct {
 	OriginalSize   int
 }
 
-// ParseCertFromHex parses an EigenDA certificate from a hex-encoded RLP string
+// DisplayAltDACommitmentFromHex parses an EigenDA AltDA commitment from a hex-encoded RLP string
 // and prints a nicely formatted display of its contents to stdout
 func DisplayAltDACommitmentFromHex(ctx *cli.Context) error {
 	hexString := ctx.String(flags.CertHexFlag.Name)
@@ -42,18 +42,17 @@ func DisplayAltDACommitmentFromHex(ctx *cli.Context) error {
 	}
 
 	// Display the certificate data
-	DisplayCertificateData(certV3)
+	DisplayCertV3Data(certV3)
 	return nil
 }
 
-// ParseCertFromHex parses an prefix and certificate from a hex-encoded RLP string
+// ParseAltDACommitmentFromHex parses an prefix and certificate from a hex-encoded RLP string
 func ParseAltDACommitmentFromHex(hexString string) (*PrefixMetadata, *certs.VersionedCert, error) {
 	// Process the hex string to get binary data
-	data, err := processHexString(hexString)
+	data, err := ProcessHexString(hexString)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to process hex string: %w", err)
 	}
-
 	if len(data) == 0 {
 		return nil, nil, fmt.Errorf("empty data")
 	}
@@ -101,8 +100,8 @@ func ParseAltDACommitmentFromHex(hexString string) (*PrefixMetadata, *certs.Vers
 	return &prefix, &versionedCert, nil
 }
 
-// processHexString processes a hex-encoded string and returns binary data for RLP decoding
-func processHexString(hexString string) ([]byte, error) {
+// ProcessHexString processes a hex-encoded string and returns binary data for RLP decoding
+func ProcessHexString(hexString string) ([]byte, error) {
 	// Remove common hex prefixes and whitespace
 	hexStr := strings.TrimSpace(hexString)
 	hexStr = strings.TrimPrefix(hexStr, "0x")
