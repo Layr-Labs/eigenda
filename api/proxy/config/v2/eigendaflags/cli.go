@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/consts"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
@@ -40,26 +39,8 @@ var (
 	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
 	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
 
-	ClientLedgerModeFlag = &cli.StringFlag{
-		Name: withFlagPrefix("client-ledger-mode"),
-		Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
-			"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
-			"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
-			"will be removed, once the migration to the new leaky bucket payment model is complete.",
-		Value:    "legacy",
-		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "CLIENT_LEDGER_MODE")},
-		Category: consts.PaymentsCategory,
-		Required: false,
-	}
-	PaymentVaultMonitorIntervalFlag = &cli.DurationFlag{
-		Name: withFlagPrefix("payment-vault-monitor-interval"),
-		Usage: "Interval at which clients poll to check for changes to the PaymentVault contract (relevant " +
-			"updates include changes to reservation parameters, and new on-demand payment deposits)",
-		Value:    30 * time.Second,
-		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "PAYMENT_VAULT_MONITOR_INTERVAL")},
-		Category: consts.PaymentsCategory,
-		Required: false,
-	}
+	ClientLedgerModeFlagName            = withFlagPrefix("client-ledger-mode")
+	PaymentVaultMonitorIntervalFlagName = withFlagPrefix("payment-vault-monitor-interval")
 )
 
 func withFlagPrefix(s string) string {
@@ -233,8 +214,26 @@ This check is optional and will be skipped when set to 0.`,
 			Category: category,
 			Required: false,
 		},
-		ClientLedgerModeFlag,
-		PaymentVaultMonitorIntervalFlag,
+		&cli.StringFlag{
+			Name: ClientLedgerModeFlagName,
+			Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
+				"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
+				"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
+				"will be removed, once the migration to the new leaky bucket payment model is complete.",
+			Value:    "legacy",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "CLIENT_LEDGER_MODE")},
+			Category: category,
+			Required: false,
+		},
+		&cli.DurationFlag{
+			Name: PaymentVaultMonitorIntervalFlagName,
+			Usage: "Interval at which clients poll to check for changes to the PaymentVault contract (relevant " +
+				"updates include changes to reservation parameters, and new on-demand payment deposits)",
+			Value:    30 * time.Second,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "PAYMENT_VAULT_MONITOR_INTERVAL")},
+			Category: category,
+			Required: false,
+		},
 	}
 }
 
@@ -293,7 +292,8 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
-		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlag.Name)),
+		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlagName)),
+		VaultMonitorInterval:               ctx.Duration(PaymentVaultMonitorIntervalFlagName),
 	}, nil
 }
 
