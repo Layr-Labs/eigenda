@@ -41,6 +41,8 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestReservationVaultMonitor(t *testing.T) {
+	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	updateInterval := time.Millisecond

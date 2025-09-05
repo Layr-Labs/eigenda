@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testTime = time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-
 func TestNewReservationPaymentValidatorInvalidParams(t *testing.T) {
 	ctx := context.Background()
 	testVault := vault.NewTestPaymentVault()
@@ -33,6 +31,8 @@ func TestNewReservationPaymentValidatorInvalidParams(t *testing.T) {
 }
 
 func TestDebitMultipleAccounts(t *testing.T) {
+	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -86,6 +86,8 @@ func TestDebitMultipleAccounts(t *testing.T) {
 }
 
 func TestDebitInsufficientCapacity(t *testing.T) {
+	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -128,6 +130,8 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 }
 
 func TestDebitNoReservation(t *testing.T) {
+	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
