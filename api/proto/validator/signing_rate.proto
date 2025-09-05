@@ -27,6 +27,16 @@ message ValidatorSigningRate {
   uint64 signing_latency = 6;
 }
 
+// Contains signing rate information about a specific quorum.
+message QuorumSigningRate {
+  // The unique identifier of the quorum. Technically quorums are stored in a a uint8,
+  // but using uint64 here to future-proof things.
+  uint64 quorum_id = 1;
+
+  // The signing rates of individual validators in this quorum.
+  repeated ValidatorSigningRate validator_signing_rates = 2;
+}
+
 // Signing rate information about validators during a particular time bucket.
 message SigningRateBucket {
 
@@ -36,6 +46,6 @@ message SigningRateBucket {
   // The end time of the bucket in seconds since Unix epoch, exclusive.
   uint64 end_timestamp = 2;
 
-  // The signing rates of individual validators during the bucket period.
-  repeated validator.ValidatorSigningRate validator_signing_rates = 3;
+  // The signing rates for each quorum during the bucket time period.
+  repeated QuorumSigningRate quorum_signing_rates = 3;
 }

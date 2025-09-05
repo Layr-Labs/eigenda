@@ -18,9 +18,8 @@ type SigningRateBucket struct {
 	// The timestamp when the last data could have been added to this bucket.
 	endTimestamp time.Time
 
-	// Signing rate info for each validator in this bucket. If a validator is not present in this map, it can be
-	// assumed that the validator has been Down for the entire duration of the bucket.
-	validatorInfo map[core.OperatorID]*validator.ValidatorSigningRate
+	// Signing rate info. The first key is the quorum ID, the second key is the operator ID.
+	validatorInfo map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate
 
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
 	cachedProtobuf *validator.SigningRateBucket
@@ -38,7 +37,7 @@ func NewSigningRateBucket(startTime time.Time, span time.Duration) (*SigningRate
 		return nil, fmt.Errorf("error creating signing rate bucket: %w", err)
 	}
 
-	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+	validatorInfo := make(map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate)
 	bucket := &SigningRateBucket{
 		startTimestamp: startTimestamp,
 		endTimestamp:   endTimestamp,
@@ -56,6 +55,7 @@ func NewBucketFromProto(pb *validator.SigningRateBucket) *SigningRateBucket {
 
 	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
 
+	// TODO future cody: refactor this so it works with quorums
 	for _, info := range pb.GetValidatorSigningRates() {
 		var id core.OperatorID
 		copy(id[:], info.GetId())
@@ -106,6 +106,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 // If the validator was previously Down, it will be marked as Up.
 func (b *SigningRateBucket) ReportSuccess(
 	id core.OperatorID,
+	quorum uint64,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
@@ -121,7 +122,7 @@ func (b *SigningRateBucket) ReportSuccess(
 // Report that a validator has failed to sign a batch of the given size.
 //
 // If the validator was previously Up, it will be marked as Down.
-func (b *SigningRateBucket) ReportFailure(id core.OperatorID, batchSize uint64) {
+func (b *SigningRateBucket) ReportFailure(id core.OperatorID, quorum uint64, batchSize uint64) {
 	info := b.getValidator(id)
 
 	info.UnsignedBatches += 1
