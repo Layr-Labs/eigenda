@@ -24,6 +24,17 @@ Basic RS encoding is used to achieve the first requirement of *Adversarial toler
 
 Notice that given any number of chunks $M$ such that $M \times$`ChunkLength` >= `BlobLength`, via [polynomial interpolation](https://en.wikipedia.org/wiki/Polynomial_interpolation) it is possible to reconstruct the original polynomial, and therefore its coefficients which represent the original blob. 
 
+### Blob Encoding Parameters
+
+We define the **Blob encoding parameters** as a tuple **$(c, r, \gamma)$** where:
+
+- $c$ (`NumChunks`): The total number of encoded chunks after erasure coding (must be a power of 2).  
+- $\gamma$ (`1/CodingRate`): The ratio of original data to total encoded chunks, providing redundancy (must be an inverse power of 2). Note that for representational purposes, the `CodingRate` in our code is the inverse of  $\gamma$, the standard coding rate used in coding theory.
+- $r$ (`ReconstructionThreshold`): The minimum fraction of total stake required to reconstruct the blob.  
+
+These parameters determine the trade-off between storage overhead and fault tolerance. A lower coding rate $\gamma$ increases redundancy but also storage costs, while the reconstruction threshold $r$ defines the minimum honest stake needed for data recovery. 
+The relationship of $\gamma$ and $r$ is discussed in [Security Parameters](./security-parameters.md)
+
 ### Validation via KZG
 
 To address the requirement *Adversarial tolerance for disperser* using RS encoding alone requires fraud proofs: a challenger must download all of the encoded chunks and check that they lie on a polynomial corresponding to the blob commitment. 

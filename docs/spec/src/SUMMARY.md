@@ -7,6 +7,7 @@
     - [Encoding](./protocol/architecture/encoding.md)
       - [Amortized Proving](./protocol/architecture/amortized-proving.md)
     - [Assignment](./protocol/architecture/assignment.md)
+    - [Security Parameters](./protocol/architecture/security-parameters.md)
   - [Contracts](./protocol/contracts.md)
   - [EigenDA V1 (Deprecated)](./v1.md)
 - [Integrations](./integration.md)
