@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
@@ -36,10 +37,13 @@ func init() {
 }
 
 var (
-	testConfig                     *deploy.Config
-	templateName                   string
-	testName                       string
-	logger                         = testutils.GetLogger()
+	anvilContainer      *testbed.AnvilContainer
+	localstackContainer *testbed.LocalStackContainer
+	testConfig          *deploy.Config
+	templateName        string
+	testName            string
+
+	localstackPort                 = "4570"
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -47,6 +51,8 @@ var (
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	numRetries                     = 0
+
+	logger = testutils.GetLogger()
 )
 
 func TestMain(m *testing.M) {
@@ -57,7 +63,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
 	rootPath := "../../../"
 
 	if testName == "" {
@@ -77,8 +83,24 @@ func setup(m *testing.M) {
 		return
 	}
 
-	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
+	var err error
+	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		Logger:         logger,
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Deploying experiment")
 	testConfig.DeployExperiment()
@@ -87,8 +109,7 @@ func setup(m *testing.M) {
 func teardown() {
 	if testConfig != nil {
 		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
-		testConfig.StopGraphNode()
+		_ = anvilContainer.Terminate(context.Background())
 	}
 }
 

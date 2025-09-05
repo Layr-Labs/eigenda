@@ -112,10 +112,8 @@ integration-tests:
 # Tests that require a build because they start local inabox infra:
 # either chain, subgraph, or localstack.
 integration-tests-inabox: build
+	go test -v ./core/thegraph
 	cd inabox && make run-e2e
-#   TODO: TestIndexerIntegration in core/thegraph/state_integration_test.go fails to start its inabox dependency...
-#         Seems like it was never run in CI, and I don't know how to fix it, so just commenting and will let someone else fix.
-# 	go test -v ./core/thegraph
 
 # These are e2e tests that run against live environments (preprod and holesky currently).
 live-tests:

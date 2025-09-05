@@ -49,6 +49,7 @@ import (
 )
 
 var (
+	logger          = testutils.GetLogger()
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
@@ -624,21 +625,20 @@ func setup() {
 	}
 
 	if deployLocalStack {
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
 		}
 
 		// Deploy resources using the testbed DeployResources function
-		logger := testutils.GetLogger()
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,
@@ -729,7 +729,6 @@ func teardown() {
 	if deployLocalStack && localstackContainer != nil {
 		ctx := context.Background()
 		if err := localstackContainer.Terminate(ctx); err != nil {
-			logger := testutils.GetLogger()
 			logger.Error("Failed to terminate localstack container", "error", err)
 		}
 	}
@@ -739,8 +738,6 @@ func teardown() {
 }
 
 func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	logger := testutils.GetLogger()
-
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",

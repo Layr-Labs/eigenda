@@ -37,6 +37,7 @@ import (
 )
 
 var (
+	logger              = tu.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -58,11 +59,12 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3, dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		require.NoError(t, err)
 	}
 

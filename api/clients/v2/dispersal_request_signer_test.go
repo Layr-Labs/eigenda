@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigenda/testbed"
@@ -18,6 +19,7 @@ import (
 )
 
 var (
+	logger              = testutils.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 )
 
@@ -32,12 +34,12 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3, kms"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"kms"},
+			Logger:         logger,
+		})
 		require.NoError(t, err)
 	}
 }

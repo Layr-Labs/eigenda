@@ -21,6 +21,7 @@ import (
 )
 
 var (
+	logger              = tu.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 )
 
@@ -56,17 +57,11 @@ var clientBuilders = []*clientBuilder{
 			return setupLocalstack()
 		},
 		build: func() (s3.Client, error) {
-
-			logger, err := common.NewLogger(common.DefaultLoggerConfig())
-			if err != nil {
-				return nil, err
-			}
-
 			config := aws.DefaultClientConfig()
 			config.EndpointURL = localstackHost
 			config.Region = "us-east-1"
 
-			err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+			err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
 			if err != nil {
 				return nil, err
 			}
@@ -99,12 +94,12 @@ func setupLocalstack() error {
 
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardownLocalstack()
 			return err

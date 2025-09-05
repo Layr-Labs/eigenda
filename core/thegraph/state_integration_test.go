@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
@@ -21,10 +21,19 @@ import (
 )
 
 var (
-	templateName string
-	testName     string
-	graphUrl     string
-	testConfig   *deploy.Config
+	anvilContainer      *testbed.AnvilContainer
+	localstackContainer *testbed.LocalStackContainer
+	templateName        string
+	testName            string
+	graphUrl            string
+	testConfig          *deploy.Config
+
+	localstackPort      = "4570"
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
+
+	logger = testutils.GetLogger()
 )
 
 func init() {
@@ -50,47 +59,62 @@ func setup() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
-
-	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
-
-	fmt.Println("Starting graph node")
-	testConfig.StartGraphNode()
-
-	fmt.Println("Deploying experiment")
-	testConfig.DeployExperiment()
-
-	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: 0,
-		NumRetries:       1,
-	}, gethcommon.Address{}, testutils.GetLogger())
+	var err error
+	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
+	})
 	if err != nil {
 		panic(err)
 	}
-	testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-	fmt.Println("Starting binaries")
+	fmt.Println("Deploying LocalStack resources")
+	deployConfig := testbed.DeployResourcesConfig{
+		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
+		MetadataTableName:   metadataTableName,
+		BucketTableName:     bucketTableName,
+		V2MetadataTableName: metadataTableNameV2,
+		Logger:              logger,
+	}
+	err = testbed.DeployResources(context.Background(), deployConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		ExposeHostPort: true,
+		HostPort:       "8545",
+		Logger:         logger,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	logger.Info("Starting graph node")
+	testConfig.StartGraphNode()
+
+	logger.Info("Deploying experiment")
+	if err := testConfig.DeployExperiment(); err != nil {
+		panic(err)
+	}
+
+	logger.Info("Starting binaries")
 	testConfig.StartBinaries()
 }
 
 func teardown() {
-	fmt.Println("Stopping anvil")
-	testConfig.StopAnvil()
+	_ = localstackContainer.Terminate(context.Background())
+	_ = anvilContainer.Terminate(context.Background())
 
-	fmt.Println("Stop graph node")
+	logger.Info("Stop graph node")
 	testConfig.StopGraphNode()
 
-	fmt.Println("Stop binaries")
+	logger.Info("Stop binaries")
 	testConfig.StopBinaries()
 }
 
-// TODO: this test needs to be fixed, its currently broken and CI never runs it (see Makefile integration-tests-inabox target).
-// The inabox dependency fails to start for some reason that I don't understand.
 func TestIndexerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skip graph indexer integrations test in short mode")
@@ -98,7 +122,6 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger := testutils.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
 		logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
