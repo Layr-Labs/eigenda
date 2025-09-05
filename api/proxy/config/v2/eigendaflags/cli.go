@@ -41,8 +41,11 @@ var (
 	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
 
 	ClientLedgerModeFlag = &cli.StringFlag{
-		Name:     withFlagPrefix("client-ledger-mode"),
-		Usage:    "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'.",
+		Name: withFlagPrefix("client-ledger-mode"),
+		Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
+			"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
+			"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option" +
+			"will be removed, once the migration to the new leaky bucket payment model is complete.",
 		Value:    "legacy",
 		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "CLIENT_LEDGER_MODE")},
 		Category: consts.PaymentsCategory,
