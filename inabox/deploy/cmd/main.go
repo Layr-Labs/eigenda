@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/testbed"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
 
 var (
+	logger                  = testutils.GetLogger()
 	testNameFlagName        = "testname"
 	rootPathFlagName        = "root-path"
 	localstackFlagName      = "localstack-port"
@@ -137,7 +138,6 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	logger := config.GetLogger()
 	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
@@ -164,11 +164,6 @@ func localstack(ctx *cli.Context, config *deploy.Config) error {
 
 	context, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
-	var logger logging.Logger
-	if config != nil {
-		logger = config.GetLogger()
-	}
 
 	_, err := testbed.NewLocalStackContainerWithOptions(context, testbed.LocalStackOptions{
 		ExposeHostPort: true,

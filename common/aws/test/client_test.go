@@ -7,16 +7,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/stretchr/testify/require"
 )
 
 var (
+	logger              = testutils.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 )
 
@@ -52,17 +53,11 @@ var clientBuilders = []*clientBuilder{
 			return setupLocalstack()
 		},
 		build: func() (s3.Client, error) {
-
-			logger, err := common.NewLogger(common.DefaultLoggerConfig())
-			if err != nil {
-				return nil, err
-			}
-
 			config := aws.DefaultClientConfig()
 			config.EndpointURL = localstackHost
 			config.Region = "us-east-1"
 
-			err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+			err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
 			if err != nil {
 				return nil, err
 			}
@@ -99,6 +94,7 @@ func setupLocalstack() error {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"s3", "dynamodb", "kms"},
+			Logger:         logger,
 		})
 		if err != nil {
 			teardownLocalstack()

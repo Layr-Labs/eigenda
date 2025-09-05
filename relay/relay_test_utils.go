@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -37,6 +38,7 @@ import (
 )
 
 var (
+	logger              = testutils.GetLogger()
 	localstackContainer *testbed.LocalStackContainer
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -62,6 +64,7 @@ func setup(t *testing.T) {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
 		})
 		require.NoError(t, err)
 	}

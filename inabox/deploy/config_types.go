@@ -2,14 +2,11 @@ package deploy
 
 import (
 	"encoding/json"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"gopkg.in/yaml.v3"
 )
@@ -208,8 +205,6 @@ type Config struct {
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
-
-	logger logging.Logger
 }
 
 func (env *Config) IsEigenDADeployed() bool {
@@ -232,39 +227,6 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 	// Initialize testEnv before using it
 	testEnv = &Config{}
 
-	// Set up file logging to deploy.log in the test directory
-	deployLogPath := filepath.Join(testPath, "deploy.log")
-	if err := os.MkdirAll(testPath, 0755); err != nil && !os.IsExist(err) {
-		log.Panicf("Error creating test directory: %s", err.Error())
-	}
-	
-	logFile, err := os.OpenFile(deployLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Panicf("Error opening deploy.log: %s", err.Error())
-	}
-	
-	// Create a logger config based on environment
-	// For file output, we always want text format without colors
-	var loggerConfig *common.LoggerConfig
-	if os.Getenv("CI") != "" {
-		// CI mode - JSON format to stdout and file
-		loggerConfig = common.DefaultLoggerConfig()
-		loggerConfig.OutputWriter = io.MultiWriter(os.Stdout, logFile)
-	} else {
-		// Local mode - colored text to console, non-colored text to file
-		// We use DefaultTextLoggerConfig which has NoColor: true
-		loggerConfig = common.DefaultTextLoggerConfig()
-		// Write to both stdout and file
-		loggerConfig.OutputWriter = io.MultiWriter(os.Stdout, logFile)
-	}
-	
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		logFile.Close()
-		log.Panicf("Error creating logger %s:", err.Error())
-	}
-	testEnv.logger = logger
-
 	data, err := readFile(configPath)
 	if err != nil {
 		logger.Fatal("Error reading config file", "error", err)
@@ -281,13 +243,9 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 	return
 }
 
-func (env *Config) GetLogger() logging.Logger {
-	return env.logger
-}
-
 func (env *Config) SaveTestConfig() {
 	obj, _ := yaml.Marshal(env)
 	if err := writeFile(env.Path+"/config.lock.yaml", obj); err != nil {
-		env.logger.Fatal("Error writing config.lock.yaml", "error", err)
+		logger.Fatal("Error writing config.lock.yaml", "error", err)
 	}
 }

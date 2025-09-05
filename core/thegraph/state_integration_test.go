@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -21,6 +22,7 @@ import (
 )
 
 var (
+	logger              = testutils.GetLogger()
 	anvilContainer      *testbed.AnvilContainer
 	localstackContainer *testbed.LocalStackContainer
 	localstackPort      = "4570"
@@ -56,8 +58,6 @@ func setup() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
-	logger := testConfig.GetLogger()
-	logger.Info("Starting localstack")
 	var err error
 	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
 		ExposeHostPort: true,
@@ -82,7 +82,6 @@ func setup() {
 		panic(err)
 	}
 
-	logger.Info("Starting anvil")
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
@@ -125,7 +124,6 @@ func setup() {
 }
 
 func teardown() {
-	logger := testConfig.GetLogger()
 	logger.Info("Stopping localstack")
 	_ = localstackContainer.Terminate(context.Background())
 
@@ -146,7 +144,6 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger := testConfig.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
 		logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)

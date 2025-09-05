@@ -71,6 +71,7 @@ func setup(_ *testing.M) {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
 		})
 		if err != nil {
 			teardown()

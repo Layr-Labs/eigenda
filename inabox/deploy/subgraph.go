@@ -142,42 +142,42 @@ func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlo
 
 	// Log the current working directory (absolute path)
 	if cwd, err := os.Getwd(); err == nil {
-		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	env.logger.Debug("Executing bash command", "command", `cp "./templates/subgraph.yaml" "./"`)
+	logger.Debug("Executing bash command", "command", `cp "./templates/subgraph.yaml" "./"`)
 	if err := execBashCmd(`cp "./templates/subgraph.yaml" "./"`); err != nil {
 		return fmt.Errorf("failed to copy subgraph.yaml: %w", err)
 	}
 
-	env.logger.Debug("Executing bash command", "command", `cp "./templates/networks.json" "./"`)
+	logger.Debug("Executing bash command", "command", `cp "./templates/networks.json" "./"`)
 	if err := execBashCmd(`cp "./templates/networks.json" "./"`); err != nil {
 		return fmt.Errorf("failed to copy networks.json: %w", err)
 	}
 
 	env.updateSubgraph(updater, subgraphPath, startBlock)
 
-	env.logger.Debug("Executing yarn install")
+	logger.Debug("Executing yarn install")
 	if err := execYarnCmd("install"); err != nil {
 		return fmt.Errorf("failed to execute yarn install: %w", err)
 	}
 
-	env.logger.Debug("Executing yarn codegen")
+	logger.Debug("Executing yarn codegen")
 	if err := execYarnCmd("codegen"); err != nil {
 		return fmt.Errorf("failed to execute yarn codegen: %w", err)
 	}
 
-	env.logger.Debug("Executing yarn remove-local")
+	logger.Debug("Executing yarn remove-local")
 	if err := execYarnCmd("remove-local"); err != nil {
 		return fmt.Errorf("failed to execute yarn remove-local: %w", err)
 	}
 
-	env.logger.Debug("Executing yarn create-local")
+	logger.Debug("Executing yarn create-local")
 	if err := execYarnCmd("create-local"); err != nil {
 		return fmt.Errorf("failed to execute yarn create-local: %w", err)
 	}
 
-	env.logger.Debug("Executing yarn deploy-local")
+	logger.Debug("Executing yarn deploy-local")
 	if err := execYarnCmd("deploy-local", "--version-label", "v0.0.1"); err != nil {
 		return fmt.Errorf("failed to execute yarn deploy-local: %w", err)
 	}
@@ -193,87 +193,87 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 
 	currDir, _ := os.Getwd()
 	if err := changeDirectory(currDir); err != nil {
-		env.logger.Fatal("Error changing directories", "error", err)
+		logger.Fatal("Error changing directories", "error", err)
 	}
 	defer func() {
 		if err := changeDirectory(currDir); err != nil {
-			env.logger.Fatal("Error changing directories", "error", err)
+			logger.Fatal("Error changing directories", "error", err)
 		}
 	}()
 
 	// Log the current working directory (absolute path)
 	if cwd, err := os.Getwd(); err == nil {
-		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
 	networkData, err := readFile(networkFile)
 	if err != nil {
-		env.logger.Fatal("Error reading networks.json", "error", err)
+		logger.Fatal("Error reading networks.json", "error", err)
 	}
 
 	var networkTemplate Networks
 	if err := json.Unmarshal([]byte(networkData), &networkTemplate); err != nil {
-		env.logger.Fatal("Failed to unmarshal networks.json", "error", err)
+		logger.Fatal("Failed to unmarshal networks.json", "error", err)
 	}
 	updater.UpdateNetworks(networkTemplate, startBlock)
 	networkJson, err := json.MarshalIndent(networkTemplate, "", "  ")
 	if err != nil {
-		env.logger.Fatal("Error marshaling networks.json", "error", err)
+		logger.Fatal("Error marshaling networks.json", "error", err)
 	}
 
 	if err := writeFile(networkFile, networkJson); err != nil {
-		env.logger.Fatal("Error writing networks.json", "error", err)
+		logger.Fatal("Error writing networks.json", "error", err)
 	}
-	env.logger.Info("networks.json written")
+	logger.Info("networks.json written")
 
 	subgraphTemplateData, err := readFile(subgraphFile)
 	if err != nil {
-		env.logger.Fatal("Error reading subgraph.yaml", "error", err)
+		logger.Fatal("Error reading subgraph.yaml", "error", err)
 	}
 
 	var sub Subgraph
 	if err := yaml.Unmarshal(subgraphTemplateData, &sub); err != nil {
-		env.logger.Fatal("Error unmarshaling subgraph.yaml", "error", err)
+		logger.Fatal("Error unmarshaling subgraph.yaml", "error", err)
 	}
 	updater.UpdateSubgraph(&sub, startBlock)
 	subgraphYaml, err := yaml.Marshal(&sub)
 	if err != nil {
-		env.logger.Fatal("Error marshaling subgraph", "error", err)
+		logger.Fatal("Error marshaling subgraph", "error", err)
 	}
 	if err := writeFile(subgraphFile, subgraphYaml); err != nil {
-		env.logger.Fatal("Error writing subgraph.yaml", "error", err)
+		logger.Fatal("Error writing subgraph.yaml", "error", err)
 	}
-	env.logger.Info("subgraph.yaml written")
+	logger.Info("subgraph.yaml written")
 }
 
 func (env *Config) StartGraphNode() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		env.logger.Fatal("Error changing directories", "error", err)
+		logger.Fatal("Error changing directories", "error", err)
 	}
 
 	// Log the current working directory (absolute path)
 	if cwd, err := os.Getwd(); err == nil {
-		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
 	err := execCmd("./bin.sh", []string{"start-graph"}, []string{}, true)
 	if err != nil {
-		env.logger.Fatal("Failed to start graph node", "error", err)
+		logger.Fatal("Failed to start graph node", "error", err)
 	}
 }
 
 func (env *Config) StopGraphNode() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		env.logger.Fatal("Error changing directories", "error", err)
+		logger.Fatal("Error changing directories", "error", err)
 	}
 
 	// Log the current working directory (absolute path)
 	if cwd, err := os.Getwd(); err == nil {
-		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
 	err := execCmd("./bin.sh", []string{"stop-graph"}, []string{}, true)
 	if err != nil {
-		env.logger.Fatal("Failed to stop graph node", "error", err)
+		logger.Fatal("Failed to stop graph node", "error", err)
 	}
 }

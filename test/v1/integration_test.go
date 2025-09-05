@@ -40,7 +40,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -69,9 +68,10 @@ import (
 )
 
 var (
-	p   encoding.Prover
-	v   encoding.Verifier
-	asn core.AssignmentCoordinator
+	logger = testutils.GetLogger()
+	p      encoding.Prover
+	v      encoding.Verifier
+	asn    core.AssignmentCoordinator
 
 	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
@@ -147,7 +147,7 @@ type TestDisperser struct {
 	txnManager    *batchermock.MockTxnManager
 }
 
-func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger logging.Logger) TestDisperser {
+func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore) TestDisperser {
 	dispatcherConfig := &dispatcher.Config{
 		Timeout: time.Second,
 	}
@@ -248,6 +248,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
 			ExposeHostPort: true,
 			HostPort:       localStackPort,
+			Logger:         logger,
 		})
 		if err != nil {
 			teardown()
@@ -314,7 +315,7 @@ type TestOperator struct {
 	ServerV2 *nodegrpc.ServerV2
 }
 
-func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging.Logger) map[core.OperatorID]TestOperator {
+func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.OperatorID]TestOperator {
 	bn := uint(0)
 	state := cst.GetTotalOperatorState(context.Background(), bn)
 
@@ -464,7 +465,7 @@ type TestRetriever struct {
 	Server *retriever.Server
 }
 
-func mustMakeRetriever(logger logging.Logger) (*commonmock.MockEthClient, TestRetriever) {
+func mustMakeRetriever() (*commonmock.MockEthClient, TestRetriever) {
 	config := &retriever.Config{
 		Timeout: 5 * time.Second,
 	}
@@ -503,18 +504,16 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger := testutils.GetLogger()
-	require.NoError(t, err)
 	store := inmem.NewBlobStore()
-	dis := mustMakeDisperser(t, cst, store, logger)
+	dis := mustMakeDisperser(t, cst, store)
 	go func() {
 		_ = dis.encoderServer.Start()
 	}()
 	t.Cleanup(func() {
 		dis.encoderServer.Close()
 	})
-	ops := mustMakeOperators(t, cst, logger)
-	gethClient, _ := mustMakeRetriever(logger)
+	ops := mustMakeOperators(t, cst)
+	gethClient, _ := mustMakeRetriever()
 
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])

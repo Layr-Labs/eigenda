@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/testbed"
@@ -21,6 +22,7 @@ const (
 )
 
 var (
+	logger       = testutils.GetLogger()
 	dynamoClient *dynamodb.Client
 )
 
@@ -38,6 +40,7 @@ func TestMain(m *testing.M) {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"dynamodb"},
+			Logger:         logger,
 		})
 		if err != nil {
 			_ = localstackContainer.Terminate(context.Background())

@@ -3,7 +3,6 @@ package testbed
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -30,15 +29,6 @@ type AnvilOptions struct {
 	ExposeHostPort bool           // If true, binds container port 8545 to host port 8545
 	HostPort       string         // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
 	Logger         logging.Logger // Logger for container operations (required)
-}
-
-// NewAnvilContainer creates and starts a new Anvil container with a default noop logger
-func NewAnvilContainer(ctx context.Context) (*AnvilContainer, error) {
-	// Create a silent logger that discards all output
-	noopLogger := logging.NewTextSLogger(io.Discard, &logging.SLoggerOptions{})
-	return NewAnvilContainerWithOptions(ctx, AnvilOptions{
-		Logger: noopLogger,
-	})
 }
 
 // NewAnvilContainerWithOptions creates and starts a new Anvil container with custom options

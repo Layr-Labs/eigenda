@@ -49,6 +49,7 @@ import (
 )
 
 var (
+	logger          = testutils.GetLogger()
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
@@ -628,6 +629,7 @@ func setup() {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
 		})
 		if err != nil {
 			teardown()
@@ -635,7 +637,6 @@ func setup() {
 		}
 
 		// Deploy resources using the testbed DeployResources function
-		logger := testutils.GetLogger()
 		deployConfig := testbed.DeployResourcesConfig{
 			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
 			MetadataTableName:   metadataTableName,
@@ -728,7 +729,6 @@ func teardown() {
 	if deployLocalStack && localstackContainer != nil {
 		ctx := context.Background()
 		if err := localstackContainer.Terminate(ctx); err != nil {
-			logger := testutils.GetLogger()
 			logger.Error("Failed to terminate localstack container", "error", err)
 		}
 	}
@@ -738,8 +738,6 @@ func teardown() {
 }
 
 func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	logger := testutils.GetLogger()
-
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",

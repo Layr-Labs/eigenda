@@ -11,8 +11,11 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"gopkg.in/yaml.v3"
 )
+
+var logger = testutils.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {
@@ -44,7 +47,7 @@ func (env *Config) loadPrivateKeys() error {
 	addNames("retriever", 1)
 	addNames("relay", env.Services.Counts.NumRelays)
 
-	env.logger.Info("Service names", "names", names)
+	logger.Info("Service names", "names", names)
 
 	// Collect private keys from file
 	keyPath := "secrets"
@@ -415,7 +418,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		env.logger.Fatal("Could not generate key", "error", err)
+		logger.Fatal("Could not generate key", "error", err)
 	}
 
 	//String representation of n in base 32
@@ -599,10 +602,10 @@ func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile 
 
 func (env *Config) getKey(name string) (key, address string, err error) {
 	key = env.Pks.EcdsaMap[name].PrivateKey
-	env.logger.Debug("Getting key", "name", name, "key", key)
-	address, err = GetAddress(env.logger, key)
+	logger.Debug("Getting key", "name", name, "key", key)
+	address, err = GetAddress(key)
 	if err != nil {
-		env.logger.Error("Failed to get address", "error", err)
+		logger.Error("Failed to get address", "error", err)
 		return "", "", fmt.Errorf("failed to get address: %w", err)
 	}
 
@@ -624,14 +627,14 @@ func (env *Config) GenerateAllVariables() error {
 		return fmt.Errorf("failed to create envs directory: %w", err)
 	}
 
-	env.logger.Info("Changing directories", "path", env.rootPath+"/inabox")
+	logger.Info("Changing directories", "path", env.rootPath+"/inabox")
 	if err := changeDirectory(env.rootPath + "/inabox"); err != nil {
 		return fmt.Errorf("failed to change directories: %w", err)
 	}
 
 	// Log the current working directory (absolute path)
 	if cwd, err := os.Getwd(); err == nil {
-		env.logger.Info("Successfully changed to absolute path", "path", cwd)
+		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
 	// Create compose file

@@ -3,6 +3,8 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -125,5 +127,33 @@ func RandomString(length int) string {
 }
 
 func GetLogger() logging.Logger {
-	return logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
+	var writer io.Writer
+	var noColor bool
+
+	if os.Getenv("CI") != "" {
+		// CI mode - JSON format to stdout and file
+		logFile, err := os.OpenFile("test.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			// If we can't create the file, just use stdout
+			writer = os.Stdout
+		} else {
+			writer = io.MultiWriter(os.Stdout, logFile)
+		}
+		// Use JSON format in CI
+		return logging.NewJsonSLogger(writer, &logging.SLoggerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})
+	} else {
+		// Local mode - colored text to console only
+		writer = os.Stdout
+		noColor = false // Enable colors in local mode
+	}
+
+	// Use text logger with color support for local development
+	return logging.NewTextSLogger(writer, &logging.SLoggerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+		NoColor:   noColor,
+	})
 }

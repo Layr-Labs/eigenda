@@ -3,7 +3,6 @@ package testbed
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -36,21 +35,12 @@ type LocalStackContainer struct {
 	logger    logging.Logger
 }
 
-// NewLocalStackContainer creates and starts a new LocalStack container with a default noop logger
-func NewLocalStackContainer(ctx context.Context) (*LocalStackContainer, error) {
-	// Create a silent logger that discards all output
-	noopLogger := logging.NewTextSLogger(io.Discard, &logging.SLoggerOptions{})
-	return NewLocalStackContainerWithOptions(ctx, LocalStackOptions{
-		Logger: noopLogger,
-	})
-}
-
 // NewLocalStackContainerWithOptions creates and starts a new LocalStack container with custom options
 func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptions) (*LocalStackContainer, error) {
 	if opts.Logger == nil {
 		return nil, fmt.Errorf("logger is required in LocalStackOptions")
 	}
-	
+
 	// Set defaults
 	if len(opts.Services) == 0 {
 		opts.Services = []string{"s3", "dynamodb", "kms"}
@@ -63,10 +53,10 @@ func NewLocalStackContainerWithOptions(ctx context.Context, opts LocalStackOptio
 	logger.Info("Starting LocalStack container", "services", opts.Services, "region", opts.Region)
 
 	var customizers []testcontainers.ContainerCustomizer
-	
+
 	// Add logger
 	customizers = append(customizers, testcontainers.WithLogger(newTestcontainersLogger(logger)))
-	
+
 	env := buildLocalStackEnv(opts)
 	customizers = append(customizers, testcontainers.WithEnv(env))
 

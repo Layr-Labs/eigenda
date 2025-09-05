@@ -49,8 +49,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
-
+func setup(_ *testing.M) {
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localstackPort = os.Getenv("LOCALSTACK_PORT")
@@ -62,6 +61,7 @@ func setup(m *testing.M) {
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
 		})
 		if err != nil {
 			teardown()

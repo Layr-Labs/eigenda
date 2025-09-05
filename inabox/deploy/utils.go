@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 const (
@@ -154,7 +152,7 @@ func execBashCmd(command string) error {
 }
 
 // Converts a private key to an address.
-func GetAddress(logger logging.Logger, privateKey string) (string, error) {
+func GetAddress(privateKey string) (string, error) {
 	cmd := exec.Command(
 		"cast", "wallet", "address",
 		"--private-key", privateKey)
@@ -173,7 +171,7 @@ func GetAddress(logger logging.Logger, privateKey string) (string, error) {
 }
 
 // From the Foundry book: "Perform a call on an account without publishing a transaction."
-func GetLatestBlockNumber(logger logging.Logger, rpcUrl string) (int, error) {
+func GetLatestBlockNumber(rpcUrl string) (int, error) {
 	cmd := exec.Command("cast", "bn", "--rpc-url", rpcUrl)
 
 	var out bytes.Buffer
