@@ -222,6 +222,11 @@ func (r *TestRandom) Uint64Range(min uint64, max uint64) uint64 {
 	return r.Uint64()%(max-min) + min
 }
 
+// IntRange generates a random int between min (inclusive) and max (exclusive).
+func (r *TestRandom) IntRange(min, max int) int {
+	return r.Intn(max-min) + min
+}
+
 // Int32Range generates a random int32 between min (inclusive) and max (exclusive).
 func (r *TestRandom) Int32Range(min, max int32) int32 {
 	return r.Int31n(max-min) + min
