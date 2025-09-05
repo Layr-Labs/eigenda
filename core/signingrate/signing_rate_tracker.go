@@ -46,7 +46,6 @@ type SigningRateTracker interface {
 		now time.Time,
 		id core.OperatorID,
 		batchSize uint64,
-		timeout bool,
 	)
 
 	// Update a bucket, overwriting an existing bucket with the same start time if it is present. Should

@@ -1,6 +1,7 @@
 package signingrate
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -31,13 +32,15 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 		return nil
 	}
 
+	labels := []string{"id", "quorum"}
+
 	signedBatchCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ControllerMetricsNamespace,
 			Name:      "validator_signed_batch_count",
 			Help:      "Total number of batches successfully signed by validators",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	signedByteCount := promauto.With(registry).NewCounterVec(
@@ -46,7 +49,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Name:      "validator_signed_byte_count",
 			Help:      "Total number of bytes successfully signed by validators",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	unsignedBatchCount := promauto.With(registry).NewCounterVec(
@@ -55,7 +58,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Name:      "validator_unsigned_batch_count",
 			Help:      "Total number of batches that validators failed to sign",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	unsignedByteCount := promauto.With(registry).NewCounterVec(
@@ -64,7 +67,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Name:      "validator_unsigned_byte_count",
 			Help:      "Total number of bytes that validators failed to sign",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	timeoutBatchCount := promauto.With(registry).NewCounterVec(
@@ -73,7 +76,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Name:      "validator_timeout_batch_count",
 			Help:      "Total number of batches that validators failed to sign due to timeout",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	timeoutByteCount := promauto.With(registry).NewCounterVec(
@@ -82,7 +85,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Name:      "validator_timeout_byte_count",
 			Help:      "Total number of bytes that validators failed to sign due to timeout",
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	signingLatency := promauto.With(registry).NewSummaryVec(
@@ -92,7 +95,7 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 			Help:       "Latency for validators to sign batches",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
-		[]string{"id"},
+		labels,
 	)
 
 	return &SigningRateMetrics{
@@ -110,35 +113,42 @@ func NewSigningRateMetrics(registry *prometheus.Registry) *SigningRateMetrics {
 func (s *SigningRateMetrics) ReportSuccess(
 	id core.OperatorID,
 	batchSize uint64,
-	signingLatency time.Duration) {
+	signingLatency time.Duration,
+	quorums []core.QuorumID) {
 
 	if s == nil {
 		return
 	}
 
-	label := prometheus.Labels{"id": id.Hex()}
+	for _, quorum := range quorums {
+		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-	s.signedBatchCount.With(label).Add(1)
-	s.signedByteCount.With(label).Add(float64(batchSize))
-	s.signingLatency.With(label).Observe(signingLatency.Seconds())
+		s.signedBatchCount.With(label).Add(1)
+		s.signedByteCount.With(label).Add(float64(batchSize))
+		s.signingLatency.With(label).Observe(signingLatency.Seconds())
+	}
+
 }
 
 // Report a failed signing event for a validator.
 func (s *SigningRateMetrics) ReportFailure(
 	id core.OperatorID,
 	batchSize uint64,
-	timeout bool) {
+	timeout bool,
+	quorums []core.QuorumID) {
 
 	if s == nil {
 		return
 	}
 
-	label := prometheus.Labels{"id": id.Hex()}
+	for _, quorum := range quorums {
+		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-	s.unsignedBatchCount.With(label).Add(1)
-	s.unsignedByteCount.With(label).Add(float64(batchSize))
-	if timeout {
-		s.timeoutBatchCount.With(label).Add(1)
-		s.timeoutByteCount.With(label).Add(float64(batchSize))
+		s.unsignedBatchCount.With(label).Add(1)
+		s.unsignedByteCount.With(label).Add(float64(batchSize))
+		if timeout {
+			s.timeoutBatchCount.With(label).Add(1)
+			s.timeoutByteCount.With(label).Add(float64(batchSize))
+		}
 	}
 }

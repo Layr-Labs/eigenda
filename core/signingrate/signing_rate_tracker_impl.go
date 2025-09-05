@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ SigningRateTracker = (*signingRateTracker)(nil)
@@ -31,9 +30,6 @@ type signingRateTracker struct {
 	// The duration of each bucket. Buckets loaded from storage may have different spans, but new buckets will
 	// always have this span.
 	bucketSpan time.Duration
-
-	// Metrics about signing rates.
-	metrics *SigningRateMetrics
 }
 
 // Create a new SigningRateTracker.
@@ -45,7 +41,6 @@ func NewSigningRateTracker(
 	logger logging.Logger,
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
-	registry *prometheus.Registry,
 ) (SigningRateTracker, error) {
 
 	if timeSpan.Seconds() < 1 {
@@ -58,7 +53,6 @@ func NewSigningRateTracker(
 		timeSpan:         timeSpan,
 		bucketSpan:       bucketSpan,
 		unflushedBuckets: make(map[time.Time]*SigningRateBucket),
-		metrics:          NewSigningRateMetrics(registry),
 	}
 
 	return store, nil
@@ -78,7 +72,6 @@ func (s *signingRateTracker) ReportSuccess(
 	bucket := s.getMutableBucket(now)
 	bucket.ReportSuccess(id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
-	s.metrics.ReportSuccess(id, batchSize, signingLatency)
 
 	s.garbageCollectBuckets(now)
 }
@@ -88,12 +81,10 @@ func (s *signingRateTracker) ReportFailure(
 	now time.Time,
 	id core.OperatorID,
 	batchSize uint64,
-	timeout bool,
 ) {
 	bucket := s.getMutableBucket(now)
 	bucket.ReportFailure(id, batchSize)
 	s.markUnflushed(bucket)
-	s.metrics.ReportFailure(id, batchSize, timeout)
 
 	s.garbageCollectBuckets(now)
 }

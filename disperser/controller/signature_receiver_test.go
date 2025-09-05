@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/stretchr/testify/require"
 )
@@ -195,7 +196,8 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 
 	// send signing messages from each operator
@@ -231,7 +233,8 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 
 	// Send signing messages with one error
@@ -270,7 +273,8 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 
 	// Send signing messages from each operator
@@ -313,7 +317,8 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 		batchHeaderHash,
 		signingMessageChan,
 		50*time.Millisecond,
-		55)
+		55,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 
 	// Send only 1 signing message
@@ -352,7 +357,8 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 		batchHeaderHash,
 		signingMessageChan,
 		1*time.Millisecond,
-		55)
+		55,
+		signingrate.NewNoOpSigningRateTracker())
 	require.NoError(t, err)
 
 	attestationCount := atomic.Int32{}
