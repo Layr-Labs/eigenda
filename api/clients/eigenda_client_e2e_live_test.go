@@ -43,7 +43,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Parallel()
 		confDepth := uint64(0)
 
-		client, err := NewEigenDAClient(testutils.GetLogger(), EigenDAClientConfig{
+		client, err := NewEigenDAClient(testutils.GetLogger(t), EigenDAClientConfig{
 			RPC: testRPC,
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
 			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
