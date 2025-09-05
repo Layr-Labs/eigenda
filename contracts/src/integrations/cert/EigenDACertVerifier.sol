@@ -52,7 +52,7 @@ contract EigenDACertVerifier is
     //
     // For zk rollups and optimistic rollups with zk fraud proofs, this limit is less crucial, but still useful to enforce
     // a max limit on the amount of prover compute units needs to validate a cert.
-    uint32 internal _checkDACertGasLimit;
+    uint32 internal immutable _checkDACertGasLimit;
 
     uint8 internal constant MAJOR_VERSION = 3;
     uint8 internal constant MINOR_VERSION = 1;
