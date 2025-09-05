@@ -46,7 +46,7 @@ func main() {
 		{
 			Name:        "calldata-gas-estimator",
 			Usage:       "Estimate EVM gas cost to send calldata containing AltDA commitment",
-			Description: "Estimate EVM gas cost to send calldata containing AltDA commitment",
+			Description: "Calculate EVM gas costs using EIP-2028 and EIP-7623 pricing models.",
 			Flags:       flags.CallDataGasEstimatorFlags,
 			Action:      calldata_gas_estimator.RunEstimator,
 		},
