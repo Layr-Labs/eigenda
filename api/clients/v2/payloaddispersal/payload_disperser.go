@@ -170,9 +170,13 @@ func (pd *PayloadDisperser) SendPayload(
 
 	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
 	if err != nil {
-		// TODO(samlaf): do we want to return an api.ErrorFailover here? In case the disperser is being malicious
-		// and returning invalid data? This could also just indicate that our cert building procedure above is buggy though...
-		// but perhaps also a reason to failover?
+		var errInvalidCert *verification.CertVerifierInvalidCertError
+		if errors.As(err, &errInvalidCert) {
+			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
+			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry policy),
+			// then its safer for the rollup to failover to another DA layer.
+			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
+		}
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
 
