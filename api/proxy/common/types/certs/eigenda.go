@@ -15,6 +15,20 @@ const (
 	V2VersionByte
 )
 
+// versionByteString returns a string representation of the version byte for display
+func (v VersionByte) VersionByteString() string {
+	switch v {
+	case V0VersionByte:
+		return "EigenDA V1"
+	case V1VersionByte:
+		return "EigenDA V2 Legacy"
+	case V2VersionByte:
+		return "EigenDA V2 with V3 Cert"
+	default:
+		return fmt.Sprintf("Unknown (0x%02x)", byte(v))
+	}
+}
+
 func ByteToVersion(b byte) (VersionByte, error) {
 	switch b {
 	case byte(V0VersionByte):
