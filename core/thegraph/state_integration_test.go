@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -87,6 +86,7 @@ func setup() {
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
+		Logger:         logger,
 	})
 	if err != nil {
 		panic(err)
@@ -108,7 +108,7 @@ func setup() {
 		PrivateKeyString: pk,
 		NumConfirmations: 0,
 		NumRetries:       1,
-	}, gethcommon.Address{}, testutils.GetLogger())
+	}, gethcommon.Address{}, logger)
 	if err != nil {
 		panic(err)
 	}

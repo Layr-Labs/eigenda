@@ -132,7 +132,6 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 
 	for key, value := range env.Services.Variables[stub] {
 		field := v.FieldByName(prefix + key)
-		fmt.Println(prefix + key)
 		if field.IsValid() && field.CanSet() {
 			field.SetString(value)
 		}
