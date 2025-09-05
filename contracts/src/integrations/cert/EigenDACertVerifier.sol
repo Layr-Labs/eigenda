@@ -78,8 +78,10 @@ contract EigenDACertVerifier is
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
-    /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert.
-    function decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
+    /// @dev This function is external for the purpose of try/catch'ing it inside checkDACert,
+    /// and should be considered an implementation detail. Do not rely on this function being
+    /// part of the public interface of this contract.
+    function _decodeCert(bytes calldata data) external pure returns (CT.EigenDACertV3 memory cert) {
         return abi.decode(data, (CT.EigenDACertV3));
     }
 
@@ -96,7 +98,7 @@ contract EigenDACertVerifier is
         CT.EigenDACertV3 memory daCert;
         // We try catch this here because decoding error would appear as a Panic,
         // which we consider bugs in the try/catch for the checkDACertReverts call below.
-        try this.decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory _daCert) {
+        try this._decodeCert(abiEncodedCert) returns (CT.EigenDACertV3 memory _daCert) {
             daCert = _daCert;
         } catch {
             return uint8(StatusCode.INVALID_CERT);
