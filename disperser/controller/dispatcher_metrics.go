@@ -12,7 +12,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-const dispatcherNamespace = "eigenda_dispatcher"
+// It's unfortunate that this isn't "controller",
+// but at this point in time the effort to change the dashboards is extremely high.
+const ControllerMetricsNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
@@ -49,7 +51,7 @@ func newDispatcherMetrics(
 
 	attestation := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "attestation",
 			Help:      "number of signers and non-signers for the batch",
 		},
@@ -58,7 +60,7 @@ func newDispatcherMetrics(
 
 	sendChunksRetryCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "send_chunks_retry_count",
 			Help:      "The number of times chunks were retried to be sent (part of HandleBatch()).",
 		},
@@ -67,7 +69,7 @@ func newDispatcherMetrics(
 
 	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "process_signing_message_latency_ms",
 			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -77,7 +79,7 @@ func newDispatcherMetrics(
 
 	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "signing_message_channel_latency_ms",
 			Help:       "The time a signing message sits in the channel waiting to be processed (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -87,7 +89,7 @@ func newDispatcherMetrics(
 
 	attestationUpdateLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "attestation_update_latency_ms",
 			Help:       "The time between the signature receiver yielding attestations (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -97,7 +99,7 @@ func newDispatcherMetrics(
 
 	attestationBuildingLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "attestation_building_latency_ms",
 			Help:       "The time it takes for the signature receiver to build and send a single attestation (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -107,7 +109,7 @@ func newDispatcherMetrics(
 
 	attestationUpdateCount := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "attestation_update_count",
 			Help:       "The number of updates to the batch attestation throughout the signature gathering process.",
 			Objectives: objectives,
@@ -117,7 +119,7 @@ func newDispatcherMetrics(
 
 	thresholdSignedToDoneLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "threshold_signed_to_done_latency_ms",
 			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
 				"of signature gathering",
@@ -128,7 +130,7 @@ func newDispatcherMetrics(
 
 	aggregateSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "aggregate_signatures_latency_ms",
 			Help:       "The time required to aggregate signatures (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -138,7 +140,7 @@ func newDispatcherMetrics(
 
 	putAttestationLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "put_attestation_latency_ms",
 			Help:       "The time required to put the attestation (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -148,7 +150,7 @@ func newDispatcherMetrics(
 
 	updateBatchStatusLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "update_batch_status_latency_ms",
 			Help:       "The time required to update the batch status (part of HandleSignatures()).",
 			Objectives: objectives,
@@ -158,7 +160,7 @@ func newDispatcherMetrics(
 
 	blobE2EDispersalLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
+			Namespace:  ControllerMetricsNamespace,
 			Name:       "e2e_dispersal_latency_ms",
 			Help:       "The time required to disperse a blob end-to-end.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
@@ -168,7 +170,7 @@ func newDispatcherMetrics(
 
 	completedBlobs := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "completed_blobs_total",
 			Help:      "The number and size of completed blobs by status.",
 		},
@@ -177,17 +179,17 @@ func newDispatcherMetrics(
 
 	blobSetSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "blob_queue_size",
 			Help:      "The size of the blob queue used for deduplication.",
 		},
 		[]string{},
 	)
 
-	batchStageTimer := common.NewStageTimer(registry, dispatcherNamespace, "batch", false)
+	batchStageTimer := common.NewStageTimer(registry, ControllerMetricsNamespace, "batch", false)
 	sendToValidatorStageTimer := common.NewStageTimer(
 		registry,
-		dispatcherNamespace,
+		ControllerMetricsNamespace,
 		"send_to_validator",
 		false)
 
@@ -209,7 +211,7 @@ func newDispatcherMetrics(
 
 	batchSigningThresholdCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: dispatcherNamespace,
+			Namespace: ControllerMetricsNamespace,
 			Name:      "batch_signing_threshold_count",
 			Help:      "A count of batches that have reached various signature thresholds.",
 		},
