@@ -111,8 +111,8 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    Payments
 
-   --eigenda.v2.client-ledger-mode value              Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'. (default: "legacy") [$EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE]
-   --eigenda.v2.payment-vault-monitor-interval value  Interval for monitoring payment vault updates. (default: 30s) [$EIGENDA_PROXY_EIGENDA_V2_PAYMENT_VAULT_MONITOR_INTERVAL]
+   --eigenda.v2.client-ledger-mode value              Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option will be removed, once the migration to the new leaky bucket payment model is complete. (default: "legacy") [$EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE]
+   --eigenda.v2.payment-vault-monitor-interval value  Interval at which clients poll to check for changes to the PaymentVault contract (relevant updates include changes to reservation parameters, and new on-demand payment deposits) (default: 30s) [$EIGENDA_PROXY_EIGENDA_V2_PAYMENT_VAULT_MONITOR_INTERVAL]
 
    Proxy Server
 

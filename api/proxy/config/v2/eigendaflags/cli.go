@@ -44,7 +44,7 @@ var (
 		Name: withFlagPrefix("client-ledger-mode"),
 		Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
 			"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
-			"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option" +
+			"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
 			"will be removed, once the migration to the new leaky bucket payment model is complete.",
 		Value:    "legacy",
 		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "CLIENT_LEDGER_MODE")},
@@ -52,8 +52,9 @@ var (
 		Required: false,
 	}
 	PaymentVaultMonitorIntervalFlag = &cli.DurationFlag{
-		Name:     withFlagPrefix("payment-vault-monitor-interval"),
-		Usage:    "Interval for monitoring payment vault updates.",
+		Name: withFlagPrefix("payment-vault-monitor-interval"),
+		Usage: "Interval at which clients poll to check for changes to the PaymentVault contract (relevant " +
+			"updates include changes to reservation parameters, and new on-demand payment deposits)",
 		Value:    30 * time.Second,
 		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "PAYMENT_VAULT_MONITOR_INTERVAL")},
 		Category: consts.PaymentsCategory,
