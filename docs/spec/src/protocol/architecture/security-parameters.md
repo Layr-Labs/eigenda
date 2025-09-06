@@ -3,20 +3,48 @@
 This page proves the relationship between blob parameters and security thresholds. 
 We also point readers to the code where security threshold constraints are implemented.
 
-## Encoding Rate and Reconstruction Threshold
-Recall the blob parameters defined in [Encoding](./encoding.md):
-- $c$: The total number of encoded chunks.  
-- $\gamma$: The ratio of original data to total encoded chunks, providing redundancy.
-- $r$ (`ReconstructionThreshold`): The minimum fraction of total stake required to reconstruct the blob.  
-- $n$: Maximum number of validators.
+## Blob Parameters and Reconstruction Threshold
 
-In this section, we prove that, with our [assignment algorithm](./assignment.md), the encoding rate and the reconstruction threshold satisfy the following equation:
+In this part, we present the blob parameters and use these parameters to derive the reconstricution threshold.
+
+### Blob Parameters
+
+We define the **Blob parameters** as a tuple **$(n, c, \gamma)$** where:
+
+
+- $n$ (`MaxNumOperators`): Maximum number of validators allowed in EigenDA.  
+- $c$ (`NumChunks`): The total number of encoded chunks after erasure coding (must be a power of 2).  
+- $\gamma$ (`1/CodingRate`): The ratio of original data to total encoded chunks, providing redundancy (must be an inverse power of 2). Note that for representational purposes, the `CodingRate` in our code is the inverse of  $\gamma$, the standard coding rate used in coding theory.
+
+Among the blob parameters, `CodingRate` and `NumChunks` are used in the [encoding](./encoding.md) process, while `NumChunks` and `MaxNumOperators` are used in the chunk [assignment](./assignment.md) process.
+
+This tumple is stored in the struct shown below ([see in the code](https://github.com/Layr-Labs/eigenda/blob/d8090af76ed69920983bb3781399a91d84d20d10/contracts/src/core/libraries/v1/EigenDATypesV1.sol#L7)):
+
+```solidity
+struct VersionedBlobParams {
+    uint32 maxNumOperators;
+    uint32 numChunks;
+    uint8 codingRate;
+}
+```
+The blob parameters for each version is stored in deploying the `EigenDAThresholdRegistry` contract.
+It's configured [here](https://github.com/Layr-Labs/eigenda/blob/556dc34fcd4774b683cbc78590bccee66a096b42/contracts/script/deploy/eigenda/mainnet.beta.config.toml#L69) and the default parameters are shown below.
+```
+versionedBlobParams = [
+    { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
+]
+```
+
+### Reconstruction Threshold
+
+We define `ReconstructionThreshold`, also denoted as $r$, the minimum fraction of total stake required to reconstruct the blob. 
+In this section, we prove that, with our [chunk assignment algorithm](./assignment.md), the reconstruction threshold is:
 $$
 r = \frac{c}{c-n} \gamma 
 $$
 
-In other words, we want to prove that any subset of validators with $\frac{c}{c-n} \gamma$ of total stake own enough chunks to reconstruct the original blob. 
-Formally, we need to show that for any set of validators $H$ with total stake $\sum_{i \in H} \eta_i \geq \frac{c}{c-n} \gamma$, the chunks assigned to $H$ satisfy $\sum_{i \in H} c_i \geq c\gamma$. 
+In other words, we want to prove that any subset of validators with $\frac{c}{c-n} \gamma$ of total stake collectively own enough chunks to reconstruct the original blob. 
+Formally, we need to show that for any set of validators $H$ with total stake $\sum_{i \in H} \eta_i \geq \frac{c}{c-n} \gamma$, the chunks assigned to $H$ satisfy $\sum_{i \in H} c_i \geq \gamma c$. 
 
 **Proof:**
 
@@ -26,6 +54,10 @@ $$\geq \eta_i(c - n)$$
 
 Therefore, since $\sum_{i \in H} \eta_i \geq \frac{c}{c-n} \gamma$, we have:
 $$ \sum_{i \in H} c_i \geq \sum_{i \in H} \eta_i (c-n) \geq \frac{c}{c-n} \gamma \cdot (c - n) = \gamma c$$
+
+Now, we prove that any subset of validators with $r$ of the total stake own at least $\gamma c$ chunks, which is guaranteed to reconstruct the origianl blob due to the property of Reed-Solomon encoding.
+
+As we show in the previous subsection, by default, $n = 3537$, $c = 8192$ and $\gamma = 1/8$, which gives us the reconstruction threshold $r = 22\%$.
 
 ## BFT Security
 
@@ -62,7 +94,7 @@ The `ConfirmationThreshold` and `LivenessThreshold` satisfy the following inequa
 
 This is because a valid certificate requires signatures from at least `ConfirmationThreshold` of stake. If `ConfirmationThreshold` is greater than 1 - `LivenessThreshold`, the adversary can cause a liveness failure by simply not signing the certificate.
 
-### Implementation
+### Implementation Details
 
 **1. Safety Threshold**
 
@@ -87,4 +119,4 @@ The `LivenessThreshold` does not appear in the code, but users should keep it in
 
 **System Default**
 
-By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 13%, this gives a `SafetyThreshold` of 42% and a `LivenessThreshold` of 45%. 
+By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 22%, this gives a `SafetyThreshold` of 33% and a `LivenessThreshold` of 45%. 

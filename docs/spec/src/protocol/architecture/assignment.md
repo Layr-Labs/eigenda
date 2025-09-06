@@ -17,8 +17,8 @@ The assignment module is implemented by the `AssignmentCoordinator` interface.
 
 Our chunk assignment scheme (CAS) assigns encoded chunks to validators proportionally to their stake, ensuring that any coalition of validators with sufficient combined stake can reconstruct the blob. Given:
 
-- Blob encoding parameters $(c, \gamma, r)$ where $c$ is the total number of chunks, $\gamma$ is the coding rate, and $r$ is the reconstruction threshold
 - A set of $n$ validators with stakes $\eta_1, \eta_2, \ldots, \eta_n$, where $\sum_{i=1}^n \eta_i = 1$
+- A set of $c$ chunks to be assigned to the validators
 
 The assignment algorithm `GetAssignments` works as follows:
 
@@ -40,7 +40,7 @@ The assignment algorithm `GetAssignments` works as follows:
    $$
    where $\mathbb{I}$ is the indicator function that adds one extra chunk to the first $c - c'$ validators to ensure the total number of assigned chunks equals $c$.
 
-
+We will prove that any subet of validators with sufficient combined stake can reconstruct the blob in [Security Parameters](./security-parameters.md).
 
 ### Assignment Logic
 
