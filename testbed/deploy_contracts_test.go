@@ -21,7 +21,9 @@ func TestDeployWithAnvilContainer(t *testing.T) {
 		Logger:         logger,
 	})
 	require.NoError(t, err)
-	defer anvil.Terminate(ctx)
+	defer func() {
+		_ = anvil.Terminate(ctx)
+	}()
 
 	// Deploy contracts to Anvil with 4 operators
 	result, err := testbed.DeployContractsToAnvil(anvil.RpcURL(), 4, logger)

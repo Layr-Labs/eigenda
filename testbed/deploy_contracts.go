@@ -205,20 +205,24 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 
 	remainingJSON, err := json.Marshal(remainingFields)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal remaining fields: %w", err)
 	}
 
 	// Convert to map to add custom fields
 	var result map[string]interface{}
 	if err := json.Unmarshal(remainingJSON, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal JSON to map: %w", err)
 	}
 
 	// Add the custom formatted fields as raw JSON
 	result["stakerTokenAmounts"] = json.RawMessage(amountsStr)
 	result["operatorPrivateKeys"] = json.RawMessage(operatorPrivateKeysStr)
 
-	return json.Marshal(result)
+	finalJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal final result: %w", err)
+	}
+	return finalJSON, nil
 }
 
 // V1CertVerifierDeployConfig contains configuration for deploying V1 CertVerifier
@@ -266,7 +270,12 @@ type DeploymentResult struct {
 	EigenDAV2CertVerifier string
 }
 
-// DeployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
+// DeployEigenDAContracts deploys EigenDA core system and along with Eigenlayer contracts on a local anvil chain.
+// This calls the SetupEigenDA.s.sol forge script to initialize the deployment.
+//
+// TODO: SetupEigenDA.s.sol is pretty legacy and its primary function is to set up the EigenDA environment for the inabox environment.
+// There exists a DeployEigenDA.s.sol script that has been used in production to deploy environments but it currently does not handle the
+// Eigenlayer contracts. We should consider deprecating SetupEigenDA.s.sol in favor of DeployEigenDA.s.sol.
 func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) {
 	if config.Logger == nil {
 		return nil, fmt.Errorf("logger is required")
@@ -281,7 +290,9 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
-	defer os.Chdir(origDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
 
 	contractsDir := "../contracts"
 	if err := os.Chdir(contractsDir); err != nil {
@@ -462,8 +473,12 @@ func generateEigenDADeployConfig(config DeploymentConfig) (EigenDADeployConfig, 
 		operators = append(operators, operatorKey.PrivateKey)
 	}
 
-	// Use deployer key as batcher/confirmer key
-	batcherKey := config.DeployerKey
+	// Use batcher0 key as the batch confirmer
+	batcherKeyInfo, ok := config.PrivateKeys.EcdsaMap["batcher0"]
+	if !ok {
+		return EigenDADeployConfig{}, fmt.Errorf("failed to get key for batcher0")
+	}
+	batcherKey := batcherKeyInfo.PrivateKey
 
 	deployConfig := EigenDADeployConfig{
 		UseDefaults:         true,
