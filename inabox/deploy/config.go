@@ -2,16 +2,15 @@ package deploy
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,95 +25,64 @@ func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	return nil, false
 }
 
-// Constructs a mapping between service names/deployer names (e.g., 'dis0', 'opr1') and private keys. Order of priority: Map, List, File
+// Constructs a mapping between service names/deployer names (e.g., 'dis0', 'opr1') and private keys
 func (env *Config) loadPrivateKeys() error {
+	logger.Info("Loading private keys using testbed")
 
-	// construct full list of names
-	// nTotal := env.Services.Counts.NumDis + env.Services.Counts.NumOpr + env.Services.Counts.NumRet + env.Services.Counts.NumSeq + env.Services.Counts.NumCha
-	// names := make([]string, len(env.Deployers)+nTotal)
-	names := make([]string, 0)
+	// Use testbed's LoadPrivateKeys function
+	testbedKeys, err := testbed.LoadPrivateKeys(testbed.LoadPrivateKeysInput{
+		NumOperators: env.Services.Counts.NumOpr,
+		NumRelays:    env.Services.Counts.NumRelays,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to load private keys from testbed: %w", err)
+	}
+
+	// Convert testbed keys to our format
+	if env.Pks == nil {
+		env.Pks = &PkConfig{
+			EcdsaMap: make(map[string]KeyInfo),
+			BlsMap:   make(map[string]KeyInfo),
+		}
+	} else {
+		// Initialize maps if they're nil
+		if env.Pks.EcdsaMap == nil {
+			env.Pks.EcdsaMap = make(map[string]KeyInfo)
+		}
+		if env.Pks.BlsMap == nil {
+			env.Pks.BlsMap = make(map[string]KeyInfo)
+		}
+	}
+
+	// Copy testbed keys to our structure
+	for name, keyInfo := range testbedKeys.EcdsaMap {
+		env.Pks.EcdsaMap[name] = KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
+		}
+	}
+
+	for name, keyInfo := range testbedKeys.BlsMap {
+		env.Pks.BlsMap[name] = KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
+		}
+	}
+
+	// Add deployer keys if they don't exist (for backward compatibility)
 	for _, d := range env.Deployers {
-		names = append(names, d.Name)
-	}
-	addNames := func(prefix string, num int) {
-		for i := 0; i < num; i++ {
-			names = append(names, fmt.Sprintf("%v%v", prefix, i))
+		if _, exists := env.Pks.EcdsaMap[d.Name]; !exists {
+			// Use the same key as "deployer" if available
+			if deployerKey, ok := env.Pks.EcdsaMap["deployer"]; ok {
+				env.Pks.EcdsaMap[d.Name] = deployerKey
+				env.Pks.BlsMap[d.Name] = env.Pks.BlsMap["deployer"]
+			}
 		}
 	}
-	addNames("dis", 2)
-	addNames("opr", env.Services.Counts.NumOpr)
-	addNames("staker", env.Services.Counts.NumOpr)
-	addNames("retriever", 1)
-	addNames("relay", env.Services.Counts.NumRelays)
 
-	logger.Info("Service names", "names", names)
-
-	// Collect private keys from file
-	keyPath := "secrets"
-
-	// Read ECDSA private keys
-	fileData, err := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
-	if err != nil {
-		return err
-	}
-
-	ecdsaPks := strings.Split(string(fileData), "\n")
-	// Read ECDSA passwords
-	fileData, err = readFile(filepath.Join(keyPath, "ecdsa_keys/password.txt"))
-	if err != nil {
-		return err
-	}
-	ecdsaPwds := strings.Split(string(fileData), "\n")
-	// Read BLS private keys
-	fileData, err = readFile(filepath.Join(keyPath, "bls_keys/private_key_hex.txt"))
-	if err != nil {
-		return err
-	}
-
-	blsPks := strings.Split(string(fileData), "\n")
-	// Read BLS passwords
-	fileData, err = readFile(filepath.Join(keyPath, "bls_keys/password.txt"))
-	if err != nil {
-		return err
-	}
-
-	blsPwds := strings.Split(string(fileData), "\n")
-
-	if len(ecdsaPks) != len(blsPks) || len(blsPks) != len(ecdsaPwds) || len(ecdsaPwds) != len(blsPwds) {
-		return errors.New("the number of keys and passwords for ECDSA and BLS must be the same")
-	}
-
-	// Add missing items to map
-	if env.Pks.EcdsaMap == nil {
-		env.Pks.EcdsaMap = make(map[string]KeyInfo)
-	}
-	if env.Pks.BlsMap == nil {
-		env.Pks.BlsMap = make(map[string]KeyInfo)
-	}
-
-	ind := 0
-	for _, name := range names {
-		_, exists := env.Pks.EcdsaMap[name]
-		if !exists {
-
-			if ind >= len(ecdsaPks) {
-				return errors.New("not enough pks")
-			}
-
-			env.Pks.EcdsaMap[name] = KeyInfo{
-				PrivateKey: ecdsaPks[ind],
-				Password:   ecdsaPwds[ind],
-				KeyFile:    fmt.Sprintf("%s/ecdsa_keys/keys/%v.ecdsa.key.json", keyPath, ind+1),
-			}
-			env.Pks.BlsMap[name] = KeyInfo{
-				PrivateKey: blsPks[ind],
-				Password:   blsPwds[ind],
-				KeyFile:    fmt.Sprintf("%s/bls_keys/keys/%v.bls.key.json", keyPath, ind+1),
-			}
-
-			ind++
-		}
-	}
+	logger.Info("Successfully loaded private keys", "ecdsaKeys", len(env.Pks.EcdsaMap), "blsKeys", len(env.Pks.BlsMap))
 
 	return nil
 }
@@ -518,7 +486,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 }
 
 // Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genService(compose testbed, name, image, envFile string, ports []string) {
+func (env *Config) genService(compose DockerCompose, name, image, envFile string, ports []string) {
 
 	for i, port := range ports {
 		ports[i] = port + ":" + port
@@ -540,7 +508,7 @@ func (env *Config) genService(compose testbed, name, image, envFile string, port
 }
 
 // Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genNodeService(compose testbed, name, image, envFile string, ports []string) {
+func (env *Config) genNodeService(compose DockerCompose, name, image, envFile string, ports []string) {
 
 	for i, port := range ports {
 		ports[i] = port + ":" + port
@@ -579,7 +547,7 @@ func (env *Config) genNodeService(compose testbed, name, image, envFile string, 
 	}
 }
 
-func genTelemetryServices(compose testbed, name, image string, volumes []string) {
+func genTelemetryServices(compose DockerCompose, name, image string, volumes []string) {
 	compose.Services[name] = map[string]interface{}{
 		"image":  image,
 		"volume": volumes,
@@ -640,7 +608,7 @@ func (env *Config) GenerateAllVariables() error {
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
 	servicesMap := make(map[string]map[string]interface{})
-	compose := testbed{
+	compose := DockerCompose{
 		Services: servicesMap,
 	}
 
