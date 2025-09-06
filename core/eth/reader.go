@@ -16,6 +16,7 @@ import (
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -24,7 +25,6 @@ import (
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
@@ -44,7 +44,7 @@ type ContractBindings struct {
 	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
 	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
 	IndexRegistry         *indexreg.ContractIIndexRegistry
-	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
+	RegistryCoordinator   *regcoordinator.ContractEigenDARegistryCoordinator
 	StakeRegistry         *stakereg.ContractStakeRegistry
 	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
 	EjectionManager       *ejectionmg.ContractEjectionManager
@@ -130,7 +130,10 @@ func (t *Reader) updateContractBindings(
 		return err
 	}
 
-	contractIRegistryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(registryCoordinatorAddr, t.ethClient)
+	contractIRegistryCoordinator, err := regcoordinator.NewContractEigenDARegistryCoordinator(
+		registryCoordinatorAddr,
+		t.ethClient,
+	)
 	if err != nil {
 		t.logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
 		return err

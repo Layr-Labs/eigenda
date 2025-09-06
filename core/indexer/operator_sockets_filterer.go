@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/Layr-Labs/eigenda/common"
+	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	regcoord "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -51,7 +51,7 @@ func (f *operatorSocketsFilterer) FilterHeaders(headers indexer.Headers) ([]inde
 		return nil, err
 	}
 
-	filterer, err := regcoord.NewContractRegistryCoordinatorFilterer(f.Address, f.Filterer)
+	filterer, err := regcoord.NewContractEigenDARegistryCoordinatorFilterer(f.Address, f.Filterer)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +108,12 @@ func (f *operatorSocketsFilterer) FilterFastMode(headers indexer.Headers) (*inde
 }
 
 func (f *operatorSocketsFilterer) WatchOperatorSocketUpdate(ctx context.Context, operatorId core.OperatorID) (chan string, error) {
-	filterer, err := regcoord.NewContractRegistryCoordinatorFilterer(f.Address, f.Filterer)
+	filterer, err := regcoord.NewContractEigenDARegistryCoordinatorFilterer(f.Address, f.Filterer)
 	if err != nil {
 		return nil, err
 	}
 
-	sink := make(chan *regcoord.ContractRegistryCoordinatorOperatorSocketUpdate)
+	sink := make(chan *regcoord.ContractEigenDARegistryCoordinatorOperatorSocketUpdate)
 	operatorID := [][32]byte{operatorId}
 	_, err = filterer.WatchOperatorSocketUpdate(&bind.WatchOpts{Context: ctx}, sink, operatorID)
 	if err != nil {
