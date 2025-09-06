@@ -45,18 +45,22 @@ func GetAnvilDefaultKeys() (defaultKey string, batcher0Key string) {
 }
 
 // LoadPrivateKeys constructs a mapping between service names (e.g., 'deployer', 'dis0', 'opr1') and private keys
+//
+// TODO: This feels pretty confusing but for now I need to make it work with inabox. Once most of the inabox deployment
+// code lives here I will refactor this function.
 func LoadPrivateKeys(input LoadPrivateKeysInput) (*PrivateKeyMaps, error) {
 	// Get funded Anvil keys for deployer and batcher
 	deployerKey, batcherKey := GetAnvilDefaultKeys()
 
 	// Use testbed secrets for other services
-	keyPath := "secrets"
+	// The secrets are located in the testbed directory
+	keyPath := filepath.Join("..", "testbed", "secrets")
 
 	// Build the list of service names
 	names := make([]string, 0)
 
 	// Add single deployer
-	names = append(names, "deployer")
+	names = append(names, "deployer", "batcher0")
 
 	addNames := func(prefix string, num int) {
 		for i := 0; i < num; i++ {
@@ -126,7 +130,20 @@ func LoadPrivateKeys(input LoadPrivateKeysInput) (*PrivateKeyMaps, error) {
 				KeyFile:    "",
 			}
 		case "dis0":
-			// First disperser (batcher) uses Anvil account #1
+			// Batcher uses Anvil account #1
+			result.EcdsaMap[name] = KeyInfo{
+				PrivateKey: batcherKey,
+				Password:   "",
+				KeyFile:    "",
+			}
+			// No BLS key for batcher
+			result.BlsMap[name] = KeyInfo{
+				PrivateKey: "",
+				Password:   "",
+				KeyFile:    "",
+			}
+		case "batcher0":
+			// Batcher uses Anvil account #1
 			result.EcdsaMap[name] = KeyInfo{
 				PrivateKey: batcherKey,
 				Password:   "",
@@ -273,9 +290,10 @@ type DeploymentResult struct {
 // DeployEigenDAContracts deploys EigenDA core system and along with Eigenlayer contracts on a local anvil chain.
 // This calls the SetupEigenDA.s.sol forge script to initialize the deployment.
 //
-// TODO: SetupEigenDA.s.sol is pretty legacy and its primary function is to set up the EigenDA environment for the inabox environment.
-// There exists a DeployEigenDA.s.sol script that has been used in production to deploy environments but it currently does not handle the
-// Eigenlayer contracts. We should consider deprecating SetupEigenDA.s.sol in favor of DeployEigenDA.s.sol.
+// TODO: SetupEigenDA.s.sol is legacy and is primarily used for setting up the EigenDA environment for the
+// inabox environment. There exists a DeployEigenDA.s.sol script that has been used in production to deploy
+// environments, but it currently does not handle the Eigenlayer contracts. We should consider deprecating
+// SetupEigenDA.s.sol in favor of DeployEigenDA.s.sol.
 func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) {
 	if config.Logger == nil {
 		return nil, fmt.Errorf("logger is required")

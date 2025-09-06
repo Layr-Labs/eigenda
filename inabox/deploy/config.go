@@ -498,7 +498,7 @@ func (env *Config) genService(compose DockerCompose, name, image, envFile string
 		"ports":    ports,
 		"volumes": []string{
 			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
+			env.rootPath + "/testbed/secrets:/secrets",
 			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
@@ -519,7 +519,7 @@ func (env *Config) genNodeService(compose DockerCompose, name, image, envFile st
 		"env_file": []string{envFile},
 		"volumes": []string{
 			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
+			env.rootPath + "/testbed/secrets:/secrets",
 			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
