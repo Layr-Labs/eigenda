@@ -123,6 +123,16 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 	}
 }
 
+// Gets the current fill level of the bucket
+//
+// Use a time source that includes monotonic time for best results.
+func (lb *LeakyBucket) CheckFillLevel(now time.Time) float64 {
+	// even if there is an error, we still want to just return whatever the current fill level is
+	_ = lb.leak(now)
+
+	return lb.currentFillLevel
+}
+
 // Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
 //
 // Use a time source that includes monotonic time for best results.
@@ -180,4 +190,11 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 
 	lb.previousLeakTime = now
 	return nil
+}
+
+// Gets the amount of capacity available in the bucket, i.e. how much could be dispersed right now.
+//
+// May be negative if the bucket is currently overfilled
+func (lb *LeakyBucket) GetRemainingCapacity() float64 {
+	return lb.bucketCapacity - lb.currentFillLevel
 }

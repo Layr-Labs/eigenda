@@ -10,7 +10,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/consts"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
 )
 
@@ -37,6 +39,23 @@ var (
 	NetworkFlagName                 = withFlagPrefix("network")
 	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
 	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
+
+	ClientLedgerModeFlag = &cli.StringFlag{
+		Name:     withFlagPrefix("client-ledger-mode"),
+		Usage:    "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'.",
+		Value:    "legacy",
+		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "CLIENT_LEDGER_MODE")},
+		Category: consts.PaymentsCategory,
+		Required: false,
+	}
+	PaymentVaultMonitorIntervalFlag = &cli.DurationFlag{
+		Name:     withFlagPrefix("payment-vault-monitor-interval"),
+		Usage:    "Interval for monitoring payment vault updates.",
+		Value:    30 * time.Second,
+		EnvVars:  []string{withEnvPrefix(consts.GlobalEnvVarPrefix, "PAYMENT_VAULT_MONITOR_INTERVAL")},
+		Category: consts.PaymentsCategory,
+		Required: false,
+	}
 )
 
 func withFlagPrefix(s string) string {
@@ -210,6 +229,8 @@ This check is optional and will be skipped when set to 0.`,
 			Category: category,
 			Required: false,
 		},
+		ClientLedgerModeFlag,
+		PaymentVaultMonitorIntervalFlag,
 	}
 }
 
@@ -268,6 +289,7 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
 		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
+		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlag.Name)),
 	}, nil
 }
 

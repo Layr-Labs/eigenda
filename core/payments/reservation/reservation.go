@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
@@ -61,6 +62,16 @@ func NewReservation(
 	}, nil
 }
 
+// Creates a Reservation from contract binding data
+func NewReservationFromBindings(bindingReservation *bindings.IPaymentVaultReservation) (*Reservation, error) {
+	return NewReservation(
+		bindingReservation.SymbolsPerSecond,
+		time.Unix(int64(bindingReservation.StartTimestamp), 0),
+		time.Unix(int64(bindingReservation.EndTimestamp), 0),
+		bindingReservation.QuorumNumbers,
+	)
+}
+
 // Checks whether an input list of quorums are all permitted by the reservation.
 //
 // Returns nil if all input quorums are permitted, otherwise returns [QuorumNotPermittedError].
@@ -96,4 +107,36 @@ func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 	}
 
 	return nil
+}
+
+// Checks if two Reservation instances are equal
+// TODO: write tests for this
+func (r *Reservation) Equal(other *Reservation) bool {
+	if other == nil {
+		return false
+	}
+
+	if r.symbolsPerSecond != other.symbolsPerSecond {
+		return false
+	}
+
+	if !r.startTime.Equal(other.startTime) {
+		return false
+	}
+
+	if !r.endTime.Equal(other.endTime) {
+		return false
+	}
+
+	if len(r.permittedQuorumIDs) != len(other.permittedQuorumIDs) {
+		return false
+	}
+
+	for quorumID := range r.permittedQuorumIDs {
+		if _, exists := other.permittedQuorumIDs[quorumID]; !exists {
+			return false
+		}
+	}
+
+	return true
 }

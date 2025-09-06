@@ -307,6 +307,7 @@ func setupPayloadDisperserWithRouter() error {
 		certBuilder,
 		routerCertVerifier,
 		nil,
+		nil,
 	)
 
 	return err
