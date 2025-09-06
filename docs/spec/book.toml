@@ -11,7 +11,11 @@ git-repository-url = "https://github.com/Layr-Labs/eigenda"
 additional-css = ["last-changed.css"]  # for styling footer
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
-[preprocessor]
+[preprocessor.katex]
+# Preprocesses the latext syntax into prettified displays.
+# See https://github.com/lzanini/mdbook-katex for more information.
+# This requires the mdbook-katex crate to be installed.
+after = ["links"]
 
 [preprocessor.mermaid]
 # Preprocesses the mermaid diagrams (see src/integration/proxy.md for an example)
