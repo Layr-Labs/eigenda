@@ -77,6 +77,10 @@ func (cv *CertVerifier) CheckDACert(
 	// TODO(ethenotethan): determine if there's any merit in passing call context
 	// options (e.g, block number) to impose better determinism and safety on the simulation
 	// call
+	//
+	// imposing determinism here by binding a block reference would introduce the requirement
+	// for an archival node for rollups syncing which would introduce an additional operational cost
+	// to rollup operators
 
 	callMsgBytes, err := cv.v2VerifierBinding.TryPackCheckDACert(certBytes)
 	if err != nil {
