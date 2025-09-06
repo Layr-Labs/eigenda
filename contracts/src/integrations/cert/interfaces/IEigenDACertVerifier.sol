@@ -24,4 +24,7 @@ interface IEigenDACertVerifier {
 
     /// @notice Returns the quorum numbers required in bytes format for certificate verification.
     function quorumNumbersRequired() external view returns (bytes memory);
+
+    /// @notice Returns the gas limit used for checkDACert calls.
+    function checkDACertGasLimit() external view returns (uint32);
 }

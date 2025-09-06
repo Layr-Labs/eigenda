@@ -259,7 +259,8 @@ contract DeployEigenDA is Script {
                 IEigenDAThresholdRegistry(deployed[THRESHOLD_REGISTRY]),
                 IEigenDASignatureVerifier(deployed[STAKE_REGISTRY]),
                 cfg.certVerifierSecurityThresholds(),
-                cfg.certVerifierQuorumNumbersRequired()
+                cfg.certVerifierQuorumNumbersRequired(),
+                cfg.certVerifierCheckDACertGasLimit()
             )
         );
         impl[CERT_VERIFIER] = deployed[CERT_VERIFIER];

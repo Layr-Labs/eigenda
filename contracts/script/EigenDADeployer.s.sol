@@ -345,7 +345,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
         DATypesV1.VersionedBlobParams[] memory versionedBlobParams = new DATypesV1.VersionedBlobParams[](0);
-        DATypesV1.SecurityThresholds memory defaultSecurityThresholds = DATypesV1.SecurityThresholds(55, 33);
 
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
@@ -365,29 +364,35 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             AddressDirectoryConstants.OPERATOR_STATE_RETRIEVER_NAME, address(operatorStateRetriever)
         );
 
-        // NOTE: will be deprecated in the future with subsequent release
-        //       which removes the legacy V2 cert verifier entirely
-        legacyEigenDACertVerifier = new EigenDACertVerifierV2(
-            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
-            OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator)),
-            defaultSecurityThresholds,
-            hex"0001"
-        );
-        eigenDADirectory.addAddress(
-            AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
-        );
+        {
+            DATypesV1.SecurityThresholds memory defaultSecurityThresholds = DATypesV1.SecurityThresholds(55, 33);
+            uint32 defaultCheckDACertGasLimit = 15_000_000;
 
-        eigenDACertVerifier = new EigenDACertVerifier(
-            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
-            defaultSecurityThresholds,
-            hex"0001"
-        );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
+            // NOTE: will be deprecated in the future with subsequent release
+            //       which removes the legacy V2 cert verifier entirely
+            legacyEigenDACertVerifier = new EigenDACertVerifierV2(
+                IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+                IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+                OperatorStateRetriever(address(operatorStateRetriever)),
+                IRegistryCoordinator(address(registryCoordinator)),
+                defaultSecurityThresholds,
+                hex"0001"
+            );
+            eigenDADirectory.addAddress(
+                AddressDirectoryConstants.CERT_VERIFIER_LEGACY_V2_NAME, address(legacyEigenDACertVerifier)
+            );
 
-        eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
+            eigenDACertVerifier = new EigenDACertVerifier(
+                IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+                IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+                defaultSecurityThresholds,
+                hex"0001",
+                defaultCheckDACertGasLimit
+            );
+            eigenDADirectory.addAddress(AddressDirectoryConstants.CERT_VERIFIER_NAME, address(eigenDACertVerifier));
+
+            eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
+        }
 
         uint32[] memory initABNs = new uint32[](1);
         initABNs[0] = 0; // default RBN
