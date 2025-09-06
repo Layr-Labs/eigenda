@@ -59,6 +59,30 @@ Now, we prove that any subset of validators with $r$ of the total stake own at l
 
 As we show in the previous subsection, by default, $n = 3537$, $c = 8192$ and $\gamma = 1/8$, which gives us the reconstruction threshold $r = 22\%$.
 
+### Intuition: Loss in Chunk Assignment
+If we look closely at the reconstruction threshold, we find that it is given by the encoding rate multiplied by a factor:  
+
+$$
+\frac{c}{c-n} > 1
+$$
+
+This means that in practice, a group of validators needs to hold **more stake** than the theoretical threshold to guarantee reconstruction.  
+
+In an ideal world, any subset of validators holding a fraction $\gamma$ of the total stake would also hold $\gamma$ of the chunks, and therefore could recover the blob.
+But in reality, because chunk assignments are discrete, some loss occurs: a validator’s assigned share of chunks can be **less** than its stake share.  
+
+Suppose there are 10 chunks and 3 validators, each with one-third of the stake. Using the assignment algorithm, we might get:  
+- Validator 1 → 4 chunks  
+- Validator 2 → 3 chunks  
+- Validator 3 → 3 chunks  
+
+Here, Validator 2 has 33% of the stake but only 30% of the chunks. This loss can make the difference in meeting the reconstruction threshold.  
+
+The mismatch becomes even more pronounced as the number of validators increases.
+Imagine 10 million validators, each with equal stake, but only 10,000 chunks in total. In this case, only a small fraction of validators can get at least 1 chunk, while the majority get none at all. The loss is enormous.
+This is why the `MaxNumOperators` becomes an important parameter in determining the reconstruction threshold: the more validators there are relative to the number of chunks, the higher the loss from assignment imbalance.  
+
+
 ## BFT Security
 
 Having established the relationship between the blob parameters and the reconstruction threshold, we now turn to the Byzantine Fault Tolerant (BFT) security model and how it relates to the blob parameters. 
