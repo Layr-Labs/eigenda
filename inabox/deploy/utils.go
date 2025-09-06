@@ -89,52 +89,6 @@ func execYarnCmd(command string, args ...string) error {
 	return nil
 }
 
-// Executes a forge script with a given rpc and private key
-func execForgeScript(script, privateKey string, deployer *ContractDeployer, extraArgs []string) error {
-	// Execute forge script
-	var cmd *exec.Cmd
-
-	args := []string{"script", script,
-		"--rpc-url", deployer.RPC,
-		"--private-key", privateKey,
-		"--broadcast"}
-
-	if deployer.VerifyContracts {
-		args = append(args, "--verify",
-			"--verifier", "blockscout",
-			"--verifier-url", deployer.VerifierURL)
-	}
-
-	if deployer.Slow {
-		args = append(args, "--slow")
-	}
-
-	if len(extraArgs) > 0 {
-		args = append(args, extraArgs...)
-	}
-
-	// The following code converts the forge call into a docker call
-	if useDocker {
-		pwd, _ := os.Getwd()
-		argString := fmt.Sprintf("docker run -v %v:/app -w /app %v \"forge %v\"", pwd, foundryImage, strings.Join(args[:], " "))
-		cmd = exec.Command("/bin/sh", "-c", argString)
-	} else {
-		cmd = exec.Command("forge", args...)
-	}
-
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to execute forge script: %w", err)
-	}
-
-	return nil
-}
-
 func execBashCmd(command string) error {
 	cmd := exec.Command("bash", "-c", command)
 
