@@ -35,6 +35,8 @@ contract CertVerifierDeployerV2 is Script, Test {
         raw = stdJson.parseRaw(data, ".eigenDAThresholdRegistry");
         eigenDAThresholdRegistry = abi.decode(raw, (address));
 
+        /// @dev read eigenda/docs/spec/src/protocol/architecture/security-parameters.md 
+        ///      before changing the default security thresholds
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
