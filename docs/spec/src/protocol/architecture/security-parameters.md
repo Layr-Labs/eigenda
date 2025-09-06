@@ -61,7 +61,7 @@ As we show in the previous subsection, by default, $n = 3537$, $c = 8192$ and $\
 
 ## BFT Security
 
-Having established the relationship between encoding rate and reconstruction threshold, we now turn to the Byzantine Fault Tolerant (BFT) security model and how it relates to the blob parameters. 
+Having established the relationship between the blob parameters and the reconstruction threshold, we now turn to the Byzantine Fault Tolerant (BFT) security model and how it relates to the blob parameters. 
 ### Definition of Security Thresholds
 In this section, we define and prove the safety and liveness properties of EigenDA, building on the reconstruction property established above.
 
@@ -94,6 +94,10 @@ The `ConfirmationThreshold` and `LivenessThreshold` satisfy the following inequa
 
 This is because a valid certificate requires signatures from at least `ConfirmationThreshold` of stake. If `ConfirmationThreshold` is greater than 1 - `LivenessThreshold`, the adversary can cause a liveness failure by simply not signing the certificate.
 
+In summary, the `SafetyThreshold` and `LivenessThreshold` depends on the choice of `ConfirmationThreshold`. The picture below shows the relationship between these security thresholds.
+
+![image](../../assets/security_thresholds.png)
+
 ### Implementation Details
 
 **1. Safety Threshold**
@@ -119,4 +123,4 @@ The `LivenessThreshold` does not appear in the code, but users should keep it in
 
 **System Default**
 
-By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 22%, this gives a `SafetyThreshold` of 33% and a `LivenessThreshold` of 45%. 
+By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 22%, the default  `ConfirmationThreshold` gives a `SafetyThreshold` of 33% and a `LivenessThreshold` of 45%. 
