@@ -138,6 +138,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_BATCHER_HEALTH_ENDPOINT"),
 	}
 	/* Optional Flags*/
+	PoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pool-size"),
+		Usage:    "Size of the worker pool for operator status checks",
+		Required: false,
+		Value:    50,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POOL_SIZE"),
+	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -174,6 +181,7 @@ var requiredFlags = []cli.Flag{
 
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
+	PoolSizeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
 	EigenDADirectoryFlag,
