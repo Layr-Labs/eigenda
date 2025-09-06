@@ -37,6 +37,14 @@ jobs:
           experimental: true
       - run: go version
 
+      - name: Build contract dependencies
+        run: |
+          cd contracts && yarn
+
+      - name: Compile contracts
+        run: |
+          cd contracts && forge build
+
       - name: Build
         run: make build
 
