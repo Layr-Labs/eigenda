@@ -19,12 +19,7 @@ type OperatorOnlineStatus struct {
 	OperatorProcessError string
 }
 
-var (
-	// TODO: Poolsize should be configurable
-	// Observe performance and tune accordingly
-	poolSize                        = 50
-	operatorOnlineStatusresultsChan chan *QueriedStateOperatorMetadata
-)
+// Note: channel must be created per call-site to avoid concurrency issues between requests
 
 // Function to get registered operators for given number of days
 // Queries subgraph for deregistered operators
@@ -42,8 +37,8 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 	// Convert the map to a slice.
 	operators := indexedDeregisteredOperatorState.Operators
 
-	operatorOnlineStatusresultsChan = make(chan *QueriedStateOperatorMetadata, len(operators))
-	processOperatorOnlineCheck(indexedDeregisteredOperatorState, operatorOnlineStatusresultsChan, s.logger)
+	operatorOnlineStatusresultsChan := make(chan *QueriedStateOperatorMetadata, len(operators))
+	processOperatorOnlineCheck(indexedDeregisteredOperatorState, operatorOnlineStatusresultsChan, s.logger, s.poolSize)
 
 	// Collect results of work done
 	DeregisteredOperatorMetadata := make([]*QueriedStateOperatorMetadata, 0, len(operators))
@@ -77,8 +72,8 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 	// Convert the map to a slice.
 	operators := indexedRegisteredOperatorState.Operators
 
-	operatorOnlineStatusresultsChan = make(chan *QueriedStateOperatorMetadata, len(operators))
-	processOperatorOnlineCheck(indexedRegisteredOperatorState, operatorOnlineStatusresultsChan, s.logger)
+	operatorOnlineStatusresultsChan := make(chan *QueriedStateOperatorMetadata, len(operators))
+	processOperatorOnlineCheck(indexedRegisteredOperatorState, operatorOnlineStatusresultsChan, s.logger, s.poolSize)
 
 	// Collect results of work done
 	RegisteredOperatorMetadata := make([]*QueriedStateOperatorMetadata, 0, len(operators))
@@ -174,7 +169,7 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 	return operatorEjections, nil
 }
 
-func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
+func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger, poolSize int) {
 	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)
 

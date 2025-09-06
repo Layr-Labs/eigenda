@@ -122,6 +122,7 @@ func RunDataApi(ctx *cli.Context) error {
 				DisperserHostname:  config.DisperserHostname,
 				ChurnerHostname:    config.ChurnerHostname,
 				BatcherHealthEndpt: config.BatcherHealthEndpt,
+				PoolSize:           config.PoolSize,
 			},
 			blobMetadataStorev2,
 			promClient,
