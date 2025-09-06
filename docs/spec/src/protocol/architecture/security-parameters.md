@@ -79,7 +79,7 @@ Suppose there are 10 chunks and 3 validators, each with one-third of the stake. 
 Here, Validator 2 has 33% of the stake but only 30% of the chunks. This loss can make the difference in meeting the reconstruction threshold.  
 
 The mismatch becomes even more pronounced as the number of validators increases.
-Imagine 10 million validators, each with equal stake, but only 10,000 chunks in total. In this case, only a small fraction of validators can get at least 1 chunk, while the majority get none at all. The loss is enormous.
+Imagine 10 million validators, each with equal stake, but only 10,000 chunks to be assigned in total. In this case, only a small fraction of validators can get at least 1 chunk, while the majority get none at all. The loss is enormous.
 This is why the `MaxNumOperators` becomes an important parameter in determining the reconstruction threshold: the more validators there are relative to the number of chunks, the higher the loss from assignment imbalance.  
 
 
@@ -124,27 +124,66 @@ In summary, the `SafetyThreshold` and `LivenessThreshold` depends on the choice 
 
 ### Implementation Details
 
+In our code, we use slightly different names for the security thresholds compared to the notation in this document.  
+Here is the mapping from the notations in this doc to the variable names in the code:  
+
+- `ConfirmationThreshold` → `securityThresholds.confirmationThreshold`  
+- `SafetyThreshold` → `securityThresholds.adversaryThreshold`
+- $c$ → `blobParams.numChunks`
+- $n$ → `blobParams.maxNumOperators`
+- $\gamma$ → 1 / `blobParams.codingRate`
+
+Note that `SafetyThreshold` is called `adversaryThreshold` in the code.
+
 **1. Safety Threshold**
 
-The check for the inequality (1) above is implemented [here](https://github.com/Layr-Labs/eigenda/blob/6cd192ecbe5f0abfe73fc08df306cf00e32ef010/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L188).
-Specifically, the code implements the check for the following inequality:
+The check for the inequality (1) above is implemented as follows ([see in code](https://github.com/Layr-Labs/eigenda/blob/6cd192ecbe5f0abfe73fc08df306cf00e32ef010/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L188)).
 
-`ConfirmationThreshold` - `SafetyThreshold` >=  `ReconstructionThreshold`$ = \frac{c}{c-n} \gamma$,
+```solidity
+function checkSecurityParams(
+    DATypesV1.VersionedBlobParams memory blobParams,
+    DATypesV1.SecurityThresholds memory securityThresholds
+) internal pure returns (StatusCode err, bytes memory errParams) {
+    uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
+    uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
+    uint256 minRequired = blobParams.maxNumOperators * 10000;
 
-with the following mapping of notation in the doc and variables in the code:
+    if (n >= minRequired) {
+        return (StatusCode.SUCCESS, "");
+    } else {
+        return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
+    }
+}
+```
+Specifically, the code above implements a check for the following inequality:  
 
-- `ConfirmationThreshold` : `securityThresholds.confirmationThreshold`
-- `SafetyThreshold` : `securityThresholds.adversaryThreshold`
-- $c$ : `blobParams.numChunks`
-- $n$ : `blobParams.maxNumOperators`
-- $\gamma$: 1 / `blobParams.codingRate`
+`(10000 - ((1_000_000 / (securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold)) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks) >= blobParams.maxNumOperators * 10000`  
+
+By substituting the variables using the notation mapping shown at the beginning of this section and simplifying, we get:  
+`ConfirmationThreshold - SafetyThreshold >= (c / (c - n)) * γ = ReconstructionThreshold`, 
+which is exactly inequality (1) shown in the previous subsection.  
 
 We strongly recommend that users set a `SafetyThreshold` >= 33% if they ever want to change the default settings.
 
 **2. Liveness Threshold**
 
-The `LivenessThreshold` does not appear in the code, but users should keep it in mind when changing the default settings. 
+The `LivenessThreshold` does not appear in the code, but users should keep the inequation (2) in mind when setting the confirmation `ConfirmationThreshold`. 
 
 **System Default**
+
+The security threshods are configured as follows ([see in the code](https://github.com/Layr-Labs/eigenda/blob/730ab91d41a8ba2cae141d782adcb4aec2aaaa0b/contracts/script/deploy/certverifier/config/v2/sepolia/testnet.config.json#L4)):
+
+```
+{
+    "eigenDAServiceManager": "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764",
+    "eigenDAThresholdRegistry": "0x0DA66C1930Acc54809093Bb42f2e6a4bE21d5403",
+    "defaultSecurityThresholds": {
+        "0_confirmationThreshold": 55,
+        "1_adversaryThreshold": 33
+    },
+    
+    "quorumNumbersRequired": "0x0001"
+}
+```
 
 By default, the `ConfirmationThreshold` is 55%. With the default `ReconstructionThreshold` = 22%, the default  `ConfirmationThreshold` gives a `SafetyThreshold` of 33% and a `LivenessThreshold` of 45%. 
