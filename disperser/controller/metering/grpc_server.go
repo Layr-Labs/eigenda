@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -18,7 +18,7 @@ import (
 )
 
 type GrpcServer struct {
-	pb.UnimplementedControllerServer
+	pb.UnimplementedControllerServiceServer
 
 	config   *Config
 	logger   logging.Logger
@@ -57,10 +57,10 @@ func (s *GrpcServer) Start() error {
 
 	// Register services
 	reflection.Register(s.server)
-	pb.RegisterControllerServer(s.server, s)
+	pb.RegisterControllerServiceServer(s.server, s)
 
 	// Register health check
-	name := pb.Controller_ServiceDesc.ServiceName
+	name := pb.ControllerService_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, s.server)
 
 	s.logger.Info("gRPC server listening", "address", listener.Addr().String())

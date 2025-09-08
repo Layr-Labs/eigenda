@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type ControllerClient struct {
 	clientConnection *grpc.ClientConn
-	client           pb.ControllerClient
+	client           pb.ControllerServiceClient
 }
 
 func NewControllerClient(address string) (*ControllerClient, error) {
@@ -29,7 +29,7 @@ func NewControllerClient(address string) (*ControllerClient, error) {
 
 	return &ControllerClient{
 		clientConnection: clientConnection,
-		client:           pb.NewControllerClient(clientConnection),
+		client:           pb.NewControllerServiceClient(clientConnection),
 	}, nil
 }
 

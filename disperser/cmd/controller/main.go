@@ -236,7 +236,7 @@ func RunController(ctx *cli.Context) error {
 			GrpcPort: config.GrpcPort,
 		}, logger, metricsRegistry)
 		if err != nil {
-			return fmt.Errorf("failed to create gRPC server: %v", err)
+			return fmt.Errorf("failed to create gRPC server: %w", err)
 		}
 
 		go func() {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -41,7 +42,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if s.controllerClient != nil {
 		// s.controllerClient is non-nil, so use the new logic which delegates accounting and metering to the Controller
 
-		_, err := s.controllerClient.AuthorizePayment(ctx, &pb.AuthorizePaymentRequest{
+		_, err := s.controllerClient.AuthorizePayment(ctx, &controller.AuthorizePaymentRequest{
 			BlobHeader: req.GetBlobHeader(),
 			Signature:  req.GetSignature(),
 		})
