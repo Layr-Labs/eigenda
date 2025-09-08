@@ -1,4 +1,4 @@
-package server
+package rest
 
 // The tests in this file test not only the handlers but also the middlewares,
 // because server.registerRoutes(r) registers the handlers wrapped with middlewares.
