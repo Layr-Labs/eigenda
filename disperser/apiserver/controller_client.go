@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// TODO: do we actually need this wrapper?
+
 type ControllerClient struct {
 	clientConnection *grpc.ClientConn
 	client           pb.ControllerServiceClient

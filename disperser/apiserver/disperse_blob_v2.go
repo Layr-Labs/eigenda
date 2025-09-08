@@ -43,8 +43,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		// s.controllerClient is non-nil, so use the new logic which delegates accounting and metering to the Controller
 
 		_, err := s.controllerClient.AuthorizePayment(ctx, &controller.AuthorizePaymentRequest{
-			BlobHeader: req.GetBlobHeader(),
-			Signature:  req.GetSignature(),
+			BlobHeader:      req.GetBlobHeader(),
+			ClientSignature: req.GetSignature(),
 		})
 		if err != nil {
 			// Pass through the structured error from the controller
