@@ -77,7 +77,6 @@ schemars = { version = "0.8.21", default-features = false, features = [
 
 # Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L261
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
-smallvec = "1.15.1"
 
 [build-dependencies]
 ark-bn254 = { version = "0.5.0", default-features = false }

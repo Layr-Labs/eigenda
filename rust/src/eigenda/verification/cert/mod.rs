@@ -1,5 +1,4 @@
-//! Following eigenda-contracts/lib/eigenlayer-middleware/src/BLSSignatureChecker.sol
-//! from 6797f3821db92c2214aaa6f137d94c603011ac2a lib/eigenlayer-middleware (v0.5.4-mainnet-rewards-v2-1-g6797f38)
+//! [Reference implementation](https://github.com/Layr-Labs/eigenda/blob/60d438705b30e899777736cdffcc478ded08cc76/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L125)
 
 pub mod bitmap;
 mod check;
@@ -10,8 +9,6 @@ mod signature;
 pub mod types;
 
 use crate::eigenda::cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
-use alloy_primitives::keccak256;
-use alloy_sol_types::SolValue;
 use ark_bn254::{G1Affine, G2Affine};
 use tracing::instrument;
 
@@ -44,6 +41,17 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         storage,
     } = inputs;
 
+    let NonSignerStakesAndSignature {
+        non_signer_quorum_bitmap_indices,
+        non_signer_pubkeys,
+        quorum_apks,
+        apk_g2,
+        sigma,
+        quorum_apk_indices,
+        total_stake_indices,
+        non_signer_stake_indices,
+    } = non_signer_stakes_and_signature;
+
     let Storage {
         quorum_count,
         current_block,
@@ -51,21 +59,46 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         operator_stake_history,
         total_stake_history,
         apk_history,
-        relay_key_to_relay_address,
         versioned_blob_params,
+        next_blob_version,
         #[cfg(feature = "stale-stakes-forbidden")]
         staleness,
     } = storage;
 
-    let blob_certificate = blob_inclusion_info.blob_certificate.hash_ext();
-    let encoded = blob_certificate.abi_encode_packed();
-    let leaf_node = keccak256(&encoded);
-    check::leaf_node_belongs_to_merkle_tree(
-        leaf_node,
+    check::blob_inclusion(
+        &blob_inclusion_info.blob_certificate,
         batch_header.batch_root.into(),
         blob_inclusion_info.inclusion_proof,
         blob_inclusion_info.blob_index,
     )?;
+
+    let cert_blob_version = blob_inclusion_info.blob_certificate.blob_header.version;
+    check::blob_version(cert_blob_version, next_blob_version)?;
+
+    check::security_assumptions_are_met(
+        cert_blob_version,
+        &versioned_blob_params,
+        &security_thresholds,
+    )?;
+
+    check::not_empty(&signed_quorum_numbers)?;
+
+    let lengths = [
+        signed_quorum_numbers.len(),
+        quorum_apks.len(),
+        quorum_apk_indices.len(),
+        total_stake_indices.len(),
+        non_signer_stake_indices.len(),
+    ];
+
+    check::equal_lengths(&lengths).unwrap();
+
+    let lengths = [
+        non_signer_pubkeys.len(),
+        non_signer_quorum_bitmap_indices.len(),
+    ];
+
+    check::equal_lengths(&lengths).unwrap();
 
     if batch_header.reference_block_number >= current_block {
         return Err(ReferenceBlockDoesNotPrecedeCurrentBlock(
@@ -74,28 +107,84 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
         ));
     }
 
-    let lengths = [
-        non_signer_stakes_and_signature.non_signer_pubkeys.len(),
-        non_signer_stakes_and_signature
-            .non_signer_quorum_bitmap_indices
-            .len(),
-    ];
+    // assumption: collection_a[i] corresponds to collection_b[i] for all i
+    let non_signers = non_signer_pubkeys
+        .into_iter()
+        .zip(non_signer_quorum_bitmap_indices.into_iter())
+        .map(|(pk, quorum_bitmap_history_index)| {
+            let pk_hash = convert::point_to_hash(&pk);
 
-    check::equal_lengths(&lengths).unwrap();
+            let quorum_bitmap_history = quorum_bitmap_history
+                .get(&pk_hash)
+                .ok_or(MissingSignerEntry)?
+                .try_get_at(quorum_bitmap_history_index)?
+                .try_get_against(batch_header.reference_block_number)?;
 
-    check::not_empty(&signed_quorum_numbers)?;
+            let non_signer = NonSigner {
+                pk: pk.into_ext(),
+                pk_hash,
+                quorum_bitmap_history,
+            };
+            Ok::<_, CertVerificationError>(non_signer)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let lengths = [
-        signed_quorum_numbers.len(),
-        non_signer_stakes_and_signature.quorum_apks.len(),
-        non_signer_stakes_and_signature.quorum_apk_indices.len(),
-        non_signer_stakes_and_signature.total_stake_indices.len(),
-        non_signer_stakes_and_signature
-            .non_signer_stake_indices
-            .len(),
-    ];
+    check::non_signers_strictly_sorted_by_hash(&non_signers)?;
 
-    check::equal_lengths(&lengths).unwrap();
+    // assumption: collection_a[i] corresponds to collection_b[i] for all i, for all (a, b)
+    let quorums = signed_quorum_numbers
+        .iter()
+        .zip(quorum_apks.iter())
+        .zip(total_stake_indices.into_iter())
+        .zip(non_signer_stake_indices.into_iter())
+        .map(
+            |(
+                ((signed_quorum, apk), total_stake_index),
+                stake_index_for_each_required_non_signer,
+            )| {
+                let total_stake = total_stake_history
+                    .get(signed_quorum)
+                    .ok_or(MissingQuorumEntry)?
+                    .try_get_at(total_stake_index)?
+                    .try_get_against(batch_header.reference_block_number)?;
+
+                let bit = *signed_quorum as usize;
+                let unsigned_stake = non_signers
+                    .iter()
+                    .filter(|non_signer| {
+                        // whether signer was required to sign this quorum
+                        non_signer.quorum_bitmap_history[bit]
+                    })
+                    // assumption: collection_a[i] corresponds to collection_b[i] for all i
+                    .zip(stake_index_for_each_required_non_signer.into_iter())
+                    .map(|(required_non_signer, stake_index)| {
+                        let stake = operator_stake_history
+                            .get(&required_non_signer.pk_hash)
+                            .ok_or(MissingSignerEntry)?
+                            .get(signed_quorum)
+                            .ok_or(MissingQuorumEntry)?
+                            .try_get_at(stake_index)?
+                            .try_get_against(batch_header.reference_block_number)?;
+                        Ok(stake)
+                    })
+                    .sum::<Result<_, CertVerificationError>>()?;
+
+                let signed_stake = total_stake.checked_sub(unsigned_stake).ok_or(Underflow)?;
+
+                let apk: G1Affine = (*apk).into_ext();
+                let quorum = Quorum {
+                    number: *signed_quorum,
+                    apk,
+                    total_stake,
+                    signed_stake,
+                };
+
+                Ok::<_, CertVerificationError>(quorum)
+            },
+        )
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
 
     #[cfg(feature = "stale-stakes-forbidden")]
     if staleness.stale_stakes_forbidden {
@@ -110,114 +199,27 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
     check::cert_apks_equal_storage_apks(
         &signed_quorum_numbers,
         batch_header.reference_block_number,
-        &non_signer_stakes_and_signature.quorum_apks,
-        non_signer_stakes_and_signature.quorum_apk_indices,
+        &quorum_apks,
+        quorum_apk_indices,
         apk_history,
     )?;
 
-    // assumption: collection_a[i] corresponds to collection_b[i] for all i
-    let non_signers = non_signer_stakes_and_signature
-        .non_signer_pubkeys
-        .into_iter()
-        .zip(
-            non_signer_stakes_and_signature
-                .non_signer_quorum_bitmap_indices
-                .into_iter(),
-        )
-        .map(|(pk, quorum_bitmap_history_index)| {
-            let pk_hash = convert::point_to_hash(&pk);
+    let msg_hash = batch_header.hash_ext();
+    let apk_g2: G2Affine = apk_g2.into_ext();
+    let sigma: G1Affine = sigma.into_ext();
 
-            let quorum_bitmap_history = quorum_bitmap_history
-                .get(&pk_hash)
-                .ok_or(MissingSignerEntry)?
-                .try_get_at(quorum_bitmap_history_index)?
-                .try_get_against(batch_header.reference_block_number)?;
-
-            let pk: G1Affine = pk.into_ext();
-            let non_signer = NonSigner {
-                pk,
-                pk_hash,
-                quorum_bitmap_history,
-            };
-            Ok::<_, CertVerificationError>(non_signer)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    check::non_signers_strictly_sorted_by_hash(&non_signers)?;
-
-    // assumption: collection_a[i] corresponds to collection_b[i] for all i, for all (a, b)
-    let quorums = signed_quorum_numbers
-        .into_iter()
-        .zip(non_signer_stakes_and_signature.quorum_apks.into_iter())
-        .zip(
-            non_signer_stakes_and_signature
-                .total_stake_indices
-                .into_iter(),
-        )
-        .zip(
-            non_signer_stakes_and_signature
-                .non_signer_stake_indices
-                .into_iter(),
-        )
-        .map(
-            |(
-                ((signed_quorum, apk), total_stake_index),
-                stake_index_for_each_required_non_signer,
-            )| {
-                let total_stake = total_stake_history
-                    .get(&signed_quorum)
-                    .ok_or(MissingQuorumEntry)?
-                    .try_get_at(total_stake_index)?
-                    .try_get_against(batch_header.reference_block_number)?;
-
-                let bit = signed_quorum as usize;
-                let unsigned_stake = non_signers
-                    .iter()
-                    .filter(|non_signer| {
-                        // whether signer was required to sign this quorum
-                        non_signer.quorum_bitmap_history[bit]
-                    })
-                    // assumption: collection_a[i] corresponds to collection_b[i] for all i
-                    .zip(stake_index_for_each_required_non_signer.into_iter())
-                    .map(|(required_non_signer, stake_index)| {
-                        let stake = operator_stake_history
-                            .get(&required_non_signer.pk_hash)
-                            .ok_or(MissingSignerEntry)?
-                            .get(&signed_quorum)
-                            .ok_or(MissingQuorumEntry)?
-                            .try_get_at(stake_index)?
-                            .try_get_against(batch_header.reference_block_number)?;
-                        Ok(stake)
-                    })
-                    .sum::<Result<_, CertVerificationError>>()?;
-
-                let signed_stake = total_stake.checked_sub(unsigned_stake).ok_or(Underflow)?;
-
-                let apk: G1Affine = apk.into_ext();
-                let quorum = Quorum {
-                    number: signed_quorum,
-                    apk,
-                    total_stake,
-                    signed_stake,
-                };
-
-                Ok::<_, CertVerificationError>(quorum)
-            },
-        )
-        .collect::<Result<Vec<_>, _>>()?;
-
-    check::relay_keys_are_set(
-        &blob_inclusion_info.blob_certificate.relay_keys,
-        &relay_key_to_relay_address,
-    )?;
-
-    let version = blob_inclusion_info.blob_certificate.blob_header.version;
-    check::security_assumptions_are_met(version, &versioned_blob_params, &security_thresholds)?;
+    if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
+        return Err(SignatureVerificationFailed);
+    }
 
     let blob_quorums = blob_inclusion_info
         .blob_certificate
         .blob_header
         .quorum_numbers;
+
+    if blob_quorums.is_empty() {
+        return Err(EmptyBlobQuorums);
+    }
 
     check::confirmed_quorums_contain_blob_quorums(
         security_thresholds.confirmationThreshold,
@@ -226,16 +228,6 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
     )?;
 
     check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorum_numbers)?;
-
-    let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
-
-    let msg_hash = batch_header.hash_ext();
-    let apk_g2: G2Affine = non_signer_stakes_and_signature.apk_g2.into_ext();
-    let sigma: G1Affine = non_signer_stakes_and_signature.sigma.into_ext();
-
-    if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
-        return Err(SignatureVerificationFailed);
-    }
 
     Ok(())
 }
@@ -247,7 +239,7 @@ mod tests {
             BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
             G1Point, NonSignerStakesAndSignature,
         },
-        verification::cert::hash::keccak256_many,
+        verification::cert::hash::streaming_keccak256,
     };
     use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
     use alloy_sol_types::SolValue;
@@ -371,20 +363,6 @@ mod tests {
                 window: 1,
             }
         );
-    }
-
-    #[test]
-    fn cert_apk_not_equal_storage_apk() {
-        let mut inputs = success_inputs();
-
-        inputs.non_signer_stakes_and_signature.quorum_apks[0] = G1Point {
-            x: alloy_primitives::Uint::ONE,
-            y: alloy_primitives::Uint::ONE,
-        };
-
-        let err = verify(inputs).unwrap_err();
-
-        assert!(matches!(err, CertApkDoesNotEqualStorageApk { .. }));
     }
 
     #[test]
@@ -588,22 +566,6 @@ mod tests {
         let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, SignatureVerificationFailed);
-    }
-
-    #[test]
-    fn relay_keys_not_set() {
-        let mut inputs = success_inputs();
-
-        let relay_address = inputs
-            .storage
-            .relay_key_to_relay_address
-            .get_mut(&42)
-            .unwrap();
-        *relay_address = Default::default();
-
-        let err = verify(inputs).unwrap_err();
-
-        assert_eq!(err, RelayKeyNotSet);
     }
 
     #[test]
@@ -826,8 +788,6 @@ mod tests {
             })
             .collect();
 
-        let relay_key_to_relay_address = HashMap::from([(42, [42u8; 20].into())]);
-
         let versioned_blob_params = HashMap::from([(
             42,
             VersionedBlobParams {
@@ -836,6 +796,8 @@ mod tests {
                 codingRate: 42,
             },
         )]);
+
+        let next_blob_version = 43;
 
         #[cfg(feature = "stale-stakes-forbidden")]
         let staleness = {
@@ -859,8 +821,8 @@ mod tests {
             operator_stake_history,
             total_stake_history,
             apk_history,
-            relay_key_to_relay_address,
             versioned_blob_params,
+            next_blob_version,
             #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };
@@ -893,7 +855,7 @@ mod tests {
         let left_child = keccak256(&encoded);
 
         let right_sibling = [42u8; 32].into();
-        let batch_root = keccak256_many(&[left_child, right_sibling]);
+        let batch_root = streaming_keccak256(&[left_child, right_sibling]);
 
         let batch_header = BatchHeaderV2 {
             batch_root: batch_root.into(),

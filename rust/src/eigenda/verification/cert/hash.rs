@@ -1,10 +1,8 @@
 use std::fmt::Display;
 
 use crate::eigenda::cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
-use alloy_primitives::{B256, keccak256};
+use alloy_primitives::{B256, Keccak256, keccak256};
 use alloy_sol_types::SolValue;
-use smallvec::SmallVec;
-
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From, Into};
 
 #[repr(transparent)]
@@ -54,12 +52,10 @@ impl HashExt for BatchHeaderV2 {
     }
 }
 
-pub fn keccak256_many<T: AsRef<[u8]>>(values: &[T]) -> B256 {
-    let mut buffer: SmallVec<[u8; 256]> = SmallVec::with_capacity(values.len() * 32);
-
-    for value in values {
-        buffer.extend_from_slice(value.as_ref());
+pub fn streaming_keccak256<T: AsRef<[u8]>>(values: &[T]) -> B256 {
+    let mut hasher = Keccak256::new();
+    for v in values {
+        hasher.update(v.as_ref());
     }
-
-    keccak256(&buffer)
+    hasher.finalize()
 }

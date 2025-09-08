@@ -2,7 +2,7 @@ pub mod conversions;
 pub mod history;
 pub mod solidity;
 
-use alloy_primitives::{Address, B256, aliases::U96};
+use alloy_primitives::{B256, aliases::U96};
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
@@ -23,8 +23,8 @@ pub struct Storage {
     // number of quorums initialized in the RegistryCoordinator
     pub quorum_count: u8,
     pub current_block: BlockNumber,
-    pub relay_key_to_relay_address: HashMap<RelayKey, Address>,
     pub versioned_blob_params: HashMap<Version, VersionedBlobParams>,
+    pub next_blob_version: Version,
     pub quorum_bitmap_history: HashMap<B256, History<Bitmap>>,
     pub apk_history: HashMap<QuorumNumber, History<TruncHash>>,
     pub total_stake_history: HashMap<QuorumNumber, History<Stake>>,

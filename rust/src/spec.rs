@@ -26,9 +26,9 @@ use crate::{
     eigenda::{
         cert::StandardCommitment,
         extraction::{
-            ApkHistoryExtractor, DataDecoder, OperatorBitmapHistoryExtractor,
-            OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-            RelayKeyToRelayInfoExtractor, SecurityThresholdsV2Extractor,
+            ApkHistoryExtractor, DataDecoder, NextBlobVersionExtractor,
+            OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
+            QuorumNumbersRequiredV2Extractor, SecurityThresholdsV2Extractor,
             TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
         },
         verification::cert::{
@@ -369,7 +369,6 @@ pub struct TransactionWithBlob {
 /// used to verify the data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CertificateStateData {
-    pub relay_registry: AccountProof,
     pub threshold_registry: AccountProof,
     pub registry_coordinator: AccountProof,
     #[cfg(feature = "stale-stakes-forbidden")]
@@ -384,7 +383,6 @@ pub struct CertificateStateData {
 impl CertificateStateData {
     #![allow(clippy::result_large_err)]
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
-        self.relay_registry.verify(state_root)?;
         self.threshold_registry.verify(state_root)?;
         self.registry_coordinator.verify(state_root)?;
         #[cfg(feature = "stale-stakes-forbidden")]
@@ -423,10 +421,10 @@ impl CertificateStateData {
         let apk_history =
             ApkHistoryExtractor::new(cert).decode_data(&self.bls_apk_registry.storage_proofs)?;
 
-        let relay_key_to_relay_address = RelayKeyToRelayInfoExtractor::new(cert)
-            .decode_data(&self.relay_registry.storage_proofs)?;
-
         let versioned_blob_params = VersionedBlobParamsExtractor::new(cert)
+            .decode_data(&self.threshold_registry.storage_proofs)?;
+
+        let next_blob_version = NextBlobVersionExtractor::new(cert)
             .decode_data(&self.threshold_registry.storage_proofs)?;
 
         #[cfg(feature = "stale-stakes-forbidden")]
@@ -456,8 +454,8 @@ impl CertificateStateData {
             operator_stake_history,
             total_stake_history,
             apk_history,
-            relay_key_to_relay_address,
             versioned_blob_params,
+            next_blob_version,
             #[cfg(feature = "stale-stakes-forbidden")]
             staleness,
         };

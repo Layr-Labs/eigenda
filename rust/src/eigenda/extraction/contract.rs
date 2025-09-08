@@ -12,20 +12,12 @@ use crate::eigenda::extraction::{
 use crate::eigenda::{
     cert::StandardCommitment,
     extraction::{
-        ApkHistoryExtractor, OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor,
-        QuorumCountExtractor, QuorumNumbersRequiredV2Extractor, RelayKeyToRelayInfoExtractor,
+        ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
+        OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
         SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
         VersionedBlobParamsExtractor,
     },
 };
-
-pub struct RelayRegistry;
-
-impl RelayRegistry {
-    pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-        RelayKeyToRelayInfoExtractor::new(certificate).storage_keys()
-    }
-}
 
 pub struct RegistryCoordinator;
 
@@ -75,7 +67,13 @@ pub struct EigenDaThresholdRegistry;
 
 impl EigenDaThresholdRegistry {
     pub fn storage_keys(certificate: &StandardCommitment) -> Vec<StorageKey> {
-        VersionedBlobParamsExtractor::new(certificate).storage_keys()
+        let versioned_blob_params = VersionedBlobParamsExtractor::new(certificate).storage_keys();
+        let next_blob_version = NextBlobVersionExtractor::new(certificate).storage_keys();
+
+        [versioned_blob_params, next_blob_version]
+            .into_iter()
+            .flatten()
+            .collect()
     }
 }
 

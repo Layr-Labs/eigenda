@@ -5,7 +5,7 @@ use crate::eigenda::{
     verification::cert::{
         bitmap::BitmapError,
         hash::TruncHash,
-        types::{RelayKey, history::HistoryError},
+        types::{Version, history::HistoryError},
     },
 };
 
@@ -59,12 +59,6 @@ pub enum CertVerificationError {
     #[error("Underflow")]
     Underflow,
 
-    #[error("Missing relay key entry {0}")]
-    MissingRelayKeyEntry(RelayKey),
-
-    #[error("Relay key not set")]
-    RelayKeyNotSet,
-
     #[error("Missing version entry {0}")]
     MissingVersionEntry(u16),
 
@@ -100,4 +94,12 @@ pub enum CertVerificationError {
 
     #[error(transparent)]
     WrapBitmapError(#[from] BitmapError),
+
+    #[error(
+        "Certificate blob version ({0}) must be less than Threshold Registry's next blob version ({1})"
+    )]
+    InvalidBlobVersion(Version, Version),
+
+    #[error("A blob certificate containing no quorum numbers is invalid")]
+    EmptyBlobQuorums,
 }

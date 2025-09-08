@@ -5287,7 +5287,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "smallvec",
  "sov-rollup-interface",
  "test-strategy",
  "testcontainers",

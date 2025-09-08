@@ -268,13 +268,6 @@ impl EigenDaService {
         block_height: u64,
         cert: &StandardCommitment,
     ) -> Result<CertificateStateData, EigenDaServiceError> {
-        let keys = contract::RelayRegistry::storage_keys(cert);
-        let relay_registry_fut = self
-            .ethereum
-            .get_proof(self.contracts.relay_registry, keys)
-            .number(block_height)
-            .into_future();
-
         let keys = contract::EigenDaThresholdRegistry::storage_keys(cert);
         let threshold_registry_fut = self
             .ethereum
@@ -329,7 +322,6 @@ impl EigenDaService {
         };
 
         let responses = try_join_all([
-            relay_registry_fut,
             threshold_registry_fut,
             registry_coordinator_fut,
             #[cfg(feature = "stale-stakes-forbidden")]
@@ -344,7 +336,6 @@ impl EigenDaService {
 
         #[cfg(feature = "stale-stakes-forbidden")]
         let [
-            relay_registry,
             threshold_registry,
             registry_coordinator,
             service_manager,
@@ -352,20 +343,18 @@ impl EigenDaService {
             stake_registry,
             cert_verifier,
             delegation_manager,
-        ]: [EIP1186AccountProofResponse; 8] = responses.try_into().expect("Expected 8 elements");
+        ]: [EIP1186AccountProofResponse; 7] = responses.try_into().expect("Expected 8 elements");
 
         #[cfg(not(feature = "stale-stakes-forbidden"))]
         let [
-            relay_registry,
             threshold_registry,
             registry_coordinator,
             bls_apk_registry,
             stake_registry,
             cert_verifier,
-        ]: [EIP1186AccountProofResponse; 6] = responses.try_into().expect("Expected 6 elements");
+        ]: [EIP1186AccountProofResponse; 5] = responses.try_into().expect("Expected 6 elements");
 
         Ok(CertificateStateData {
-            relay_registry: AccountProof::from(relay_registry),
             threshold_registry: AccountProof::from(threshold_registry),
             registry_coordinator: AccountProof::from(registry_coordinator),
             #[cfg(feature = "stale-stakes-forbidden")]

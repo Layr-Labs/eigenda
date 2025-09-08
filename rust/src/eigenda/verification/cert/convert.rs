@@ -1,4 +1,4 @@
-use crate::eigenda::{cert::G1Point, verification::cert::hash::keccak256_many};
+use crate::eigenda::{cert::G1Point, verification::cert::hash::streaming_keccak256};
 use alloy_primitives::{B256, Uint};
 use ark_bn254::{Fq, G1Affine};
 use ark_ff::{BigInt, BigInteger, Field, MontFp, PrimeField};
@@ -9,7 +9,7 @@ const THREE: Fq = MontFp!("3");
 pub fn point_to_hash(point: &G1Point) -> B256 {
     let x_bytes: [u8; 32] = point.x.to_be_bytes();
     let y_bytes: [u8; 32] = point.y.to_be_bytes();
-    keccak256_many(&[&x_bytes, &y_bytes])
+    streaming_keccak256(&[&x_bytes, &y_bytes])
 }
 
 pub(crate) fn hash_to_point(hash: B256) -> G1Affine {

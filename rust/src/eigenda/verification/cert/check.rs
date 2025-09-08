@@ -1,5 +1,9 @@
-use crate::eigenda::{cert::G1Point, verification::cert::hash::keccak256_many};
-use alloy_primitives::{Address, B256, Bytes, aliases::U96};
+use crate::eigenda::{
+    cert::{BlobCertificate, G1Point},
+    verification::cert::hash::{HashExt, streaming_keccak256},
+};
+use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
+use alloy_sol_types::SolValue;
 use hashbrown::HashMap;
 use tracing::{Level, instrument};
 
@@ -9,13 +13,24 @@ use crate::eigenda::verification::cert::{
     error::CertVerificationError::{self, *},
     hash::TruncHash,
     types::{
-        BlockNumber, NonSigner, Quorum, QuorumNumber, RelayKey, Version,
+        BlockNumber, NonSigner, Quorum, QuorumNumber, Version,
         history::History,
         solidity::{SecurityThresholds, VersionedBlobParams},
     },
 };
 
 const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol
+
+/// Validate that the certificate blob's version is valid. Otherwise it'll result a `coding_rate = 0`
+/// which in turn will lead to division by zero at the subsequent `check::security_assumptions_are_met`
+pub fn blob_version(
+    cert_blob_version: Version,
+    next_blob_version: Version,
+) -> Result<(), CertVerificationError> {
+    (cert_blob_version < next_blob_version)
+        .then_some(())
+        .ok_or(InvalidBlobVersion(cert_blob_version, next_blob_version))
+}
 
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
@@ -103,24 +118,8 @@ pub fn cert_apks_equal_storage_apks(
 }
 
 #[instrument(level = Level::DEBUG, skip_all)]
-pub fn relay_keys_are_set(
-    relay_keys: &[RelayKey],
-    relay_key_to_relay_address: &HashMap<RelayKey, Address>,
-) -> Result<(), CertVerificationError> {
-    relay_keys.iter().try_for_each(|relay_key| {
-        let relay_address = relay_key_to_relay_address
-            .get(relay_key)
-            .ok_or(MissingRelayKeyEntry(*relay_key))?;
-
-        (relay_address != &Address::default())
-            .then_some(())
-            .ok_or(RelayKeyNotSet)
-    })
-}
-
-#[instrument(level = Level::DEBUG, skip_all)]
 pub fn security_assumptions_are_met(
-    version: Version,
+    cert_blob_version: Version,
     versioned_blob_params: &HashMap<Version, VersionedBlobParams>,
     security_thresholds: &SecurityThresholds,
 ) -> Result<(), CertVerificationError> {
@@ -134,8 +133,8 @@ pub fn security_assumptions_are_met(
         numChunks,
         codingRate,
     } = versioned_blob_params
-        .get(&version)
-        .ok_or(MissingVersionEntry(version))?;
+        .get(&cert_blob_version)
+        .ok_or(MissingVersionEntry(cert_blob_version))?;
 
     if confirmationThreshold <= adversaryThreshold {
         return Err(ConfirmationThresholdLessThanOrEqualToAdversaryThreshold(
@@ -176,11 +175,9 @@ pub fn security_assumptions_are_met(
     //     where the upper bound can overflow if represented as u32 hence the casts to u64
     //     same for maxNumOperators * 10_000
 
-    if n < max_num_operators * 10_000 {
-        return Err(UnmetSecurityAssumptions);
-    }
-
-    Ok(())
+    (n >= max_num_operators * 10_000)
+        .then_some(())
+        .ok_or(UnmetSecurityAssumptions)
 }
 
 #[instrument(level = Level::DEBUG, skip_all)]
@@ -238,7 +235,20 @@ fn contains(container: Bitmap, contained: Bitmap) -> bool {
 }
 
 #[instrument(level = Level::DEBUG, skip_all)]
-pub fn leaf_node_belongs_to_merkle_tree(
+pub fn blob_inclusion(
+    blob_certificate: &BlobCertificate,
+    expected_root: B256,
+    proof: Bytes,
+    sibling_path: u32,
+) -> Result<(), CertVerificationError> {
+    let blob_certificate = blob_certificate.hash_ext();
+    let encoded = blob_certificate.abi_encode_packed();
+    let leaf_node = keccak256(&encoded);
+    leaf_node_belongs_to_merkle_tree(leaf_node, expected_root, proof, sibling_path)
+}
+
+#[instrument(level = Level::DEBUG, skip_all)]
+fn leaf_node_belongs_to_merkle_tree(
     leaf_node: B256,
     expected_root: B256,
     proof: Bytes,
@@ -270,7 +280,7 @@ pub fn leaf_node_belongs_to_merkle_tree(
             true => (sibling_node, current_node),
             false => (current_node, sibling_node),
         };
-        let parent_node = keccak256_many(&[left_node, right_node]);
+        let parent_node = streaming_keccak256(&[left_node, right_node]);
         current_node = parent_node;
     }
 
@@ -278,6 +288,29 @@ pub fn leaf_node_belongs_to_merkle_tree(
     (actual_root == expected_root)
         .then_some(())
         .ok_or(LeafNodeDoesNotBelongToMerkleTree)
+}
+
+#[cfg(test)]
+mod test_blob_version {
+    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
+
+    #[test]
+    fn success_when_cert_version_less_than_next_version() {
+        let result = check::blob_version(42, 43);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn invalid_blob_version_when_cert_version_equals_next_version() {
+        let err = check::blob_version(42, 42).unwrap_err();
+        assert_eq!(err, InvalidBlobVersion(42, 42));
+    }
+
+    #[test]
+    fn invalid_blob_version_when_cert_version_greater_than_next_version() {
+        let err = check::blob_version(43, 42).unwrap_err();
+        assert_eq!(err, InvalidBlobVersion(43, 42));
+    }
 }
 
 #[cfg(test)]
@@ -669,47 +702,6 @@ mod test_cert_apks_equal_storage_apks {
 }
 
 #[cfg(test)]
-mod test_relay_keys_are_set {
-    use alloy_primitives::Address;
-    use hashbrown::HashMap;
-
-    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
-
-    #[test]
-    fn success_when_all_relay_keys_are_set() {
-        let relay_keys = vec![0];
-
-        let relay_key_to_relay_address = HashMap::from([(0, [42u8; 20].into())]);
-
-        let result = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address);
-
-        assert_eq!(result, Ok(()));
-    }
-
-    #[test]
-    fn relay_keys_are_set_fails_with_missing_relay_key() {
-        let relay_keys = vec![99]; // 99 not found on storage
-
-        let relay_key_to_relay_address = HashMap::from([(42, [42u8; 20].into())]);
-
-        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
-
-        assert_eq!(err, MissingRelayKeyEntry(99));
-    }
-
-    #[test]
-    fn relay_keys_are_set_fails_when_corresponding_address_is_not_set() {
-        let relay_keys = vec![42];
-
-        let relay_key_to_relay_address = HashMap::from([(42, Address::default())]);
-
-        let err = check::relay_keys_are_set(&relay_keys, &relay_key_to_relay_address).unwrap_err();
-
-        assert_eq!(err, RelayKeyNotSet);
-    }
-}
-
-#[cfg(test)]
 mod test_security_assumptions_are_met {
     use hashbrown::HashMap;
 
@@ -1070,7 +1062,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
     use alloy_primitives::FixedBytes;
 
     use crate::eigenda::verification::cert::{
-        check, error::CertVerificationError::*, hash::keccak256_many,
+        check, error::CertVerificationError::*, hash::streaming_keccak256,
     };
 
     #[test]
@@ -1081,7 +1073,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let left_child: FixedBytes<32> = [1; 32].into();
         let right_sibling: FixedBytes<32> = [2; 32].into();
-        let expected_root: FixedBytes<32> = keccak256_many(&[left_child, right_sibling]);
+        let expected_root: FixedBytes<32> = streaming_keccak256(&[left_child, right_sibling]);
 
         let proof = right_sibling.into();
 
@@ -1102,7 +1094,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let right_child: FixedBytes<32> = [2; 32].into();
         let left_sibling: FixedBytes<32> = [1; 32].into();
-        let expected_root: FixedBytes<32> = keccak256_many(&[left_sibling, right_child]);
+        let expected_root: FixedBytes<32> = streaming_keccak256(&[left_sibling, right_child]);
 
         let proof = left_sibling.into();
 
@@ -1127,8 +1119,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let right_sibling: FixedBytes<32> = [2; 32].into();
         let right_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak256_many(&[left_child, right_sibling]);
-        let expected_root = keccak256_many(&[parent, right_pibling]);
+        let parent = streaming_keccak256(&[left_child, right_sibling]);
+        let expected_root = streaming_keccak256(&[parent, right_pibling]);
 
         let proof = [&right_sibling[..], &right_pibling[..]].concat().into();
 
@@ -1152,8 +1144,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_sibling: FixedBytes<32> = [1; 32].into();
         let right_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak256_many(&[right_child, left_sibling]);
-        let expected_root = keccak256_many(&[parent, right_pibling]);
+        let parent = streaming_keccak256(&[right_child, left_sibling]);
+        let expected_root = streaming_keccak256(&[parent, right_pibling]);
 
         let proof = [&left_sibling[..], &right_pibling[..]].concat().into();
 
@@ -1178,8 +1170,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let right_sibling: FixedBytes<32> = [2; 32].into();
         let left_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak256_many(&[left_child, right_sibling]);
-        let expected_root = keccak256_many(&[left_pibling, parent]);
+        let parent = streaming_keccak256(&[left_child, right_sibling]);
+        let expected_root = streaming_keccak256(&[left_pibling, parent]);
 
         let proof = [&right_sibling[..], &left_pibling[..]].concat().into();
 
@@ -1204,8 +1196,8 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_sibling: FixedBytes<32> = [1; 32].into();
         let left_pibling: FixedBytes<32> = [3; 32].into();
 
-        let parent = keccak256_many(&[left_sibling, right_child]);
-        let expected_root = keccak256_many(&[left_pibling, parent]);
+        let parent = streaming_keccak256(&[left_sibling, right_child]);
+        let expected_root = streaming_keccak256(&[left_pibling, parent]);
 
         let proof = [&left_sibling[..], &left_pibling[..]].concat().into();
 
@@ -1233,9 +1225,9 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_pibling: FixedBytes<32> = [3; 32].into();
         let right_grandparent: FixedBytes<32> = [4; 32].into();
 
-        let right_parent = keccak256_many(&[left_child, right_sibling]);
-        let left_grandparent = keccak256_many(&[left_pibling, right_parent]);
-        let expected_root = keccak256_many(&[left_grandparent, right_grandparent]);
+        let right_parent = streaming_keccak256(&[left_child, right_sibling]);
+        let left_grandparent = streaming_keccak256(&[left_pibling, right_parent]);
+        let expected_root = streaming_keccak256(&[left_grandparent, right_grandparent]);
 
         let proof = [
             &right_sibling[..],
@@ -1313,7 +1305,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
         let left_child: FixedBytes<32> = [1; 32].into();
         let correct_right_sibling: FixedBytes<32> = [2; 32].into();
         let wrong_right_sibling: FixedBytes<32> = [3; 32].into();
-        let expected_root = keccak256_many(&[left_child, correct_right_sibling]);
+        let expected_root = streaming_keccak256(&[left_child, correct_right_sibling]);
 
         let proof = wrong_right_sibling.into();
         // path: ... 0000 0000
@@ -1333,7 +1325,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         let left_child: FixedBytes<32> = [1; 32].into();
         let right_sibling: FixedBytes<32> = [2; 32].into();
-        let expected_root = keccak256_many(&[left_child, right_sibling]);
+        let expected_root = streaming_keccak256(&[left_child, right_sibling]);
 
         let proof = right_sibling.into();
         // path: ... 0000 0001 (should be 0000 0000)
@@ -1356,7 +1348,7 @@ mod test_leaf_node_belongs_to_merkle_tree {
 
         for i in 0..=255u8 {
             let right_sibling_node = [i; 32].into();
-            left_current_node = keccak256_many(&[left_current_node, right_sibling_node]);
+            left_current_node = streaming_keccak256(&[left_current_node, right_sibling_node]);
             proof.extend_from_slice(right_sibling_node.as_ref());
         }
 

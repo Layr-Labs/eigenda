@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::eigenda::verification::cert::convert;
+use crate::eigenda::verification::cert::types::RelayKey;
 
 /// Byte indicating a version 2 certificate.
 const VERSION_2: u8 = 1;
@@ -65,13 +66,6 @@ impl StandardCommitment {
         match &self.0 {
             EigenDAVersionedCert::V2(c) => c.batch_header_v2.reference_block_number as u64,
             EigenDAVersionedCert::V3(c) => c.batch_header_v2.reference_block_number as u64,
-        }
-    }
-
-    pub fn relay_keys(&self) -> &[u32] {
-        match &self.0 {
-            EigenDAVersionedCert::V2(cert) => &cert.blob_inclusion_info.blob_certificate.relay_keys,
-            EigenDAVersionedCert::V3(cert) => &cert.blob_inclusion_info.blob_certificate.relay_keys,
         }
     }
 
@@ -245,7 +239,7 @@ pub struct BlobInclusionInfo {
 pub struct BlobCertificate {
     pub blob_header: BlobHeaderV2,
     pub signature: Bytes,
-    pub relay_keys: Vec<u32>,
+    pub relay_keys: Vec<RelayKey>,
 }
 
 // BlobHeaderV2 is the version 2 of blob header

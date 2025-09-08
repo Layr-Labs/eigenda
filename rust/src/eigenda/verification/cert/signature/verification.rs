@@ -6,7 +6,7 @@ use ark_ec::{
 };
 use ark_ff::{AdditiveGroup, PrimeField};
 
-use crate::eigenda::verification::cert::{convert, hash::keccak256_many};
+use crate::eigenda::verification::cert::{convert, hash::streaming_keccak256};
 
 /// Verifies the `sigma` signature over `msg_hash` by the (`apk_g1`, `apk_g2`) pubkey
 /// by checking e(sigma + apk_g1 * gamma, -G2) * e(msg_hash + G1 * gamma, apk_g2) == 1
@@ -42,7 +42,7 @@ fn compute_gamma(
     let (apk_g2_x, apk_g2_y) = apk_g2.xy()?;
     let (sigma_x, sigma_y) = sigma.xy()?;
 
-    let gamma = keccak256_many(&[
+    let gamma = streaming_keccak256(&[
         msg_hash.as_slice(),
         &convert::fq_to_bytes_be(apk_g1_x),
         &convert::fq_to_bytes_be(apk_g1_y),

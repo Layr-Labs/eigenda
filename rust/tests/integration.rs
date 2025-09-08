@@ -105,7 +105,7 @@ async fn check_blobs_roundtrip(
         rollup_process_relevant_blobs(&mut blobs);
 
         // Verify relevant blobs against proofs
-        verify_relevant_blobs(&verifier, &block.header, &blobs, &proofs)?;
+        verify_relevant_blobs(verifier, &block.header, &blobs, &proofs)?;
 
         for batch in blobs.batch_blobs {
             if batch.sender() != sender {

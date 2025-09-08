@@ -48,15 +48,6 @@ pub enum Network {
 pub struct EigenDaContracts {
     /// # Ethereum description
     ///
-    /// Registry for EigenDA relay keys
-    ///
-    /// # Details
-    ///
-    /// The `relayKeyToInfo` mapping is read from it
-    pub relay_registry: Address,
-
-    /// # Ethereum description
-    ///
     /// The `EigenDAThresholdRegistry` contract.
     ///
     /// # Details
@@ -154,7 +145,6 @@ impl EigenDaContracts {
     /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/mainnet.json
     pub fn mainnet() -> Self {
         Self {
-            relay_registry: address!("0xD160e6C1543f562fc2B0A5bf090aED32640Ec55B"),
             threshold_registry: address!("0xdb4c89956eEa6F606135E7d366322F2bDE609F15"),
             registry_coordinator: address!("0x0BAAc79acD45A023E19345c352d8a7a83C4e5656"),
             #[cfg(feature = "stale-stakes-forbidden")]
@@ -176,7 +166,6 @@ impl EigenDaContracts {
     /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/holesky.json
     pub fn holesky() -> Self {
         Self {
-            relay_registry: address!("0xaC8C6C7Ee7572975454E2f0b5c720f9E74989254"),
             threshold_registry: address!("0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1"),
             registry_coordinator: address!("0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"),
             #[cfg(feature = "stale-stakes-forbidden")]

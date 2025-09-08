@@ -6,7 +6,7 @@ pub mod storage_key_helpers;
 pub use stale_stakes_forbidden::*;
 
 use alloy_primitives::{
-    Address, B256, Bytes, StorageKey, U256,
+    B256, Bytes, StorageKey, U256,
     aliases::{U96, U192},
 };
 use hashbrown::HashMap;
@@ -20,15 +20,15 @@ use crate::eigenda::{
         bitmap::Bitmap,
         hash::TruncHash,
         types::{
-            QuorumNumber, RelayKey, Stake, Version,
+            QuorumNumber, Stake, Version,
             history::{History, HistoryError},
             solidity::{SecurityThresholds, StakeUpdate, VersionedBlobParams},
         },
     },
 };
 
-const RELAY_KEY_TO_RELAY_INFO_MAPPING_SLOT: u64 = 101u64;
 const VERSIONED_BLOB_PARAMS_MAPPING_SLOT: u64 = 4;
+const NEXT_BLOB_VERSION_SLOT: u64 = 3;
 const QUORUM_COUNT_VARIABLE_SLOT: u64 = 150;
 const OPERATOR_BITMAP_HISTORY_MAPPING_SLOT: u64 = 152;
 const APK_HISTORY_MAPPING_SLOT: u64 = 4;
@@ -95,54 +95,6 @@ impl DataDecoder for QuorumCountExtractor {
     }
 }
 
-pub struct RelayKeyToRelayInfoExtractor {
-    pub relay_keys: Vec<RelayKey>,
-}
-
-impl RelayKeyToRelayInfoExtractor {
-    pub fn new(certificate: &StandardCommitment) -> Self {
-        Self {
-            relay_keys: certificate.relay_keys().to_vec(),
-        }
-    }
-}
-
-impl StorageKeyProvider for RelayKeyToRelayInfoExtractor {
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
-    fn storage_keys(&self) -> Vec<StorageKey> {
-        self.relay_keys
-            .iter()
-            .map(|&relay_key| {
-                storage_key_helpers::mapping_key(
-                    U256::from(relay_key),
-                    RELAY_KEY_TO_RELAY_INFO_MAPPING_SLOT,
-                )
-            })
-            .collect()
-    }
-}
-
-// RELAY_REGISTRY::relayKeyToAddress
-// TODO: been using relayKeyToRelayInfo but there's no need because relayKeyToAddress exists
-impl DataDecoder for RelayKeyToRelayInfoExtractor {
-    type Output = HashMap<RelayKey, Address>;
-
-    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
-    fn decode_data(
-        &self,
-        storage_proofs: &[StorageProof],
-    ) -> Result<Self::Output, CertExtractionError> {
-        self.storage_keys()
-            .iter()
-            .zip(self.relay_keys.iter())
-            .map(|(storage_key, &relay_key)| {
-                decode_helpers::find_required_proof(storage_proofs, storage_key, "relayKeyToInfo")
-                    .map(|proof| (relay_key, Address::from_word(proof.value.into())))
-            })
-            .collect()
-    }
-}
-
 pub struct VersionedBlobParamsExtractor {
     pub version: u16,
 }
@@ -188,6 +140,40 @@ impl DataDecoder for VersionedBlobParamsExtractor {
             codingRate: le[8],
         };
         Ok(HashMap::from([(key, value)]))
+    }
+}
+
+pub struct NextBlobVersionExtractor;
+
+impl NextBlobVersionExtractor {
+    pub fn new(_certificate: &StandardCommitment) -> Self {
+        Self
+    }
+}
+
+impl StorageKeyProvider for NextBlobVersionExtractor {
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    fn storage_keys(&self) -> Vec<StorageKey> {
+        vec![storage_key_helpers::simple_slot_key(NEXT_BLOB_VERSION_SLOT)]
+    }
+}
+
+impl DataDecoder for NextBlobVersionExtractor {
+    type Output = Version;
+
+    #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
+    fn decode_data(
+        &self,
+        storage_proofs: &[StorageProof],
+    ) -> Result<Self::Output, CertExtractionError> {
+        let storage_key = &self.storage_keys()[0];
+        let proof =
+            decode_helpers::find_required_proof(storage_proofs, storage_key, "nextBlobVersion")?;
+        let next_blob_version = proof.value.to::<Self::Output>();
+
+        tracing::info!(?next_blob_version);
+
+        Ok(next_blob_version)
     }
 }
 
@@ -672,7 +658,7 @@ mod stale_stakes_forbidden {
                 storage_key,
                 "minWithdrawalDelayBlocks",
             )?;
-            Ok(proof.value.to::<u32>())
+            Ok(proof.value.to::<Self::Output>())
         }
     }
 
