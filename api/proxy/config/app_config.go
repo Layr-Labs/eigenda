@@ -50,6 +50,7 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 	return AppConfig{
 		StoreBuilderConfig:  storeBuilderConfig,
 		SecretConfig:        eigendaflags.ReadSecretConfigV2(ctx),
+		ArbCustomDASvrCfg:   arbitrum_altda.ReadConfig(ctx),
 		RestSvrCfg:          rest.ReadConfig(ctx),
 		MetricsServerConfig: metrics.ReadConfig(ctx),
 	}, nil
