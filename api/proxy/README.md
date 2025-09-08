@@ -12,7 +12,7 @@ A basic REST proxy server to interact with the EigenDA network:
 [![push-image-ghcr](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/docker-publish-release.yaml)
 
 
-[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
+[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [Clients Godoc Examples](https://pkg.go.dev/github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client)
 
 ## Overview
 
@@ -259,15 +259,13 @@ Below is a list of the main high-level features offered for configuring the eige
 
 #### Certificate verification <!-- omit from toc -->
 
-In order for the EigenDA Proxy to avoid a trust assumption on the EigenDA disperser, the proxy offers a DA cert verification feature which ensures that:
+In order for the EigenDA Proxy to avoid a trust assumption on the EigenDA disperser, the proxy verifies the validity of DA certs during both the POST and GET routes. When targetting EigenDA V2 backend, [cert validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation) is turned on by default and cannot be turned off. 
 
+For V1, cert validation is recommended but optional, and can be turned on with the CLI flags `--eigenda.svc-manager-addr`, `--eigenda.eth-rpc`. When turned on, it ensures that:
 1. The DA cert's batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
 2. The DA cert's blob inclusion proof can be successfully verified against the blob-batch merkle root
 3. The DA cert's quorum params are adequately defined and expressed when compared to their on-chain counterparts
 4. The DA cert's quorum ids map to valid quorums
-
-To target this feature, use the CLI flags `--eigenda-svc-manager-addr`, `--eigenda-eth-rpc`.
-
 
 #### Soft Confirmations <!-- omit from toc -->
 
