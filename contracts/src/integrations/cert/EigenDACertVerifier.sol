@@ -28,6 +28,7 @@ contract EigenDACertVerifier is
 {
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
+    error ZeroCheckDACertGasLimit();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
 
@@ -88,6 +89,9 @@ contract EigenDACertVerifier is
         }
         if (initQuorumNumbersRequired.length == 0 || initQuorumNumbersRequired.length > 256) {
             revert InvalidQuorumNumbersRequired(initQuorumNumbersRequired.length);
+        }
+        if (initCheckDACertGasLimit == 0) {
+            revert ZeroCheckDACertGasLimit();
         }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
