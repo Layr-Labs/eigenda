@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
@@ -34,8 +35,8 @@ const (
 	registryCoordinatorAddress = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	// These two addresses are no longer required for the Eth Client, but parameter is still being taken until we deprecate the flags
 	eigenDAServiceManagerAddress = ""
-	// blsOperatorStateRetrieverAddress is still used for CertBuilder
-	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	// operatorStateRetrieverAddress is still used for CertBuilder
+	operatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 )
 
 func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
@@ -124,7 +125,8 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 }
 
 func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetriever, error) {
@@ -173,7 +175,8 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClient,
-		kzgVerifier.Srs.G1)
+		kzgVerifier.Srs.G1,
+		metrics.NoopRetrievalMetrics)
 }
 
 func createRelayClient(
@@ -218,7 +221,8 @@ func createDisperserClient(
 		disperserClientConfig,
 		signer,
 		kzgProver,
-		nil)
+		nil,
+		metrics.NoopDispersalMetrics)
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
@@ -282,7 +286,7 @@ func createCertBuilder() (*clients.CertBuilder, error) {
 
 	return clients.NewCertBuilder(
 		logger,
-		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(operatorStateRetrieverAddress),
 		gethcommon.HexToAddress(registryCoordinatorAddress),
 		ethClient,
 	)
@@ -338,7 +342,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		blsOperatorStateRetrieverAddress,
+		operatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
 	)
 	if err != nil {

@@ -3,10 +3,12 @@ package common
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 )
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
@@ -37,10 +39,8 @@ type ClientConfigV2 struct {
 	// RetrieversToEnable specifies which retrievers should be enabled
 	RetrieversToEnable []RetrieverType
 
-	// Fields required for validator payload retrieval
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	EigenDADirectory              string
+	// EigenDADirectory address is used to get addresses for all EigenDA contracts needed.
+	EigenDADirectory string
 
 	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
@@ -54,6 +54,12 @@ type ClientConfigV2 struct {
 	// The EigenDA network that is being used.
 	// It is optional, and when set will be used for validating that the eth-rpc chain ID matches the network.
 	EigenDANetwork EigenDANetwork
+
+	// Determines which payment mechanism to use
+	ClientLedgerMode clientledger.ClientLedgerMode
+
+	// VaultMonitorInterval is how often to check for payment vault updates
+	VaultMonitorInterval time.Duration
 }
 
 // Check checks config invariants, and returns an error if there is a problem with the config struct
@@ -84,20 +90,14 @@ func (cfg *ClientConfigV2) Check() error {
 		if cfg.EigenDADirectory == "" {
 			return fmt.Errorf("EigenDA directory is required for validator retrieval in EigenDA V2 backend")
 		}
-
-		if cfg.BLSOperatorStateRetrieverAddr == "" {
-			return fmt.Errorf(
-				"BLS operator state retriever address is required for validator retrieval in EigenDA V2 backend")
-		}
-
-		if cfg.EigenDAServiceManagerAddr == "" {
-			return fmt.Errorf(
-				"EigenDA service manager address is required for validator retrieval in EigenDA V2 backend")
-		}
 	}
 
 	if cfg.PutTries == 0 {
 		return fmt.Errorf("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
+	}
+
+	if cfg.VaultMonitorInterval < 0 {
+		return fmt.Errorf("vault monitor interval cannot be negative")
 	}
 
 	return nil

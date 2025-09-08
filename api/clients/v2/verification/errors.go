@@ -2,8 +2,6 @@ package verification
 
 import (
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // CertVerifierInternalError represents a 5xx-like error (unexpected, internal, infra, etc.)
@@ -37,8 +35,13 @@ func (e *CertVerifierInternalError) Error() string {
 // [coretypes.VerificationStatusCode] != (StatusSuccess or StatusNullError).
 // StatusNullError returns a [CertVerifierInternalError] instead as it is a contract bug
 // that should never happen.
+//
+// Starting with CertVerifier v3.1.0, StatusCode would either be [StatusInvalidCert], or [StatusBug].
+// We treat them both as InvalidCertErrors in order to prevent stalling rollup Derivation pipelines:
+// For read paths, both errors should be discarded.
+// For write paths, bugs should be mapped to 503 signals to let the rollup failover to another DA layer.
 type CertVerifierInvalidCertError struct {
-	StatusCode coretypes.VerificationStatusCode
+	StatusCode CheckDACertStatusCode
 	Msg        string
 }
 

@@ -44,6 +44,10 @@ interface IEigenDAThresholdRegistry {
 
     ///////////////////////// V2 ///////////////////////////////
 
+    /// @notice Returns the next blob version
+    /// @dev Can be called before calling getBlobParams to verify that an input blobVersion actually exists
+    function nextBlobVersion() external view returns (uint16);
+
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory);
 }

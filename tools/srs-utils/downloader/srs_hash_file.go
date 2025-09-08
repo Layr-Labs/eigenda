@@ -27,10 +27,16 @@ type fileHashInfo struct {
 }
 
 // newSrsHashFile creates a new srsHashFile
-func newSrsHashFile(blobSizeBytes uint64, outputDir string) (*srsHashFile, error) {
+func newSrsHashFile(blobSizeBytes uint64, outputDir string, includePowerOf2 bool) (*srsHashFile, error) {
 	var srsFileInfo []*fileHashInfo
 
 	fileNames := []string{g1FileName, g2FileName, g2TrailingFileName}
+
+	// Add g2.point.powerOf2 to the list if it was downloaded
+	if includePowerOf2 {
+		fileNames = append(fileNames, g2PowerOf2FileName)
+	}
+
 	for _, fileName := range fileNames {
 		hashInfo, err := getFileHashInfo(outputDir, fileName)
 		if err != nil {

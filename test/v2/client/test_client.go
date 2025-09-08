@@ -23,6 +23,7 @@ import (
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/server"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -76,6 +77,7 @@ type TestClient struct {
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(
+	ctx context.Context,
 	logger logging.Logger,
 	metrics *testClientMetrics,
 	config *TestClientConfig) (*TestClient, error) {
@@ -151,7 +153,14 @@ func NewTestClient(
 	}
 
 	accountant := clientsv2.NewUnpopulatedAccountant(accountId, metricsv2.NoopAccountantMetrics)
-	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserConfig, signer, kzgProver, accountant)
+	disperserClient, err := clientsv2.NewDisperserClient(
+		logger,
+		disperserConfig,
+		signer,
+		kzgProver,
+		accountant,
+		metricsv2.NoopDispersalMetrics,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
@@ -176,11 +185,27 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
+	contractDirectoryAddress := gethcommon.HexToAddress(config.ContractDirectoryAddress)
+	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, contractDirectoryAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create contract directory: %w", err)
+	}
+
+	operatorStateRetrieverAddress, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OperatorStateRetriever address from contract directory: %w", err)
+	}
+
+	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ServiceManager address from contract directory: %w", err)
+	}
+
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		operatorStateRetrieverAddress.Hex(),
+		serviceManagerAddress.Hex())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}
@@ -209,7 +234,10 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
-	certBuilder, err := clientsv2.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), ethReader.GetRegistryCoordinatorAddress(), ethClient)
+	certBuilder, err := clientsv2.NewCertBuilder(logger,
+		operatorStateRetrieverAddress,
+		ethReader.GetRegistryCoordinatorAddress(),
+		ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert builder: %w", err)
 	}
@@ -284,7 +312,8 @@ func NewTestClient(
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
 	}
@@ -321,7 +350,8 @@ func NewTestClient(
 		logger,
 		*validatorPayloadRetrieverConfig,
 		retrievalClient,
-		blobVerifier.Srs.G1)
+		blobVerifier.Srs.G1,
+		metricsv2.NoopRetrievalMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
@@ -384,9 +414,7 @@ func NewTestClient(
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
 					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,
-					BLSOperatorStateRetrieverAddr:      config.BLSOperatorStateRetrieverAddr,
-					EigenDAServiceManagerAddr:          config.EigenDAServiceManagerAddr,
-					EigenDADirectory:                   config.EigenDADirectory,
+					EigenDADirectory:                   contractDirectoryAddress.Hex(),
 					RetrieversToEnable: []proxycommon.RetrieverType{
 						proxycommon.RelayRetrieverType,
 						proxycommon.ValidatorRetrieverType,
@@ -915,4 +943,17 @@ func (c *TestClient) GetProxyWrapper() (*ProxyWrapper, error) {
 		return nil, fmt.Errorf("proxy wrapper is not enabled in the test client configuration")
 	}
 	return c.proxyWrapper, nil
+}
+
+func (c *TestClient) EstimateGasAndReportCheckDACert(
+	ctx context.Context,
+	eigenDAV3Cert *coretypes.EigenDACertV3,
+) (uint64, error) {
+	gas, err := c.certVerifier.EstimateGasCheckDACert(ctx, eigenDAV3Cert)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate gas for CheckDACert call: %w", err)
+	}
+
+	c.metrics.reportEstimateGasCheckDACert(gas)
+	return gas, nil
 }

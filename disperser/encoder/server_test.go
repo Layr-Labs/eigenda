@@ -36,9 +36,9 @@ var logger = testutils.GetLogger()
 
 func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

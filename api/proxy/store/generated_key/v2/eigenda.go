@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
@@ -74,7 +75,7 @@ func NewStore(
 // This function is bug-prone as is because it returns []byte which can either be a raw payload or an encoded payload.
 // TODO: Refactor to use [coretypes.EncodedPayload] and [coretypes.Payload] instead of []byte.
 func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert, returnEncodedPayload bool) ([]byte, error) {
-	var cert coretypes.RetrievableEigenDACert
+	var cert coretypes.EigenDACert
 
 	switch versionedCert.Version {
 	case certs.V0VersionByte, certs.V1VersionByte:
@@ -139,9 +140,18 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		},
 		retry.RetryIf(
 			func(err error) bool {
+				if err == nil {
+					// This should never happen since RetryIf function should only be called err != nil.
+					// But returning false since if no error happened... then don't need to retry,
+					// unless there's a bug in the RetryIf library...
+					return false
+				}
+				if errors.Is(err, &api.ErrorFailover{}) {
+					// Failover errors should be retried before failing over.
+					return true
+				}
 				grpcStatus, isGRPCError := status.FromError(err)
 				if !isGRPCError {
-					// api.ErrorFailover is returned, so we should retry
 					e.log.Warn("Received non-grpc error, retrying", "err", err)
 					return true
 				}
@@ -152,7 +162,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 					e.log.Warn("Received InvalidArgument status code, not retrying", "err", err)
 					return false
 				case codes.ResourceExhausted:
-					// we retry on 429s because *can* mean we are being rate limited
+					// we retry on 429s because it *can* mean we are being rate limited
 					// we sleep 1 second... very arbitrarily, because we don't have more info.
 					// grpc error itself should return a backoff time,
 					// see https://github.com/Layr-Labs/eigenda/issues/845 for more details

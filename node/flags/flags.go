@@ -158,21 +158,9 @@ var (
 	}
 	EigenDADirectoryFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "eigenda-directory"),
-		Usage:    "Address of the EigenDA Address Directory",
-		Required: false,
+		Usage:    "Address of the EigenDA Contract Directory",
+		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_DIRECTORY"),
-	}
-	BlsOperatorStateRetrieverFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state Retriever",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_OPERATOR_STATE_RETRIVER"),
-	}
-	EigenDAServiceManagerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "eigenda-service-manager"),
-		Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
@@ -466,6 +454,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_RESPECT_LOCKS"),
 	}
+	LittMinimumFlushIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-minimum-flush-interval"),
+		Usage:    "The minimum interval between LittDB flushes, ignored if 0",
+		Required: false,
+		Value:    100 * time.Millisecond,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_MINIMUM_FLUSH_INTERVAL"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool.",
@@ -539,6 +534,13 @@ var (
 		Required: false,
 		Value:    0.1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_BUFFER_SIZE_FRACTION"),
+	}
+	OperatorStateCacheSizeFlag = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "operator-state-cache-size"),
+		Usage:    "The size of the operator state cache.",
+		Required: false,
+		Value:    64,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -670,18 +672,18 @@ var optionalFlags = []cli.Flag{
 	LittDBWriteCacheSizeFractionFlag,
 	LittDBReadCacheSizeFractionFlag,
 	LittDBStoragePathsFlag,
+	LittMinimumFlushIntervalFlag,
 	GetChunksHotCacheReadLimitMBFlag,
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,
 	GetChunksColdBurstLimitMBFlag,
 	GCSafetyBufferSizeGBFlag,
 	EigenDADirectoryFlag,
-	BlsOperatorStateRetrieverFlag,
-	EigenDAServiceManagerFlag,
 	LittRespectLocksFlag,
 	StoreChunksBufferTimeoutFlag,
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
+	OperatorStateCacheSizeFlag,
 }
 
 func init() {

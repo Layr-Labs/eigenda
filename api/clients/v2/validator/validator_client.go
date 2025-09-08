@@ -23,15 +23,20 @@ type ValidatorClient interface {
 	) ([]byte, error)
 }
 
+type BlobParamsReader interface {
+	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
+	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*core.BlobVersionParameters, error)
+}
+
 type validatorClient struct {
-	logger         logging.Logger
-	ethClient      core.Reader
-	chainState     core.ChainState
-	verifier       encoding.Verifier
-	config         *ValidatorClientConfig
-	connectionPool *workerpool.WorkerPool
-	computePool    *workerpool.WorkerPool
-	metrics        *ValidatorClientMetrics
+	logger           logging.Logger
+	blobParamsReader BlobParamsReader
+	chainState       core.ChainState
+	verifier         encoding.Verifier
+	config           *ValidatorClientConfig
+	connectionPool   *workerpool.WorkerPool
+	computePool      *workerpool.WorkerPool
+	metrics          *ValidatorClientMetrics
 }
 
 var _ ValidatorClient = &validatorClient{}
@@ -39,7 +44,7 @@ var _ ValidatorClient = &validatorClient{}
 // NewValidatorClient creates a new retrieval client.
 func NewValidatorClient(
 	logger logging.Logger,
-	ethClient core.Reader,
+	blobParamsReader BlobParamsReader,
 	chainState core.ChainState,
 	verifier encoding.Verifier,
 	config *ValidatorClientConfig,
@@ -73,14 +78,14 @@ func NewValidatorClient(
 	}
 
 	return &validatorClient{
-		logger:         logger.With("component", "ValidatorClient"),
-		ethClient:      ethClient,
-		chainState:     chainState,
-		verifier:       verifier,
-		config:         config,
-		connectionPool: workerpool.New(config.ConnectionPoolSize),
-		computePool:    workerpool.New(config.ComputePoolSize),
-		metrics:        metrics,
+		logger:           logger.With("component", "ValidatorClient"),
+		blobParamsReader: blobParamsReader,
+		chainState:       chainState,
+		verifier:         verifier,
+		config:           config,
+		connectionPool:   workerpool.New(config.ConnectionPoolSize),
+		computePool:      workerpool.New(config.ComputePoolSize),
+		metrics:          metrics,
 	}
 }
 
@@ -110,9 +115,9 @@ func (c *validatorClient) GetBlob(
 	}
 
 	probe.SetStage("get_blob_versions")
-	blobVersions, err := c.ethClient.GetAllVersionedBlobParams(ctx)
+	blobVersions, err := c.blobParamsReader.GetAllVersionedBlobParams(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get all versioned blob params: %w", err)
 	}
 
 	blobParams, ok := blobVersions[blobHeader.BlobVersion]

@@ -2,13 +2,16 @@ package payloadretrieval
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -21,6 +24,7 @@ type ValidatorPayloadRetriever struct {
 	config          ValidatorPayloadRetrieverConfig
 	retrievalClient validator.ValidatorClient
 	g1Srs           []bn254.G1Affine
+	metrics         metrics.RetrievalMetricer
 }
 
 var _ clients.PayloadRetriever = &ValidatorPayloadRetriever{}
@@ -31,6 +35,7 @@ func NewValidatorPayloadRetriever(
 	config ValidatorPayloadRetrieverConfig,
 	retrievalClient validator.ValidatorClient,
 	g1Srs []bn254.G1Affine,
+	metrics metrics.RetrievalMetricer,
 ) (*ValidatorPayloadRetriever, error) {
 	err := config.checkAndSetDefaults()
 	if err != nil {
@@ -42,6 +47,7 @@ func NewValidatorPayloadRetriever(
 		config:          config,
 		retrievalClient: retrievalClient,
 		g1Srs:           g1Srs,
+		metrics:         metrics,
 	}, nil
 }
 
@@ -55,7 +61,7 @@ func NewValidatorPayloadRetriever(
 // verified prior to calling this method.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) (coretypes.Payload, error) {
 
 	encodedPayload, err := pr.GetEncodedPayload(ctx, eigenDACert)
@@ -73,6 +79,8 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		return nil, coretypes.ErrBlobDecodingFailedDerivationError.WithMessage(err.Error())
 	}
 
+	pr.metrics.RecordPayloadSizeBytes(len(payload))
+
 	return payload, nil
 }
 
@@ -86,7 +94,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 // eigenDACert has already been verified prior to calling this method.
 func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	ctx context.Context,
-	eigenDACert coretypes.RetrievableEigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) (*coretypes.EncodedPayload, error) {
 
 	blobHeader, err := eigenDACert.BlobHeader()
@@ -97,6 +105,12 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key from eigenDACert: %w", err)
+	}
+
+	blobLengthSymbols := uint32(blobHeader.BlobCommitments.Length)
+	// TODO(samlaf): are there more properties of the Cert that should lead to [coretypes.MaliciousOperatorsError]s?
+	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
 	}
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
@@ -139,7 +153,11 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 	return nil, fmt.Errorf("unable to retrieve encoded payload with blobKey %v from quorums %v", blobKey.Hex(), blobHeader.QuorumNumbers)
 }
 
-// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum,
+// and times out based on [ValidatorPayloadRetrieverConfig.RetrievalTimeout].
+//
+// blobLengthSymbols MUST be taken from the eigenDACert for the blob being retrieved,
+// and MUST be a power of 2.
 func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	header *corev2.BlobHeaderWithHashedPayment,
@@ -161,6 +179,16 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	}
 
 	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(header.BlobCommitments.Length))
+	if errors.Is(err, coretypes.ErrBlobLengthSymbolsNotPowerOf2) {
+		// In a better language I would write this as a debug assert.
+		pr.logger.Error("BROKEN INVARIANT: retrieveBlobWithTimeout: blobLengthSymbols is not power of 2: "+
+			"this is a major broken invariant, that should have been checked by the validators, "+
+			"and the caller (GetEncodedPayload) should already have checked this invariant "+
+			"and returned a MaliciousOperatorsError. Returning the same MaliciousOperatorsError "+
+			"to be safe, but this code should be fixed.", "err", err)
+		blobKey, _ := header.BlobKey() // discard error since returning the below error is most important
+		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
+	}
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}

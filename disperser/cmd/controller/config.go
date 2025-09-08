@@ -34,9 +34,7 @@ type Config struct {
 	ChainStateConfig                    thegraph.Config
 	UseGraph                            bool
 
-	EigenDADirectory              string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	EigenDAContractDirectoryAddress string
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
@@ -87,6 +85,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			PullInterval:                          ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),
 			FinalizationBlockDelay:                ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
 			AttestationTimeout:                    ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
+			BatchMetadataUpdatePeriod:             ctx.GlobalDuration(flags.BatchMetadataUpdatePeriodFlag.Name),
 			BatchAttestationTimeout:               ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
 			SignatureTickInterval:                 ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
 			NumRequestRetries:                     ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
@@ -94,19 +93,16 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
 		},
-		NumConcurrentEncodingRequests:  ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
-		NumConcurrentDispersalRequests: ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
-		NodeClientCacheSize:            ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
-		IndexerConfig:                  indexer.ReadIndexerConfig(ctx),
-		ChainStateConfig:               thegraph.ReadCLIConfig(ctx),
-		UseGraph:                       ctx.GlobalBool(flags.UseGraphFlag.Name),
-
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		EigenDADirectory:              ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
-		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
+		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
+		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
+		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
+		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
+		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
+		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
+		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
+		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
+		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		GrpcPort:                      ctx.GlobalString(flags.GrpcPortFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {

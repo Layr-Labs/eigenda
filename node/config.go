@@ -59,8 +59,6 @@ type Config struct {
 	LogPath                         string
 	ID                              core.OperatorID
 	EigenDADirectory                string
-	BLSOperatorStateRetrieverAddr   string
-	EigenDAServiceManagerAddr       string
 	PubIPProviders                  []string
 	PubIPCheckInterval              time.Duration
 	ChurnerUrl                      string
@@ -137,6 +135,11 @@ type Config struct {
 	// users of this software will be running in such an environment, this is disabled by default.
 	LittRespectLocks bool
 
+	// The minimum interval between littDB flushes. If zero, then there is no minimum interval.
+	// Useful for "batching" flush operations when flush operations become extremely frequent.
+	// Set this to zero to disable this feature.
+	LittMinimumFlushInterval time.Duration
+
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
 	GetChunksHotCacheReadLimitMB float64
@@ -176,6 +179,9 @@ type Config struct {
 	// StoreChunks() gRPC request buffer, in bytes. If set, this config value overrides the
 	// StoreChunksBufferSizeFraction value if greater than 0.
 	StoreChunksBufferSizeBytes uint64
+
+	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
+	operatorStateCacheSize uint64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -381,8 +387,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
 		EigenDADirectory:                    ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
-		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
@@ -416,6 +420,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
 		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
 		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
+		LittMinimumFlushInterval:      ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
 		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
@@ -426,5 +431,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
 		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
 		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
+		operatorStateCacheSize:        ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
 	}, nil
 }

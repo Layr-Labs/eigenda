@@ -20,27 +20,23 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
 )
 
 var (
 	logger = testutils.GetLogger()
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-
-	deployLocalStack bool
-	localStackPort   = "4571"
+	deployLocalStack    bool
+	localstackPort      = "4580"
+	localstackContainer *testbed.LocalStackContainer
 
 	s3Client          s3.Client
 	dynamoClient      dynamodb.Client
-	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
 
 	UUID              = uuid.New()
@@ -62,16 +58,21 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		cfg := testbed.DefaultLocalStackConfig()
+		cfg.Services = []string{"s3", "dynamodb"}
+		cfg.Port = localstackPort
+		cfg.Host = "0.0.0.0"
+
+		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -82,7 +83,7 @@ func setup(m *testing.M) {
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
@@ -109,7 +110,6 @@ func setup(m *testing.M) {
 		teardown()
 		panic("failed to create s3 bucket: " + err.Error())
 	}
-	blobStore = blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
@@ -173,7 +173,7 @@ func teardown() {
 	}
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(context.Background())
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/urfave/cli/v2"
 )
 
@@ -27,18 +28,19 @@ var (
 	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
 		"cert-verifier-router-or-immutable-verifier-addr",
 	)
-	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
-	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
-	EigenDADirectoryFlagName          = withFlagPrefix("eigenda-directory")
-	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
-	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
-	NetworkFlagName                   = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
-	RelayConnectionPoolSizeFlagName   = withFlagPrefix("relay-connection-pool-size")
+	EigenDADirectoryFlagName        = withFlagPrefix("eigenda-directory")
+	RelayTimeoutFlagName            = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName        = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName     = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName       = withFlagPrefix("blob-version")
+	EthRPCURLFlagName               = withFlagPrefix("eth-rpc")
+	MaxBlobLengthFlagName           = withFlagPrefix("max-blob-length")
+	NetworkFlagName                 = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName    = withFlagPrefix("rbn-recency-window-size")
+	RelayConnectionPoolSizeFlagName = withFlagPrefix("relay-connection-pool-size")
+
+	ClientLedgerModeFlagName            = withFlagPrefix("client-ledger-mode")
+	PaymentVaultMonitorIntervalFlagName = withFlagPrefix("payment-vault-monitor-interval")
 )
 
 func withFlagPrefix(s string) string {
@@ -116,20 +118,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 				"Required for performing eth_calls to verify EigenDA certificates, as well as fetching " +
 				"required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes).",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     ServiceManagerAddrFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the EigenDA Service Manager contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
-			Category: category,
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     BLSOperatorStateRetrieverFlagName,
-			Usage:    "[Deprecated: use EigenDADirectory instead] Address of the BLS operator state retriever contract.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
 			Category: category,
 			Required: false,
 		},
@@ -218,11 +206,31 @@ This check is optional and will be skipped when set to 0.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
 		},
-		&cli.IntFlag{
+		&cli.Uint64Flag{
 			Name:     RelayConnectionPoolSizeFlagName,
 			Usage:    "Number of gRPC connections to maintain to each relay.",
 			Value:    1,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RELAY_CONNECTION_POOL_SIZE")},
+			Category: category,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name: ClientLedgerModeFlagName,
+			Usage: "Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', " +
+				"'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked " +
+				"via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option " +
+				"will be removed, once the migration to the new leaky bucket payment model is complete.",
+			Value:    "legacy",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "CLIENT_LEDGER_MODE")},
+			Category: category,
+			Required: false,
+		},
+		&cli.DurationFlag{
+			Name: PaymentVaultMonitorIntervalFlagName,
+			Usage: "Interval at which clients poll to check for changes to the PaymentVault contract (relevant " +
+				"updates include changes to reservation parameters, and new on-demand payment deposits)",
+			Value:    30 * time.Second,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "PAYMENT_VAULT_MONITOR_INTERVAL")},
 			Category: category,
 			Required: false,
 		},
@@ -253,30 +261,15 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 
 	eigenDADirectory := ctx.String(EigenDADirectoryFlagName)
 	if eigenDADirectory == "" {
-		eigenDADirectory, err = eigenDANetwork.GetEigenDADirectory()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		if networkString == "" {
+			return common.ClientConfigV2{},
+				fmt.Errorf("either EigenDA Directory contract address or EigenDANetwork enum must be specified")
 		}
-	}
-
-	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
-	if serviceManagerAddress == "" {
-		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
+		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
 		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+			return common.ClientConfigV2{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
-	}
-
-	blsOperatorStateRetrieverAddress := ctx.String(BLSOperatorStateRetrieverFlagName)
-	if blsOperatorStateRetrieverAddress == "" {
-		blsOperatorStateRetrieverAddress, err = eigenDANetwork.GetBLSOperatorStateRetrieverAddress()
-		if err != nil {
-			return common.ClientConfigV2{}, fmt.Errorf(
-				`BLS operator state retriever address wasn't specified, and failed to get it from the
-							specified network : %w`, err)
-		}
+		eigenDADirectory = eigenDANetwork.GetEigenDADirectory()
 	}
 
 	return common.ClientConfigV2{
@@ -294,12 +287,13 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 			common.RelayRetrieverType,
 			common.ValidatorRetrieverType,
 		},
-		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
-		EigenDAServiceManagerAddr:          serviceManagerAddress,
 		EigenDADirectory:                   eigenDADirectory,
 		RBNRecencyWindowSize:               ctx.Uint64(RBNRecencyWindowSizeFlagName),
 		EigenDANetwork:                     eigenDANetwork,
+		RelayConnectionPoolSize:            ctx.Uint(RelayConnectionPoolSizeFlagName),
+		ClientLedgerMode:                   clientledger.ParseClientLedgerMode(ctx.String(ClientLedgerModeFlagName)),
+		VaultMonitorInterval:               ctx.Duration(PaymentVaultMonitorIntervalFlagName),
 	}, nil
 }
 
@@ -340,7 +334,6 @@ func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperser
 
 func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error) {
 	disperserAddressString := ctx.String(DisperserFlagName)
-
 	if disperserAddressString == "" {
 		networkString := ctx.String(NetworkFlagName)
 		if networkString == "" {
@@ -353,10 +346,7 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 			return clients_v2.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
 		}
 
-		disperserAddressString, err = eigenDANetwork.GetDisperserAddress()
-		if err != nil {
-			return clients_v2.DisperserClientConfig{}, fmt.Errorf("get disperser address: %w", err)
-		}
+		disperserAddressString = eigenDANetwork.GetDisperserAddress()
 	}
 
 	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)

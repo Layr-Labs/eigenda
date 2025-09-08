@@ -3,7 +3,13 @@ package metrics
 import (
 	"errors"
 	"math"
+	"os"
+	"slices"
+	"strings"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
+	"github.com/olekukonko/tablewriter"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -74,5 +80,42 @@ func ReadConfig(ctx *cli.Context) Config {
 		Enabled: ctx.Bool(EnabledFlagName),
 		Host:    ctx.String(ListenAddrFlagName),
 		Port:    ctx.Int(PortFlagName),
+	}
+}
+
+// NewSubcommands is used by `doc metrics` to output all supported metrics to
+// stdout. For metrics to be included in the output they need to be created
+// using the factory defined in `common/metrics.go`, and the metrics interface
+// must have a `Document()` func. See interfaces and structs defined in
+// `api/clients/v2/metrics` or `api/proxy/metrics/metrics.go` for usage.
+func NewSubcommands() cli.Commands {
+	return cli.Commands{
+		{
+			Name:  "metrics",
+			Usage: "Dumps a list of supported metrics to stdout",
+			Action: func(*cli.Context) error {
+				registry := prometheus.NewRegistry()
+				supportedMetrics := slices.Concat(
+					NewMetrics(registry).Document(),
+					metrics.NewAccountantMetrics(registry).Document(),
+					metrics.NewDispersalMetrics(registry).Document(),
+					metrics.NewRetrievalMetrics(registry).Document(),
+				)
+
+				table := tablewriter.NewWriter(os.Stdout)
+				table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+				table.SetCenterSeparator("|")
+				table.SetAutoWrapText(false)
+				table.SetHeader([]string{"Metric", "Description", "Labels", "Type"})
+				data := make([][]string, 0, len(supportedMetrics))
+				for _, metric := range supportedMetrics {
+					labels := strings.Join(metric.Labels, ",")
+					data = append(data, []string{metric.Name, metric.Help, labels, metric.Type})
+				}
+				table.AppendBulk(data)
+				table.Render()
+				return nil
+			},
+		},
 	}
 }

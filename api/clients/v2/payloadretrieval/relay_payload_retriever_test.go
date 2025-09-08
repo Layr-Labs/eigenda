@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -31,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const g1Path = "../../../../inabox/resources/kzg/g1.point"
+const g1Path = "../../../../resources/srs/g1.point"
 const maxPayloadBytes = 1025 // arbitrary value
 
 type RelayPayloadRetrieverTester struct {
@@ -69,7 +70,8 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		g1Srs)
+		g1Srs,
+		metrics.NoopRetrievalMetrics)
 
 	require.NotNil(t, client)
 	require.NoError(t, err)
@@ -108,9 +110,9 @@ func buildCertFromBlobBytes(
 ) (core.BlobKey, *coretypes.EigenDACertV3) {
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../../../resources/srs/g1.point",
+		G2Path:          "../../../../resources/srs/g2.point",
+		CacheDir:        "../../../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
@@ -388,7 +390,8 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) - 1
+	// Divide by 2 because length must be a power of 2.
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) / 2
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(blobBytes, nil).Once()
 

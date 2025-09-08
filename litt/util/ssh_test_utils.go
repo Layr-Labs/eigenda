@@ -7,16 +7,19 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +37,39 @@ import (
 const SSHTestPortBase = 22022
 
 const containerDataDir = "/mnt/data"
+const username = "testuser"
+
+// Global variables for shared SSH test image
+var (
+	sharedImageName string
+	imageMutex      sync.Mutex
+)
+
+// getCurrentUserUID returns the current user's UID
+func getCurrentUserUID() (int, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current user: %w", err)
+	}
+	uid, err := strconv.Atoi(currentUser.Uid)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert UID to int: %w", err)
+	}
+	return uid, nil
+}
+
+// getCurrentUserGID returns the current user's GID
+func getCurrentUserGID() (int, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current user: %w", err)
+	}
+	gid, err := strconv.Atoi(currentUser.Gid)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert GID to int: %w", err)
+	}
+	return gid, nil
+}
 
 // GetFreeSSHTestPort returns a free port starting from SSHTestPortBase
 func GetFreeSSHTestPort() (int, error) {
@@ -78,14 +114,16 @@ func GetUniqueSSHTestPort(testName string) (int, error) {
 
 // SSHTestContainer manages a Docker container with SSH server for testing
 type SSHTestContainer struct {
+	t           *testing.T
 	client      *client.Client
 	containerID string
 	sshPort     uint64
 	tempDir     string
 	privateKey  string
 	publicKey   string
-	user        string
 	host        string
+	uid         int
+	gid         int
 }
 
 // GetSSHPort returns the SSH port of the test container
@@ -110,7 +148,17 @@ func (c *SSHTestContainer) GetTempDir() string {
 
 // GetUser returns the SSH user for the test container
 func (c *SSHTestContainer) GetUser() string {
-	return c.user
+	return username
+}
+
+// Get the UID of the user inside the container.
+func (c *SSHTestContainer) GetUID() int {
+	return c.uid
+}
+
+// Get the GID of the user inside the container.
+func (c *SSHTestContainer) GetGID() int {
+	return c.gid
 }
 
 // GetHost returns the host address for the SSH connection
@@ -134,7 +182,7 @@ func (c *SSHTestContainer) cleanupDataDir() error {
 
 	session, err := NewSSHSession(
 		logger,
-		c.user,
+		c.GetUser(),
 		c.host,
 		c.sshPort,
 		c.privateKey,
@@ -145,23 +193,24 @@ func (c *SSHTestContainer) cleanupDataDir() error {
 	}
 	defer func() { _ = session.Close() }()
 
+	require.NotEqual(c.t, "", containerDataDir,
+		"if this is an empty string then we will attempt to 'rm -rf /*'... let's not do that")
+
 	// Remove the entire workspace directory tree from inside the container
 	// This ensures container-owned files are removed by the container user
-	cleanupCmd := fmt.Sprintf("rm -rf %s", containerDataDir)
-	_, _, err = session.Exec(cleanupCmd)
+	cleanupCmd := fmt.Sprintf("rm -rf %s/*", containerDataDir)
+	stdout, stderr, err := session.Exec(cleanupCmd)
 	if err != nil {
-		return fmt.Errorf("failed to cleanup workspace: %w", err)
+		return fmt.Errorf("failed to cleanup workspace: %w\nstdout: %s\nstderr: %s", err, stdout, stderr)
 	}
 
 	return nil
 }
 
 // Cleanup removes the Docker container and cleans up resources
-func (c *SSHTestContainer) Cleanup() error {
+func (c *SSHTestContainer) Cleanup() {
 	err := c.cleanupDataDir()
-	if err != nil {
-		return fmt.Errorf("failed to cleanup data directory: %w", err)
-	}
+	require.NoError(c.t, err)
 
 	// Use a context with timeout for cleanup operations
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -181,15 +230,11 @@ func (c *SSHTestContainer) Cleanup() error {
 	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{
 		Force: true, // Force removal even if container is still running
 	})
-	if err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
-	}
-
-	return nil
+	require.NoError(c.t, err)
 }
 
 // GenerateSSHKeyPair creates an RSA key pair for testing
-func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
+func GenerateSSHKeyPair(privateKeyPath string, publicKeyPath string) error {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return fmt.Errorf("failed to generate private key: %w", err)
@@ -232,6 +277,65 @@ func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
 	return nil
 }
 
+// configureContainerSSHKey updates the container's SSH authorized_keys file with the test-specific public key
+func configureContainerSSHKey(ctx context.Context, cli *client.Client, containerID string, publicKeyPath string) error {
+	publicKeyContent, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to read public key: %w", err)
+	}
+
+	// Use base64 encoding to safely pass the SSH key content without shell escaping issues
+	// Base64 encoding ensures no shell metacharacters can cause problems
+	encodedKey := base64.StdEncoding.EncodeToString(publicKeyContent)
+
+	execConfig := container.ExecOptions{
+		Cmd: []string{
+			"sh", "-c",
+			fmt.Sprintf(
+				"echo '%s' | base64 -d > /home/%s/.ssh/authorized_keys && chmod 600 /home/%s/.ssh/authorized_keys",
+				encodedKey, username, username),
+		},
+	}
+
+	// Create the exec instance
+	execIDResp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec instance: %w", err)
+	}
+
+	// Start the exec instance with Detach: false to ensure it blocks until completion
+	err = cli.ContainerExecStart(ctx, execIDResp.ID, container.ExecStartOptions{
+		Detach: false, // Explicitly set to false to block until completion
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start exec instance: %w", err)
+	}
+
+	// With Detach: false, ContainerExecStart should block until completion.
+	// However, to be absolutely certain, we'll add a brief polling loop.
+	for i := 0; i < 10; i++ { // Max 10 attempts with 100ms intervals = 1 second max wait
+		execInspect, err := cli.ContainerExecInspect(ctx, execIDResp.ID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect exec instance: %w", err)
+		}
+
+		// If the command is no longer running, we can check the exit code
+		if !execInspect.Running {
+			// Check if the command was successful
+			if execInspect.ExitCode != 0 {
+				return fmt.Errorf("SSH key configuration command failed with exit code %d", execInspect.ExitCode)
+			}
+			return nil // Success!
+		}
+
+		// Brief sleep before checking again
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// If still running after polling, something is wrong
+	return fmt.Errorf("SSH key configuration command is still running after timeout")
+}
+
 // WaitForSSH waits for the SSH server to be ready
 func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -252,7 +356,7 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 		case <-ticker.C:
 			session, err := NewSSHSession(
 				logger,
-				"testuser",
+				username,
 				"localhost",
 				sshPort,
 				privateKeyPath,
@@ -267,6 +371,63 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	}
 }
 
+// getOrBuildSharedSSHImage returns the name of the shared SSH test image.
+// If the image doesn't exist, it builds it. This method is thread-safe.
+func getOrBuildSharedSSHImage(ctx context.Context, cli *client.Client, t *testing.T) (string, error) {
+	imageMutex.Lock()
+	defer imageMutex.Unlock()
+
+	// If we already have a cached image name, verify it still exists
+	if sharedImageName != "" {
+		_, err := cli.ImageInspect(ctx, sharedImageName)
+		if err == nil {
+			return sharedImageName, nil
+		}
+		// Image no longer exists, reset and rebuild
+		sharedImageName = ""
+	}
+
+	// Get current user's UID/GID for the shared image
+	uid, err := getCurrentUserUID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user UID: %w", err)
+	}
+	gid, err := getCurrentUserGID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user GID: %w", err)
+	}
+
+	// Generate a unique image name based on UID/GID and current time to avoid conflicts
+	imageName := fmt.Sprintf("ssh-test-shared:%d-%d-%d", uid, gid, time.Now().Unix())
+
+	// Create a temporary directory for building the image
+	tempDir := t.TempDir()
+	privateKeyPath := filepath.Join(tempDir, "shared_ssh_key")
+	publicKeyPath := filepath.Join(tempDir, "shared_ssh_key.pub")
+
+	// Generate SSH key pair for the shared image
+	err = GenerateSSHKeyPair(privateKeyPath, publicKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate SSH key pair: %w", err)
+	}
+
+	publicKeyContent, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read public key: %w", err)
+	}
+
+	// Build the shared image
+	t.Logf("Building shared SSH test Docker image: %s", imageName)
+	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent), uid, gid)
+	if err != nil {
+		return "", fmt.Errorf("failed to build shared SSH image: %w", err)
+	}
+
+	// Cache the image name for future use
+	sharedImageName = imageName
+	return sharedImageName, nil
+}
+
 // SetupSSHTestContainer creates and starts a Docker container with SSH server
 // If dataDir is not empty, it will be mounted in the container at /mnt/data
 func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
@@ -274,11 +435,17 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
+	// Get current user's UID/GID
+	uid, err := getCurrentUserUID()
+	require.NoError(t, err)
+	gid, err := getCurrentUserGID()
+	require.NoError(t, err)
+
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	require.NoError(t, err)
 
-	// Generate SSH key pair
+	// Generate SSH key pair for this specific test
 	tempDir := t.TempDir()
 	privateKeyPath := filepath.Join(tempDir, "test_ssh_key")
 	publicKeyPath := filepath.Join(tempDir, "test_ssh_key.pub")
@@ -286,27 +453,9 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	err = GenerateSSHKeyPair(privateKeyPath, publicKeyPath)
 	require.NoError(t, err)
 
-	publicKeyContent, err := os.ReadFile(publicKeyPath)
+	// Get or build the shared SSH test image
+	imageName, err := getOrBuildSharedSSHImage(ctx, cli, t)
 	require.NoError(t, err)
-
-	// Build Docker image with a unique name that includes the public key hash
-	// This allows reusing images when the public key is the same
-	h := fnv.New32a()
-	_, err = h.Write(publicKeyContent)
-	require.NoError(t, err)
-	keyHash := fmt.Sprintf("%08x", h.Sum32()) // Pad to 8 characters with leading zeros
-	imageName := fmt.Sprintf("ssh-test:%s", keyHash[:8])
-
-	// Check if image already exists to avoid rebuilding
-	_, _, err = cli.ImageInspectWithRaw(ctx, imageName)
-	if err != nil {
-		// Image doesn't exist, build it
-		t.Logf("Building SSH test Docker image: %s", imageName)
-		err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
-		require.NoError(t, err)
-	} else {
-		t.Logf("Reusing existing SSH test Docker image: %s", imageName)
-	}
 
 	if dataDir != "" {
 		// we have to grant broad permissions here because the container may have a different UID
@@ -314,32 +463,40 @@ func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 		require.NoError(t, err, "failed to set permissions on data directory")
 	}
 
-	// Start container
+	// Start container and configure it with the test-specific SSH key
 	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, dataDir, t.Name())
+	require.NoError(t, err)
+
+	// Configure the container to use the test-specific SSH key
+	err = configureContainerSSHKey(ctx, cli, containerID, publicKeyPath)
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
 	WaitForSSH(t, sshPort, privateKeyPath)
 
 	return &SSHTestContainer{
+		t:           t,
 		client:      cli,
 		containerID: containerID,
 		sshPort:     sshPort,
 		tempDir:     tempDir,
 		privateKey:  privateKeyPath,
 		publicKey:   publicKeyPath,
-		user:        "testuser",
 		host:        "localhost",
+		uid:         uid,
+		gid:         gid,
 	}
 }
 
-// BuildSSHTestImage builds the SSH test image with the provided public key
+// BuildSSHTestImage builds the SSH test image with the provided public key and user IDs
 func BuildSSHTestImage(
 	ctx context.Context,
 	cli *client.Client,
 	tempDir string,
 	imageName string,
 	publicKey string,
+	uid int,
+	gid int,
 ) error {
 
 	// Get the Dockerfile path
@@ -378,7 +535,7 @@ func BuildSSHTestImage(
 		"\n# Add test SSH public key\n"+
 			"RUN echo '%s' > /home/testuser/.ssh/authorized_keys\n"+
 			"RUN chmod 600 /home/testuser/.ssh/authorized_keys\n"+
-			"RUN chown testuser:testuser /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey))
+			"RUN chown %d:%d /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey), uid, gid)
 	modifiedDockerfile := string(dockerfileContent) + publicKeySetup
 
 	err = os.WriteFile(filepath.Join(buildContext, "Dockerfile"), []byte(modifiedDockerfile), 0644)
@@ -400,6 +557,10 @@ func BuildSSHTestImage(
 		Remove:      true,
 		ForceRemove: true,
 		NoCache:     false, // Allow caching to speed up builds
+		BuildArgs: map[string]*string{
+			"USER_UID": &[]string{strconv.Itoa(uid)}[0],
+			"USER_GID": &[]string{strconv.Itoa(gid)}[0],
+		},
 	}
 
 	response, err := cli.ImageBuild(ctx, buildCtx, buildOptions)
@@ -421,6 +582,17 @@ func BuildSSHTestImage(
 			buildOutputStr = buildOutputStr[:1000] + "... (truncated)"
 		}
 		return fmt.Errorf("failed to read build response: %w\nBuild output: %s", err, buildOutputStr)
+	}
+
+	// After the build finishes, verify the image actually exists
+	_, err = cli.ImageInspect(ctx, imageName)
+	if err != nil {
+		buildOutputStr := buildOutput.String()
+		if len(buildOutputStr) > 2000 {
+			buildOutputStr = buildOutputStr[:2000] + "... (truncated)"
+		}
+		return fmt.Errorf("docker image build failed - image not found after build: %w\nBuild output: %s",
+			err, buildOutputStr)
 	}
 
 	return nil
@@ -471,13 +643,17 @@ func StartSSHContainer(
 		}(),
 	}
 
+	// Create a container name that includes the test name for easier debugging
+	containerName := fmt.Sprintf("ssh-test-%s-%d",
+		strings.ReplaceAll(testName, "/", "-"), time.Now().Unix())
+
 	resp, err := cli.ContainerCreate(
 		ctx,
 		containerConfig,
 		hostConfig,
 		nil,
 		nil,
-		"")
+		containerName)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to create container: %w", err)
 	}
