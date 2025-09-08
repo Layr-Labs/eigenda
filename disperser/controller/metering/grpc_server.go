@@ -78,7 +78,10 @@ func (s *GrpcServer) Stop() {
 	}
 }
 
-func (s *GrpcServer) AuthorizePayment(ctx context.Context, req *pb.AuthorizePaymentRequest) (*pb.AuthorizePaymentReply, error) {
+func (s *GrpcServer) AuthorizePayment(
+	ctx context.Context,
+	request *pb.AuthorizePaymentRequest,
+) (*pb.AuthorizePaymentReply, error) {
 	// TODO: Implement actual payment authorization logic
 
 	// Example: Simulate insufficient balance error with structured metadata
@@ -86,7 +89,7 @@ func (s *GrpcServer) AuthorizePayment(ctx context.Context, req *pb.AuthorizePaym
 	simulateInsufficientBalance := false
 
 	if simulateInsufficientBalance {
-		accountID := req.GetBlobHeader().GetPaymentHeader().GetAccountId()
+		accountID := request.GetBlobHeader().GetPaymentHeader().GetAccountId()
 		currentBalance := uint64(100) // In production, get actual balance
 		requiredCost := uint64(150)   // In production, calculate actual cost
 
