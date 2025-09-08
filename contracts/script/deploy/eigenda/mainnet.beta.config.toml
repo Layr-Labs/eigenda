@@ -89,4 +89,4 @@ batchConfirmers = []
 confirmationThreshold = 55
 adversaryThreshold = 33
 quorumNumbersRequired = [0, 1]
-checkDACertGasLimit = 15000000
+checkDACertGasLimit = 15_000_000
