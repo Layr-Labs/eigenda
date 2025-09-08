@@ -104,9 +104,9 @@ func StartProxyService(cliCtx *cli.Context) error {
 			}
 			log.Info("Successfully shutdown Arbitrum Custom DA server")
 		}()
-	}
 
-	log.Info("Started Arbitrum Custom DA JSON RPC server")
+		log.Info("Started Arbitrum Custom DA JSON RPC server")
+	}
 
 	if cfg.MetricsServerConfig.Enabled {
 		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
