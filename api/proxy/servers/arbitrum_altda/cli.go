@@ -30,10 +30,10 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "PORT"),
 			Category: category,
 		},
-		&cli.StringSliceFlag{
+		&cli.BoolFlag{
 			Name:     Enabled,
 			Usage:    "Whether or not to enable Arbitrum Custom DA JSON RPC API",
-			Value:    cli.NewStringSlice(),
+			Value:    false,
 			EnvVars:  withEnvPrefix(envPrefix, "ENABLED"),
 			Category: category,
 		},
