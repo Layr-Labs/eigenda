@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -13,9 +14,12 @@ type TestPaymentVault struct {
 	// Storage for individual account deposits
 	totalDeposits map[gethcommon.Address]*big.Int
 
+	// Storage for individual account reservations
+	reservations map[gethcommon.Address]*bindings.IPaymentVaultReservation
+
 	// Global parameters
 	globalSymbolsPerSecond uint64
-	minNumSymbols          uint64
+	minNumSymbols          uint32
 	PricePerSymbol         uint64
 }
 
@@ -24,6 +28,7 @@ var _ payments.PaymentVault = &TestPaymentVault{}
 func NewTestPaymentVault() *TestPaymentVault {
 	return &TestPaymentVault{
 		totalDeposits:          make(map[gethcommon.Address]*big.Int),
+		reservations:           make(map[gethcommon.Address]*bindings.IPaymentVaultReservation),
 		globalSymbolsPerSecond: 1000,
 		minNumSymbols:          1,
 		PricePerSymbol:         100,
@@ -42,7 +47,7 @@ func (t *TestPaymentVault) SetGlobalSymbolsPerSecond(value uint64) {
 	t.globalSymbolsPerSecond = value
 }
 
-func (t *TestPaymentVault) SetMinNumSymbols(value uint64) {
+func (t *TestPaymentVault) SetMinNumSymbols(value uint32) {
 	t.minNumSymbols = value
 }
 
@@ -73,10 +78,43 @@ func (t *TestPaymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint6
 	return t.globalSymbolsPerSecond, nil
 }
 
-func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint64, error) {
+func (t *TestPaymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	return t.minNumSymbols, nil
 }
 
 func (t *TestPaymentVault) GetPricePerSymbol(ctx context.Context) (uint64, error) {
 	return t.PricePerSymbol, nil
+}
+
+func (t *TestPaymentVault) SetReservation(account gethcommon.Address, reservation *bindings.IPaymentVaultReservation) {
+	if reservation == nil {
+		delete(t.reservations, account)
+	} else {
+		t.reservations[account] = reservation
+	}
+}
+
+func (t *TestPaymentVault) GetReservations(
+	ctx context.Context,
+	accountIDs []gethcommon.Address,
+) ([]*bindings.IPaymentVaultReservation, error) {
+	result := make([]*bindings.IPaymentVaultReservation, len(accountIDs))
+	for i, accountID := range accountIDs {
+		if reservation, exists := t.reservations[accountID]; exists {
+			result[i] = reservation
+		} else {
+			result[i] = nil
+		}
+	}
+	return result, nil
+}
+
+func (t *TestPaymentVault) GetReservation(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*bindings.IPaymentVaultReservation, error) {
+	if reservation, exists := t.reservations[accountID]; exists {
+		return reservation, nil
+	}
+	return nil, nil
 }
