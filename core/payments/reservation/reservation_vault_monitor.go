@@ -83,9 +83,9 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 			continue
 		}
 
-		newReservation, err := NewReservationFromBindings(newReservationData)
+		newReservation, err := FromContractStruct(newReservationData)
 		if err != nil {
-			vm.logger.Errorf("convert reservation for account %v failed: %v", accountID.Hex(), err)
+			vm.logger.Errorf("reservation from contract struct for account %v failed: %v", accountID.Hex(), err)
 			continue
 		}
 
