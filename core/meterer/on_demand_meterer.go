@@ -51,8 +51,8 @@ func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation,
 
 // Cancels a reservation obtained by MeterDispersal, returning tokens to the rate limiter.
 // This should be called when a reserved dispersal will not be performed (e.g., payment verification failed).
+//
+// Input reservation must be non-nil, otherwise this will panic
 func (m *OnDemandMeterer) CancelDispersal(reservation *rate.Reservation) {
-	if reservation != nil {
-		reservation.Cancel()
-	}
+	reservation.Cancel()
 }
