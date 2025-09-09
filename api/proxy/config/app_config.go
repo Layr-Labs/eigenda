@@ -18,9 +18,9 @@ type AppConfig struct {
 	StoreBuilderConfig builder.Config
 	SecretConfig       common.SecretConfigV2
 
-	ArbCustomDASvrCfg   arbitrum_altda.Config
-	RestSvrCfg          rest.Config
-	MetricsServerConfig metrics.Config
+	ArbCustomDASvrCfg arbitrum_altda.Config
+	RestSvrCfg        rest.Config
+	MetricsSvrConfig  metrics.Config
 }
 
 // Check checks config invariants, and returns an error if there is a problem with the config struct
@@ -48,10 +48,10 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 	}
 
 	return AppConfig{
-		StoreBuilderConfig:  storeBuilderConfig,
-		SecretConfig:        eigendaflags.ReadSecretConfigV2(ctx),
-		ArbCustomDASvrCfg:   arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:          rest.ReadConfig(ctx),
-		MetricsServerConfig: metrics.ReadConfig(ctx),
+		StoreBuilderConfig: storeBuilderConfig,
+		SecretConfig:       eigendaflags.ReadSecretConfigV2(ctx),
+		ArbCustomDASvrCfg:  arbitrum_altda.ReadConfig(ctx),
+		RestSvrCfg:         rest.ReadConfig(ctx),
+		MetricsSvrConfig:   metrics.ReadConfig(ctx),
 	}, nil
 }

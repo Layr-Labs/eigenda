@@ -385,7 +385,7 @@ func NewTestClient(
 				Port:        config.ProxyPort,
 				EnabledAPIs: []string{"admin"},
 			},
-			MetricsServerConfig: proxymetrics.Config{
+			MetricsSvrConfig: proxymetrics.Config{
 				Enabled: false, // TODO (cody.littley) enable proxy metrics
 			},
 			StoreBuilderConfig: builder.Config{

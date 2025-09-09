@@ -108,9 +108,9 @@ func StartProxyService(cliCtx *cli.Context) error {
 		log.Info("Started Arbitrum Custom DA JSON RPC server", "addr", arbitrumRpcServer.Addr())
 	}
 
-	if cfg.MetricsServerConfig.Enabled {
-		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
-		svr := proxy_metrics.NewServer(registry, cfg.MetricsServerConfig)
+	if cfg.MetricsSvrConfig.Enabled {
+		log.Info("Starting metrics server", "addr", cfg.MetricsSvrConfig.Host, "port", cfg.MetricsSvrConfig.Port)
+		svr := proxy_metrics.NewServer(registry, cfg.MetricsSvrConfig)
 		err := svr.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)

@@ -340,9 +340,9 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		EthRPCURL:        ethRPC,
 	}
 	return config.AppConfig{
-		StoreBuilderConfig:  builderConfig,
-		SecretConfig:        secretConfig,
-		MetricsServerConfig: proxy_metrics.Config{},
+		StoreBuilderConfig: builderConfig,
+		SecretConfig:       secretConfig,
+		MetricsSvrConfig:   proxy_metrics.Config{},
 		RestSvrCfg: rest.Config{
 			Host: host,
 			Port: 0,
