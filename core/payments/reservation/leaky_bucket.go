@@ -181,3 +181,10 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	lb.previousLeakTime = now
 	return nil
 }
+
+// Gets the amount of capacity available in the bucket, i.e. how much could be dispersed right now.
+//
+// May be negative if the bucket is currently overfilled
+func (lb *LeakyBucket) GetRemainingCapacity() float64 {
+	return lb.bucketCapacity - lb.currentFillLevel
+}
