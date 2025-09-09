@@ -154,7 +154,7 @@ func (cl *ClientLedger) debitReservationOnly(
 		panic(fmt.Sprintf("reservation debit failed: %v", err))
 	}
 
-	cl.accountantMetricer.RecordReservationPayment(cl.accountID.Hex(), remainingCapacity)
+	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if !success {
 		return nil, fmt.Errorf(
@@ -211,7 +211,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		panic(fmt.Sprintf("reservation debit failed: %v", err))
 	}
 
-	cl.accountantMetricer.RecordReservationPayment(cl.accountID.Hex(), remainingCapacity)
+	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if success {
 		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
@@ -269,7 +269,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
 
-		cl.accountantMetricer.RecordReservationPayment(cl.accountID.Hex(), remainingCapacity)
+		cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 	}
 
 	return nil
