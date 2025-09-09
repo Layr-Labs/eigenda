@@ -319,7 +319,7 @@ func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReser
 		return fmt.Errorf("update reservation: %w", err)
 	}
 
-	cl.accountantMetricer.RecordReservationBucketCapacity(cl.accountID.Hex(), cl.reservationLedger.GetBucketCapacity())
+	cl.accountantMetricer.RecordReservationBucketCapacity(cl.reservationLedger.GetBucketCapacity())
 
 	return nil
 }

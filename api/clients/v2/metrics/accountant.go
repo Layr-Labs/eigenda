@@ -20,7 +20,7 @@ type AccountantMetricer interface {
 	RecordOnDemandTotalDeposits(accountID string, wei *big.Int)
 
 	RecordReservationPayment(remainingCapacity float64)
-	RecordReservationBucketCapacity(accountID string, bucketSize float64)
+	RecordReservationBucketCapacity(bucketSize float64)
 
 	Document() []metrics.DocumentedMetric
 }
@@ -30,7 +30,7 @@ type AccountantMetrics struct {
 	OnDemandTotalDeposits *prometheus.GaugeVec
 
 	ReservationRemainingCapacity prometheus.Gauge
-	ReservationBucketCapacity    *prometheus.GaugeVec
+	ReservationBucketCapacity    prometheus.Gauge
 
 	factory *metrics.Documentor
 }
@@ -65,13 +65,11 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Subsystem: accountantSubsystem,
 			Help:      "Remaining capacity in reservation bucket (symbols)",
 		}),
-		ReservationBucketCapacity: factory.NewGaugeVec(prometheus.GaugeOpts{
+		ReservationBucketCapacity: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "reservation_bucket_size",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
 			Help:      "Total reservation bucket size (symbols)",
-		}, []string{
-			"account_id",
 		}),
 		factory: factory,
 	}
@@ -97,8 +95,8 @@ func (m *AccountantMetrics) RecordReservationPayment(remainingCapacity float64) 
 	m.ReservationRemainingCapacity.Set(remainingCapacity)
 }
 
-func (m *AccountantMetrics) RecordReservationBucketCapacity(accountID string, bucketCapacity float64) {
-	m.ReservationBucketCapacity.WithLabelValues(accountID).Set(bucketCapacity)
+func (m *AccountantMetrics) RecordReservationBucketCapacity(bucketCapacity float64) {
+	m.ReservationBucketCapacity.Set(bucketCapacity)
 }
 
 func (m *AccountantMetrics) Document() []metrics.DocumentedMetric {
@@ -119,7 +117,7 @@ func (n *noopAccountantMetricer) RecordOnDemandTotalDeposits(_ string, _ *big.In
 func (n *noopAccountantMetricer) RecordReservationPayment(_ float64) {
 }
 
-func (n *noopAccountantMetricer) RecordReservationBucketCapacity(_ string, _ float64) {
+func (n *noopAccountantMetricer) RecordReservationBucketCapacity(_ float64) {
 }
 
 func (n *noopAccountantMetricer) Document() []metrics.DocumentedMetric {
