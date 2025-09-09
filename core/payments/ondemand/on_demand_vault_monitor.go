@@ -51,6 +51,9 @@ func NewOnDemandVaultMonitor(
 }
 
 // Fetches the latest state from the PaymentVault, and updates the ledgers with it
+//
+// TODO(litt3): If the number of accounts returned by getAccountsToUpdate ever gets very large, a potential
+// optimization would be to create batches of accounts, and use multiple RPC calls to fetch the total deposits.
 func (vm *OnDemandVaultMonitor) refreshTotalDeposits(ctx context.Context) error {
 	accountIDs := vm.getAccountsToUpdate()
 	if len(accountIDs) == 0 {
