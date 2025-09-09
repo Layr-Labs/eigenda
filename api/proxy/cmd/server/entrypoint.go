@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
 )
 
-// TODO: Explore better enscapsulation patterns that binds common interfaces / usage patterns
+// TODO: Explore better encapsulation patterns that binds common interfaces / usage patterns
 // across the three servers (arb-altda, rest, metrics) that can be spun-up under the proxy service.
 // Especially if there's ever a need for an additional stack specific ALT DA server type to be introduced.
 func StartProxyService(cliCtx *cli.Context) error {
@@ -105,7 +105,7 @@ func StartProxyService(cliCtx *cli.Context) error {
 			log.Info("Successfully shutdown Arbitrum Custom DA server")
 		}()
 
-		log.Info("Started Arbitrum Custom DA JSON RPC server")
+		log.Info("Started Arbitrum Custom DA JSON RPC server", "addr", arbitrumRpcServer.Addr())
 	}
 
 	if cfg.MetricsServerConfig.Enabled {
