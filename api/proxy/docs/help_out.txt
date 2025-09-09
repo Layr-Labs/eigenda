@@ -86,10 +86,10 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    KZG
 
-   --eigenda.cache-path value        path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
+   --eigenda.cache-path value        Path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
    --eigenda.g1-path value           path to g1.point file. (default: "resources/g1.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH]
-   --eigenda.g2-path value           path to g2.point file. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
-   --eigenda.g2-path-trailing value  path to g2.trailing.point file. (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
+   --eigenda.g2-path value           Path to g2.point file, which is needed to generate and verify blob length proofs. If this flag doesn't point to a complete 16GiB G2 SRS file, then the --eigenda.g2-path-trailing flag must be used to specify a trailing segment of that file, of equivalent length to the initial segment pointed to by this flag. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
+   --eigenda.g2-path-trailing value  Path to g2.trailing.point file, which is needed to generate and verify blob length proofs. If --eigenda.g2-path is pointing to the entire 16GiB G2 SRS file which contains 268435456 G2 points, this flag is not needed. Otherwise, users can truncate the G2 file by taking an initial segment, and a trailing segment (both of the same size). (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
 
    Logging
 
