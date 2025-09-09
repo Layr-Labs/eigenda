@@ -1,9 +1,11 @@
+use core::fmt::{Debug, Formatter, Result};
+
 use alloy_primitives::{Address, address};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for the [`crate::service::EigenDaService`].
-#[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct EigenDaConfig {
     /// Network the adapter is running against.
     pub network: Network,
@@ -34,6 +36,23 @@ pub struct EigenDaConfig {
     /// is used by the sequencer to persist the certificates to Ethereum.
     /// Expected private key in the HEX format.
     pub sequencer_signer: String,
+}
+
+impl Debug for EigenDaConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("EigenDaConfig")
+            .field("network", &self.network)
+            .field("ethereum_rpc_url", &self.ethereum_rpc_url)
+            .field("ethereum_compute_units", &self.ethereum_compute_units)
+            .field("ethereum_max_retry_times", &self.ethereum_max_retry_times)
+            .field("ethereum_initial_backoff", &self.ethereum_initial_backoff)
+            .field("proxy_url", &self.proxy_url)
+            .field("proxy_min_retry_delay", &self.proxy_min_retry_delay)
+            .field("proxy_max_retry_delay", &self.proxy_max_retry_delay)
+            .field("proxy_max_retry_times", &self.proxy_max_retry_times)
+            .field("sequencer_signer", &"[REDACTED]")
+            .finish()
+    }
 }
 
 /// Network the adapter is running against.

@@ -5,7 +5,7 @@ use bytes::Bytes;
 use hex::encode;
 use reqwest::{Request, Url, header::CONTENT_TYPE};
 use thiserror::Error;
-use tracing::trace;
+use tracing::{error, trace};
 
 use crate::{
     eigenda::cert::{StandardCommitment, StandardCommitmentParseError},
@@ -82,8 +82,31 @@ impl ProxyClient {
             .build()?;
 
         let response = self.call(request).await?;
-        let certificate = StandardCommitment::from_rlp_bytes(response.as_ref())?;
-        Ok(certificate)
+
+        // We optimistically expect a certificate
+        match StandardCommitment::from_rlp_bytes(response.as_ref()) {
+            Ok(cert) => Ok(cert),
+            Err(err) => {
+                // Try to serialize a string from response bytes for a nicer
+                // error message. This error handling could be better. But
+                // currently, we don't really know what to expect from the proxy
+                // in cases when response is not a cert
+                match str::from_utf8(&response) {
+                    Ok(response_body) => {
+                        error!(?err, %response_body, "Error occurred while parsing proxy response");
+                    }
+                    Err(_) => {
+                        error!(
+                            ?err,
+                            response_body = ?response,
+                            "Error occurred while parsing proxy response"
+                        );
+                    }
+                }
+
+                Err(err.into())
+            }
+        }
     }
 
     async fn call(&self, request: Request) -> Result<Bytes, reqwest::Error> {

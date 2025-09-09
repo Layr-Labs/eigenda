@@ -22,6 +22,7 @@ use sov_rollup_interface::{
 };
 use thiserror::Error;
 use tokio::{sync::oneshot, time::sleep};
+use tracing::info;
 use tracing::{debug, error, instrument, warn};
 
 use crate::{
@@ -101,6 +102,7 @@ impl EigenDaService {
             Network::Holesky => EigenDaContracts::holesky(),
         };
 
+        info!(?config, ?params, "EigenDa service initialized");
         Ok(Self {
             proxy,
             ethereum,
