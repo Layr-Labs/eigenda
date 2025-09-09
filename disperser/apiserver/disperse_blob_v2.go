@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -41,11 +40,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 
 	if s.controllerClient != nil {
 		// s.controllerClient is non-nil, so use the new logic which delegates accounting and metering to the Controller
-
-		_, err := s.controllerClient.AuthorizePayment(ctx, &controller.AuthorizePaymentRequest{
-			BlobHeader:      req.GetBlobHeader(),
-			ClientSignature: req.GetSignature(),
-		})
+		err := s.controllerClient.AuthorizePayment(ctx, req.GetBlobHeader(), req.GetSignature())
 		if err != nil {
 			// Pass through the structured error from the controller
 			return nil, err
@@ -154,7 +149,6 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	// Existing payment meter logic remains unchanged
 	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())

@@ -211,6 +211,18 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
 		Hidden:   false,
 	}
+	ControllerAddressFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-address"),
+		Usage:    "gRPC address of the controller service",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
+	}
+	DisperserKMSKeyIDFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-kms-key-id"),
+		Usage:    "KMS key ID for signing payment authorization requests (key must be stored in AWS KMS under this name)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -309,6 +321,8 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
 	ReservedOnly,
+	ControllerAddressFlag,
+	DisperserKMSKeyIDFlag,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

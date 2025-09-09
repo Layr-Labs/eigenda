@@ -584,7 +584,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 		// reserved only mode
 		false,
-		nil, // No controller in tests
+		nil, // No controller client in tests
 	)
 	require.NoError(t, err)
 

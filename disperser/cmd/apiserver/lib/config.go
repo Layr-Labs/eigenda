@@ -46,6 +46,8 @@ type Config struct {
 	MaxBlobSize                 int
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
+	ControllerAddress           string
+	DisperserKMSKeyID           string
 
 	EigenDADirectory                string
 	OperatorStateRetrieverAddr      string
@@ -121,6 +123,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservedOnly:                ctx.GlobalBoolT(flags.ReservedOnly.Name),
+		ControllerAddress:           ctx.GlobalString(flags.ControllerAddressFlag.Name),
+		DisperserKMSKeyID:           ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
 		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
 		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),

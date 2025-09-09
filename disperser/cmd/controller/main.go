@@ -280,7 +280,6 @@ func RunController(ctx *cli.Context) error {
 	if config.GrpcPort != "" {
 		paymentAuthorizationHandler, err := payments.NewPaymentAuthorizationHandler(
 			context.Background(),
-			logger,
 			config.AwsClientConfig.Region,
 			config.AwsClientConfig.EndpointURL,
 			config.DisperserKMSKeyID)

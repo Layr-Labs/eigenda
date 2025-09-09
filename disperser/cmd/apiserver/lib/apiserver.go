@@ -149,6 +149,21 @@ func RunDisperserServer(ctx *cli.Context) error {
 		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
+		var controllerClient *apiserver.ControllerClient
+		if config.ControllerAddress != "" {
+			controllerClient, err = apiserver.NewControllerClient(
+				context.Background(),
+				config.ControllerAddress,
+				config.AwsClientConfig.Region,
+				config.AwsClientConfig.EndpointURL,
+				config.DisperserKMSKeyID,
+			)
+			if err != nil {
+				return fmt.Errorf("create controller client: %w", err)
+			}
+			logger.Debug("Controller client created", "address", config.ControllerAddress)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -163,7 +178,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
-			nil, // TODO: Add controller client initialization
+			controllerClient,
 		)
 		if err != nil {
 			return err

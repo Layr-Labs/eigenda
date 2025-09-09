@@ -8,17 +8,16 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type PaymentAuthorizationHandler struct {
-	logger     logging.Logger
 	keyID      string
 	publicKey  *ecdsa.PublicKey
 	keyManager *kms.Client
@@ -27,7 +26,6 @@ type PaymentAuthorizationHandler struct {
 // NewPaymentAuthorizationHandler creates a new PaymentAuthorizationHandler.
 func NewPaymentAuthorizationHandler(
 	ctx context.Context,
-	logger logging.Logger,
 	region string,
 	endpoint string,
 	keyID string,
@@ -52,43 +50,25 @@ func NewPaymentAuthorizationHandler(
 		keyManager = kms.NewFromConfig(cfg)
 	}
 
-	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
+	publicKey, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
 
 	return &PaymentAuthorizationHandler{
-		logger:     logger,
 		keyID:      keyID,
-		publicKey:  key,
+		publicKey:  publicKey,
 		keyManager: keyManager,
 	}, nil
 }
 
-// AuthorizePayment processes a payment authorization request.
+// Processes a payment authorization request. Verifies the signature, and checks whether the payment is valid.
 func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	ctx context.Context,
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentReply, error) {
-	// Sign the request with the disperser's KMS key to prove this controller authorized it
-	if h.keyManager != nil {
-		// Hash the request first
-		hash, err := hashing.HashAuthorizePaymentRequest(request)
-		if err != nil {
-			h.logger.Error("Failed to hash AuthorizePaymentRequest", "error", err)
-			return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
-		}
-
-		// Sign the hash
-		signature, err := aws2.SignKMS(ctx, h.keyManager, h.keyID, h.publicKey, hash)
-		if err != nil {
-			h.logger.Error("Failed to sign AuthorizePaymentRequest", "error", err)
-			return nil, status.Errorf(codes.Internal, "failed to sign request: %v", err)
-		}
-
-		// Store the signature in the request for audit/logging purposes
-		request.DisperserSignature = signature
-		h.logger.Debug("Signed AuthorizePaymentRequest", "signatureLength", len(signature), "hashLength", len(hash))
+	if err := h.verifyDisperserSignature(request); err != nil {
+		return nil, err
 	}
 
 	// TODO: Implement actual payment authorization logic
@@ -114,9 +94,37 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	return &pb.AuthorizePaymentReply{}, nil
 }
 
+// Verifies the disperser's signature on the payment authorization request.
+func (h *PaymentAuthorizationHandler) verifyDisperserSignature(request *pb.AuthorizePaymentRequest) error {
+	if len(request.DisperserSignature) == 0 {
+		return status.Errorf(codes.Unauthenticated, "disperser signature is required")
+	}
+
+	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to hash request: %v", err)
+	}
+
+	if len(request.DisperserSignature) != 65 {
+		return status.Errorf(codes.Unauthenticated, "invalid disperser signature length")
+	}
+
+	// Remove the recovery ID (last byte) for verification
+	valid := crypto.VerifySignature(crypto.FromECDSAPub(h.publicKey), requestHash, request.DisperserSignature[:64])
+	if !valid {
+		return status.Errorf(codes.Unauthenticated, "invalid disperser signature")
+	}
+
+	return nil
+}
+
 // newInsufficientBalanceError creates a structured gRPC error for insufficient balance
 // with detailed metadata about the account balance and required cost.
-func (h *PaymentAuthorizationHandler) newInsufficientBalanceError(accountID string, currentBalance, requiredCost uint64) error {
+func (h *PaymentAuthorizationHandler) newInsufficientBalanceError(
+	accountID string,
+	currentBalance uint64,
+	requiredCost uint64,
+) error {
 	deficit := uint64(0)
 	if requiredCost > currentBalance {
 		deficit = requiredCost - currentBalance
@@ -140,7 +148,6 @@ func (h *PaymentAuthorizationHandler) newInsufficientBalanceError(accountID stri
 
 	if err != nil {
 		// If we can't add details, return the basic error
-		h.logger.Error("failed to add error details", "error", err)
 		return st.Err()
 	}
 
