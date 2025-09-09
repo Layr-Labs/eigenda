@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
@@ -59,6 +60,16 @@ func NewReservation(
 		endTime:            endTime,
 		permittedQuorumIDs: permittedQuorumIDSet,
 	}, nil
+}
+
+// Creates a Reservation from contract binding data
+func FromContractStruct(contractStruct *bindings.IPaymentVaultReservation) (*Reservation, error) {
+	return NewReservation(
+		contractStruct.SymbolsPerSecond,
+		time.Unix(int64(contractStruct.StartTimestamp), 0),
+		time.Unix(int64(contractStruct.EndTimestamp), 0),
+		contractStruct.QuorumNumbers,
+	)
 }
 
 // Checks whether an input list of quorums are all permitted by the reservation.
