@@ -1,7 +1,7 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 
-package contractRegistryCoordinator
+package contractEigenDARegistryCoordinator
 
 import (
 	"errors"
@@ -87,113 +87,113 @@ type IStakeRegistryStrategyParams struct {
 	Multiplier *big.Int
 }
 
-// ContractRegistryCoordinatorMetaData contains all meta data concerning the ContractRegistryCoordinator contract.
-var ContractRegistryCoordinatorMetaData = &bind.MetaData{
+// ContractEigenDARegistryCoordinatorMetaData contains all meta data concerning the ContractEigenDARegistryCoordinator contract.
+var ContractEigenDARegistryCoordinatorMetaData = &bind.MetaData{
 	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"_serviceManager\",\"type\":\"address\",\"internalType\":\"contractIServiceManager\"},{\"name\":\"_stakeRegistry\",\"type\":\"address\",\"internalType\":\"contractIStakeRegistry\"},{\"name\":\"_blsApkRegistry\",\"type\":\"address\",\"internalType\":\"contractIBLSApkRegistry\"},{\"name\":\"_indexRegistry\",\"type\":\"address\",\"internalType\":\"contractIIndexRegistry\"},{\"name\":\"_socketRegistry\",\"type\":\"address\",\"internalType\":\"contractISocketRegistry\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"OPERATOR_CHURN_APPROVAL_TYPEHASH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"PUBKEY_REGISTRATION_TYPEHASH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"blsApkRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIBLSApkRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"calculateOperatorChurnApprovalDigestHash\",\"inputs\":[{\"name\":\"registeringOperator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"registeringOperatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"operatorKickParams\",\"type\":\"tuple[]\",\"internalType\":\"structIRegistryCoordinator.OperatorKickParam[]\",\"components\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"churnApprover\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"createQuorum\",\"inputs\":[{\"name\":\"operatorSetParams\",\"type\":\"tuple\",\"internalType\":\"structIRegistryCoordinator.OperatorSetParam\",\"components\":[{\"name\":\"maxOperatorCount\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"kickBIPsOfOperatorStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"kickBIPsOfTotalStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"name\":\"minimumStake\",\"type\":\"uint96\",\"internalType\":\"uint96\"},{\"name\":\"strategyParams\",\"type\":\"tuple[]\",\"internalType\":\"structIStakeRegistry.StrategyParams[]\",\"components\":[{\"name\":\"strategy\",\"type\":\"address\",\"internalType\":\"contractIStrategy\"},{\"name\":\"multiplier\",\"type\":\"uint96\",\"internalType\":\"uint96\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"deregisterOperator\",\"inputs\":[{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ejectOperator\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ejectionCooldown\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ejector\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCurrentQuorumBitmap\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint192\",\"internalType\":\"uint192\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOperator\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIRegistryCoordinator.OperatorInfo\",\"components\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"status\",\"type\":\"uint8\",\"internalType\":\"enumIRegistryCoordinator.OperatorStatus\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOperatorFromId\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOperatorId\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOperatorSetParams\",\"inputs\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIRegistryCoordinator.OperatorSetParam\",\"components\":[{\"name\":\"maxOperatorCount\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"kickBIPsOfOperatorStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"kickBIPsOfTotalStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOperatorStatus\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"enumIRegistryCoordinator.OperatorStatus\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumBitmapAtBlockNumberByIndex\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"blockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint192\",\"internalType\":\"uint192\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumBitmapHistoryLength\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumBitmapIndicesAtBlockNumber\",\"inputs\":[{\"name\":\"blockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"operatorIds\",\"type\":\"bytes32[]\",\"internalType\":\"bytes32[]\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumBitmapUpdateByIndex\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIRegistryCoordinator.QuorumBitmapUpdate\",\"components\":[{\"name\":\"updateBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"nextUpdateBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"quorumBitmap\",\"type\":\"uint192\",\"internalType\":\"uint192\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"indexRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIIndexRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_initialOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_churnApprover\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_ejector\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_pauserRegistry\",\"type\":\"address\",\"internalType\":\"contractIPauserRegistry\"},{\"name\":\"_initialPausedStatus\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"_operatorSetParams\",\"type\":\"tuple[]\",\"internalType\":\"structIRegistryCoordinator.OperatorSetParam[]\",\"components\":[{\"name\":\"maxOperatorCount\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"kickBIPsOfOperatorStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"kickBIPsOfTotalStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]},{\"name\":\"_minimumStakes\",\"type\":\"uint96[]\",\"internalType\":\"uint96[]\"},{\"name\":\"_strategyParams\",\"type\":\"tuple[][]\",\"internalType\":\"structIStakeRegistry.StrategyParams[][]\",\"components\":[{\"name\":\"strategy\",\"type\":\"address\",\"internalType\":\"contractIStrategy\"},{\"name\":\"multiplier\",\"type\":\"uint96\",\"internalType\":\"uint96\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"isChurnApproverSaltUsed\",\"inputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"lastEjectionTimestamp\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"numRegistries\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pause\",\"inputs\":[{\"name\":\"newPausedStatus\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"pauseAll\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"paused\",\"inputs\":[{\"name\":\"index\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"paused\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pauserRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIPauserRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pubkeyRegistrationMessageHash\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumCount\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorumUpdateBlockNumber\",\"inputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"registerOperator\",\"inputs\":[{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"socket\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"params\",\"type\":\"tuple\",\"internalType\":\"structIBLSApkRegistry.PubkeyRegistrationParams\",\"components\":[{\"name\":\"pubkeyRegistrationSignature\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"pubkeyG1\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"pubkeyG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]}]},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"registerOperatorWithChurn\",\"inputs\":[{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"socket\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"params\",\"type\":\"tuple\",\"internalType\":\"structIBLSApkRegistry.PubkeyRegistrationParams\",\"components\":[{\"name\":\"pubkeyRegistrationSignature\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"pubkeyG1\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"pubkeyG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]}]},{\"name\":\"operatorKickParams\",\"type\":\"tuple[]\",\"internalType\":\"structIRegistryCoordinator.OperatorKickParam[]\",\"components\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"operator\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"name\":\"churnApproverSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"operatorSignature\",\"type\":\"tuple\",\"internalType\":\"structISignatureUtils.SignatureWithSaltAndExpiry\",\"components\":[{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"salt\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"expiry\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"registries\",\"inputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"serviceManager\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIServiceManager\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setChurnApprover\",\"inputs\":[{\"name\":\"_churnApprover\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setEjectionCooldown\",\"inputs\":[{\"name\":\"_ejectionCooldown\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setEjector\",\"inputs\":[{\"name\":\"_ejector\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setOperatorSetParams\",\"inputs\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"operatorSetParams\",\"type\":\"tuple\",\"internalType\":\"structIRegistryCoordinator.OperatorSetParam\",\"components\":[{\"name\":\"maxOperatorCount\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"kickBIPsOfOperatorStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"kickBIPsOfTotalStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setPauserRegistry\",\"inputs\":[{\"name\":\"newPauserRegistry\",\"type\":\"address\",\"internalType\":\"contractIPauserRegistry\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"socketRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractISocketRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"stakeRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIStakeRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"unpause\",\"inputs\":[{\"name\":\"newPausedStatus\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updateOperators\",\"inputs\":[{\"name\":\"operators\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updateOperatorsForQuorum\",\"inputs\":[{\"name\":\"operatorsPerQuorum\",\"type\":\"address[][]\",\"internalType\":\"address[][]\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"updateSocket\",\"inputs\":[{\"name\":\"socket\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"ChurnApproverUpdated\",\"inputs\":[{\"name\":\"prevChurnApprover\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newChurnApprover\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"EjectorUpdated\",\"inputs\":[{\"name\":\"prevEjector\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newEjector\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OperatorDeregistered\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"operatorId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OperatorRegistered\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"operatorId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OperatorSetParamsUpdated\",\"inputs\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"uint8\"},{\"name\":\"operatorSetParams\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structIRegistryCoordinator.OperatorSetParam\",\"components\":[{\"name\":\"maxOperatorCount\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"kickBIPsOfOperatorStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"kickBIPsOfTotalStake\",\"type\":\"uint16\",\"internalType\":\"uint16\"}]}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OperatorSocketUpdate\",\"inputs\":[{\"name\":\"operatorId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"socket\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Paused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newPausedStatus\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"PauserRegistrySet\",\"inputs\":[{\"name\":\"pauserRegistry\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"contractIPauserRegistry\"},{\"name\":\"newPauserRegistry\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"contractIPauserRegistry\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"QuorumBlockNumberUpdated\",\"inputs\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"uint8\"},{\"name\":\"blocknumber\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Unpaused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newPausedStatus\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false}]",
 }
 
-// ContractRegistryCoordinatorABI is the input ABI used to generate the binding from.
-// Deprecated: Use ContractRegistryCoordinatorMetaData.ABI instead.
-var ContractRegistryCoordinatorABI = ContractRegistryCoordinatorMetaData.ABI
+// ContractEigenDARegistryCoordinatorABI is the input ABI used to generate the binding from.
+// Deprecated: Use ContractEigenDARegistryCoordinatorMetaData.ABI instead.
+var ContractEigenDARegistryCoordinatorABI = ContractEigenDARegistryCoordinatorMetaData.ABI
 
-// ContractRegistryCoordinator is an auto generated Go binding around an Ethereum contract.
-type ContractRegistryCoordinator struct {
-	ContractRegistryCoordinatorCaller     // Read-only binding to the contract
-	ContractRegistryCoordinatorTransactor // Write-only binding to the contract
-	ContractRegistryCoordinatorFilterer   // Log filterer for contract events
+// ContractEigenDARegistryCoordinator is an auto generated Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinator struct {
+	ContractEigenDARegistryCoordinatorCaller     // Read-only binding to the contract
+	ContractEigenDARegistryCoordinatorTransactor // Write-only binding to the contract
+	ContractEigenDARegistryCoordinatorFilterer   // Log filterer for contract events
 }
 
-// ContractRegistryCoordinatorCaller is an auto generated read-only Go binding around an Ethereum contract.
-type ContractRegistryCoordinatorCaller struct {
+// ContractEigenDARegistryCoordinatorCaller is an auto generated read-only Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinatorCaller struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ContractRegistryCoordinatorTransactor is an auto generated write-only Go binding around an Ethereum contract.
-type ContractRegistryCoordinatorTransactor struct {
+// ContractEigenDARegistryCoordinatorTransactor is an auto generated write-only Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinatorTransactor struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ContractRegistryCoordinatorFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
-type ContractRegistryCoordinatorFilterer struct {
+// ContractEigenDARegistryCoordinatorFilterer is an auto generated log filtering Go binding around an Ethereum contract events.
+type ContractEigenDARegistryCoordinatorFilterer struct {
 	contract *bind.BoundContract // Generic contract wrapper for the low level calls
 }
 
-// ContractRegistryCoordinatorSession is an auto generated Go binding around an Ethereum contract,
+// ContractEigenDARegistryCoordinatorSession is an auto generated Go binding around an Ethereum contract,
 // with pre-set call and transact options.
-type ContractRegistryCoordinatorSession struct {
-	Contract     *ContractRegistryCoordinator // Generic contract binding to set the session for
-	CallOpts     bind.CallOpts                // Call options to use throughout this session
-	TransactOpts bind.TransactOpts            // Transaction auth options to use throughout this session
+type ContractEigenDARegistryCoordinatorSession struct {
+	Contract     *ContractEigenDARegistryCoordinator // Generic contract binding to set the session for
+	CallOpts     bind.CallOpts                       // Call options to use throughout this session
+	TransactOpts bind.TransactOpts                   // Transaction auth options to use throughout this session
 }
 
-// ContractRegistryCoordinatorCallerSession is an auto generated read-only Go binding around an Ethereum contract,
+// ContractEigenDARegistryCoordinatorCallerSession is an auto generated read-only Go binding around an Ethereum contract,
 // with pre-set call options.
-type ContractRegistryCoordinatorCallerSession struct {
-	Contract *ContractRegistryCoordinatorCaller // Generic contract caller binding to set the session for
-	CallOpts bind.CallOpts                      // Call options to use throughout this session
+type ContractEigenDARegistryCoordinatorCallerSession struct {
+	Contract *ContractEigenDARegistryCoordinatorCaller // Generic contract caller binding to set the session for
+	CallOpts bind.CallOpts                             // Call options to use throughout this session
 }
 
-// ContractRegistryCoordinatorTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
+// ContractEigenDARegistryCoordinatorTransactorSession is an auto generated write-only Go binding around an Ethereum contract,
 // with pre-set transact options.
-type ContractRegistryCoordinatorTransactorSession struct {
-	Contract     *ContractRegistryCoordinatorTransactor // Generic contract transactor binding to set the session for
-	TransactOpts bind.TransactOpts                      // Transaction auth options to use throughout this session
+type ContractEigenDARegistryCoordinatorTransactorSession struct {
+	Contract     *ContractEigenDARegistryCoordinatorTransactor // Generic contract transactor binding to set the session for
+	TransactOpts bind.TransactOpts                             // Transaction auth options to use throughout this session
 }
 
-// ContractRegistryCoordinatorRaw is an auto generated low-level Go binding around an Ethereum contract.
-type ContractRegistryCoordinatorRaw struct {
-	Contract *ContractRegistryCoordinator // Generic contract binding to access the raw methods on
+// ContractEigenDARegistryCoordinatorRaw is an auto generated low-level Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinatorRaw struct {
+	Contract *ContractEigenDARegistryCoordinator // Generic contract binding to access the raw methods on
 }
 
-// ContractRegistryCoordinatorCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
-type ContractRegistryCoordinatorCallerRaw struct {
-	Contract *ContractRegistryCoordinatorCaller // Generic read-only contract binding to access the raw methods on
+// ContractEigenDARegistryCoordinatorCallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinatorCallerRaw struct {
+	Contract *ContractEigenDARegistryCoordinatorCaller // Generic read-only contract binding to access the raw methods on
 }
 
-// ContractRegistryCoordinatorTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
-type ContractRegistryCoordinatorTransactorRaw struct {
-	Contract *ContractRegistryCoordinatorTransactor // Generic write-only contract binding to access the raw methods on
+// ContractEigenDARegistryCoordinatorTransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
+type ContractEigenDARegistryCoordinatorTransactorRaw struct {
+	Contract *ContractEigenDARegistryCoordinatorTransactor // Generic write-only contract binding to access the raw methods on
 }
 
-// NewContractRegistryCoordinator creates a new instance of ContractRegistryCoordinator, bound to a specific deployed contract.
-func NewContractRegistryCoordinator(address common.Address, backend bind.ContractBackend) (*ContractRegistryCoordinator, error) {
-	contract, err := bindContractRegistryCoordinator(address, backend, backend, backend)
+// NewContractEigenDARegistryCoordinator creates a new instance of ContractEigenDARegistryCoordinator, bound to a specific deployed contract.
+func NewContractEigenDARegistryCoordinator(address common.Address, backend bind.ContractBackend) (*ContractEigenDARegistryCoordinator, error) {
+	contract, err := bindContractEigenDARegistryCoordinator(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinator{ContractRegistryCoordinatorCaller: ContractRegistryCoordinatorCaller{contract: contract}, ContractRegistryCoordinatorTransactor: ContractRegistryCoordinatorTransactor{contract: contract}, ContractRegistryCoordinatorFilterer: ContractRegistryCoordinatorFilterer{contract: contract}}, nil
+	return &ContractEigenDARegistryCoordinator{ContractEigenDARegistryCoordinatorCaller: ContractEigenDARegistryCoordinatorCaller{contract: contract}, ContractEigenDARegistryCoordinatorTransactor: ContractEigenDARegistryCoordinatorTransactor{contract: contract}, ContractEigenDARegistryCoordinatorFilterer: ContractEigenDARegistryCoordinatorFilterer{contract: contract}}, nil
 }
 
-// NewContractRegistryCoordinatorCaller creates a new read-only instance of ContractRegistryCoordinator, bound to a specific deployed contract.
-func NewContractRegistryCoordinatorCaller(address common.Address, caller bind.ContractCaller) (*ContractRegistryCoordinatorCaller, error) {
-	contract, err := bindContractRegistryCoordinator(address, caller, nil, nil)
+// NewContractEigenDARegistryCoordinatorCaller creates a new read-only instance of ContractEigenDARegistryCoordinator, bound to a specific deployed contract.
+func NewContractEigenDARegistryCoordinatorCaller(address common.Address, caller bind.ContractCaller) (*ContractEigenDARegistryCoordinatorCaller, error) {
+	contract, err := bindContractEigenDARegistryCoordinator(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorCaller{contract: contract}, nil
+	return &ContractEigenDARegistryCoordinatorCaller{contract: contract}, nil
 }
 
-// NewContractRegistryCoordinatorTransactor creates a new write-only instance of ContractRegistryCoordinator, bound to a specific deployed contract.
-func NewContractRegistryCoordinatorTransactor(address common.Address, transactor bind.ContractTransactor) (*ContractRegistryCoordinatorTransactor, error) {
-	contract, err := bindContractRegistryCoordinator(address, nil, transactor, nil)
+// NewContractEigenDARegistryCoordinatorTransactor creates a new write-only instance of ContractEigenDARegistryCoordinator, bound to a specific deployed contract.
+func NewContractEigenDARegistryCoordinatorTransactor(address common.Address, transactor bind.ContractTransactor) (*ContractEigenDARegistryCoordinatorTransactor, error) {
+	contract, err := bindContractEigenDARegistryCoordinator(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorTransactor{contract: contract}, nil
+	return &ContractEigenDARegistryCoordinatorTransactor{contract: contract}, nil
 }
 
-// NewContractRegistryCoordinatorFilterer creates a new log filterer instance of ContractRegistryCoordinator, bound to a specific deployed contract.
-func NewContractRegistryCoordinatorFilterer(address common.Address, filterer bind.ContractFilterer) (*ContractRegistryCoordinatorFilterer, error) {
-	contract, err := bindContractRegistryCoordinator(address, nil, nil, filterer)
+// NewContractEigenDARegistryCoordinatorFilterer creates a new log filterer instance of ContractEigenDARegistryCoordinator, bound to a specific deployed contract.
+func NewContractEigenDARegistryCoordinatorFilterer(address common.Address, filterer bind.ContractFilterer) (*ContractEigenDARegistryCoordinatorFilterer, error) {
+	contract, err := bindContractEigenDARegistryCoordinator(address, nil, nil, filterer)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorFilterer{contract: contract}, nil
+	return &ContractEigenDARegistryCoordinatorFilterer{contract: contract}, nil
 }
 
-// bindContractRegistryCoordinator binds a generic wrapper to an already deployed contract.
-func bindContractRegistryCoordinator(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := ContractRegistryCoordinatorMetaData.GetAbi()
+// bindContractEigenDARegistryCoordinator binds a generic wrapper to an already deployed contract.
+func bindContractEigenDARegistryCoordinator(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := ContractEigenDARegistryCoordinatorMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
@@ -204,46 +204,46 @@ func bindContractRegistryCoordinator(address common.Address, caller bind.Contrac
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _ContractRegistryCoordinator.Contract.ContractRegistryCoordinatorCaller.contract.Call(opts, result, method, params...)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _ContractEigenDARegistryCoordinator.Contract.ContractEigenDARegistryCoordinatorCaller.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.ContractRegistryCoordinatorTransactor.contract.Transfer(opts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ContractEigenDARegistryCoordinatorTransactor.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.ContractRegistryCoordinatorTransactor.contract.Transact(opts, method, params...)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ContractEigenDARegistryCoordinatorTransactor.contract.Transact(opts, method, params...)
 }
 
 // Call invokes the (constant) contract method with params as input values and
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _ContractRegistryCoordinator.Contract.contract.Call(opts, result, method, params...)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _ContractEigenDARegistryCoordinator.Contract.contract.Call(opts, result, method, params...)
 }
 
 // Transfer initiates a plain transaction to move funds to the contract, calling
 // its default method if one is available.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.contract.Transfer(opts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.contract.Transfer(opts)
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.contract.Transact(opts, method, params...)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.contract.Transact(opts, method, params...)
 }
 
 // OPERATORCHURNAPPROVALTYPEHASH is a free data retrieval call binding the contract method 0xca0de882.
 //
 // Solidity: function OPERATOR_CHURN_APPROVAL_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) OPERATORCHURNAPPROVALTYPEHASH(opts *bind.CallOpts) ([32]byte, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) OPERATORCHURNAPPROVALTYPEHASH(opts *bind.CallOpts) ([32]byte, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "OPERATOR_CHURN_APPROVAL_TYPEHASH")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "OPERATOR_CHURN_APPROVAL_TYPEHASH")
 
 	if err != nil {
 		return *new([32]byte), err
@@ -258,23 +258,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) OPERATORC
 // OPERATORCHURNAPPROVALTYPEHASH is a free data retrieval call binding the contract method 0xca0de882.
 //
 // Solidity: function OPERATOR_CHURN_APPROVAL_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) OPERATORCHURNAPPROVALTYPEHASH() ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.OPERATORCHURNAPPROVALTYPEHASH(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) OPERATORCHURNAPPROVALTYPEHASH() ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.OPERATORCHURNAPPROVALTYPEHASH(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // OPERATORCHURNAPPROVALTYPEHASH is a free data retrieval call binding the contract method 0xca0de882.
 //
 // Solidity: function OPERATOR_CHURN_APPROVAL_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) OPERATORCHURNAPPROVALTYPEHASH() ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.OPERATORCHURNAPPROVALTYPEHASH(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) OPERATORCHURNAPPROVALTYPEHASH() ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.OPERATORCHURNAPPROVALTYPEHASH(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // PUBKEYREGISTRATIONTYPEHASH is a free data retrieval call binding the contract method 0x9feab859.
 //
 // Solidity: function PUBKEY_REGISTRATION_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PUBKEYREGISTRATIONTYPEHASH(opts *bind.CallOpts) ([32]byte, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) PUBKEYREGISTRATIONTYPEHASH(opts *bind.CallOpts) ([32]byte, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "PUBKEY_REGISTRATION_TYPEHASH")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "PUBKEY_REGISTRATION_TYPEHASH")
 
 	if err != nil {
 		return *new([32]byte), err
@@ -289,23 +289,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PUBKEYREG
 // PUBKEYREGISTRATIONTYPEHASH is a free data retrieval call binding the contract method 0x9feab859.
 //
 // Solidity: function PUBKEY_REGISTRATION_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) PUBKEYREGISTRATIONTYPEHASH() ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.PUBKEYREGISTRATIONTYPEHASH(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) PUBKEYREGISTRATIONTYPEHASH() ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PUBKEYREGISTRATIONTYPEHASH(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // PUBKEYREGISTRATIONTYPEHASH is a free data retrieval call binding the contract method 0x9feab859.
 //
 // Solidity: function PUBKEY_REGISTRATION_TYPEHASH() view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) PUBKEYREGISTRATIONTYPEHASH() ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.PUBKEYREGISTRATIONTYPEHASH(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) PUBKEYREGISTRATIONTYPEHASH() ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PUBKEYREGISTRATIONTYPEHASH(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // BlsApkRegistry is a free data retrieval call binding the contract method 0x5df45946.
 //
 // Solidity: function blsApkRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) BlsApkRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) BlsApkRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "blsApkRegistry")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "blsApkRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -320,23 +320,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) BlsApkReg
 // BlsApkRegistry is a free data retrieval call binding the contract method 0x5df45946.
 //
 // Solidity: function blsApkRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) BlsApkRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.BlsApkRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) BlsApkRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.BlsApkRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // BlsApkRegistry is a free data retrieval call binding the contract method 0x5df45946.
 //
 // Solidity: function blsApkRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) BlsApkRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.BlsApkRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) BlsApkRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.BlsApkRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // CalculateOperatorChurnApprovalDigestHash is a free data retrieval call binding the contract method 0x84ca5213.
 //
 // Solidity: function calculateOperatorChurnApprovalDigestHash(address registeringOperator, bytes32 registeringOperatorId, (uint8,address)[] operatorKickParams, bytes32 salt, uint256 expiry) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) CalculateOperatorChurnApprovalDigestHash(opts *bind.CallOpts, registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) CalculateOperatorChurnApprovalDigestHash(opts *bind.CallOpts, registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "calculateOperatorChurnApprovalDigestHash", registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "calculateOperatorChurnApprovalDigestHash", registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
 
 	if err != nil {
 		return *new([32]byte), err
@@ -351,23 +351,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Calculate
 // CalculateOperatorChurnApprovalDigestHash is a free data retrieval call binding the contract method 0x84ca5213.
 //
 // Solidity: function calculateOperatorChurnApprovalDigestHash(address registeringOperator, bytes32 registeringOperatorId, (uint8,address)[] operatorKickParams, bytes32 salt, uint256 expiry) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) CalculateOperatorChurnApprovalDigestHash(registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.CalculateOperatorChurnApprovalDigestHash(&_ContractRegistryCoordinator.CallOpts, registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) CalculateOperatorChurnApprovalDigestHash(registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.CalculateOperatorChurnApprovalDigestHash(&_ContractEigenDARegistryCoordinator.CallOpts, registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
 }
 
 // CalculateOperatorChurnApprovalDigestHash is a free data retrieval call binding the contract method 0x84ca5213.
 //
 // Solidity: function calculateOperatorChurnApprovalDigestHash(address registeringOperator, bytes32 registeringOperatorId, (uint8,address)[] operatorKickParams, bytes32 salt, uint256 expiry) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) CalculateOperatorChurnApprovalDigestHash(registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.CalculateOperatorChurnApprovalDigestHash(&_ContractRegistryCoordinator.CallOpts, registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) CalculateOperatorChurnApprovalDigestHash(registeringOperator common.Address, registeringOperatorId [32]byte, operatorKickParams []IRegistryCoordinatorOperatorKickParam, salt [32]byte, expiry *big.Int) ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.CalculateOperatorChurnApprovalDigestHash(&_ContractEigenDARegistryCoordinator.CallOpts, registeringOperator, registeringOperatorId, operatorKickParams, salt, expiry)
 }
 
 // ChurnApprover is a free data retrieval call binding the contract method 0x054310e6.
 //
 // Solidity: function churnApprover() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) ChurnApprover(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) ChurnApprover(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "churnApprover")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "churnApprover")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -382,23 +382,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) ChurnAppr
 // ChurnApprover is a free data retrieval call binding the contract method 0x054310e6.
 //
 // Solidity: function churnApprover() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) ChurnApprover() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.ChurnApprover(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) ChurnApprover() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ChurnApprover(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // ChurnApprover is a free data retrieval call binding the contract method 0x054310e6.
 //
 // Solidity: function churnApprover() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) ChurnApprover() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.ChurnApprover(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) ChurnApprover() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ChurnApprover(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // EjectionCooldown is a free data retrieval call binding the contract method 0xa96f783e.
 //
 // Solidity: function ejectionCooldown() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) EjectionCooldown(opts *bind.CallOpts) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) EjectionCooldown(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "ejectionCooldown")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "ejectionCooldown")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -413,23 +413,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) EjectionC
 // EjectionCooldown is a free data retrieval call binding the contract method 0xa96f783e.
 //
 // Solidity: function ejectionCooldown() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) EjectionCooldown() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.EjectionCooldown(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) EjectionCooldown() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.EjectionCooldown(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // EjectionCooldown is a free data retrieval call binding the contract method 0xa96f783e.
 //
 // Solidity: function ejectionCooldown() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) EjectionCooldown() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.EjectionCooldown(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) EjectionCooldown() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.EjectionCooldown(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Ejector is a free data retrieval call binding the contract method 0x28f61b31.
 //
 // Solidity: function ejector() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Ejector(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) Ejector(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "ejector")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "ejector")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -444,23 +444,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Ejector(o
 // Ejector is a free data retrieval call binding the contract method 0x28f61b31.
 //
 // Solidity: function ejector() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Ejector() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Ejector(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Ejector() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Ejector(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Ejector is a free data retrieval call binding the contract method 0x28f61b31.
 //
 // Solidity: function ejector() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) Ejector() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Ejector(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) Ejector() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Ejector(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // GetCurrentQuorumBitmap is a free data retrieval call binding the contract method 0x871ef049.
 //
 // Solidity: function getCurrentQuorumBitmap(bytes32 operatorId) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetCurrentQuorumBitmap(opts *bind.CallOpts, operatorId [32]byte) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetCurrentQuorumBitmap(opts *bind.CallOpts, operatorId [32]byte) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getCurrentQuorumBitmap", operatorId)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getCurrentQuorumBitmap", operatorId)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -475,23 +475,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetCurren
 // GetCurrentQuorumBitmap is a free data retrieval call binding the contract method 0x871ef049.
 //
 // Solidity: function getCurrentQuorumBitmap(bytes32 operatorId) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetCurrentQuorumBitmap(operatorId [32]byte) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetCurrentQuorumBitmap(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetCurrentQuorumBitmap(operatorId [32]byte) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetCurrentQuorumBitmap(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetCurrentQuorumBitmap is a free data retrieval call binding the contract method 0x871ef049.
 //
 // Solidity: function getCurrentQuorumBitmap(bytes32 operatorId) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetCurrentQuorumBitmap(operatorId [32]byte) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetCurrentQuorumBitmap(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetCurrentQuorumBitmap(operatorId [32]byte) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetCurrentQuorumBitmap(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetOperator is a free data retrieval call binding the contract method 0x5865c60c.
 //
 // Solidity: function getOperator(address operator) view returns((bytes32,uint8))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperator(opts *bind.CallOpts, operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetOperator(opts *bind.CallOpts, operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getOperator", operator)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getOperator", operator)
 
 	if err != nil {
 		return *new(IRegistryCoordinatorOperatorInfo), err
@@ -506,23 +506,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperat
 // GetOperator is a free data retrieval call binding the contract method 0x5865c60c.
 //
 // Solidity: function getOperator(address operator) view returns((bytes32,uint8))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetOperator(operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperator(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetOperator(operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperator(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetOperator is a free data retrieval call binding the contract method 0x5865c60c.
 //
 // Solidity: function getOperator(address operator) view returns((bytes32,uint8))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetOperator(operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperator(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetOperator(operator common.Address) (IRegistryCoordinatorOperatorInfo, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperator(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetOperatorFromId is a free data retrieval call binding the contract method 0x296bb064.
 //
 // Solidity: function getOperatorFromId(bytes32 operatorId) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperatorFromId(opts *bind.CallOpts, operatorId [32]byte) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetOperatorFromId(opts *bind.CallOpts, operatorId [32]byte) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getOperatorFromId", operatorId)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getOperatorFromId", operatorId)
 
 	if err != nil {
 		return *new(common.Address), err
@@ -537,23 +537,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperat
 // GetOperatorFromId is a free data retrieval call binding the contract method 0x296bb064.
 //
 // Solidity: function getOperatorFromId(bytes32 operatorId) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetOperatorFromId(operatorId [32]byte) (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorFromId(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetOperatorFromId(operatorId [32]byte) (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorFromId(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetOperatorFromId is a free data retrieval call binding the contract method 0x296bb064.
 //
 // Solidity: function getOperatorFromId(bytes32 operatorId) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetOperatorFromId(operatorId [32]byte) (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorFromId(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetOperatorFromId(operatorId [32]byte) (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorFromId(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetOperatorId is a free data retrieval call binding the contract method 0x13542a4e.
 //
 // Solidity: function getOperatorId(address operator) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperatorId(opts *bind.CallOpts, operator common.Address) ([32]byte, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetOperatorId(opts *bind.CallOpts, operator common.Address) ([32]byte, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getOperatorId", operator)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getOperatorId", operator)
 
 	if err != nil {
 		return *new([32]byte), err
@@ -568,23 +568,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperat
 // GetOperatorId is a free data retrieval call binding the contract method 0x13542a4e.
 //
 // Solidity: function getOperatorId(address operator) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetOperatorId(operator common.Address) ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorId(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetOperatorId(operator common.Address) ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorId(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetOperatorId is a free data retrieval call binding the contract method 0x13542a4e.
 //
 // Solidity: function getOperatorId(address operator) view returns(bytes32)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetOperatorId(operator common.Address) ([32]byte, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorId(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetOperatorId(operator common.Address) ([32]byte, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorId(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetOperatorSetParams is a free data retrieval call binding the contract method 0xe65797ad.
 //
 // Solidity: function getOperatorSetParams(uint8 quorumNumber) view returns((uint32,uint16,uint16))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperatorSetParams(opts *bind.CallOpts, quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetOperatorSetParams(opts *bind.CallOpts, quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getOperatorSetParams", quorumNumber)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getOperatorSetParams", quorumNumber)
 
 	if err != nil {
 		return *new(IRegistryCoordinatorOperatorSetParam), err
@@ -599,23 +599,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperat
 // GetOperatorSetParams is a free data retrieval call binding the contract method 0xe65797ad.
 //
 // Solidity: function getOperatorSetParams(uint8 quorumNumber) view returns((uint32,uint16,uint16))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetOperatorSetParams(quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorSetParams(&_ContractRegistryCoordinator.CallOpts, quorumNumber)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetOperatorSetParams(quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorSetParams(&_ContractEigenDARegistryCoordinator.CallOpts, quorumNumber)
 }
 
 // GetOperatorSetParams is a free data retrieval call binding the contract method 0xe65797ad.
 //
 // Solidity: function getOperatorSetParams(uint8 quorumNumber) view returns((uint32,uint16,uint16))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetOperatorSetParams(quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorSetParams(&_ContractRegistryCoordinator.CallOpts, quorumNumber)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetOperatorSetParams(quorumNumber uint8) (IRegistryCoordinatorOperatorSetParam, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorSetParams(&_ContractEigenDARegistryCoordinator.CallOpts, quorumNumber)
 }
 
 // GetOperatorStatus is a free data retrieval call binding the contract method 0xfd39105a.
 //
 // Solidity: function getOperatorStatus(address operator) view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperatorStatus(opts *bind.CallOpts, operator common.Address) (uint8, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetOperatorStatus(opts *bind.CallOpts, operator common.Address) (uint8, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getOperatorStatus", operator)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getOperatorStatus", operator)
 
 	if err != nil {
 		return *new(uint8), err
@@ -630,23 +630,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetOperat
 // GetOperatorStatus is a free data retrieval call binding the contract method 0xfd39105a.
 //
 // Solidity: function getOperatorStatus(address operator) view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetOperatorStatus(operator common.Address) (uint8, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorStatus(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetOperatorStatus(operator common.Address) (uint8, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorStatus(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetOperatorStatus is a free data retrieval call binding the contract method 0xfd39105a.
 //
 // Solidity: function getOperatorStatus(address operator) view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetOperatorStatus(operator common.Address) (uint8, error) {
-	return _ContractRegistryCoordinator.Contract.GetOperatorStatus(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetOperatorStatus(operator common.Address) (uint8, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetOperatorStatus(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // GetQuorumBitmapAtBlockNumberByIndex is a free data retrieval call binding the contract method 0x04ec6351.
 //
 // Solidity: function getQuorumBitmapAtBlockNumberByIndex(bytes32 operatorId, uint32 blockNumber, uint256 index) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorumBitmapAtBlockNumberByIndex(opts *bind.CallOpts, operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetQuorumBitmapAtBlockNumberByIndex(opts *bind.CallOpts, operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapAtBlockNumberByIndex", operatorId, blockNumber, index)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapAtBlockNumberByIndex", operatorId, blockNumber, index)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -661,23 +661,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorum
 // GetQuorumBitmapAtBlockNumberByIndex is a free data retrieval call binding the contract method 0x04ec6351.
 //
 // Solidity: function getQuorumBitmapAtBlockNumberByIndex(bytes32 operatorId, uint32 blockNumber, uint256 index) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetQuorumBitmapAtBlockNumberByIndex(operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapAtBlockNumberByIndex(&_ContractRegistryCoordinator.CallOpts, operatorId, blockNumber, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetQuorumBitmapAtBlockNumberByIndex(operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapAtBlockNumberByIndex(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId, blockNumber, index)
 }
 
 // GetQuorumBitmapAtBlockNumberByIndex is a free data retrieval call binding the contract method 0x04ec6351.
 //
 // Solidity: function getQuorumBitmapAtBlockNumberByIndex(bytes32 operatorId, uint32 blockNumber, uint256 index) view returns(uint192)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetQuorumBitmapAtBlockNumberByIndex(operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapAtBlockNumberByIndex(&_ContractRegistryCoordinator.CallOpts, operatorId, blockNumber, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetQuorumBitmapAtBlockNumberByIndex(operatorId [32]byte, blockNumber uint32, index *big.Int) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapAtBlockNumberByIndex(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId, blockNumber, index)
 }
 
 // GetQuorumBitmapHistoryLength is a free data retrieval call binding the contract method 0x03fd3492.
 //
 // Solidity: function getQuorumBitmapHistoryLength(bytes32 operatorId) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorumBitmapHistoryLength(opts *bind.CallOpts, operatorId [32]byte) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetQuorumBitmapHistoryLength(opts *bind.CallOpts, operatorId [32]byte) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapHistoryLength", operatorId)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapHistoryLength", operatorId)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -692,23 +692,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorum
 // GetQuorumBitmapHistoryLength is a free data retrieval call binding the contract method 0x03fd3492.
 //
 // Solidity: function getQuorumBitmapHistoryLength(bytes32 operatorId) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetQuorumBitmapHistoryLength(operatorId [32]byte) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapHistoryLength(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetQuorumBitmapHistoryLength(operatorId [32]byte) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapHistoryLength(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetQuorumBitmapHistoryLength is a free data retrieval call binding the contract method 0x03fd3492.
 //
 // Solidity: function getQuorumBitmapHistoryLength(bytes32 operatorId) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetQuorumBitmapHistoryLength(operatorId [32]byte) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapHistoryLength(&_ContractRegistryCoordinator.CallOpts, operatorId)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetQuorumBitmapHistoryLength(operatorId [32]byte) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapHistoryLength(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId)
 }
 
 // GetQuorumBitmapIndicesAtBlockNumber is a free data retrieval call binding the contract method 0xc391425e.
 //
 // Solidity: function getQuorumBitmapIndicesAtBlockNumber(uint32 blockNumber, bytes32[] operatorIds) view returns(uint32[])
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorumBitmapIndicesAtBlockNumber(opts *bind.CallOpts, blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetQuorumBitmapIndicesAtBlockNumber(opts *bind.CallOpts, blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapIndicesAtBlockNumber", blockNumber, operatorIds)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapIndicesAtBlockNumber", blockNumber, operatorIds)
 
 	if err != nil {
 		return *new([]uint32), err
@@ -723,23 +723,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorum
 // GetQuorumBitmapIndicesAtBlockNumber is a free data retrieval call binding the contract method 0xc391425e.
 //
 // Solidity: function getQuorumBitmapIndicesAtBlockNumber(uint32 blockNumber, bytes32[] operatorIds) view returns(uint32[])
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetQuorumBitmapIndicesAtBlockNumber(blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapIndicesAtBlockNumber(&_ContractRegistryCoordinator.CallOpts, blockNumber, operatorIds)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetQuorumBitmapIndicesAtBlockNumber(blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapIndicesAtBlockNumber(&_ContractEigenDARegistryCoordinator.CallOpts, blockNumber, operatorIds)
 }
 
 // GetQuorumBitmapIndicesAtBlockNumber is a free data retrieval call binding the contract method 0xc391425e.
 //
 // Solidity: function getQuorumBitmapIndicesAtBlockNumber(uint32 blockNumber, bytes32[] operatorIds) view returns(uint32[])
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetQuorumBitmapIndicesAtBlockNumber(blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapIndicesAtBlockNumber(&_ContractRegistryCoordinator.CallOpts, blockNumber, operatorIds)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetQuorumBitmapIndicesAtBlockNumber(blockNumber uint32, operatorIds [][32]byte) ([]uint32, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapIndicesAtBlockNumber(&_ContractEigenDARegistryCoordinator.CallOpts, blockNumber, operatorIds)
 }
 
 // GetQuorumBitmapUpdateByIndex is a free data retrieval call binding the contract method 0x1eb812da.
 //
 // Solidity: function getQuorumBitmapUpdateByIndex(bytes32 operatorId, uint256 index) view returns((uint32,uint32,uint192))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorumBitmapUpdateByIndex(opts *bind.CallOpts, operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) GetQuorumBitmapUpdateByIndex(opts *bind.CallOpts, operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapUpdateByIndex", operatorId, index)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "getQuorumBitmapUpdateByIndex", operatorId, index)
 
 	if err != nil {
 		return *new(IRegistryCoordinatorQuorumBitmapUpdate), err
@@ -754,23 +754,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) GetQuorum
 // GetQuorumBitmapUpdateByIndex is a free data retrieval call binding the contract method 0x1eb812da.
 //
 // Solidity: function getQuorumBitmapUpdateByIndex(bytes32 operatorId, uint256 index) view returns((uint32,uint32,uint192))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) GetQuorumBitmapUpdateByIndex(operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapUpdateByIndex(&_ContractRegistryCoordinator.CallOpts, operatorId, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) GetQuorumBitmapUpdateByIndex(operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapUpdateByIndex(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId, index)
 }
 
 // GetQuorumBitmapUpdateByIndex is a free data retrieval call binding the contract method 0x1eb812da.
 //
 // Solidity: function getQuorumBitmapUpdateByIndex(bytes32 operatorId, uint256 index) view returns((uint32,uint32,uint192))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) GetQuorumBitmapUpdateByIndex(operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
-	return _ContractRegistryCoordinator.Contract.GetQuorumBitmapUpdateByIndex(&_ContractRegistryCoordinator.CallOpts, operatorId, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) GetQuorumBitmapUpdateByIndex(operatorId [32]byte, index *big.Int) (IRegistryCoordinatorQuorumBitmapUpdate, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.GetQuorumBitmapUpdateByIndex(&_ContractEigenDARegistryCoordinator.CallOpts, operatorId, index)
 }
 
 // IndexRegistry is a free data retrieval call binding the contract method 0x9e9923c2.
 //
 // Solidity: function indexRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) IndexRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) IndexRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "indexRegistry")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "indexRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -785,23 +785,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) IndexRegi
 // IndexRegistry is a free data retrieval call binding the contract method 0x9e9923c2.
 //
 // Solidity: function indexRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) IndexRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.IndexRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) IndexRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.IndexRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // IndexRegistry is a free data retrieval call binding the contract method 0x9e9923c2.
 //
 // Solidity: function indexRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) IndexRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.IndexRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) IndexRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.IndexRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // IsChurnApproverSaltUsed is a free data retrieval call binding the contract method 0x1478851f.
 //
 // Solidity: function isChurnApproverSaltUsed(bytes32 ) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) IsChurnApproverSaltUsed(opts *bind.CallOpts, arg0 [32]byte) (bool, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) IsChurnApproverSaltUsed(opts *bind.CallOpts, arg0 [32]byte) (bool, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "isChurnApproverSaltUsed", arg0)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "isChurnApproverSaltUsed", arg0)
 
 	if err != nil {
 		return *new(bool), err
@@ -816,23 +816,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) IsChurnAp
 // IsChurnApproverSaltUsed is a free data retrieval call binding the contract method 0x1478851f.
 //
 // Solidity: function isChurnApproverSaltUsed(bytes32 ) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) IsChurnApproverSaltUsed(arg0 [32]byte) (bool, error) {
-	return _ContractRegistryCoordinator.Contract.IsChurnApproverSaltUsed(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) IsChurnApproverSaltUsed(arg0 [32]byte) (bool, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.IsChurnApproverSaltUsed(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // IsChurnApproverSaltUsed is a free data retrieval call binding the contract method 0x1478851f.
 //
 // Solidity: function isChurnApproverSaltUsed(bytes32 ) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) IsChurnApproverSaltUsed(arg0 [32]byte) (bool, error) {
-	return _ContractRegistryCoordinator.Contract.IsChurnApproverSaltUsed(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) IsChurnApproverSaltUsed(arg0 [32]byte) (bool, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.IsChurnApproverSaltUsed(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // LastEjectionTimestamp is a free data retrieval call binding the contract method 0x125e0584.
 //
 // Solidity: function lastEjectionTimestamp(address ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) LastEjectionTimestamp(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) LastEjectionTimestamp(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "lastEjectionTimestamp", arg0)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "lastEjectionTimestamp", arg0)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -847,23 +847,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) LastEject
 // LastEjectionTimestamp is a free data retrieval call binding the contract method 0x125e0584.
 //
 // Solidity: function lastEjectionTimestamp(address ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) LastEjectionTimestamp(arg0 common.Address) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.LastEjectionTimestamp(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) LastEjectionTimestamp(arg0 common.Address) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.LastEjectionTimestamp(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // LastEjectionTimestamp is a free data retrieval call binding the contract method 0x125e0584.
 //
 // Solidity: function lastEjectionTimestamp(address ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) LastEjectionTimestamp(arg0 common.Address) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.LastEjectionTimestamp(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) LastEjectionTimestamp(arg0 common.Address) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.LastEjectionTimestamp(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // NumRegistries is a free data retrieval call binding the contract method 0xd72d8dd6.
 //
 // Solidity: function numRegistries() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) NumRegistries(opts *bind.CallOpts) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) NumRegistries(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "numRegistries")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "numRegistries")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -878,23 +878,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) NumRegist
 // NumRegistries is a free data retrieval call binding the contract method 0xd72d8dd6.
 //
 // Solidity: function numRegistries() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) NumRegistries() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.NumRegistries(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) NumRegistries() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.NumRegistries(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // NumRegistries is a free data retrieval call binding the contract method 0xd72d8dd6.
 //
 // Solidity: function numRegistries() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) NumRegistries() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.NumRegistries(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) NumRegistries() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.NumRegistries(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "owner")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "owner")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -909,23 +909,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Owner(opt
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Owner() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Owner(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Owner() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Owner(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) Owner() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Owner(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) Owner() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Owner(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Paused is a free data retrieval call binding the contract method 0x5ac86ab7.
 //
 // Solidity: function paused(uint8 index) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Paused(opts *bind.CallOpts, index uint8) (bool, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) Paused(opts *bind.CallOpts, index uint8) (bool, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "paused", index)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "paused", index)
 
 	if err != nil {
 		return *new(bool), err
@@ -940,23 +940,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Paused(op
 // Paused is a free data retrieval call binding the contract method 0x5ac86ab7.
 //
 // Solidity: function paused(uint8 index) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Paused(index uint8) (bool, error) {
-	return _ContractRegistryCoordinator.Contract.Paused(&_ContractRegistryCoordinator.CallOpts, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Paused(index uint8) (bool, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Paused(&_ContractEigenDARegistryCoordinator.CallOpts, index)
 }
 
 // Paused is a free data retrieval call binding the contract method 0x5ac86ab7.
 //
 // Solidity: function paused(uint8 index) view returns(bool)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) Paused(index uint8) (bool, error) {
-	return _ContractRegistryCoordinator.Contract.Paused(&_ContractRegistryCoordinator.CallOpts, index)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) Paused(index uint8) (bool, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Paused(&_ContractEigenDARegistryCoordinator.CallOpts, index)
 }
 
 // Paused0 is a free data retrieval call binding the contract method 0x5c975abb.
 //
 // Solidity: function paused() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Paused0(opts *bind.CallOpts) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) Paused0(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "paused0")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "paused0")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -971,23 +971,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Paused0(o
 // Paused0 is a free data retrieval call binding the contract method 0x5c975abb.
 //
 // Solidity: function paused() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Paused0() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.Paused0(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Paused0() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Paused0(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // Paused0 is a free data retrieval call binding the contract method 0x5c975abb.
 //
 // Solidity: function paused() view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) Paused0() (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.Paused0(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) Paused0() (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Paused0(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // PauserRegistry is a free data retrieval call binding the contract method 0x886f1195.
 //
 // Solidity: function pauserRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PauserRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) PauserRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "pauserRegistry")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "pauserRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -1002,23 +1002,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PauserReg
 // PauserRegistry is a free data retrieval call binding the contract method 0x886f1195.
 //
 // Solidity: function pauserRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) PauserRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.PauserRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) PauserRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PauserRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // PauserRegistry is a free data retrieval call binding the contract method 0x886f1195.
 //
 // Solidity: function pauserRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) PauserRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.PauserRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) PauserRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PauserRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // PubkeyRegistrationMessageHash is a free data retrieval call binding the contract method 0x3c2a7f4c.
 //
 // Solidity: function pubkeyRegistrationMessageHash(address operator) view returns((uint256,uint256))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PubkeyRegistrationMessageHash(opts *bind.CallOpts, operator common.Address) (BN254G1Point, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) PubkeyRegistrationMessageHash(opts *bind.CallOpts, operator common.Address) (BN254G1Point, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "pubkeyRegistrationMessageHash", operator)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "pubkeyRegistrationMessageHash", operator)
 
 	if err != nil {
 		return *new(BN254G1Point), err
@@ -1033,23 +1033,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) PubkeyReg
 // PubkeyRegistrationMessageHash is a free data retrieval call binding the contract method 0x3c2a7f4c.
 //
 // Solidity: function pubkeyRegistrationMessageHash(address operator) view returns((uint256,uint256))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) PubkeyRegistrationMessageHash(operator common.Address) (BN254G1Point, error) {
-	return _ContractRegistryCoordinator.Contract.PubkeyRegistrationMessageHash(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) PubkeyRegistrationMessageHash(operator common.Address) (BN254G1Point, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PubkeyRegistrationMessageHash(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // PubkeyRegistrationMessageHash is a free data retrieval call binding the contract method 0x3c2a7f4c.
 //
 // Solidity: function pubkeyRegistrationMessageHash(address operator) view returns((uint256,uint256))
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) PubkeyRegistrationMessageHash(operator common.Address) (BN254G1Point, error) {
-	return _ContractRegistryCoordinator.Contract.PubkeyRegistrationMessageHash(&_ContractRegistryCoordinator.CallOpts, operator)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) PubkeyRegistrationMessageHash(operator common.Address) (BN254G1Point, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PubkeyRegistrationMessageHash(&_ContractEigenDARegistryCoordinator.CallOpts, operator)
 }
 
 // QuorumCount is a free data retrieval call binding the contract method 0x9aa1653d.
 //
 // Solidity: function quorumCount() view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) QuorumCount(opts *bind.CallOpts) (uint8, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) QuorumCount(opts *bind.CallOpts) (uint8, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "quorumCount")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "quorumCount")
 
 	if err != nil {
 		return *new(uint8), err
@@ -1064,23 +1064,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) QuorumCou
 // QuorumCount is a free data retrieval call binding the contract method 0x9aa1653d.
 //
 // Solidity: function quorumCount() view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) QuorumCount() (uint8, error) {
-	return _ContractRegistryCoordinator.Contract.QuorumCount(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) QuorumCount() (uint8, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.QuorumCount(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // QuorumCount is a free data retrieval call binding the contract method 0x9aa1653d.
 //
 // Solidity: function quorumCount() view returns(uint8)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) QuorumCount() (uint8, error) {
-	return _ContractRegistryCoordinator.Contract.QuorumCount(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) QuorumCount() (uint8, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.QuorumCount(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // QuorumUpdateBlockNumber is a free data retrieval call binding the contract method 0x249a0c42.
 //
 // Solidity: function quorumUpdateBlockNumber(uint8 ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) QuorumUpdateBlockNumber(opts *bind.CallOpts, arg0 uint8) (*big.Int, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) QuorumUpdateBlockNumber(opts *bind.CallOpts, arg0 uint8) (*big.Int, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "quorumUpdateBlockNumber", arg0)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "quorumUpdateBlockNumber", arg0)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -1095,23 +1095,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) QuorumUpd
 // QuorumUpdateBlockNumber is a free data retrieval call binding the contract method 0x249a0c42.
 //
 // Solidity: function quorumUpdateBlockNumber(uint8 ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) QuorumUpdateBlockNumber(arg0 uint8) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.QuorumUpdateBlockNumber(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) QuorumUpdateBlockNumber(arg0 uint8) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.QuorumUpdateBlockNumber(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // QuorumUpdateBlockNumber is a free data retrieval call binding the contract method 0x249a0c42.
 //
 // Solidity: function quorumUpdateBlockNumber(uint8 ) view returns(uint256)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) QuorumUpdateBlockNumber(arg0 uint8) (*big.Int, error) {
-	return _ContractRegistryCoordinator.Contract.QuorumUpdateBlockNumber(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) QuorumUpdateBlockNumber(arg0 uint8) (*big.Int, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.QuorumUpdateBlockNumber(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // Registries is a free data retrieval call binding the contract method 0x6347c900.
 //
 // Solidity: function registries(uint256 ) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Registries(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) Registries(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "registries", arg0)
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "registries", arg0)
 
 	if err != nil {
 		return *new(common.Address), err
@@ -1126,23 +1126,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) Registrie
 // Registries is a free data retrieval call binding the contract method 0x6347c900.
 //
 // Solidity: function registries(uint256 ) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Registries(arg0 *big.Int) (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Registries(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Registries(arg0 *big.Int) (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Registries(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // Registries is a free data retrieval call binding the contract method 0x6347c900.
 //
 // Solidity: function registries(uint256 ) view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) Registries(arg0 *big.Int) (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.Registries(&_ContractRegistryCoordinator.CallOpts, arg0)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) Registries(arg0 *big.Int) (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Registries(&_ContractEigenDARegistryCoordinator.CallOpts, arg0)
 }
 
 // ServiceManager is a free data retrieval call binding the contract method 0x3998fdd3.
 //
 // Solidity: function serviceManager() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) ServiceManager(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) ServiceManager(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "serviceManager")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "serviceManager")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -1157,23 +1157,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) ServiceMa
 // ServiceManager is a free data retrieval call binding the contract method 0x3998fdd3.
 //
 // Solidity: function serviceManager() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) ServiceManager() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.ServiceManager(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) ServiceManager() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ServiceManager(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // ServiceManager is a free data retrieval call binding the contract method 0x3998fdd3.
 //
 // Solidity: function serviceManager() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) ServiceManager() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.ServiceManager(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) ServiceManager() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.ServiceManager(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // SocketRegistry is a free data retrieval call binding the contract method 0xea32afae.
 //
 // Solidity: function socketRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) SocketRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) SocketRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "socketRegistry")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "socketRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -1188,23 +1188,23 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) SocketReg
 // SocketRegistry is a free data retrieval call binding the contract method 0xea32afae.
 //
 // Solidity: function socketRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SocketRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.SocketRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SocketRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SocketRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // SocketRegistry is a free data retrieval call binding the contract method 0xea32afae.
 //
 // Solidity: function socketRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) SocketRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.SocketRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) SocketRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SocketRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // StakeRegistry is a free data retrieval call binding the contract method 0x68304835.
 //
 // Solidity: function stakeRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) StakeRegistry(opts *bind.CallOpts) (common.Address, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCaller) StakeRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _ContractRegistryCoordinator.contract.Call(opts, &out, "stakeRegistry")
+	err := _ContractEigenDARegistryCoordinator.contract.Call(opts, &out, "stakeRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -1219,419 +1219,419 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCaller) StakeRegi
 // StakeRegistry is a free data retrieval call binding the contract method 0x68304835.
 //
 // Solidity: function stakeRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) StakeRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.StakeRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) StakeRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.StakeRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // StakeRegistry is a free data retrieval call binding the contract method 0x68304835.
 //
 // Solidity: function stakeRegistry() view returns(address)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorCallerSession) StakeRegistry() (common.Address, error) {
-	return _ContractRegistryCoordinator.Contract.StakeRegistry(&_ContractRegistryCoordinator.CallOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorCallerSession) StakeRegistry() (common.Address, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.StakeRegistry(&_ContractEigenDARegistryCoordinator.CallOpts)
 }
 
 // CreateQuorum is a paid mutator transaction binding the contract method 0xd75b4c88.
 //
 // Solidity: function createQuorum((uint32,uint16,uint16) operatorSetParams, uint96 minimumStake, (address,uint96)[] strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) CreateQuorum(opts *bind.TransactOpts, operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "createQuorum", operatorSetParams, minimumStake, strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) CreateQuorum(opts *bind.TransactOpts, operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "createQuorum", operatorSetParams, minimumStake, strategyParams)
 }
 
 // CreateQuorum is a paid mutator transaction binding the contract method 0xd75b4c88.
 //
 // Solidity: function createQuorum((uint32,uint16,uint16) operatorSetParams, uint96 minimumStake, (address,uint96)[] strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) CreateQuorum(operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.CreateQuorum(&_ContractRegistryCoordinator.TransactOpts, operatorSetParams, minimumStake, strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) CreateQuorum(operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.CreateQuorum(&_ContractEigenDARegistryCoordinator.TransactOpts, operatorSetParams, minimumStake, strategyParams)
 }
 
 // CreateQuorum is a paid mutator transaction binding the contract method 0xd75b4c88.
 //
 // Solidity: function createQuorum((uint32,uint16,uint16) operatorSetParams, uint96 minimumStake, (address,uint96)[] strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) CreateQuorum(operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.CreateQuorum(&_ContractRegistryCoordinator.TransactOpts, operatorSetParams, minimumStake, strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) CreateQuorum(operatorSetParams IRegistryCoordinatorOperatorSetParam, minimumStake *big.Int, strategyParams []IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.CreateQuorum(&_ContractEigenDARegistryCoordinator.TransactOpts, operatorSetParams, minimumStake, strategyParams)
 }
 
 // DeregisterOperator is a paid mutator transaction binding the contract method 0xca4f2d97.
 //
 // Solidity: function deregisterOperator(bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) DeregisterOperator(opts *bind.TransactOpts, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "deregisterOperator", quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) DeregisterOperator(opts *bind.TransactOpts, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "deregisterOperator", quorumNumbers)
 }
 
 // DeregisterOperator is a paid mutator transaction binding the contract method 0xca4f2d97.
 //
 // Solidity: function deregisterOperator(bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) DeregisterOperator(quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.DeregisterOperator(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) DeregisterOperator(quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.DeregisterOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers)
 }
 
 // DeregisterOperator is a paid mutator transaction binding the contract method 0xca4f2d97.
 //
 // Solidity: function deregisterOperator(bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) DeregisterOperator(quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.DeregisterOperator(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) DeregisterOperator(quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.DeregisterOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers)
 }
 
 // EjectOperator is a paid mutator transaction binding the contract method 0x6e3b17db.
 //
 // Solidity: function ejectOperator(address operator, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) EjectOperator(opts *bind.TransactOpts, operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "ejectOperator", operator, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) EjectOperator(opts *bind.TransactOpts, operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "ejectOperator", operator, quorumNumbers)
 }
 
 // EjectOperator is a paid mutator transaction binding the contract method 0x6e3b17db.
 //
 // Solidity: function ejectOperator(address operator, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) EjectOperator(operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.EjectOperator(&_ContractRegistryCoordinator.TransactOpts, operator, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) EjectOperator(operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.EjectOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, operator, quorumNumbers)
 }
 
 // EjectOperator is a paid mutator transaction binding the contract method 0x6e3b17db.
 //
 // Solidity: function ejectOperator(address operator, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) EjectOperator(operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.EjectOperator(&_ContractRegistryCoordinator.TransactOpts, operator, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) EjectOperator(operator common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.EjectOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, operator, quorumNumbers)
 }
 
 // Initialize is a paid mutator transaction binding the contract method 0xdd8283f3.
 //
 // Solidity: function initialize(address _initialOwner, address _churnApprover, address _ejector, address _pauserRegistry, uint256 _initialPausedStatus, (uint32,uint16,uint16)[] _operatorSetParams, uint96[] _minimumStakes, (address,uint96)[][] _strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "initialize", _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "initialize", _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
 }
 
 // Initialize is a paid mutator transaction binding the contract method 0xdd8283f3.
 //
 // Solidity: function initialize(address _initialOwner, address _churnApprover, address _ejector, address _pauserRegistry, uint256 _initialPausedStatus, (uint32,uint16,uint16)[] _operatorSetParams, uint96[] _minimumStakes, (address,uint96)[][] _strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Initialize(_initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Initialize(&_ContractRegistryCoordinator.TransactOpts, _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Initialize(_initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Initialize(&_ContractEigenDARegistryCoordinator.TransactOpts, _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
 }
 
 // Initialize is a paid mutator transaction binding the contract method 0xdd8283f3.
 //
 // Solidity: function initialize(address _initialOwner, address _churnApprover, address _ejector, address _pauserRegistry, uint256 _initialPausedStatus, (uint32,uint16,uint16)[] _operatorSetParams, uint96[] _minimumStakes, (address,uint96)[][] _strategyParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) Initialize(_initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Initialize(&_ContractRegistryCoordinator.TransactOpts, _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) Initialize(_initialOwner common.Address, _churnApprover common.Address, _ejector common.Address, _pauserRegistry common.Address, _initialPausedStatus *big.Int, _operatorSetParams []IRegistryCoordinatorOperatorSetParam, _minimumStakes []*big.Int, _strategyParams [][]IStakeRegistryStrategyParams) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Initialize(&_ContractEigenDARegistryCoordinator.TransactOpts, _initialOwner, _churnApprover, _ejector, _pauserRegistry, _initialPausedStatus, _operatorSetParams, _minimumStakes, _strategyParams)
 }
 
 // Pause is a paid mutator transaction binding the contract method 0x136439dd.
 //
 // Solidity: function pause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) Pause(opts *bind.TransactOpts, newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "pause", newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) Pause(opts *bind.TransactOpts, newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "pause", newPausedStatus)
 }
 
 // Pause is a paid mutator transaction binding the contract method 0x136439dd.
 //
 // Solidity: function pause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Pause(newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Pause(&_ContractRegistryCoordinator.TransactOpts, newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Pause(newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Pause(&_ContractEigenDARegistryCoordinator.TransactOpts, newPausedStatus)
 }
 
 // Pause is a paid mutator transaction binding the contract method 0x136439dd.
 //
 // Solidity: function pause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) Pause(newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Pause(&_ContractRegistryCoordinator.TransactOpts, newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) Pause(newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Pause(&_ContractEigenDARegistryCoordinator.TransactOpts, newPausedStatus)
 }
 
 // PauseAll is a paid mutator transaction binding the contract method 0x595c6a67.
 //
 // Solidity: function pauseAll() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) PauseAll(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "pauseAll")
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) PauseAll(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "pauseAll")
 }
 
 // PauseAll is a paid mutator transaction binding the contract method 0x595c6a67.
 //
 // Solidity: function pauseAll() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) PauseAll() (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.PauseAll(&_ContractRegistryCoordinator.TransactOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) PauseAll() (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PauseAll(&_ContractEigenDARegistryCoordinator.TransactOpts)
 }
 
 // PauseAll is a paid mutator transaction binding the contract method 0x595c6a67.
 //
 // Solidity: function pauseAll() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) PauseAll() (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.PauseAll(&_ContractRegistryCoordinator.TransactOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) PauseAll() (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.PauseAll(&_ContractEigenDARegistryCoordinator.TransactOpts)
 }
 
 // RegisterOperator is a paid mutator transaction binding the contract method 0xa50857bf.
 //
 // Solidity: function registerOperator(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) RegisterOperator(opts *bind.TransactOpts, quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "registerOperator", quorumNumbers, socket, params, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) RegisterOperator(opts *bind.TransactOpts, quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "registerOperator", quorumNumbers, socket, params, operatorSignature)
 }
 
 // RegisterOperator is a paid mutator transaction binding the contract method 0xa50857bf.
 //
 // Solidity: function registerOperator(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) RegisterOperator(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RegisterOperator(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) RegisterOperator(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RegisterOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorSignature)
 }
 
 // RegisterOperator is a paid mutator transaction binding the contract method 0xa50857bf.
 //
 // Solidity: function registerOperator(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) RegisterOperator(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RegisterOperator(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) RegisterOperator(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RegisterOperator(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorSignature)
 }
 
 // RegisterOperatorWithChurn is a paid mutator transaction binding the contract method 0x9b5d177b.
 //
 // Solidity: function registerOperatorWithChurn(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (uint8,address)[] operatorKickParams, (bytes,bytes32,uint256) churnApproverSignature, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) RegisterOperatorWithChurn(opts *bind.TransactOpts, quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "registerOperatorWithChurn", quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) RegisterOperatorWithChurn(opts *bind.TransactOpts, quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "registerOperatorWithChurn", quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
 }
 
 // RegisterOperatorWithChurn is a paid mutator transaction binding the contract method 0x9b5d177b.
 //
 // Solidity: function registerOperatorWithChurn(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (uint8,address)[] operatorKickParams, (bytes,bytes32,uint256) churnApproverSignature, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) RegisterOperatorWithChurn(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RegisterOperatorWithChurn(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) RegisterOperatorWithChurn(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RegisterOperatorWithChurn(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
 }
 
 // RegisterOperatorWithChurn is a paid mutator transaction binding the contract method 0x9b5d177b.
 //
 // Solidity: function registerOperatorWithChurn(bytes quorumNumbers, string socket, ((uint256,uint256),(uint256,uint256),(uint256[2],uint256[2])) params, (uint8,address)[] operatorKickParams, (bytes,bytes32,uint256) churnApproverSignature, (bytes,bytes32,uint256) operatorSignature) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) RegisterOperatorWithChurn(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RegisterOperatorWithChurn(&_ContractRegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) RegisterOperatorWithChurn(quorumNumbers []byte, socket string, params IBLSApkRegistryPubkeyRegistrationParams, operatorKickParams []IRegistryCoordinatorOperatorKickParam, churnApproverSignature ISignatureUtilsSignatureWithSaltAndExpiry, operatorSignature ISignatureUtilsSignatureWithSaltAndExpiry) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RegisterOperatorWithChurn(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumbers, socket, params, operatorKickParams, churnApproverSignature, operatorSignature)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "renounceOwnership")
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "renounceOwnership")
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RenounceOwnership(&_ContractRegistryCoordinator.TransactOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RenounceOwnership(&_ContractEigenDARegistryCoordinator.TransactOpts)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
 //
 // Solidity: function renounceOwnership() returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.RenounceOwnership(&_ContractRegistryCoordinator.TransactOpts)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) RenounceOwnership() (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.RenounceOwnership(&_ContractEigenDARegistryCoordinator.TransactOpts)
 }
 
 // SetChurnApprover is a paid mutator transaction binding the contract method 0x29d1e0c3.
 //
 // Solidity: function setChurnApprover(address _churnApprover) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) SetChurnApprover(opts *bind.TransactOpts, _churnApprover common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "setChurnApprover", _churnApprover)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) SetChurnApprover(opts *bind.TransactOpts, _churnApprover common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "setChurnApprover", _churnApprover)
 }
 
 // SetChurnApprover is a paid mutator transaction binding the contract method 0x29d1e0c3.
 //
 // Solidity: function setChurnApprover(address _churnApprover) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SetChurnApprover(_churnApprover common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetChurnApprover(&_ContractRegistryCoordinator.TransactOpts, _churnApprover)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SetChurnApprover(_churnApprover common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetChurnApprover(&_ContractEigenDARegistryCoordinator.TransactOpts, _churnApprover)
 }
 
 // SetChurnApprover is a paid mutator transaction binding the contract method 0x29d1e0c3.
 //
 // Solidity: function setChurnApprover(address _churnApprover) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) SetChurnApprover(_churnApprover common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetChurnApprover(&_ContractRegistryCoordinator.TransactOpts, _churnApprover)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) SetChurnApprover(_churnApprover common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetChurnApprover(&_ContractEigenDARegistryCoordinator.TransactOpts, _churnApprover)
 }
 
 // SetEjectionCooldown is a paid mutator transaction binding the contract method 0x0d3f2134.
 //
 // Solidity: function setEjectionCooldown(uint256 _ejectionCooldown) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) SetEjectionCooldown(opts *bind.TransactOpts, _ejectionCooldown *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "setEjectionCooldown", _ejectionCooldown)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) SetEjectionCooldown(opts *bind.TransactOpts, _ejectionCooldown *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "setEjectionCooldown", _ejectionCooldown)
 }
 
 // SetEjectionCooldown is a paid mutator transaction binding the contract method 0x0d3f2134.
 //
 // Solidity: function setEjectionCooldown(uint256 _ejectionCooldown) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SetEjectionCooldown(_ejectionCooldown *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetEjectionCooldown(&_ContractRegistryCoordinator.TransactOpts, _ejectionCooldown)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SetEjectionCooldown(_ejectionCooldown *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetEjectionCooldown(&_ContractEigenDARegistryCoordinator.TransactOpts, _ejectionCooldown)
 }
 
 // SetEjectionCooldown is a paid mutator transaction binding the contract method 0x0d3f2134.
 //
 // Solidity: function setEjectionCooldown(uint256 _ejectionCooldown) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) SetEjectionCooldown(_ejectionCooldown *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetEjectionCooldown(&_ContractRegistryCoordinator.TransactOpts, _ejectionCooldown)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) SetEjectionCooldown(_ejectionCooldown *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetEjectionCooldown(&_ContractEigenDARegistryCoordinator.TransactOpts, _ejectionCooldown)
 }
 
 // SetEjector is a paid mutator transaction binding the contract method 0x2cdd1e86.
 //
 // Solidity: function setEjector(address _ejector) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) SetEjector(opts *bind.TransactOpts, _ejector common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "setEjector", _ejector)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) SetEjector(opts *bind.TransactOpts, _ejector common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "setEjector", _ejector)
 }
 
 // SetEjector is a paid mutator transaction binding the contract method 0x2cdd1e86.
 //
 // Solidity: function setEjector(address _ejector) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SetEjector(_ejector common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetEjector(&_ContractRegistryCoordinator.TransactOpts, _ejector)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SetEjector(_ejector common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetEjector(&_ContractEigenDARegistryCoordinator.TransactOpts, _ejector)
 }
 
 // SetEjector is a paid mutator transaction binding the contract method 0x2cdd1e86.
 //
 // Solidity: function setEjector(address _ejector) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) SetEjector(_ejector common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetEjector(&_ContractRegistryCoordinator.TransactOpts, _ejector)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) SetEjector(_ejector common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetEjector(&_ContractEigenDARegistryCoordinator.TransactOpts, _ejector)
 }
 
 // SetOperatorSetParams is a paid mutator transaction binding the contract method 0x5b0b829f.
 //
 // Solidity: function setOperatorSetParams(uint8 quorumNumber, (uint32,uint16,uint16) operatorSetParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) SetOperatorSetParams(opts *bind.TransactOpts, quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "setOperatorSetParams", quorumNumber, operatorSetParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) SetOperatorSetParams(opts *bind.TransactOpts, quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "setOperatorSetParams", quorumNumber, operatorSetParams)
 }
 
 // SetOperatorSetParams is a paid mutator transaction binding the contract method 0x5b0b829f.
 //
 // Solidity: function setOperatorSetParams(uint8 quorumNumber, (uint32,uint16,uint16) operatorSetParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SetOperatorSetParams(quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetOperatorSetParams(&_ContractRegistryCoordinator.TransactOpts, quorumNumber, operatorSetParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SetOperatorSetParams(quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetOperatorSetParams(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumber, operatorSetParams)
 }
 
 // SetOperatorSetParams is a paid mutator transaction binding the contract method 0x5b0b829f.
 //
 // Solidity: function setOperatorSetParams(uint8 quorumNumber, (uint32,uint16,uint16) operatorSetParams) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) SetOperatorSetParams(quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetOperatorSetParams(&_ContractRegistryCoordinator.TransactOpts, quorumNumber, operatorSetParams)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) SetOperatorSetParams(quorumNumber uint8, operatorSetParams IRegistryCoordinatorOperatorSetParam) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetOperatorSetParams(&_ContractEigenDARegistryCoordinator.TransactOpts, quorumNumber, operatorSetParams)
 }
 
 // SetPauserRegistry is a paid mutator transaction binding the contract method 0x10d67a2f.
 //
 // Solidity: function setPauserRegistry(address newPauserRegistry) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) SetPauserRegistry(opts *bind.TransactOpts, newPauserRegistry common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "setPauserRegistry", newPauserRegistry)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) SetPauserRegistry(opts *bind.TransactOpts, newPauserRegistry common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "setPauserRegistry", newPauserRegistry)
 }
 
 // SetPauserRegistry is a paid mutator transaction binding the contract method 0x10d67a2f.
 //
 // Solidity: function setPauserRegistry(address newPauserRegistry) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) SetPauserRegistry(newPauserRegistry common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetPauserRegistry(&_ContractRegistryCoordinator.TransactOpts, newPauserRegistry)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) SetPauserRegistry(newPauserRegistry common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetPauserRegistry(&_ContractEigenDARegistryCoordinator.TransactOpts, newPauserRegistry)
 }
 
 // SetPauserRegistry is a paid mutator transaction binding the contract method 0x10d67a2f.
 //
 // Solidity: function setPauserRegistry(address newPauserRegistry) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) SetPauserRegistry(newPauserRegistry common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.SetPauserRegistry(&_ContractRegistryCoordinator.TransactOpts, newPauserRegistry)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) SetPauserRegistry(newPauserRegistry common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.SetPauserRegistry(&_ContractEigenDARegistryCoordinator.TransactOpts, newPauserRegistry)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "transferOwnership", newOwner)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.TransferOwnership(&_ContractRegistryCoordinator.TransactOpts, newOwner)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.TransferOwnership(&_ContractEigenDARegistryCoordinator.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
 // Solidity: function transferOwnership(address newOwner) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.TransferOwnership(&_ContractRegistryCoordinator.TransactOpts, newOwner)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.TransferOwnership(&_ContractEigenDARegistryCoordinator.TransactOpts, newOwner)
 }
 
 // Unpause is a paid mutator transaction binding the contract method 0xfabc1cbc.
 //
 // Solidity: function unpause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) Unpause(opts *bind.TransactOpts, newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "unpause", newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) Unpause(opts *bind.TransactOpts, newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "unpause", newPausedStatus)
 }
 
 // Unpause is a paid mutator transaction binding the contract method 0xfabc1cbc.
 //
 // Solidity: function unpause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) Unpause(newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Unpause(&_ContractRegistryCoordinator.TransactOpts, newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) Unpause(newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Unpause(&_ContractEigenDARegistryCoordinator.TransactOpts, newPausedStatus)
 }
 
 // Unpause is a paid mutator transaction binding the contract method 0xfabc1cbc.
 //
 // Solidity: function unpause(uint256 newPausedStatus) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) Unpause(newPausedStatus *big.Int) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.Unpause(&_ContractRegistryCoordinator.TransactOpts, newPausedStatus)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) Unpause(newPausedStatus *big.Int) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.Unpause(&_ContractEigenDARegistryCoordinator.TransactOpts, newPausedStatus)
 }
 
 // UpdateOperators is a paid mutator transaction binding the contract method 0x00cf2ab5.
 //
 // Solidity: function updateOperators(address[] operators) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) UpdateOperators(opts *bind.TransactOpts, operators []common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "updateOperators", operators)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) UpdateOperators(opts *bind.TransactOpts, operators []common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "updateOperators", operators)
 }
 
 // UpdateOperators is a paid mutator transaction binding the contract method 0x00cf2ab5.
 //
 // Solidity: function updateOperators(address[] operators) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) UpdateOperators(operators []common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateOperators(&_ContractRegistryCoordinator.TransactOpts, operators)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) UpdateOperators(operators []common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateOperators(&_ContractEigenDARegistryCoordinator.TransactOpts, operators)
 }
 
 // UpdateOperators is a paid mutator transaction binding the contract method 0x00cf2ab5.
 //
 // Solidity: function updateOperators(address[] operators) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) UpdateOperators(operators []common.Address) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateOperators(&_ContractRegistryCoordinator.TransactOpts, operators)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) UpdateOperators(operators []common.Address) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateOperators(&_ContractEigenDARegistryCoordinator.TransactOpts, operators)
 }
 
 // UpdateOperatorsForQuorum is a paid mutator transaction binding the contract method 0x5140a548.
 //
 // Solidity: function updateOperatorsForQuorum(address[][] operatorsPerQuorum, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) UpdateOperatorsForQuorum(opts *bind.TransactOpts, operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "updateOperatorsForQuorum", operatorsPerQuorum, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) UpdateOperatorsForQuorum(opts *bind.TransactOpts, operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "updateOperatorsForQuorum", operatorsPerQuorum, quorumNumbers)
 }
 
 // UpdateOperatorsForQuorum is a paid mutator transaction binding the contract method 0x5140a548.
 //
 // Solidity: function updateOperatorsForQuorum(address[][] operatorsPerQuorum, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) UpdateOperatorsForQuorum(operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateOperatorsForQuorum(&_ContractRegistryCoordinator.TransactOpts, operatorsPerQuorum, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) UpdateOperatorsForQuorum(operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateOperatorsForQuorum(&_ContractEigenDARegistryCoordinator.TransactOpts, operatorsPerQuorum, quorumNumbers)
 }
 
 // UpdateOperatorsForQuorum is a paid mutator transaction binding the contract method 0x5140a548.
 //
 // Solidity: function updateOperatorsForQuorum(address[][] operatorsPerQuorum, bytes quorumNumbers) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) UpdateOperatorsForQuorum(operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateOperatorsForQuorum(&_ContractRegistryCoordinator.TransactOpts, operatorsPerQuorum, quorumNumbers)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) UpdateOperatorsForQuorum(operatorsPerQuorum [][]common.Address, quorumNumbers []byte) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateOperatorsForQuorum(&_ContractEigenDARegistryCoordinator.TransactOpts, operatorsPerQuorum, quorumNumbers)
 }
 
 // UpdateSocket is a paid mutator transaction binding the contract method 0x0cf4b767.
 //
 // Solidity: function updateSocket(string socket) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactor) UpdateSocket(opts *bind.TransactOpts, socket string) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.contract.Transact(opts, "updateSocket", socket)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactor) UpdateSocket(opts *bind.TransactOpts, socket string) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.contract.Transact(opts, "updateSocket", socket)
 }
 
 // UpdateSocket is a paid mutator transaction binding the contract method 0x0cf4b767.
 //
 // Solidity: function updateSocket(string socket) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorSession) UpdateSocket(socket string) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateSocket(&_ContractRegistryCoordinator.TransactOpts, socket)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorSession) UpdateSocket(socket string) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateSocket(&_ContractEigenDARegistryCoordinator.TransactOpts, socket)
 }
 
 // UpdateSocket is a paid mutator transaction binding the contract method 0x0cf4b767.
 //
 // Solidity: function updateSocket(string socket) returns()
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorTransactorSession) UpdateSocket(socket string) (*types.Transaction, error) {
-	return _ContractRegistryCoordinator.Contract.UpdateSocket(&_ContractRegistryCoordinator.TransactOpts, socket)
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorTransactorSession) UpdateSocket(socket string) (*types.Transaction, error) {
+	return _ContractEigenDARegistryCoordinator.Contract.UpdateSocket(&_ContractEigenDARegistryCoordinator.TransactOpts, socket)
 }
 
-// ContractRegistryCoordinatorChurnApproverUpdatedIterator is returned from FilterChurnApproverUpdated and is used to iterate over the raw logs and unpacked data for ChurnApproverUpdated events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorChurnApproverUpdatedIterator struct {
-	Event *ContractRegistryCoordinatorChurnApproverUpdated // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator is returned from FilterChurnApproverUpdated and is used to iterate over the raw logs and unpacked data for ChurnApproverUpdated events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorChurnApproverUpdated // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1645,7 +1645,7 @@ type ContractRegistryCoordinatorChurnApproverUpdatedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1654,7 +1654,7 @@ func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorChurnApproverUpdated)
+			it.Event = new(ContractEigenDARegistryCoordinatorChurnApproverUpdated)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1669,7 +1669,7 @@ func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorChurnApproverUpdated)
+		it.Event = new(ContractEigenDARegistryCoordinatorChurnApproverUpdated)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1685,19 +1685,19 @@ func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorChurnApproverUpdatedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorChurnApproverUpdated represents a ChurnApproverUpdated event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorChurnApproverUpdated struct {
+// ContractEigenDARegistryCoordinatorChurnApproverUpdated represents a ChurnApproverUpdated event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorChurnApproverUpdated struct {
 	PrevChurnApprover common.Address
 	NewChurnApprover  common.Address
 	Raw               types.Log // Blockchain specific contextual infos
@@ -1706,21 +1706,21 @@ type ContractRegistryCoordinatorChurnApproverUpdated struct {
 // FilterChurnApproverUpdated is a free log retrieval operation binding the contract event 0x315457d8a8fe60f04af17c16e2f5a5e1db612b31648e58030360759ef8f3528c.
 //
 // Solidity: event ChurnApproverUpdated(address prevChurnApprover, address newChurnApprover)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterChurnApproverUpdated(opts *bind.FilterOpts) (*ContractRegistryCoordinatorChurnApproverUpdatedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterChurnApproverUpdated(opts *bind.FilterOpts) (*ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "ChurnApproverUpdated")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "ChurnApproverUpdated")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorChurnApproverUpdatedIterator{contract: _ContractRegistryCoordinator.contract, event: "ChurnApproverUpdated", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorChurnApproverUpdatedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "ChurnApproverUpdated", logs: logs, sub: sub}, nil
 }
 
 // WatchChurnApproverUpdated is a free log subscription operation binding the contract event 0x315457d8a8fe60f04af17c16e2f5a5e1db612b31648e58030360759ef8f3528c.
 //
 // Solidity: event ChurnApproverUpdated(address prevChurnApprover, address newChurnApprover)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchChurnApproverUpdated(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorChurnApproverUpdated) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchChurnApproverUpdated(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorChurnApproverUpdated) (event.Subscription, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "ChurnApproverUpdated")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "ChurnApproverUpdated")
 	if err != nil {
 		return nil, err
 	}
@@ -1730,8 +1730,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchCh
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorChurnApproverUpdated)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "ChurnApproverUpdated", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorChurnApproverUpdated)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "ChurnApproverUpdated", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1755,18 +1755,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchCh
 // ParseChurnApproverUpdated is a log parse operation binding the contract event 0x315457d8a8fe60f04af17c16e2f5a5e1db612b31648e58030360759ef8f3528c.
 //
 // Solidity: event ChurnApproverUpdated(address prevChurnApprover, address newChurnApprover)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseChurnApproverUpdated(log types.Log) (*ContractRegistryCoordinatorChurnApproverUpdated, error) {
-	event := new(ContractRegistryCoordinatorChurnApproverUpdated)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "ChurnApproverUpdated", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseChurnApproverUpdated(log types.Log) (*ContractEigenDARegistryCoordinatorChurnApproverUpdated, error) {
+	event := new(ContractEigenDARegistryCoordinatorChurnApproverUpdated)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "ChurnApproverUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorEjectorUpdatedIterator is returned from FilterEjectorUpdated and is used to iterate over the raw logs and unpacked data for EjectorUpdated events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorEjectorUpdatedIterator struct {
-	Event *ContractRegistryCoordinatorEjectorUpdated // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorEjectorUpdatedIterator is returned from FilterEjectorUpdated and is used to iterate over the raw logs and unpacked data for EjectorUpdated events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorEjectorUpdatedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorEjectorUpdated // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1780,7 +1780,7 @@ type ContractRegistryCoordinatorEjectorUpdatedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorEjectorUpdatedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1789,7 +1789,7 @@ func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorEjectorUpdated)
+			it.Event = new(ContractEigenDARegistryCoordinatorEjectorUpdated)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1804,7 +1804,7 @@ func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorEjectorUpdated)
+		it.Event = new(ContractEigenDARegistryCoordinatorEjectorUpdated)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1820,19 +1820,19 @@ func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorEjectorUpdatedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorEjectorUpdatedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorEjectorUpdatedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorEjectorUpdated represents a EjectorUpdated event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorEjectorUpdated struct {
+// ContractEigenDARegistryCoordinatorEjectorUpdated represents a EjectorUpdated event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorEjectorUpdated struct {
 	PrevEjector common.Address
 	NewEjector  common.Address
 	Raw         types.Log // Blockchain specific contextual infos
@@ -1841,21 +1841,21 @@ type ContractRegistryCoordinatorEjectorUpdated struct {
 // FilterEjectorUpdated is a free log retrieval operation binding the contract event 0x8f30ab09f43a6c157d7fce7e0a13c003042c1c95e8a72e7a146a21c0caa24dc9.
 //
 // Solidity: event EjectorUpdated(address prevEjector, address newEjector)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterEjectorUpdated(opts *bind.FilterOpts) (*ContractRegistryCoordinatorEjectorUpdatedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterEjectorUpdated(opts *bind.FilterOpts) (*ContractEigenDARegistryCoordinatorEjectorUpdatedIterator, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "EjectorUpdated")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "EjectorUpdated")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorEjectorUpdatedIterator{contract: _ContractRegistryCoordinator.contract, event: "EjectorUpdated", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorEjectorUpdatedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "EjectorUpdated", logs: logs, sub: sub}, nil
 }
 
 // WatchEjectorUpdated is a free log subscription operation binding the contract event 0x8f30ab09f43a6c157d7fce7e0a13c003042c1c95e8a72e7a146a21c0caa24dc9.
 //
 // Solidity: event EjectorUpdated(address prevEjector, address newEjector)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchEjectorUpdated(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorEjectorUpdated) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchEjectorUpdated(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorEjectorUpdated) (event.Subscription, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "EjectorUpdated")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "EjectorUpdated")
 	if err != nil {
 		return nil, err
 	}
@@ -1865,8 +1865,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchEj
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorEjectorUpdated)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "EjectorUpdated", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorEjectorUpdated)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "EjectorUpdated", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1890,18 +1890,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchEj
 // ParseEjectorUpdated is a log parse operation binding the contract event 0x8f30ab09f43a6c157d7fce7e0a13c003042c1c95e8a72e7a146a21c0caa24dc9.
 //
 // Solidity: event EjectorUpdated(address prevEjector, address newEjector)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseEjectorUpdated(log types.Log) (*ContractRegistryCoordinatorEjectorUpdated, error) {
-	event := new(ContractRegistryCoordinatorEjectorUpdated)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "EjectorUpdated", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseEjectorUpdated(log types.Log) (*ContractEigenDARegistryCoordinatorEjectorUpdated, error) {
+	event := new(ContractEigenDARegistryCoordinatorEjectorUpdated)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "EjectorUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorInitializedIterator struct {
-	Event *ContractRegistryCoordinatorInitialized // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorInitializedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorInitialized // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1915,7 +1915,7 @@ type ContractRegistryCoordinatorInitializedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorInitializedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorInitializedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1924,7 +1924,7 @@ func (it *ContractRegistryCoordinatorInitializedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorInitialized)
+			it.Event = new(ContractEigenDARegistryCoordinatorInitialized)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1939,7 +1939,7 @@ func (it *ContractRegistryCoordinatorInitializedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorInitialized)
+		it.Event = new(ContractEigenDARegistryCoordinatorInitialized)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1955,19 +1955,19 @@ func (it *ContractRegistryCoordinatorInitializedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorInitializedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorInitializedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorInitializedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorInitializedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorInitialized represents a Initialized event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorInitialized struct {
+// ContractEigenDARegistryCoordinatorInitialized represents a Initialized event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorInitialized struct {
 	Version uint8
 	Raw     types.Log // Blockchain specific contextual infos
 }
@@ -1975,21 +1975,21 @@ type ContractRegistryCoordinatorInitialized struct {
 // FilterInitialized is a free log retrieval operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
 //
 // Solidity: event Initialized(uint8 version)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterInitialized(opts *bind.FilterOpts) (*ContractRegistryCoordinatorInitializedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterInitialized(opts *bind.FilterOpts) (*ContractEigenDARegistryCoordinatorInitializedIterator, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "Initialized")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "Initialized")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorInitializedIterator{contract: _ContractRegistryCoordinator.contract, event: "Initialized", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorInitializedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "Initialized", logs: logs, sub: sub}, nil
 }
 
 // WatchInitialized is a free log subscription operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
 //
 // Solidity: event Initialized(uint8 version)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorInitialized) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorInitialized) (event.Subscription, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "Initialized")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "Initialized")
 	if err != nil {
 		return nil, err
 	}
@@ -1999,8 +1999,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchIn
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorInitialized)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Initialized", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorInitialized)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Initialized", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2024,18 +2024,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchIn
 // ParseInitialized is a log parse operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
 //
 // Solidity: event Initialized(uint8 version)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseInitialized(log types.Log) (*ContractRegistryCoordinatorInitialized, error) {
-	event := new(ContractRegistryCoordinatorInitialized)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Initialized", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseInitialized(log types.Log) (*ContractEigenDARegistryCoordinatorInitialized, error) {
+	event := new(ContractEigenDARegistryCoordinatorInitialized)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Initialized", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorOperatorDeregisteredIterator is returned from FilterOperatorDeregistered and is used to iterate over the raw logs and unpacked data for OperatorDeregistered events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorDeregisteredIterator struct {
-	Event *ContractRegistryCoordinatorOperatorDeregistered // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator is returned from FilterOperatorDeregistered and is used to iterate over the raw logs and unpacked data for OperatorDeregistered events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator struct {
+	Event *ContractEigenDARegistryCoordinatorOperatorDeregistered // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2049,7 +2049,7 @@ type ContractRegistryCoordinatorOperatorDeregisteredIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2058,7 +2058,7 @@ func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorOperatorDeregistered)
+			it.Event = new(ContractEigenDARegistryCoordinatorOperatorDeregistered)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2073,7 +2073,7 @@ func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorOperatorDeregistered)
+		it.Event = new(ContractEigenDARegistryCoordinatorOperatorDeregistered)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2089,19 +2089,19 @@ func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorOperatorDeregisteredIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorOperatorDeregistered represents a OperatorDeregistered event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorDeregistered struct {
+// ContractEigenDARegistryCoordinatorOperatorDeregistered represents a OperatorDeregistered event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorDeregistered struct {
 	Operator   common.Address
 	OperatorId [32]byte
 	Raw        types.Log // Blockchain specific contextual infos
@@ -2110,7 +2110,7 @@ type ContractRegistryCoordinatorOperatorDeregistered struct {
 // FilterOperatorDeregistered is a free log retrieval operation binding the contract event 0x396fdcb180cb0fea26928113fb0fd1c3549863f9cd563e6a184f1d578116c8e4.
 //
 // Solidity: event OperatorDeregistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterOperatorDeregistered(opts *bind.FilterOpts, operator []common.Address, operatorId [][32]byte) (*ContractRegistryCoordinatorOperatorDeregisteredIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterOperatorDeregistered(opts *bind.FilterOpts, operator []common.Address, operatorId [][32]byte) (*ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator, error) {
 
 	var operatorRule []interface{}
 	for _, operatorItem := range operator {
@@ -2121,17 +2121,17 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterO
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "OperatorDeregistered", operatorRule, operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "OperatorDeregistered", operatorRule, operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorOperatorDeregisteredIterator{contract: _ContractRegistryCoordinator.contract, event: "OperatorDeregistered", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorOperatorDeregisteredIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "OperatorDeregistered", logs: logs, sub: sub}, nil
 }
 
 // WatchOperatorDeregistered is a free log subscription operation binding the contract event 0x396fdcb180cb0fea26928113fb0fd1c3549863f9cd563e6a184f1d578116c8e4.
 //
 // Solidity: event OperatorDeregistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOperatorDeregistered(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorOperatorDeregistered, operator []common.Address, operatorId [][32]byte) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchOperatorDeregistered(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorOperatorDeregistered, operator []common.Address, operatorId [][32]byte) (event.Subscription, error) {
 
 	var operatorRule []interface{}
 	for _, operatorItem := range operator {
@@ -2142,7 +2142,7 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "OperatorDeregistered", operatorRule, operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "OperatorDeregistered", operatorRule, operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2152,8 +2152,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorOperatorDeregistered)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorDeregistered", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorOperatorDeregistered)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorDeregistered", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2177,18 +2177,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 // ParseOperatorDeregistered is a log parse operation binding the contract event 0x396fdcb180cb0fea26928113fb0fd1c3549863f9cd563e6a184f1d578116c8e4.
 //
 // Solidity: event OperatorDeregistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseOperatorDeregistered(log types.Log) (*ContractRegistryCoordinatorOperatorDeregistered, error) {
-	event := new(ContractRegistryCoordinatorOperatorDeregistered)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorDeregistered", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseOperatorDeregistered(log types.Log) (*ContractEigenDARegistryCoordinatorOperatorDeregistered, error) {
+	event := new(ContractEigenDARegistryCoordinatorOperatorDeregistered)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorDeregistered", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorOperatorRegisteredIterator is returned from FilterOperatorRegistered and is used to iterate over the raw logs and unpacked data for OperatorRegistered events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorRegisteredIterator struct {
-	Event *ContractRegistryCoordinatorOperatorRegistered // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorOperatorRegisteredIterator is returned from FilterOperatorRegistered and is used to iterate over the raw logs and unpacked data for OperatorRegistered events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorRegisteredIterator struct {
+	Event *ContractEigenDARegistryCoordinatorOperatorRegistered // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2202,7 +2202,7 @@ type ContractRegistryCoordinatorOperatorRegisteredIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorOperatorRegisteredIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2211,7 +2211,7 @@ func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorOperatorRegistered)
+			it.Event = new(ContractEigenDARegistryCoordinatorOperatorRegistered)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2226,7 +2226,7 @@ func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorOperatorRegistered)
+		it.Event = new(ContractEigenDARegistryCoordinatorOperatorRegistered)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2242,19 +2242,19 @@ func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorRegisteredIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorOperatorRegisteredIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorRegisteredIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorOperatorRegistered represents a OperatorRegistered event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorRegistered struct {
+// ContractEigenDARegistryCoordinatorOperatorRegistered represents a OperatorRegistered event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorRegistered struct {
 	Operator   common.Address
 	OperatorId [32]byte
 	Raw        types.Log // Blockchain specific contextual infos
@@ -2263,7 +2263,7 @@ type ContractRegistryCoordinatorOperatorRegistered struct {
 // FilterOperatorRegistered is a free log retrieval operation binding the contract event 0xe8e68cef1c3a761ed7be7e8463a375f27f7bc335e51824223cacce636ec5c3fe.
 //
 // Solidity: event OperatorRegistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterOperatorRegistered(opts *bind.FilterOpts, operator []common.Address, operatorId [][32]byte) (*ContractRegistryCoordinatorOperatorRegisteredIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterOperatorRegistered(opts *bind.FilterOpts, operator []common.Address, operatorId [][32]byte) (*ContractEigenDARegistryCoordinatorOperatorRegisteredIterator, error) {
 
 	var operatorRule []interface{}
 	for _, operatorItem := range operator {
@@ -2274,17 +2274,17 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterO
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "OperatorRegistered", operatorRule, operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "OperatorRegistered", operatorRule, operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorOperatorRegisteredIterator{contract: _ContractRegistryCoordinator.contract, event: "OperatorRegistered", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorOperatorRegisteredIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "OperatorRegistered", logs: logs, sub: sub}, nil
 }
 
 // WatchOperatorRegistered is a free log subscription operation binding the contract event 0xe8e68cef1c3a761ed7be7e8463a375f27f7bc335e51824223cacce636ec5c3fe.
 //
 // Solidity: event OperatorRegistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOperatorRegistered(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorOperatorRegistered, operator []common.Address, operatorId [][32]byte) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchOperatorRegistered(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorOperatorRegistered, operator []common.Address, operatorId [][32]byte) (event.Subscription, error) {
 
 	var operatorRule []interface{}
 	for _, operatorItem := range operator {
@@ -2295,7 +2295,7 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "OperatorRegistered", operatorRule, operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "OperatorRegistered", operatorRule, operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2305,8 +2305,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorOperatorRegistered)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorRegistered", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorOperatorRegistered)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorRegistered", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2330,18 +2330,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 // ParseOperatorRegistered is a log parse operation binding the contract event 0xe8e68cef1c3a761ed7be7e8463a375f27f7bc335e51824223cacce636ec5c3fe.
 //
 // Solidity: event OperatorRegistered(address indexed operator, bytes32 indexed operatorId)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseOperatorRegistered(log types.Log) (*ContractRegistryCoordinatorOperatorRegistered, error) {
-	event := new(ContractRegistryCoordinatorOperatorRegistered)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorRegistered", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseOperatorRegistered(log types.Log) (*ContractEigenDARegistryCoordinatorOperatorRegistered, error) {
+	event := new(ContractEigenDARegistryCoordinatorOperatorRegistered)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorRegistered", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator is returned from FilterOperatorSetParamsUpdated and is used to iterate over the raw logs and unpacked data for OperatorSetParamsUpdated events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator struct {
-	Event *ContractRegistryCoordinatorOperatorSetParamsUpdated // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator is returned from FilterOperatorSetParamsUpdated and is used to iterate over the raw logs and unpacked data for OperatorSetParamsUpdated events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2355,7 +2355,7 @@ type ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2364,7 +2364,7 @@ func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Next() bo
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorOperatorSetParamsUpdated)
+			it.Event = new(ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2379,7 +2379,7 @@ func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Next() bo
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorOperatorSetParamsUpdated)
+		it.Event = new(ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2395,19 +2395,19 @@ func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Next() bo
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorOperatorSetParamsUpdated represents a OperatorSetParamsUpdated event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorSetParamsUpdated struct {
+// ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated represents a OperatorSetParamsUpdated event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated struct {
 	QuorumNumber      uint8
 	OperatorSetParams IRegistryCoordinatorOperatorSetParam
 	Raw               types.Log // Blockchain specific contextual infos
@@ -2416,31 +2416,31 @@ type ContractRegistryCoordinatorOperatorSetParamsUpdated struct {
 // FilterOperatorSetParamsUpdated is a free log retrieval operation binding the contract event 0x3ee6fe8d54610244c3e9d3c066ae4aee997884aa28f10616ae821925401318ac.
 //
 // Solidity: event OperatorSetParamsUpdated(uint8 indexed quorumNumber, (uint32,uint16,uint16) operatorSetParams)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterOperatorSetParamsUpdated(opts *bind.FilterOpts, quorumNumber []uint8) (*ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterOperatorSetParamsUpdated(opts *bind.FilterOpts, quorumNumber []uint8) (*ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator, error) {
 
 	var quorumNumberRule []interface{}
 	for _, quorumNumberItem := range quorumNumber {
 		quorumNumberRule = append(quorumNumberRule, quorumNumberItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "OperatorSetParamsUpdated", quorumNumberRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "OperatorSetParamsUpdated", quorumNumberRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorOperatorSetParamsUpdatedIterator{contract: _ContractRegistryCoordinator.contract, event: "OperatorSetParamsUpdated", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorOperatorSetParamsUpdatedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "OperatorSetParamsUpdated", logs: logs, sub: sub}, nil
 }
 
 // WatchOperatorSetParamsUpdated is a free log subscription operation binding the contract event 0x3ee6fe8d54610244c3e9d3c066ae4aee997884aa28f10616ae821925401318ac.
 //
 // Solidity: event OperatorSetParamsUpdated(uint8 indexed quorumNumber, (uint32,uint16,uint16) operatorSetParams)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOperatorSetParamsUpdated(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorOperatorSetParamsUpdated, quorumNumber []uint8) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchOperatorSetParamsUpdated(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated, quorumNumber []uint8) (event.Subscription, error) {
 
 	var quorumNumberRule []interface{}
 	for _, quorumNumberItem := range quorumNumber {
 		quorumNumberRule = append(quorumNumberRule, quorumNumberItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "OperatorSetParamsUpdated", quorumNumberRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "OperatorSetParamsUpdated", quorumNumberRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2450,8 +2450,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorOperatorSetParamsUpdated)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorSetParamsUpdated", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorSetParamsUpdated", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2475,18 +2475,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 // ParseOperatorSetParamsUpdated is a log parse operation binding the contract event 0x3ee6fe8d54610244c3e9d3c066ae4aee997884aa28f10616ae821925401318ac.
 //
 // Solidity: event OperatorSetParamsUpdated(uint8 indexed quorumNumber, (uint32,uint16,uint16) operatorSetParams)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseOperatorSetParamsUpdated(log types.Log) (*ContractRegistryCoordinatorOperatorSetParamsUpdated, error) {
-	event := new(ContractRegistryCoordinatorOperatorSetParamsUpdated)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorSetParamsUpdated", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseOperatorSetParamsUpdated(log types.Log) (*ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated, error) {
+	event := new(ContractEigenDARegistryCoordinatorOperatorSetParamsUpdated)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorSetParamsUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorOperatorSocketUpdateIterator is returned from FilterOperatorSocketUpdate and is used to iterate over the raw logs and unpacked data for OperatorSocketUpdate events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorSocketUpdateIterator struct {
-	Event *ContractRegistryCoordinatorOperatorSocketUpdate // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator is returned from FilterOperatorSocketUpdate and is used to iterate over the raw logs and unpacked data for OperatorSocketUpdate events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator struct {
+	Event *ContractEigenDARegistryCoordinatorOperatorSocketUpdate // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2500,7 +2500,7 @@ type ContractRegistryCoordinatorOperatorSocketUpdateIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2509,7 +2509,7 @@ func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorOperatorSocketUpdate)
+			it.Event = new(ContractEigenDARegistryCoordinatorOperatorSocketUpdate)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2524,7 +2524,7 @@ func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorOperatorSocketUpdate)
+		it.Event = new(ContractEigenDARegistryCoordinatorOperatorSocketUpdate)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2540,19 +2540,19 @@ func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorOperatorSocketUpdateIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorOperatorSocketUpdate represents a OperatorSocketUpdate event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOperatorSocketUpdate struct {
+// ContractEigenDARegistryCoordinatorOperatorSocketUpdate represents a OperatorSocketUpdate event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOperatorSocketUpdate struct {
 	OperatorId [32]byte
 	Socket     string
 	Raw        types.Log // Blockchain specific contextual infos
@@ -2561,31 +2561,31 @@ type ContractRegistryCoordinatorOperatorSocketUpdate struct {
 // FilterOperatorSocketUpdate is a free log retrieval operation binding the contract event 0xec2963ab21c1e50e1e582aa542af2e4bf7bf38e6e1403c27b42e1c5d6e621eaa.
 //
 // Solidity: event OperatorSocketUpdate(bytes32 indexed operatorId, string socket)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterOperatorSocketUpdate(opts *bind.FilterOpts, operatorId [][32]byte) (*ContractRegistryCoordinatorOperatorSocketUpdateIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterOperatorSocketUpdate(opts *bind.FilterOpts, operatorId [][32]byte) (*ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator, error) {
 
 	var operatorIdRule []interface{}
 	for _, operatorIdItem := range operatorId {
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "OperatorSocketUpdate", operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "OperatorSocketUpdate", operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorOperatorSocketUpdateIterator{contract: _ContractRegistryCoordinator.contract, event: "OperatorSocketUpdate", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorOperatorSocketUpdateIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "OperatorSocketUpdate", logs: logs, sub: sub}, nil
 }
 
 // WatchOperatorSocketUpdate is a free log subscription operation binding the contract event 0xec2963ab21c1e50e1e582aa542af2e4bf7bf38e6e1403c27b42e1c5d6e621eaa.
 //
 // Solidity: event OperatorSocketUpdate(bytes32 indexed operatorId, string socket)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOperatorSocketUpdate(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorOperatorSocketUpdate, operatorId [][32]byte) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchOperatorSocketUpdate(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorOperatorSocketUpdate, operatorId [][32]byte) (event.Subscription, error) {
 
 	var operatorIdRule []interface{}
 	for _, operatorIdItem := range operatorId {
 		operatorIdRule = append(operatorIdRule, operatorIdItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "OperatorSocketUpdate", operatorIdRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "OperatorSocketUpdate", operatorIdRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2595,8 +2595,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorOperatorSocketUpdate)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorSocketUpdate", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorOperatorSocketUpdate)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorSocketUpdate", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2620,18 +2620,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOp
 // ParseOperatorSocketUpdate is a log parse operation binding the contract event 0xec2963ab21c1e50e1e582aa542af2e4bf7bf38e6e1403c27b42e1c5d6e621eaa.
 //
 // Solidity: event OperatorSocketUpdate(bytes32 indexed operatorId, string socket)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseOperatorSocketUpdate(log types.Log) (*ContractRegistryCoordinatorOperatorSocketUpdate, error) {
-	event := new(ContractRegistryCoordinatorOperatorSocketUpdate)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OperatorSocketUpdate", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseOperatorSocketUpdate(log types.Log) (*ContractEigenDARegistryCoordinatorOperatorSocketUpdate, error) {
+	event := new(ContractEigenDARegistryCoordinatorOperatorSocketUpdate)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OperatorSocketUpdate", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOwnershipTransferredIterator struct {
-	Event *ContractRegistryCoordinatorOwnershipTransferred // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOwnershipTransferredIterator struct {
+	Event *ContractEigenDARegistryCoordinatorOwnershipTransferred // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2645,7 +2645,7 @@ type ContractRegistryCoordinatorOwnershipTransferredIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorOwnershipTransferredIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2654,7 +2654,7 @@ func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorOwnershipTransferred)
+			it.Event = new(ContractEigenDARegistryCoordinatorOwnershipTransferred)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2669,7 +2669,7 @@ func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorOwnershipTransferred)
+		it.Event = new(ContractEigenDARegistryCoordinatorOwnershipTransferred)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2685,19 +2685,19 @@ func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorOwnershipTransferredIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorOwnershipTransferredIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorOwnershipTransferredIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorOwnershipTransferred represents a OwnershipTransferred event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorOwnershipTransferred struct {
+// ContractEigenDARegistryCoordinatorOwnershipTransferred represents a OwnershipTransferred event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorOwnershipTransferred struct {
 	PreviousOwner common.Address
 	NewOwner      common.Address
 	Raw           types.Log // Blockchain specific contextual infos
@@ -2706,7 +2706,7 @@ type ContractRegistryCoordinatorOwnershipTransferred struct {
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*ContractRegistryCoordinatorOwnershipTransferredIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*ContractEigenDARegistryCoordinatorOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
@@ -2717,17 +2717,17 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterO
 		newOwnerRule = append(newOwnerRule, newOwnerItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorOwnershipTransferredIterator{contract: _ContractRegistryCoordinator.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorOwnershipTransferredIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
 }
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
 	for _, previousOwnerItem := range previousOwner {
@@ -2738,7 +2738,7 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOw
 		newOwnerRule = append(newOwnerRule, newOwnerItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2748,8 +2748,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOw
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorOwnershipTransferred)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorOwnershipTransferred)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2773,18 +2773,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchOw
 // ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseOwnershipTransferred(log types.Log) (*ContractRegistryCoordinatorOwnershipTransferred, error) {
-	event := new(ContractRegistryCoordinatorOwnershipTransferred)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseOwnershipTransferred(log types.Log) (*ContractEigenDARegistryCoordinatorOwnershipTransferred, error) {
+	event := new(ContractEigenDARegistryCoordinatorOwnershipTransferred)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorPausedIterator is returned from FilterPaused and is used to iterate over the raw logs and unpacked data for Paused events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorPausedIterator struct {
-	Event *ContractRegistryCoordinatorPaused // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorPausedIterator is returned from FilterPaused and is used to iterate over the raw logs and unpacked data for Paused events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorPausedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorPaused // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2798,7 +2798,7 @@ type ContractRegistryCoordinatorPausedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorPausedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorPausedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2807,7 +2807,7 @@ func (it *ContractRegistryCoordinatorPausedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorPaused)
+			it.Event = new(ContractEigenDARegistryCoordinatorPaused)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2822,7 +2822,7 @@ func (it *ContractRegistryCoordinatorPausedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorPaused)
+		it.Event = new(ContractEigenDARegistryCoordinatorPaused)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2838,19 +2838,19 @@ func (it *ContractRegistryCoordinatorPausedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorPausedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorPausedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorPausedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorPausedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorPaused represents a Paused event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorPaused struct {
+// ContractEigenDARegistryCoordinatorPaused represents a Paused event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorPaused struct {
 	Account         common.Address
 	NewPausedStatus *big.Int
 	Raw             types.Log // Blockchain specific contextual infos
@@ -2859,31 +2859,31 @@ type ContractRegistryCoordinatorPaused struct {
 // FilterPaused is a free log retrieval operation binding the contract event 0xab40a374bc51de372200a8bc981af8c9ecdc08dfdaef0bb6e09f88f3c616ef3d.
 //
 // Solidity: event Paused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterPaused(opts *bind.FilterOpts, account []common.Address) (*ContractRegistryCoordinatorPausedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterPaused(opts *bind.FilterOpts, account []common.Address) (*ContractEigenDARegistryCoordinatorPausedIterator, error) {
 
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "Paused", accountRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "Paused", accountRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorPausedIterator{contract: _ContractRegistryCoordinator.contract, event: "Paused", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorPausedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "Paused", logs: logs, sub: sub}, nil
 }
 
 // WatchPaused is a free log subscription operation binding the contract event 0xab40a374bc51de372200a8bc981af8c9ecdc08dfdaef0bb6e09f88f3c616ef3d.
 //
 // Solidity: event Paused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPaused(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorPaused, account []common.Address) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchPaused(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorPaused, account []common.Address) (event.Subscription, error) {
 
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "Paused", accountRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "Paused", accountRule)
 	if err != nil {
 		return nil, err
 	}
@@ -2893,8 +2893,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPa
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorPaused)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Paused", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorPaused)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Paused", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2918,18 +2918,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPa
 // ParsePaused is a log parse operation binding the contract event 0xab40a374bc51de372200a8bc981af8c9ecdc08dfdaef0bb6e09f88f3c616ef3d.
 //
 // Solidity: event Paused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParsePaused(log types.Log) (*ContractRegistryCoordinatorPaused, error) {
-	event := new(ContractRegistryCoordinatorPaused)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Paused", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParsePaused(log types.Log) (*ContractEigenDARegistryCoordinatorPaused, error) {
+	event := new(ContractEigenDARegistryCoordinatorPaused)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Paused", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorPauserRegistrySetIterator is returned from FilterPauserRegistrySet and is used to iterate over the raw logs and unpacked data for PauserRegistrySet events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorPauserRegistrySetIterator struct {
-	Event *ContractRegistryCoordinatorPauserRegistrySet // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorPauserRegistrySetIterator is returned from FilterPauserRegistrySet and is used to iterate over the raw logs and unpacked data for PauserRegistrySet events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorPauserRegistrySetIterator struct {
+	Event *ContractEigenDARegistryCoordinatorPauserRegistrySet // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -2943,7 +2943,7 @@ type ContractRegistryCoordinatorPauserRegistrySetIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorPauserRegistrySetIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -2952,7 +2952,7 @@ func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorPauserRegistrySet)
+			it.Event = new(ContractEigenDARegistryCoordinatorPauserRegistrySet)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -2967,7 +2967,7 @@ func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorPauserRegistrySet)
+		it.Event = new(ContractEigenDARegistryCoordinatorPauserRegistrySet)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -2983,19 +2983,19 @@ func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorPauserRegistrySetIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorPauserRegistrySetIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorPauserRegistrySetIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorPauserRegistrySet represents a PauserRegistrySet event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorPauserRegistrySet struct {
+// ContractEigenDARegistryCoordinatorPauserRegistrySet represents a PauserRegistrySet event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorPauserRegistrySet struct {
 	PauserRegistry    common.Address
 	NewPauserRegistry common.Address
 	Raw               types.Log // Blockchain specific contextual infos
@@ -3004,21 +3004,21 @@ type ContractRegistryCoordinatorPauserRegistrySet struct {
 // FilterPauserRegistrySet is a free log retrieval operation binding the contract event 0x6e9fcd539896fca60e8b0f01dd580233e48a6b0f7df013b89ba7f565869acdb6.
 //
 // Solidity: event PauserRegistrySet(address pauserRegistry, address newPauserRegistry)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterPauserRegistrySet(opts *bind.FilterOpts) (*ContractRegistryCoordinatorPauserRegistrySetIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterPauserRegistrySet(opts *bind.FilterOpts) (*ContractEigenDARegistryCoordinatorPauserRegistrySetIterator, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "PauserRegistrySet")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "PauserRegistrySet")
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorPauserRegistrySetIterator{contract: _ContractRegistryCoordinator.contract, event: "PauserRegistrySet", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorPauserRegistrySetIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "PauserRegistrySet", logs: logs, sub: sub}, nil
 }
 
 // WatchPauserRegistrySet is a free log subscription operation binding the contract event 0x6e9fcd539896fca60e8b0f01dd580233e48a6b0f7df013b89ba7f565869acdb6.
 //
 // Solidity: event PauserRegistrySet(address pauserRegistry, address newPauserRegistry)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPauserRegistrySet(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorPauserRegistrySet) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchPauserRegistrySet(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorPauserRegistrySet) (event.Subscription, error) {
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "PauserRegistrySet")
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "PauserRegistrySet")
 	if err != nil {
 		return nil, err
 	}
@@ -3028,8 +3028,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPa
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorPauserRegistrySet)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "PauserRegistrySet", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorPauserRegistrySet)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "PauserRegistrySet", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -3053,18 +3053,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchPa
 // ParsePauserRegistrySet is a log parse operation binding the contract event 0x6e9fcd539896fca60e8b0f01dd580233e48a6b0f7df013b89ba7f565869acdb6.
 //
 // Solidity: event PauserRegistrySet(address pauserRegistry, address newPauserRegistry)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParsePauserRegistrySet(log types.Log) (*ContractRegistryCoordinatorPauserRegistrySet, error) {
-	event := new(ContractRegistryCoordinatorPauserRegistrySet)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "PauserRegistrySet", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParsePauserRegistrySet(log types.Log) (*ContractEigenDARegistryCoordinatorPauserRegistrySet, error) {
+	event := new(ContractEigenDARegistryCoordinatorPauserRegistrySet)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "PauserRegistrySet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator is returned from FilterQuorumBlockNumberUpdated and is used to iterate over the raw logs and unpacked data for QuorumBlockNumberUpdated events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator struct {
-	Event *ContractRegistryCoordinatorQuorumBlockNumberUpdated // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator is returned from FilterQuorumBlockNumberUpdated and is used to iterate over the raw logs and unpacked data for QuorumBlockNumberUpdated events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -3078,7 +3078,7 @@ type ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -3087,7 +3087,7 @@ func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Next() bo
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorQuorumBlockNumberUpdated)
+			it.Event = new(ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -3102,7 +3102,7 @@ func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Next() bo
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorQuorumBlockNumberUpdated)
+		it.Event = new(ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -3118,19 +3118,19 @@ func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Next() bo
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorQuorumBlockNumberUpdated represents a QuorumBlockNumberUpdated event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorQuorumBlockNumberUpdated struct {
+// ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated represents a QuorumBlockNumberUpdated event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated struct {
 	QuorumNumber uint8
 	Blocknumber  *big.Int
 	Raw          types.Log // Blockchain specific contextual infos
@@ -3139,31 +3139,31 @@ type ContractRegistryCoordinatorQuorumBlockNumberUpdated struct {
 // FilterQuorumBlockNumberUpdated is a free log retrieval operation binding the contract event 0x46077d55330763f16269fd75e5761663f4192d2791747c0189b16ad31db07db4.
 //
 // Solidity: event QuorumBlockNumberUpdated(uint8 indexed quorumNumber, uint256 blocknumber)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterQuorumBlockNumberUpdated(opts *bind.FilterOpts, quorumNumber []uint8) (*ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterQuorumBlockNumberUpdated(opts *bind.FilterOpts, quorumNumber []uint8) (*ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator, error) {
 
 	var quorumNumberRule []interface{}
 	for _, quorumNumberItem := range quorumNumber {
 		quorumNumberRule = append(quorumNumberRule, quorumNumberItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "QuorumBlockNumberUpdated", quorumNumberRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "QuorumBlockNumberUpdated", quorumNumberRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorQuorumBlockNumberUpdatedIterator{contract: _ContractRegistryCoordinator.contract, event: "QuorumBlockNumberUpdated", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdatedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "QuorumBlockNumberUpdated", logs: logs, sub: sub}, nil
 }
 
 // WatchQuorumBlockNumberUpdated is a free log subscription operation binding the contract event 0x46077d55330763f16269fd75e5761663f4192d2791747c0189b16ad31db07db4.
 //
 // Solidity: event QuorumBlockNumberUpdated(uint8 indexed quorumNumber, uint256 blocknumber)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchQuorumBlockNumberUpdated(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorQuorumBlockNumberUpdated, quorumNumber []uint8) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchQuorumBlockNumberUpdated(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated, quorumNumber []uint8) (event.Subscription, error) {
 
 	var quorumNumberRule []interface{}
 	for _, quorumNumberItem := range quorumNumber {
 		quorumNumberRule = append(quorumNumberRule, quorumNumberItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "QuorumBlockNumberUpdated", quorumNumberRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "QuorumBlockNumberUpdated", quorumNumberRule)
 	if err != nil {
 		return nil, err
 	}
@@ -3173,8 +3173,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchQu
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorQuorumBlockNumberUpdated)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "QuorumBlockNumberUpdated", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "QuorumBlockNumberUpdated", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -3198,18 +3198,18 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchQu
 // ParseQuorumBlockNumberUpdated is a log parse operation binding the contract event 0x46077d55330763f16269fd75e5761663f4192d2791747c0189b16ad31db07db4.
 //
 // Solidity: event QuorumBlockNumberUpdated(uint8 indexed quorumNumber, uint256 blocknumber)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseQuorumBlockNumberUpdated(log types.Log) (*ContractRegistryCoordinatorQuorumBlockNumberUpdated, error) {
-	event := new(ContractRegistryCoordinatorQuorumBlockNumberUpdated)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "QuorumBlockNumberUpdated", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseQuorumBlockNumberUpdated(log types.Log) (*ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated, error) {
+	event := new(ContractEigenDARegistryCoordinatorQuorumBlockNumberUpdated)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "QuorumBlockNumberUpdated", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
 	return event, nil
 }
 
-// ContractRegistryCoordinatorUnpausedIterator is returned from FilterUnpaused and is used to iterate over the raw logs and unpacked data for Unpaused events raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorUnpausedIterator struct {
-	Event *ContractRegistryCoordinatorUnpaused // Event containing the contract specifics and raw log
+// ContractEigenDARegistryCoordinatorUnpausedIterator is returned from FilterUnpaused and is used to iterate over the raw logs and unpacked data for Unpaused events raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorUnpausedIterator struct {
+	Event *ContractEigenDARegistryCoordinatorUnpaused // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -3223,7 +3223,7 @@ type ContractRegistryCoordinatorUnpausedIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ContractRegistryCoordinatorUnpausedIterator) Next() bool {
+func (it *ContractEigenDARegistryCoordinatorUnpausedIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -3232,7 +3232,7 @@ func (it *ContractRegistryCoordinatorUnpausedIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ContractRegistryCoordinatorUnpaused)
+			it.Event = new(ContractEigenDARegistryCoordinatorUnpaused)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -3247,7 +3247,7 @@ func (it *ContractRegistryCoordinatorUnpausedIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ContractRegistryCoordinatorUnpaused)
+		it.Event = new(ContractEigenDARegistryCoordinatorUnpaused)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -3263,19 +3263,19 @@ func (it *ContractRegistryCoordinatorUnpausedIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractRegistryCoordinatorUnpausedIterator) Error() error {
+func (it *ContractEigenDARegistryCoordinatorUnpausedIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ContractRegistryCoordinatorUnpausedIterator) Close() error {
+func (it *ContractEigenDARegistryCoordinatorUnpausedIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ContractRegistryCoordinatorUnpaused represents a Unpaused event raised by the ContractRegistryCoordinator contract.
-type ContractRegistryCoordinatorUnpaused struct {
+// ContractEigenDARegistryCoordinatorUnpaused represents a Unpaused event raised by the ContractEigenDARegistryCoordinator contract.
+type ContractEigenDARegistryCoordinatorUnpaused struct {
 	Account         common.Address
 	NewPausedStatus *big.Int
 	Raw             types.Log // Blockchain specific contextual infos
@@ -3284,31 +3284,31 @@ type ContractRegistryCoordinatorUnpaused struct {
 // FilterUnpaused is a free log retrieval operation binding the contract event 0x3582d1828e26bf56bd801502bc021ac0bc8afb57c826e4986b45593c8fad389c.
 //
 // Solidity: event Unpaused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) FilterUnpaused(opts *bind.FilterOpts, account []common.Address) (*ContractRegistryCoordinatorUnpausedIterator, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) FilterUnpaused(opts *bind.FilterOpts, account []common.Address) (*ContractEigenDARegistryCoordinatorUnpausedIterator, error) {
 
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.FilterLogs(opts, "Unpaused", accountRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.FilterLogs(opts, "Unpaused", accountRule)
 	if err != nil {
 		return nil, err
 	}
-	return &ContractRegistryCoordinatorUnpausedIterator{contract: _ContractRegistryCoordinator.contract, event: "Unpaused", logs: logs, sub: sub}, nil
+	return &ContractEigenDARegistryCoordinatorUnpausedIterator{contract: _ContractEigenDARegistryCoordinator.contract, event: "Unpaused", logs: logs, sub: sub}, nil
 }
 
 // WatchUnpaused is a free log subscription operation binding the contract event 0x3582d1828e26bf56bd801502bc021ac0bc8afb57c826e4986b45593c8fad389c.
 //
 // Solidity: event Unpaused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchUnpaused(opts *bind.WatchOpts, sink chan<- *ContractRegistryCoordinatorUnpaused, account []common.Address) (event.Subscription, error) {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) WatchUnpaused(opts *bind.WatchOpts, sink chan<- *ContractEigenDARegistryCoordinatorUnpaused, account []common.Address) (event.Subscription, error) {
 
 	var accountRule []interface{}
 	for _, accountItem := range account {
 		accountRule = append(accountRule, accountItem)
 	}
 
-	logs, sub, err := _ContractRegistryCoordinator.contract.WatchLogs(opts, "Unpaused", accountRule)
+	logs, sub, err := _ContractEigenDARegistryCoordinator.contract.WatchLogs(opts, "Unpaused", accountRule)
 	if err != nil {
 		return nil, err
 	}
@@ -3318,8 +3318,8 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchUn
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ContractRegistryCoordinatorUnpaused)
-				if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Unpaused", log); err != nil {
+				event := new(ContractEigenDARegistryCoordinatorUnpaused)
+				if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Unpaused", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -3343,9 +3343,9 @@ func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) WatchUn
 // ParseUnpaused is a log parse operation binding the contract event 0x3582d1828e26bf56bd801502bc021ac0bc8afb57c826e4986b45593c8fad389c.
 //
 // Solidity: event Unpaused(address indexed account, uint256 newPausedStatus)
-func (_ContractRegistryCoordinator *ContractRegistryCoordinatorFilterer) ParseUnpaused(log types.Log) (*ContractRegistryCoordinatorUnpaused, error) {
-	event := new(ContractRegistryCoordinatorUnpaused)
-	if err := _ContractRegistryCoordinator.contract.UnpackLog(event, "Unpaused", log); err != nil {
+func (_ContractEigenDARegistryCoordinator *ContractEigenDARegistryCoordinatorFilterer) ParseUnpaused(log types.Log) (*ContractEigenDARegistryCoordinatorUnpaused, error) {
+	event := new(ContractEigenDARegistryCoordinatorUnpaused)
+	if err := _ContractEigenDARegistryCoordinator.contract.UnpackLog(event, "Unpaused", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
