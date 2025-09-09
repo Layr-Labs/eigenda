@@ -68,6 +68,8 @@ func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.I
 }
 
 func (m *AccountantMetrics) RecordReservationPayment(accountID string, remainingCapacity float64) {
+	// We are expecting at most 100s of reservation, so the number of accountIDs (prom dimensions) won't be excessively
+	// large
 	m.ReservationRemainingCapacity.WithLabelValues(accountID).Set(remainingCapacity)
 }
 
