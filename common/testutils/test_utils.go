@@ -128,29 +128,16 @@ func RandomString(length int) string {
 
 // GetLogger returns a logger for use in tests.
 //
-// In CI ($CI set), logs are written in JSON format to stdout.
-// In local runs, logs are written in text format with colors enabled by default.
-// Colors can be disabled by setting $NO_COLOR.
-//
 // The logger always includes source information and logs at debug level.
 //
 // TODO: Future improvements like writing the test output to a file
 // and adding test metadata (e.g. test name) to log entries.
 func GetLogger() logging.Logger {
 	writer := io.Writer(os.Stdout)
-	inCI := os.Getenv("CI") != ""
 
-	if inCI {
-		return logging.NewJsonSLogger(writer, &logging.SLoggerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		})
-	}
-
-	noColor := os.Getenv("NO_COLOR") != ""
 	return logging.NewTextSLogger(writer, &logging.SLoggerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
-		NoColor:   noColor,
+		NoColor:   false,
 	})
 }
