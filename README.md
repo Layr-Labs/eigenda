@@ -18,7 +18,7 @@ If you're interested in integrating your rollup with EigenDA, follow the rollup 
 
 ## API Documentation
 
-The EigenDA public API is documented [here]([https://github.com/Layr-Labs/eigenda/tree/master/api/docs](https://docs.eigencloud.xyz/products/eigenda/api/disperser-v2-API/overview)).
+The EigenDA public API is documented [here](https://docs.eigencloud.xyz/products/eigenda/api/disperser-v2-API/overview).
 
 ## Operating EigenDA Node
 
