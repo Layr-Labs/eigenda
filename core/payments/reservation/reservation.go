@@ -110,7 +110,6 @@ func (r *Reservation) CheckTime(timeToCheck time.Time) error {
 }
 
 // Checks if two Reservation instances are equal
-// TODO: write tests for this
 func (r *Reservation) Equal(other *Reservation) bool {
 	if other == nil {
 		return false
