@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -21,16 +23,6 @@ import (
 //
 // The ClientLedger aggressively triggers panics for errors that indicate no future payments will succeed. A client
 // is only useful if it can disperse blobs, and blobs can only be dispersed with a functioning payment mechanism.
-//
-// TODO(litt3): Currently, the client ledger has no mechanism to observe the following changes that may occur in the
-// PaymentVault:
-//
-// 1. Reservation expiration
-// 2. Reservation update
-// 3. OnDemand deposit
-//
-// It is the responsibility of the user to restart the client if such a change occurs. A mechanism should be implemented
-// to remove this burden from the user.
 type ClientLedger struct {
 	logger             logging.Logger
 	accountantMetricer metrics.AccountantMetricer
@@ -49,10 +41,14 @@ type ClientLedger struct {
 	reservationLedger *reservation.ReservationLedger
 	onDemandLedger    *ondemand.OnDemandLedger
 	getNow            func() time.Time
+
+	reservationMonitor *reservation.ReservationVaultMonitor
+	onDemandMonitor    *ondemand.OnDemandVaultMonitor
 }
 
 // Creates a ClientLedger, which is responsible for managing payments for a single client.
 func NewClientLedger(
+	ctx context.Context,
 	logger logging.Logger,
 	accountantMetricer metrics.AccountantMetricer,
 	// The account that this client ledger is for
@@ -65,6 +61,10 @@ func NewClientLedger(
 	// Should be a timesource which includes monotonic timestamps, for best results. Otherwise, reservation payments
 	// may occasionally fail due to NTP adjustments
 	getNow func() time.Time,
+	// provides access to payment vault contract
+	paymentVault payments.PaymentVault,
+	// interval for checking for PaymentVault updates
+	updateInterval time.Duration,
 ) *ClientLedger {
 	if accountantMetricer == nil {
 		accountantMetricer = metrics.NoopAccountantMetrics
@@ -90,6 +90,9 @@ func NewClientLedger(
 	}
 
 	enforce.True(getNow != nil, "getNow function must not be nil")
+	if paymentVault == nil {
+		panic("payment vault must not be nil")
+	}
 
 	clientLedger := &ClientLedger{
 		logger:             logger,
@@ -99,6 +102,29 @@ func NewClientLedger(
 		reservationLedger:  reservationLedger,
 		onDemandLedger:     onDemandLedger,
 		getNow:             getNow,
+	}
+
+	var err error
+	if clientLedger.reservationLedger != nil {
+		clientLedger.reservationMonitor, err = reservation.NewReservationVaultMonitor(
+			ctx,
+			logger,
+			paymentVault,
+			updateInterval,
+			clientLedger.GetAccountsToUpdate,
+			clientLedger.UpdateReservation)
+		enforce.NilError(err, "new reservation vault monitor")
+	}
+
+	if clientLedger.onDemandLedger != nil {
+		clientLedger.onDemandMonitor, err = ondemand.NewOnDemandVaultMonitor(
+			ctx,
+			logger,
+			paymentVault,
+			updateInterval,
+			clientLedger.GetAccountsToUpdate,
+			clientLedger.UpdateTotalDeposit)
+		enforce.NilError(err, "new on demand vault monitor")
 	}
 
 	return clientLedger
@@ -271,6 +297,47 @@ func (cl *ClientLedger) RevertDebit(
 
 		cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 	}
+
+	return nil
+}
+
+// Returns the single account being tracked by this client ledger
+func (cl *ClientLedger) GetAccountsToUpdate() []gethcommon.Address {
+	return []gethcommon.Address{cl.accountID}
+}
+
+// Updates the reservation for the client's account
+func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReservation *reservation.Reservation) error {
+	if accountID != cl.accountID {
+		panic(fmt.Sprintf(
+			"attempted to update reservation for the wrong account. Received account: %s, actual account: %s",
+			accountID, cl.accountID))
+	}
+
+	err := cl.reservationLedger.UpdateReservation(newReservation, cl.getNow())
+	if err != nil {
+		return fmt.Errorf("update reservation: %w", err)
+	}
+
+	cl.accountantMetricer.RecordReservationBucketCapacity(cl.reservationLedger.GetBucketCapacity())
+
+	return nil
+}
+
+// Updates the total deposit for the client's account
+func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+	if accountID != cl.accountID {
+		panic(fmt.Sprintf(
+			"attempted to update total deposit for the wrong account. Received account: %s, actual account: %s",
+			accountID, cl.accountID))
+	}
+
+	err := cl.onDemandLedger.UpdateTotalDeposits(newTotalDeposit)
+	if err != nil {
+		return fmt.Errorf("update total deposits: %w", err)
+	}
+
+	cl.accountantMetricer.RecordOnDemandTotalDeposits(cl.accountID.Hex(), newTotalDeposit)
 
 	return nil
 }
