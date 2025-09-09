@@ -8,6 +8,8 @@
 | eigenda_proxy_secondary_requests_total              | Total requests to the secondary storage            | backend_type,method,status                 | counter   |
 | eigenda_proxy_secondary_request_duration_seconds    | Histogram of secondary storage request durations   | backend_type                               | histogram |
 | eigenda_accountant_cumulative_payment               | Current cumulative payment balance (gwei)          | account_id                                 | gauge     |
+| eigenda_accountant_ondemand_total_deposits          | Total on-demand deposits available (gwei)          | account_id                                 | gauge     |
 | eigenda_accountant_reservation_remaining_capacity   | Remaining capacity in reservation bucket (symbols) |                                            | gauge     |
+| eigenda_accountant_reservation_bucket_size          | Total reservation bucket size (symbols)            |                                            | gauge     |
 | eigenda_dispersal_blob_size_bytes                   | Size of blobs created from payloads in bytes       |                                            | histogram |
 | eigenda_retrieval_payload_size_bytes                | Size of decoded payloads in bytes                  |                                            | histogram |
