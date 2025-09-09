@@ -14,11 +14,11 @@ To understand more about how EigenDA works and how it transforms the modern land
 
 To dive deep into the technical details, continue reading [EigenDA protocol spec](https://layr-labs.github.io/eigenda/) in mdBook.
 
-If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA Partner Registration](https://docs.google.com/forms/d/e/1FAIpQLSdXvfxgRfIHWYu90FqN-2yyhgrYm9oExr0jSy7ERzbMUimJew/viewform).
+If you're interested in integrating your rollup with EigenDA, follow the rollup guides [here](https://docs.eigencloud.xyz/products/eigenda/api/disperser-v2-API/overview)
 
 ## API Documentation
 
-The EigenDA public API is documented [here](https://github.com/Layr-Labs/eigenda/tree/master/api/docs).
+The EigenDA public API is documented [here](https://docs.eigencloud.xyz/products/eigenda/api/disperser-v2-API/overview).
 
 ## Operating EigenDA Node
 
@@ -42,6 +42,6 @@ To install dependencies using mise, first [install and activate mise](https://mi
 ## Contact
 
 - [Open an Issue](https://github.com/Layr-Labs/eigenda/issues/new/choose)
-- [EigenLayer/EigenDA forum](https://forum.eigenlayer.xyz)
+- [EigenDA forum](https://forum.eigenlayer.xyz/c/eigenda-research/36)
 - [Email](mailto:eigenda-support@eigenlabs.org)
 - [Follow us on X](https://x.com/eigen_da)
