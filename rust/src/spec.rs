@@ -485,7 +485,6 @@ mod tests {
     use std::str::FromStr;
 
     use sov_rollup_interface::sov_universal_wallet::schema::Schema;
-    use test_strategy::proptest;
 
     use crate::spec::EthereumAddress;
 
@@ -548,51 +547,59 @@ mod tests {
         assert_eq!(address_from_str, address_from_slice);
     }
 
-    #[proptest]
-    fn validate_json_schema(input: EthereumAddress) {
-        let schema = serde_json::to_value(schemars::schema_for!(EthereumAddress)).unwrap();
-        let json = serde_json::to_value(input).unwrap();
+    #[cfg(feature = "arbitrary")]
+    mod proptest_tests {
+        use super::*;
+        use test_strategy::proptest;
 
-        jsonschema::validate(&schema, &json)
-            .map_err(|e| e.kind)
-            .unwrap()
-    }
+        #[proptest]
+        fn validate_json_schema(input: EthereumAddress) {
+            let schema = serde_json::to_value(schemars::schema_for!(EthereumAddress)).unwrap();
+            let json = serde_json::to_value(input).unwrap();
 
-    #[proptest]
-    fn ord_invariants(values: [EthereumAddress; 3]) {
-        reltester::ord(&values[0], &values[1], &values[2]).unwrap();
-    }
-
-    #[proptest]
-    fn hash_invariants(values: [EthereumAddress; 2]) {
-        reltester::hash(&values[0], &values[1]).unwrap();
-    }
-
-    #[proptest]
-    fn test_try_from_any_slice(#[any(proptest::sample::size_range(0..100).lift())] input: Vec<u8>) {
-        let _ = EthereumAddress::try_from(&input[..]);
-    }
-
-    #[proptest]
-    fn test_from_str_anything(#[strategy("\\PC*")] input: String) {
-        let _ = EthereumAddress::from_str(&input);
-    }
-
-    #[proptest]
-    fn test_from_str_hex_addresses(#[strategy("0x[a-fA-F0-9]{40}")] input: String) {
-        let result = EthereumAddress::from_str(&input);
-        if let Ok(address) = result {
-            let output = format!("{address}");
-            assert_eq!(input, output);
+            jsonschema::validate(&schema, &json)
+                .map_err(|e| e.kind)
+                .unwrap()
         }
-    }
 
-    #[proptest]
-    fn test_try_from_bytes(input: [u8; 20]) {
-        let hex_str = format!("0x{}", hex::encode(input));
-        let address_from_bytes = EthereumAddress::try_from(input.as_slice()).unwrap();
-        let output = format!("{address_from_bytes}");
+        #[proptest]
+        fn ord_invariants(values: [EthereumAddress; 3]) {
+            reltester::ord(&values[0], &values[1], &values[2]).unwrap();
+        }
 
-        assert_eq!(hex_str, output.to_lowercase());
+        #[proptest]
+        fn hash_invariants(values: [EthereumAddress; 2]) {
+            reltester::hash(&values[0], &values[1]).unwrap();
+        }
+
+        #[proptest]
+        fn test_try_from_any_slice(
+            #[any(proptest::sample::size_range(0..100).lift())] input: Vec<u8>,
+        ) {
+            let _ = EthereumAddress::try_from(&input[..]);
+        }
+
+        #[proptest]
+        fn test_from_str_anything(#[strategy("\\PC*")] input: String) {
+            let _ = EthereumAddress::from_str(&input);
+        }
+
+        #[proptest]
+        fn test_from_str_hex_addresses(#[strategy("0x[a-fA-F0-9]{40}")] input: String) {
+            let result = EthereumAddress::from_str(&input);
+            if let Ok(address) = result {
+                let output = format!("{address}");
+                assert_eq!(input, output);
+            }
+        }
+
+        #[proptest]
+        fn test_try_from_bytes(input: [u8; 20]) {
+            let hex_str = format!("0x{}", hex::encode(input));
+            let address_from_bytes = EthereumAddress::try_from(input.as_slice()).unwrap();
+            let output = format!("{address_from_bytes}");
+
+            assert_eq!(hex_str, output.to_lowercase());
+        }
     }
 }
