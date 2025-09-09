@@ -22,7 +22,7 @@ impl StandardCommitment {
     pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, StandardCommitmentParseError> {
         let (cert_version, mut cert_bytes) = bytes
             .split_first()
-            .ok_or(StandardCommitmentParseError::InsufficientData)?;
+            .ok_or(StandardCommitmentParseError::EmptyCommitment)?;
 
         let versioned_cert = match *cert_version {
             VERSION_2 => {
@@ -325,13 +325,13 @@ pub struct NonSignerStakesAndSignature {
 
 #[derive(Debug, Error)]
 pub enum StandardCommitmentParseError {
-    /// Invalid cert metadata
-    #[error("Insufficient commitment data")]
-    InsufficientData,
-    /// Unsupported cer version
+    /// Empty commitment data (tx calldata contains 0 bytes)
+    #[error("Empty commitment data")]
+    EmptyCommitment,
+    /// Unsupported cert version
     #[error("Unsupported cert version {0}")]
     UnsupportedCertVersion(u8),
-    /// The cert couldn't be parsed from the RPL format
+    /// The cert couldn't be parsed from the RLP format
     #[error("Invalid RLP Cert")]
     InvalidRlpCert(Error),
 }
@@ -358,7 +358,7 @@ mod tests {
 
         assert!(matches!(
             &commitment,
-            Err(StandardCommitmentParseError::InsufficientData),
+            Err(StandardCommitmentParseError::EmptyCommitment),
         ));
     }
 

@@ -56,8 +56,8 @@ impl EigenDaVerifier {
         // specified set are in the block
         let proven_transactions = completeness_proof.verify(block_header)?;
 
-        // Verify that the provided `relevant_blobs` are the only ones that
-        // contain rollup data, and that they are correctly build from the block
+        // Verify that the provided `blobs_with_senders` are the only ones that
+        // contain rollup data, and that they are correctly built from the block
         inclusion_proof.verify(
             block_header,
             namespace,
@@ -139,7 +139,7 @@ impl EigenDaCompletenessProof {
     }
 
     /// Verify that the proof holds the complete list of transactions for the
-    /// block. Also verify that the certificate states are are correct.
+    /// block. Also verify that the certificate states are correct.
     ///
     /// Upon success, the proof returns a vector of transactions that were
     /// proven to represent a whole transaction set of a specific block.
@@ -290,10 +290,10 @@ impl EigenDaInclusionProof {
     {
         // Returning of iterator might be a bit convoluted. But it's nice
         // because we can skip having to allocate a temporary vector for
-        // verified senders with blobs. The idea here is. Ignore all
-        // transactions with the invalid certificates. If the certificate is
-        // valid but the data blob is not, return a proof error. If both are
-        // valid, construct a validated blob with sender.
+        // verified senders with blobs. The idea here is:
+        // - Ignore all transactions with the invalid certificates.
+        // - If the certificate is valid but the data blob is not, return a proof error.
+        // - If both are valid, construct a validated blob with sender.
         self.transactions.iter().flat_map(
             move |TransactionWithBlob {
                       tx,
@@ -345,7 +345,7 @@ impl EigenDaInclusionProof {
     ///
     /// The proof accepts all transactions previously verified for completeness
     /// in the block. Based on that, the proof will verify if the list of its
-    /// transactions forms complete namespace i.e. if there are no transactions
+    /// transactions forms a complete namespace i.e. if there are no transactions
     /// in the block with the same namespace not included in proof.
     ///
     /// Then, since the proof holds all the transactions part of the namespace,
