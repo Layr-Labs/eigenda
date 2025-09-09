@@ -30,6 +30,10 @@ message AuthorizePaymentRequest {
   //
   // This is the same as the signature field in DisperseBlobRequest and BlobCertificate
   bytes client_signature = 2;
+  
+  // Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
+  // Proves that the request was created by the holder of the KMS key.
+  bytes disperser_signature = 3;
 }
 
 // AuthorizePaymentReply is returned after the controller does accounting and metering.

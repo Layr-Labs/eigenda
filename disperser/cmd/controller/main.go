@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,7 +29,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/metering"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -278,11 +278,21 @@ func RunController(ctx *cli.Context) error {
 
 	// Start gRPC server if port is configured
 	if config.GrpcPort != "" {
-		grpcServer, err := metering.NewGrpcServer(&metering.Config{
-			GrpcPort: config.GrpcPort,
-		}, logger, metricsRegistry)
+		kmsSigner, err := clients.NewKMSSigner(
+			context.Background(),
+			config.AwsClientConfig.Region,
+			config.AwsClientConfig.EndpointURL,
+			config.DisperserKMSKeyID)
 		if err != nil {
-			return fmt.Errorf("failed to create gRPC server: %w", err)
+			return fmt.Errorf("create KMS signer: %w", err)
+		}
+
+		paymentAuthorizationHandler := payments.NewPaymentAuthorizationHandler(logger, kmsSigner)
+
+		grpcServer, err := controller.NewGrpcServer(
+			logger, config.GrpcPort, paymentAuthorizationHandler, metricsRegistry)
+		if err != nil {
+			return fmt.Errorf("create gRPC server: %w", err)
 		}
 
 		go func() {
