@@ -261,7 +261,7 @@ Below is a list of the main high-level features offered for configuring the eige
 
 In order for the EigenDA Proxy to avoid a trust assumption on the EigenDA disperser, the proxy verifies the validity of DA certs during both the POST and GET routes. When targeting EigenDA V2 backend, [cert validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#2-cert-validation) is turned on by default and cannot be turned off. 
 
-For V1, cert validation is recommended but optional, and can be turned on with the CLI flags `--eigenda.svc-manager-addr`, `--eigenda.eth-rpc`. When turned on, it ensures that:
+For V1, the idea is the same but the implementation is different, since the disperser confirms batches onchain, which already verifies the signatures. Cert validation thus requires making sure that the batch contained in the cert has been confirmed:
 1. The DA cert's batch hash can be computed locally and matches the one persisted on-chain in the `ServiceManager` contract
 2. The DA cert's blob inclusion proof can be successfully verified against the blob-batch merkle root
 3. The DA cert's quorum params are adequately defined and expressed when compared to their on-chain counterparts
