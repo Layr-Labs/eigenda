@@ -17,12 +17,14 @@ var (
 
 type AccountantMetricer interface {
 	RecordCumulativePayment(accountID string, wei *big.Int)
+	RecordReservationPayment(remainingCapacity float64)
 
 	Document() []metrics.DocumentedMetric
 }
 
 type AccountantMetrics struct {
-	CumulativePayment *prometheus.GaugeVec
+	CumulativePayment            *prometheus.GaugeVec
+	ReservationRemainingCapacity prometheus.Gauge
 
 	factory *metrics.Documentor
 }
@@ -43,6 +45,12 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 		}, []string{
 			"account_id",
 		}),
+		ReservationRemainingCapacity: factory.NewGauge(prometheus.GaugeOpts{
+			Name:      "reservation_remaining_capacity",
+			Namespace: namespace,
+			Subsystem: accountantSubsystem,
+			Help:      "Remaining capacity in reservation bucket (symbols)",
+		}),
 		factory: factory,
 	}
 }
@@ -57,6 +65,10 @@ func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.I
 	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
+func (m *AccountantMetrics) RecordReservationPayment(remainingCapacity float64) {
+	m.ReservationRemainingCapacity.Set(remainingCapacity)
+}
+
 func (m *AccountantMetrics) Document() []metrics.DocumentedMetric {
 	return m.factory.Document()
 }
@@ -67,6 +79,9 @@ type noopAccountantMetricer struct {
 var NoopAccountantMetrics AccountantMetricer = new(noopAccountantMetricer)
 
 func (n *noopAccountantMetricer) RecordCumulativePayment(_ string, _ *big.Int) {
+}
+
+func (n *noopAccountantMetricer) RecordReservationPayment(_ float64) {
 }
 
 func (n *noopAccountantMetricer) Document() []metrics.DocumentedMetric {

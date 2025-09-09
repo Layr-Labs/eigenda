@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -98,7 +99,7 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	// NOTE: there is a synchronization edge case where the disperser accredits a RBN that correlates
+	// NOTE: there is a synchronization edge case where the disperser accredits an RBN that correlates
 	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in
 	//       potentially a few failed dispersals until the RBN advances; guaranteeing eventual consistency.
 	//       This is a known issue and will be addressed with future enhancements.
@@ -169,6 +170,13 @@ func (pd *PayloadDisperser) SendPayload(
 
 	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
 	if err != nil {
+		var errInvalidCert *verification.CertVerifierInvalidCertError
+		if errors.As(err, &errInvalidCert) {
+			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
+			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry policy),
+			// then its safer for the rollup to failover to another DA layer.
+			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
+		}
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
 
@@ -236,11 +244,12 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf(
+			// Failover to another DA layer because EigenDA is not completing its signing duty in time.
+			return nil, api.NewErrorFailover(fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.String(),
 				previousStatus.String(),
-				ctx.Err())
+				ctx.Err()))
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
@@ -261,13 +270,19 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				previousStatus = newStatus
 			}
 
-			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
 				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
 				if err != nil {
-					// returned error is verbose enough, no need to wrap it with additional context
-					return nil, err
+					// TODO(samlaf): checkThresholds should return more fine-grained errors
+					// For now, we only failover if thresholds were unmet, not anything else.
+					// The risk of failing over for everything is that eth-rpc calls could fail
+					// for networking reasons, which we don't want to failover to eth for!
+					var thresholdNotMetErr *thresholdNotMetError
+					if errors.As(err, &thresholdNotMetErr) {
+						return nil, api.NewErrorFailover(fmt.Errorf("check thresholds: %w", err))
+					}
+					return nil, fmt.Errorf("check thresholds: %w", err)
 				}
 
 				return blobStatusReply, nil
@@ -294,10 +309,11 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
 				continue
 			default:
-				return nil, fmt.Errorf(
-					"terminal dispersal failure for blobKey %v. blob status: %v",
-					blobKey.Hex(),
-					newStatus.String())
+				// Failover to another DA layer because something is wrong with EigenDA.
+				return nil, api.NewErrorFailover(
+					fmt.Errorf("terminal dispersal failure for blobKey %v. blob status: %v",
+						blobKey.Hex(),
+						newStatus.String()))
 			}
 		}
 	}
