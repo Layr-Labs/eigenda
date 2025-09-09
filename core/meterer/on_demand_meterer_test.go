@@ -27,7 +27,6 @@ func TestCancelDispersal(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, reservation)
 
-	require.NotPanics(t, func() {
-		meterer.CancelDispersal(reservation)
-	})
+	// don't panic
+	meterer.CancelDispersal(reservation)
 }

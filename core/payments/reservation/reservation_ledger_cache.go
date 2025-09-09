@@ -155,9 +155,9 @@ func (c *ReservationLedgerCache) GetOrCreate(
 		return nil, fmt.Errorf("no reservation found for account %v", accountID.Hex())
 	}
 
-	reservationObj, err := NewReservationFromBindings(reservationData)
+	reservationObj, err := FromContractStruct(reservationData)
 	if err != nil {
-		return nil, fmt.Errorf("convert reservation: %w", err)
+		return nil, fmt.Errorf("from contract struct: %w", err)
 	}
 
 	reservationLedgerConfig, err := NewReservationLedgerConfig(

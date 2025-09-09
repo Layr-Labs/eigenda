@@ -22,7 +22,7 @@ type OnDemandMeterer struct {
 // globalRatePeriodInterval is being used to mirror the old implementation. Some thoughts:
 // 1. There isn't really any purpose in storing this configuration on-chain in the PaymentVault, which is where we
 // currently get these values
-// 2. It would probably be easier to simply define the burst size directly, instead of making it a function of rate *
+// 2. It might be easier to simply define the burst size directly, instead of making it a function of rate *
 // a configured duration.
 func NewOnDemandMeterer(
 	globalSymbolsPerSecond uint64,
@@ -39,8 +39,12 @@ func NewOnDemandMeterer(
 }
 
 // Reserves tokens for a dispersal with the given number of symbols.
+//
 // Returns a reservation that can be cancelled if the dispersal is not performed (e.g., if payment verification fails).
 // The reservation will automatically take effect if not cancelled.
+//
+// This method only succeeds if tokens are immediately available (no queueing/waiting). If a reservation is returned,
+// it is safe to proceed with dispersal without checking the delay.
 func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation, error) {
 	reservation := m.limiter.ReserveN(m.getNow(), int(symbolCount))
 
@@ -54,8 +58,8 @@ func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation,
 
 // Cancels a reservation obtained by MeterDispersal, returning tokens to the rate limiter.
 // This should be called when a reserved dispersal will not be performed (e.g., payment verification failed).
+//
+// Input reservation must be non-nil, otherwise this will panic
 func (m *OnDemandMeterer) CancelDispersal(reservation *rate.Reservation) {
-	if reservation != nil {
-		reservation.Cancel()
-	}
+	reservation.Cancel()
 }

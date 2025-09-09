@@ -212,11 +212,11 @@ func (c *disperserClient) DisperseBlob(
 
 		probe.SetStage("accountant")
 
-		err := c.initOncePopulateAccountant(ctx)
-		if err != nil {
-			c.accountantLock.Unlock()
-			return nil, [32]byte{}, api.NewErrorFailover(err)
-		}
+	err := c.initOncePopulateAccountant(ctx)
+	if err != nil {
+		c.accountantLock.Unlock()
+		return nil, [32]byte{}, fmt.Errorf("error initializing accountant: %w", err)
+	}
 
 		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
 		if err != nil {
@@ -251,7 +251,8 @@ func (c *disperserClient) DisperseBlob(
 		// if prover is not configured, get blob commitments from disperser
 		commitments, err := c.GetBlobCommitment(ctx, data)
 		if err != nil {
-			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
+			// Failover worthy error because it means the disperser is not responsive.
+			return nil, [32]byte{}, api.NewErrorFailover(fmt.Errorf("GetBlobCommitment rpc: %w", err))
 		}
 		deserialized, err := encoding.BlobCommitmentsFromProtobuf(commitments.GetBlobCommitment())
 		if err != nil {
@@ -272,7 +273,6 @@ func (c *disperserClient) DisperseBlob(
 		}
 	} else {
 		// if prover is configured, get commitments from prover
-
 		blobCommitments, err = c.prover.GetCommitmentsForPaddedLength(data)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
@@ -306,7 +306,7 @@ func (c *disperserClient) DisperseBlob(
 
 	reply, err := c.clientPool.GetClient().DisperseBlob(ctx, request)
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
+		return nil, [32]byte{}, api.NewErrorFailover(fmt.Errorf("DisperseBlob rpc: %w", err))
 	}
 
 	blobStatus, err := dispv2.BlobStatusFromProtobuf(reply.GetResult())

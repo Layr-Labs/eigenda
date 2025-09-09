@@ -63,12 +63,12 @@ func NewReservation(
 }
 
 // Creates a Reservation from contract binding data
-func NewReservationFromBindings(bindingReservation *bindings.IPaymentVaultReservation) (*Reservation, error) {
+func FromContractStruct(contractStruct *bindings.IPaymentVaultReservation) (*Reservation, error) {
 	return NewReservation(
-		bindingReservation.SymbolsPerSecond,
-		time.Unix(int64(bindingReservation.StartTimestamp), 0),
-		time.Unix(int64(bindingReservation.EndTimestamp), 0),
-		bindingReservation.QuorumNumbers,
+		contractStruct.SymbolsPerSecond,
+		time.Unix(int64(contractStruct.StartTimestamp), 0),
+		time.Unix(int64(contractStruct.EndTimestamp), 0),
+		contractStruct.QuorumNumbers,
 	)
 }
 

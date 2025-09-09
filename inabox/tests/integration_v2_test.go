@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -212,12 +214,20 @@ var _ = Describe("Inabox v2 Integration", func() {
 		// TODO: Test other cert verification failure cases as well
 		eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
 
+		var certErr *verification.CertVerifierInvalidCertError
 		err = routerCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
-		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("Merkle inclusion proof for blob batch is invalid"))
+		Expect(err).To(BeAssignableToTypeOf(&verification.CertVerifierInvalidCertError{}))
+		Expect(errors.As(err, &certErr)).To(BeTrue())
+		// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+		// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+		Expect(certErr.StatusCode).To(Equal(verification.StatusInvalidCert))
+
 		err = staticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
-		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("Merkle inclusion proof for blob batch is invalid"))
+		Expect(err).To(BeAssignableToTypeOf(&verification.CertVerifierInvalidCertError{}))
+		Expect(errors.As(err, &certErr)).To(BeTrue())
+		// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
+		// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
+		Expect(certErr.StatusCode).To(Equal(verification.StatusInvalidCert))
 	})
 })
 
