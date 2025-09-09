@@ -2,31 +2,67 @@ package payments
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 
-	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type PaymentAuthorizationHandler struct {
-	logger    logging.Logger
-	kmsSigner *clients.KMSSigner
+	logger     logging.Logger
+	keyID      string
+	publicKey  *ecdsa.PublicKey
+	keyManager *kms.Client
 }
 
 // NewPaymentAuthorizationHandler creates a new PaymentAuthorizationHandler.
 func NewPaymentAuthorizationHandler(
+	ctx context.Context,
 	logger logging.Logger,
-	kmsSigner *clients.KMSSigner,
-) *PaymentAuthorizationHandler {
-	return &PaymentAuthorizationHandler{
-		logger:    logger,
-		kmsSigner: kmsSigner,
+	region string,
+	endpoint string,
+	keyID string,
+) (*PaymentAuthorizationHandler, error) {
+
+	// Load the AWS SDK configuration, which will automatically detect credentials
+	// from environment variables, IAM roles, or AWS config files
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
+
+	var keyManager *kms.Client
+	if endpoint != "" {
+		keyManager = kms.New(kms.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(endpoint),
+		})
+	} else {
+		keyManager = kms.NewFromConfig(cfg)
+	}
+
+	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
+	}
+
+	return &PaymentAuthorizationHandler{
+		logger:     logger,
+		keyID:      keyID,
+		publicKey:  key,
+		keyManager: keyManager,
+	}, nil
 }
 
 // AuthorizePayment processes a payment authorization request.
@@ -35,7 +71,7 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentReply, error) {
 	// Sign the request with the disperser's KMS key to prove this controller authorized it
-	if h.kmsSigner != nil {
+	if h.keyManager != nil {
 		// Hash the request first
 		hash, err := hashing.HashAuthorizePaymentRequest(request)
 		if err != nil {
@@ -44,7 +80,7 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 		}
 
 		// Sign the hash
-		signature, err := h.kmsSigner.SignHash(ctx, hash)
+		signature, err := aws2.SignKMS(ctx, h.keyManager, h.keyID, h.publicKey, hash)
 		if err != nil {
 			h.logger.Error("Failed to sign AuthorizePaymentRequest", "error", err)
 			return nil, status.Errorf(codes.Internal, "failed to sign request: %v", err)

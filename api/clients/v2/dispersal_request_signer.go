@@ -2,10 +2,15 @@ package clients
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
+	aws2 "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
 // DispersalRequestSigner encapsulates the logic for signing GetChunks requests.
@@ -18,7 +23,9 @@ type DispersalRequestSigner interface {
 var _ DispersalRequestSigner = &requestSigner{}
 
 type requestSigner struct {
-	*KMSSigner
+	keyID      string
+	publicKey  *ecdsa.PublicKey
+	keyManager *kms.Client
 }
 
 // NewDispersalRequestSigner creates a new DispersalRequestSigner.
@@ -28,13 +35,34 @@ func NewDispersalRequestSigner(
 	endpoint string,
 	keyID string) (DispersalRequestSigner, error) {
 
-	kmsSigner, err := NewKMSSigner(ctx, region, endpoint, keyID)
+	// Load the AWS SDK configuration, which will automatically detect credentials
+	// from environment variables, IAM roles, or AWS config files
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create KMS signer: %w", err)
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	var keyManager *kms.Client
+	if endpoint != "" {
+		keyManager = kms.New(kms.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(endpoint),
+		})
+	} else {
+		keyManager = kms.NewFromConfig(cfg)
+	}
+
+	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
 
 	return &requestSigner{
-		KMSSigner: kmsSigner,
+		keyID:      keyID,
+		publicKey:  key,
+		keyManager: keyManager,
 	}, nil
 }
 
@@ -44,5 +72,10 @@ func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grp
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 
-	return s.SignHash(ctx, hash)
+	signature, err := aws2.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	return signature, nil
 }

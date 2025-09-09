@@ -278,16 +278,15 @@ func RunController(ctx *cli.Context) error {
 
 	// Start gRPC server if port is configured
 	if config.GrpcPort != "" {
-		kmsSigner, err := clients.NewKMSSigner(
+		paymentAuthorizationHandler, err := payments.NewPaymentAuthorizationHandler(
 			context.Background(),
+			logger,
 			config.AwsClientConfig.Region,
 			config.AwsClientConfig.EndpointURL,
 			config.DisperserKMSKeyID)
 		if err != nil {
-			return fmt.Errorf("create KMS signer: %w", err)
+			return fmt.Errorf("create payment authorization handler: %w", err)
 		}
-
-		paymentAuthorizationHandler := payments.NewPaymentAuthorizationHandler(logger, kmsSigner)
 
 		grpcServer, err := controller.NewGrpcServer(
 			logger, config.GrpcPort, paymentAuthorizationHandler, metricsRegistry)
