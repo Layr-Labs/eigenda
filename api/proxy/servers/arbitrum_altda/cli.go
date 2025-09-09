@@ -26,7 +26,7 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 		&cli.IntFlag{
 			Name:     PortFlagName,
 			Usage:    "Server listening port",
-			Value:    3100,
+			Value:    3101,
 			EnvVars:  withEnvPrefix(envPrefix, "PORT"),
 			Category: category,
 		},
