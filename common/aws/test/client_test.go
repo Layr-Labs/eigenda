@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
@@ -16,8 +17,7 @@ import (
 )
 
 var (
-	logger              = tu.GetLogger()
-	localstackContainer *testbed.LocalStackContainer
+	logger = tu.GetLogger()
 )
 
 const (
@@ -26,92 +26,48 @@ const (
 	localstackHost = "http://0.0.0.0:4578"
 )
 
-type clientBuilder struct {
-	// This method is called at the beginning of the test.
-	start func() error
-	// This method is called to build a new client.
-	build func() (s3.Client, error)
-	// This method is called at the end of the test when all operations are done.
-	finish func() error
+func setupLocalStackTest(t *testing.T) s3.Client {
+	t.Helper()
+
+	ctx := t.Context()
+
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
+	})
+	require.NoError(t, err, "failed to start LocalStack container")
+
+	t.Cleanup(func() {
+		logger.Info("Stopping LocalStack container")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
+	})
+
+	config := aws.DefaultClientConfig()
+	config.EndpointURL = localstackHost
+	config.Region = "us-east-1"
+
+	err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+	require.NoError(t, err, "failed to set AWS_ACCESS_KEY_ID")
+	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
+	require.NoError(t, err, "failed to set AWS_SECRET_ACCESS_KEY")
+
+	client, err := s3.NewClient(ctx, *config, logger)
+	require.NoError(t, err, "failed to create S3 client")
+
+	err = client.CreateBucket(ctx, bucket)
+	require.NoError(t, err, "failed to create S3 bucket")
+
+	return client
 }
 
-var clientBuilders = []*clientBuilder{
-	{
-		start: func() error {
-			return nil
-		},
-		build: func() (s3.Client, error) {
-			return mock.NewS3Client(), nil
-		},
-		finish: func() error {
-			return nil
-		},
-	},
-	{
-		start: func() error {
-			return setupLocalstack()
-		},
-		build: func() (s3.Client, error) {
-			config := aws.DefaultClientConfig()
-			config.EndpointURL = localstackHost
-			config.Region = "us-east-1"
 
-			err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
-			if err != nil {
-				return nil, err
-			}
-			err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
-			if err != nil {
-				return nil, err
-			}
-
-			client, err := s3.NewClient(context.Background(), *config, logger)
-			if err != nil {
-				return nil, err
-			}
-
-			err = client.CreateBucket(context.Background(), bucket)
-			if err != nil {
-				return nil, err
-			}
-
-			return client, nil
-		},
-		finish: func() error {
-			teardownLocalstack()
-			return nil
-		},
-	},
-}
-
-func setupLocalstack() error {
-	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
-
-	if deployLocalStack {
-		var err error
-		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
-			ExposeHostPort: true,
-			HostPort:       localstackPort,
-			Services:       []string{"s3", "dynamodb", "kms"},
-			Logger:         logger,
-		})
-		if err != nil {
-			teardownLocalstack()
-			return err
-		}
-	}
-	return nil
-}
-
-func teardownLocalstack() {
-	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
-
-	if deployLocalStack {
-		_ = localstackContainer.Terminate(context.Background())
-	}
-}
-
-func RandomOperationsTest(t *testing.T, client s3.Client) {
+func runRandomOperationsTest(t *testing.T, client s3.Client) {
+	t.Helper()
+	ctx := t.Context()
 	numberToWrite := 100
 	expectedData := make(map[string][]byte)
 
@@ -122,90 +78,103 @@ func RandomOperationsTest(t *testing.T, client s3.Client) {
 		dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
 		data := tu.RandomBytes(dataSize)
 		expectedData[key] = data
-		err := client.FragmentedUploadObject(context.Background(), bucket, key, data, fragmentSize)
-		require.NoError(t, err)
+		err := client.FragmentedUploadObject(ctx, bucket, key, data, fragmentSize)
+		require.NoError(t, err, "failed to upload fragmented object for key %s", key)
 	}
 
 	// Read back the data
 	for key, expected := range expectedData {
-		data, err := client.FragmentedDownloadObject(context.Background(), bucket, key, len(expected), fragmentSize)
-		require.NoError(t, err)
-		require.Equal(t, expected, data)
+		data, err := client.FragmentedDownloadObject(ctx, bucket, key, len(expected), fragmentSize)
+		require.NoError(t, err, "failed to download fragmented object for key %s", key)
+		require.Equal(t, expected, data, "downloaded data should match uploaded data for key %s", key)
 
 		// List the objects
-		objects, err := client.ListObjects(context.Background(), bucket, key)
-		require.NoError(t, err)
+		objects, err := client.ListObjects(ctx, bucket, key)
+		require.NoError(t, err, "failed to list objects for key %s", key)
 		numFragments := math.Ceil(float64(len(expected)) / float64(fragmentSize))
-		require.Len(t, objects, int(numFragments))
+		require.Len(t, objects, int(numFragments), "should have correct number of fragments for key %s", key)
 		totalSize := int64(0)
 		for _, object := range objects {
 			totalSize += object.Size
 		}
-		require.Equal(t, int64(len(expected)), totalSize)
+		require.Equal(t, int64(len(expected)), totalSize, 
+			"total fragment size should match original data size for key %s", key)
 	}
 
 	// Attempt to list non-existent objects
-	objects, err := client.ListObjects(context.Background(), bucket, "nonexistent")
-	require.NoError(t, err)
-	require.Len(t, objects, 0)
+	objects, err := client.ListObjects(ctx, bucket, "nonexistent")
+	require.NoError(t, err, "failed to list non-existent objects")
+	require.Len(t, objects, 0, "should return empty list for non-existent objects")
 }
 
 func TestRandomOperations(t *testing.T) {
 	tu.InitializeRandom()
-	for _, builder := range clientBuilders {
-		err := builder.start()
-		require.NoError(t, err)
 
-		client, err := builder.build()
-		require.NoError(t, err)
-		RandomOperationsTest(t, client)
+	t.Run("mock_client", func(t *testing.T) {
+		client := mock.NewS3Client()
+		runRandomOperationsTest(t, client)
+	})
 
-		err = builder.finish()
-		require.NoError(t, err)
-	}
+	t.Run("localstack_client", func(t *testing.T) {
+		client := setupLocalStackTest(t)
+		runRandomOperationsTest(t, client)
+	})
 }
 
 func TestReadNonExistentValue(t *testing.T) {
 	tu.InitializeRandom()
-	for _, builder := range clientBuilders {
-		err := builder.start()
-		require.NoError(t, err)
 
-		client, err := builder.build()
-		require.NoError(t, err)
-		_, err = client.FragmentedDownloadObject(context.Background(), bucket, "nonexistent", 1000, 1000)
-		require.Error(t, err)
-		randomKey := tu.RandomString(10)
-		_, err = client.FragmentedDownloadObject(context.Background(), bucket, randomKey, 0, 0)
-		require.Error(t, err)
+	t.Run("mock_client", func(t *testing.T) {
+		client := mock.NewS3Client()
+		runReadNonExistentValueTest(t, client)
+	})
 
-		err = builder.finish()
-		require.NoError(t, err)
-	}
+	t.Run("localstack_client", func(t *testing.T) {
+		client := setupLocalStackTest(t)
+		runReadNonExistentValueTest(t, client)
+	})
+}
+
+func runReadNonExistentValueTest(t *testing.T, client s3.Client) {
+	t.Helper()
+	ctx := t.Context()
+
+	_, err := client.FragmentedDownloadObject(ctx, bucket, "nonexistent", 1000, 1000)
+	require.Error(t, err, "should fail to download non-existent object")
+
+	randomKey := tu.RandomString(10)
+	_, err = client.FragmentedDownloadObject(ctx, bucket, randomKey, 0, 0)
+	require.Error(t, err, "should fail to download random non-existent object")
 }
 
 func TestHeadObject(t *testing.T) {
 	tu.InitializeRandom()
-	for _, builder := range clientBuilders {
-		err := builder.start()
-		require.NoError(t, err)
 
-		client, err := builder.build()
-		require.NoError(t, err)
+	t.Run("mock_client", func(t *testing.T) {
+		client := mock.NewS3Client()
+		runHeadObjectTest(t, client)
+	})
 
-		key := tu.RandomString(10)
-		err = client.UploadObject(context.Background(), bucket, key, []byte("test"))
-		require.NoError(t, err)
-		size, err := client.HeadObject(context.Background(), bucket, key)
-		require.NoError(t, err)
-		require.NotNil(t, size)
-		require.Equal(t, int64(4), *size)
+	t.Run("localstack_client", func(t *testing.T) {
+		client := setupLocalStackTest(t)
+		runHeadObjectTest(t, client)
+	})
+}
 
-		size, err = client.HeadObject(context.Background(), bucket, "nonexistent")
-		require.ErrorIs(t, err, s3.ErrObjectNotFound)
-		require.Nil(t, size)
+func runHeadObjectTest(t *testing.T, client s3.Client) {
+	t.Helper()
+	ctx := t.Context()
 
-		err = builder.finish()
-		require.NoError(t, err)
-	}
+	key := tu.RandomString(10)
+	err := client.UploadObject(ctx, bucket, key, []byte("test"))
+	require.NoError(t, err, "failed to upload test object")
+
+	size, err := client.HeadObject(ctx, bucket, key)
+	require.NoError(t, err, "failed to get head object for existing key")
+	require.NotNil(t, size, "size should not be nil for existing object")
+	require.Equal(t, int64(4), *size, "size should match uploaded data")
+
+	size, err = client.HeadObject(ctx, bucket, "nonexistent")
+	require.ErrorIs(t, err, s3.ErrObjectNotFound, "should return ErrObjectNotFound for non-existent object")
+	require.Nil(t, size, "size should be nil for non-existent object")
 }

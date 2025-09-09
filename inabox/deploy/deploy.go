@@ -296,10 +296,15 @@ func (env *Config) DeployExperiment() error {
 			logger.Info("Registering blob versions and relays")
 			env.RegisterBlobVersionAndRelays(ethClient)
 
-			logger.Info("Registering disperser keypair")
-			err = env.RegisterDisperserKeypair(ethClient)
-			if err != nil {
-				logger.Errorf("could not register disperser keypair: %v", err)
+			// Only register disperser keypair if we have a valid address (i.e., localstack was available)
+			if env.DisperserAddress != (gcommon.Address{}) {
+				logger.Info("Registering disperser keypair")
+				err = env.RegisterDisperserKeypair(ethClient)
+				if err != nil {
+					logger.Errorf("could not register disperser keypair: %v", err)
+				}
+			} else {
+				logger.Info("Skipping disperser keypair registration (localstack not available)")
 			}
 		}
 	}

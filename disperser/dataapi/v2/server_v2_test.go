@@ -138,17 +138,21 @@ type MockHealthCheckService struct {
 
 func TestMain(m *testing.M) {
 	setup(m)
-	m.Run()
+	code := m.Run()
 	teardown()
+	os.Exit(code)
 }
 
 func teardown() {
 	if deployLocalStack {
-		_ = localstackContainer.Terminate(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
+	ctx := context.Background()
 	// Start localstack
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
@@ -156,7 +160,7 @@ func setup(m *testing.M) {
 	}
 	if deployLocalStack {
 		var err error
-		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"dynamodb"},
@@ -175,7 +179,7 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTable(ctx, cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())
@@ -204,15 +208,16 @@ func setup(m *testing.M) {
 
 // makeCommitment returns a test hardcoded BlobCommitments
 func makeCommitment(t *testing.T) encoding.BlobCommitments {
+	t.Helper()
 	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
 	_, err := lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthXA0")
 	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthXA1")
 	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthYA0")
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthYA1")
 
 	var lengthProof bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
@@ -233,17 +238,18 @@ func makeCommitment(t *testing.T) encoding.BlobCommitments {
 
 // makeBlobHeaderV2 returns a test hardcoded V2 BlobHeader
 func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
+	t.Helper()
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random account bytes")
 	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random timestamp")
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random cumulative payment")
 	sig := make([]byte, 32)
 	_, err = rand.Read(sig)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random signature")
 	return &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0, 1},
@@ -261,6 +267,7 @@ func setUpRouter() *gin.Engine {
 }
 
 func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
+	t.Helper()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, url, nil)
 	router.ServeHTTP(w, req)
@@ -269,24 +276,27 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 }
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
+	t.Helper()
 	body := w.Result().Body
 	defer core.CloseLogOnError(body, "response body", logger)
 	data, err := io.ReadAll(body)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read response body")
 
 	var response T
 	err = json.Unmarshal(data, &response)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to unmarshal response body")
 	return response
 }
 
 func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	t.Helper()
 	bk, err := blobHeader.BlobKey()
-	require.Nil(t, err)
+	require.Nil(t, err, "failed to get blob key from header")
 	require.Equal(t, blobKey, bk)
 }
 
 func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.OperatorSigningInfo) {
+	t.Helper()
 	require.Equal(t, expected.OperatorId, actual.OperatorId)
 	require.Equal(t, expected.OperatorAddress, actual.OperatorAddress)
 	require.Equal(t, expected.QuorumId, actual.QuorumId)
@@ -296,14 +306,16 @@ func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.Oper
 }
 
 func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+	t.Helper()
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to parse cursor token")
 	require.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
 func deleteItems(t *testing.T, keys []dynamodb.Key) {
-	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
-	require.NoError(t, err)
+	t.Helper()
+	failed, err := dynamoClient.DeleteItems(t.Context(), metadataTableName, keys)
+	require.NoError(t, err, "failed to delete test items from DynamoDB")
 	require.Len(t, failed, 0)
 }
 
@@ -320,7 +332,7 @@ func TestFetchBlob(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	err := blobMetadataStore.PutBlobMetadata(t.Context(), metadata)
 	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
@@ -340,7 +352,7 @@ func TestFetchBlob(t *testing.T) {
 
 func TestFetchOperatorDispersalFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	numRequests := 60
 	opID := core.OperatorID{16, 32}
@@ -599,7 +611,7 @@ func TestFetchBlobCertificate(t *testing.T) {
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}
-	err = blobMetadataStore.PutBlobCertificate(context.Background(), blobCert, fragmentInfo)
+	err = blobMetadataStore.PutBlobCertificate(t.Context(), blobCert, fragmentInfo)
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
@@ -614,7 +626,7 @@ func TestFetchBlobCertificate(t *testing.T) {
 
 func TestFetchBlobFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a timeline of test blobs:
 	// - Total of 103 blobs
@@ -975,7 +987,7 @@ func TestFetchBlobFeed(t *testing.T) {
 }
 
 func TestFetchBlobAttestationInfo(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	r := setUpRouter()
 
 	// Set up blob inclusion info
@@ -988,7 +1000,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	err := blobMetadataStore.PutBlobMetadata(t.Context(), metadata)
 	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
@@ -1222,7 +1234,7 @@ func TestFetchBatch(t *testing.T) {
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 10,
 	}
-	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
+	err := blobMetadataStore.PutBatchHeader(t.Context(), batchHeader)
 	require.NoError(t, err)
 	batchHeaderHashBytes, err := batchHeader.Hash()
 	require.NoError(t, err)
@@ -1241,7 +1253,7 @@ func TestFetchBatch(t *testing.T) {
 		BatchHeader:      batchHeader,
 		BlobCertificates: []*corev2.BlobCertificate{blobCert},
 	}
-	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	err = blobMetadataStore.PutBatch(t.Context(), batch)
 	require.NoError(t, err)
 
 	// Set up attestation in metadata store
@@ -1267,7 +1279,7 @@ func TestFetchBatch(t *testing.T) {
 			1: 80,
 		},
 	}
-	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
+	err = blobMetadataStore.PutAttestation(t.Context(), attestation)
 	require.NoError(t, err)
 
 	mockTx.On("BatchOperatorIDToAddress").Return(
@@ -1408,7 +1420,7 @@ func TestFetchBatch(t *testing.T) {
 
 func TestFetchBatchFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a timeline of test batches
 	numBatches := 72
@@ -1658,7 +1670,7 @@ func TestFetchBatchFeed(t *testing.T) {
 
 func TestFetchOperatorSigningInfo(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	/*
 		Test data setup
@@ -2270,7 +2282,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 
 func TestFetchAccountBlobFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	numBlobs := 60
 	now := uint64(time.Now().UnixNano())
@@ -2475,7 +2487,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 func TestFetchOperatorDispersalResponse(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 0, 2, 4},

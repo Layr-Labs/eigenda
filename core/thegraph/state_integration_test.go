@@ -17,21 +17,19 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
-	anvilContainer      *testbed.AnvilContainer
-	localstackContainer *testbed.LocalStackContainer
-	templateName        string
-	testName            string
-	graphUrl            string
-	testConfig          *deploy.Config
+	templateName string
+	testName     string
+	graphUrl     string
 
 	localstackPort      = "4570"
 	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
 	metadataTableNameV2 = "test-BlobMetadata-v2"
+	testQuorums         = []uint8{0, 1}
 
 	logger = testutils.GetLogger()
 )
@@ -42,35 +40,34 @@ func init() {
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
 
-func setup() {
+func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+	t.Helper()
+
 	if testing.Short() {
-		return
+		t.Skip("Skipping graph indexer integration test in short mode")
 	}
 
+	flag.Parse()
+	ctx := t.Context()
 	rootPath := "../../"
 
 	if testName == "" {
 		var err error
 		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, err, "failed to create test directory")
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig := deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
-	var err error
-	localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
 		Services:       []string{"s3", "dynamodb", "kms"},
 		Logger:         logger,
 	})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "failed to start localstack container")
 
-	fmt.Println("Deploying LocalStack resources")
 	deployConfig := testbed.DeployResourcesConfig{
 		LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 		MetadataTableName:   metadataTableName,
@@ -78,72 +75,72 @@ func setup() {
 		V2MetadataTableName: metadataTableNameV2,
 		Logger:              logger,
 	}
-	err = testbed.DeployResources(context.Background(), deployConfig)
-	if err != nil {
-		panic(err)
-	}
+	err = testbed.DeployResources(ctx, deployConfig)
+	require.NoError(t, err, "failed to deploy resources")
 
-	anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
 		Logger:         logger,
 	})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "failed to start anvil container")
 
 	logger.Info("Starting graph node")
 	testConfig.StartGraphNode()
 
 	logger.Info("Deploying experiment")
-	if err := testConfig.DeployExperiment(); err != nil {
-		panic(err)
-	}
+	err = testConfig.DeployExperiment()
+	require.NoError(t, err, "failed to deploy experiment")
 
 	logger.Info("Starting binaries")
 	testConfig.StartBinaries()
-}
 
-func teardown() {
-	_ = localstackContainer.Terminate(context.Background())
-	_ = anvilContainer.Terminate(context.Background())
+	t.Cleanup(func() {
+		logger.Info("Stopping containers and services")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
-	logger.Info("Stop graph node")
-	testConfig.StopGraphNode()
+		logger.Info("Stop binaries")
+		testConfig.StopBinaries()
 
-	logger.Info("Stop binaries")
-	testConfig.StopBinaries()
+		logger.Info("Stop graph node")
+		testConfig.StopGraphNode()
+
+		_ = anvilContainer.Terminate(ctx)
+		_ = localstackContainer.Terminate(ctx)
+	})
+
+	return anvilContainer, localstackContainer, testConfig
 }
 
 func TestIndexerIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skip graph indexer integrations test in short mode")
-	}
-	setup()
-	defer teardown()
+	ctx := t.Context()
+	_, _, testConfig := setupTest(t)
 
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
 		logger, client, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to create eth writer")
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)
 	time.Sleep(5 * time.Second)
 
-	err = cs.Start(context.Background())
-	assert.NoError(t, err)
+	err = cs.Start(ctx)
+	require.NoError(t, err, "failed to start indexed chain state")
 
-	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
-	assert.NoError(t, err)
+	headerNum, err := cs.GetCurrentBlockNumber(ctx)
+	require.NoError(t, err, "failed to get current block number")
 
-	state, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
-	assert.NoError(t, err)
-	assert.Equal(t, len(testConfig.Operators), len(state.IndexedOperators))
+	state, err := cs.GetIndexedOperatorState(ctx, headerNum, testQuorums)
+	require.NoError(t, err, "failed to get indexed operator state")
+	require.Equal(t, len(testConfig.Operators), len(state.IndexedOperators), "operator count mismatch")
 }
 
 func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) common.EthClient {
+	t.Helper()
+
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
-	assert.True(t, ok)
+	require.True(t, ok, "failed to get deployer")
 
 	config := geth.EthClientConfig{
 		RPCURLs:          []string{deployer.RPC},
@@ -153,6 +150,6 @@ func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, log
 	}
 
 	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to create eth client")
 	return client
 }

@@ -33,18 +33,20 @@ func TestMain(m *testing.M) {
 	var localstackContainer *testbed.LocalStackContainer
 	var deployLocalStack bool
 
+	ctx := context.Background()
+
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		deployLocalStack = true
 		var err error
-		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"dynamodb"},
 			Logger:         logger,
 		})
 		if err != nil {
-			_ = localstackContainer.Terminate(context.Background())
-			panic("failed to start localstack container: " + err.Error())
+			_ = localstackContainer.Terminate(ctx)
+			logger.Fatal("Failed to start localstack container:", err)
 		}
 	} else {
 		// localstack is already deployed
@@ -82,7 +84,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 	if deployLocalStack {
-		_ = localstackContainer.Terminate(context.Background())
+		_ = localstackContainer.Terminate(ctx)
 	}
 	os.Exit(code)
 }
@@ -92,6 +94,7 @@ func TestMain(m *testing.M) {
 // our test table schema exactly matches the production schema.
 // Appends a random suffix to the table name to prevent collisions between tests.
 func createPaymentTable(t *testing.T, tableName string) string {
+	t.Helper()
 	testRandom := random.NewTestRandom()
 	randomSuffix := testRandom.Intn(999999)
 	fullTableName := fmt.Sprintf("%s_%d", tableName, randomSuffix)
@@ -110,16 +113,17 @@ func createPaymentTable(t *testing.T, tableName string) string {
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create on-demand table")
 
 	return fullTableName
 }
 
 // deleteTable deletes a DynamoDB table used in testing
 func deleteTable(t *testing.T, tableName string) {
-	ctx := context.Background()
+	t.Helper()
+	ctx := t.Context()
 	_, err := dynamoClient.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName),
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to delete table")
 }

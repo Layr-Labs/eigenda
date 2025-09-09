@@ -1,7 +1,6 @@
 package blobstore_test
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -19,8 +18,8 @@ import (
 )
 
 func TestSharedBlobStore(t *testing.T) {
+	ctx := t.Context()
 	requestedAt := uint64(time.Now().UnixNano())
-	ctx := context.Background()
 	blobKey, err := sharedStorage.StoreBlob(ctx, blob, requestedAt)
 	assert.Nil(t, err)
 	assert.Equal(t, blobHash, blobKey.BlobHash)
@@ -194,7 +193,7 @@ func TestSharedBlobStore(t *testing.T) {
 }
 
 func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1 := disperser.BlobKey{
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
@@ -289,7 +288,7 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 }
 
 func TestSharedBlobStoreGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	batchHeaderHash := [32]byte{1, 2, 3}
 
 	// Create and store multiple blob metadata for the same batch
@@ -407,6 +406,8 @@ func TestSharedBlobStoreGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
 }
 
 func assertMetadata(t *testing.T, blobKey disperser.BlobKey, expectedBlobSize uint, expectedRequestedAt uint64, expectedStatus disperser.BlobStatus, actualMetadata *disperser.BlobMetadata) {
+	t.Helper()
+
 	assert.NotNil(t, actualMetadata)
 	assert.Equal(t, expectedStatus, actualMetadata.BlobStatus)
 	assert.Equal(t, blob.RequestHeader, actualMetadata.RequestMetadata.BlobRequestHeader)
@@ -414,18 +415,22 @@ func assertMetadata(t *testing.T, blobKey disperser.BlobKey, expectedBlobSize ui
 	assert.Equal(t, blobKey.MetadataHash, actualMetadata.MetadataHash)
 	assert.Equal(t, expectedBlobSize, actualMetadata.RequestMetadata.BlobSize)
 	assert.Equal(t, expectedRequestedAt, actualMetadata.RequestMetadata.RequestedAt)
-	metadataSuffix, err := metadataSuffix(actualMetadata.RequestMetadata.RequestedAt, actualMetadata.RequestMetadata.SecurityParams)
+	metadataSuffix, err := metadataSuffix(t, actualMetadata.RequestMetadata.RequestedAt, actualMetadata.RequestMetadata.SecurityParams)
 	assert.Nil(t, err)
 	assert.Equal(t, metadataSuffix, actualMetadata.MetadataHash)
 }
 
 func assertBlob(t *testing.T, blob *core.Blob) {
+	t.Helper()
+
 	assert.NotNil(t, blob)
 	assert.Equal(t, blob.Data, blob.Data)
 	assert.Equal(t, blob.RequestHeader.SecurityParams, blob.RequestHeader.SecurityParams)
 }
 
-func metadataSuffix(requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
+func metadataSuffix(t *testing.T, requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
+	t.Helper()
+
 	var str string
 	str = fmt.Sprintf("%d/", requestedAt)
 	for _, param := range securityParams {

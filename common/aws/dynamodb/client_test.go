@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -31,22 +32,28 @@ var (
 	localstackPort   = "4567"
 )
 
+// TODO: Refactor to use t.Run subtests pattern instead of TestMain
+// This would allow setup to run once with subtests, eliminating global state
+// and enabling potential parallel execution within the main test function
 func TestMain(m *testing.M) {
-	setup(m)
+	setup()
 	code := m.Run()
 	teardown()
 	os.Exit(code)
 }
 
-func setup(_ *testing.M) {
+func setup() {
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	if deployLocalStack {
 		var err error
-		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
 			HostPort:       localstackPort,
 			Services:       []string{"dynamodb"},
@@ -54,7 +61,7 @@ func setup(_ *testing.M) {
 		})
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container: " + err.Error())
+			logger.Fatal("Failed to start LocalStack container:", err)
 		}
 	}
 
@@ -69,18 +76,23 @@ func setup(_ *testing.M) {
 	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb client")
+		logger.Fatal("Failed to create DynamoDB client:", err)
 	}
 }
 
 func teardown() {
 	if deployLocalStack {
-		_ = localstackContainer.Terminate(context.Background())
+		logger.Info("Stopping LocalStack container")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }
 
 func createTable(t *testing.T, tableName string) {
-	ctx := context.Background()
+	t.Helper()
+
+	ctx := t.Context()
 	tableDescription, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
@@ -130,15 +142,15 @@ func createTable(t *testing.T, tableName string) {
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	assert.NoError(t, err)
-	assert.NotNil(t, tableDescription)
+	require.NoError(t, err, "failed to create table %s", tableName)
+	require.NotNil(t, tableDescription, "table description should not be nil")
 }
 
 func TestBasicOperations(t *testing.T) {
 	tableName := "Processing"
 	createTable(t, tableName)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	item := commondynamodb.Item{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 		"RequestedAt": &types.AttributeValueMemberN{Value: "123"},
@@ -163,18 +175,18 @@ func TestBasicOperations(t *testing.T) {
 		"Status":   &types.AttributeValueMemberS{Value: "Processing"},
 	}
 	err := dynamoClient.PutItem(ctx, tableName, item)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to put initial item")
 
 	fetchedItem, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to get item after put")
 
-	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "Processing", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "blob1", fetchedItem["BlobKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value, "metadata key should match")
+	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value, "requested at should match")
+	assert.Equal(t, "Processing", fetchedItem["Status"].(*types.AttributeValueMemberS).Value, "status should match")
+	assert.Equal(t, "blob1", fetchedItem["BlobKey"].(*types.AttributeValueMemberS).Value, "blob key should match")
+	assert.Equal(t, "123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value, "blob size should match")
 	assert.Equal(t, []types.AttributeValue{
 		&types.AttributeValueMemberM{
 			Value: map[string]types.AttributeValue{
@@ -188,20 +200,20 @@ func TestBasicOperations(t *testing.T) {
 				"AdversaryThreshold": &types.AttributeValueMemberN{Value: "70"},
 			},
 		},
-	}, fetchedItem["SecurityParams"].(*types.AttributeValueMemberL).Value)
+	}, fetchedItem["SecurityParams"].(*types.AttributeValueMemberL).Value, "security params should match")
 
 	// Attempt to put an item with the same key
 	err = dynamoClient.PutItemWithCondition(ctx, tableName, commondynamodb.Item{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
 	}, "attribute_not_exists(MetadataKey)", nil, nil)
-	assert.ErrorIs(t, err, commondynamodb.ErrConditionFailed)
+	assert.ErrorIs(t, err, commondynamodb.ErrConditionFailed, "condition should fail for existing key")
 	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to get item after failed conditional put")
 	// Shouldn't have been updated
-	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value, "RequestedAt should not have been updated due to failed condition")
 
 	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
@@ -214,7 +226,7 @@ func TestBasicOperations(t *testing.T) {
 			Value: "0",
 		},
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to update item with new status")
 
 	// Attempt to update the item with invalid condition
 	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
@@ -222,7 +234,7 @@ func TestBasicOperations(t *testing.T) {
 	}, commondynamodb.Item{
 		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
 	}, expression.Name("Status").In(expression.Value("Dispersing")))
-	assert.Error(t, err)
+	assert.Error(t, err, "update should fail with invalid condition")
 
 	// Attempt to update the item with valid condition
 	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
@@ -230,38 +242,38 @@ func TestBasicOperations(t *testing.T) {
 	}, commondynamodb.Item{
 		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
 	}, expression.Name("Status").In(expression.Value("Confirmed")))
-	assert.NoError(t, err)
+	require.NoError(t, err, "update should succeed with valid condition")
 
 	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	}, "BlobSize", 1000)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to increment BlobSize")
 
 	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "Confirmed", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "0x123", fetchedItem["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "0", fetchedItem["BlobIndex"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "456", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	require.NoError(t, err, "failed to get item after updates")
+	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value, "metadata key should match")
+	assert.Equal(t, "Confirmed", fetchedItem["Status"].(*types.AttributeValueMemberS).Value, "status should be updated to Confirmed")
+	assert.Equal(t, "0x123", fetchedItem["BatchHeaderHash"].(*types.AttributeValueMemberS).Value, "batch header hash should match")
+	assert.Equal(t, "0", fetchedItem["BlobIndex"].(*types.AttributeValueMemberN).Value, "blob index should match")
+	assert.Equal(t, "1123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value, "blob size should be incremented")
+	assert.Equal(t, "456", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value, "requested at should be updated")
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to delete table")
 }
 
 func TestBatchOperations(t *testing.T) {
 	tableName := "Processing"
 	createTable(t, tableName)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 33
 	items := make([]commondynamodb.Item, numItems)
 	expectedBlobKeys := make([]string, numItems)
 	expectedMetadataKeys := make([]string, numItems)
-	for i := 0; i < numItems; i += 1 {
+	for i := range numItems {
 		items[i] = commondynamodb.Item{
 			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
 			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
@@ -328,7 +340,7 @@ func TestQueryIndex(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 30
 	items := make([]commondynamodb.Item, numItems)
 	for i := 0; i < numItems; i += 1 {
@@ -357,7 +369,7 @@ func TestQueryIndexCount(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItemsProcessing := 10
 	items1 := make([]commondynamodb.Item, numItemsProcessing)
 	for i := 0; i < numItemsProcessing; i += 1 {
@@ -410,7 +422,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	requestedAt := time.Now().Unix()
 	item := commondynamodb.Item{
 		"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", 0)},
@@ -451,7 +463,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
 		requestedAt := time.Now().Add(-time.Duration(3*i) * time.Second).Unix()
@@ -496,7 +508,7 @@ func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
@@ -511,7 +523,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 30
 	for i := 0; i < numItems; i += 1 {
 		// Noticed same timestamp for multiple items which resulted in key28
@@ -581,7 +593,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	createTable(t, tableName)
 	indexName := "StatusIndex"
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 30
 	items := make([]commondynamodb.Item, numItems)
 	for i := 0; i < numItems; i += 1 {
@@ -635,7 +647,7 @@ func TestQueryWithInput(t *testing.T) {
 	tableName := "ProcessingQueryWithInput"
 	createTable(t, tableName)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	numItems := 30
 	items := make([]commondynamodb.Item, numItems)
 	for i := 0; i < numItems; i++ {
@@ -723,7 +735,7 @@ func TestPutItemWithConditionAndReturn(t *testing.T) {
 	tableName := "PutItemWithConditionAndReturn"
 	createTable(t, tableName)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create an initial item
 	initialItem := commondynamodb.Item{
@@ -817,5 +829,5 @@ func TestPutItemWithConditionAndReturn(t *testing.T) {
 	assert.Equal(t, "New", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
-	assert.NoError(t, err)
+	require.NoError(t, err, "failed to delete table")
 }
