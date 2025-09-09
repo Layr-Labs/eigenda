@@ -110,6 +110,9 @@ To ensure that each blob with a valid DA certificate is available, the following
 Intuitively, since the adversary controls less than `SafetyThreshold` of stake, at least `ConfirmationThreshold` - `SafetyThreshold` honest validators need to sign to form a valid DA certificate. 
 Therefore, as long as `ConfirmationThreshold` - `SafetyThreshold` >= `ReconstructionThreshold`, the honest validators should own a large enough set of chunks to reconstruct the blob.
 
+⚠️
+We strongly recommend that users set a `SafetyThreshold` >= 33% if they ever want to change the default settings.
+
 **2. Confirmation Threshold and Liveness Threshold**
 
 The `ConfirmationThreshold` and `LivenessThreshold` satisfy the following inequality:
@@ -121,6 +124,14 @@ This is because a valid certificate requires signatures from at least `Confirmat
 In summary, the `SafetyThreshold` and `LivenessThreshold` depends on the choice of `ConfirmationThreshold`. The picture below shows the relationship between these security thresholds.
 
 ![image](../../assets/security_thresholds.png)
+
+A table of the security thresholds is given below for the reader's reference, assuming that the reconstruction threshold is 22%.
+
+| Confirmation Threshold | Safety Threshold | Liveness Threshold |
+| :------: | :------: | :------: |
+|  55%    |  33%  |   45%  |
+|  60%    |  38%  |   40%  |
+|  65%    |  43%  |   35%  |
 
 ### Implementation Details
 
@@ -162,8 +173,6 @@ Specifically, the code above implements a check for the following inequality:
 By substituting the variables using the notation mapping shown at the beginning of this section and simplifying, we get:  
 `ConfirmationThreshold - SafetyThreshold >= (c / (c - n)) * γ = ReconstructionThreshold`, 
 which is exactly inequality (1) shown in the previous subsection.  
-
-We strongly recommend that users set a `SafetyThreshold` >= 33% if they ever want to change the default settings.
 
 **2. Liveness Threshold**
 
