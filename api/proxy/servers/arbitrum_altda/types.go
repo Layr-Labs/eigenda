@@ -29,9 +29,9 @@ const (
 // TODO: Figure out what's getting passed over the wire. We're
 // being passed a mapping and populating it with EigenDAV2 Arbitrum batch
 // context. It'd be good to know when an EigenDA batch is populated
-// during the preimage mapping population given we use 16mib-buffer_to_ensure_padding batch
-// sizing which arbitrum doesn't
-// natively support. If other preimage entries exist for the node prestate trie then data size limits
+// during the preimage mapping population given we can use up-to 16,252,897 bytes for
+// a batch which arbitrum doesn't
+// natively support. If other preimage entries exist for the node prestate trie then request data size limits
 // could unknowningly be hit/exceeded.
 type PreimagesMap map[PreimageType]map[common.Hash][]byte
 
