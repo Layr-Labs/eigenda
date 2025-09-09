@@ -1,6 +1,7 @@
 package blobstore_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -179,7 +180,7 @@ func TestSharedBlobStore(t *testing.T) {
 
 	// Cleanup: Delete test items
 	t.Cleanup(func() {
-		deleteItems(t, []commondynamodb.Key{
+		deleteItemsWithBackgroundContext(t, []commondynamodb.Key{
 			{
 				"MetadataHash": &types.AttributeValueMemberS{Value: blobKey.MetadataHash},
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
@@ -274,7 +275,7 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 
 	// Cleanup: Delete test items
 	t.Cleanup(func() {
-		deleteItems(t, []commondynamodb.Key{
+		deleteItemsWithBackgroundContext(t, []commondynamodb.Key{
 			{
 				"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
@@ -401,7 +402,7 @@ func TestSharedBlobStoreGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
 			})
 		}
-		deleteItems(t, keys)
+		deleteItemsWithBackgroundContext(t, keys)
 	})
 }
 
@@ -415,7 +416,8 @@ func assertMetadata(t *testing.T, blobKey disperser.BlobKey, expectedBlobSize ui
 	assert.Equal(t, blobKey.MetadataHash, actualMetadata.MetadataHash)
 	assert.Equal(t, expectedBlobSize, actualMetadata.RequestMetadata.BlobSize)
 	assert.Equal(t, expectedRequestedAt, actualMetadata.RequestMetadata.RequestedAt)
-	metadataSuffix, err := metadataSuffix(t, actualMetadata.RequestMetadata.RequestedAt, actualMetadata.RequestMetadata.SecurityParams)
+	metadataSuffix, err := metadataSuffix(t, actualMetadata.RequestMetadata.RequestedAt,
+		actualMetadata.RequestMetadata.SecurityParams)
 	assert.Nil(t, err)
 	assert.Equal(t, metadataSuffix, actualMetadata.MetadataHash)
 }
@@ -440,4 +442,14 @@ func metadataSuffix(t *testing.T, requestedAt uint64, securityParams []*core.Sec
 	}
 	bytes := []byte(str)
 	return hex.EncodeToString(sha256.New().Sum(bytes)), nil
+}
+
+func deleteItemsWithBackgroundContext(t *testing.T, keys []commondynamodb.Key) {
+	t.Helper()
+	// Use context.Background() instead of t.Context() to avoid "context canceled" errors
+	// during cleanup. When tests complete or fail, t.Context() gets cancelled, which can
+	// interrupt database cleanup operations.
+	ctx := context.Background()
+	_, err := dynamoClient.DeleteItems(ctx, metadataTableName, keys)
+	assert.NoError(t, err)
 }

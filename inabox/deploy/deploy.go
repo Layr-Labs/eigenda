@@ -284,33 +284,39 @@ func (env *Config) DeployExperiment() error {
 
 	// Register blob versions, relays, and disperser keypair
 	if env.EigenDA.Deployer != "" && env.IsEigenDADeployed() {
-		ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-			RPCURLs:          []string{env.Deployers[0].RPC},
-			PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
-			NumConfirmations: 0,
-			NumRetries:       3,
-		}, gcommon.Address{}, logger)
-		if err != nil {
-			logger.Errorf("could not create eth client for registration: %v", err)
-		} else {
-			logger.Info("Registering blob versions and relays")
-			env.RegisterBlobVersionAndRelays(ethClient)
-
-			// Only register disperser keypair if we have a valid address (i.e., localstack was available)
-			if env.DisperserAddress != (gcommon.Address{}) {
-				logger.Info("Registering disperser keypair")
-				err = env.RegisterDisperserKeypair(ethClient)
-				if err != nil {
-					logger.Errorf("could not register disperser keypair: %v", err)
-				}
-			} else {
-				logger.Info("Skipping disperser keypair registration (localstack not available)")
-			}
-		}
+		env.performRegistrations()
 	}
 
 	logger.Info("Test environment has successfully deployed!")
 	return nil
+}
+
+// performRegistrations handles blob version, relay, and disperser keypair registrations.
+func (env *Config) performRegistrations() {
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{env.Deployers[0].RPC},
+		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gcommon.Address{}, logger)
+	if err != nil {
+		logger.Errorf("could not create eth client for registration: %v", err)
+		return
+	}
+
+	logger.Info("Registering blob versions and relays")
+	env.RegisterBlobVersionAndRelays(ethClient)
+
+	// Only register disperser keypair if we have a valid address (i.e., localstack was available)
+	if env.DisperserAddress != (gcommon.Address{}) {
+		logger.Info("Registering disperser keypair")
+		err = env.RegisterDisperserKeypair(ethClient)
+		if err != nil {
+			logger.Errorf("could not register disperser keypair: %v", err)
+		}
+	} else {
+		logger.Info("Skipping disperser keypair registration (localstack not available)")
+	}
 }
 
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS.

@@ -179,7 +179,8 @@ func setup(_ *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	_, err := test_utils.CreateTable(ctx, cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTable(ctx, cfg, metadataTableName,
+		blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())

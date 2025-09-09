@@ -58,7 +58,9 @@ func setupLocalStack(t *testing.T) *testbed.LocalStackContainer {
 	return localstackContainer
 }
 
-func createTestKMSKey(t *testing.T, ctx context.Context, keyManager *kms.Client) (keyID string, publicAddress gethcommon.Address) {
+func createTestKMSKey(
+	t *testing.T, ctx context.Context, keyManager *kms.Client,
+) (keyID string, publicAddress gethcommon.Address) {
 	t.Helper()
 
 	createKeyOutput, err := keyManager.CreateKey(ctx, &kms.CreateKeyInput{

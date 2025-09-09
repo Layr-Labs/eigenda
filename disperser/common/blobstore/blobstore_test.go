@@ -95,7 +95,8 @@ func setup(_ *testing.M) {
 	}
 
 	if shadowMetadataTableName != "" {
-		_, err = test_utils.CreateTable(ctx, cfg, shadowMetadataTableName, blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
+		_, err = test_utils.CreateTable(ctx, cfg, shadowMetadataTableName,
+			blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
 		if err != nil {
 			teardown()
 			logger.Fatal("Failed to create shadow dynamodb table:", err)
