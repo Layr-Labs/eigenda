@@ -142,7 +142,7 @@ func (cl *ClientLedger) debitReservationOnly(
 ) (*core.PaymentMetadata, error) {
 	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
@@ -153,6 +153,8 @@ func (cl *ClientLedger) debitReservationOnly(
 		// all other modes of failure are fatal
 		panic(fmt.Sprintf("reservation debit failed: %v", err))
 	}
+
+	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if !success {
 		return nil, fmt.Errorf(
@@ -197,7 +199,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 ) (*core.PaymentMetadata, error) {
 	// As the client, "now" and the dispersal time are the same. The client is responsible for populating the
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
-	success, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
+	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
 		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
@@ -208,6 +210,8 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 		// all other modes of failure are fatal
 		panic(fmt.Sprintf("reservation debit failed: %v", err))
 	}
+
+	cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 
 	if success {
 		paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, nil)
@@ -260,10 +264,12 @@ func (cl *ClientLedger) RevertDebit(
 		enforce.NotNil(cl.reservationLedger,
 			"payment metadata is for a reservation payment, but ReservationLedger is nil")
 
-		err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
+		remainingCapacity, err := cl.reservationLedger.RevertDebit(cl.getNow(), blobSymbolCount)
 		if err != nil {
 			return fmt.Errorf("revert reservation debit: %w", err)
 		}
+
+		cl.accountantMetricer.RecordReservationPayment(remainingCapacity)
 	}
 
 	return nil
