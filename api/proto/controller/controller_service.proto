@@ -7,7 +7,7 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
 
 // ControllerService defines the APIs for the controller.
 //
-// Currently, this API is only intended for *internal* consumption: this is a way for different parts of the disperse
+// Currently, this API is only intended for *internal* consumption: this is a way for different parts of the disperser
 // to communicate with each other
 service ControllerService {
   // AuthorizePayment handles payment authorization for blob dispersal
