@@ -39,7 +39,8 @@ import (
 // Some custom code / refactoring will likely be necessary for supporting the READPREIMAGE proof serialization logic
 type Handlers struct {
 	// TODO: Metrics support - makes sense to share metrics server between both rest and arbitrum alt da
-	//       servers. go-ethereum might suppprot
+	//       servers. There should exist some label used or tag that can be used to filter between
+	//       this and the REST ALT DA Server.
 	// TODO: Add EigenDA manager here
 	// TODO: Add logging
 }
@@ -47,8 +48,7 @@ type Handlers struct {
 // IsValidHeaderByte determines whether or not the sequencer message header byte is an EigenDAV2 cert type.
 // Arbitrum Nitro does this check via a bitwise AND which can cause overlapping and requires careful future
 // management. while we could determine a byte value with bits that don't overlap - it's more maintainable
-// to do a literal comparison and assume OCL would never introduce a conlficting byte value
-// OR our com
+// to do a literal comparison and assume OCL NOR our competitors would never introduce a conflicting byte value
 func (s *Handlers) IsValidHeaderByte(ctx context.Context, headerByte byte) (IsValidHeaderByteResult, error) {
 	isValid := headerByte == EigenDAV2MessageHeaderByte
 
@@ -148,15 +148,20 @@ func (s *Server) Store(
 //
 // TODO: Determine encoding standard that's also understood for onchain verification
 //
-// // current encoding proposal:
-// // // SERIALIZED EigenDA V2 CUSTOM READ PREIMAGE PROOF:
-// // // kzg commitment and preimage length are extractable
-// // // from the existing DA Cert
-//
-// // // [0:32]  - root of unity @ field element offset
-// // // [32:64] - field element or preimageChunk being one step proven
-// // // [64:128] - point opening proof (g1 point)
-// // // [128:256] - g2TauMinusG2z
+
+/*
+current encoding proposal:
+
+	Assumptions:
+		- kzg commitment and preimage length are extractable
+		  from the existing DA Cert
+
+	Proposed schema:
+		- [0:32]: root of unity @ field element offset
+		- [32:64]: field element or preimageChunk being one step proven
+		- [64:128]: point opening proof (g1 point)
+		- [128:256]: g2TauMinusG2z
+*/
 func (s *Server) GenerateProof(
 	ctx context.Context,
 	preimageType hexutil.Uint,
