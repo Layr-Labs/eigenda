@@ -40,7 +40,7 @@ The assignment algorithm `GetAssignments` works as follows:
    $$
    where $\mathbb{I}$ is the indicator function that adds one extra chunk to the first $c - c'$ validators to ensure the total number of assigned chunks equals $c$.
 
-We will prove that any subet of validators with sufficient combined stake can reconstruct the blob in [Security Parameters](./security-parameters.md).
+We will prove that any subset of validators with sufficient combined stake can reconstruct the blob in [Security Parameters](./security-parameters.md).
 
 ### Assignment Logic
 

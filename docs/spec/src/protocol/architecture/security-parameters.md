@@ -18,7 +18,7 @@ We define the **Blob parameters** as a tuple **$(n, c, \gamma)$** where:
 
 Among the blob parameters, `CodingRate` and `NumChunks` are used in the [encoding](./encoding.md) process, while `NumChunks` and `MaxNumOperators` are used in the chunk [assignment](./assignment.md) process.
 
-This tumple is stored in the struct shown below ([see in the code](https://github.com/Layr-Labs/eigenda/blob/d8090af76ed69920983bb3781399a91d84d20d10/contracts/src/core/libraries/v1/EigenDATypesV1.sol#L7)):
+This tuple is stored in the struct shown below ([see in the code](https://github.com/Layr-Labs/eigenda/blob/d8090af76ed69920983bb3781399a91d84d20d10/contracts/src/core/libraries/v1/EigenDATypesV1.sol#L7)):
 
 ```solidity
 struct VersionedBlobParams {
@@ -27,7 +27,7 @@ struct VersionedBlobParams {
     uint8 codingRate;
 }
 ```
-The blob parameters for each version is stored in deploying the `EigenDAThresholdRegistry` contract.
+The blob parameters for each version is stored in the `EigenDAThresholdRegistry` contract.
 It's configured [here](https://github.com/Layr-Labs/eigenda/blob/556dc34fcd4774b683cbc78590bccee66a096b42/contracts/script/deploy/eigenda/mainnet.beta.config.toml#L69) and the default parameters are shown below.
 ```
 versionedBlobParams = [
@@ -176,7 +176,7 @@ which is exactly inequality (1) shown in the previous subsection.
 
 **2. Liveness Threshold**
 
-The `LivenessThreshold` does not appear in the code, but users should keep the inequation (2) in mind when setting the confirmation `ConfirmationThreshold`. 
+The `LivenessThreshold` does not appear in the code, but users should keep the equation (2) in mind when setting the confirmation `ConfirmationThreshold`. 
 
 **System Default**
 
