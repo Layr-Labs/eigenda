@@ -22,18 +22,11 @@ message AuthorizePaymentRequest {
   // The blob header is used for the following purposes:
   // 1. Contains the PaymentHeader, which describes the payment being offered
   // 2. Contains the quorums being dispersed to
-  // 3. The signature is over the BlobHeader, so it's needed in its entirety for signature verification
   common.v2.BlobHeader blob_header = 1;
-  
-  // Client signature over the keccak hash of the BlobHeader. Must verify against the AccountID public key, which is
-  // included in the PaymentHeader.
-  //
-  // This is the same as the signature field in DisperseBlobRequest and BlobCertificate
-  bytes client_signature = 2;
   
   // Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
   // Proves that the request was created by the holder of the KMS key.
-  bytes disperser_signature = 3;
+  bytes disperser_signature = 2;
 }
 
 // AuthorizePaymentReply is returned after the controller does accounting and metering.

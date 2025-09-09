@@ -89,12 +89,8 @@ func NewControllerClient(
 func (c *ControllerClient) AuthorizePayment(
 	ctx context.Context,
 	blobHeader *pbcommon.BlobHeader,
-	clientSignature []byte,
 ) error {
-	authorizePaymentRequest := &controller.AuthorizePaymentRequest{
-		BlobHeader:      blobHeader,
-		ClientSignature: clientSignature,
-	}
+	authorizePaymentRequest := &controller.AuthorizePaymentRequest{BlobHeader: blobHeader}
 
 	hash, err := hashing.HashAuthorizePaymentRequest(authorizePaymentRequest)
 	if err != nil {

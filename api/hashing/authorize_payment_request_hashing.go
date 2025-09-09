@@ -21,11 +21,6 @@ func HashAuthorizePaymentRequest(request *controller.AuthorizePaymentRequest) ([
 		return nil, fmt.Errorf("hash blob header: %w", err)
 	}
 
-	err = hashByteArray(hasher, request.GetClientSignature())
-	if err != nil {
-		return nil, fmt.Errorf("hash client signature: %w", err)
-	}
-
 	// We intentionally do not hash the disperser_signature field as it's what we're signing
 
 	return hasher.Sum(nil), nil
