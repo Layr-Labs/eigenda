@@ -18,9 +18,9 @@ GLOBAL OPTIONS:
 
    Arbitrum Custom DA JSON RPC Server
 
-   --arbitrum-da.addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ARB_CUSTOM_DA_ADDR]
-   --arbitrum-da.enabled     Whether or not to enable Arbitrum Custom DA JSON RPC API (default: false) [$EIGENDA_PROXY_ARB_CUSTOM_DA_ENABLED]
-   --arbitrum-da.port value  Server listening port (default: 3100) [$EIGENDA_PROXY_ARB_CUSTOM_DA_PORT]
+   --arbitrum-da.addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ARB_DA_ADDR]
+   --arbitrum-da.enabled     Whether or not to enable Arbitrum Custom DA JSON RPC API (default: false) [$EIGENDA_PROXY_ARB_DA_ENABLED]
+   --arbitrum-da.port value  Server listening port (default: 3101) [$EIGENDA_PROXY_ARB_DA_PORT]
 
    Cert Verifier (V1 only)
 

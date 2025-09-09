@@ -11,7 +11,7 @@ const (
 )
 
 func withEnvPrefix(prefix, s string) []string {
-	return []string{prefix + "_ARB_CUSTOM_DA_" + s}
+	return []string{prefix + "_ARB_DA_" + s}
 }
 
 func CLIFlags(envPrefix string, category string) []cli.Flag {
