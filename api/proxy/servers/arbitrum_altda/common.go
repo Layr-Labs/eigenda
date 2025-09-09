@@ -26,7 +26,7 @@ const (
 //
 // only the CustomDAPreimageType is used for EigenDAV2 batches
 //
-// TODO: Figure out what's getting passed over that wire. We're
+// TODO: Figure out what's getting passed over the wire. We're
 // being passed a mapping and populating it with EigenDAV2 Arbitrum batch
 // context. It'd be good to know when an EigenDA batch is populated
 // during the preimage mapping population given we use 16mib-buffer_to_ensure_padding batch
