@@ -9,6 +9,8 @@ import (
 type ReservationLedgerConfig struct {
 	// Contains the parameters of the reservation that the [ReservationLedger] is responsible for
 	reservation Reservation
+	// Minimum number of symbols to bill for any dispersal
+	minNumSymbols uint32
 	// Whether the underlying reservation [LeakyBucket] should start full or empty.
 	// This asymmetric approach is necessary to handle restart scenarios correctly for different entities.
 	//
@@ -47,6 +49,7 @@ type ReservationLedgerConfig struct {
 
 func NewReservationLedgerConfig(
 	reservation Reservation,
+	minNumSymbols uint32,
 	startFull bool,
 	overfillBehavior OverfillBehavior,
 	bucketCapacityDuration time.Duration,
@@ -57,6 +60,7 @@ func NewReservationLedgerConfig(
 
 	return &ReservationLedgerConfig{
 		reservation:            reservation,
+		minNumSymbols:          minNumSymbols,
 		startFull:              startFull,
 		overfillBehavior:       overfillBehavior,
 		bucketCapacityDuration: bucketCapacityDuration,
