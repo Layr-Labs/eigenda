@@ -16,7 +16,7 @@ const EigenDAV2MessageHeaderByte byte = 0x42
 
 type PreimageType uint8
 
-// The ALT DA server only cares about type 3 or Custom DA preimage types
+// The ALT DA server only cares about type 3 Custom DA preimage types
 const (
 	CustomDAPreimageType PreimageType = 3
 )
