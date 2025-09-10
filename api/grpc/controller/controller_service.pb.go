@@ -32,7 +32,6 @@ type AuthorizePaymentRequest struct {
 	// 2. Contains the quorums being dispersed to
 	BlobHeader *v2.BlobHeader `protobuf:"bytes,1,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 	// Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
-	// Proves that the request was created by the holder of the KMS key.
 	DisperserSignature []byte `protobuf:"bytes,2,opt,name=disperser_signature,json=disperserSignature,proto3" json:"disperser_signature,omitempty"`
 }
 
