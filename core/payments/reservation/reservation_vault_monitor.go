@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"golang.org/x/sync/errgroup"
 )
 
 // Checks for updates to the PaymentVault contract, and updates ledgers with the new state
@@ -67,13 +69,12 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, vm.updateInterval)
 	defer cancel()
 
-	newReservations, err := vm.fetchReservations(ctxWithTimeout, accountIDs)
+	reservationsMap, err := vm.fetchReservations(ctxWithTimeout, accountIDs)
 	if err != nil {
 		return fmt.Errorf("fetch reservations: %w", err)
 	}
 
-	for i, newReservationData := range newReservations {
-		accountID := accountIDs[i]
+	for accountID, newReservationData := range reservationsMap {
 		if newReservationData == nil {
 			err := vm.updateReservation(accountID, nil)
 			if err != nil {
@@ -98,12 +99,12 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 }
 
 // Fetches reservations from the PaymentVault. If number of accountIDs exceeds configured rpcBatchSize, multiple RPC
-// calls will be made in series to fetch all reservation data. If rpcBatchSize is configured to be 0, all data
+// calls will be made in parallel to fetch all reservation data. If rpcBatchSize is configured to be 0, all data
 // will be fetched in a single call, no matter how many accounts are passed in.
 func (vm *ReservationVaultMonitor) fetchReservations(
 	ctx context.Context,
 	accountIDs []gethcommon.Address,
-) ([]*bindings.IPaymentVaultReservation, error) {
+) (map[gethcommon.Address]*bindings.IPaymentVaultReservation, error) {
 	// Split accounts into accountBatches to avoid RPC size limits
 	var accountBatches [][]gethcommon.Address
 
@@ -113,32 +114,50 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 	} else {
 		// Create batches of the specified size
 		for i := 0; i < len(accountIDs); i += int(vm.rpcBatchSize) {
-			end := i + int(vm.rpcBatchSize)
-			if end > len(accountIDs) {
-				end = len(accountIDs)
-			}
+			end := min(i+int(vm.rpcBatchSize), len(accountIDs))
 			accountBatches = append(accountBatches, accountIDs[i:end])
 		}
 	}
 
-	allReservations := make([]*bindings.IPaymentVaultReservation, 0, len(accountIDs))
-	for batchIndex, batch := range accountBatches {
-		newReservations, err := vm.paymentVault.GetReservations(ctx, batch)
-		if err != nil {
-			return nil, fmt.Errorf("get reservations for batch %d: %w", batchIndex, err)
-		}
+	results := make(map[gethcommon.Address]*bindings.IPaymentVaultReservation, len(accountIDs))
+	var resultsMutex sync.Mutex
 
-		if len(newReservations) != len(batch) {
-			// this shouldn't be possible
-			return nil, fmt.Errorf(
-				"reservation count mismatch in batch %d: got %d reservations for %d accounts",
-				batchIndex, len(newReservations), len(batch))
-		}
+	errorGroup, groupCtx := errgroup.WithContext(ctx)
 
-		allReservations = append(allReservations, newReservations...)
+	for index, batch := range accountBatches {
+		// Capture loop variables for goroutine
+		batchIndex := index
+		batchAccounts := batch
+
+		errorGroup.Go(func() error {
+			newReservations, err := vm.paymentVault.GetReservations(groupCtx, batchAccounts)
+			if err != nil {
+				return fmt.Errorf("get reservations for batch %d: %w", batchIndex, err)
+			}
+
+			if len(newReservations) != len(batchAccounts) {
+				// this shouldn't be possible
+				return fmt.Errorf(
+					"reservation count mismatch in batch %d: got %d reservations for %d accounts",
+					batchIndex, len(newReservations), len(batchAccounts))
+			}
+
+			resultsMutex.Lock()
+			defer resultsMutex.Unlock()
+			// Store results in the map
+			for i, accountID := range batchAccounts {
+				results[accountID] = newReservations[i]
+			}
+
+			return nil
+		})
 	}
 
-	return allReservations, nil
+	if err := errorGroup.Wait(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // Runs the background update loop to periodically consume updates made to the PaymentVault
