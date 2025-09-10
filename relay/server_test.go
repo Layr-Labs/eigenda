@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"context"
 	"encoding/binary"
 	"testing"
 	"time"
@@ -69,6 +68,9 @@ func defaultConfig() *Config {
 }
 
 func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
+	t.Helper()
+	ctx := t.Context()
+
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -80,7 +82,7 @@ func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error)
 	}()
 
 	client := pb.NewRelayClient(conn)
-	response, err := client.GetBlob(context.Background(), request)
+	response, err := client.GetBlob(ctx, request)
 	return response, err
 }
 
@@ -89,6 +91,8 @@ func getChunks(
 	random *random.TestRandom,
 	operatorKeys map[uint32]*core.KeyPair,
 	request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	t.Helper()
+	ctx := t.Context()
 
 	// Choose a random operator to send this request as. Operator IDs are expected to be sequential starting at 0.
 	operatorID := random.Uint32() % uint32(len(operatorKeys))
@@ -110,23 +114,24 @@ func getChunks(
 	}()
 
 	client := pb.NewRelayClient(conn)
-	response, err := client.GetChunks(context.Background(), request)
+	response, err := client.GetChunks(ctx, request)
 	return response, err
 }
 
 func TestReadWriteBlobs(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 
 	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
@@ -137,7 +142,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -149,7 +154,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -168,14 +173,14 @@ func TestReadWriteBlobs(t *testing.T) {
 		expectedData[blobKey] = data
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 			},
 			&encoding.FragmentInfo{})
 		require.NoError(t, err)
 
-		err = blobStore.StoreBlob(context.Background(), blobKey, data)
+		err = blobStore.StoreBlob(ctx, blobKey, data)
 		require.NoError(t, err)
 	}
 
@@ -205,13 +210,11 @@ func TestReadWriteBlobs(t *testing.T) {
 }
 
 func TestReadNonExistentBlob(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -225,9 +228,9 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -239,7 +242,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -259,13 +262,14 @@ func TestReadNonExistentBlob(t *testing.T) {
 }
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -290,9 +294,9 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayKeys = shardList
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -304,7 +308,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -330,7 +334,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		shardMap[blobKey] = shards
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 				RelayKeys:  shards,
@@ -338,7 +342,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 			&encoding.FragmentInfo{})
 		require.NoError(t, err)
 
-		err = blobStore.StoreBlob(context.Background(), blobKey, data)
+		err = blobStore.StoreBlob(ctx, blobKey, data)
 		require.NoError(t, err)
 	}
 
@@ -396,13 +400,10 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 }
 
 func TestReadWriteChunks(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -435,9 +436,9 @@ func TestReadWriteChunks(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -449,7 +450,7 @@ func TestReadWriteChunks(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -468,15 +469,15 @@ func TestReadWriteChunks(t *testing.T) {
 		require.NoError(t, err)
 		expectedData[blobKey] = chunks
 
-		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
+		coeffs, chunkProofs := disassembleFrames(t, chunks)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 			},
@@ -627,13 +628,10 @@ func TestReadWriteChunks(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunks(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -662,9 +660,9 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -677,7 +675,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -696,15 +694,15 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		require.NoError(t, err)
 		expectedData[blobKey] = chunks
 
-		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
+		coeffs, chunkProofs := disassembleFrames(t, chunks)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 			},
@@ -766,13 +764,14 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 }
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -817,9 +816,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -831,7 +830,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -856,15 +855,15 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		shards := []v2.RelayKey{shard1, shard2}
 		shardMap[blobKey] = shards
 
-		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
+		coeffs, chunkProofs := disassembleFrames(t, chunks)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 				RelayKeys:  shards,
@@ -1072,13 +1071,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
@@ -1123,9 +1120,9 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
-	chainReader := newMockChainReader()
+	chainReader := newMockChainReader(t)
 	server, err := NewServer(
-		context.Background(),
+		ctx,
 		prometheus.NewRegistry(),
 		logger,
 		config,
@@ -1138,7 +1135,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
 	go func() {
-		err = server.Start(context.Background())
+		err = server.Start(ctx)
 		require.NoError(t, err)
 	}()
 	defer func() {
@@ -1157,10 +1154,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		require.NoError(t, err)
 		expectedData[blobKey] = chunks
 
-		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
+		coeffs, chunkProofs := disassembleFrames(t, chunks)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -1171,7 +1168,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		shardMap[blobKey] = shards
 
 		err = metadataStore.PutBlobCertificate(
-			context.Background(),
+			ctx,
 			&v2.BlobCertificate{
 				BlobHeader: header,
 				RelayKeys:  shards,

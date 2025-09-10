@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments"
 )
 
 // Keeps track of the cumulative payment state for on-demand dispersals for a single account.
@@ -263,11 +264,7 @@ func (odl *OnDemandLedger) UpdateTotalDeposits(newTotalDeposits *big.Int) error 
 
 // Computes the on demand cost of a number of symbols
 func (odl *OnDemandLedger) computeCost(symbolCount uint32) *big.Int {
-	billableSymbols := symbolCount
-	if billableSymbols < odl.minNumSymbols {
-		billableSymbols = odl.minNumSymbols
-	}
-
+	billableSymbols := payments.CalculateBillableSymbols(symbolCount, odl.minNumSymbols)
 	billableSymbolsBig := new(big.Int).SetUint64(uint64(billableSymbols))
 	return billableSymbolsBig.Mul(billableSymbolsBig, odl.pricePerSymbol)
 }

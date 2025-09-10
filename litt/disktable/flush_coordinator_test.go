@@ -16,7 +16,7 @@ import (
 
 // Flush 1000 times in a second, but limit actual flush rate to 10 times a second.
 func TestRapidFlushes(t *testing.T) {
-	// Intentionally do not run in parallel with other tests, since it is timing-sensitive.
+	// This test is inherently timing sensitive, don't parallelize it.
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -75,6 +75,8 @@ func TestRapidFlushes(t *testing.T) {
 
 // If we flush slower than the maximum rate, then we should never wait that long for a flush.
 func TestInfrequentFlushes(t *testing.T) {
+	// This test is inherently timing sensitive, don't parallelize it.
+
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 

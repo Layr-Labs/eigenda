@@ -181,7 +181,7 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 //
 //	 blobInfo, err := client.PutBlob(ctx, blobData)
 //	 if err != nil {
-//	   if errors.Is(err, api.ErrorFailover) {
+//	   if errors.Is(err, &api.ErrorFailover{}) {
 //	     // failover to ethda
 //		  }
 //	   st, isGRPCError := status.FromError(err)

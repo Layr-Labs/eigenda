@@ -192,6 +192,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }
 
+    /// @notice Returns the next blob version
+    function nextBlobVersion() external view returns (uint16) {
+        return eigenDAThresholdRegistry.nextBlobVersion();
+    }
+
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
