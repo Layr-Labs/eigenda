@@ -50,7 +50,7 @@ pub enum EigenDaServiceError {
     #[error("Error received from the EigenDA proxy: {0}")]
     ProxyError(#[from] ProxyError),
 
-    #[error("Error received from the Ethereum node: {0}")]
+    #[error(transparent)]
     EthereumRpcError(#[from] RpcError<TransportErrorKind>),
 }
 
@@ -88,7 +88,7 @@ impl EigenDaService {
             ));
         }
 
-        // Setup ethereum client
+        // Setup Ethereum client
         let sequencer_signer = LocalSigner::from_str(&config.sequencer_signer)
             .map_err(|err| EigenDaServiceError::Configuration(err.to_string()))?;
         let ethereum = init_ethereum_provider(&config, sequencer_signer.clone()).await?;
@@ -96,13 +96,14 @@ impl EigenDaService {
         // Setup proxy client
         let proxy = ProxyClient::new(&config)?;
 
-        // Set contracts
+        // Set contracts used
         let contracts = match config.network {
-            Network::Mainnet => EigenDaContracts::mainnet(),
-            Network::Holesky => EigenDaContracts::holesky(),
-        };
+            Network::Mainnet => EigenDaContracts::mainnet(&ethereum).await,
+            Network::Holesky => EigenDaContracts::holesky(&ethereum).await,
+        }?;
 
         info!(?config, ?params, "EigenDa service initialized");
+
         Ok(Self {
             proxy,
             ethereum,

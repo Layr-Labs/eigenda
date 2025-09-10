@@ -1,8 +1,13 @@
-use core::fmt::{Debug, Formatter, Result};
+use core::fmt::{Debug, Formatter};
 
 use alloy_primitives::{Address, address};
+use alloy_provider::{DynProvider, Provider};
+use alloy_rpc_types_eth::TransactionRequest;
+use alloy_sol_types::{SolCall, sol};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::service::{EigenDaServiceError, config::IEigenDADirectory::getAddressCall};
 
 /// Configuration for the [`crate::service::EigenDaService`].
 #[derive(Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
@@ -38,8 +43,14 @@ pub struct EigenDaConfig {
     pub sequencer_signer: String,
 }
 
+sol! {
+    interface IEigenDADirectory {
+        function getAddress(string memory name) external view returns (address);
+    }
+}
+
 impl Debug for EigenDaConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("EigenDaConfig")
             .field("network", &self.network)
             .field("ethereum_rpc_url", &self.ethereum_rpc_url)
@@ -157,44 +168,73 @@ pub struct EigenDaContracts {
 impl EigenDaContracts {
     /// Initialize contracts used by the Mainnet.
     ///
-    /// Instructions on how they were retrieved:
-    /// * <https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses>
+    /// The EigenDA Directory contract address on mainnet is
+    /// `0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4`. This address serves as the
+    /// central registry for all EigenDA contract addresses. The method
+    /// dynamically queries the EigenDADirectory contract to retrieve [`EigenDaContracts`].
     ///
-    /// Except for `delegation_manager` taken from:
-    /// * <https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/mainnet.json>
-    pub fn mainnet() -> Self {
-        Self {
-            threshold_registry: address!("0xdb4c89956eEa6F606135E7d366322F2bDE609F15"),
-            registry_coordinator: address!("0x0BAAc79acD45A023E19345c352d8a7a83C4e5656"),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            service_manager: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
-            bls_apk_registry: address!("0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505"),
-            stake_registry: address!("0x006124Ae7976137266feeBFb3F4D2BE4C073139D"),
-            cert_verifier: address!("0x61692e93b6B045c444e942A91EcD1527F23A3FB7"),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            delegation_manager: address!("0x870679E138bCdf293b7Ff14dD44b70FC97e12fc0"),
-        }
+    /// <https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses>
+    pub async fn mainnet(provider: &DynProvider) -> Result<Self, EigenDaServiceError> {
+        let directory_address = address!("0x64AB2e9A86FA2E183CB6f01B2D4050c1c2dFAad4");
+        let eigen_da_contracts = Self::from_directory(provider, directory_address).await?;
+        Ok(eigen_da_contracts)
     }
 
     /// Initialize contracts used by the Holesky.
     ///
-    /// Instructions on how they were retrieved:
-    /// * <https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses>
+    /// The EigenDA Directory contract address on Holesky is
+    /// `0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE`. This address serves as the
+    /// central registry for all EigenDA contract addresses. The method
+    /// dynamically queries the EigenDADirectory contract to retrieve [`EigenDaContracts`].
     ///
-    /// Except for `delegation_manager` taken from:
-    /// * <https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/holesky.json>
-    pub fn holesky() -> Self {
-        Self {
-            threshold_registry: address!("0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1"),
-            registry_coordinator: address!("0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            service_manager: address!("0xD4A7E1Bd8015057293f0D0A557088c286942e84b"),
-            bls_apk_registry: address!("0x066cF95c1bf0927124DFB8B02B401bc23A79730D"),
-            stake_registry: address!("0xBDACD5998989Eec814ac7A0f0f6596088AA2a270"),
-            // CERT_VERIFIER (also available: CERT_VERIFIER_V1, CERT_VERIFIER_V2)
-            cert_verifier: address!("0x036bB27A1F03350bDcccF344b497Ef22604006a3"),
-            #[cfg(feature = "stale-stakes-forbidden")]
-            delegation_manager: address!("0xA44151489861Fe9e3055d95adC98FbD462B948e7"),
-        }
+    /// <https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses>
+    pub async fn holesky(provider: &DynProvider) -> Result<Self, EigenDaServiceError> {
+        let directory_address = address!("0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE");
+        let eigen_da_contracts = Self::from_directory(provider, directory_address).await?;
+        Ok(eigen_da_contracts)
     }
+
+    /// Query the EigenDADirectory contract to fetch all required contract addresses
+    async fn from_directory(
+        provider: &DynProvider,
+        directory_address: Address,
+    ) -> Result<Self, EigenDaServiceError> {
+        let eigen_da_contracts = Self {
+            threshold_registry: get_address("THRESHOLD_REGISTRY", provider, directory_address)
+                .await?,
+            registry_coordinator: get_address("REGISTRY_COORDINATOR", provider, directory_address)
+                .await?,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            service_manager: get_address("SERVICE_MANAGER", provider, directory_address).await?,
+            bls_apk_registry: get_address("BLS_APK_REGISTRY", provider, directory_address).await?,
+            stake_registry: get_address("STAKE_REGISTRY", provider, directory_address).await?,
+            cert_verifier: get_address("CERT_VERIFIER", provider, directory_address).await?,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            delegation_manager: get_address("DELEGATION_MANAGER", provider, directory_address)
+                .await?,
+        };
+
+        Ok(eigen_da_contracts)
+    }
+}
+
+/// The function performs a contract call to the EigenDA contract directory
+/// to look up an address associated with a given contract name. It uses the
+/// `getAddress` function from the directory contract.
+async fn get_address(
+    name: &'static str,
+    provider: &DynProvider,
+    directory_address: Address,
+) -> Result<Address, EigenDaServiceError> {
+    let input = getAddressCall {
+        name: name.to_string(),
+    };
+
+    let tx = TransactionRequest::default()
+        .to(directory_address)
+        .input(input.abi_encode().into());
+
+    let src = provider.call(tx).await?;
+
+    Ok(Address::from_slice(&src[12..32]))
 }
