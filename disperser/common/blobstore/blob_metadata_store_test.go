@@ -1,7 +1,6 @@
 package blobstore_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -15,7 +14,8 @@ import (
 )
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+
 	blobKey1 := disperser.BlobKey{
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
@@ -117,7 +117,8 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 }
 
 func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+
 	blobKey1 := disperser.BlobKey{
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
@@ -194,7 +195,8 @@ func TestBlobMetadataStoreOperationsWithPagination(t *testing.T) {
 }
 
 func TestGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+
 	blobKey1 := disperser.BlobKey{
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
@@ -291,7 +293,8 @@ func TestGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
 }
 
 func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+
 	// Query BlobMetadataStore for a blob that does not exist
 	// This should return nil for both the blob and lastEvaluatedKey
 	processing, lastEvaluatedKey, err := blobMetadataStore.GetBlobMetadataByStatusWithPagination(ctx, disperser.Processing, 1, nil)
@@ -301,7 +304,7 @@ func TestBlobMetadataStoreOperationsWithPaginationNoStoredBlob(t *testing.T) {
 }
 
 func TestFilterOutExpiredBlobMetadata(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	blobKey := disperser.BlobKey{
 		BlobHash:     "blob1",
@@ -346,11 +349,15 @@ func TestFilterOutExpiredBlobMetadata(t *testing.T) {
 }
 
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
-	_, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
+	t.Helper()
+	ctx := t.Context()
+	_, err := dynamoClient.DeleteItems(ctx, metadataTableName, keys)
 	assert.NoError(t, err)
 }
 
 func getConfirmedMetadata(t *testing.T, metadata *disperser.BlobMetadata, blobIndex uint32) *disperser.BlobMetadata {
+	t.Helper()
+
 	batchHeaderHash := [32]byte{1, 2, 3}
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")

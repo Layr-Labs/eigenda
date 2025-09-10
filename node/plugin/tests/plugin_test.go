@@ -3,20 +3,22 @@ package test
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -25,84 +27,111 @@ func init() {
 }
 
 var (
-	testConfig   *deploy.Config
 	templateName string
 	testName     string
+
+	logger = testutils.GetLogger()
+
+	// Shared test resources
+	anvilContainer *testbed.AnvilContainer
+	testConfig     *deploy.Config
 )
 
+// TestMain sets up the test environment once for all tests
 func TestMain(m *testing.M) {
 	flag.Parse()
-	setup(m)
-	code := m.Run()
-	teardown()
-	os.Exit(code)
+
+	if testing.Short() {
+		logger.Info("Skipping plugin integration tests in short mode")
+		os.Exit(0)
+	}
+
+	setupAndRun(m)
 }
 
-func setup(m *testing.M) {
+func setupAndRun(m *testing.M) {
+	ctx := context.Background()
 	rootPath := "../../../"
 
 	if testName == "" {
 		var err error
 		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
-			panic(err)
+			logger.Fatal("Failed to create test directory:", err)
 		}
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
-	if testing.Short() {
-		fmt.Println("Skipping plugin integration test in short mode")
-		os.Exit(0)
-		return
+	logger.Info("Starting anvil")
+	var err error
+	anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
+		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		Logger:         logger,
+	})
+	if err != nil {
+		logger.Fatal("Failed to start anvil container:", err)
 	}
 
-	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
+	logger.Info("Deploying experiment")
+	if err := testConfig.DeployExperiment(); err != nil {
+		logger.Fatal("Failed to deploy experiment:", err)
+	}
 
-	fmt.Println("Deploying experiment")
-	testConfig.DeployExperiment()
+	// Run tests
+	code := m.Run()
+
+	// Cleanup
+	cleanup()
+
+	os.Exit(code)
 }
 
-func teardown() {
-	if testConfig != nil {
-		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
+func cleanup() {
+	if anvilContainer != nil {
+		logger.Info("Stopping anvil")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = anvilContainer.Terminate(ctx)
 	}
 }
 
 func TestPluginOptIn(t *testing.T) {
+	ctx := t.Context()
+
 	operator := testConfig.Operators[0]
-	assert.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
+	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
 
-	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(registeredQuorumIds))
+	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(registeredQuorumIds))
 
-	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
+	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), ids)
 
 	testConfig.RunNodePluginBinary("opt-in", operator)
 
-	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(registeredQuorumIds))
+	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(registeredQuorumIds))
 
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), ids)
+	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), ids)
 }
 
 func TestPluginOptInAndOptOut(t *testing.T) {
+	ctx := t.Context()
+
 	operator := testConfig.Operators[0]
-	assert.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
+	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
@@ -110,28 +139,29 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 	operatorID := getOperatorId(t, operator)
 
 	testConfig.RunNodePluginBinary("opt-in", operator)
-	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(registeredQuorumIds))
-
-	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), ids)
+	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(registeredQuorumIds))
+	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), ids)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
-	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(registeredQuorumIds))
+	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(registeredQuorumIds))
 
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
+	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), ids)
 }
 
 func TestPluginOptInAndQuorumUpdate(t *testing.T) {
+	ctx := t.Context()
+
 	operator := testConfig.Operators[0]
-	assert.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
+	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
@@ -140,51 +170,55 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 
 	testConfig.RunNodePluginBinary("opt-in", operator)
 
-	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(registeredQuorumIds))
-	assert.Equal(t, uint8(0), registeredQuorumIds[0])
+	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(registeredQuorumIds))
+	require.Equal(t, uint8(0), registeredQuorumIds[0])
 
-	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), ids)
+	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), ids)
 }
 
 func TestPluginInvalidOperation(t *testing.T) {
+	ctx := t.Context()
+
 	operator := testConfig.Operators[0]
-	assert.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
+	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
 	testConfig.RunNodePluginBinary("opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
 
-	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(registeredQuorumIds))
+	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(registeredQuorumIds))
 
-	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
+	ids, err := tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), ids)
 
 	testConfig.RunNodePluginBinary("invalid", operator)
 
-	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(context.Background(), operatorID)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, len(registeredQuorumIds))
+	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(registeredQuorumIds))
 
-	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(context.Background(), core.QuorumID(0))
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(0), ids)
+	ids, err = tx.GetNumberOfRegisteredOperatorForQuorum(ctx, core.QuorumID(0))
+	require.NoError(t, err)
+	require.Equal(t, uint32(0), ids)
 }
 
 func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
+	t.Helper()
+
 	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
-	assert.NoError(t, err)
-	assert.NotNil(t, privateKey)
+	require.NoError(t, err)
+	require.NotNil(t, privateKey)
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
@@ -192,18 +226,17 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	}
 
 	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
+	require.NoError(t, err)
+	require.NotNil(t, client)
 
 	transactor, err := eth.NewWriter(
 		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
-	assert.NoError(t, err)
-	assert.NotNil(t, transactor)
+	require.NoError(t, err)
+	require.NotNil(t, transactor)
 
 	kp, err := bls.ReadPrivateKeyFromFile(operator.NODE_BLS_KEY_FILE, operator.NODE_BLS_KEY_PASSWORD)
-	assert.NoError(t, err)
-	assert.NotNil(t, kp)
-
+	require.NoError(t, err)
+	require.NotNil(t, kp)
 	g1point := &core.G1Point{
 		G1Affine: kp.PubKey.G1Affine,
 	}
@@ -216,10 +249,12 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 }
 
 func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
+	t.Helper()
+
 	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
 		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
@@ -228,13 +263,13 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	}
 
 	client, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
+	require.NoError(t, err)
+	require.NotNil(t, client)
 
 	transactor, err := eth.NewWriter(
 		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
-	assert.NoError(t, err)
-	assert.NotNil(t, transactor)
+	require.NoError(t, err)
+	require.NotNil(t, transactor)
 
 	return transactor
 }
