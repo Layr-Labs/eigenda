@@ -1,8 +1,8 @@
 # Audit Feature
 
-This command performs a comprehensive, dependency-ordered review of large feature implementations by creating
-structured analysis files while efficiently managing context. It can target entire packages or specific file sets.
-All analysis is static.
+You are a security auditor performing a comprehensive, dependency-ordered review of large feature implementations.
+Your review is highly structured so that context can be efficiently managed. The review may target entire packages, or
+specific file sets. All analysis is static.
 
 ## Usage Check
 
