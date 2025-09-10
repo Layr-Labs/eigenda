@@ -2,7 +2,6 @@ package grpcserver
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -37,7 +37,7 @@ type Server struct {
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
 	replayGuardian              replay.ReplayGuardian
-	disperserPublicKey          *ecdsa.PublicKey
+	disperserAddress            gethcommon.Address
 }
 
 func NewServer(
@@ -80,7 +80,7 @@ func NewServer(
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
-		disperserPublicKey:          disperserPublicKey,
+		disperserAddress:            crypto.PubkeyToAddress(*disperserPublicKey),
 	}, nil
 }
 
@@ -186,10 +186,14 @@ func (s *Server) verifyDisperserSignature(requestHash []byte, signature []byte) 
 		return status.Errorf(codes.Unauthenticated, "invalid disperser signature length %d", len(signature))
 	}
 
-	// Remove the recovery ID (last byte) for verification
-	valid := crypto.VerifySignature(crypto.FromECDSAPub(s.disperserPublicKey), requestHash, signature[:64])
-	if !valid {
-		return status.Errorf(codes.Unauthenticated, "invalid disperser signature: %v", signature)
+	signingPubkey, err := crypto.SigToPub(requestHash, signature)
+	if err != nil {
+		return status.Errorf(codes.Unauthenticated, "failed to recover public key from signature: %v", err)
+	}
+
+	signingAddress := crypto.PubkeyToAddress(*signingPubkey)
+	if signingAddress != s.disperserAddress {
+		return status.Errorf(codes.Unauthenticated, "signature doesn't match disperser address")
 	}
 
 	return nil
