@@ -1,6 +1,7 @@
 package signingrate
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -58,10 +59,13 @@ func validateTrackerDump(
 
 		require.Equal(t, int(uint64(expectedBucket.startTimestamp.Unix())), int(dumpedBucket.GetStartTimestamp()))
 		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), dumpedBucket.GetEndTimestamp())
-		for _, signingRate := range dumpedBucket.GetValidatorSigningRates() {
-			validatorID := core.OperatorID(signingRate.GetId())
-			expectedSigningRate := expectedBucket.signingRateInfo[validatorID]
-			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
+		for _, quorumInfo := range dumpedBucket.GetQuorumSigningRates() {
+			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
+			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
+				validatorID := core.OperatorID(signingRate.GetId())
+				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
+				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
+			}
 		}
 	}
 }
@@ -120,14 +124,14 @@ func validateTracker(
 			// This bucket is entirely after the requested time range.
 			break
 		}
-		expectedSigningRate.SignedBatches += bucket.signingRateInfo[validatorID].GetSignedBatches()
-		expectedSigningRate.SignedBytes += bucket.signingRateInfo[validatorID].GetSignedBytes()
-		expectedSigningRate.UnsignedBatches += bucket.signingRateInfo[validatorID].GetUnsignedBatches()
-		expectedSigningRate.UnsignedBytes += bucket.signingRateInfo[validatorID].GetUnsignedBytes()
-		expectedSigningRate.SigningLatency += bucket.signingRateInfo[validatorID].GetSigningLatency()
+		expectedSigningRate.SignedBatches += bucket.signingRateInfo[0][validatorID].GetSignedBatches()
+		expectedSigningRate.SignedBytes += bucket.signingRateInfo[0][validatorID].GetSignedBytes()
+		expectedSigningRate.UnsignedBatches += bucket.signingRateInfo[0][validatorID].GetUnsignedBatches()
+		expectedSigningRate.UnsignedBytes += bucket.signingRateInfo[0][validatorID].GetUnsignedBytes()
+		expectedSigningRate.SigningLatency += bucket.signingRateInfo[0][validatorID].GetSigningLatency()
 	}
 
-	reportedSigningRate, err := tracker.GetValidatorSigningRate(validatorID[:], startTime, endTime)
+	reportedSigningRate, err := tracker.GetValidatorSigningRate(0, validatorID, startTime, endTime)
 	require.NoError(t, err)
 
 	require.True(t, areSigningRatesEqual(expectedSigningRate, reportedSigningRate))
@@ -178,6 +182,7 @@ func randomOperationsTest(
 	trackerClone SigningRateTracker,
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
+	timePointer *atomic.Pointer[time.Time],
 ) {
 	rand := random.NewTestRandom()
 
@@ -217,13 +222,15 @@ func randomOperationsTest(
 			expectedBuckets = append(expectedBuckets, expectedBucket)
 		}
 
+		// TODO use more than just quorum 0
+
 		if rand.Bool() {
 			latency := rand.DurationRange(time.Second, time.Hour)
-			tracker.ReportSuccess(currentTime, validatorID, batchSize, latency)
-			expectedBucket.ReportSuccess(validatorID, batchSize, latency)
+			tracker.ReportSuccess(0, validatorID, batchSize, latency)
+			expectedBucket.ReportSuccess(0, validatorID, batchSize, latency)
 		} else {
-			tracker.ReportFailure(currentTime, validatorID, batchSize, rand.Bool() /* just used for metrics */)
-			expectedBucket.ReportFailure(validatorID, batchSize)
+			tracker.ReportFailure(0, validatorID, batchSize)
+			expectedBucket.ReportFailure(0, validatorID, batchSize)
 		}
 
 		// On average, validate once per bucket.
@@ -251,6 +258,7 @@ func randomOperationsTest(
 		require.Equal(t, 0, len(buckets))
 
 		currentTime = nextTime
+		timePointer.Store(&currentTime)
 	}
 }
 
@@ -268,21 +276,26 @@ func TestRandomOperations(t *testing.T) {
 	t.Run("signingRateTracker", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		currentTime := &atomic.Pointer[time.Time]{}
+		timeSource := func() time.Time {
+			return *currentTime.Load()
+		}
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		defer tracker.Close()
 
-		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		defer trackerClone.Close()
 
-		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
+		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
 
 	t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		tracker = NewThreadsafeSigningRateTracker(tracker)
 
