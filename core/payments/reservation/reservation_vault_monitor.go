@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -18,6 +19,8 @@ type ReservationVaultMonitor struct {
 	paymentVault payments.PaymentVault
 	// how frequently to fetch state from the PaymentVault to check for updates
 	updateInterval time.Duration
+	// maximum number of accounts to fetch in a single RPC call (0 = no batching)
+	rpcBatchSize uint32
 	// function to get accounts that need to be updated
 	getAccountsToUpdate func() []gethcommon.Address
 	// function to update the reservation for an account
@@ -30,6 +33,7 @@ func NewReservationVaultMonitor(
 	logger logging.Logger,
 	paymentVault payments.PaymentVault,
 	updateInterval time.Duration,
+	rpcBatchSize uint32,
 	getAccountsToUpdate func() []gethcommon.Address,
 	updateReservation func(accountID gethcommon.Address, newReservation *Reservation) error,
 ) (*ReservationVaultMonitor, error) {
@@ -41,6 +45,7 @@ func NewReservationVaultMonitor(
 		logger:              logger,
 		paymentVault:        paymentVault,
 		updateInterval:      updateInterval,
+		rpcBatchSize:        rpcBatchSize,
 		getAccountsToUpdate: getAccountsToUpdate,
 		updateReservation:   updateReservation,
 	}
@@ -49,10 +54,7 @@ func NewReservationVaultMonitor(
 	return monitor, nil
 }
 
-// Fetches the latest state from the PaymentVault, and updates the ledgers with it
-//
-// TODO(litt3): If the number of accounts returned by getAccountsToUpdate ever gets very large, a potential
-// optimization would be to create batches of accounts, and use multiple RPC calls to fetch the reservations.
+// Refreshes reservation ledgers with the latest state from the PaymentVault
 func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) error {
 	accountIDs := vm.getAccountsToUpdate()
 	if len(accountIDs) == 0 {
@@ -65,15 +67,9 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, vm.updateInterval)
 	defer cancel()
 
-	newReservations, err := vm.paymentVault.GetReservations(ctxWithTimeout, accountIDs)
+	newReservations, err := vm.fetchReservations(ctxWithTimeout, accountIDs)
 	if err != nil {
-		return fmt.Errorf("get reservations: %w", err)
-	}
-
-	if len(newReservations) != len(accountIDs) {
-		// this shouldn't be possible
-		return fmt.Errorf(
-			"reservation count mismatch: got %d reservations for %d accounts", len(newReservations), len(accountIDs))
+		return fmt.Errorf("fetch reservations: %w", err)
 	}
 
 	for i, newReservationData := range newReservations {
@@ -99,6 +95,54 @@ func (vm *ReservationVaultMonitor) refreshReservations(ctx context.Context) erro
 	}
 
 	return nil
+}
+
+// Fetches reservations from the PaymentVault. If number of accountIDs exceeds configured rpcBatchSize, multiple RPC
+// calls will be made in series to fetch all reservation data. If rpcBatchSize is configured to be 0, all data
+// will be fetched in a single call, no matter how many accounts are passed in.
+func (vm *ReservationVaultMonitor) fetchReservations(
+	ctx context.Context,
+	accountIDs []gethcommon.Address,
+) ([]*bindings.IPaymentVaultReservation, error) {
+	if len(accountIDs) == 0 {
+		return nil, nil
+	}
+
+	// Split accounts into accountBatches to avoid RPC size limits
+	var accountBatches [][]gethcommon.Address
+
+	// Special case: 0 means no batching
+	if vm.rpcBatchSize == 0 {
+		accountBatches = [][]gethcommon.Address{accountIDs}
+	} else {
+		// Create batches of the specified size
+		for i := 0; i < len(accountIDs); i += int(vm.rpcBatchSize) {
+			end := i + int(vm.rpcBatchSize)
+			if end > len(accountIDs) {
+				end = len(accountIDs)
+			}
+			accountBatches = append(accountBatches, accountIDs[i:end])
+		}
+	}
+
+	allReservations := make([]*bindings.IPaymentVaultReservation, 0, len(accountIDs))
+	for batchIndex, batch := range accountBatches {
+		newReservations, err := vm.paymentVault.GetReservations(ctx, batch)
+		if err != nil {
+			return nil, fmt.Errorf("get reservations for batch %d: %w", batchIndex, err)
+		}
+
+		if len(newReservations) != len(batch) {
+			// this shouldn't be possible
+			return nil, fmt.Errorf(
+				"reservation count mismatch in batch %d: got %d reservations for %d accounts",
+				batchIndex, len(newReservations), len(batch))
+		}
+
+		allReservations = append(allReservations, newReservations...)
+	}
+
+	return allReservations, nil
 }
 
 // Runs the background update loop to periodically consume updates made to the PaymentVault
