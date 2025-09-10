@@ -29,6 +29,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/grpcserver"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -276,8 +277,7 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-	// Start gRPC server if port is configured
-	if config.GrpcPort != "" {
+	if config.ServerConfig.Enable {
 		paymentAuthorizationHandler, err := payments.NewPaymentAuthorizationHandler(
 			context.Background(),
 			config.AwsClientConfig.Region,
@@ -287,14 +287,13 @@ func RunController(ctx *cli.Context) error {
 			return fmt.Errorf("create payment authorization handler: %w", err)
 		}
 
-		grpcServer, err := controller.NewGrpcServer(
-			logger, config.GrpcPort, paymentAuthorizationHandler, metricsRegistry)
+		grpcServer, err := grpcserver.NewServer(config.ServerConfig, metricsRegistry, logger, paymentAuthorizationHandler)
 		if err != nil {
 			return fmt.Errorf("create gRPC server: %w", err)
 		}
 
 		go func() {
-			logger.Info("Starting controller gRPC server", "port", config.GrpcPort)
+			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
 			if err := grpcServer.Start(); err != nil {
 				logger.Error("gRPC server failed", "error", err)
 			}

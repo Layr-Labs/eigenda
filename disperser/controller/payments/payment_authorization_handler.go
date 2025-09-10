@@ -91,7 +91,7 @@ func (h *PaymentAuthorizationHandler) verifyDisperserSignature(request *pb.Autho
 	}
 
 	// Remove the recovery ID (last byte) for verification
-	valid := crypto.VerifySignature(crypto.FromECDSAPub(h.publicKey), requestHash, request.DisperserSignature[:64])
+	valid := crypto.VerifySignature(crypto.FromECDSAPub(h.publicKey), requestHash, request.GetDisperserSignature()[:64])
 	if !valid {
 		return status.Errorf(codes.Unauthenticated, "invalid disperser signature")
 	}

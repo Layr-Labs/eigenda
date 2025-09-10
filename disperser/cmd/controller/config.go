@@ -10,6 +10,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/controller/grpcserver"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -39,7 +40,7 @@ type Config struct {
 	MetricsPort                  int
 	ControllerReadinessProbePath string
 	ControllerHealthProbePath    string
-	GrpcPort                     string
+	ServerConfig                 grpcserver.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -63,6 +64,17 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		}
 		relays[i] = corev2.RelayKey(relay)
 	}
+	
+	serverConfig, err := grpcserver.NewConfig(
+		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
+		ctx.GlobalString(flags.GrpcPortFlag.Name),
+		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
+		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)
+	}
+	
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		EthClientConfig:                     ethClientConfig,
@@ -103,7 +115,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MetricsPort:                     ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
-		GrpcPort:                      ctx.GlobalString(flags.GrpcPortFlag.Name),
+		ServerConfig:                    serverConfig,
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

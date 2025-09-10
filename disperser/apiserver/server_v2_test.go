@@ -582,9 +582,9 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
-		// reserved only mode
-		false,
-		nil, // No controller client in tests
+		false, // enable both reservation and on-demand
+		false, // use old style payments
+		nil,   // No controller client in tests
 	)
 	require.NoError(t, err)
 
