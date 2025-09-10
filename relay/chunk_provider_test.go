@@ -1,18 +1,18 @@
 package relay
 
 import (
-	"context"
-	"github.com/Layr-Labs/eigenda/common"
+	"testing"
+	"time"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func deserializeBinaryFrames(t *testing.T, binaryFrames *core.ChunksData) []*encoding.Frame {
+	t.Helper()
 	bundleBytes, err := binaryFrames.FlattenToBundle()
 	require.NoError(t, err)
 	bundle := core.Bundle{}
@@ -22,13 +22,11 @@ func deserializeBinaryFrames(t *testing.T, binaryFrames *core.ChunksData) []*enc
 }
 
 func TestFetchingIndividualBlobs(t *testing.T) {
+	ctx := t.Context()
 	tu.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
@@ -43,12 +41,12 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
-		rsFrames, proofs := disassembleFrames(frames)
+		rsFrames, proofs := disassembleFrames(t, frames)
 
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, proofs)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, proofs)
 		require.NoError(t, err)
 
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, rsFrames)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, rsFrames)
 		require.NoError(t, err)
 
 		expectedFrames[blobKey] = frames
@@ -56,7 +54,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 	}
 
 	server, err := newChunkProvider(
-		context.Background(),
+		ctx,
 		logger,
 		chunkReader,
 		1024*1024*32,
@@ -76,7 +74,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 		}
 
-		fMap, err := server.GetFrames(context.Background(), mMap)
+		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(fMap))
@@ -91,7 +89,6 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 	// Read it back again to test caching.
 	for key, frames := range expectedFrames {
-
 		mMap := make(metadataMap)
 		fragmentInfo := fragmentInfoMap[key]
 		mMap[key] = &blobMetadata{
@@ -99,7 +96,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 		}
 
-		fMap, err := server.GetFrames(context.Background(), mMap)
+		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(fMap))
@@ -112,13 +109,11 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 }
 
 func TestFetchingBatchedBlobs(t *testing.T) {
+	ctx := t.Context()
 	tu.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
@@ -133,12 +128,12 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
-		rsFrames, proofs := disassembleFrames(frames)
+		rsFrames, proofs := disassembleFrames(t, frames)
 
-		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, proofs)
+		err = chunkWriter.PutFrameProofs(ctx, blobKey, proofs)
 		require.NoError(t, err)
 
-		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, rsFrames)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(ctx, blobKey, rsFrames)
 		require.NoError(t, err)
 
 		expectedFrames[blobKey] = frames
@@ -146,7 +141,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 	}
 
 	server, err := newChunkProvider(
-		context.Background(),
+		ctx,
 		logger,
 		chunkReader,
 		1024*1024*32,
@@ -171,7 +166,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 			}
 		}
 
-		fMap, err := server.GetFrames(context.Background(), mMap)
+		fMap, err := server.GetFrames(ctx, mMap)
 		require.NoError(t, err)
 
 		require.Equal(t, batchSize, len(fMap))

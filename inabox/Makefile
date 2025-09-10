@@ -23,7 +23,6 @@ new-anvil-nochurner:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
 
-
 new-docker-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-docker.yaml "testdata/$(dt)/config.yaml"
@@ -43,7 +42,8 @@ deploy-all:
 stop-infra:
 	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	docker stop localstack-test
+	# Stop localstack based on container name
+	docker ps -q --filter "ancestor=localstack/localstack" | xargs -r docker stop 2>/dev/null || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml

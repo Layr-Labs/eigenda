@@ -6,9 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -22,12 +20,13 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -36,10 +35,10 @@ func init() {
 }
 
 var (
-	testConfig                     *deploy.Config
-	templateName                   string
-	testName                       string
-	logger                         = testutils.GetLogger()
+	templateName string
+	testName     string
+
+	localstackPort                 = "4570"
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -47,55 +46,61 @@ var (
 	churnerPrivateKeyHex           = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	numRetries                     = 0
+
+	logger = testutils.GetLogger()
 )
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-	setup(m)
-	code := m.Run()
-	teardown()
-	os.Exit(code)
-}
+func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+	if testing.Short() {
+		t.Skip("Skipping churner test in short mode")
+	}
 
-func setup(m *testing.M) {
+	flag.Parse()
+	ctx := t.Context()
 	rootPath := "../../../"
 
 	if testName == "" {
 		var err error
 		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, err, "failed to create test directory")
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig := deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
-	if testing.Short() {
-		fmt.Println("Skipping churner test in short mode")
-		os.Exit(0)
-		return
-	}
+	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+		ExposeHostPort: true,
+		HostPort:       localstackPort,
+		Services:       []string{"s3", "dynamodb", "kms"},
+		Logger:         logger,
+	})
+	require.NoError(t, err, "failed to start localstack container")
 
-	fmt.Println("Starting anvil")
-	testConfig.StartAnvil()
+	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
+		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		Logger:         logger,
+	})
+	require.NoError(t, err, "failed to start anvil container")
 
-	fmt.Println("Deploying experiment")
+	logger.Info("Deploying experiment")
 	testConfig.DeployExperiment()
-}
 
-func teardown() {
-	if testConfig != nil {
-		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
-		testConfig.StopGraphNode()
-	}
+	t.Cleanup(func() {
+		logger.Info("Stopping containers")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = anvilContainer.Terminate(ctx)
+		_ = localstackContainer.Terminate(ctx)
+	})
+
+	return anvilContainer, localstackContainer, testConfig
 }
 
 func TestChurner(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+	_, _, testConfig := setupTest(t)
 
-	server := newTestServer(t)
+	server := newTestServer(t, testConfig)
 	quorumIDsUint8 := make([]uint8, len(quorumIds))
 	for i, id := range quorumIds {
 		quorumIDsUint8[i] = uint8(id)
@@ -114,22 +119,22 @@ func TestChurner(t *testing.T) {
 			Password:   op.NODE_BLS_KEY_PASSWORD,
 			SignerType: blssignerTypes.Local,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		opG1PointHex := opSigner.GetPublicKeyG1()
 		opG1PointBytes, err := hex.DecodeString(opG1PointHex)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		opG1Point := new(core.G1Point)
 		opG1Point, err = opG1Point.Deserialize(opG1PointBytes)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		opG2PointHex := opSigner.GetPublicKeyG2()
 		opG2PointBytes, err := hex.DecodeString(opG2PointHex)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		opG2Point := new(core.G2Point)
 		opG2Point, err = opG2Point.Deserialize(opG2PointBytes)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if i == 0 {
 			// This is the lowest stake operator that will be eventually churned
 			lowestStakeOperatorAddr = sk.Address
@@ -138,9 +143,8 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-		tx, err = createTransactorFromScratch(
-			*privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
-		assert.NoError(t, err)
+		tx = mustCreateTransactorFromScratch(
+			t, *privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
@@ -151,9 +155,9 @@ func TestChurner(t *testing.T) {
 			break
 		}
 		err = tx.RegisterOperator(ctx, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
-	assert.Greater(t, len(lowestStakeOperatorAddr), 0)
+	require.Greater(t, len(lowestStakeOperatorAddr), 0)
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
@@ -174,8 +178,8 @@ func TestChurner(t *testing.T) {
 	)
 	copy(requestHash[:], requestHashBytes)
 
-	signature, err := signer.Sign(context.Background(), requestHash[:])
-	assert.NoError(t, err)
+	signature, err := signer.Sign(ctx, requestHash[:])
+	require.NoError(t, err)
 	request.OperatorRequestSignature = signature
 
 	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
@@ -183,34 +187,37 @@ func TestChurner(t *testing.T) {
 	}, nil)
 
 	reply, err := server.Churn(ctx, request)
-	assert.NoError(t, err)
-	assert.NotNil(t, reply)
-	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
-	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetExpiry())
-	assert.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSignature())
-	assert.Equal(t, 65, len(reply.GetSignatureWithSaltAndExpiry().GetSignature()))
-	assert.Len(t, reply.GetOperatorsToChurn(), 2)
+	require.NoError(t, err)
+	require.NotNil(t, reply)
+	require.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
+	require.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetExpiry())
+	require.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSignature())
+	require.Equal(t, 65, len(reply.GetSignatureWithSaltAndExpiry().GetSignature()))
+	require.Len(t, reply.GetOperatorsToChurn(), 2)
 	actualQuorums := make([]uint32, 0)
 	for _, param := range reply.GetOperatorsToChurn() {
 		actualQuorums = append(actualQuorums, param.GetQuorumId())
-		assert.Equal(t, lowestStakeOperatorAddr, gethcommon.BytesToAddress(param.GetOperator()))
-		assert.Equal(t, lowestStakeOperatorPubKey.Serialize(), param.GetPubkey())
+		require.Equal(t, lowestStakeOperatorAddr, gethcommon.BytesToAddress(param.GetOperator()))
+		require.Equal(t, lowestStakeOperatorPubKey.Serialize(), param.GetPubkey())
 	}
-	assert.ElementsMatch(t, quorumIds, actualQuorums)
+	require.ElementsMatch(t, quorumIds, actualQuorums)
 
 	salt32 := [32]byte{}
 	copy(salt32[:], salt)
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
 	err = tx.RegisterOperatorWithChurn(ctx, signer, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
-func createTransactorFromScratch(
+func mustCreateTransactorFromScratch(
+	t *testing.T,
 	privateKey string,
 	operatorStateRetriever string,
 	serviceManager string,
 	logger logging.Logger,
-) (*eth.Writer, error) {
+) *eth.Writer {
+	t.Helper()
+
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -219,19 +226,17 @@ func createTransactorFromScratch(
 	}
 
 	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
-	}
+	require.NoError(t, err, "failed to create eth client")
 
 	writer, err := eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transactor: %w", err)
-	}
-	return writer, nil
+	require.NoError(t, err, "failed to create eth writer")
+
+	return writer
 }
 
-func newTestServer(t *testing.T) *churner.Server {
-	var err error
+func newTestServer(t *testing.T, testConfig *deploy.Config) *churner.Server {
+	t.Helper()
+
 	config := &churner.Config{
 		EthClientConfig: geth.EthClientConfig{
 			RPCURLs:          []string{rpcURL},
@@ -245,17 +250,17 @@ func newTestServer(t *testing.T) *churner.Server {
 		ChurnApprovalInterval:      15 * time.Minute,
 	}
 
-	operatorTransactorChurner, err := createTransactorFromScratch(
+	operatorTransactorChurner := mustCreateTransactorFromScratch(
+		t,
 		churnerPrivateKeyHex,
 		testConfig.EigenDA.OperatorStateRetriever,
 		testConfig.EigenDA.ServiceManager,
 		logger,
 	)
-	assert.NoError(t, err)
 
 	metrics := churner.NewMetrics("9001", logger)
 	cn, err := churner.NewChurner(config, mockIndexer, operatorTransactorChurner, logger, metrics)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return churner.NewServer(config, cn, logger, metrics)
 }
