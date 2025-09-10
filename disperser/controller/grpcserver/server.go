@@ -87,8 +87,7 @@ func NewServer(
 // Start the server. Blocks until the server is stopped.
 func (s *Server) Start() error {
 	if !s.config.EnableServer {
-		s.logger.Info("Controller gRPC server is disabled")
-		return nil
+		return fmt.Errorf("controller gRPC server is disabled")
 	}
 
 	addr := fmt.Sprintf("0.0.0.0:%s", s.config.GrpcPort)
@@ -116,7 +115,7 @@ func (s *Server) Start() error {
 	pb.RegisterControllerServiceServer(s.server, s)
 	healthcheck.RegisterHealthServer(pb.ControllerService_ServiceDesc.ServiceName, s.server)
 
-	s.logger.Info("gRPC server listening", "port", s.config.GrpcPort, "address", listener.Addr().String())
+	s.logger.Infof("gRPC server listening at %v", listener.Addr().String())
 
 	err = s.server.Serve(listener)
 	if err != nil {
@@ -131,7 +130,10 @@ func (s *Server) Stop() {
 		s.server.GracefulStop()
 	}
 	if s.listener != nil {
-		_ = s.listener.Close()
+		err := s.listener.Close()
+		if err != nil {
+			s.logger.Errorf("close listener: %w", err)
+		}
 	}
 }
 
@@ -140,6 +142,8 @@ func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentReply, error) {
+	start := time.Now()
+
 	if s.paymentAuthorizationHandler == nil {
 		s.metrics.ReportAuthorizePaymentAuthFailure()
 		//nolint:wrapcheck
@@ -152,13 +156,12 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
 	}
 
-	signatureVerificationStart := time.Now()
 	err = s.verifyDisperserSignature(requestHash, request.GetDisperserSignature())
 	if err != nil {
 		s.metrics.ReportAuthorizePaymentSignatureFailure()
 		return nil, err
 	}
-	s.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(signatureVerificationStart))
+	s.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(start))
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
@@ -167,13 +170,12 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Errorf(codes.InvalidArgument, "replay protection check failed: %v", err)
 	}
 
-	paymentAuthorizationStart := time.Now()
 	reply, err := s.paymentAuthorizationHandler.AuthorizePayment(ctx, request.GetBlobHeader())
 	if err != nil {
 		//nolint:wrapcheck // payment handler returns properly formatted grpc errors
 		return nil, err
 	}
-	s.metrics.ReportAuthorizePaymentLatency(time.Since(paymentAuthorizationStart))
+	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
 
 	return reply, nil
 }

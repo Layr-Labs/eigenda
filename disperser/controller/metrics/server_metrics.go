@@ -13,7 +13,7 @@ import (
 
 const namespace = "eigenda_controller"
 
-// Encapsulates metrics for the controller GRPC service
+// Encapsulates metrics for the controller GRPC server
 type ServerMetrics struct {
 	logger           logging.Logger
 	grpcServerOption grpc.ServerOption
@@ -42,7 +42,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "authorize_payment_latency_ms",
-			Help:       "Latency of the AuthorizePayment RPC",
+			Help:       "Total latency of the AuthorizePayment RPC, including signature verification",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -62,7 +62,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "authorize_payment_auth_failure_count",
-			Help:      "Number of AuthorizePayment RPC authentication failures",
+			Help:      "Number of AuthorizePayment RPC authentication failures, not including signature verification failures",
 		},
 		[]string{},
 	)
