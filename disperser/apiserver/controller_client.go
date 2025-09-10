@@ -113,9 +113,12 @@ func (c *ControllerClient) AuthorizePayment(ctx context.Context, blobHeader *pbc
 func (c *ControllerClient) Close() error {
 	if c.clientConnection != nil {
 		err := c.clientConnection.Close()
+		if err != nil {
+			return fmt.Errorf("close connection: %w", err)
+		}
+
 		c.clientConnection = nil
 		c.serviceClient = nil
-		return fmt.Errorf("close connection: %w", err)
 	}
 	return nil
 }
