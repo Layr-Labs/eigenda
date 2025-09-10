@@ -58,19 +58,22 @@ impl ProxyClient {
         })
     }
 
-    /// Fetch blob data for the given certificate.
-    pub async fn get_blob(&self, certificate: &StandardCommitment) -> Result<Bytes, ProxyError> {
+    /// Fetch encoded payload data for the given certificate.
+    pub async fn get_encoded_payload(
+        &self,
+        certificate: &StandardCommitment,
+    ) -> Result<Bytes, ProxyError> {
         let hex = encode(certificate.to_rlp_bytes());
         let mut url = self.url.join(&format!("/get/0x{hex}"))?;
-        url.set_query(Some("commitment_mode=standard"));
+        url.set_query(Some("commitment_mode=standard&return_encoded_payload=true"));
 
         let request = self.inner.get(url).build()?;
         let response = self.call(request).await?;
         Ok(response)
     }
 
-    /// Stores the new blob and returns a certificate
-    pub async fn store_blob(&self, blob: &[u8]) -> Result<StandardCommitment, ProxyError> {
+    /// Stores the payload and returns a certificate
+    pub async fn store_payload(&self, payload: &[u8]) -> Result<StandardCommitment, ProxyError> {
         let mut url = self.url.join("/put")?;
         url.set_query(Some("commitment_mode=standard"));
 
@@ -78,7 +81,7 @@ impl ProxyClient {
             .inner
             .post(url)
             .header(CONTENT_TYPE, "application/octet-stream")
-            .body(blob.to_vec())
+            .body(payload.to_vec())
             .build()?;
 
         let response = self.call(request).await?;

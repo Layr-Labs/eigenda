@@ -9,7 +9,7 @@ use testcontainers::{
 use crate::common::SEQUENCER_SIGNER;
 
 const NAME: &str = "ghcr.io/layr-labs/eigenda-proxy";
-const TAG: &str = "latest";
+const TAG: &str = "2.2.1";
 const READY_MSG: &str = "Started EigenDA proxy server";
 const PORT: ContainerPort = ContainerPort::Tcp(3100);
 

@@ -351,8 +351,8 @@ impl BlobReaderTrait for BlobWithSender {
 /// Struct that holds an Ethereum transaction. If the transaction contains a
 /// certificate. Then the [`TransactionWithBlob`] also contains a
 /// [`CertificateStateData`] used to verify the included certificate. If the
-/// certificate is valid, then it should also contain a data blob that was
-/// persisted to the EigenDA.
+/// certificate is valid, then it should also contain an encoded payload
+/// retrieved from the EigenDA.
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
@@ -361,8 +361,8 @@ pub struct TransactionWithBlob {
     pub tx: EthereumTxEnvelope<TxEip4844>,
     /// Data used to verify the certificate.
     pub cert_state: Option<CertificateStateData>,
-    /// The blob persisted to the EigenDA.
-    pub blob: Option<Bytes>,
+    /// The encoded payload retrieved from the EigenDA.
+    pub encoded_payload: Option<Bytes>,
 }
 
 /// Contains data needed to validate the certificate. It also contains proofs

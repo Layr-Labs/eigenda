@@ -12,7 +12,6 @@
 //! - [`BlobInclusionInfo`] - Information about blob inclusion in batches
 //! - [`BatchHeaderV2`] - Batch header containing batch root and reference block
 //! - [`G1Point`]/[`G2Point`] - Elliptic curve points for cryptographic operations
-//! ```
 //!
 //! ## Notes
 //!

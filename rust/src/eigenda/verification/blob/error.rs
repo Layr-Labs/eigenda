@@ -13,11 +13,15 @@ use thiserror::Error;
 pub enum BlobVerificationError {
     /// Blob is too small to contain the required 32-byte header
     #[error("Blob is too small ({0} bytes), it is shorter than the 32 byte header")]
-    BlobTooSmallForHeader(u32),
+    BlobTooSmallForHeader(usize),
 
-    /// Blob is too small to contain both header and claimed payload
-    #[error("Blob is too small ({0} bytes), it can't hold header (32 bytes) + payload ({0} bytes)")]
-    BlobTooSmallForHeaderAndPayload(usize),
+    #[error(
+        "Blob is too small ({encoded_payload_bytes_len} bytes), it can't hold claimed encoded payload length ({claimed_encoded_payload_bytes_len} bytes)"
+    )]
+    BlobTooSmallForHeaderAndPayload {
+        encoded_payload_bytes_len: usize,
+        claimed_encoded_payload_bytes_len: usize,
+    },
 
     /// Blob length exceeds the maximum representable size (u32::MAX)
     #[error("Blob length does not fit into a u32 variable: {0}")]
@@ -46,4 +50,7 @@ pub enum BlobVerificationError {
     /// Underlying KZG cryptographic library error
     #[error("Kzg error: {0}")]
     WrapKzgError(#[from] KzgError),
+
+    #[error("Arithmetic overflow during payload processing")]
+    Overflow,
 }

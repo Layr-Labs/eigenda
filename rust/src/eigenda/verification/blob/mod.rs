@@ -47,12 +47,16 @@
 //! - Compares computed commitment with claimed commitment
 //! - Uses precomputed SRS (Structured Reference String)
 
+pub mod codec;
 pub mod error;
 pub mod srs;
 
 use std::sync::LazyLock;
 
-use crate::eigenda::cert::{BlobCommitment, G1Point};
+use crate::eigenda::{
+    cert::{BlobCommitment, G1Point},
+    verification::blob::codec::BYTES_PER_SYMBOL,
+};
 use ark_bn254::G1Affine;
 use ark_serialize::CanonicalDeserialize;
 use rust_kzg_bn254_primitives::blob::Blob;
@@ -60,25 +64,6 @@ use rust_kzg_bn254_prover::{kzg::KZG, srs::SRS};
 
 use crate::eigenda::verification::blob::{error::BlobVerificationError, srs::SerializableSRS};
 
-/// Field element guard byte prepended to each symbol to ensure BN254 field validity
-const FIELD_ELEMENT_GUARD_BYTE: u8 = 0;
-
-/// Size of each symbol in the blob encoding (32 bytes)
-const BYTES_PER_SYMBOL: usize = 32;
-
-/// Size of payload data per symbol (31 bytes, leaving 1 byte for guard)
-const BYTES_PER_CHUNK: usize = BYTES_PER_SYMBOL - 1;
-
-/// Number of symbols used for the blob header (always 1)
-const HEADER_SYMBOLS_LEN: usize = 1;
-
-/// Total byte length of the blob header (32 bytes)
-const HEADER_BYTES_LEN: usize = HEADER_SYMBOLS_LEN * BYTES_PER_SYMBOL;
-
-/// EigenDA blob encoding version (currently 0)
-const VERSION: u8 = 0;
-
-/// Precomputed SRS (Structured Reference String) data included at compile time
 const SRS_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/srs.bin"));
 
 /// Global SRS instance loaded lazily for KZG operations
@@ -91,6 +76,8 @@ pub static SRS: LazyLock<SRS> = LazyLock::new(|| {
         .into()
 });
 
+/// Verifies that `blob` passes all the checks defined in
+/// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
 /// Verify blob data against its KZG commitment
 ///
 /// Performs comprehensive validation of blob data according to the EigenDA
@@ -115,9 +102,9 @@ pub static SRS: LazyLock<SRS> = LazyLock::new(|| {
 /// [EigenDA Specification - Blob Validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)
 pub fn verify(
     blob_commitment: &BlobCommitment,
-    payload: &[u8],
+    encoded_payload: &[u8],
 ) -> Result<(), BlobVerificationError> {
-    let blob = payload_into_blob(payload)?;
+    let blob = Blob::new(encoded_payload);
     let blob_symbols_len = blob.len() / BYTES_PER_SYMBOL;
 
     let BlobCommitment {
@@ -170,107 +157,6 @@ fn verify_commitment_len_is_power_of_two(
 }
 
 /// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
-/// 4. Verify that the payload length claimed in the encoded payload header is <= the
-///    maximum permissible payload length, as calculated from the length in the
-///    BlobCommitment
-///
-///   1. The maximum permissible payload length is computed by looking at the
-///      claimed blob length, and determining how many bytes would remain if you were
-///      to remove the encoding which is performed when converting a payload into a
-///      encodedPayload. This presents an upper bound for payload length: e.g.
-///      "If the payload were any bigger than x, then the process of converting it
-///      to an encodedPayload would have yielded a blob of larger size than claimed"
-/// 5. If the bytes received for the blob are longer than necessary to convey
-///    the payload, as determined by the claimed payload length, then verify that
-///    all extra bytes are 0x0
-///
-///   1. Due to how padding of a blob works, it's possible that there may be
-///      trailing 0x0 bytes, but there shouldn't be any trailing bytes that aren't
-///      equal to 0x0
-///
-/// Requirements 4. and 5. are satisfied by construction
-fn payload_into_blob(payload: &[u8]) -> Result<Blob, BlobVerificationError> {
-    let header = construct_header(payload)?;
-    let header_bytes_len = header.len();
-
-    let payload = pad_payload(payload);
-    let payload_bytes_len = payload.len();
-
-    let blob_symbols_len =
-        ((payload_bytes_len + header_bytes_len) / BYTES_PER_SYMBOL).next_power_of_two();
-    let blob_bytes_len = blob_symbols_len * BYTES_PER_SYMBOL;
-
-    let mut blob = vec![0; blob_bytes_len];
-    blob[..header_bytes_len].copy_from_slice(&header);
-    let from = header_bytes_len;
-    let to = header_bytes_len + payload_bytes_len;
-    blob[from..to].copy_from_slice(&payload);
-
-    Ok(Blob::new(&blob))
-}
-
-/// Constructs the blob header according to EigenDA specification.
-///
-/// The header is a 32-byte structure with the following format:
-/// - Byte 0: Field element guard byte (0x00)
-/// - Byte 1: Version byte (0x00)
-/// - Bytes 2-5: Payload length as big-endian u32
-/// - Bytes 6-31: Zero padding
-///
-/// # Arguments
-/// * `payload` - The payload data to encode in the header
-///
-/// # Returns
-/// * `Result<[u8; HEADER_BYTES_LEN], BlobVerificationError>` - The constructed header or an error if payload is too large
-fn construct_header(payload: &[u8]) -> Result<[u8; HEADER_BYTES_LEN], BlobVerificationError> {
-    let mut header = [0; HEADER_BYTES_LEN];
-    header[0] = FIELD_ELEMENT_GUARD_BYTE;
-    header[1] = VERSION;
-    let payload_len: u32 = payload.len().try_into()?;
-    header[2..6].copy_from_slice(&payload_len.to_be_bytes());
-    Ok(header)
-}
-
-/// Pads and encodes payload data into symbols for blob creation.
-///
-/// This function transforms raw payload data into a format suitable for EigenDA blob encoding
-/// by splitting it into chunks and adding field element guard bytes. Each 31-byte chunk of
-/// payload data becomes a 32-byte symbol with a guard byte prefix.
-/// The guard byte ensures that the resulting symbol is a valid field element
-///
-/// # Process
-/// 1. Divides payload into 31-byte chunks (BYTES_PER_CHUNK)
-/// 2. Pads the last chunk with zeros if needed
-/// 3. Converts each chunk into a 32-byte symbol by prepending a field element guard byte
-///
-/// # Arguments
-/// * `payload` - The raw payload data to pad and encode
-///
-/// # Returns
-/// * `Vec<u8>` - The padded and encoded payload as a vector of symbols
-fn pad_payload(payload: &[u8]) -> Vec<u8> {
-    let chunks = payload.len().div_ceil(BYTES_PER_CHUNK);
-
-    let chunk_bytes_len = chunks * BYTES_PER_CHUNK;
-    let mut src = Vec::with_capacity(chunk_bytes_len);
-    src.extend_from_slice(payload);
-    src.resize(chunk_bytes_len, 0u8);
-
-    let symbol_bytes_len = chunks * BYTES_PER_SYMBOL;
-    let mut dst = vec![0; symbol_bytes_len];
-
-    for (src, dst) in src
-        .chunks_exact(BYTES_PER_CHUNK)
-        .zip(dst.chunks_exact_mut(BYTES_PER_SYMBOL))
-    {
-        dst[0] = FIELD_ELEMENT_GUARD_BYTE;
-        dst[1..].copy_from_slice(src);
-    }
-
-    dst
-}
-
-/// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
 ///
 /// 6. Verify the KZG commitment. This can either be done:
 ///
@@ -304,14 +190,15 @@ mod test {
     use crate::eigenda::{
         cert::BlobCommitment,
         verification::blob::{
-            error::BlobVerificationError::*, verify, verify_blob_symbols_len_against_commitment,
-            verify_commitment_len_is_power_of_two,
+            codec::tests::encode_raw_payload, error::BlobVerificationError::*, verify,
+            verify_blob_symbols_len_against_commitment, verify_commitment_len_is_power_of_two,
         },
     };
 
     #[test]
     fn verify_succeeds_with_known_commitment() {
-        let payload = [123; 512];
+        let raw_payload = [123; 512];
+        let encoded_payload = encode_raw_payload(&raw_payload).unwrap();
 
         let known_commitment = G1Affine::new_unchecked(
             Fq::from_str(
@@ -332,7 +219,7 @@ mod test {
             length: 32 + 32,
         };
 
-        assert_eq!(verify(&blob_commitment, &payload), Ok(()));
+        assert_eq!(verify(&blob_commitment, &encoded_payload), Ok(()));
     }
 
     #[test]

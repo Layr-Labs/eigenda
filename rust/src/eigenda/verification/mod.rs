@@ -121,35 +121,38 @@ pub fn verify_cert(
     cert::verify(inputs)
 }
 
-/// Validate blob data against certificate commitment
+/// Validate encoded payload against certificate commitment
 ///
-/// Verifies that the provided blob data matches the cryptographic commitment
-/// contained in the certificate using KZG polynomial commitments.
+/// Verifies that the provided encoded payload matches the cryptographic
+/// commitment contained in the certificate using KZG polynomial commitments.
 ///
 /// # Arguments
 /// * `cert` - Certificate containing the blob commitment
-/// * `blob` - Raw blob data to validate
+/// * `encoded_payload` - Encoded payload to validate
 ///
 /// # Returns
-/// `Ok(())` if the blob matches the certificate commitment
+/// `Ok(())` if the encoded payload matches the certificate commitment
 ///
 /// # Errors
 /// Returns [`BlobVerificationError`] if:
-/// - Blob data doesn't match the commitment
+/// - Encoded payload doesn't match the commitment
 /// - KZG proof verification fails
 /// - Commitment is malformed
 ///
 /// # Reference
 /// [EigenDA Specification - Blob Validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)
 #[instrument(skip_all)]
-pub fn verify_blob(cert: &StandardCommitment, blob: &[u8]) -> Result<(), BlobVerificationError> {
+pub fn verify_blob(
+    cert: &StandardCommitment,
+    encoded_payload: &[u8],
+) -> Result<(), BlobVerificationError> {
     let blob_commitment = &cert
         .blob_inclusion_info()
         .blob_certificate
         .blob_header
         .commitment;
 
-    blob::verify(blob_commitment, blob)
+    blob::verify(blob_commitment, encoded_payload)
 }
 
 #[cfg(test)]

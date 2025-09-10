@@ -39,6 +39,7 @@ async fn submit_extract_verify_e2e() {
             let size = rng.gen_range(blobs_size_range.clone());
             let mut blob = vec![0u8; size];
             rng.fill_bytes(&mut blob);
+
             Bytes::from(blob)
         })
         .collect::<Vec<_>>();

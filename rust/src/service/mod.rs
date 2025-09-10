@@ -12,6 +12,7 @@ use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
 use backon::ExponentialBuilder;
 use backon::Retryable;
+use bytes::Bytes;
 use futures::future::try_join_all;
 use reth_trie_common::AccountProof;
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,7 @@ use tokio::{sync::oneshot, time::sleep};
 use tracing::info;
 use tracing::{debug, error, instrument, warn};
 
+use crate::eigenda::verification::blob::codec::decode_encoded_payload;
 use crate::{
     eigenda::{
         cert::StandardCommitment,
@@ -123,7 +125,7 @@ impl EigenDaService {
         namespace: NamespaceId,
     ) -> Result<SubmitBlobReceipt<EthereumHash>, anyhow::Error> {
         // Submit blob to the EigenDA
-        let cert = self.proxy.store_blob(blob).await?;
+        let cert = self.proxy.store_payload(blob).await?;
         debug!(?cert, "Certificate was received by EigenDa");
 
         // Persist certificate to the ethereum
@@ -192,7 +194,7 @@ impl EigenDaService {
             {
                 block_transactions.push(TransactionWithBlob {
                     tx,
-                    blob: None,
+                    encoded_payload: None,
                     cert_state: None,
                 });
                 continue;
@@ -202,7 +204,7 @@ impl EigenDaService {
             let Some(cert) = extract_certificate(&tx) else {
                 block_transactions.push(TransactionWithBlob {
                     tx,
-                    blob: None,
+                    encoded_payload: None,
                     cert_state: None,
                 });
                 continue;
@@ -223,7 +225,7 @@ impl EigenDaService {
                     // certificate recency is invalid.
                     TransactionWithBlob {
                         tx,
-                        blob: None,
+                        encoded_payload: None,
                         cert_state: None,
                     },
                 );
@@ -245,19 +247,19 @@ impl EigenDaService {
                     // was the reason we skipped it.
                     TransactionWithBlob {
                         tx,
-                        blob: None,
+                        encoded_payload: None,
                         cert_state: Some(cert_state),
                     },
                 );
                 continue;
             };
 
-            // The blob should always be available for the valid certificate
-            let blob = self.proxy.get_blob(&cert).await?;
+            // Fetch the encoded payload for the valid certificate
+            let encoded_payload = self.proxy.get_encoded_payload(&cert).await?;
 
             block_transactions.push(TransactionWithBlob {
                 tx,
-                blob: Some(blob),
+                encoded_payload: Some(encoded_payload),
                 cert_state: Some(cert_state),
             });
         }
@@ -553,21 +555,40 @@ pub struct EthereumBlock {
 impl EthereumBlock {
     /// Extract all rollup's blobs (indicated by namespace) from this block.
     pub fn extract_relevant_blobs(&self, namespace: NamespaceId) -> Vec<BlobWithSender> {
-        self.transactions
-            .iter()
-            .filter_map(|tx| {
-                namespace
-                    .contains(&tx.tx)
-                    .then(|| tx.blob.clone().map(|blob| (&tx.tx, blob)))
-                    .flatten()
-            })
-            .filter_map(|(tx, blob)| {
-                let sender = tx.recover_signer().ok()?;
-                let tx_hash = tx.hash().to_owned();
+        let mut blobs = Vec::new();
 
-                Some(BlobWithSender::new(sender, tx_hash, blob))
-            })
-            .collect::<Vec<_>>()
+        for TransactionWithBlob {
+            tx,
+            encoded_payload,
+            ..
+        } in &self.transactions
+        {
+            // Discard transactions not part of the namespace
+            if !namespace.contains(tx) {
+                continue;
+            }
+
+            // Discard transactions with blobs that can't be decoded
+            let Some(blob) = encoded_payload
+                .as_ref()
+                .and_then(|ep| decode_encoded_payload(ep).ok())
+            else {
+                continue;
+            };
+
+            // Skip transactions for which the sender can't be recovered. This
+            // should never happen.
+            let Ok(sender) = tx.recover_signer() else {
+                continue;
+            };
+
+            // Create and store the blob
+            let tx_hash = tx.hash().to_owned();
+            let blob = BlobWithSender::new(sender, tx_hash, Bytes::from(blob));
+            blobs.push(blob);
+        }
+
+        blobs
     }
 
     /// Get the inclusion and completeness proofs pair for rollup's blobs (indicated by namespace)

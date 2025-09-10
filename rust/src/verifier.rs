@@ -11,7 +11,8 @@ use tracing::instrument;
 
 use crate::{
     eigenda::verification::{
-        blob::error::BlobVerificationError, verify_blob, verify_cert, verify_cert_recency,
+        blob::{codec::decode_encoded_payload, error::BlobVerificationError},
+        verify_blob, verify_cert, verify_cert_recency,
     },
     ethereum::extract_certificate,
     spec::{
@@ -297,44 +298,45 @@ impl EigenDaInclusionProof {
         self.transactions.iter().flat_map(
             move |TransactionWithBlob {
                       tx,
-                      blob,
+                      encoded_payload,
                       cert_state,
                   }| {
                 // Skipping malformed cert
                 let cert = extract_certificate(tx)?;
 
-                // Skipping cert with failed recency check
+                // Check the recency. Skipping certs with failed recency check
                 let referenced_height = cert.reference_block();
-                if verify_cert_recency(header, referenced_height, cert_recency_window).is_err() {
-                    return None;
-                }
+                verify_cert_recency(header, referenced_height, cert_recency_window).ok()?;
 
                 // State should be set, so we can verify the cert
                 let Some(state) = cert_state.as_ref() else {
                     return Some(Err(InclusionProofError::CertStateMissing(*tx.hash())));
                 };
 
-                // Skipping invalid cert
-                if verify_cert(header, state, &cert).is_err() {
-                    return None;
-                }
+                // Verify the cert. We are skipping it if it's invalid.
+                verify_cert(header, state, &cert).ok()?;
 
-                // The certificate is proven to be valid. The corresponding blob
-                // should exist and it should be valid.
-                let Some(blob) = blob.as_ref() else {
+                // The encoded payload should be set
+                let Some(encoded_payload) = encoded_payload.as_ref() else {
                     return Some(Err(InclusionProofError::MissingBlob(*tx.hash())));
                 };
-                if let Err(err) = verify_blob(&cert, blob) {
+
+                // Verify the encoded payload against the certificate
+                if let Err(err) = verify_blob(&cert, encoded_payload) {
                     return Some(Err(err.into()));
                 };
 
-                // The relationship is valid
+                // Decode an encoded payload. The blob is dropped if it can't be decoded.
+                let blob = decode_encoded_payload(encoded_payload).ok()?;
+
+                // Recover the signer of the transaction
                 let Ok(sender) = tx.recover_signer() else {
                     return Some(Err(InclusionProofError::RecoverSenderError));
                 };
+
                 let hash = EthereumHash::from(*tx.hash());
                 let sender = EthereumAddress::from(sender);
-                Some(Ok((hash, sender, blob.clone())))
+                Some(Ok((hash, sender, Bytes::from(blob))))
             },
         )
     }
@@ -476,7 +478,7 @@ mod tests {
         let tx = EthereumTxEnvelope::Eip1559(tx_signed);
         TransactionWithBlob {
             tx,
-            blob: Some(Bytes::from(b"test blob data".to_vec())),
+            encoded_payload: Some(Bytes::from(b"test blob data".to_vec())),
             cert_state: None,
         }
     }
