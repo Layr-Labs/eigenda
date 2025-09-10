@@ -1,9 +1,9 @@
 syntax = "proto3";
-package controller;
+package controller.v1;
 
 import "common/v2/common_v2.proto";
 
-option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller/v1";
 
 // ControllerService defines the APIs for the controller.
 //
@@ -14,7 +14,7 @@ service ControllerService {
   //
   // This is intended to be called by API server instances that are handling dispersal requests. The controller
   // is responsible for accounting and metering for the dispersal.
-  rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentReply) {}
+  rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentResponse) {}
 }
 
 // Contains all information necessary for the controller to evaluate the validity of a dispersal payment
@@ -23,15 +23,14 @@ message AuthorizePaymentRequest {
   // 1. Contains the PaymentHeader, which describes the payment being offered
   // 2. Contains the quorums being dispersed to
   common.v2.BlobHeader blob_header = 1;
-  
+
   // Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
   bytes disperser_signature = 2;
 }
 
-// AuthorizePaymentReply is returned after the controller does accounting and metering.
+// AuthorizePaymentResponse is returned after the controller does accounting and metering.
 //
 // A GRPC error indicates that there was a problem with the payment authorization. No error means everything succeeded.
 //
 // TODO(litt3): We should document the potential errors that could be returned.
-message AuthorizePaymentReply {
-}
+message AuthorizePaymentResponse {}

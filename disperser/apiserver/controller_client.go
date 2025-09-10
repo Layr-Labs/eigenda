@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"

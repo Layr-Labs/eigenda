@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -141,7 +141,7 @@ func (s *Server) Stop() {
 func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *pb.AuthorizePaymentRequest,
-) (*pb.AuthorizePaymentReply, error) {
+) (*pb.AuthorizePaymentResponse, error) {
 	start := time.Now()
 
 	if s.paymentAuthorizationHandler == nil {

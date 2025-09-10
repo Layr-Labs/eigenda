@@ -3,7 +3,7 @@ package hashing
 import (
 	"fmt"
 
-	controller "github.com/Layr-Labs/eigenda/api/grpc/controller"
+	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"golang.org/x/crypto/sha3"
 )
 

@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: controller/controller_service.proto
+// source: controller/v1/controller_service.proto
 
-package controller
+package v1
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ControllerService_AuthorizePayment_FullMethodName = "/controller.ControllerService/AuthorizePayment"
+	ControllerService_AuthorizePayment_FullMethodName = "/controller.v1.ControllerService/AuthorizePayment"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
@@ -30,7 +30,7 @@ type ControllerServiceClient interface {
 	//
 	// This is intended to be called by API server instances that are handling dispersal requests. The controller
 	// is responsible for accounting and metering for the dispersal.
-	AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentReply, error)
+	AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error)
 }
 
 type controllerServiceClient struct {
@@ -41,8 +41,8 @@ func NewControllerServiceClient(cc grpc.ClientConnInterface) ControllerServiceCl
 	return &controllerServiceClient{cc}
 }
 
-func (c *controllerServiceClient) AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentReply, error) {
-	out := new(AuthorizePaymentReply)
+func (c *controllerServiceClient) AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error) {
+	out := new(AuthorizePaymentResponse)
 	err := c.cc.Invoke(ctx, ControllerService_AuthorizePayment_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ type ControllerServiceServer interface {
 	//
 	// This is intended to be called by API server instances that are handling dispersal requests. The controller
 	// is responsible for accounting and metering for the dispersal.
-	AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentReply, error)
+	AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error)
 	mustEmbedUnimplementedControllerServiceServer()
 }
 
@@ -66,7 +66,7 @@ type ControllerServiceServer interface {
 type UnimplementedControllerServiceServer struct {
 }
 
-func (UnimplementedControllerServiceServer) AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentReply, error) {
+func (UnimplementedControllerServiceServer) AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AuthorizePayment not implemented")
 }
 func (UnimplementedControllerServiceServer) mustEmbedUnimplementedControllerServiceServer() {}
@@ -104,7 +104,7 @@ func _ControllerService_AuthorizePayment_Handler(srv interface{}, ctx context.Co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ControllerService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "controller.ControllerService",
+	ServiceName: "controller.v1.ControllerService",
 	HandlerType: (*ControllerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -113,5 +113,5 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "controller/controller_service.proto",
+	Metadata: "controller/v1/controller_service.proto",
 }
