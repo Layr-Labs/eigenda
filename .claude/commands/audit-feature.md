@@ -2,6 +2,7 @@
 
 This command performs a comprehensive, dependency-ordered review of large feature implementations by creating
 structured analysis files while efficiently managing context. It can target entire packages or specific file sets.
+All analysis is static.
 
 ## Usage Check
 
