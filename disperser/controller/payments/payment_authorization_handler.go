@@ -3,6 +3,7 @@ package payments
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
@@ -70,9 +71,8 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 		return nil, err
 	}
 
-	// TODO: Implement actual payment authorization logic
-
-	return &pb.AuthorizePaymentReply{}, nil
+	// TODO(litt3): Implement actual payment authorization logic
+	return nil, errors.New("Payment authorization not implemented")
 }
 
 // Verifies the disperser's signature on the payment authorization request.
