@@ -159,7 +159,7 @@ Disperse a blob:
 # To install `grpcurl`, run `brew install grpcurl` or `go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest`
 
 # From top level eigenda directory
-$ grpcurl -plaintext -d '{"data": "'$(tools/kzgpad/bin/kzgpad -e hello)'"}' \
+$ grpcurl -plaintext -d '{"data": "'$(kzgpad -e hello)'"}' \
   localhost:32003 disperser.Disperser/DisperseBlob
 ```
 
