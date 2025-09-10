@@ -1,3 +1,31 @@
+//! EigenDA data extraction from Ethereum contract storage
+//!
+//! This module provides utilities for extracting and decoding data from EigenDA
+//! protocol smart contracts deployed on Ethereum. It enables verification of
+//! blob certificates by fetching the necessary on-chain state data.
+//!
+//! ## Architecture
+//!
+//! The extraction system follows a trait-based approach:
+//! - [`StorageKeyProvider`]: Generates storage keys for contract data
+//! - [`DataDecoder`]: Decodes storage proofs into typed data structures
+//!
+//! ## Key Components
+//!
+//! - **Extractors**: Specialized types for extracting specific data from contracts
+//! - **Contract Interfaces**: High-level interfaces for each EigenDA contract
+//! - **Storage Helpers**: Utilities for generating Ethereum storage keys
+//! - **Decode Helpers**: Utilities for parsing storage proofs
+//!
+//! ## Contract Data Extracted
+//!
+//! - Quorum configurations and counts
+//! - Operator stake histories and bitmap histories  
+//! - Aggregated public key (APK) histories
+//! - Blob versioning parameters
+//! - Security thresholds and required quorum numbers
+//! - Stale stake prevention settings (feature-gated)
+
 #[cfg(feature = "native")]
 pub mod contract;
 pub mod decode_helpers;
@@ -27,44 +55,87 @@ use crate::eigenda::{
     },
 };
 
+// Storage slot constants for EigenDA contract variables
+// These correspond to specific storage slots in the deployed contracts
+
+/// Storage slot for versioned blob parameters mapping in EigenDaThresholdRegistry
 const VERSIONED_BLOB_PARAMS_MAPPING_SLOT: u64 = 4;
+/// Storage slot for next blob version in EigenDaThresholdRegistry
 const NEXT_BLOB_VERSION_SLOT: u64 = 3;
+/// Storage slot for quorum count in RegistryCoordinator
 const QUORUM_COUNT_VARIABLE_SLOT: u64 = 150;
+/// Storage slot for operator bitmap history mapping in RegistryCoordinator
 const OPERATOR_BITMAP_HISTORY_MAPPING_SLOT: u64 = 152;
+/// Storage slot for APK history mapping in BlsApkRegistry
 const APK_HISTORY_MAPPING_SLOT: u64 = 4;
+/// Storage slot for total stake history mapping in StakeRegistry
 const TOTAL_STAKE_HISTORY_MAPPING_SLOT: u64 = 1;
+/// Storage slot for operator stake history mapping in StakeRegistry
 const OPERATOR_STAKE_HISTORY_MAPPING_SLOT: u64 = 2;
+/// Storage slot for security thresholds V2 in EigenDaCertVerifier
 const SECURITY_THRESHOLDS_V2_VARIABLE_SLOT: u64 = 0;
+/// Storage slot for required quorum numbers V2 in EigenDaCertVerifier
 const QUORUM_NUMBERS_REQUIRED_V2_VARIABLE_SLOT: u64 = 1;
 
+/// Errors that can occur during certificate data extraction
 #[derive(Debug, Error, PartialEq)]
 pub enum CertExtractionError {
+    /// Storage proof was not found for the requested variable
     #[error("Failed to extract StorageProof for {0}")]
     MissingStorageProof(String),
 
+    /// Error from history data processing
     #[error(transparent)]
     WrapHistoryError(#[from] HistoryError),
 
+    /// Error from Alloy Solidity types decoding
     #[error(transparent)]
     WrapAlloySolTypesError(#[from] alloy_sol_types::Error),
 }
 
+/// Trait for types that can provide storage keys for data extraction
+///
+/// This trait is implemented by extractors to specify which storage locations
+/// they need to read from Ethereum contracts.
 pub trait StorageKeyProvider {
+    /// Returns the storage keys that need to be fetched from the blockchain
     fn storage_keys(&self) -> Vec<StorageKey>;
 }
 
+/// Trait for types that can decode storage proofs into typed data
+///
+/// This trait extends [`StorageKeyProvider`] to also handle the decoding of
+/// the fetched storage data into application-specific types.
 pub trait DataDecoder: StorageKeyProvider {
+    /// The type of data this decoder produces
     type Output;
 
+    /// Decode storage proofs into the output type
+    ///
+    /// # Arguments
+    /// * `storage_proofs` - Array of storage proofs from the blockchain
+    ///
+    /// # Returns
+    /// The decoded data of type `Self::Output`
+    ///
+    /// # Errors
+    /// Returns [`CertExtractionError`] if required proofs are missing or decoding fails
     fn decode_data(
         &self,
         storage_proofs: &[StorageProof],
     ) -> Result<Self::Output, CertExtractionError>;
 }
 
+/// Extractor for the total number of quorums in the registry
+///
+/// Reads the `quorumCount` variable from the RegistryCoordinator contract.
 pub struct QuorumCountExtractor;
 
 impl QuorumCountExtractor {
+    /// Create a new quorum count extractor
+    ///
+    /// # Arguments
+    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new(_certificate: &StandardCommitment) -> Self {
         Self {}
     }
@@ -79,7 +150,6 @@ impl StorageKeyProvider for QuorumCountExtractor {
     }
 }
 
-// REGISTRY_COORDINATOR::quorumCount (3 on holesky)
 impl DataDecoder for QuorumCountExtractor {
     type Output = u8;
 
@@ -95,11 +165,20 @@ impl DataDecoder for QuorumCountExtractor {
     }
 }
 
+/// Extractor for versioned blob parameters
+///
+/// Reads blob configuration parameters for a specific version from the
+/// EigenDaThresholdRegistry contract
 pub struct VersionedBlobParamsExtractor {
+    /// The blob version to extract parameters for
     pub version: u16,
 }
 
 impl VersionedBlobParamsExtractor {
+    /// Create a new versioned blob parameters extractor
+    ///
+    /// # Arguments
+    /// * `certificate` - Certificate containing the blob version
     pub fn new(certificate: &StandardCommitment) -> Self {
         Self {
             version: certificate.version(),
@@ -143,9 +222,17 @@ impl DataDecoder for VersionedBlobParamsExtractor {
     }
 }
 
+/// Extractor for the next blob version from the threshold registry.
+///
+/// Reads the `nextBlobVersion` variable from the EigenDaThresholdRegistry contract.
+/// This indicates the next version number that will be assigned to blob parameters.
 pub struct NextBlobVersionExtractor;
 
 impl NextBlobVersionExtractor {
+    /// Create a new next blob version extractor
+    ///
+    /// # Arguments
+    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new(_certificate: &StandardCommitment) -> Self {
         Self
     }
@@ -161,6 +248,7 @@ impl StorageKeyProvider for NextBlobVersionExtractor {
 impl DataDecoder for NextBlobVersionExtractor {
     type Output = Version;
 
+    /// Decode the next blob version from storage proofs
     #[instrument(skip_all, fields(component = std::any::type_name::<Self>()))]
     fn decode_data(
         &self,
@@ -177,12 +265,24 @@ impl DataDecoder for NextBlobVersionExtractor {
     }
 }
 
+/// Extractor for operator bitmap history from the registry coordinator.
+///
+/// This extractor fetches historical quorum membership data for non-signing operators.
+/// The bitmap indicates which quorums each operator was a member of at specific block heights.
+/// This information is needed to verify that non-signers were actually part of the required
+/// quorums at the time the certificate was created.
 pub struct OperatorBitmapHistoryExtractor {
+    /// Public key hashes of operators that did not sign the certificate
     pub non_signers_pk_hashes: Vec<B256>,
+    /// Indices for looking up bitmap history entries for each non-signer
     pub non_signer_quorum_bitmap_indices: Vec<u32>,
 }
 
 impl OperatorBitmapHistoryExtractor {
+    /// Create a new operator bitmap history extractor
+    ///
+    /// # Arguments
+    /// * `certificate` - Certificate containing non-signer information
     pub fn new(certificate: &StandardCommitment) -> Self {
         Self {
             non_signers_pk_hashes: certificate.non_signers_pk_hashes(),
@@ -210,7 +310,7 @@ impl StorageKeyProvider for OperatorBitmapHistoryExtractor {
     }
 }
 
-// REGISTRY_COORDINATOR::getQuorumBitmapAtBlockNumberByIndex (accesses _operatorBitmapHistory)
+/// Extracts operator bitmap history from RegistryCoordinator::_operatorBitmapHistory.
 impl DataDecoder for OperatorBitmapHistoryExtractor {
     type Output = HashMap<B256, History<Bitmap>>;
 
@@ -247,12 +347,23 @@ impl DataDecoder for OperatorBitmapHistoryExtractor {
     }
 }
 
+/// Extractor for aggregate public key (APK) history from the BLS APK registry.
+///
+/// This extractor fetches the historical aggregate public keys for each quorum that signed
+/// the certificate. The APK represents the combined public key of all operators in a quorum
+/// at a specific block height, which is essential for verifying BLS aggregate signatures.
 pub struct ApkHistoryExtractor {
+    /// Numbers of quorums that signed the certificate
     pub signed_quorum_numbers: Bytes,
+    /// Indices for looking up APK history entries for each quorum
     pub quorum_apk_indices: Vec<u32>,
 }
 
 impl ApkHistoryExtractor {
+    /// Create a new APK history extractor
+    ///
+    /// # Arguments
+    /// * `certificate` - Certificate containing signed quorum information
     pub fn new(certificate: &StandardCommitment) -> Self {
         Self {
             signed_quorum_numbers: certificate.signed_quorum_numbers().clone(),
@@ -278,7 +389,8 @@ impl StorageKeyProvider for ApkHistoryExtractor {
     }
 }
 
-// BLS_APK_REGISTRY::apkHistory
+/// Extracts APK history from BlsApkRegistry::apkHistory.
+/// Contains the aggregate public keys for each quorum at different block heights.
 impl DataDecoder for ApkHistoryExtractor {
     type Output = HashMap<QuorumNumber, History<TruncHash>>;
 
@@ -316,12 +428,23 @@ impl DataDecoder for ApkHistoryExtractor {
     }
 }
 
+/// Extractor for total stake history from the stake registry.
+///
+/// This extractor fetches the historical total stake amounts for each quorum at specific
+/// block heights. The total stake is used to calculate voting thresholds and determine
+/// whether sufficient stake participated in signing the certificate.
 pub struct TotalStakeHistoryExtractor {
+    /// Numbers of quorums that signed the certificate
     pub signed_quorum_numbers: Bytes,
+    /// Indices for looking up total stake history entries
     pub non_signer_total_stake_indices: Vec<u32>,
 }
 
 impl TotalStakeHistoryExtractor {
+    /// Create a new total stake history extractor
+    ///
+    /// # Arguments
+    /// * `certificate` - Certificate containing quorum and stake index information
     pub fn new(certificate: &StandardCommitment) -> Self {
         Self {
             signed_quorum_numbers: certificate.signed_quorum_numbers().clone(),
@@ -347,7 +470,8 @@ impl StorageKeyProvider for TotalStakeHistoryExtractor {
     }
 }
 
-// STAKE_REGISTRY::getTotalStakeAtBlockNumberFromIndex (accesses _totalStakeHistory)
+/// Extracts total stake history from StakeRegistry::_totalStakeHistory.
+/// This is used by getTotalStakeAtBlockNumberFromIndex for stake calculations.
 impl DataDecoder for TotalStakeHistoryExtractor {
     type Output = HashMap<QuorumNumber, History<Stake>>;
 
@@ -387,13 +511,26 @@ impl DataDecoder for TotalStakeHistoryExtractor {
     }
 }
 
+/// Extractor for individual operator stake history from the stake registry.
+///
+/// This extractor fetches the historical stake amounts for individual operators
+/// who did not sign the certificate. This data is needed to calculate the exact
+/// stake distribution and verify that non-signers' stakes are properly accounted
+/// for in the threshold calculations.
 pub struct OperatorStakeHistoryExtractor {
+    /// Numbers of quorums that signed the certificate
     pub signed_quorum_numbers: Bytes,
+    /// Public key hashes of operators that did not sign
     pub non_signers_pk_hashes: Vec<B256>,
+    /// Nested indices for looking up stake history (per quorum, per operator)
     pub non_signer_stake_indices: Vec<Vec<u32>>,
 }
 
 impl OperatorStakeHistoryExtractor {
+    /// Create a new operator stake history extractor
+    ///
+    /// # Arguments
+    /// * `certificate` - Certificate containing non-signer and stake index information
     pub fn new(certificate: &StandardCommitment) -> Self {
         Self {
             signed_quorum_numbers: certificate.signed_quorum_numbers().clone(),
@@ -416,7 +553,8 @@ impl StorageKeyProvider for OperatorStakeHistoryExtractor {
             for &operator_id in &self.non_signers_pk_hashes {
                 // without peeking at the actual data it's impossible to associate indices with
                 // any one non_signer so it's necessary to do this cartesian product. Storage keys
-                // that map to non-existent data will return empty but won't fail
+                // that map to non-existent data will return empty but won't fail. When retrieved
+                // an empty value will be returned for inexisting storage keys
                 for &stake_index in stake_index_for_each_required_non_signer {
                     let storage_key = storage_key_helpers::nested_dynamic_array_key(
                         operator_id.into(),
@@ -433,7 +571,7 @@ impl StorageKeyProvider for OperatorStakeHistoryExtractor {
     }
 }
 
-// STAKE_REGISTRY::getStakeAtBlockNumberAndIndex (accesses operatorStakeHistory)
+/// Extracts operator stake history from StakeRegistry::operatorStakeHistory.
 impl DataDecoder for OperatorStakeHistoryExtractor {
     type Output = HashMap<B256, HashMap<QuorumNumber, History<Stake>>>;
 
@@ -494,9 +632,18 @@ impl DataDecoder for OperatorStakeHistoryExtractor {
     }
 }
 
+/// Extractor for security thresholds from the certificate verifier.
+///
+/// This extractor fetches the security threshold parameters that define the minimum
+/// requirements for certificate validation, including confirmation and adversary thresholds
+/// that determine the minimum stake percentages needed for valid signatures.
 pub struct SecurityThresholdsV2Extractor;
 
 impl SecurityThresholdsV2Extractor {
+    /// Create a new security thresholds extractor
+    ///
+    /// # Arguments
+    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new(_certificate: &StandardCommitment) -> Self {
         Self {}
     }
@@ -511,8 +658,8 @@ impl StorageKeyProvider for SecurityThresholdsV2Extractor {
     }
 }
 
-// _CERT_VERIFIER_V2::securityThresholdsV2
-// (confirmationThreshold: 55u8, adversaryThreshold: 33u8 on holesky)
+/// Extracts security thresholds from EigenDaCertVerifier::securityThresholdsV2.
+/// Example on Holesky: confirmationThreshold=55%, adversaryThreshold=33%.
 impl DataDecoder for SecurityThresholdsV2Extractor {
     type Output = SecurityThresholds;
 
@@ -539,9 +686,18 @@ impl DataDecoder for SecurityThresholdsV2Extractor {
     }
 }
 
+/// Extractor for required quorum numbers from the certificate verifier.
+///
+/// This extractor fetches the list of quorum numbers that are required to participate
+/// in certificate signing for the certificate to be considered valid. This defines
+/// which quorums must have sufficient stake participation.
 pub struct QuorumNumbersRequiredV2Extractor;
 
 impl QuorumNumbersRequiredV2Extractor {
+    /// Create a new required quorum numbers extractor
+    ///
+    /// # Arguments
+    /// * `_certificate` - Certificate (not used but kept for consistency)
     pub fn new(_certificate: &StandardCommitment) -> Self {
         Self {}
     }
@@ -556,7 +712,8 @@ impl StorageKeyProvider for QuorumNumbersRequiredV2Extractor {
     }
 }
 
-// _CERT_VERIFIER_V2::quorumNumbersRequiredV2 (0x0001 on holesky)
+/// Extracts required quorum numbers from EigenDaCertVerifier::quorumNumbersRequiredV2.
+/// Example on Holesky: 0x0001 (indicating quorum 0 and 1 are required).
 impl DataDecoder for QuorumNumbersRequiredV2Extractor {
     type Output = Bytes;
 
@@ -590,9 +747,18 @@ mod stale_stakes_forbidden {
     const STALE_STAKES_FORBIDDEN_VARIABLE_SLOT: u64 = 201;
     const MIN_WITHDRAWAL_DELAY_BLOCKS_VARIABLE_SLOT: u64 = 157;
 
+    /// Extractor for the stale stakes forbidden flag from the service manager.
+    ///
+    /// This extractor determines whether stale stakes are forbidden in the current
+    /// configuration. When enabled, this prevents operators from using outdated
+    /// stake information for validation.
     pub struct StaleStakesForbiddenExtractor;
 
     impl StaleStakesForbiddenExtractor {
+        /// Create a new stale stakes forbidden extractor
+        ///
+        /// # Arguments
+        /// * `_certificate` - Certificate (not used but kept for consistency)
         pub fn new(_certificate: &StandardCommitment) -> Self {
             Self {}
         }
@@ -607,7 +773,8 @@ mod stale_stakes_forbidden {
         }
     }
 
-    // _SERVICE_MANAGER::staleStakesForbidden (false on holesky)
+    /// Extracts stale stakes flag from EigenDAServiceManager::staleStakesForbidden.
+    /// Example on Holesky: false (stale stakes are allowed).
     impl DataDecoder for StaleStakesForbiddenExtractor {
         type Output = bool;
 
@@ -626,9 +793,18 @@ mod stale_stakes_forbidden {
         }
     }
 
+    /// Extractor for minimum withdrawal delay blocks from the delegation manager.
+    ///
+    /// This extractor fetches the minimum number of blocks that must pass before
+    /// stake withdrawals can be completed. This delay is a security mechanism
+    /// to prevent rapid stake changes that could affect validation integrity.
     pub struct MinWithdrawalDelayBlocksExtractor;
 
     impl MinWithdrawalDelayBlocksExtractor {
+        /// Create a new minimum withdrawal delay blocks extractor
+        ///
+        /// # Arguments
+        /// * `_certificate` - Certificate (not used but kept for consistency)
         pub fn new(_certificate: &StandardCommitment) -> Self {
             Self {}
         }
@@ -643,7 +819,8 @@ mod stale_stakes_forbidden {
         }
     }
 
-    // DELEGATION_MANAGER::minWithdrawalDelayBlocks
+    /// Extracts minimum withdrawal delay from DelegationManager::minWithdrawalDelayBlocks.
+    /// Defines the security delay period for stake withdrawals.
     impl DataDecoder for MinWithdrawalDelayBlocksExtractor {
         type Output = u32;
 
@@ -662,11 +839,21 @@ mod stale_stakes_forbidden {
         }
     }
 
+    /// Extractor for quorum update block numbers from the registry coordinator.
+    ///
+    /// This extractor fetches the block numbers when each quorum was last updated.
+    /// This information is used in conjunction with stale stakes prevention to ensure
+    /// that stake information is sufficiently recent for validation purposes.
     pub struct QuorumUpdateBlockNumberExtractor {
+        /// Numbers of quorums that signed the certificate
         pub signed_quorum_numbers: Bytes,
     }
 
     impl QuorumUpdateBlockNumberExtractor {
+        /// Create a new quorum update block number extractor
+        ///
+        /// # Arguments
+        /// * `certificate` - Certificate containing signed quorum information
         pub fn new(certificate: &StandardCommitment) -> Self {
             Self {
                 signed_quorum_numbers: certificate.signed_quorum_numbers().clone(),
@@ -689,7 +876,8 @@ mod stale_stakes_forbidden {
         }
     }
 
-    // REGISTRY_COORDINATOR::quorumUpdateBlockNumber
+    /// Extracts quorum update blocks from RegistryCoordinator::quorumUpdateBlockNumber.
+    /// Tracks when each quorum configuration was last modified.
     impl DataDecoder for QuorumUpdateBlockNumberExtractor {
         type Output = HashMap<QuorumNumber, BlockNumber>;
 

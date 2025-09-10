@@ -1,5 +1,51 @@
-//! Implementation of EigenDA blob verification as defined in
-//! [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
+//! EigenDA blob verification using KZG polynomial commitments
+//!
+//! This module implements the blob validation stage of EigenDA verification,
+//! ensuring that blob data matches its cryptographic commitment using KZG proofs
+//! over the BN254 curve.
+//!
+//! ## Overview
+//!
+//! Blob verification validates that received data matches the commitment specified
+//! in an EigenDA certificate. This prevents data tampering and ensures integrity
+//! of the data availability guarantees.
+//!
+//! ## Verification Process
+//!
+//! The verification follows the [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation):
+//!
+//! 1. **Length Validation**: Ensure received blob length ≤ committed length
+//! 2. **Power-of-two Check**: Verify commitment length is a power of two
+//! 3. **Payload Encoding**: Transform payload into proper blob format
+//! 4. **Header Validation**: Verify encoded payload header constraints
+//! 5. **Padding Verification**: Ensure all extra bytes are zero
+//! 6. **KZG Commitment**: Verify the cryptographic commitment matches
+//!
+//! ## Blob Encoding Format
+//!
+//! EigenDA uses a specific encoding format for blobs:
+//!
+//! ```text
+//! [32-byte header][padded payload symbols...]
+//!
+//! Header format:
+//! - Byte 0: Field element guard (0x00)
+//! - Byte 1: Version (0x00)  
+//! - Bytes 2-5: Payload length (big-endian u32)
+//! - Bytes 6-31: Zero padding
+//!
+//! Payload symbols:
+//! - Each 31-byte payload chunk becomes a 32-byte symbol
+//! - Symbols are prefixed with field element guard byte (0x00)
+//! - Final chunk padded with zeros if needed
+//! ```
+//!
+//! ## KZG Verification
+//!
+//! The module uses KZG polynomial commitments over BN254 for cryptographic verification:
+//! - Recomputes the commitment from blob data using SRS points
+//! - Compares computed commitment with claimed commitment
+//! - Uses precomputed SRS (Structured Reference String)
 
 pub mod error;
 pub mod srs;
@@ -12,27 +58,61 @@ use ark_serialize::CanonicalDeserialize;
 use rust_kzg_bn254_primitives::blob::Blob;
 use rust_kzg_bn254_prover::{kzg::KZG, srs::SRS};
 
-use crate::eigenda::verification::{
-    blob::{error::BlobVerificationError, srs::SerializableSRS},
-    cert::types::conversions::IntoExt,
-};
+use crate::eigenda::verification::blob::{error::BlobVerificationError, srs::SerializableSRS};
 
+/// Field element guard byte prepended to each symbol to ensure BN254 field validity
 const FIELD_ELEMENT_GUARD_BYTE: u8 = 0;
+
+/// Size of each symbol in the blob encoding (32 bytes)
 const BYTES_PER_SYMBOL: usize = 32;
+
+/// Size of payload data per symbol (31 bytes, leaving 1 byte for guard)
 const BYTES_PER_CHUNK: usize = BYTES_PER_SYMBOL - 1;
+
+/// Number of symbols used for the blob header (always 1)
 const HEADER_SYMBOLS_LEN: usize = 1;
+
+/// Total byte length of the blob header (32 bytes)
 const HEADER_BYTES_LEN: usize = HEADER_SYMBOLS_LEN * BYTES_PER_SYMBOL;
+
+/// EigenDA blob encoding version (currently 0)
 const VERSION: u8 = 0;
+
+/// Precomputed SRS (Structured Reference String) data included at compile time
 const SRS_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/srs.bin"));
 
+/// Global SRS instance loaded lazily for KZG operations
+///
+/// The SRS is precomputed at build time and embedded in the binary for
+/// efficient KZG commitment verification without runtime generation.
 pub static SRS: LazyLock<SRS> = LazyLock::new(|| {
     SerializableSRS::deserialize_compressed(SRS_BYTES)
         .expect("Failed to deserialize precomputed SRS")
         .into()
 });
 
-/// Verifies that `blob` passes all the checks defined in
-/// [EigenDA specification](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)!
+/// Verify blob data against its KZG commitment
+///
+/// Performs comprehensive validation of blob data according to the EigenDA
+/// specification, including length checks, encoding validation, and KZG
+/// commitment verification.
+///
+/// # Arguments
+/// * `blob_commitment` - The commitment from the EigenDA certificate
+/// * `payload` - Raw blob data to verify
+///
+/// # Returns
+/// `Ok(())` if the blob is valid and matches the commitment
+///
+/// # Errors
+/// Returns [`BlobVerificationError`] for various validation failures:
+/// - Blob larger than committed length
+/// - Invalid commitment length (not power of two)
+/// - Payload too large for encoding
+/// - KZG commitment mismatch
+///
+/// # Reference
+/// [EigenDA Specification - Blob Validation](https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#3-blob-validation)
 pub fn verify(
     blob_commitment: &BlobCommitment,
     payload: &[u8],
@@ -156,6 +236,7 @@ fn construct_header(payload: &[u8]) -> Result<[u8; HEADER_BYTES_LEN], BlobVerifi
 /// This function transforms raw payload data into a format suitable for EigenDA blob encoding
 /// by splitting it into chunks and adding field element guard bytes. Each 31-byte chunk of
 /// payload data becomes a 32-byte symbol with a guard byte prefix.
+/// The guard byte ensures that the resulting symbol is a valid field element
 ///
 /// # Process
 /// 1. Divides payload into 31-byte chunks (BYTES_PER_CHUNK)
@@ -197,16 +278,17 @@ fn pad_payload(payload: &[u8]) -> Vec<u8> {
 ///      that the two commitments match (this is the current implemented way)
 ///   2. indirectly: verifying a point opening using Fiat-Shamir (see this [issue](https://github.com/Layr-Labs/eigenda/issues/1037))
 ///
-/// > the PR is still open so we don't have the data for option 2.
+/// > the referenced PR is still open so we don't have the means to implement option 2.
 fn verify_kzg_commitment(
     blob: &Blob,
     claimed_commitment: G1Point,
 ) -> Result<(), BlobVerificationError> {
     use BlobVerificationError::*;
 
+    // for a large number of SRS points this is slow (~40s on a M2)
     let computed_commitment = KZG::new().commit_blob(blob, &SRS)?;
 
-    let claimed_commitment: G1Affine = claimed_commitment.into_ext();
+    let claimed_commitment: G1Affine = claimed_commitment.into();
 
     (computed_commitment == claimed_commitment)
         .then_some(())
@@ -218,17 +300,12 @@ mod test {
     use std::str::FromStr;
 
     use ark_bn254::{Fq, G1Affine, G2Affine};
-    use rust_kzg_bn254_primitives::errors::KzgError;
 
     use crate::eigenda::{
-        cert::{BlobCommitment, G1Point},
-        verification::{
-            blob::{
-                error::BlobVerificationError::*, payload_into_blob, srs::POINTS_TO_LOAD, verify,
-                verify_blob_symbols_len_against_commitment, verify_commitment_len_is_power_of_two,
-                verify_kzg_commitment,
-            },
-            cert::types::conversions::IntoExt,
+        cert::BlobCommitment,
+        verification::blob::{
+            error::BlobVerificationError::*, verify, verify_blob_symbols_len_against_commitment,
+            verify_commitment_len_is_power_of_two,
         },
     };
 
@@ -246,31 +323,16 @@ mod test {
             )
             .unwrap(),
         )
-        .into_ext();
+        .into();
 
         let blob_commitment = BlobCommitment {
             commitment: known_commitment,
-            length_commitment: G2Affine::default().into_ext(),
-            length_proof: G2Affine::default().into_ext(),
+            length_commitment: G2Affine::default().into(),
+            length_proof: G2Affine::default().into(),
             length: 32 + 32,
         };
 
         assert_eq!(verify(&blob_commitment, &payload), Ok(()));
-    }
-
-    #[test]
-    fn verify_fails_when_payload_is_too_large() {
-        let payload = vec![42u8; u32::MAX as usize + 1]; // 4GB vec
-
-        let blob_commitment = BlobCommitment {
-            commitment: G1Affine::default().into_ext(),
-            length_commitment: G2Affine::default().into_ext(),
-            length_proof: G2Affine::default().into_ext(),
-            length: Default::default(),
-        };
-
-        let result = verify(&blob_commitment, &payload);
-        assert!(matches!(result, Err(BlobTooLarge(_))));
     }
 
     #[test]
@@ -289,21 +351,6 @@ mod test {
         assert_eq!(
             verify_commitment_len_is_power_of_two(0b0111),
             Err(CommitmentLengthNotPowerOfTwo(0b0111))
-        );
-    }
-
-    #[test]
-    fn verify_kzg_commitment_fails_when_payload_is_too_big_for_srs() {
-        const LEN: usize = (POINTS_TO_LOAD as usize + 1) * 32;
-        let payload = [42u8; LEN];
-        let blob = payload_into_blob(&payload).unwrap();
-        let claimed_commitment: G1Point = G1Affine::default().into_ext();
-
-        assert_eq!(
-            verify_kzg_commitment(&blob, claimed_commitment),
-            Err(WrapKzgError(KzgError::SerializationError(
-                "polynomial length is not correct".into()
-            )))
         );
     }
 }

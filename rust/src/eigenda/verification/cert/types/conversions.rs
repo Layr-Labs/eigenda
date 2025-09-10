@@ -1,4 +1,39 @@
-use crate::eigenda::cert::{BlobCommitment, G1Point, G2Point};
+//! Type conversion utilities between EigenDA and arkworks representations
+//!
+//! This module provides conversion implementations for seamlessly converting
+//! between EigenDA's Solidity-compatible types and arkworks' cryptographic types used
+//! for elliptic curve operations.
+//!
+//! ## Key Conversions
+//!
+//! - **G1Point ↔ G1Affine**: Converts between EigenDA's 256-bit coordinate representation
+//!   and arkworks' native BN254 G1 point format using standard `From`/`Into` traits
+//! - **G2Point ↔ G2Affine**: Handles the more complex G2 field extension elements
+//! - **Identity/Zero handling**: Properly maps between different representations of
+//!   the point at infinity
+//!
+//! ## Design Principles
+//!
+//! - **Standard Rust traits**: Uses `From`/`Into` for type conversions, following Rust conventions
+//! - **Bidirectional conversions**: All conversions are implemented in both directions
+//! - **Field element ordering**: Correctly handles the [imaginary, real] vs [real, imaginary] 
+//!   difference between EigenDA and arkworks G2 representations
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use ark_bn254::G1Affine;
+//! use sov_eigenda_adapter::eigenda::cert::G1Point;
+//!
+//! // Convert arkworks point to EigenDA format
+//! let arkworks_point = G1Affine::generator();
+//! let eigenda_point: G1Point = arkworks_point.into();
+//!
+//! // Convert back to arkworks format  
+//! let back_to_arkworks: G1Affine = eigenda_point.into();
+//! ```
+
+use crate::eigenda::cert::{G1Point, G2Point};
 use alloy_primitives::Uint;
 use ark_bn254::{Fq, Fq2, G1Affine, G2Affine};
 use ark_ec::AffineRepr;
@@ -6,32 +41,13 @@ use ark_ff::PrimeField;
 
 use crate::eigenda::verification::cert::convert;
 
-pub trait DefaultExt: Sized {
-    fn default_ext() -> Self;
-}
-
-impl DefaultExt for BlobCommitment {
-    fn default_ext() -> Self {
-        Self {
-            commitment: G1Point::default_ext(),
-            length_commitment: G2Point::default_ext(),
-            length_proof: G2Point::default_ext(),
-            length: u32::default(),
-        }
-    }
-}
-
-impl DefaultExt for G1Point {
-    fn default_ext() -> Self {
-        Self {
-            x: Uint::ZERO,
-            y: Uint::ZERO,
-        }
-    }
-}
-
-impl DefaultExt for G2Point {
-    fn default_ext() -> Self {
+impl Default for G2Point {
+    /// Create a default G2Point representing the point at infinity.
+    ///
+    /// Returns a G2Point with all coordinates set to zero, which represents
+    /// the identity element (point at infinity) in EigenDA's representation.
+    /// This is equivalent to the identity point in arkworks G2Affine.
+    fn default() -> Self {
         Self {
             x: vec![Uint::ZERO, Uint::ZERO],
             y: vec![Uint::ZERO, Uint::ZERO],
@@ -39,54 +55,52 @@ impl DefaultExt for G2Point {
     }
 }
 
-pub trait FromExt<T>: Sized {
-    fn from_ext(value: T) -> Self;
-}
-
-pub trait IntoExt<T>: Sized {
-    fn into_ext(self) -> T;
-}
-
-impl<T, U> IntoExt<U> for T
-where
-    U: FromExt<T>,
-{
-    fn into_ext(self) -> U {
-        FromExt::from_ext(self)
-    }
-}
-
-impl FromExt<G1Affine> for G1Point {
-    fn from_ext(affine: G1Affine) -> Self {
+impl From<G1Affine> for G1Point {
+    /// Convert an arkworks G1Affine point to EigenDA's G1Point representation.
+    ///
+    /// Handles the identity/infinity point by returning a zero representation
+    /// when the arkworks point is at infinity.
+    fn from(affine: G1Affine) -> Self {
         match affine.xy() {
             Some((x, y)) => G1Point {
                 x: convert::fq_to_uint(x),
                 y: convert::fq_to_uint(y),
             },
-            None => G1Point::default_ext(),
+            None => G1Point::default(),
         }
     }
 }
 
-impl FromExt<G2Affine> for G2Point {
-    /// EigenDA points are represented as [imaginary, real]
+impl From<G2Affine> for G2Point {
+    /// Convert an arkworks G2Affine point to EigenDA's G2Point representation.
     ///
-    /// `ark_bn254` points are represented as [real, imaginary]
+    /// **Important field element ordering difference:**
+    /// - EigenDA points are represented as [imaginary, real]
+    /// - arkworks points are represented as [real, imaginary]
     ///
-    /// This conversion takes care of correctly mapping one to the other
-    fn from_ext(affine: G2Affine) -> Self {
+    /// This conversion correctly maps between the two representations and
+    /// handles the identity/infinity point by returning zeros.
+    fn from(affine: G2Affine) -> Self {
         match affine.xy() {
             Some((x, y)) => G2Point {
                 x: vec![convert::fq_to_uint(x.c1), convert::fq_to_uint(x.c0)],
                 y: vec![convert::fq_to_uint(y.c1), convert::fq_to_uint(y.c0)],
             },
-            None => G2Point::default_ext(),
+            None => G2Point::default(),
         }
     }
 }
 
-impl FromExt<G1Point> for G1Affine {
-    fn from_ext(point: G1Point) -> G1Affine {
+impl From<G1Point> for G1Affine {
+    /// Convert EigenDA's G1Point representation to arkworks G1Affine.
+    ///
+    /// Detects the zero point (both coordinates zero) and maps it to
+    /// arkworks' identity representation. Otherwise converts the 256-bit
+    /// coordinates to field elements using big-endian byte order.
+    ///
+    /// Uses `new_unchecked` since we trust the input coordinates represent
+    /// a valid curve point from EigenDA's verified data.
+    fn from(point: G1Point) -> G1Affine {
         if point.x.is_zero() && point.y.is_zero() {
             return G1Affine::identity();
         }
@@ -101,13 +115,19 @@ impl FromExt<G1Point> for G1Affine {
     }
 }
 
-impl FromExt<G2Point> for G2Affine {
-    /// EigenDA points are represented as [imaginary, real]
+impl From<G2Point> for G2Affine {
+    /// Convert EigenDA's G2Point representation to arkworks G2Affine.
     ///
-    /// `ark_bn254` points are represented as [real, imaginary]
+    /// **Important field element ordering difference:**
+    /// - EigenDA points are represented as [imaginary, real]
+    /// - arkworks points are represented as [real, imaginary]
     ///
-    /// This conversion takes care of correctly mapping one to the other
-    fn from_ext(point: G2Point) -> Self {
+    /// This conversion correctly maps between the two representations,
+    /// detects zero points, and creates valid G2 field extension elements.
+    ///
+    /// Uses `new_unchecked` since we trust the input represents a valid
+    /// curve point from EigenDA's verified data.
+    fn from(point: G2Point) -> Self {
         if point.x[0].is_zero()
             && point.y[0].is_zero()
             && point.x[1].is_zero()
@@ -145,7 +165,7 @@ mod tests {
             y: uint!(987654321_U256),
         };
 
-        let affine: G1Affine = point.into_ext();
+        let affine: G1Affine = point.into();
         assert!(!affine.is_zero());
     }
 
@@ -163,8 +183,8 @@ mod tests {
         ]);
         let point = G1Affine::new_unchecked(x, y);
 
-        let converted: G1Point = point.into_ext();
-        let back_converted: G1Affine = converted.into_ext();
+        let converted: G1Point = point.into();
+        let back_converted: G1Affine = converted.into();
 
         assert_eq!(point, back_converted);
     }
@@ -172,7 +192,7 @@ mod tests {
     #[test]
     fn test_affine_to_point_identity() {
         let affine = G1Affine::identity();
-        let point: G1Point = affine.into_ext();
+        let point: G1Point = affine.into();
 
         assert_eq!(point.x, Uint::ZERO);
         assert_eq!(point.y, Uint::ZERO);
@@ -185,7 +205,7 @@ mod tests {
             y: Uint::ZERO,
         };
 
-        let affine: G1Affine = point.into_ext();
+        let affine: G1Affine = point.into();
         assert_eq!(affine, G1Affine::identity());
     }
 
@@ -196,7 +216,7 @@ mod tests {
             y: vec![uint!(987654321_U256), uint!(444555666_U256)],
         };
 
-        let affine: G2Affine = point.into_ext();
+        let affine: G2Affine = point.into();
         assert!(!affine.is_zero());
     }
 
@@ -226,8 +246,8 @@ mod tests {
         let y = Fq2::new(y_c0, y_c1);
         let affine = G2Affine::new_unchecked(x, y);
 
-        let converted: G2Point = affine.into_ext();
-        let back_converted: G2Affine = converted.into_ext();
+        let converted: G2Point = affine.into();
+        let back_converted: G2Affine = converted.into();
 
         assert_eq!(affine, back_converted);
     }
@@ -235,7 +255,7 @@ mod tests {
     #[test]
     fn test_affine_to_point_identity_g2() {
         let affine = G2Affine::identity();
-        let point: G2Point = affine.into_ext();
+        let point: G2Point = affine.into();
 
         assert_eq!(point.x[0], Uint::ZERO);
         assert_eq!(point.x[1], Uint::ZERO);
@@ -250,7 +270,7 @@ mod tests {
             y: vec![Uint::ZERO, Uint::ZERO],
         };
 
-        let affine: G2Affine = point.into_ext();
+        let affine: G2Affine = point.into();
         assert_eq!(affine, G2Affine::identity());
     }
 }

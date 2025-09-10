@@ -79,7 +79,7 @@ pub struct RollupParams {
     pub rollup_proof_namespace: NamespaceId,
     /// A cert is considered valid when it is included onchain before the cert's ReferenceBlockNumber (RBN) + the cert's CPW (Cert punctuality window).
     ///
-    /// https://docs.eigencloud.xyz/products/eigenda/integrations-guides/rollup-guides/glossary#cert-punctuality-window
+    /// <https://docs.eigencloud.xyz/products/eigenda/integrations-guides/rollup-guides/glossary#cert-punctuality-window>
     pub cert_recency_window: u64,
 }
 

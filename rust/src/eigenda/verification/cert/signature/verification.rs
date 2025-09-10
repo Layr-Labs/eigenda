@@ -1,3 +1,26 @@
+//! BLS signature verification using bilinear pairings
+//!
+//! This module implements BLS signature verification for EigenDA certificates using
+//! the BN254 pairing-friendly elliptic curve. It verifies that aggregate signatures
+//! were indeed created by the claimed aggregate public keys.
+//!
+//! ## BLS Signature Verification
+//!
+//! The verification process uses bilinear pairings to check the equation:
+//! `e(σ + γG₁, -G₂) · e(H(m) + γG₁, APK_G₂) = 1`
+//!
+//! Where:
+//! - `σ`: The aggregate signature (G₁ point)
+//! - `APK_G₂`: Aggregate public key on G₂
+//! - `H(m)`: Hash-to-curve of the message  
+//! - `γ`: Challenge derived from Fiat-Shamir heuristic
+//! - `G₁`, `G₂`: Curve generators
+//!
+//! ## Security
+//!
+//! The challenge `γ` is computed as `keccak256(H(m) || APK_G₁ || APK_G₂ || σ)`
+//! to prevent rogue public key attacks in the aggregate setting.
+
 use alloy_primitives::B256;
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
 use ark_ec::{
@@ -8,10 +31,25 @@ use ark_ff::{AdditiveGroup, PrimeField};
 
 use crate::eigenda::verification::cert::{convert, hash::streaming_keccak256};
 
-/// Verifies the `sigma` signature over `msg_hash` by the (`apk_g1`, `apk_g2`) pubkey
-/// by checking e(sigma + apk_g1 * gamma, -G2) * e(msg_hash + G1 * gamma, apk_g2) == 1
+/// Verify a BLS signature using bilinear pairings.
 ///
-/// Where gamma = keccak256(msg || apk_g1 || apk_g2 || sigma)
+/// Checks if the signature `sigma` was created by holders of the aggregate public key
+/// (`apk_g1`, `apk_g2`) over the message `msg_hash`.
+///
+/// # Arguments
+/// * `msg_hash` - 32-byte hash of the message that was signed
+/// * `apk_g1` - Aggregate public key on G₁ (used for challenge computation)
+/// * `apk_g2` - Aggregate public key on G₂ (used in pairing verification)  
+/// * `sigma` - Aggregate signature to verify (G₁ point)
+///
+/// # Returns
+/// `true` if the signature is valid, `false` otherwise
+///
+/// # Algorithm
+/// Verifies the equation: `e(σ + γG₁, -G₂) · e(H(m) + γG₁, APK_G₂) = 1`
+///
+/// Where `γ = keccak256(msg_hash || apk_g1 || apk_g2 || sigma)` is a Fiat-Shamir challenge
+/// that prevents rogue public key attacks in the aggregate signature setting.
 pub fn verify(msg_hash: B256, apk_g1: G1Affine, apk_g2: G2Affine, sigma: G1Affine) -> bool {
     let Some(gamma) = compute_gamma(msg_hash, apk_g1, apk_g2, sigma) else {
         return false;
@@ -31,6 +69,19 @@ pub fn verify(msg_hash: B256, apk_g1: G1Affine, apk_g2: G2Affine, sigma: G1Affin
     pairing_result == Some(PairingOutput::ZERO)
 }
 
+/// Compute the Fiat-Shamir challenge for BLS signature verification.
+///
+/// Creates a cryptographic challenge by hashing all public parameters
+///
+/// # Arguments
+/// * `msg_hash` - Hash of the signed message
+/// * `apk_g1` - Aggregate public key on G₁
+/// * `apk_g2` - Aggregate public key on G₂  
+/// * `sigma` - Signature being verified
+///
+/// # Returns
+/// * `Some(Fr)` - Challenge scalar if all points are valid (not at infinity)
+/// * `None` - If any input point is at infinity (invalid)
 fn compute_gamma(
     msg_hash: B256,
     apk_g1: G1Affine,

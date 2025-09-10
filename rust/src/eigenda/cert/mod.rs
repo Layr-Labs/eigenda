@@ -1,3 +1,23 @@
+//! EigenDA Certificate Types and Structures
+//!
+//! This module provides Rust types for working with EigenDA certificates, which are used
+//! to verify the inclusion of data blobs in the EigenDA network. The module supports
+//! both version 2 and version 3 certificates.
+//!
+//! ## Key Components
+//!
+//! - [`StandardCommitment`] - Main wrapper for versioned certificates with RLP serialization
+//! - [`EigenDAVersionedCert`] - Enum representing different certificate versions
+//! - [`EigenDACertV2`]/[`EigenDACertV3`] - Version-specific certificate structures
+//! - [`BlobInclusionInfo`] - Information about blob inclusion in batches
+//! - [`BatchHeaderV2`] - Batch header containing batch root and reference block
+//! - [`G1Point`]/[`G2Point`] - Elliptic curve points for cryptographic operations
+//! ```
+//!
+//! ## Notes
+//!
+//! - Due to sovereign-sdk compatibility constraints these types could not be imported from [rust-eigenda-v2-common](https://crates.io/crates/rust-eigenda-v2-common)
+
 mod solidity;
 
 use alloy_primitives::{B256, Bytes, FixedBytes, U256};
@@ -15,10 +35,34 @@ const VERSION_2: u8 = 1;
 /// Byte indicating a version 3 certificate.
 const VERSION_3: u8 = 2;
 
+/// Main wrapper for EigenDA certificates supporting multiple versions.
+///
+/// This structure provides a unified interface for working with different versions
+/// of EigenDA certificates (V2 and V3). It handles RLP serialization/deserialization
+/// and provides version-agnostic access to certificate data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StandardCommitment(EigenDAVersionedCert);
 
 impl StandardCommitment {
+    /// Parse a certificate from RLP-encoded bytes.
+    ///
+    /// The first byte indicates the certificate version (1 for V2, 2 for V3),
+    /// followed by the RLP-encoded certificate data.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The RLP-encoded certificate bytes including version prefix
+    ///
+    /// # Returns
+    ///
+    /// Returns a `StandardCommitment` on success, or a parse error if the data
+    /// is invalid or uses an unsupported version.
+    ///
+    /// # Errors
+    ///
+    /// * [`StandardCommitmentParseError::InsufficientData`] - If bytes are empty
+    /// * [`StandardCommitmentParseError::UnsupportedCertVersion`] - If version is not supported
+    /// * [`StandardCommitmentParseError::InvalidRlpCert`] - If RLP decoding fails
     pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, StandardCommitmentParseError> {
         let (cert_version, mut cert_bytes) = bytes
             .split_first()
@@ -45,6 +89,14 @@ impl StandardCommitment {
         Ok(Self(versioned_cert))
     }
 
+    /// Serialize the certificate to RLP-encoded bytes.
+    ///
+    /// The output includes a version byte prefix followed by the RLP-encoded
+    /// certificate data.
+    ///
+    /// # Returns
+    ///
+    /// Returns the complete certificate as RLP-encoded bytes with version prefix.
     pub fn to_rlp_bytes(&self) -> Bytes {
         let mut bytes = Vec::new();
         match &self.0 {
@@ -61,7 +113,14 @@ impl StandardCommitment {
         Bytes::from(bytes)
     }
 
-    /// Get reference block used when constructing this certificate.
+    /// Get the reference block number used when constructing this certificate.
+    ///
+    /// The reference block number is used for verifying the certificate against
+    /// the blockchain state at a specific block height.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reference block number as a u64.
     pub fn reference_block(&self) -> u64 {
         match &self.0 {
             EigenDAVersionedCert::V2(c) => c.batch_header_v2.reference_block_number as u64,
@@ -69,6 +128,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get the blob header version from the certificate.
+    ///
+    /// # Returns
+    ///
+    /// Returns the blob header version number.
     pub fn version(&self) -> u16 {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -86,6 +150,13 @@ impl StandardCommitment {
         }
     }
 
+    /// Get hashes of public keys of non-signing validators.
+    ///
+    /// These are validators that did not participate in signing the certificate.
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of 32-byte hashes of non-signer public keys.
     pub fn non_signers_pk_hashes(&self) -> Vec<B256> {
         let pks = match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -100,6 +171,11 @@ impl StandardCommitment {
         pks.map(convert::point_to_hash).collect()
     }
 
+    /// Get indices in the quorum bitmap for non-signing validators.
+    ///
+    /// # Returns
+    ///
+    /// Returns a slice of indices corresponding to non-signers in the quorum bitmap.
     pub fn non_signer_quorum_bitmap_indices(&self) -> &[u32] {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -116,6 +192,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get the quorums that signed this certificate.
+    ///
+    /// # Returns
+    ///
+    /// Returns the quorum numbers as bytes.
     pub fn signed_quorum_numbers(&self) -> &Bytes {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => &cert.signed_quorum_numbers,
@@ -123,6 +204,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get indices of aggregate public keys for each quorum.
+    ///
+    /// # Returns
+    ///
+    /// Returns indices pointing to the aggregate public keys used for verification.
     pub fn quorum_apk_indices(&self) -> &[u32] {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -134,6 +220,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get indices of total stakes for non-signing operators.
+    ///
+    /// # Returns
+    ///
+    /// Returns indices for looking up total stake amounts of non-signers.
     pub fn non_signer_total_stake_indices(&self) -> &[u32] {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -145,6 +236,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get stake indices for non-signing operators per quorum.
+    ///
+    /// # Returns
+    ///
+    /// Returns a nested vector of stake indices, organized by quorum.
     pub fn non_signer_stake_indices(&self) -> &[Vec<u32>] {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => {
@@ -156,6 +252,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get a reference to the batch header.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reference to the BatchHeaderV2 containing batch metadata.
     pub fn batch_header_v2(&self) -> &BatchHeaderV2 {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => &cert.batch_header_v2,
@@ -163,6 +264,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get blob inclusion information.
+    ///
+    /// # Returns
+    ///
+    /// Returns blob inclusion metadata.
     pub fn blob_inclusion_info(&self) -> &BlobInclusionInfo {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => &cert.blob_inclusion_info,
@@ -170,6 +276,11 @@ impl StandardCommitment {
         }
     }
 
+    /// Get non-signer stakes and signature information.
+    ///
+    /// # Returns
+    ///
+    /// Returns complete information about non-signers including their stakes and signatures.
     pub fn nonsigner_stake_and_signature(&self) -> &NonSignerStakesAndSignature {
         match &self.0 {
             EigenDAVersionedCert::V2(cert) => &cert.nonsigner_stake_and_signature,
@@ -178,46 +289,89 @@ impl StandardCommitment {
     }
 }
 
-/// EigenDa versioned certificate
+/// EigenDA versioned certificate enum.
+///
+/// This enum wraps different versions of EigenDA certificates, allowing
+/// the system to handle multiple certificate formats transparently.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum EigenDAVersionedCert {
+    /// Version 2 certificate
     V2(EigenDACertV2),
+    /// Version 3 certificate
     V3(EigenDACertV3),
 }
 
-/// EigenDA CertV2
+/// EigenDA Certificate Version 2.
+///
+/// This structure represents a version 2 certificate containing all necessary
+/// information for verifying blob inclusion in the EigenDA network.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct EigenDACertV2 {
+    /// Information about blob inclusion in the batch
     pub blob_inclusion_info: BlobInclusionInfo,
+    /// Batch header containing batch metadata
     pub batch_header_v2: BatchHeaderV2,
+    /// Non-signer information and signatures
     pub nonsigner_stake_and_signature: NonSignerStakesAndSignature,
+    /// Numbers of quorums that signed this certificate
     pub signed_quorum_numbers: Bytes,
 }
 
-/// EigenDA CertV3
+/// EigenDA Certificate Version 3.
+///
+/// This structure represents a version 3 certificate with the same core components
+/// as V2 but potentially different field ordering or processing logic.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct EigenDACertV3 {
+    /// Batch header containing batch metadata
     pub batch_header_v2: BatchHeaderV2,
+    /// Information about blob inclusion in the batch
     pub blob_inclusion_info: BlobInclusionInfo,
+    /// Non-signer information and signatures
     pub nonsigner_stake_and_signature: NonSignerStakesAndSignature,
+    /// Numbers of quorums that signed this certificate
     pub signed_quorum_numbers: Bytes,
 }
 
-/// BatchHeaderV2 is the version 2 of batch header which is defined by the EigenDA protocol
-/// This version is separate from the cert Version. For example, Cert V3 can use BatchHeaderV2
-/// since V2 is a tag for EigenDA protocol. The V2 is added to the suffix of the name for
-/// matching the same variable name for its solidity part.
-/// <https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L47>
+/// Batch Header Version 2 as defined by the EigenDA protocol.
+///
+/// This version is separate from the certificate version. For example, Certificate V3
+/// can use BatchHeaderV2 since V2 is a tag for the EigenDA protocol. The V2 suffix
+/// matches the corresponding Solidity struct name.
+///
+/// Reference: [EigenDATypesV2.sol](https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L47)
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BatchHeaderV2 {
+    /// 32-byte root hash of the batch merkle tree
     pub batch_root: [u8; 32],
+    /// Ethereum block number used as reference point for operator set verification
+    ///
+    /// This block number serves as a "snapshot" of the EigenDA operator set state
+    /// for signature verification. When operators sign batches, their stakes and
+    /// registered quorums are validated against the historical state at this specific
+    /// block number, ensuring that signature verification uses a consistent view of
+    /// the operator set even if operators join/leave or update their stakes after
+    /// creating their signatures.
+    ///
+    /// The reference block number must be:
+    /// - Less than the current block number when verification occurs
+    /// - Within the stale stakes window (if stale stakes are forbidden)
+    /// - Used consistently across all operator state lookups during verification
+    ///
+    /// See: [BLSSignatureChecker.checkSignatures](https://github.com/Layr-Labs/eigenlayer-middleware/blob/dev/docs/BLSSignatureChecker.md#blssignaturecheckerchecksignatures)
     pub reference_block_number: u32,
 }
 
-/// The V2 is added to the suffix of the name for matching the same variable name
-/// for its solidity part.
-/// <https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L28>
 impl BatchHeaderV2 {
+    /// Convert this batch header to its Solidity representation.
+    ///
+    /// The V2 suffix matches the corresponding Solidity struct name in the EigenDA contracts.
+    ///
+    /// Reference: [EigenDATypesV2.sol](https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L28)
+    ///
+    /// # Returns
+    ///
+    /// Returns a `solidity::BatchHeaderV2` struct for use in contract interactions.
     pub fn to_sol(&self) -> solidity::BatchHeaderV2 {
         solidity::BatchHeaderV2 {
             batchRoot: FixedBytes::<32>(self.batch_root),
@@ -226,43 +380,72 @@ impl BatchHeaderV2 {
     }
 }
 
-/// BlobInclusionInfo contains inclusion proof information for a blob
+/// Information required to prove blob inclusion in a batch.
+///
+/// This structure contains all the data needed to verify that a specific blob
+/// is included in the batch at the specified index.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BlobInclusionInfo {
+    /// Certificate containing blob metadata and commitments
     pub blob_certificate: BlobCertificate,
+    /// Index of the blob within the batch
     pub blob_index: u32,
+    /// Merkle proof data for inclusion verification
     pub inclusion_proof: Bytes,
 }
 
-// BlobCertificate contains certification information for a blob
+/// Certificate containing all necessary information about a blob.
+///
+/// This structure includes the blob header with commitments, signatures,
+/// and relay keys used for blob retrieval.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BlobCertificate {
+    /// Header containing blob metadata and commitments
     pub blob_header: BlobHeaderV2,
+    /// Cryptographic signature over the blob data
     pub signature: Bytes,
+    /// Keys for relaying/retrieving the blob data
     pub relay_keys: Vec<RelayKey>,
 }
 
-// BlobHeaderV2 is the version 2 of blob header
-// This version is separate from the cert Version. For example, Cert V3 can use BlobHeaderV2
-// since V2 is a tag for EigenDA protocol
+/// Blob Header Version 2 containing blob metadata and commitments.
+///
+/// This version is separate from the certificate version. For example, Certificate V3
+/// can use BlobHeaderV2 since V2 is a tag for the EigenDA protocol.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct BlobHeaderV2 {
+    /// Version number of the blob header format
     pub version: u16,
+    /// Numbers identifying which quorums store this blob
     pub quorum_numbers: Bytes,
+    /// Cryptographic commitment to the blob data
     pub commitment: BlobCommitment,
+    /// Hash of the payment header for this blob
     pub payment_header_hash: [u8; 32],
 }
 
-// BlobCommitment contains commitment information for a blob
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+/// Cryptographic commitments for verifying blob data integrity.
+///
+/// This structure contains KZG polynomial commitments that allow verification
+/// of blob data without requiring the full blob content.
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct BlobCommitment {
+    /// KZG commitment to the blob polynomial (G1 point)
     pub commitment: G1Point,
+    /// Commitment to the length of the blob (G2 point)
     pub length_commitment: G2Point,
+    /// Proof for the length commitment (G2 point)
     pub length_proof: G2Point,
+    /// Actual length of the blob in bytes
     pub length: u32,
 }
 
 impl BlobCommitment {
+    /// Convert this blob commitment to its Solidity representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `solidity::BlobCommitment` struct for use in contract interactions.
     pub fn to_sol(&self) -> solidity::BlobCommitment {
         solidity::BlobCommitment {
             commitment: (&self.commitment).into(),
@@ -273,14 +456,22 @@ impl BlobCommitment {
     }
 }
 
-// G1Point represents a point on the BN254 G1 curve
-#[derive(Debug, Clone, Copy, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+/// A point on the BN254 elliptic curve G1 subgroup.
+///
+/// G1 points are used for cryptographic commitments and signatures in EigenDA.
+/// The BN254 curve is also known as the alt-bn128 curve.
+#[derive(
+    Debug, Clone, Copy, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default,
+)]
 pub struct G1Point {
+    /// X coordinate of the point
     pub x: U256,
+    /// Y coordinate of the point
     pub y: U256,
 }
 
 impl From<&G1Point> for solidity::G1Point {
+    /// Convert a G1Point to its Solidity representation.
     fn from(value: &G1Point) -> Self {
         solidity::G1Point {
             X: value.x,
@@ -289,14 +480,23 @@ impl From<&G1Point> for solidity::G1Point {
     }
 }
 
-// G2Point represents a point on the BN254 G2 curve
+/// A point on the BN254 elliptic curve G2 subgroup.
+///
+/// G2 points are used for pairing-based cryptographic operations. Each coordinate
+/// is represented as a vector of two U256 values forming an element in the quadratic
+/// extension field Fp2.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct G2Point {
+    /// X coordinate as an Fp2 element [x0, x1]
     pub x: Vec<U256>,
+    /// Y coordinate as an Fp2 element [y0, y1]
     pub y: Vec<U256>,
 }
 
 impl From<&G2Point> for solidity::G2Point {
+    /// Convert a G2Point to its Solidity representation.
+    ///
+    /// Maps the Fp2 coordinates to the fixed-size arrays expected by Solidity.
     fn from(value: &G2Point) -> solidity::G2Point {
         let mut x = [U256::default(); 2];
         x[0] = value.x[0];
@@ -310,19 +510,31 @@ impl From<&G2Point> for solidity::G2Point {
     }
 }
 
-/// NonSignerStakesAndSignature contains information about non-signers and their stakes
+/// Information about validators who did not sign the certificate.
+///
+/// This structure contains all data needed to verify the aggregate signature
+/// while accounting for validators that did not participate in signing.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
 pub struct NonSignerStakesAndSignature {
+    /// Indices of non-signers in the quorum bitmap
     pub non_signer_quorum_bitmap_indices: Vec<u32>,
+    /// Public keys of validators that did not sign
     pub non_signer_pubkeys: Vec<G1Point>,
+    /// Aggregate public keys for each quorum
     pub quorum_apks: Vec<G1Point>,
+    /// Aggregate public key in G2 for pairing verification
     pub apk_g2: G2Point,
+    /// BLS signature aggregated from all signers
     pub sigma: G1Point,
+    /// Indices for quorum aggregate public keys
     pub quorum_apk_indices: Vec<u32>,
+    /// Indices for total stake lookups
     pub total_stake_indices: Vec<u32>,
+    /// Nested indices for non-signer stakes per quorum
     pub non_signer_stake_indices: Vec<Vec<u32>>,
 }
 
+/// Errors that can occur when parsing a `StandardCommitment` from bytes.
 #[derive(Debug, Error)]
 pub enum StandardCommitmentParseError {
     /// Empty commitment data (tx calldata contains 0 bytes)

@@ -1,7 +1,7 @@
 use alloy_consensus::EthereumTxEnvelope;
 
 /// Copied from:
-/// * https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/envelope.rs.html#264-272
+/// * <https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/envelope.rs.html#264-272>
 #[cfg(feature = "native")]
 pub fn map_eip4844(
     tx: EthereumTxEnvelope<alloy_consensus::TxEip4844Variant>,
@@ -18,8 +18,8 @@ pub fn map_eip4844(
 }
 
 /// Copied from:
-/// * https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/typed.rs.html#697-710
-/// * https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/envelope.rs.html#532-538
+/// * <https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/typed.rs.html#697-710>
+/// * <https://docs.rs/alloy-consensus/1.0.27/src/alloy_consensus/transaction/envelope.rs.html#532-538>
 pub mod serde_bincode_compat {
     extern crate alloc;
 
@@ -29,7 +29,7 @@ pub mod serde_bincode_compat {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use serde_with::{DeserializeAs, SerializeAs};
 
-    /// Bincode-compatible [`super::EthereumTypedTransaction`] serde implementation.
+    /// Bincode-compatible [`alloy_consensus::EthereumTxEnvelope`] serde implementation.
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
     /// ```ignore

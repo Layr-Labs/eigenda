@@ -5,22 +5,49 @@ use thiserror::Error;
 
 use crate::eigenda::verification::cert::types::BlockNumber;
 
+/// Errors that can occur when working with historical data structures.
+///
+/// These errors typically arise when trying to access historical operator state
+/// data at specific block heights, such as when block ranges are invalid or
+/// data is missing from the historical record.
 #[derive(Debug, Error, PartialEq)]
 pub enum HistoryError {
+    /// The requested block number is not within the valid interval for this historical data
     #[error("Element ({0}) not in interval {1}")]
     ElementNotInInterval(String, String),
 
+    /// The historical interval is invalid (e.g., start block >= end block)
     #[error("Degenerate interval {0}")]
     DegenerateInterval(String),
 
+    /// No historical entry exists at the requested index
     #[error("Missing history entry {0}")]
     MissingHistoryEntry(u32),
 }
 
+/// Historical data structure that tracks values over block ranges.
+///
+/// Stores a mapping of indices to `Update` objects, each containing a value
+/// and the block range during which it was valid. This is used to track
+/// historical operator states, stakes, and other time-dependent data in
+/// EigenDA's on-chain contracts.
+///
+/// The generic parameter `T` represents the type of value being tracked
+/// (e.g., stake amounts, truncated hashes, quorum bitmaps).
 #[derive(Default, Debug, Clone)]
 pub struct History<T: Copy + std::fmt::Debug>(pub HashMap<u32, Update<T>>);
 
 impl<T: Copy + std::fmt::Debug> History<T> {
+    /// Retrieve a historical update entry at the specified index.
+    ///
+    /// # Arguments
+    /// * `index` - Index of the historical update to retrieve
+    ///
+    /// # Returns
+    /// The `Update<T>` at the specified index
+    ///
+    /// # Errors
+    /// Returns `HistoryError::MissingHistoryEntry` if no entry exists at the given index
     pub(crate) fn try_get_at(&self, index: u32) -> Result<Update<T>, HistoryError> {
         use HistoryError::*;
 
@@ -31,6 +58,11 @@ impl<T: Copy + std::fmt::Debug> History<T> {
     }
 }
 
+/// A single update entry in historical data with an associated validity interval.
+///
+/// Contains a value and the block number range during which this value was active.
+/// The interval is left-inclusive and right-exclusive: [start_block, end_block).
+/// A `right_exclusive` value of 0 indicates the update is still current.
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Update<T: Copy + std::fmt::Debug> {
     interval: Interval,
@@ -38,6 +70,19 @@ pub struct Update<T: Copy + std::fmt::Debug> {
 }
 
 impl<T: Copy + std::fmt::Debug> Update<T> {
+    /// Create a new update with the specified block range and value.
+    ///
+    /// # Arguments
+    /// * `update_block` - Block number when this update became active
+    /// * `next_update_block` - Block number when this update was superseded (0 means never)
+    /// * `value` - The value associated with this update
+    ///
+    /// # Returns
+    /// A new `Update` instance if the block range is valid
+    ///
+    /// # Errors
+    /// Returns `HistoryError::DegenerateInterval` if `update_block >= next_update_block`
+    /// (unless next_update_block is 0, which indicates the update is still current)
     pub fn new(
         update_block: BlockNumber,
         next_update_block: BlockNumber,
@@ -48,6 +93,20 @@ impl<T: Copy + std::fmt::Debug> Update<T> {
         Ok(update)
     }
 
+    /// Retrieve the value from this update if it was valid at the given block number.
+    ///
+    /// Checks if the reference block number falls within this update's validity interval
+    /// and returns the associated value if so.
+    ///
+    /// # Arguments
+    /// * `reference_block` - Block number to check against this update's interval
+    ///
+    /// # Returns
+    /// The value `T` if the reference block is within the validity interval
+    ///
+    /// # Errors
+    /// Returns `HistoryError::ElementNotInInterval` if the reference block is outside
+    /// the validity interval for this update
     pub(crate) fn try_get_against(&self, reference_block: BlockNumber) -> Result<T, HistoryError> {
         use HistoryError::*;
 
@@ -61,6 +120,13 @@ impl<T: Copy + std::fmt::Debug> Update<T> {
     }
 }
 
+/// A block number interval representing the validity period of a historical update.
+///
+/// Uses a half-open interval [left_inclusive, right_exclusive) where:
+/// - `left_inclusive`: The first block where the update became valid
+/// - `right_exclusive`: The first block where the update was superseded (exclusive)
+///
+/// A special case allows `right_exclusive = 0` to indicate the update is still current.
 #[derive(Default, Debug, Clone, Copy)]
 pub(crate) struct Interval {
     left_inclusive: BlockNumber,
@@ -74,6 +140,18 @@ impl Display for Interval {
 }
 
 impl Interval {
+    /// Create a new interval with the specified block range.
+    ///
+    /// # Arguments
+    /// * `left_inclusive` - First block where the interval is valid (inclusive)
+    /// * `right_exclusive` - First block where the interval ends (exclusive, 0 means current)
+    ///
+    /// # Returns
+    /// A valid `Interval` if the parameters are valid
+    ///
+    /// # Errors
+    /// Returns `HistoryError::DegenerateInterval` if `left_inclusive >= right_exclusive`
+    /// (unless `right_exclusive = 0`, which indicates the interval is still current)
     pub fn new(
         left_inclusive: BlockNumber,
         right_exclusive: BlockNumber,
@@ -92,6 +170,14 @@ impl Interval {
         }
     }
 
+    /// Check if a block number falls within this interval.
+    ///
+    /// # Arguments
+    /// * `element` - Block number to test for inclusion
+    ///
+    /// # Returns
+    /// `true` if the block number is within [left_inclusive, right_exclusive),
+    /// where `right_exclusive = 0` is treated as "no upper bound"
     pub fn contains(&self, element: BlockNumber) -> bool {
         element >= self.left_inclusive
             && (self.right_exclusive == 0 || element < self.right_exclusive)

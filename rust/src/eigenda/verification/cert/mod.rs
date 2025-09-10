@@ -1,4 +1,44 @@
-//! [Reference implementation](https://github.com/Layr-Labs/eigenda/blob/60d438705b30e899777736cdffcc478ded08cc76/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L125)
+//! EigenDA certificate verification using BLS signature aggregation
+//!
+//! This module implements comprehensive verification of EigenDA certificates,
+//! validating the cryptographic integrity and security properties of data
+//! availability certificates.
+//!
+//! ## Overview
+//!
+//! Certificate verification ensures that:
+//! - The certificate was signed by a sufficient stake-weighted quorum
+//! - All cryptographic signatures are valid (BLS signature aggregation)
+//! - Security thresholds are met for data availability guarantees
+//! - Historical operator state is consistent at the reference block
+//!
+//! ## Verification Process
+//!
+//! The verification follows a multi-stage approach:
+//!
+//! 1. **Signature Verification**: Validate BLS aggregate signatures
+//! 2. **Stake Validation**: Ensure sufficient stake signed the certificate  
+//! 3. **Quorum Checks**: Verify required quorums participated
+//! 4. **Security Thresholds**: Enforce minimum security requirements
+//! 5. **Historical Consistency**: Validate operator state at reference block
+//!
+//! ## BLS Signature Aggregation
+//!
+//! EigenDA uses BLS signatures over the BN254 curve for efficient aggregation:
+//! - Individual operator signatures are aggregated into a single signature
+//! - Public keys are aggregated using elliptic curve operations
+//! - Verification checks the aggregate signature against the aggregate public key
+//!
+//! ## Security Model
+//!
+//! The verification enforces EigenDA's security model:
+//! - **Confirmation Threshold**: Minimum percentage of honest stake required
+//! - **Adversary Threshold**: Maximum percentage of adversarial stake tolerated
+//! - **Quorum Requirements**: Specific quorums that must participate
+//!
+//! ## Reference Implementation
+//!
+//! Based on the [EigenDA Solidity implementation](https://github.com/Layr-Labs/eigenda/blob/60d438705b30e899777736cdffcc478ded08cc76/contracts/src/integrations/cert/libraries/EigenDACertVerificationLib.sol#L125)
 
 pub mod bitmap;
 mod check;
@@ -8,27 +48,133 @@ pub mod hash;
 mod signature;
 pub mod types;
 
-use crate::eigenda::cert::{BatchHeaderV2, BlobInclusionInfo, NonSignerStakesAndSignature};
+use crate::eigenda::{
+    cert::{BatchHeaderV2, BlobInclusionInfo, G1Point, NonSignerStakesAndSignature},
+    verification::cert::types::{BlockNumber, QuorumNumber, Stake, history::History},
+};
+use alloy_primitives::{B256, Bytes};
 use ark_bn254::{G1Affine, G2Affine};
+use hashbrown::HashMap;
 use tracing::instrument;
 
 use crate::eigenda::verification::cert::{
     error::CertVerificationError::{self, *},
     hash::HashExt,
-    types::{NonSigner, Quorum, Storage, conversions::IntoExt, solidity::SecurityThresholds},
+    types::{NonSigner, Quorum, Storage, solidity::SecurityThresholds},
 };
 
+/// Input parameters for certificate verification
+///
+/// Contains all the data needed to perform comprehensive certificate validation,
+/// including on-chain state data, signature information, and security parameters.
 #[derive(Clone, Debug)]
 pub struct CertVerificationInputs {
+    /// Batch header containing the merkle root and reference block number
     pub batch_header: BatchHeaderV2,
+    /// Blob inclusion proof and certificate information
     pub blob_inclusion_info: BlobInclusionInfo,
+    /// Non-signer information and aggregated signatures
     pub non_signer_stakes_and_signature: NonSignerStakesAndSignature,
+    /// Security thresholds for confirmation and adversary limits
     pub security_thresholds: SecurityThresholds,
+    /// Quorum numbers required to sign certificates
     pub required_quorum_numbers: alloy_primitives::Bytes,
+    /// Quorum numbers that actually signed this certificate
     pub signed_quorum_numbers: alloy_primitives::Bytes,
+    /// Historical on-chain storage data for verification
     pub storage: Storage,
 }
 
+/// Performs comprehensive EigenDA certificate verification.
+///
+/// This is the main entry point for validating data availability certificates in the EigenDA
+/// system. It implements a multi-stage verification process that ensures cryptographic integrity,
+/// sufficient stake participation, and compliance with security parameters.
+///
+/// # Verification Process
+///
+/// The function executes the following verification stages in order:
+///
+/// ## 1. Blob Inclusion Verification
+/// - Validates the blob certificate is included in the batch using Merkle proofs
+/// - Ensures the blob index corresponds to the correct position in the batch
+///
+/// ## 2. Version and Security Validation  
+/// - Checks blob version compatibility against available versions
+/// - Enforces security assumptions are met for the blob's coding parameters
+/// - Validates confirmation thresholds and adversarial assumptions
+///
+/// ## 3. Input Validation
+/// - Ensures signed quorum numbers are not empty
+/// - Verifies corresponding array lengths match across all input collections
+/// - Validates reference block precedes current block
+///
+/// ## 4. Non-Signer Processing
+/// - Reconstructs non-signer data from public keys and bitmap indices
+/// - Validates non-signers are sorted by hash (required for verification)
+/// - Retrieves historical quorum participation bitmaps at reference block
+///
+/// ## 5. Quorum Stake Calculation
+/// - Processes each signing quorum to compute stake distributions
+/// - Calculates signed stake by subtracting non-signer stakes from totals
+/// - Validates sufficient stake participated in each quorum
+///
+/// ## 6. Signature Aggregation and Verification
+/// - Aggregates public keys of signing operators across all quorums
+/// - Computes expected aggregate public key excluding non-signers
+/// - Verifies BLS signature against batch header hash using aggregated keys
+///
+/// ## 7. Security Threshold Enforcement
+/// - Validates quorums meeting confirmation threshold include blob quorums
+/// - Ensures blob quorums contain all required quorum numbers
+/// - Enforces minimum security guarantees for data availability
+///
+/// # Arguments
+///
+/// * `inputs` - Complete verification input containing:
+///   - `batch_header` - Batch metadata with reference block and root hash
+///   - `blob_inclusion_info` - Certificate and Merkle inclusion proof  
+///   - `non_signer_stakes_and_signature` - BLS signature data and non-signer info
+///   - `security_thresholds` - Required confirmation and adversarial thresholds
+///   - `required_quorum_numbers` - Quorums mandated for this certificate type
+///   - `signed_quorum_numbers` - Quorums that actually signed the certificate
+///   - `storage` - Historical on-chain state data for validation
+///
+/// # Returns
+///
+/// * `Ok(())` - Certificate passes all verification checks and is valid
+/// * `Err(CertVerificationError)` - Verification failed with specific error details
+///
+/// # Errors
+///
+/// Returns [`CertVerificationError`] for various validation failures:
+///
+/// ## Cryptographic Failures
+/// - `SignatureVerificationFailed` - BLS signature validation failed
+/// - `LeafNodeDoesNotBelongToMerkleTree` - Invalid inclusion proof
+///
+/// ## Stake and Quorum Failures  
+/// - `InsufficientStake` - Not enough stake signed the certificate
+/// - `EmptyBlobQuorums` - No quorums specified for the blob
+/// - `MissingQuorumEntry` - Referenced quorum not found in historical data
+///
+/// ## Parameter Validation Failures
+/// - `UnsupportedVersion` - Blob version not supported
+/// - `SecurityAssumptionsNotMet` - Coding parameters violate security model
+/// - `ReferenceBlockDoesNotPrecedeCurrentBlock` - Invalid block ordering
+///
+/// ## Data Consistency Failures
+/// - `MissingSignerEntry` - Operator not found in historical data
+/// - `ArrayLengthMismatch` - Input array lengths don't correspond
+/// - `NonSignersNotSorted` - Non-signers not properly ordered
+///
+/// # Security Considerations
+///
+/// This function is critical for EigenDA's security model. It ensures:
+/// - Only certificates with sufficient economic backing are accepted
+/// - Historical operator state is accurately reflected at reference blocks
+/// - BLS signature aggregation is performed correctly to prevent forgeries
+/// - Security parameters enforce adequate redundancy for data recovery
 #[instrument]
 pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationError> {
     let CertVerificationInputs {
@@ -121,7 +267,7 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
                 .try_get_against(batch_header.reference_block_number)?;
 
             let non_signer = NonSigner {
-                pk: pk.into_ext(),
+                pk: pk.into(),
                 pk_hash,
                 quorum_bitmap_history,
             };
@@ -131,58 +277,16 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
 
     check::non_signers_strictly_sorted_by_hash(&non_signers)?;
 
-    // assumption: collection_a[i] corresponds to collection_b[i] for all i, for all (a, b)
-    let quorums = signed_quorum_numbers
-        .iter()
-        .zip(quorum_apks.iter())
-        .zip(total_stake_indices.into_iter())
-        .zip(non_signer_stake_indices.into_iter())
-        .map(
-            |(
-                ((signed_quorum, apk), total_stake_index),
-                stake_index_for_each_required_non_signer,
-            )| {
-                let total_stake = total_stake_history
-                    .get(signed_quorum)
-                    .ok_or(MissingQuorumEntry)?
-                    .try_get_at(total_stake_index)?
-                    .try_get_against(batch_header.reference_block_number)?;
-
-                let bit = *signed_quorum as usize;
-                let unsigned_stake = non_signers
-                    .iter()
-                    .filter(|non_signer| {
-                        // whether signer was required to sign this quorum
-                        non_signer.quorum_bitmap_history[bit]
-                    })
-                    // assumption: collection_a[i] corresponds to collection_b[i] for all i
-                    .zip(stake_index_for_each_required_non_signer.into_iter())
-                    .map(|(required_non_signer, stake_index)| {
-                        let stake = operator_stake_history
-                            .get(&required_non_signer.pk_hash)
-                            .ok_or(MissingSignerEntry)?
-                            .get(signed_quorum)
-                            .ok_or(MissingQuorumEntry)?
-                            .try_get_at(stake_index)?
-                            .try_get_against(batch_header.reference_block_number)?;
-                        Ok(stake)
-                    })
-                    .sum::<Result<_, CertVerificationError>>()?;
-
-                let signed_stake = total_stake.checked_sub(unsigned_stake).ok_or(Underflow)?;
-
-                let apk: G1Affine = (*apk).into_ext();
-                let quorum = Quorum {
-                    number: *signed_quorum,
-                    apk,
-                    total_stake,
-                    signed_stake,
-                };
-
-                Ok::<_, CertVerificationError>(quorum)
-            },
-        )
-        .collect::<Result<Vec<_>, _>>()?;
+    let quorums = process_quorums(
+        &signed_quorum_numbers,
+        &quorum_apks,
+        &total_stake_indices,
+        &non_signer_stake_indices,
+        &total_stake_history,
+        batch_header.reference_block_number,
+        &operator_stake_history,
+        &non_signers,
+    )?;
 
     let signers_apk = signature::aggregation::aggregate(quorum_count, &non_signers, &quorums)?;
 
@@ -205,8 +309,8 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
     )?;
 
     let msg_hash = batch_header.hash_ext();
-    let apk_g2: G2Affine = apk_g2.into_ext();
-    let sigma: G1Affine = sigma.into_ext();
+    let apk_g2: G2Affine = apk_g2.into();
+    let sigma: G1Affine = sigma.into();
 
     if !signature::verification::verify(msg_hash, signers_apk, apk_g2, sigma) {
         return Err(SignatureVerificationFailed);
@@ -230,6 +334,101 @@ pub fn verify(inputs: CertVerificationInputs) -> Result<(), CertVerificationErro
     check::blob_quorums_contain_required_quorums(&blob_quorums, &required_quorum_numbers)?;
 
     Ok(())
+}
+
+/// Processes and validates quorum data for certificate verification.
+///
+/// This function computes the stake distribution for each quorum involved in signing
+/// a certificate, calculating both total stake and signed stake by accounting for
+/// non-signing operators. It constructs validated `Quorum` objects containing the
+/// aggregate public key and stake information needed for BLS signature verification.
+///
+/// # Returns
+///
+/// * `Ok(Vec<Quorum>)` - Vector of processed quorums with computed stake distributions
+/// * `Err(CertVerificationError)` - If stake calculation fails due to:
+///   - Missing quorum or signer entries in historical data
+///   - Invalid stake indices or block number references  
+///   - Arithmetic underflow when computing signed stake
+///
+/// # Algorithm
+///
+/// For each quorum:
+/// 1. **Total Stake Lookup**: Retrieves total stake at the reference block using the provided index
+/// 2. **Non-Signer Filtering**: Identifies non-signers required to participate in this quorum
+/// 3. **Unsigned Stake Calculation**: Sums stake of all filtered non-signers at reference block
+/// 4. **Signed Stake Computation**: Subtracts unsigned stake from total stake
+/// 5. **Quorum Construction**: Creates validated quorum with APK and computed stakes
+///
+/// # Invariants
+///
+/// - All input collections must have corresponding elements at the same indices
+/// - `signed_stake = total_stake - unsigned_stake` must not underflow
+/// - Historical data must exist for all referenced quorums and operators
+/// - Non-signer quorum bitmaps must accurately reflect participation requirements
+#[allow(clippy::too_many_arguments)]
+fn process_quorums(
+    signed_quorum_numbers: &Bytes,
+    quorum_apks: &[G1Point],
+    total_stake_indices: &[u32],
+    non_signer_stake_indices: &[Vec<u32>],
+    total_stake_history: &HashMap<QuorumNumber, History<Stake>>,
+    reference_block_number: BlockNumber,
+    operator_stake_history: &HashMap<B256, HashMap<QuorumNumber, History<Stake>>>,
+    non_signers: &[NonSigner],
+) -> Result<Vec<Quorum>, CertVerificationError> {
+    // assumption: collection_a[i] corresponds to collection_b[i] for all i, for all (a, b)
+    signed_quorum_numbers
+        .iter()
+        .zip(quorum_apks.iter())
+        .zip(total_stake_indices.iter())
+        .zip(non_signer_stake_indices.iter())
+        .map(
+            |(
+                ((signed_quorum, apk), total_stake_index),
+                stake_index_for_each_required_non_signer,
+            )| {
+                let total_stake = total_stake_history
+                    .get(signed_quorum)
+                    .ok_or(MissingQuorumEntry)?
+                    .try_get_at(*total_stake_index)?
+                    .try_get_against(reference_block_number)?;
+
+                let bit = *signed_quorum as usize;
+                let unsigned_stake = non_signers
+                    .iter()
+                    .filter(|non_signer| {
+                        // whether signer was required to sign this quorum
+                        non_signer.quorum_bitmap_history[bit]
+                    })
+                    // assumption: collection_a[i] corresponds to collection_b[i] for all i
+                    .zip(stake_index_for_each_required_non_signer.iter())
+                    .map(|(required_non_signer, stake_index)| {
+                        let stake = operator_stake_history
+                            .get(&required_non_signer.pk_hash)
+                            .ok_or(MissingSignerEntry)?
+                            .get(signed_quorum)
+                            .ok_or(MissingQuorumEntry)?
+                            .try_get_at(*stake_index)?
+                            .try_get_against(reference_block_number)?;
+                        Ok(stake)
+                    })
+                    .sum::<Result<_, CertVerificationError>>()?;
+
+                let signed_stake = total_stake.checked_sub(unsigned_stake).ok_or(Underflow)?;
+
+                let apk: G1Affine = (*apk).into();
+                let quorum = Quorum {
+                    number: *signed_quorum,
+                    apk,
+                    total_stake,
+                    signed_stake,
+                };
+
+                Ok::<_, CertVerificationError>(quorum)
+            },
+        )
+        .collect()
 }
 
 #[cfg(test)]
@@ -258,7 +457,6 @@ mod tests {
         hash::{HashExt, TruncHash},
         types::{
             Storage,
-            conversions::{DefaultExt, IntoExt},
             history::{History, HistoryError::*, Update},
             solidity::{SecurityThresholds, VersionedBlobParams},
         },
@@ -561,7 +759,7 @@ mod tests {
     fn signature_verification_failure() {
         let mut inputs = success_inputs();
 
-        inputs.non_signer_stakes_and_signature.sigma = G1Point::default_ext();
+        inputs.non_signer_stakes_and_signature.sigma = G1Point::default();
 
         let err = verify(inputs).unwrap_err();
 
@@ -605,7 +803,7 @@ mod tests {
 
         inputs.batch_header = batch_header;
 
-        inputs.non_signer_stakes_and_signature.sigma = sigma.into_ext();
+        inputs.non_signer_stakes_and_signature.sigma = sigma.into();
 
         let err = verify(inputs).unwrap_err();
 
@@ -654,7 +852,7 @@ mod tests {
                 blob_header: BlobHeaderV2 {
                     version: 42,
                     quorum_numbers: [0, 2].into(),
-                    commitment: BlobCommitment::default_ext(),
+                    commitment: BlobCommitment::default(),
                     payment_header_hash: [42; 32],
                 },
                 signature: [].into(),
@@ -680,16 +878,13 @@ mod tests {
         let non_signer_stakes_and_signature = NonSignerStakesAndSignature {
             non_signer_quorum_bitmap_indices: vec![0, 0, 0],
             non_signer_pubkeys: vec![
-                non_signer0_g1_pk.into_ext(),
-                non_signer1_g1_pk.into_ext(),
-                non_signer2_g1_pk.into_ext(),
+                non_signer0_g1_pk.into(),
+                non_signer1_g1_pk.into(),
+                non_signer2_g1_pk.into(),
             ],
-            quorum_apks: vec![
-                apk_for_each_quorum[0].into_ext(),
-                apk_for_each_quorum[1].into_ext(),
-            ],
-            apk_g2: apk_g2.into_ext(),
-            sigma: sigma.into_ext(),
+            quorum_apks: vec![apk_for_each_quorum[0].into(), apk_for_each_quorum[1].into()],
+            apk_g2: apk_g2.into(),
+            sigma: sigma.into(),
             quorum_apk_indices: vec![0, 0],
             total_stake_indices: vec![0, 0],
             non_signer_stake_indices: vec![vec![0, 0, 0], vec![0, 0, 0]],
@@ -709,13 +904,13 @@ mod tests {
             adversaryThreshold: 0,
         };
 
-        let non_signer0_pk_hash = convert::point_to_hash(&non_signer0_g1_pk.into_ext());
-        let non_signer1_pk_hash = convert::point_to_hash(&non_signer1_g1_pk.into_ext());
-        let non_signer2_pk_hash = convert::point_to_hash(&non_signer2_g1_pk.into_ext());
-        let signer3_pk_hash = convert::point_to_hash(&signer3_g1_pk.into_ext());
-        let signer4_pk_hash = convert::point_to_hash(&signer4_g1_pk.into_ext());
+        let non_signer0_pk_hash = convert::point_to_hash(&non_signer0_g1_pk.into());
+        let non_signer1_pk_hash = convert::point_to_hash(&non_signer1_g1_pk.into());
+        let non_signer2_pk_hash = convert::point_to_hash(&non_signer2_g1_pk.into());
+        let signer3_pk_hash = convert::point_to_hash(&signer3_g1_pk.into());
+        let signer4_pk_hash = convert::point_to_hash(&signer4_g1_pk.into());
         let optional_non_signer5_pk_hash =
-            convert::point_to_hash(&optional_non_signer5_g1_pk.into_ext());
+            convert::point_to_hash(&optional_non_signer5_g1_pk.into());
 
         // by sheer coincidence the first 3 hashes are already sorted
         let pk_hashes = [
@@ -779,7 +974,7 @@ mod tests {
             .into_iter()
             .zip(apk_for_each_quorum)
             .map(|(quorum, apk)| {
-                let apk_hash = convert::point_to_hash(&apk.into_ext());
+                let apk_hash = convert::point_to_hash(&apk.into());
                 let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
                 let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
                 let update = Update::new(41, 43, apk_trunc_hash).unwrap();

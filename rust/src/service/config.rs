@@ -83,7 +83,7 @@ pub struct EigenDaContracts {
     ///
     /// # Details
     ///
-    /// The quorumCount variable is read from it. See [eigenda_cert_verifier::types::Storage]'s `quorum_count`
+    /// The quorumCount variable is read from it
     /// The _operatorBitmapHistory mapping is read from it
     /// The quorumUpdateBlockNumber mapping is read from it
     pub registry_coordinator: Address,
@@ -158,10 +158,10 @@ impl EigenDaContracts {
     /// Initialize contracts used by the Mainnet.
     ///
     /// Instructions on how they were retrieved:
-    /// * https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses
+    /// * <https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses>
     ///
     /// Except for `delegation_manager` taken from:
-    /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/mainnet.json
+    /// * <https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/mainnet.json>
     pub fn mainnet() -> Self {
         Self {
             threshold_registry: address!("0xdb4c89956eEa6F606135E7d366322F2bDE609F15"),
@@ -179,10 +179,10 @@ impl EigenDaContracts {
     /// Initialize contracts used by the Holesky.
     ///
     /// Instructions on how they were retrieved:
-    /// * https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses
+    /// * <https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses>
     ///
     /// Except for `delegation_manager` taken from:
-    /// * https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/holesky.json
+    /// * <https://github.com/Layr-Labs/eigenlayer-contracts/blob/cd5612ec76e31b4f7768f3a2308f658e476d94ea/script/configs/holesky.json>
     pub fn holesky() -> Self {
         Self {
             threshold_registry: address!("0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1"),

@@ -21,8 +21,22 @@ use crate::eigenda::verification::cert::{
 
 const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol
 
-/// Validate that the certificate blob's version is valid. Otherwise it'll result a `coding_rate = 0`
-/// which in turn will lead to division by zero at the subsequent `check::security_assumptions_are_met`
+/// Validate that the certificate blob's version is supported.
+///
+/// Ensures the blob version in the certificate is less than the next available
+/// version in the threshold registry, preventing use of future/invalid versions.
+/// This prevents division-by-zero errors in subsequent security assumption checks
+/// where an invalid version would result in `coding_rate = 0`.
+///
+/// # Arguments
+/// * `cert_blob_version` - Version specified in the certificate
+/// * `next_blob_version` - Next version that will be assigned by the registry
+///
+/// # Returns
+/// `Ok(())` if the version is valid
+///
+/// # Errors
+/// Returns `InvalidBlobVersion` if the certificate version is >= next version
 pub fn blob_version(
     cert_blob_version: Version,
     next_blob_version: Version,
@@ -32,6 +46,20 @@ pub fn blob_version(
         .ok_or(InvalidBlobVersion(cert_blob_version, next_blob_version))
 }
 
+/// Verify all provided lengths are equal.
+///
+/// Used to validate that parallel arrays (like operator lists and stake lists)
+/// have consistent lengths before processing to prevent index mismatches.
+///
+/// # Arguments
+/// * `lengths` - Slice of lengths to compare
+///
+/// # Returns
+/// `Ok(())` if all lengths are equal
+///
+/// # Errors
+/// * Returns `EmptyVec` if the slice is empty
+/// * Returns `UnequalLengths` if any lengths differ
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
     let Some(first) = lengths.first() else {
@@ -45,11 +73,38 @@ pub fn equal_lengths(lengths: &[usize]) -> Result<(), CertVerificationError> {
         .ok_or(UnequalLengths)
 }
 
+/// Verify a slice is not empty.
+///
+/// Simple validation helper used throughout certificate verification to ensure
+/// required data structures contain at least one element.
+///
+/// # Arguments
+/// * `slice` - Slice to check for emptiness
+///
+/// # Returns
+/// `Ok(())` if the slice contains at least one element
+///
+/// # Errors
+/// Returns `EmptyVec` if the slice is empty
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn not_empty<T>(slice: &[T]) -> Result<(), CertVerificationError> {
     (!slice.is_empty()).then_some(()).ok_or(EmptyVec)
 }
 
+/// Verify non-signer public keys are strictly sorted by their hash values.
+///
+/// EigenDA requires non-signer lists to be sorted by public key hash for
+/// efficient verification algorithms and to prevent duplicate entries.
+/// The sorting must be strict (no duplicates allowed).
+///
+/// # Arguments  
+/// * `non_signers` - List of non-signing operators to validate
+///
+/// # Returns
+/// `Ok(())` if the list is strictly sorted by public key hash
+///
+/// # Errors
+/// Returns `NotStrictlySortedByHash` if the list is not strictly sorted
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn non_signers_strictly_sorted_by_hash(
     non_signers: &[NonSigner],
@@ -62,6 +117,23 @@ pub fn non_signers_strictly_sorted_by_hash(
         .ok_or(NotStrictlySortedByHash)
 }
 
+/// Verify quorums were updated recently enough to avoid stale stake issues.
+///
+/// When stale stakes are forbidden, this function ensures that all signed quorums
+/// have been updated within the acceptable staleness window relative to the
+/// reference block number. This prevents attacks using outdated stake information.
+///
+/// # Arguments
+/// * `signed_quorums` - List of quorum numbers that were signed
+/// * `reference_block` - Reference block number for the certificate
+/// * `quorum_update_block_number` - Map of quorum numbers to their last update blocks
+/// * `window` - Maximum allowed staleness window (in blocks)
+///
+/// # Returns
+/// `Ok(())` if all quorums are fresh enough
+///
+/// # Errors
+/// Returns `StaleQuorum` if any quorum was last updated too long ago
 #[cfg(feature = "stale-stakes-forbidden")]
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn quorums_last_updated_after_most_recent_stale_block(
@@ -85,6 +157,24 @@ pub fn quorums_last_updated_after_most_recent_stale_block(
     })
 }
 
+/// Verify certificate aggregate public keys match on-chain storage.
+///
+/// Compares the aggregate public key hashes provided in the certificate
+/// with the historical APK data stored on-chain at the reference block.
+/// This ensures the certificate was created using the correct operator set.
+///
+/// # Arguments
+/// * `signed_quorums` - List of quorum numbers that were signed
+/// * `reference_block` - Block number for historical APK lookup
+/// * `apk_for_each_quorum` - APKs from the certificate
+/// * `apk_index_for_each_quorum` - Historical indices for APK lookups
+/// * `apk_history` - On-chain APK history data
+///
+/// # Returns
+/// `Ok(())` if all certificate APKs match on-chain data
+///
+/// # Errors
+/// Returns `CertApkDoesNotEqualStorageApk` if any APK hash mismatch is found
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn cert_apks_equal_storage_apks(
     signed_quorums: &[QuorumNumber],
@@ -117,6 +207,25 @@ pub fn cert_apks_equal_storage_apks(
         })
 }
 
+/// Verify the certificate meets EigenDA's security assumptions.
+///
+/// Validates that the security thresholds are properly configured and that
+/// the blob parameters for this version support the required security properties.
+/// This includes checking confirmation > adversary thresholds and validating
+/// the relationship between coding rate, chunk count, and thresholds.
+///
+/// # Arguments
+/// * `cert_blob_version` - Version of the blob being verified
+/// * `versioned_blob_params` - Parameters for different blob versions
+/// * `security_thresholds` - Required security thresholds
+///
+/// # Returns
+/// `Ok(())` if security assumptions are met
+///
+/// # Errors
+/// * `MissingVersionEntry` if the blob version is not configured
+/// * `ConfirmationThresholdLessThanOrEqualToAdversaryThreshold` if thresholds are invalid
+/// * `UnmetSecurityAssumptions` if security assumptions don't hold
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn security_assumptions_are_met(
     cert_blob_version: Version,
@@ -180,6 +289,22 @@ pub fn security_assumptions_are_met(
         .ok_or(UnmetSecurityAssumptions)
 }
 
+/// Verify that quorums with sufficient stake contain all required blob quorums.
+///
+/// Checks that every quorum required for the blob has enough signing stake
+/// to meet the confirmation threshold. This ensures data availability
+/// requirements are satisfied.
+///
+/// # Arguments
+/// * `confirmation_threshold` - Minimum percentage of stake required for confirmation
+/// * `quorums` - All quorums with their signing and total stakes
+/// * `blob_quorums` - Bit-packed list of quorums required for this blob
+///
+/// # Returns
+/// `Ok(())` if all blob quorums have sufficient confirming stake
+///
+/// # Errors
+/// Returns `ConfirmedQuorumsDoNotContainBlobQuorums` if any blob quorum lacks sufficient stake
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn confirmed_quorums_contain_blob_quorums(
     confirmation_threshold: u8,
@@ -216,6 +341,21 @@ pub fn confirmed_quorums_contain_blob_quorums(
         .ok_or(ConfirmedQuorumsDoNotContainBlobQuorums)
 }
 
+/// Verify that blob quorums include all required quorums.
+///
+/// Checks that the blob was configured to use all quorums that are
+/// mandatorily required by the protocol configuration. This ensures
+/// the blob meets minimum data availability requirements.
+///
+/// # Arguments
+/// * `blob_quorums` - Bit-packed list of quorums configured for this blob
+/// * `required_quorums` - Bit-packed list of quorums that are mandatory
+///
+/// # Returns
+/// `Ok(())` if all required quorums are included in the blob configuration
+///
+/// # Errors
+/// Returns `BlobQuorumsDoNotContainRequiredQuorums` if any required quorum is missing
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn blob_quorums_contain_required_quorums(
     blob_quorums: &Bytes,
@@ -234,6 +374,25 @@ fn contains(container: Bitmap, contained: Bitmap) -> bool {
     container & contained == contained
 }
 
+/// Verify blob certificate inclusion in a Merkle tree.
+///
+/// Uses a Merkle inclusion proof to verify that the blob certificate
+/// belongs to the batch tree with the given root. This proves that
+/// the blob was indeed part of the batch when it was committed.
+///
+/// # Arguments
+/// * `blob_certificate` - Certificate to verify inclusion for
+/// * `expected_root` - Expected Merkle root of the batch tree
+/// * `proof` - Merkle proof (sibling hashes) for the inclusion path
+/// * `sibling_path` - Path through the tree (bit pattern indicating left/right)
+///
+/// # Returns
+/// `Ok(())` if the blob certificate is included in the tree
+///
+/// # Errors
+/// * `MerkleProofLengthNotMultipleOf32Bytes` if proof format is invalid
+/// * `LeafNodeDoesNotBelongToMerkleTree` if the inclusion proof fails
+/// * `MerkleProofPathTooShort` if insufficient sibling hashes provided
 #[instrument(level = Level::DEBUG, skip_all)]
 pub fn blob_inclusion(
     blob_certificate: &BlobCertificate,
@@ -247,6 +406,35 @@ pub fn blob_inclusion(
     leaf_node_belongs_to_merkle_tree(leaf_node, expected_root, proof, sibling_path)
 }
 
+/// Verifies that a leaf node belongs to a Merkle tree with the given root.
+///
+/// This function performs Merkle proof verification by reconstructing the path from
+/// a leaf node to the root using the provided sibling nodes and path information.
+///
+/// # Arguments
+///
+/// * `leaf_node` - The hash of the leaf node to verify (B256)
+/// * `expected_root` - The expected root hash of the Merkle tree (B256)
+/// * `proof` - Concatenated sibling node hashes for the Merkle proof path (Bytes)
+/// * `sibling_path` - Bitmap indicating whether each sibling is on the left (1) or right (0)
+///
+/// # Returns
+///
+/// * `Ok(())` - If the leaf node successfully verifies against the expected root
+/// * `Err(CertVerificationError)` - If verification fails due to:
+///   - Invalid proof length (not multiple of 32 bytes)
+///   - Sibling path too short for the proof depth
+///   - Computed root doesn't match expected root
+///
+/// # Algorithm
+///
+/// 1. Validates proof length is a multiple of 32 bytes (each hash is 32 bytes)
+/// 2. Converts sibling_path to a bitmap for efficient bit operations
+/// 3. Iteratively computes parent nodes by:
+///    - Taking the current node and its sibling from the proof
+///    - Ordering them based on the sibling path bit (left/right)
+///    - Computing their parent hash using Keccak-256
+/// 4. Compares the final computed root with the expected root
 #[instrument(level = Level::DEBUG, skip_all)]
 fn leaf_node_belongs_to_merkle_tree(
     leaf_node: B256,
@@ -552,7 +740,6 @@ mod test_cert_apks_equal_storage_apks {
         hash::TruncHash,
         types::{
             BlockNumber,
-            conversions::IntoExt,
             history::{History, HistoryError::*, Update},
         },
     };
@@ -560,13 +747,13 @@ mod test_cert_apks_equal_storage_apks {
     #[test]
     fn cert_apk_equal_storage_apk() {
         let apk = (G1Projective::generator() * Fr::from(42)).into_affine();
-        let apk_hash = convert::point_to_hash(&apk.into_ext());
+        let apk_hash = convert::point_to_hash(&apk.into());
         let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
         let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into_ext()];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, apk_trunc_hash).unwrap();
@@ -589,13 +776,13 @@ mod test_cert_apks_equal_storage_apks {
     fn cert_apk_does_not_equal_storage_apk() {
         let cert_apk = (G1Projective::generator() * Fr::from(42)).into_affine();
         let storage_apk = (G1Projective::generator() * Fr::from(43)).into_affine();
-        let storage_apk_hash = convert::point_to_hash(&storage_apk.into_ext());
+        let storage_apk_hash = convert::point_to_hash(&storage_apk.into());
         let storage_apk_trunc_hash: [u8; 24] = storage_apk_hash[..24].try_into().unwrap();
         let storage_apk_trunc_hash: TruncHash = storage_apk_trunc_hash.into();
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [cert_apk.into_ext()];
+        let apk_for_each_quorum = [cert_apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, storage_apk_trunc_hash).unwrap();
@@ -612,7 +799,7 @@ mod test_cert_apks_equal_storage_apks {
         )
         .unwrap_err();
 
-        let cert_apk_hash = convert::point_to_hash(&cert_apk.into_ext());
+        let cert_apk_hash = convert::point_to_hash(&cert_apk.into());
         let cert_apk_trunc_hash: [u8; 24] = cert_apk_hash[..24].try_into().unwrap();
         let cert_apk_trunc_hash = cert_apk_trunc_hash.into();
 
@@ -631,7 +818,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into_ext()];
+        let apk_for_each_quorum = [apk.into()];
 
         let apk_index_for_each_quorum = vec![0];
 
@@ -653,7 +840,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         let reference_block = 42;
-        let apk_for_each_quorum = [apk.into_ext()];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let apk_trunc_hash_history = History(Default::default());
@@ -677,7 +864,7 @@ mod test_cert_apks_equal_storage_apks {
 
         let signed_quorums = [0];
         const STALE_REFERENCE_BLOCK: BlockNumber = 41;
-        let apk_for_each_quorum = [apk.into_ext()];
+        let apk_for_each_quorum = [apk.into()];
         let apk_index_for_each_quorum = vec![0];
 
         let update = Update::new(42, 43, Default::default()).unwrap();

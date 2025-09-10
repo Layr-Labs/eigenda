@@ -1,28 +1,91 @@
+//! Bitmap operations for quorum membership tracking
+//!
+//! This module provides utilities for working with bitmaps that represent
+//! quorum membership in the EigenDA protocol. Bitmaps are used to efficiently
+//! track which quorums an operator belongs to or which quorums are involved
+//! in a particular operation.
+//!
+//! ## Usage
+//!
+//! Bitmaps are typically created from a list of bit indices:
+//! ```rust,ignore
+//! # // This test is ignored because the eigenda module is private
+//! use sov_eigenda_adapter::eigenda::verification::cert::bitmap::bit_indices_to_bitmap;
+//! use alloy_primitives::Bytes;
+//!
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let bit_indices: Bytes = vec![0, 2, 5].into(); // quorums 0, 2, and 5
+//! let bitmap = bit_indices_to_bitmap(&bit_indices, Some(8))?;
+//! # Ok(())
+//! # }
+//! ```
+
 use alloy_primitives::Bytes;
-// little-endian is more efficient but Ethereum relies on big-endian
-// little-endian is more natural to reason about in the context of bitmaps
 use bitvec::array::BitArray;
 use thiserror::Error;
 
+/// Maximum number of bit indices supported (256 quorums max)
 pub(crate) const MAX_BIT_INDICES_LENGTH: usize = 256;
 
+/// Efficient bitmap representation using 4 usize values (256 bits total)
+///
+/// This allows tracking up to 256 quorums, which is sufficient for EigenDA's
+/// current design. Uses little-endian bit ordering for efficiency.
 pub type Bitmap = BitArray<[usize; 4]>;
 
+/// Errors that can occur during bitmap operations
 #[derive(Debug, Error, PartialEq)]
 pub enum BitmapError {
+    /// Too many bit indices provided (max 256)
     #[error("Bit indices length ({len}) exceeds max byte slice length ({max_len})")]
     IndicesGreaterThanMaxLength { len: usize, max_len: usize },
 
+    /// Bit indices contain duplicate values
     #[error("Bit indices not unique")]
     IndicesNotUnique,
 
+    /// Bit indices are not in ascending order
     #[error("Bit indices not ordered")]
     IndicesNotSorted,
 
+    /// One or more bit indices exceed the specified upper bound
     #[error("One or more bit indices are greater than or equal to the provided upper bound")]
     IndexThanOrEqualToUpperBound,
 }
 
+/// Convert a list of bit indices to a bitmap representation.
+///
+/// Creates a bitmap where each bit index in the input list sets the corresponding
+/// bit in the output bitmap. The input must be sorted in ascending order with
+/// no duplicates.
+///
+/// # Arguments
+/// * `bit_indices` - Sorted list of bit indices to set (0-255)
+/// * `upper_bound_bit_index` - Maximum allowed bit index (optional, defaults to 255)
+///
+/// # Returns
+/// A bitmap with the specified bits set
+///
+/// # Errors
+/// Returns [`BitmapError`] if:
+/// - Too many indices are provided (> 256)
+/// - Indices are not sorted in ascending order
+/// - Indices contain duplicates
+/// - Any index exceeds the upper bound
+///
+/// # Examples
+/// ```rust,ignore
+/// # // This test is ignored because the eigenda module is private
+/// use sov_eigenda_adapter::eigenda::verification::cert::bitmap::bit_indices_to_bitmap;
+/// use alloy_primitives::Bytes;
+///
+/// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let indices: Bytes = vec![0, 2, 5].into();
+/// let bitmap = bit_indices_to_bitmap(&indices, Some(8))?;
+/// // Results in bitmap with bits 0, 2, and 5 set
+/// # Ok(())
+/// # }
+/// ```
 pub fn bit_indices_to_bitmap(
     bit_indices: &Bytes,
     upper_bound_bit_index: Option<u8>,

@@ -13,7 +13,7 @@ const DEFAULT_INITIAL_BACKOFF: u64 = 1000;
 /// Default compute units per second.
 const DEFAULT_COMPUTE_UNITS: u64 = u64::MAX;
 
-/// Initialize [`EthereumProviders`] used by the [`crate::service::EigenDaService`].
+/// Initialize Ethereum provider used by the [`crate::service::EigenDaService`].
 pub async fn init_ethereum_provider(
     config: &EigenDaConfig,
     signer: PrivateKeySigner,

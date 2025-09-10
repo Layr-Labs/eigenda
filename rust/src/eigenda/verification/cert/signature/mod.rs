@@ -1,3 +1,21 @@
+//! BLS signature operations for EigenDA certificate verification
+//!
+//! This module provides BLS signature aggregation and verification functionality
+//! specifically tailored for EigenDA's operator signature scheme. It handles
+//! the logic of aggregating operator public keys while accounting for
+//! non-signing operators and verifying the resulting signatures against batch commitments.
+//!
+//! ## Key Components
+//!
+//! - [`aggregation`]: Computes aggregate public keys from quorum operators, handling non-signers
+//! - [`verification`]: Verifies BLS signatures using bilinear pairings
+//!
+//! ## BLS Signature Scheme
+//!
+//! EigenDA uses BLS signatures on the BN254 curve to enable efficient signature aggregation.
+//! Multiple operators can sign the same message, and their signatures can be combined into
+//! a single aggregate signature that can be verified against an aggregate public key.
+
 pub mod aggregation;
 pub mod verification;
 
@@ -10,7 +28,7 @@ mod tests {
 
     use crate::eigenda::verification::cert::{
         signature::{aggregation::aggregate, verification::verify},
-        types::{NonSigner, Quorum, Stake, conversions::IntoExt},
+        types::{NonSigner, Quorum, Stake},
     };
 
     #[test]
@@ -88,7 +106,7 @@ mod tests {
             .zip(params.quorum_apks.iter())
             .map(|(number, apk)| Quorum {
                 number: *number,
-                apk: (*apk).into_ext(),
+                apk: (*apk).into(),
                 total_stake: Stake::default(),
                 signed_stake: Stake::default(),
             })
@@ -98,12 +116,8 @@ mod tests {
 
         let apk_g1 = aggregate(u8::MAX, &non_signers, &quorums).unwrap();
 
-        let is_signature_valid = verify(
-            msg_hash,
-            apk_g1,
-            params.apk_g2.into_ext(),
-            params.sigma.into_ext(),
-        );
+        let is_signature_valid =
+            verify(msg_hash, apk_g1, params.apk_g2.into(), params.sigma.into());
 
         assert!(is_signature_valid);
     }
