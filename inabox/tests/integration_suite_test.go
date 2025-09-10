@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -32,7 +32,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/testbed"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -49,6 +48,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
+	anvilContainer *testbed.AnvilContainer
+
 	templateName      string
 	testName          string
 	inMemoryBlobStore bool
@@ -60,7 +61,7 @@ var (
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
 	metadataTableNameV2             = "test-BlobMetadata-v2"
-	logger                          logging.Logger
+	logger                          = testutils.GetLogger()
 	ethClient                       common.EthClient
 	rpcClient                       common.RPCEthClient
 	certBuilder                     *clientsv2.CertBuilder
@@ -114,30 +115,19 @@ var _ = BeforeSuite(func() {
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 
-	var loggerConfig *common.LoggerConfig
-	if os.Getenv("CI") != "" {
-		loggerConfig = common.DefaultLoggerConfig()
-	} else {
-		loggerConfig = common.DefaultConsoleLoggerConfig()
-	}
-	logger, err = common.NewLogger(loggerConfig)
-	Expect(err).To(BeNil())
-
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-
-			cfg := testbed.DefaultLocalStackConfig()
-			cfg.Services = []string{"s3", "dynamodb", "kms"}
-			cfg.Port = localStackPort
-			cfg.Host = "0.0.0.0"
-
-			localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+				ExposeHostPort: true,
+				HostPort:       localStackPort,
+				Logger:         logger,
+			})
 			Expect(err).To(BeNil())
 
 			deployConfig := testbed.DeployResourcesConfig{
-				LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 				MetadataTableName:   metadataTableName,
 				BucketTableName:     bucketTableName,
 				V2MetadataTableName: metadataTableNameV2,
@@ -150,7 +140,12 @@ var _ = BeforeSuite(func() {
 		}
 
 		logger.Info("Starting anvil")
-		testConfig.StartAnvil()
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+			ExposeHostPort: true,
+			HostPort:       "8545",
+			Logger:         logger,
+		})
+		Expect(err).To(BeNil())
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
@@ -173,15 +168,6 @@ var _ = BeforeSuite(func() {
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
-
-		logger.Info("Registering blob versions and relays")
-		testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-		logger.Info("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient, logger)
-		if err != nil {
-			panic(err)
-		}
 
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
@@ -449,7 +435,7 @@ var _ = AfterSuite(func() {
 		testConfig.StopBinaries()
 
 		logger.Info("Stopping anvil")
-		testConfig.StopAnvil()
+		_ = anvilContainer.Terminate(context.Background())
 
 		logger.Info("Stopping graph node")
 		testConfig.StopGraphNode()

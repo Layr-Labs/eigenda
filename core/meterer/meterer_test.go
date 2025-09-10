@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/testutils"
@@ -25,6 +24,7 @@ import (
 )
 
 var (
+	logger                   = testutils.GetLogger()
 	localstackContainer      *testbed.LocalStackContainer
 	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
@@ -59,25 +59,21 @@ func setup(_ *testing.M) {
 		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container: " + err.Error())
+			logger.Fatal("Failed to start localstack container:", err)
 		}
-	}
-
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		teardown()
-		panic("failed to create logger")
 	}
 
 	clientConfig = commonaws.ClientConfig{
@@ -87,26 +83,27 @@ func setup(_ *testing.M) {
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
+	var err error
 	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb client")
+		logger.Fatal("Failed to create dynamodb client:", err)
 	}
 
 	privateKey1, err := crypto.GenerateKey()
 	if err != nil {
 		teardown()
-		panic("failed to generate private key")
+		logger.Fatal("Failed to generate private key:", err)
 	}
 	privateKey2, err := crypto.GenerateKey()
 	if err != nil {
 		teardown()
-		panic("failed to generate private key")
+		logger.Fatal("Failed to generate private key:", err)
 	}
 	privateKey3, err := crypto.GenerateKey()
 	if err != nil {
 		teardown()
-		panic("failed to generate private key")
+		logger.Fatal("Failed to generate private key:", err)
 	}
 
 	logger = testutils.GetLogger()
@@ -118,17 +115,17 @@ func setup(_ *testing.M) {
 	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
 	if err != nil {
 		teardown()
-		panic("failed to create reservation table")
+		logger.Fatal("Failed to create reservation table:", err)
 	}
 	err = meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
 	if err != nil {
 		teardown()
-		panic("failed to create ondemand table")
+		logger.Fatal("Failed to create ondemand table:", err)
 	}
 	err = meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
 	if err != nil {
 		teardown()
-		panic("failed to create global reservation table")
+		logger.Fatal("Failed to create global reservation table:", err)
 	}
 
 	now := uint64(time.Now().Unix())
@@ -151,12 +148,12 @@ func setup(_ *testing.M) {
 
 	if err != nil {
 		teardown()
-		panic("failed to create metering store")
+		logger.Fatal("Failed to create metering store:", err)
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
-	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
-		panic("failed to make initial query to the on-chain state")
+	if err := paymentChainState.RefreshOnchainPaymentState(ctx); err != nil {
+		logger.Fatal("Failed to make initial query to the on-chain state:", err)
 	}
 
 	// add some default sensible configs
@@ -168,17 +165,19 @@ func setup(_ *testing.M) {
 		// metrics.NewNoopMetrics(),
 	)
 
-	mt.Start(context.Background())
+	mt.Start(ctx)
 }
 
 func teardown() {
 	if deployLocalStack {
-		_ = localstackContainer.Terminate(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }
 
 func TestMetererReservations(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint64(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
@@ -200,67 +199,69 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
 
 	// test not active reservation
-	header := createPaymentHeader(1, big.NewInt(0), accountID1)
+	header := createPaymentHeader(t, 1, big.NewInt(0), accountID1)
 	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	require.ErrorContains(t, err, "reservation not active")
+	require.ErrorContains(t, err, "reservation not active", "should error when reservation timestamp is not active")
 
 	// test invalid quorom ID
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	require.ErrorContains(t, err, "invalid quorum for reservation")
+	require.ErrorContains(t, err, "invalid quorum for reservation",
+		"should error when quorum IDs are invalid for reservation")
 
 	// small bin overflow for empty bin
-	header = createPaymentHeader(now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
+	header = createPaymentHeader(t,
+		now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers, now)
-	require.NoError(t, err)
+	require.NoError(t, err, "small bin overflow should succeed")
 	// overwhelming bin overflow for empty bins
-	header = createPaymentHeader(now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
+	header = createPaymentHeader(t,
+		now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers, now)
-	require.ErrorContains(t, err, "overflow usage exceeds bin limit")
+	require.ErrorContains(t, err, "overflow usage exceeds bin limit", "overwhelming bin overflow should fail")
 
 	// test non-existent account
 	unregisteredUser, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate key: %v", err)
-	}
-	header = createPaymentHeader(1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate key for unregistered user")
+	header = createPaymentHeader(t, 1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
+	require.NoError(t, err, "key generation should succeed")
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, time.Now())
-	require.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
+	require.ErrorContains(t, err, "failed to get active reservation by account: reservation not found", "unregistered user should fail reservation lookup")
 
 	// test inactive reservation
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID3)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(0), accountID3)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0}, now)
-	require.ErrorContains(t, err, "reservation not active")
+	require.ErrorContains(t, err, "reservation not active", "inactive reservation should fail")
 
 	// test invalid reservation period
-	header = createPaymentHeader(now.UnixNano()-2*int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID1)
+	header = createPaymentHeader(t,
+		now.UnixNano()-2*int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers, now)
-	require.ErrorContains(t, err, "invalid reservation period for reservation")
+	require.ErrorContains(t, err, "invalid reservation period for reservation", "invalid reservation period should fail")
 
 	// test bin usage metering
 	symbolLength := uint64(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
 		reservationPeriod = meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mt.ChainPaymentState.GetReservationWindow())
-		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+		header = createPaymentHeader(t, now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
-		require.NoError(t, err)
+		require.NoError(t, err, "valid reservation request should succeed")
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
 		})
-		require.NotNil(t, item)
-		require.NoError(t, err)
+		require.NotNil(t, item, "reservation record should exist in database")
+		require.NoError(t, err, "database query should succeed")
 		require.Equal(t, uint64(requiredLength), symbolsCharged)
 		require.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 		require.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 		require.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 	}
 	// first over flow is allowed
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(0), accountID2)
 	symbolsCharged, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers, now)
-	require.NoError(t, err)
+	require.NoError(t, err, "first overflow should be allowed")
 	require.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -275,14 +276,14 @@ func TestMetererReservations(t *testing.T) {
 	require.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(0), accountID2)
 	require.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1, quoromNumbers, now)
 	require.ErrorContains(t, err, "bin has already been filled")
 }
 
 func TestMetererOnDemand(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	quorumNumbers := []uint8{0, 1}
 	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
@@ -299,21 +300,19 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test unregistered account
 	unregisteredUser, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate key: %v", err)
-	}
-	header := createPaymentHeader(now.UnixNano(), big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
+	require.NoError(t, err, "failed to generate key for unregistered user")
+	header := createPaymentHeader(t, now.UnixNano(), big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	require.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	require.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(2), accountID1)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(2), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
 	require.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	require.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
 	// No record for invalid payment
@@ -329,25 +328,25 @@ func TestMetererOnDemand(t *testing.T) {
 	symbolsCharged := mt.SymbolsCharged(symbolLength)
 	priceCharged := meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
 	require.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
-	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
+	header = createPaymentHeader(t, now.UnixNano(), priceCharged, accountID2)
 	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	require.NoError(t, err)
 	require.Equal(t, uint64(102), symbolsCharged)
-	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
+	header = createPaymentHeader(t, now.UnixNano(), priceCharged, accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	// Doesn't check for exact payment, checks for increment
 	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
-		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
+		header = createPaymentHeader(t, now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		require.NoError(t, err)
 		require.Equal(t, uint64(102), symbolsCharged)
 	}
 
 	// test cumulative payment on-chain constraint
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
 	require.ErrorContains(t, err,
 		"invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
@@ -357,14 +356,16 @@ func TestMetererOnDemand(t *testing.T) {
 	symbolLength = uint64(2)
 	symbolsCharged = mt.SymbolsCharged(symbolLength)
 	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(),
+		big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
 	symbolsCharged = mt.SymbolsCharged(uint64(50))
-	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(),
+		meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
@@ -377,12 +378,15 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
 	symbolsCharged = mt.SymbolsCharged(uint64(30))
-	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	header = createPaymentHeader(t, now.UnixNano(),
+		meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
 	require.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
+	header = createPaymentHeader(t, now.UnixNano(),
+		big.NewInt(0).Add(previousCumulativePayment,
+			meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	require.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
@@ -493,7 +497,10 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 	}
 }
 
-func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
+func createPaymentHeader(
+	t *testing.T, timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address,
+) *core.PaymentMetadata {
+	t.Helper()
 	return &core.PaymentMetadata{
 		AccountID:         accountID,
 		Timestamp:         timestamp,
