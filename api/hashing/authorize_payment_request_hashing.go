@@ -21,7 +21,7 @@ func HashAuthorizePaymentRequest(request *controller.AuthorizePaymentRequest) ([
 		return nil, fmt.Errorf("hash blob header: %w", err)
 	}
 
-	// We intentionally do not hash the disperser_signature field as it's what we're signing
+	// We intentionally do not hash the disperser_signature field, otherwise that signature would be self referential
 
 	return hasher.Sum(nil), nil
 }

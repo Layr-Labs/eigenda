@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// The controller GRPC server
 type Server struct {
 	pb.UnimplementedControllerServiceServer
 
@@ -26,25 +26,26 @@ type Server struct {
 	server                      *grpc.Server
 	listener                    net.Listener
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
-	metrics                     *Metrics
+	metrics                     *metrics.ServerMetrics
 }
 
 func NewServer(
 	config Config,
-	metricsRegistry *prometheus.Registry,
 	logger logging.Logger,
+	metrics *metrics.ServerMetrics,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 ) (*Server, error) {
 	return &Server{
 		config:                      config,
 		logger:                      logger,
+		metrics:                     metrics,
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
-		metrics:                     NewMetrics(metricsRegistry, logger),
 	}, nil
 }
 
+// Start the server. Blocks until the server is stopped.
 func (s *Server) Start() error {
-	if !s.config.Enable {
+	if !s.config.EnableServer {
 		s.logger.Info("Controller gRPC server is disabled")
 		return nil
 	}
@@ -89,32 +90,15 @@ func (s *Server) Stop() {
 	}
 }
 
+// Handles an AuthorizePaymentRequest
 func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentReply, error) {
-	start := time.Now()
-
 	if s.paymentAuthorizationHandler == nil {
 		s.metrics.ReportAuthorizePaymentAuthFailure()
 		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
 	}
 
-	reply, err := s.paymentAuthorizationHandler.AuthorizePayment(ctx, request)
-	if err != nil {
-		// Check error type and report appropriate failure metric
-		if status.Code(err) == codes.Unauthenticated {
-			s.metrics.ReportAuthorizePaymentSignatureFailure()
-		} else {
-			s.metrics.ReportAuthorizePaymentAuthFailure()
-		}
-		// Return the error as-is if it's already a gRPC status error, otherwise wrap it as Internal
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-		return nil, status.Errorf(codes.Internal, "authorize payment: %v", err)
-	}
-
-	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
-	return reply, nil
+	return s.paymentAuthorizationHandler.AuthorizePayment(ctx, request)
 }

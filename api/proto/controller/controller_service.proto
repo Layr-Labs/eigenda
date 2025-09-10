@@ -25,7 +25,6 @@ message AuthorizePaymentRequest {
   common.v2.BlobHeader blob_header = 1;
   
   // Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
-  // Proves that the request was created by the holder of the KMS key.
   bytes disperser_signature = 2;
 }
 

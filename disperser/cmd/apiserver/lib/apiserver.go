@@ -151,9 +151,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		var controllerClient *apiserver.ControllerClient
 		if config.UseControllerMediatedPayments {
-			if config.ControllerAddress == "" {
-				return fmt.Errorf("controller address is required when not using legacy payment system")
-			}
 			controllerClient, err = apiserver.NewControllerClient(
 				context.Background(),
 				config.ControllerAddress,

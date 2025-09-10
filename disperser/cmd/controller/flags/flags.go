@@ -239,6 +239,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
 	}
+	GrpcPaymentAuthenticationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
+		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. Defaults to disabled.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "the port for the controller gRPC server",
@@ -299,6 +305,7 @@ var optionalFlags = []cli.Flag{
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
 	GrpcServerEnableFlag,
+	GrpcPaymentAuthenticationFlag,
 	GrpcPortFlag,
 	GrpcMaxMessageSizeFlag,
 	GrpcMaxIdleConnectionAgeFlag,

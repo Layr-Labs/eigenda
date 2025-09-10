@@ -11,7 +11,13 @@ type Config struct {
 	//
 	// TODO(litt3): the option to disable the server will be removed once any feature has been fully rolled out which
 	// requires the server.
-	Enable bool
+	EnableServer bool
+
+	// If true, use the new payment authentication system running on the controller.
+	// If false, payment authentication is disabled and request validation will always fail
+	//
+	// Note: This flag requires EnableServer to be true in order to function.
+	EnablePaymentAuthentication bool
 
 	// Port that the gRPC server listens on
 	GrpcPort string
@@ -25,13 +31,14 @@ type Config struct {
 
 // Creates a new server config with validation
 func NewConfig(
-	enable bool,
+	enableServer bool,
+	enablePaymentAuthentication bool,
 	grpcPort string,
 	maxGRPCMessageSize int,
 	maxIdleConnectionAge time.Duration,
 ) (Config, error) {
 
-	if enable {
+	if enableServer {
 		if grpcPort == "" {
 			return Config{}, fmt.Errorf("grpc port is required")
 		}
@@ -43,10 +50,15 @@ func NewConfig(
 		}
 	}
 
+	if enablePaymentAuthentication && !enableServer {
+		return Config{}, fmt.Errorf("payment authentication requires gRPC server to be enabled")
+	}
+
 	return Config{
-		Enable:               enable,
-		GrpcPort:             grpcPort,
-		MaxGRPCMessageSize:   maxGRPCMessageSize,
-		MaxIdleConnectionAge: maxIdleConnectionAge,
+		EnableServer:                enableServer,
+		EnablePaymentAuthentication: enablePaymentAuthentication,
+		GrpcPort:                    grpcPort,
+		MaxGRPCMessageSize:          maxGRPCMessageSize,
+		MaxIdleConnectionAge:        maxIdleConnectionAge,
 	}, nil
 }

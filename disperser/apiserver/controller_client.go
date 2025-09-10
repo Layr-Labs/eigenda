@@ -16,12 +16,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// ControllerClient wraps the controller service client and handles signing of payment authorization requests
+// ControllerClient wraps the controller service client and handles signing of requests
 type ControllerClient struct {
-	controllerAddress   string
-	disperserKMSKeyID   string
-	disperserKeyManager *kms.Client
-	disperserPublicKey  *ecdsa.PublicKey
+	controllerAddress  string
+	disperserKMSKeyID  string
+	kmsClient          *kms.Client
+	disperserPublicKey *ecdsa.PublicKey
 
 	clientConnection *grpc.ClientConn
 	serviceClient    controller.ControllerServiceClient
@@ -45,22 +45,22 @@ func NewControllerClient(
 		return nil, fmt.Errorf("KMS region is required for controller client")
 	}
 
-	awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
-	if err != nil {
-		return nil, fmt.Errorf("load AWS config: %w", err)
-	}
-
-	var keyManager *kms.Client
+	var kmsClient *kms.Client
 	if kmsEndpoint != "" {
-		keyManager = kms.New(kms.Options{
+		kmsClient = kms.New(kms.Options{
 			Region:       kmsRegion,
 			BaseEndpoint: aws.String(kmsEndpoint),
 		})
 	} else {
-		keyManager = kms.NewFromConfig(awsConfig)
+		awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
+		if err != nil {
+			return nil, fmt.Errorf("load AWS config: %w", err)
+		}
+
+		kmsClient = kms.NewFromConfig(awsConfig)
 	}
 
-	publicKey, err := aws2.LoadPublicKeyKMS(ctx, keyManager, disperserKMSKeyID)
+	publicKey, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, disperserKMSKeyID)
 	if err != nil {
 		return nil, fmt.Errorf("load public key from KMS: %w", err)
 	}
@@ -73,23 +73,20 @@ func NewControllerClient(
 		return nil, fmt.Errorf("new grpc client: %w", err)
 	}
 
-	client := controller.NewControllerServiceClient(clientConnection)
+	serviceClient := controller.NewControllerServiceClient(clientConnection)
 
 	return &ControllerClient{
-		controllerAddress:   controllerAddress,
-		disperserKMSKeyID:   disperserKMSKeyID,
-		disperserKeyManager: keyManager,
-		disperserPublicKey:  publicKey,
-		clientConnection:    clientConnection,
-		serviceClient:       client,
+		controllerAddress:  controllerAddress,
+		disperserKMSKeyID:  disperserKMSKeyID,
+		kmsClient:          kmsClient,
+		disperserPublicKey: publicKey,
+		clientConnection:   clientConnection,
+		serviceClient:      serviceClient,
 	}, nil
 }
 
 // Sends a signed payment authorization request to the controller
-func (c *ControllerClient) AuthorizePayment(
-	ctx context.Context,
-	blobHeader *pbcommon.BlobHeader,
-) error {
+func (c *ControllerClient) AuthorizePayment(ctx context.Context, blobHeader *pbcommon.BlobHeader) error {
 	authorizePaymentRequest := &controller.AuthorizePaymentRequest{BlobHeader: blobHeader}
 
 	hash, err := hashing.HashAuthorizePaymentRequest(authorizePaymentRequest)
@@ -97,7 +94,7 @@ func (c *ControllerClient) AuthorizePayment(
 		return fmt.Errorf("hash authorize payment request: %w", err)
 	}
 
-	signature, err := aws2.SignKMS(ctx, c.disperserKeyManager, c.disperserKMSKeyID, c.disperserPublicKey, hash)
+	signature, err := aws2.SignKMS(ctx, c.kmsClient, c.disperserKMSKeyID, c.disperserPublicKey, hash)
 	if err != nil {
 		return fmt.Errorf("sign authorization request: %w", err)
 	}

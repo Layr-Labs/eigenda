@@ -67,6 +67,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	
 	serverConfig, err := grpcserver.NewConfig(
 		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
+		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
 		ctx.GlobalString(flags.GrpcPortFlag.Name),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),

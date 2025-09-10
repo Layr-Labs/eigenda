@@ -1,4 +1,4 @@
-package grpcserver
+package metrics
 
 import (
 	"time"
@@ -14,7 +14,7 @@ import (
 const namespace = "eigenda_controller"
 
 // Encapsulates metrics for the controller GRPC service
-type Metrics struct {
+type ServerMetrics struct {
 	logger           logging.Logger
 	grpcServerOption grpc.ServerOption
 
@@ -25,7 +25,7 @@ type Metrics struct {
 	authorizePaymentSignatureFailures *prometheus.CounterVec
 }
 
-func NewMetrics(registry *prometheus.Registry, logger logging.Logger) *Metrics {
+func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *ServerMetrics {
 	if registry == nil {
 		registry = prometheus.NewRegistry()
 	}
@@ -76,7 +76,7 @@ func NewMetrics(registry *prometheus.Registry, logger logging.Logger) *Metrics {
 		[]string{},
 	)
 
-	return &Metrics{
+	return &ServerMetrics{
 		logger:                            logger,
 		grpcServerOption:                  grpcServerOption,
 		authorizePaymentLatency:           authorizePaymentLatency,
@@ -86,27 +86,27 @@ func NewMetrics(registry *prometheus.Registry, logger logging.Logger) *Metrics {
 	}
 }
 
-// GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
-func (m *Metrics) GetGRPCServerOption() grpc.ServerOption {
+// Returns the gRPC server option that enables automatic GRPC metrics collection.
+func (m *ServerMetrics) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-// ReportAuthorizePaymentLatency reports the total latency of an AuthorizePayment RPC.
-func (m *Metrics) ReportAuthorizePaymentLatency(duration time.Duration) {
+// Reports the total latency of an AuthorizePayment RPC.
+func (m *ServerMetrics) ReportAuthorizePaymentLatency(duration time.Duration) {
 	m.authorizePaymentLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-// ReportAuthorizePaymentSignatureLatency reports the latency of signature verification in AuthorizePayment.
-func (m *Metrics) ReportAuthorizePaymentSignatureLatency(duration time.Duration) {
+// Reports the latency of signature verification in AuthorizePayment.
+func (m *ServerMetrics) ReportAuthorizePaymentSignatureLatency(duration time.Duration) {
 	m.authorizePaymentSignatureLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-// ReportAuthorizePaymentAuthFailure increments the auth failure counter for AuthorizePayment.
-func (m *Metrics) ReportAuthorizePaymentAuthFailure() {
+// Increments the auth failure counter for AuthorizePayment.
+func (m *ServerMetrics) ReportAuthorizePaymentAuthFailure() {
 	m.authorizePaymentAuthFailures.WithLabelValues().Inc()
 }
 
-// ReportAuthorizePaymentSignatureFailure increments the signature failure counter for AuthorizePayment.
-func (m *Metrics) ReportAuthorizePaymentSignatureFailure() {
+// Increments the signature failure counter for AuthorizePayment.
+func (m *ServerMetrics) ReportAuthorizePaymentSignatureFailure() {
 	m.authorizePaymentSignatureFailures.WithLabelValues().Inc()
 }

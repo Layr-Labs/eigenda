@@ -3,12 +3,13 @@ package payments
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
+	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -17,29 +18,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Handles payment authorization requests received from API servers
 type PaymentAuthorizationHandler struct {
+	metrics    *metrics.ServerMetrics
 	keyID      string
 	publicKey  *ecdsa.PublicKey
 	keyManager *kms.Client
 }
 
-// NewPaymentAuthorizationHandler creates a new PaymentAuthorizationHandler.
 func NewPaymentAuthorizationHandler(
 	ctx context.Context,
+	metrics *metrics.ServerMetrics,
 	region string,
 	endpoint string,
 	keyID string,
 ) (*PaymentAuthorizationHandler, error) {
-
-	// Load the AWS SDK configuration, which will automatically detect credentials
-	// from environment variables, IAM roles, or AWS config files
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(region),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
 	var keyManager *kms.Client
 	if endpoint != "" {
 		keyManager = kms.New(kms.Options{
@@ -47,15 +40,21 @@ func NewPaymentAuthorizationHandler(
 			BaseEndpoint: aws.String(endpoint),
 		})
 	} else {
-		keyManager = kms.NewFromConfig(cfg)
+		awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+		if err != nil {
+			return nil, fmt.Errorf("load AWS config: %w", err)
+		}
+
+		keyManager = kms.NewFromConfig(awsConfig)
 	}
 
 	publicKey, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
+		return nil, fmt.Errorf("get ecdsa public key: %w", err)
 	}
 
 	return &PaymentAuthorizationHandler{
+		metrics:    metrics,
 		keyID:      keyID,
 		publicKey:  publicKey,
 		keyManager: keyManager,
@@ -67,27 +66,35 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	ctx context.Context,
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentReply, error) {
+	start := time.Now()
+
 	if err := h.verifyDisperserSignature(request); err != nil {
+		h.metrics.ReportAuthorizePaymentSignatureFailure()
 		return nil, err
 	}
 
+	h.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(start))
+
 	// TODO(litt3): Implement actual payment authorization logic
-	return nil, errors.New("Payment authorization not implemented")
+	if true {
+		h.metrics.ReportAuthorizePaymentAuthFailure()
+		return nil, status.Errorf(codes.Internal, "Payment authorization not implemented")
+	}
+
+	h.metrics.ReportAuthorizePaymentLatency(time.Since(start))
+	return &pb.AuthorizePaymentReply{}, nil
 }
 
 // Verifies the disperser's signature on the payment authorization request.
 func (h *PaymentAuthorizationHandler) verifyDisperserSignature(request *pb.AuthorizePaymentRequest) error {
-	if len(request.DisperserSignature) == 0 {
-		return status.Errorf(codes.Unauthenticated, "disperser signature is required")
-	}
-
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to hash request: %v", err)
 	}
 
 	if len(request.DisperserSignature) != 65 {
-		return status.Errorf(codes.Unauthenticated, "invalid disperser signature length")
+		return status.Errorf(
+			codes.Unauthenticated, "invalid disperser signature length %d", len(request.DisperserSignature))
 	}
 
 	// Remove the recovery ID (last byte) for verification
