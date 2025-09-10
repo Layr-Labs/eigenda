@@ -20,15 +20,16 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+// Prover
 type Prover struct {
-	Config    *encoding.Config
-	KzgConfig *kzg.KzgConfig
-	encoder   *rs.Encoder
-	encoding.BackendType
+	Config     *encoding.Config
+	KzgConfig  *kzg.KzgConfig
+	encoder    *rs.Encoder
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
-	mu         sync.Mutex
 
+	// mu protects access to ParametrizedProvers
+	mu                  sync.Mutex
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
@@ -302,11 +303,12 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	}
 
 	enc, err := g.newProver(params)
-	if err == nil {
-		g.ParametrizedProvers[params] = enc
+	if err != nil {
+		return nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	return enc, err
+	g.ParametrizedProvers[params] = enc
+	return enc, nil
 }
 
 func (g *Prover) GetSRSOrder() uint64 {
@@ -394,14 +396,11 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	fs := fft.NewFFTSettings(n)
 
 	// Create base KZG settings
-	ks, err := kzg.NewKZGSettings(fs, p.Srs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
-	}
+	ks := kzg.NewKZGSettings(fs, p.Srs)
 
 	switch p.Config.BackendType {
 	case encoding.GnarkBackend:
-		return p.createGnarkBackendProver(params, fs, ks)
+		return p.createGnarkBackendProver(params, fs)
 	case encoding.IcicleBackend:
 		return p.createIcicleBackendProver(params, fs, ks)
 	default:
@@ -410,7 +409,9 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 }
 
-func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+func (p *Prover) createGnarkBackendProver(
+	params encoding.EncodingParams, fs *fft.FFTSettings,
+) (*ParametrizedProver, error) {
 	if p.Config.GPUEnable {
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
@@ -443,7 +444,6 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 		Encoder:               p.encoder,
 		EncodingParams:        params,
 		KzgConfig:             p.KzgConfig,
-		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
 		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil

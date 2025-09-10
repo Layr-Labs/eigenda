@@ -12,43 +12,14 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// TODO(samlaf): is anyone using this...? Can we delete it?
 func main() {
 	TestKzgRs()
-	//err := kzg.WriteGeneratorPoints(30000)
-	//if err != nil {
-	//	log.Println("WriteGeneratorPoints failed:", err)
-	//}
-	//readpoints()
 }
-
-/*
-func readpoints() {
-	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		CacheDir:        "SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-	}
-
-	// create encoding object
-	kzgGroup, _ := prover.NewProver(kzgConfig, true)
-	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
-	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
-
-		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
-	}
-	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
-		fmt.Println("start with gen")
-	}
-}
-*/
 
 func TestKzgRs() {
 	numSymbols := 1024
@@ -77,9 +48,20 @@ func TestKzgRs() {
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
 	}
+	v, err := verifier.NewVerifier(kzgConfig, nil)
+	if err != nil {
+		log.Fatalf("Failed to create verifier: %v", err)
+	}
 
 	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / numSys}
-	enc, _ := p.GetKzgEncoder(params)
+	enc, err := p.GetKzgEncoder(params)
+	if err != nil {
+		log.Fatalf("Failed to create encoder: %v", err)
+	}
+	verifier, err := v.GetKzgVerifier(params)
+	if err != nil {
+		log.Fatalf("Failed to create verifier: %v", err)
+	}
 
 	//inputFr := kzg.ToFrArray(inputBytes)
 	inputSize := uint64(numSymbols)
@@ -101,136 +83,24 @@ func TestKzgRs() {
 	// Optionally verify
 	startVerify := time.Now()
 
-	//os.Exit(0)
 	for i := 0; i < len(frames); i++ {
-		//for i, f := range frames {
-		f := frames[i]
-		j := fIndices[i]
-		q, err := rs.GetLeadingCosetIndex(uint64(i), numSys+numPar)
+		err = verifier.VerifyFrame(&frames[i], uint64(fIndices[i]), commit, params.NumChunks)
 		if err != nil {
-			log.Fatalf("%v", err)
-		}
-
-		if j != q {
-			log.Fatal("leading coset inconsistency")
-		}
-
-		fmt.Printf("frame %v leading coset %v\n", i, j)
-		rsEncoder, err := enc.GetRsEncoder(params)
-		if err != nil {
-			log.Fatalf("%v", err)
-		}
-		lc := rsEncoder.Fs.ExpandedRootsOfUnity[uint64(j)]
-
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
-		if err != nil {
-			log.Fatalf("Load g2 %v failed\n", err)
-		}
-		err = verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
-		if err != nil {
-			log.Fatalf("Proof %v failed\n", i)
+			log.Fatalf("Failed to verify frame %d: %v", i, err)
 		}
 	}
 	fmt.Printf("* Verify %v frames -> all correct. together using %v\n",
 		len(frames), time.Since(startVerify))
 	// sample some frames
 	samples, indices := SampleFrames(frames, uint64(len(frames)-3))
-	//samples, indices := SampleFrames(frames, numSys)
-	//fmt.Printf("* Sampled %v frames\n", numSys)
-	//// Decode data from samples
 
 	dataFr, err := enc.Decode(samples, indices, inputSize)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//printFr(dataFr)
-	//dataFr, err := kzg.DecodeSys(samples, indices, inputSize)
-	//if err != nil {
-	//log.Fatalf("%v", err)
-	//}
-
 	fmt.Printf("%x\n", dataFr)
-	// printFr(dataFr)
-	//deData := kzg.ToByteArray(dataFr, inputByteSize)
-	//fmt.Println("dataFr")
-	// printFr(dataFr)
-	//fmt.Println(deData)
-	// Verify data is original in Fr
-	//compareData(inputFr, dataFr)
-	// Verify data is original in Byte
-	//compareDataByte(deData, inputBytes)
-	//fmt.Printf("* Compared original %v bytes with reconstructed -> PASS\n", inputByteSize)
-	//_ = deData
 }
-
-// func getData(inputSize uint64) []fr.Element {
-// 	inputFr := make([]fr.Element, inputSize)
-// 	for i := uint64(0); i < inputSize; i++ {
-// 		bls.AsFr(&inputFr[i], i+1)
-// 	}
-// 	return inputFr
-// }
-//
-// func compareData(inputFr, dataFr []fr.Element) {
-// 	if len(inputFr) != len(dataFr) {
-// 		log.Fatalf("Error. Diff length. input %v, data %v\n", len(inputFr), len(dataFr))
-// 	}
-//
-// 	for i := 0; i < len(inputFr); i++ {
-// 		if !bls.EqualFr(&inputFr[i], &dataFr[i]) {
-// 			log.Fatalf("Error. Diff value at %v. input %v, data %v\n",
-// 				i, inputFr[i].String(), dataFr[i].String())
-// 		}
-// 	}
-// }
-//
-// func compareDataByte(inputFr, dataFr []byte) {
-// 	if len(inputFr) != len(dataFr) {
-// 		log.Fatalf("Error. Diff length. input %v, data %v\n", len(inputFr), len(dataFr))
-// 	}
-//
-// 	for i := 0; i < len(inputFr); i++ {
-// 		if inputFr[i] != dataFr[i] {
-// 			log.Fatalf("Error. Diff Data byte value at %v. input %v, data %v\n",
-// 				i, inputFr[i:], dataFr[i:])
-// 		}
-// 	}
-// }
-//
-// func initPoly(size int) ([]fr.Element, []fr.Element) {
-// 	v := make([]uint64, size)
-// 	for i := 0; i < size; i++ {
-// 		v[i] = uint64(i + 1)
-// 	}
-// 	polyFr := makeFr(v)
-// 	fs := kzg.NewFFTSettings(3)
-// 	dataFr, _ := fs.FFT(polyFr, false)
-// 	return polyFr, dataFr
-// }
-//
-// func initData(size uint64) ([]fr.Element, []fr.Element) {
-// 	v := make([]uint64, size)
-// 	for i := uint64(0); i < size; i++ {
-// 		v[i] = uint64(i + 1)
-// 	}
-// 	dataFr := makeFr(v)
-// 	order := kzg.CeilIntPowerOf2Num(size)
-// 	fs := kzg.NewFFTSettings(uint8(order))
-// 	polyFr, err := fs.FFT(dataFr, true)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	return polyFr, dataFr
-// }
-//
-// func makeFr(input []uint64) []fr.Element {
-// 	inputFr := make([]fr.Element, len(input))
-// 	for i := 0; i < len(input); i++ {
-// 		bls.AsFr(&inputFr[i], input[i])
-// 	}
-// 	return inputFr
-// }
 
 func printFr(d []fr.Element) {
 	for _, e := range d {
@@ -238,13 +108,6 @@ func printFr(d []fr.Element) {
 	}
 	fmt.Printf("\n")
 }
-
-// func printG1(d []bn254.G1Affine) {
-// 	for i, e := range d {
-// 		fmt.Printf("%v: %v \n", i, e.String())
-// 	}
-// 	fmt.Printf("\n")
-// }
 
 func SampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
 	samples := make([]encoding.Frame, num)
