@@ -2,14 +2,23 @@ package grpcserver
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"net"
+	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
@@ -27,19 +36,51 @@ type Server struct {
 	listener                    net.Listener
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
+	replayGuardian              replay.ReplayGuardian
+	disperserPublicKey          *ecdsa.PublicKey
 }
 
 func NewServer(
+	ctx context.Context,
 	config Config,
+	awsClientConfig aws.ClientConfig,
+	disperserKMSKeyID string,
 	logger logging.Logger,
-	metrics *metrics.ServerMetrics,
+	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 ) (*Server, error) {
+	replayGuardian := replay.NewReplayGuardian(
+		time.Now,
+		config.AuthorizationRequestMaxPastAge,
+		config.AuthorizationRequestMaxFutureAge)
+
+	var kmsClient *kms.Client
+	if awsClientConfig.EndpointURL != "" {
+		endpoint := awsClientConfig.EndpointURL
+		kmsClient = kms.New(kms.Options{
+			Region:       awsClientConfig.Region,
+			BaseEndpoint: &endpoint,
+		})
+	} else {
+		awsConfig, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(awsClientConfig.Region))
+		if err != nil {
+			return nil, fmt.Errorf("load AWS config: %w", err)
+		}
+		kmsClient = kms.NewFromConfig(awsConfig)
+	}
+
+	disperserPublicKey, err := aws.LoadPublicKeyKMS(ctx, kmsClient, disperserKMSKeyID)
+	if err != nil {
+		return nil, fmt.Errorf("get disperser public key from KMS: %w", err)
+	}
+
 	return &Server{
 		config:                      config,
 		logger:                      logger,
-		metrics:                     metrics,
+		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
+		replayGuardian:              replayGuardian,
+		disperserPublicKey:          disperserPublicKey,
 	}, nil
 }
 
@@ -100,5 +141,49 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
 	}
 
-	return s.paymentAuthorizationHandler.AuthorizePayment(ctx, request)
+	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
+	if err != nil {
+		s.metrics.ReportAuthorizePaymentAuthFailure()
+		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
+	}
+
+	signatureVerificationStart := time.Now()
+	err = s.verifyDisperserSignature(requestHash, request.GetDisperserSignature())
+	if err != nil {
+		s.metrics.ReportAuthorizePaymentSignatureFailure()
+		return nil, err
+	}
+	s.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(signatureVerificationStart))
+
+	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
+	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
+	if err != nil {
+		s.metrics.ReportAuthorizePaymentAuthFailure()
+		return nil, status.Errorf(codes.InvalidArgument, "replay protection check failed: %v", err)
+	}
+
+	paymentAuthorizationStart := time.Now()
+	reply, err := s.paymentAuthorizationHandler.AuthorizePayment(ctx, request.GetBlobHeader())
+	if err != nil {
+		//nolint:wrapcheck // payment handler returns properly formatted grpc errors
+		return nil, err
+	}
+	s.metrics.ReportAuthorizePaymentLatency(time.Since(paymentAuthorizationStart))
+
+	return reply, nil
+}
+
+// Verifies the disperser's signature on a request
+func (s *Server) verifyDisperserSignature(requestHash []byte, signature []byte) error {
+	if len(signature) != 65 {
+		return status.Errorf(codes.Unauthenticated, "invalid disperser signature length %d", len(signature))
+	}
+
+	// Remove the recovery ID (last byte) for verification
+	valid := crypto.VerifySignature(crypto.FromECDSAPub(s.disperserPublicKey), requestHash, signature[:64])
+	if !valid {
+		return status.Error(codes.Unauthenticated, "invalid disperser signature")
+	}
+
+	return nil
 }

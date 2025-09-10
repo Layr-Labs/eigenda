@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -279,25 +278,18 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	if config.ServerConfig.EnableServer {
-		serverMetrics := metrics.NewServerMetrics(metricsRegistry, logger)
-
 		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
-			paymentAuthorizationHandler, err = payments.NewPaymentAuthorizationHandler(
-				context.Background(),
-				serverMetrics,
-				config.AwsClientConfig.Region,
-				config.AwsClientConfig.EndpointURL,
-				config.DisperserKMSKeyID)
-			if err != nil {
-				return fmt.Errorf("create payment authorization handler: %w", err)
-			}
+			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
 		}
 
 		grpcServer, err := grpcserver.NewServer(
+			c,
 			config.ServerConfig,
+			config.AwsClientConfig,
+			config.DisperserKMSKeyID,
 			logger,
-			serverMetrics,
+			metricsRegistry,
 			paymentAuthorizationHandler)
 		if err != nil {
 			return fmt.Errorf("create gRPC server: %w", err)

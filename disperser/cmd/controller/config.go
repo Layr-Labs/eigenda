@@ -71,6 +71,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ctx.GlobalString(flags.GrpcPortFlag.Name),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
+		ctx.GlobalDuration(flags.GrpcAuthorizationRequestMaxPastAgeFlag.Name),
+		ctx.GlobalDuration(flags.GrpcAuthorizationRequestMaxFutureAgeFlag.Name),
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)

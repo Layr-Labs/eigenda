@@ -266,6 +266,20 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_MAX_IDLE_CONNECTION_AGE"),
 	}
+	GrpcAuthorizationRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-past-age"),
+		Usage:    "the maximum age of an authorization request in the past that the server will accept",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_PAST_AGE"),
+	}
+	GrpcAuthorizationRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-future-age"),
+		Usage:    "the maximum age of an authorization request in the future that the server will accept",
+		Required: false,
+		Value:    3 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -309,6 +323,8 @@ var optionalFlags = []cli.Flag{
 	GrpcPortFlag,
 	GrpcMaxMessageSizeFlag,
 	GrpcMaxIdleConnectionAgeFlag,
+	GrpcAuthorizationRequestMaxPastAgeFlag,
+	GrpcAuthorizationRequestMaxFutureAgeFlag,
 }
 
 var Flags []cli.Flag

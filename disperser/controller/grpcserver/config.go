@@ -27,6 +27,14 @@ type Config struct {
 
 	// Maximum time a connection can be idle before it is closed.
 	MaxIdleConnectionAge time.Duration
+
+	// Maximum age of an authorization request in the past that the server will accept.
+	// Requests older than this will be rejected to prevent replay attacks.
+	AuthorizationRequestMaxPastAge time.Duration
+
+	// Maximum age of an authorization request in the future that the server will accept.
+	// Requests with timestamps too far in the future will be rejected.
+	AuthorizationRequestMaxFutureAge time.Duration
 }
 
 // Creates a new server config with validation
@@ -36,6 +44,8 @@ func NewConfig(
 	grpcPort string,
 	maxGRPCMessageSize int,
 	maxIdleConnectionAge time.Duration,
+	authorizationRequestMaxPastAge time.Duration,
+	authorizationRequestMaxFutureAge time.Duration,
 ) (Config, error) {
 
 	if enableServer {
@@ -48,6 +58,14 @@ func NewConfig(
 		if maxIdleConnectionAge < 0 {
 			return Config{}, fmt.Errorf("max idle connection age must be >= 0, got %v", maxIdleConnectionAge)
 		}
+		if authorizationRequestMaxPastAge < 0 {
+			return Config{}, fmt.Errorf("authorization request max past age must be >= 0, got %v",
+				authorizationRequestMaxPastAge)
+		}
+		if authorizationRequestMaxFutureAge < 0 {
+			return Config{}, fmt.Errorf("authorization request max future age must be >= 0, got %v",
+				authorizationRequestMaxFutureAge)
+		}
 	}
 
 	if enablePaymentAuthentication && !enableServer {
@@ -55,10 +73,12 @@ func NewConfig(
 	}
 
 	return Config{
-		EnableServer:                enableServer,
-		EnablePaymentAuthentication: enablePaymentAuthentication,
-		GrpcPort:                    grpcPort,
-		MaxGRPCMessageSize:          maxGRPCMessageSize,
-		MaxIdleConnectionAge:        maxIdleConnectionAge,
+		EnableServer:                     enableServer,
+		EnablePaymentAuthentication:      enablePaymentAuthentication,
+		GrpcPort:                         grpcPort,
+		MaxGRPCMessageSize:               maxGRPCMessageSize,
+		MaxIdleConnectionAge:             maxIdleConnectionAge,
+		AuthorizationRequestMaxPastAge:   authorizationRequestMaxPastAge,
+		AuthorizationRequestMaxFutureAge: authorizationRequestMaxFutureAge,
 	}, nil
 }
