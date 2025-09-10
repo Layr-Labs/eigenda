@@ -64,7 +64,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		}
 		relays[i] = corev2.RelayKey(relay)
 	}
-	
+
 	serverConfig, err := grpcserver.NewConfig(
 		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
 		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
@@ -77,7 +77,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)
 	}
-	
+
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		EthClientConfig:                     ethClientConfig,
