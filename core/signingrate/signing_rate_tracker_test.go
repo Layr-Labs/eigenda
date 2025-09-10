@@ -199,6 +199,7 @@ func randomOperationsTest(
 
 	// Each iteration, step forward in time by exactly one second.
 	startTime := rand.Time()
+	timePointer.Store(&startTime)
 	endTime := startTime.Add(testSpan)
 	currentTime := startTime
 	bucket, err := NewSigningRateBucket(startTime, bucketSpan)
@@ -305,7 +306,7 @@ func TestRandomOperations(t *testing.T) {
 		tracker = NewThreadsafeSigningRateTracker(tracker)
 		defer tracker.Close()
 
-		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		trackerClone = NewThreadsafeSigningRateTracker(trackerClone)
 		defer trackerClone.Close()
@@ -337,6 +338,7 @@ func unflushedBucketsTest(
 
 	// Each iteration, step forward in time by exactly one second.
 	startTime := rand.Time()
+	timePointer.Store(&startTime)
 	endTime := startTime.Add(testSpan)
 	currentTime := startTime
 	bucket, err := NewSigningRateBucket(startTime, bucketSpan)
@@ -380,6 +382,10 @@ func unflushedBucketsTest(
 		}
 
 		// Unlike TestRandomOperations, wait until the end of the test to look at unflushed buckets.
+
+		// Flush prior to updating time for determinism.
+		err = tracker.Flush()
+		require.NoError(t, err)
 
 		currentTime = nextTime
 		timePointer.Store(&currentTime)

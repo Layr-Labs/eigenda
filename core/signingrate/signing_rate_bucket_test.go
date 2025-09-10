@@ -55,6 +55,7 @@ func TestProtoConversion(t *testing.T) {
 
 	quorumCount := core.QuorumID(5)
 	for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+		bucket.signingRateInfo[quorum] = make(map[core.OperatorID]*validator.ValidatorSigningRate)
 		for _, validatorID := range validatorIDs {
 			bucket.signingRateInfo[quorum][validatorID] = &validator.ValidatorSigningRate{
 				Id:             validatorID[:],
