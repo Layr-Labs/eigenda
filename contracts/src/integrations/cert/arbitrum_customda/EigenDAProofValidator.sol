@@ -67,6 +67,11 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
         //       This will require reading the kzg data commitment from the DA Cert
         //       Blob Header which will require deserializing the cert into a structured
         //       Solidity type for adequate extraction
+
+        require(offset < 16_233_000);
+
+        bytes memory dummyReturnValue = hex"";
+        return dummyReturnValue;
     }
 
     /**
@@ -114,6 +119,7 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
         // so that an invalid cert can be skipped. If this call were to revert then the fraud proof's
         // correctness would be violated.
 
-        IEigenDACertVerifierRouter(eigenDACertVeriferRouter).checkDACert(certificate[3:]);
+        uint8 statusCode = IEigenDACertVerifierRouter(eigenDACertVeriferRouter).checkDACert(certificate[3:]);
+        return statusCode == 1 ? true : false;
     }
 }
