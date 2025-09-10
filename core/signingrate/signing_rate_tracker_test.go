@@ -295,15 +295,22 @@ func TestRandomOperations(t *testing.T) {
 	t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
 		t.Parallel()
 
+		currentTime := &atomic.Pointer[time.Time]{}
+		timeSource := func() time.Time {
+			return *currentTime.Load()
+		}
+
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		tracker = NewThreadsafeSigningRateTracker(tracker)
+		defer tracker.Close()
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
 		require.NoError(t, err)
 		trackerClone = NewThreadsafeSigningRateTracker(trackerClone)
+		defer trackerClone.Close()
 
-		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan)
+		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
 
 }
@@ -313,6 +320,7 @@ func unflushedBucketsTest(
 	tracker SigningRateTracker,
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
+	timePointer *atomic.Pointer[time.Time],
 ) {
 	rand := random.NewTestRandom()
 
@@ -353,11 +361,11 @@ func unflushedBucketsTest(
 
 		if rand.Bool() {
 			latency := rand.DurationRange(time.Second, time.Hour)
-			tracker.ReportSuccess(currentTime, validatorID, batchSize, latency)
-			expectedBucket.ReportSuccess(validatorID, batchSize, latency)
+			tracker.ReportSuccess(0, validatorID, batchSize, latency)
+			expectedBucket.ReportSuccess(0, validatorID, batchSize, latency)
 		} else {
-			tracker.ReportFailure(currentTime, validatorID, batchSize, rand.Bool() /* just used for metrics */)
-			expectedBucket.ReportFailure(validatorID, batchSize)
+			tracker.ReportFailure(0, validatorID, batchSize)
+			expectedBucket.ReportFailure(0, validatorID, batchSize)
 		}
 
 		// On average, validate once per bucket.
@@ -374,6 +382,7 @@ func unflushedBucketsTest(
 		// Unlike TestRandomOperations, wait until the end of the test to look at unflushed buckets.
 
 		currentTime = nextTime
+		timePointer.Store(&currentTime)
 	}
 
 	err = tracker.Flush()
@@ -388,10 +397,13 @@ func unflushedBucketsTest(
 		expectedBucket := expectedBuckets[i]
 		require.Equal(t, int(uint64(expectedBucket.startTimestamp.Unix())), int(bucket.GetStartTimestamp()))
 		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), bucket.GetEndTimestamp())
-		for _, signingRate := range bucket.GetValidatorSigningRates() {
-			validatorID := core.OperatorID(signingRate.GetId())
-			expectedSigningRate := expectedBucket.signingRateInfo[validatorID]
-			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
+		for _, quorumInfo := range bucket.GetQuorumSigningRates() {
+			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
+			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
+				validatorID := core.OperatorID(signingRate.GetId())
+				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
+				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
+			}
 		}
 	}
 
@@ -417,21 +429,31 @@ func TestUnflushedBuckets(t *testing.T) {
 	t.Run("signingRateTracker", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		currentTime := &atomic.Pointer[time.Time]{}
+		timeSource := func() time.Time {
+			return *currentTime.Load()
+		}
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		defer tracker.Close()
 
-		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan)
+		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})
 
 	t.Run("threadsafeSigningRateTracker", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, nil)
+		currentTime := &atomic.Pointer[time.Time]{}
+		timeSource := func() time.Time {
+			return *currentTime.Load()
+		}
+
+		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
 		tracker = NewThreadsafeSigningRateTracker(tracker)
 		defer tracker.Close()
 
-		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan)
+		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})
 }
