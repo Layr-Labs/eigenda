@@ -53,13 +53,16 @@ func TestProtoConversion(t *testing.T) {
 	bucket, err := NewSigningRateBucket(rand.Time(), span)
 	require.NoError(t, err)
 
-	for _, validatorID := range validatorIDs {
-		bucket.signingRateInfo[validatorID] = &validator.ValidatorSigningRate{
-			Id:             validatorID[:],
-			SignedBatches:  rand.Uint64(),
-			SignedBytes:    rand.Uint64(),
-			UnsignedBytes:  rand.Uint64(),
-			SigningLatency: rand.Uint64(),
+	quorumCount := core.QuorumID(5)
+	for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+		for _, validatorID := range validatorIDs {
+			bucket.signingRateInfo[quorum][validatorID] = &validator.ValidatorSigningRate{
+				Id:             validatorID[:],
+				SignedBatches:  rand.Uint64(),
+				SignedBytes:    rand.Uint64(),
+				UnsignedBytes:  rand.Uint64(),
+				SigningLatency: rand.Uint64(),
+			}
 		}
 	}
 
@@ -67,11 +70,14 @@ func TestProtoConversion(t *testing.T) {
 	pb := bucket.ToProtobuf()
 	require.Equal(t, uint64(bucket.startTimestamp.Unix()), pb.GetStartTimestamp())
 	require.Equal(t, uint64(bucket.endTimestamp.Unix()), pb.GetEndTimestamp())
-	for index := range pb.GetValidatorSigningRates() {
-		expected := bucket.signingRateInfo[validatorIDs[index]]
-		actual := pb.GetValidatorSigningRates()[index]
-		require.True(t, areSigningRatesEqual(expected, actual))
-		require.True(t, expected != actual, "Expected a deep copy of the signing rate info")
+	for _, quorumInfo := range pb.GetQuorumSigningRates() {
+		quorumID := core.QuorumID(quorumInfo.GetQuorumId())
+		for index, actualSigningRate := range quorumInfo.GetValidatorSigningRates() {
+			expected := bucket.signingRateInfo[quorumID][validatorIDs[index]]
+
+			require.True(t, areSigningRatesEqual(expected, actualSigningRate))
+			require.True(t, expected != actualSigningRate, "Expected a deep copy of the signing rate info")
+		}
 	}
 
 	// Getting the protobuf again should yield the same object (cached)
@@ -82,27 +88,29 @@ func TestProtoConversion(t *testing.T) {
 	bucket2 := NewBucketFromProto(pb)
 	require.Equal(t, bucket.startTimestamp.Unix(), bucket2.startTimestamp.Unix())
 	require.Equal(t, bucket.endTimestamp.Unix(), bucket2.endTimestamp.Unix())
-	for id, info := range bucket.signingRateInfo {
-		info2, exists := bucket2.signingRateInfo[id]
-		require.True(t, exists, "Validator ID missing in converted bucket")
-		require.True(t, areSigningRatesEqual(info, info2))
-		require.True(t, info != info2, "Expected a deep copy of the signing rate info")
+	for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+		for id, info := range bucket.signingRateInfo[quorum] {
+			info2, exists := bucket2.signingRateInfo[quorum][id]
+			require.True(t, exists, "Validator ID missing in converted bucket")
+			require.True(t, areSigningRatesEqual(info, info2))
+			require.True(t, info != info2, "Expected a deep copy of the signing rate info")
+		}
 	}
 
 	// Perform updates. This should clear the cached protobuf.
-	bucket.ReportSuccess(validatorIDs[0], 0, 0)
+	bucket.ReportSuccess(0, validatorIDs[0], 0, 0)
 	pb3 := bucket.ToProtobuf()
 	require.True(t, pb3 != pb, "Expected a new protobuf to be generated after the bucket was modified")
 	pb4 := bucket.ToProtobuf()
 	require.True(t, pb3 == pb4, "Expected the cached protobuf to be returned")
-	bucket.ReportFailure(validatorIDs[0], 0)
+	bucket.ReportFailure(1, validatorIDs[0], 0)
 	pb5 := bucket.ToProtobuf()
 	require.True(t, pb5 != pb4, "Expected a new protobuf to be generated after the bucket was modified")
 	pb6 := bucket.ToProtobuf()
 	require.True(t, pb5 == pb6, "Expected the cached protobuf to be returned")
 }
 
-func TestReporting(t *testing.T) {
+func TestReporting(t *testing.T) { // TODO augment this test to use multiple quorums
 	rand := random.NewTestRandom()
 
 	expectedSuccesses := make(map[core.OperatorID]uint64)
@@ -134,13 +142,13 @@ func TestReporting(t *testing.T) {
 
 		if rand.Bool() {
 			latency := rand.DurationRange(time.Second, time.Hour)
-			bucket.ReportSuccess(validatorID, batchSize, latency)
+			bucket.ReportSuccess(0, validatorID, batchSize, latency)
 
 			expectedSuccesses[validatorID] += 1
 			expectedSuccessBytes[validatorID] += batchSize
 			expectedLatency[validatorID] += uint64(latency.Nanoseconds())
 		} else {
-			bucket.ReportFailure(validatorID, batchSize)
+			bucket.ReportFailure(0, validatorID, batchSize)
 
 			expectedFailures[validatorID] += 1
 			expectedFailureBytes[validatorID] += batchSize
@@ -149,7 +157,7 @@ func TestReporting(t *testing.T) {
 
 	// Verify the results.
 	for _, validatorID := range validatorIDs {
-		signingRate := bucket.getValidator(validatorID)
+		signingRate := bucket.getValidator(0, validatorID)
 		require.Equal(t, expectedSuccesses[validatorID], signingRate.GetSignedBatches())
 		require.Equal(t, expectedSuccessBytes[validatorID], signingRate.GetSignedBytes())
 		require.Equal(t, expectedFailures[validatorID], signingRate.GetUnsignedBatches())

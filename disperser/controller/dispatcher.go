@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -93,9 +92,6 @@ type Dispatcher struct {
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
 	batchMetadataManager metadata.BatchMetadataManager
-
-	// signingRateTracker keeps track of signing rates for validators.
-	signingRateTracker signingrate.SigningRateTracker
 }
 
 type batchData struct {
@@ -119,7 +115,6 @@ func NewDispatcher(
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
-	signingRateTracker signingrate.SigningRateTracker,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -163,7 +158,6 @@ func NewDispatcher(
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
-		signingRateTracker:     signingRateTracker,
 	}, nil
 }
 
@@ -301,12 +295,10 @@ func (d *Dispatcher) HandleBatch(
 
 			var i int
 			var lastErr error
-			var timeout bool
 			for i = 0; i < d.NumRequestRetries+1; i++ {
 				validatorProbe.SetStage("send_chunks")
 
-				var sig *core.Signature
-				sig, timeout, err = d.sendChunks(ctx, client, batch)
+				sig, err := d.sendChunks(ctx, client, batch)
 				lastErr = err
 				if err == nil {
 					validatorProbe.SetStage("put_dispersal_response")
@@ -360,7 +352,6 @@ func (d *Dispatcher) HandleBatch(
 					BatchHeaderHash: batchData.BatchHeaderHash,
 					TimeReceived:    time.Now(),
 					Err:             lastErr,
-					Timeout:         timeout,
 				}
 			}
 			d.metrics.reportSendChunksRetryCount(float64(i))
@@ -430,9 +421,7 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.BatchHeaderHash,
 		sigChan,
 		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdPercentage,
-		d.signingRateTracker,
-		0) // TODO
+		d.DispatcherConfig.SignificantSigningThresholdPercentage)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
@@ -782,7 +771,7 @@ func (d *Dispatcher) sendChunks(
 	ctx context.Context,
 	client clients.NodeClient,
 	batch *corev2.Batch,
-) (signature *core.Signature, timeout bool, err error) {
+) (*core.Signature, error) {
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.AttestationTimeout)
 
@@ -790,11 +779,10 @@ func (d *Dispatcher) sendChunks(
 
 	sig, err := client.StoreChunks(ctxWithTimeout, batch)
 	if err != nil {
-		timeout = ctxWithTimeout.Err() != nil
-		return nil, timeout, fmt.Errorf("failed to store chunks: %w", err)
+		return nil, fmt.Errorf("failed to store chunks: %w", err)
 	}
 
-	return sig, false, nil
+	return sig, nil
 }
 
 // updateBatchStatus updates the status of the blobs in the batch based on the quorum results

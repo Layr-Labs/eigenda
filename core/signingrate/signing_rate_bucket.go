@@ -161,7 +161,8 @@ func (b *SigningRateBucket) Contains(t time.Time) bool {
 	return !t.Before(b.startTimestamp) && t.Before(b.endTimestamp)
 }
 
-// Get the signing rate info for a validator in a particular quorum, creating a new entry if necessary. Is not a deep copy.
+// Get the signing rate info for a validator in a particular quorum, creating a new entry if necessary.
+// Is not a deep copy.
 func (b *SigningRateBucket) getValidator(quorum core.QuorumID, id core.OperatorID) *validator.ValidatorSigningRate {
 	quorumSigningRate, exists := b.signingRateInfo[quorum]
 	if !exists {

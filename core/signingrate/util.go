@@ -26,7 +26,7 @@ func sortValidatorSigningRates(rates []*validator.ValidatorSigningRate) {
 // Sort quorum signing rates by quorum ID. Modifies the input slice.
 func sortQuorumSigningRates(quorums []*validator.QuorumSigningRate) {
 	sort.Slice(quorums, func(i int, j int) bool {
-		return quorums[i].QuorumId < quorums[j].QuorumId
+		return quorums[i].GetQuorumId() < quorums[j].GetQuorumId()
 	})
 }
 

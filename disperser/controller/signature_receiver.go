@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -26,20 +25,11 @@ type signatureReceiver struct {
 
 	// validSignerMap tracks which operators have already submitted valid signatures
 	validSignerMap map[core.OperatorID]bool
-
-	// the time it took for each signer to submit their signature after the signing message was created
-	signerLatencyMap map[core.OperatorID]time.Duration
-
-	// validatorTimeoutMap tracks which operators have timed out.
-	validatorTimeoutMap map[core.OperatorID]struct{}
-
 	// signatureMessageReceived tracks which operators have submitted signature messages, whether valid or invalid.
 	// this is tracked separately from signerMap, since signerMap only includes valid signatures
 	signatureMessageReceived map[core.OperatorID]bool
-
 	// aggregateSignatures stores the accumulated BLS signatures for each quorum
 	aggregateSignatures map[core.QuorumID]*core.Signature
-
 	// aggregateSignersG2PubKeys stores the accumulated G2 public keys of signers for each quorum
 	aggregateSignersG2PubKeys map[core.QuorumID]*core.G2Point
 
@@ -48,10 +38,8 @@ type signatureReceiver struct {
 
 	// batchHeaderHash is the hash of the batch header that operators are signing
 	batchHeaderHash [32]byte
-
 	// signingMessageChan is the channel through which SigningMessages are received
 	signingMessageChan chan core.SigningMessage
-
 	// quorumIDs is a sorted list of quorum IDs for which signatures are being collected
 	quorumIDs []core.QuorumID
 
@@ -84,20 +72,6 @@ type signatureReceiver struct {
 
 	// The number of errors encountered while processing SigningMessages.
 	errorCount int
-
-	// Tracks signing rates.
-	signingRateTracker signingrate.SigningRateTracker
-
-	// The size of the batch in bytes, used for signing rate tracking.
-	batchSizeBytes uint64
-
-	// Used to measure the latency of a validator's response time. There is a bit of imprecision here, as there may be
-	// some wiggle room between when each validator received their request. But it's a good enough approximation for
-	// metrics, since the alternative for more accurate metrics requires code to be refactored.
-	startTime time.Time // TODO is there a better way?
-
-	// Metrics for tracking signing rates.
-	signingRateMetrics signingrate.SigningRateMetrics // TODO make sure this is non-nil // TODO put this into dispatcher metrics
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -121,8 +95,6 @@ func ReceiveSignatures(
 	signingMessageChan chan core.SigningMessage,
 	tickInterval time.Duration,
 	significantSigningThresholdPercentage uint8,
-	signingRateTracker signingrate.SigningRateTracker,
-	batchSizeBytes uint64,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -130,7 +102,6 @@ func ReceiveSignatures(
 	}
 
 	validSignerMap := make(map[core.OperatorID]bool)
-	signerLatencyMap := make(map[core.OperatorID]time.Duration)
 	signatureMessageReceived := make(map[core.OperatorID]bool)
 	aggregateSignatures := make(map[core.QuorumID]*core.Signature, len(sortedQuorumIDs))
 	aggregateSignersG2PubKeys := make(map[core.QuorumID]*core.G2Point, len(sortedQuorumIDs))
@@ -149,7 +120,6 @@ func ReceiveSignatures(
 		indexedOperatorState:                   indexedOperatorState,
 		aggregateSignatures:                    aggregateSignatures,
 		validSignerMap:                         validSignerMap,
-		signerLatencyMap:                       signerLatencyMap,
 		signatureMessageReceived:               signatureMessageReceived,
 		aggregateSignersG2PubKeys:              aggregateSignersG2PubKeys,
 		stakeSigned:                            stakeSigned,
@@ -160,9 +130,6 @@ func ReceiveSignatures(
 		significantSigningThresholdPercentage:  significantSigningThresholdPercentage,
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
 		ticker:                                 time.NewTicker(tickInterval),
-		signingRateTracker:                     signingRateTracker,
-		batchSizeBytes:                         batchSizeBytes,
-		startTime:                              time.Now(),
 	}
 
 	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
@@ -222,27 +189,6 @@ forLoop:
 
 	// Aggregate any remaining signatures and submit an attestation.
 	sr.buildAndSubmitAttestation(attestationChan)
-
-	// At this point in time, we've received and processed all signing messages that we are going to receive.
-	// Gather and report signing rate metrics.
-	// TODO we need to handle the case where time goes backwards! We will be processing batches in parallel!
-	now := time.Now()
-	for id := range sr.signatureMessageReceived {
-
-		//quroums := nil // TODO future cody: you need to find the quorums the operator is in for this batch!
-
-		if sr.validSignerMap[id] {
-			// TODO: the signing rate tracker must also track quorums!!!
-			sr.signingRateTracker.ReportSuccess(now, id, sr.batchSizeBytes, sr.signerLatencyMap[id])
-			sr.signingRateMetrics.ReportSuccess(id, sr.batchSizeBytes, sr.signerLatencyMap[id], nil)
-		} else {
-			_, timeout := sr.validatorTimeoutMap[id]
-			sr.signingRateTracker.ReportFailure(now, id, sr.batchSizeBytes)
-			sr.signingRateMetrics.ReportFailure(id, sr.batchSizeBytes, timeout, nil)
-		}
-	}
-
-	// TODO report timeouts
 }
 
 func (sr *signatureReceiver) handleNextSignature(
@@ -291,7 +237,6 @@ func (sr *signatureReceiver) handleNextSignature(
 	}
 
 	sr.validSignerMap[signingMessage.Operator] = true
-	sr.signerLatencyMap[signingMessage.Operator] = time.Now().Sub(sr.startTime) // TODO right place???
 	sr.newSignaturesGathered = true
 
 	if thresholdCrossed {
@@ -331,9 +276,6 @@ func (sr *signatureReceiver) processSigningMessage(
 	}()
 
 	if signingMessage.Err != nil {
-		if signingMessage.Timeout {
-			sr.validatorTimeoutMap[signingMessage.Operator] = struct{}{}
-		}
 		return false, fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
 	}
 
@@ -344,7 +286,7 @@ func (sr *signatureReceiver) processSigningMessage(
 
 	thresholdCrossed := false
 	for _, quorumID := range sr.quorumIDs {
-		quorumOperators := sr.indexedOperatorState.Operators[quorumID] // TODO future cody copy this logic to determine the quorums when reporting metrics
+		quorumOperators := sr.indexedOperatorState.Operators[quorumID]
 		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.Operator]
 		if !isOperatorInQuorum {
 			// if the operator which sent the signing message isn't in a given quorum, then we shouldn't make any
