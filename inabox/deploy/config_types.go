@@ -18,7 +18,7 @@ type Staker struct {
 }
 
 // Docker compose
-type testbed struct {
+type DockerCompose struct {
 	Services map[string]map[string]interface{} `yaml:"services"`
 }
 
