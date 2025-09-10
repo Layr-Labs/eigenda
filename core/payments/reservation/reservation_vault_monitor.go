@@ -154,7 +154,7 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 	}
 
 	if err := errorGroup.Wait(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error group wait: %w", err)
 	}
 
 	return results, nil
