@@ -24,7 +24,7 @@ type ControllerClient struct {
 	disperserPublicKey  *ecdsa.PublicKey
 
 	clientConnection *grpc.ClientConn
-	client           controller.ControllerServiceClient
+	serviceClient    controller.ControllerServiceClient
 }
 
 // Creates a client for communicating with the controller GRPC server
@@ -81,7 +81,7 @@ func NewControllerClient(
 		disperserKeyManager: keyManager,
 		disperserPublicKey:  publicKey,
 		clientConnection:    clientConnection,
-		client:              client,
+		serviceClient:       client,
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func (c *ControllerClient) AuthorizePayment(
 
 	authorizePaymentRequest.DisperserSignature = signature
 
-	_, err = c.client.AuthorizePayment(ctx, authorizePaymentRequest)
+	_, err = c.serviceClient.AuthorizePayment(ctx, authorizePaymentRequest)
 	if err != nil {
 		return fmt.Errorf("authorize payment: %w", err)
 	}
@@ -117,7 +117,7 @@ func (c *ControllerClient) Close() error {
 	if c.clientConnection != nil {
 		err := c.clientConnection.Close()
 		c.clientConnection = nil
-		c.client = nil
+		c.serviceClient = nil
 		return err
 	}
 	return nil
