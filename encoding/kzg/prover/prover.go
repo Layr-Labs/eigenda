@@ -46,8 +46,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	// read the whole order, and treat it as entire SRS for low degree proof
 	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 	if err != nil {
-		log.Println("failed to read G1 points", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read G1 points: %w", err)
 	}
 
 	s2 := make([]bn254.G2Affine, 0)
@@ -61,15 +60,14 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		s2, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to read G2 points: %w", err)
 		}
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
 			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
 			if errStat != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot stat the G2TrailingPath: %w", errStat)
 			}
 			fileSizeByte := fileStat.Size()
 			if fileSizeByte%64 != 0 {
@@ -88,6 +86,10 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 				numG2point, // last exclusive
 				kzgConfig.NumWorker,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read G2 trailing points (%v to %v) from file %v: %w",
+					numG2point-kzgConfig.SRSNumberToLoad, numG2point, kzgConfig.G2TrailingPath, err)
+			}
 		} else {
 			// require entire g2 srs be available on disk
 			g2Trailing, err = kzg.ReadG2PointSection(
@@ -96,10 +98,10 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 				kzgConfig.SRSOrder, // last exclusive
 				kzgConfig.NumWorker,
 			)
-		}
-
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
+					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
+			}
 		}
 	} else {
 		// todo, there are better ways to handle it
