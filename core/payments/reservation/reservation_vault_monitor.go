@@ -104,10 +104,6 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 	ctx context.Context,
 	accountIDs []gethcommon.Address,
 ) ([]*bindings.IPaymentVaultReservation, error) {
-	if len(accountIDs) == 0 {
-		return nil, nil
-	}
-
 	// Split accounts into accountBatches to avoid RPC size limits
 	var accountBatches [][]gethcommon.Address
 
