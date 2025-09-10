@@ -97,7 +97,7 @@ func (s *Server) AuthorizePayment(
 
 	if s.paymentAuthorizationHandler == nil {
 		s.metrics.ReportAuthorizePaymentAuthFailure()
-		return nil, fmt.Errorf("payment authorization handler not configured")
+		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
 	}
 
 	reply, err := s.paymentAuthorizationHandler.AuthorizePayment(ctx, request)
@@ -108,7 +108,11 @@ func (s *Server) AuthorizePayment(
 		} else {
 			s.metrics.ReportAuthorizePaymentAuthFailure()
 		}
-		return nil, fmt.Errorf("authorize payment: %w", err)
+		// Return the error as-is if it's already a gRPC status error, otherwise wrap it as Internal
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "authorize payment: %v", err)
 	}
 
 	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
