@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/ethereum/go-ethereum/crypto"
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -72,24 +71,6 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	}
 
 	// TODO: Implement actual payment authorization logic
-	// This should include:
-	// 1. Validate the client signature against the account's public key
-	// 2. Check account balance and reservation status
-	// 3. Calculate the cost of the requested dispersal
-	// 4. Verify the account has sufficient funds
-	// 5. Record the payment authorization for audit purposes
-
-	// Example: Simulate insufficient balance error with structured metadata
-	// In real implementation, this would be based on actual balance checks
-	simulateInsufficientBalance := false
-
-	if simulateInsufficientBalance {
-		accountID := request.GetBlobHeader().GetPaymentHeader().GetAccountId()
-		currentBalance := uint64(100) // In production, get actual balance
-		requiredCost := uint64(150)   // In production, calculate actual cost
-
-		return nil, h.newInsufficientBalanceError(accountID, currentBalance, requiredCost)
-	}
 
 	return &pb.AuthorizePaymentReply{}, nil
 }
@@ -116,40 +97,4 @@ func (h *PaymentAuthorizationHandler) verifyDisperserSignature(request *pb.Autho
 	}
 
 	return nil
-}
-
-// newInsufficientBalanceError creates a structured gRPC error for insufficient balance
-// with detailed metadata about the account balance and required cost.
-func (h *PaymentAuthorizationHandler) newInsufficientBalanceError(
-	accountID string,
-	currentBalance uint64,
-	requiredCost uint64,
-) error {
-	deficit := uint64(0)
-	if requiredCost > currentBalance {
-		deficit = requiredCost - currentBalance
-	}
-
-	st := status.New(codes.FailedPrecondition, "insufficient balance for blob dispersal")
-
-	// Add structured error details with metadata
-	// TODO: make this match the same metadata that is returned from structured payments error.
-	// Consider creating a method on the structured payments error that wraps it as a gRPC error.
-	st, err := st.WithDetails(&errdetails.ErrorInfo{
-		Reason: "INSUFFICIENT_BALANCE",
-		Domain: "payment",
-		Metadata: map[string]string{
-			"account_id":      accountID,
-			"current_balance": fmt.Sprintf("%d", currentBalance),
-			"required_cost":   fmt.Sprintf("%d", requiredCost),
-			"deficit":         fmt.Sprintf("%d", deficit),
-		},
-	})
-
-	if err != nil {
-		// If we can't add details, return the basic error
-		return st.Err()
-	}
-
-	return st.Err()
 }

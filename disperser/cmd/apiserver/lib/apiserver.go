@@ -150,7 +150,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
 		var controllerClient *apiserver.ControllerClient
-		if config.ControllerAddress != "" {
+		if config.UseControllerMediatedPayments {
+			if config.ControllerAddress == "" {
+				return fmt.Errorf("controller address is required when not using legacy payment system")
+			}
 			controllerClient, err = apiserver.NewControllerClient(
 				context.Background(),
 				config.ControllerAddress,
@@ -161,7 +164,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 			if err != nil {
 				return fmt.Errorf("create controller client: %w", err)
 			}
-			logger.Debug("Controller client created", "address", config.ControllerAddress)
+			logger.Info("Controller client created", "address", config.ControllerAddress)
+		} else if config.ControllerAddress != "" {
+			logger.Warn("Controller address provided but legacy payment system is enabled; controller will not be used")
 		}
 
 		server, err := apiserver.NewDispersalServerV2(
@@ -178,6 +183,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
+			config.UseControllerMediatedPayments,
 			controllerClient,
 		)
 		if err != nil {

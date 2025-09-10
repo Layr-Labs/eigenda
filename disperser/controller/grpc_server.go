@@ -46,11 +46,10 @@ func (s *GrpcServer) Start() error {
 	addr := fmt.Sprintf("0.0.0.0:%s", s.grpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("could not start tcp listener: %w", err)
+		return fmt.Errorf("start tcp listener: %w", err)
 	}
 	s.listener = listener
 
-	// Create gRPC server with metrics interceptor
 	grpcMetrics := grpcprom.NewServerMetrics()
 	s.server = grpc.NewServer(
 		grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor()),
@@ -59,8 +58,7 @@ func (s *GrpcServer) Start() error {
 	reflection.Register(s.server)
 	pb.RegisterControllerServiceServer(s.server, s)
 
-	name := pb.ControllerService_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, s.server)
+	healthcheck.RegisterHealthServer(pb.ControllerService_ServiceDesc.ServiceName, s.server)
 
 	s.logger.Debugf("gRPC server listening", "address", listener.Addr().String())
 

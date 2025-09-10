@@ -223,6 +223,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
+	UseControllerMediatedPayments = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server (default: false)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -323,6 +329,7 @@ var optionalFlags = []cli.Flag{
 	ReservedOnly,
 	ControllerAddressFlag,
 	DisperserKMSKeyIDFlag,
+	UseControllerMediatedPayments,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

@@ -64,10 +64,17 @@ type DispersalServerV2 struct {
 	// This would be removed with decentralized ratelimiting
 	ReservedOnly bool
 
+	// Determines which payment system to use. If true, use the new payments system running on the controller.
+	// If false, use the legacy payments system which executes on the API server.
+	//
+	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
+	useControllerMediatedPayments bool
+
 	// Handles communication with the controller GRPC server
 	//
-	// It may be nil for now, in which case old payment logic will be used. If it is non-nil, then it will be used
-	// to delegate payment authorization to the Controller.
+	// TODO(litt3): Must be non-nil if any part of the system needs to communicate with the controller GRPC server.
+	// Features that rely on the controller GRPC server are currently in development: once fully implemented, this
+	// field will be required, and this comment should be removed.
 	controllerClient *ControllerClient
 }
 
@@ -86,7 +93,8 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
-	// Optional - pass nil to use old payments logic
+	useControllerMediatedPayments bool,
+	// must be non-nil if useControllerMediatedPayments is true
 	controllerClient *ControllerClient,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
@@ -116,8 +124,13 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
-	if controllerClient != nil {
-		logger.Debug("Controller client provided, will use for payment authorization")
+	if useControllerMediatedPayments {
+		if controllerClient == nil {
+			return nil, errors.New("controller client is required to use new payment system")
+		}
+		logger.Info("Using controller-based payment system")
+	} else {
+		logger.Info("Using legacy payment metering system")
 	}
 
 	return &DispersalServerV2{
@@ -137,8 +150,9 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ReservedOnly:     ReservedOnly,
-		controllerClient: controllerClient,
+		ReservedOnly:                  ReservedOnly,
+		useControllerMediatedPayments: useControllerMediatedPayments,
+		controllerClient:              controllerClient,
 	}, nil
 }
 

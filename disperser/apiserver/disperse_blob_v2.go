@@ -38,16 +38,15 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 
-	if s.controllerClient != nil {
-		// s.controllerClient is non-nil, so use the new logic which delegates accounting and metering to the Controller
+	if s.useControllerMediatedPayments {
+		// Use the new controller-based payment system
 		err := s.controllerClient.AuthorizePayment(ctx, req.GetBlobHeader())
 		if err != nil {
 			// Pass through the structured error from the controller
 			return nil, err
 		}
 	} else {
-		// s.controllerClient is nil, so use the old logic
-		//
+		// Use the legacy payment metering system
 		// Check against payment meter to make sure there is quota remaining
 		if err := s.checkPaymentMeter(ctx, req, start); err != nil {
 			return nil, err

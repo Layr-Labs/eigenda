@@ -24,30 +24,31 @@ const (
 )
 
 type Config struct {
-	DisperserVersion            DisperserVersion
-	AwsClientConfig             aws.ClientConfig
-	BlobstoreConfig             blobstore.Config
-	ServerConfig                disperser.ServerConfig
-	LoggerConfig                common.LoggerConfig
-	MetricsConfig               disperser.MetricsConfig
-	RatelimiterConfig           ratelimit.Config
-	RateConfig                  apiserver.RateConfig
-	EncodingConfig              kzg.KzgConfig
-	EnableRatelimiter           bool
-	EnablePaymentMeterer        bool
-	ReservedOnly                bool
-	ChainReadTimeout            time.Duration
-	ReservationsTableName       string
-	OnDemandTableName           string
-	GlobalRateTableName         string
-	BucketTableName             string
-	BucketStoreSize             int
-	EthClientConfig             geth.EthClientConfig
-	MaxBlobSize                 int
-	MaxNumSymbolsPerBlob        uint
-	OnchainStateRefreshInterval time.Duration
-	ControllerAddress           string
-	DisperserKMSKeyID           string
+	DisperserVersion              DisperserVersion
+	AwsClientConfig               aws.ClientConfig
+	BlobstoreConfig               blobstore.Config
+	ServerConfig                  disperser.ServerConfig
+	LoggerConfig                  common.LoggerConfig
+	MetricsConfig                 disperser.MetricsConfig
+	RatelimiterConfig             ratelimit.Config
+	RateConfig                    apiserver.RateConfig
+	EncodingConfig                kzg.KzgConfig
+	EnableRatelimiter             bool
+	EnablePaymentMeterer          bool
+	ReservedOnly                  bool
+	ChainReadTimeout              time.Duration
+	ReservationsTableName         string
+	OnDemandTableName             string
+	GlobalRateTableName           string
+	BucketTableName               string
+	BucketStoreSize               int
+	EthClientConfig               geth.EthClientConfig
+	MaxBlobSize                   int
+	MaxNumSymbolsPerBlob          uint
+	OnchainStateRefreshInterval   time.Duration
+	ControllerAddress             string
+	DisperserKMSKeyID             string
+	UseControllerMediatedPayments bool
 
 	EigenDADirectory                string
 	OperatorStateRetrieverAddr      string
@@ -117,24 +118,25 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		RatelimiterConfig:           ratelimiterConfig,
-		RateConfig:                  rateConfig,
-		EncodingConfig:              encodingConfig,
-		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
-		ReservedOnly:                ctx.GlobalBoolT(flags.ReservedOnly.Name),
-		ControllerAddress:           ctx.GlobalString(flags.ControllerAddressFlag.Name),
-		DisperserKMSKeyID:           ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
-		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
-		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
-		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
-		BucketTableName:             ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:             ctx.GlobalInt(flags.BucketStoreSize.Name),
-		ChainReadTimeout:            ctx.GlobalDuration(flags.ChainReadTimeout.Name),
-		EthClientConfig:             geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
-		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
-		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
+		RatelimiterConfig:             ratelimiterConfig,
+		RateConfig:                    rateConfig,
+		EncodingConfig:                encodingConfig,
+		EnableRatelimiter:             ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer:          ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservedOnly:                  ctx.GlobalBoolT(flags.ReservedOnly.Name),
+		ControllerAddress:             ctx.GlobalString(flags.ControllerAddressFlag.Name),
+		DisperserKMSKeyID:             ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+		UseControllerMediatedPayments: ctx.GlobalBool(flags.UseControllerMediatedPayments.Name),
+		ReservationsTableName:         ctx.GlobalString(flags.ReservationsTableName.Name),
+		OnDemandTableName:             ctx.GlobalString(flags.OnDemandTableName.Name),
+		GlobalRateTableName:           ctx.GlobalString(flags.GlobalRateTableName.Name),
+		BucketTableName:               ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:               ctx.GlobalInt(flags.BucketStoreSize.Name),
+		ChainReadTimeout:              ctx.GlobalDuration(flags.ChainReadTimeout.Name),
+		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:                   ctx.GlobalInt(flags.MaxBlobSize.Name),
+		MaxNumSymbolsPerBlob:          ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
+		OnchainStateRefreshInterval:   ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		EigenDADirectory:                ctx.GlobalString(flags.EigenDADirectoryFlag.Name),
 		OperatorStateRetrieverAddr:      ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
