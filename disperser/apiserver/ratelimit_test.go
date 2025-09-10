@@ -1,7 +1,6 @@
 package apiserver_test
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"net"
@@ -20,6 +19,7 @@ import (
 )
 
 func TestRatelimit(t *testing.T) {
+	baseCtx := t.Context()
 	data50KiB := make([]byte, 49600) // 50*1024/32*31
 	_, err := rand.Read(data50KiB)
 
@@ -39,7 +39,7 @@ func TestRatelimit(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(baseCtx, p)
 
 	// Try with non-allowlisted IP
 	// Should fail with account throughput limit because unauth throughput limit is 20 KiB/s for quorum 0
@@ -71,7 +71,7 @@ func TestRatelimit(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx = peer.NewContext(context.Background(), p)
+	ctx = peer.NewContext(baseCtx, p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data50KiB,
@@ -154,6 +154,7 @@ func TestAuthRatelimit(t *testing.T) {
 }
 
 func TestRetrievalRateLimit(t *testing.T) {
+	ctx := t.Context()
 
 	// Create random data
 	data := make([]byte, 992)
@@ -167,7 +168,7 @@ func TestRetrievalRateLimit(t *testing.T) {
 	assert.Equal(t, status, pb.BlobStatus_PROCESSING)
 	assert.NotNil(t, requestID)
 
-	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err := dispersalServer.GetBlobStatus(ctx, &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	assert.NoError(t, err)
@@ -188,7 +189,7 @@ func TestRetrievalRateLimit(t *testing.T) {
 	}
 	_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
 
-	reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err = dispersalServer.GetBlobStatus(ctx, &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	assert.NoError(t, err)
@@ -198,7 +199,7 @@ func TestRetrievalRateLimit(t *testing.T) {
 	numLimited := 0
 	tt := time.Now()
 	for i := 0; i < 15; i++ {
-		_, err = retrieveBlob(dispersalServer, requestID, 1)
+		_, err = retrieveBlob(t, dispersalServer, requestID, 1)
 		fmt.Println(time.Since(tt))
 		tt = time.Now()
 		if err != nil && strings.Contains(err.Error(), "request ratelimited: Retrieval blob rate limit") {
@@ -208,7 +209,7 @@ func TestRetrievalRateLimit(t *testing.T) {
 	assert.Greater(t, numLimited, 0)
 }
 func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, data []byte, quorums []uint32, delay time.Duration, errorChan chan error, shouldSucceed bool) {
-
+	baseCtx := t.Context()
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP(origin),
@@ -216,7 +217,7 @@ func simulateClient(t *testing.T, signer core.BlobRequestSigner, origin string, 
 		},
 	}
 
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(baseCtx, p)
 	stream := mock.MakeStreamMock(ctx)
 
 	go func() {
