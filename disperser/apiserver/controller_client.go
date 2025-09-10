@@ -9,7 +9,6 @@ import (
 	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"google.golang.org/grpc"
@@ -49,7 +48,7 @@ func NewControllerClient(
 	if kmsEndpoint != "" {
 		kmsClient = kms.New(kms.Options{
 			Region:       kmsRegion,
-			BaseEndpoint: aws.String(kmsEndpoint),
+			BaseEndpoint: &kmsEndpoint,
 		})
 	} else {
 		awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
