@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -21,7 +19,6 @@ import (
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -41,13 +38,18 @@ const (
 )
 
 // getKeyString retrieves a ECDSA private key string for a given Ethereum account
-func (env *Config) getKeyString(name string) string {
-	key, _ := env.getKey(name)
+func (env *Config) getKeyString(name string) (string, error) {
+	key, _, err := env.getKey(name)
+	if err != nil {
+		return "", fmt.Errorf("could not get key for %s: %w", name, err)
+	}
+
 	keyInt, ok := new(big.Int).SetString(key, 0)
 	if !ok {
-		log.Panicf("Error: could not parse key %s", key)
+		return "", fmt.Errorf("could not parse key %s", key)
 	}
-	return keyInt.String()
+
+	return keyInt.String(), nil
 }
 
 // generateV1CertVerifierDeployConfig generates the input config used for deploying the V1 CertVerifier
@@ -64,7 +66,7 @@ func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient
 }
 
 // generateEigenDADeployConfig generates input config fed into SetUpEigenDA.s.sol foundry script
-func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
+func (env *Config) generateEigenDADeployConfig() (EigenDADeployConfig, error) {
 
 	operators := make([]string, 0)
 	stakers := make([]string, 0)
@@ -91,8 +93,25 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		stakerName := fmt.Sprintf("staker%d", i)
 		operatorName := fmt.Sprintf("opr%d", i)
 
-		stakers = append(stakers, env.getKeyString(stakerName))
-		operators = append(operators, env.getKeyString(operatorName))
+		// Get keys for staker and operator
+		stakerKey, err := env.getKeyString(stakerName)
+		if err != nil {
+			return EigenDADeployConfig{}, fmt.Errorf("failed to get key for %s: %w", stakerName, err)
+		}
+
+		operatorKey, err := env.getKeyString(operatorName)
+		if err != nil {
+			return EigenDADeployConfig{}, fmt.Errorf("failed to get key for %s: %w", operatorName, err)
+		}
+
+		stakers = append(stakers, stakerKey)
+		operators = append(operators, operatorKey)
+	}
+
+	// Get batcher0 key
+	batcherKey, err := env.getKeyString("batcher0")
+	if err != nil {
+		return EigenDADeployConfig{}, fmt.Errorf("failed to get key for batcher0: %w", err)
 	}
 
 	config := EigenDADeployConfig{
@@ -102,44 +121,65 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
 		OperatorPrivateKeys: operators,
-		ConfirmerPrivateKey: env.getKeyString("batcher0"),
+		ConfirmerPrivateKey: batcherKey,
 	}
 
-	return config
-
+	return config, nil
 }
 
 // deployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
-func (env *Config) deployEigenDAContracts() {
-	log.Print("Deploy the EigenDA and EigenLayer contracts")
+func (env *Config) deployEigenDAContracts() error {
+	logger.Info("Deploy the EigenDA and EigenLayer contracts")
 
 	// get deployer
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	if !ok {
-		log.Panicf("Deployer improperly configured")
+		return fmt.Errorf("deployer improperly configured")
 	}
 
-	changeDirectory(filepath.Join(env.rootPath, "contracts"))
+	if err := changeDirectory(filepath.Join(env.rootPath, "contracts")); err != nil {
+		return fmt.Errorf("failed to change directories: %w", err)
+	}
 
-	eigendaDeployConfig := env.generateEigenDADeployConfig()
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
+
+	eigendaDeployConfig, err := env.generateEigenDADeployConfig()
+	if err != nil {
+		return fmt.Errorf("error generating eigenda deploy config: %w", err)
+	}
+
 	data, err := json.Marshal(&eigendaDeployConfig)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		return fmt.Errorf("error marshaling eigenda deploy config: %w", err)
 	}
-	writeFile("script/input/eigenda_deploy_config.json", data)
+	err = writeFile("script/input/eigenda_deploy_config.json", data)
+	if err != nil {
+		return fmt.Errorf("error writing eigenda deploy config: %w", err)
+	}
 
-	execForgeScript("script/SetUpEigenDA.s.sol:SetupEigenDA", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, nil)
+	logger.Info("Executing EigenDA deployer script", "script", "script/SetUpEigenDA.s.sol:SetupEigenDA", "rpc", deployer.RPC, "deployer", deployer.Name, "privateKey", env.Pks.EcdsaMap[deployer.Name].PrivateKey)
+	err = execForgeScript(
+		"script/SetUpEigenDA.s.sol:SetupEigenDA",
+		env.Pks.EcdsaMap[deployer.Name].PrivateKey,
+		deployer,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to execute EigenDA deployer script: %w", err)
+	}
 
-	//add relevant addresses to path
-	data = readFile("script/output/eigenda_deploy_output.json")
+	// Add relevant addresses to path
+	data, err = readFile("script/output/eigenda_deploy_output.json")
+	if err != nil {
+		return fmt.Errorf("error reading eigenda deploy output: %w", err)
+	}
+
 	err = json.Unmarshal(data, &env.EigenDA)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
-	}
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		return fmt.Errorf("error unmarshaling eigenda deploy output: %w", err)
 	}
 
 	ethClient, err := geth.NewClient(geth.EthClientConfig{
@@ -149,60 +189,82 @@ func (env *Config) deployEigenDAContracts() {
 		NumRetries:       0,
 	}, gcommon.Address{}, 0, logger)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		return fmt.Errorf("error creating eth client: %w", err)
 	}
 
 	certVerifierV1DeployCfg := env.generateV1CertVerifierDeployConfig(ethClient)
 	data, err = json.Marshal(&certVerifierV1DeployCfg)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		return fmt.Errorf("error marshaling certverifier config: %w", err)
 	}
 
 	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
 	//       can be deprecated.
-	writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data)
-	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"})
+	if err := writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data); err != nil {
+		return fmt.Errorf("error writing certverifier config: %w", err)
+	}
 
-	data = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
+	logger.Info("Executing CertVerifierDeployerV1 script", "script", "script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", "rpc", deployer.RPC, "deployer", deployer.Name, "privateKey", env.Pks.EcdsaMap[deployer.Name].PrivateKey)
+	if err := execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"}); err != nil {
+		return fmt.Errorf("failed to execute CertVerifierDeployerV1 script: %w", err)
+	}
+
+	data, err = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
+	if err != nil {
+		return fmt.Errorf("error reading certverifier output: %w", err)
+	}
+
 	var verifierAddress struct{ EigenDACertVerifier string }
 	err = json.Unmarshal(data, &verifierAddress)
 	if err != nil {
-		log.Panicf("Error: %s", err.Error())
+		return fmt.Errorf("error unmarshaling verifier address: %w", err)
 	}
 	env.EigenDAV1CertVerifier = verifierAddress.EigenDACertVerifier
+
+	return nil
 }
 
 // Deploys a EigenDA experiment
 // TODO: Figure out what necessitates experiment nomenclature
-func (env *Config) DeployExperiment() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+func (env *Config) DeployExperiment() error {
+	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
+		return fmt.Errorf("error changing directories: %w", err)
+	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
+
 	defer env.SaveTestConfig()
 
-	log.Print("Deploying experiment...")
-
-	// Log to file
-	f, err := os.OpenFile(filepath.Join(env.Path, "deploy.log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panicf("error opening file: %v", err)
-	}
-	defer core.CloseLogOnError(f, f.Name(), nil)
-	log.SetOutput(io.MultiWriter(os.Stdout, f))
+	logger.Info("Deploying experiment...")
 
 	// Create a new experiment and deploy the contracts
 
-	err = env.loadPrivateKeys()
+	err := env.loadPrivateKeys()
 	if err != nil {
-		log.Panicf("could not load private keys: %v", err)
+		return fmt.Errorf("could not load private keys: %w", err)
 	}
 
 	if env.EigenDA.Deployer != "" && !env.IsEigenDADeployed() {
-		fmt.Println("Deploying EigenDA")
-		env.deployEigenDAContracts()
+		logger.Info("Deploying EigenDA")
+		err = env.deployEigenDAContracts()
+		if err != nil {
+			return fmt.Errorf("error deploying EigenDA contracts: %w", err)
+		}
 	}
 
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
-		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
-		env.deploySubgraphs(startBlock)
+		startBlock, err := GetLatestBlockNumber(env.Deployers[0].RPC)
+		if err != nil {
+			return fmt.Errorf("error getting latest block number: %w", err)
+		}
+
+		err = env.deploySubgraphs(startBlock)
+		if err != nil {
+			return fmt.Errorf("error deploying subgraphs: %w", err)
+		}
 	}
 
 	// Ideally these should be set in GenerateAllVariables, but they need to be used in GenerateDisperserKeypair
@@ -210,16 +272,51 @@ func (env *Config) DeployExperiment() {
 	env.localstackEndpoint = "http://localhost:4570"
 	env.localstackRegion = "us-east-1"
 
-	fmt.Println("Generating disperser keypair")
+	logger.Info("Generating disperser keypair")
 	err = env.GenerateDisperserKeypair()
 	if err != nil {
-		log.Panicf("could not generate disperser keypair: %v", err)
+		logger.Errorf("could not generate disperser keypair: %v", err)
+		panic(err)
 	}
 
-	fmt.Println("Generating variables")
+	logger.Info("Generating variables")
 	env.GenerateAllVariables()
 
-	fmt.Println("Test environment has successfully deployed!")
+	// Register blob versions, relays, and disperser keypair
+	if env.EigenDA.Deployer != "" && env.IsEigenDADeployed() {
+		env.performRegistrations()
+	}
+
+	logger.Info("Test environment has successfully deployed!")
+	return nil
+}
+
+// performRegistrations handles blob version, relay, and disperser keypair registrations.
+func (env *Config) performRegistrations() {
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{env.Deployers[0].RPC},
+		PrivateKeyString: env.Pks.EcdsaMap[env.EigenDA.Deployer].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}, gcommon.Address{}, logger)
+	if err != nil {
+		logger.Errorf("could not create eth client for registration: %v", err)
+		return
+	}
+
+	logger.Info("Registering blob versions and relays")
+	env.RegisterBlobVersionAndRelays(ethClient)
+
+	// Only register disperser keypair if we have a valid address (i.e., localstack was available)
+	if env.DisperserAddress != (gcommon.Address{}) {
+		logger.Info("Registering disperser keypair")
+		err = env.RegisterDisperserKeypair(ethClient)
+		if err != nil {
+			logger.Errorf("could not register disperser keypair: %v", err)
+		}
+	} else {
+		logger.Info("Skipping disperser keypair registration (localstack not available)")
+	}
 }
 
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS.
@@ -238,7 +335,7 @@ func (env *Config) GenerateDisperserKeypair() error {
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "connect: connection refused") {
-			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
+			logger.Warnf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
 			err = nil
 		}
 		return err
@@ -254,15 +351,14 @@ func (env *Config) GenerateDisperserKeypair() error {
 	}
 
 	env.DisperserAddress = crypto.PubkeyToAddress(*key)
-	log.Printf("Generated disperser keypair: key ID: %s, address: %s",
+	logger.Infof("Generated disperser keypair: key ID: %s, address: %s",
 		env.DisperserKMSKeyID, env.DisperserAddress.Hex())
 
 	return nil
 }
 
 // RegisterDisperserKeypair registers the disperser's public key on-chain.
-func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient, logger logging.Logger) error {
-
+func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	// Write the disperser's public key to on-chain storage
 	writer, err := eth.NewWriter(
 		logger,
@@ -307,19 +403,19 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error creating EigenDAServiceManager contract", "error", err)
 	}
 	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error getting threshold registry address", "error", err)
 	}
 	contractThresholdRegistry, err := thresholdreg.NewContractEigenDAThresholdRegistry(thresholdRegistryAddr, ethClient)
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error creating threshold registry contract", "error", err)
 	}
 	opts, err := ethClient.GetNoSendTransactOpts()
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error getting transaction opts", "error", err)
 	}
 	for _, blobVersionParam := range env.BlobVersionParams {
 		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.EigenDATypesV1VersionedBlobParams{
@@ -328,21 +424,21 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 			CodingRate:      uint8(blobVersionParam.CodingRate),
 		})
 		if err != nil {
-			log.Panicf("Error: %s", err)
+			logger.Fatal("Error adding versioned blob params", "error", err)
 		}
 		err = ethClient.SendTransaction(context.Background(), txn)
 		if err != nil {
-			log.Panicf("Error: %s", err)
+			logger.Fatal("Error sending blob version transaction", "error", err)
 		}
 	}
 
 	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error getting relay registry address", "error", err)
 	}
 	contractRelayRegistry, err := relayreg.NewContractEigenDARelayRegistry(relayAddr, ethClient)
 	if err != nil {
-		log.Panicf("Error: %s", err)
+		logger.Fatal("Error creating relay registry contract", "error", err)
 	}
 
 	ethAddr := ethClient.GetAccountAddress()
@@ -353,52 +449,61 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 			RelayURL:     url,
 		})
 		if err != nil {
-			log.Panicf("Error: %s", err)
+			logger.Fatal("Error adding relay info", "error", err)
 		}
 		err = ethClient.SendTransaction(context.Background(), txn)
 		if err != nil {
-			log.Panicf("Error: %s", err)
+			logger.Fatal("Error sending relay transaction", "error", err)
 		}
 	}
 }
 
 // TODO: Supply the test path to the runner utility
 func (env *Config) StartBinaries() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
-
-	if err != nil {
-		log.Panicf("Failed to start binaries. Err: %s", err)
+	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
+		logger.Fatal("Error changing directories", "error", err)
 	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
+
+	logger.Info("Starting binaries")
+	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
+	if err != nil {
+		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
+	}
+
+	logger.Info("Binaries started successfully!")
 }
 
 // TODO: Supply the test path to the runner utility
 func (env *Config) StopBinaries() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
+		logger.Fatal("Error changing directories", "error", err)
+	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
+
 	err := execCmd("./bin.sh", []string{"stop"}, []string{}, true)
 	if err != nil {
-		log.Panicf("Failed to stop binaries. Err: %s", err)
-	}
-}
-
-func (env *Config) StartAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{}, false) // printing output causes hang
-	if err != nil {
-		log.Panicf("Failed to start anvil. Err: %s", err)
-	}
-}
-
-func (env *Config) StopAnvil() {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{}, true)
-	if err != nil {
-		log.Panicf("Failed to stop anvil. Err: %s", err)
+		logger.Fatal("Failed to stop binaries", "error", err)
 	}
 }
 
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
-	changeDirectory(filepath.Join(env.rootPath, "inabox"))
+	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
+		logger.Fatal("Error changing directories", "error", err)
+	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
 
 	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT))
 
@@ -421,6 +526,6 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 	err := execCmd("./node-plugin.sh", []string{}, envVars, true)
 
 	if err != nil {
-		log.Panicf("Failed to run node plugin. Err: %s", err)
+		logger.Fatal("Failed to run node plugin", "error", err)
 	}
 }

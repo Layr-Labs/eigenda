@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"gopkg.in/yaml.v3"
 )
 
@@ -202,7 +201,7 @@ type Config struct {
 	localstackRegion   string
 
 	// DisperserAddress is the address of disperser 0 (aka the only disperser at the current time)
-	DisperserAddress common.Address
+	DisperserAddress gethcommon.Address
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
@@ -213,7 +212,6 @@ func (env *Config) IsEigenDADeployed() bool {
 }
 
 func NewTestConfig(testName, rootPath string) (testEnv *Config) {
-
 	rootPath, err := filepath.Abs(rootPath)
 	if err != nil {
 		log.Panicf("Error %s:", err.Error())
@@ -224,13 +222,19 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 	configPath := testPath + "/config.lock.yaml"
 	if _, err := os.Stat(configPath); err != nil {
 		configPath = testPath + "/config.yaml"
-
 	}
-	data := readFile(configPath)
+
+	// Initialize testEnv before using it
+	testEnv = &Config{}
+
+	data, err := readFile(configPath)
+	if err != nil {
+		logger.Fatal("Error reading config file", "error", err)
+	}
 
 	err = yaml.Unmarshal(data, &testEnv)
 	if err != nil {
-		log.Panicf("Error %s:", err.Error())
+		logger.Fatal("Error unmarshaling config", "error", err)
 	}
 	testEnv.TestName = testName
 	testEnv.Path = testPath
@@ -241,5 +245,7 @@ func NewTestConfig(testName, rootPath string) (testEnv *Config) {
 
 func (env *Config) SaveTestConfig() {
 	obj, _ := yaml.Marshal(env)
-	writeFile(env.Path+"/config.lock.yaml", obj)
+	if err := writeFile(env.Path+"/config.lock.yaml", obj); err != nil {
+		logger.Fatal("Error writing config.lock.yaml", "error", err)
+	}
 }
