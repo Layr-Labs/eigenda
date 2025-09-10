@@ -59,6 +59,7 @@ func TestMain(m *testing.M) {
 }
 
 func setup(_ *testing.M) {
+	ctx := context.Background()
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
@@ -67,15 +68,15 @@ func setup(_ *testing.M) {
 
 	if deployLocalStack {
 		var err error
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container: " + err.Error())
+			logger.Fatal("Failed to start localstack container:", err)
 		}
 
 	}
@@ -87,24 +88,25 @@ func setup(_ *testing.M) {
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
-	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTable(ctx, cfg, metadataTableName, blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb table: " + err.Error())
+		logger.Fatal("Failed to create dynamodb table:", err)
 	}
 
 	if shadowMetadataTableName != "" {
-		_, err = test_utils.CreateTable(context.Background(), cfg, shadowMetadataTableName, blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
+		_, err = test_utils.CreateTable(ctx, cfg, shadowMetadataTableName,
+			blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
 		if err != nil {
 			teardown()
-			panic("failed to create shadow dynamodb table: " + err.Error())
+			logger.Fatal("Failed to create shadow dynamodb table:", err)
 		}
 	}
 
 	dynamoClient, err = dynamodb.NewClient(cfg, logger)
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb client: " + err.Error())
+		logger.Fatal("Failed to create dynamodb client:", err)
 	}
 
 	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
@@ -113,6 +115,8 @@ func setup(_ *testing.M) {
 
 func teardown() {
 	if deployLocalStack && localstackContainer != nil {
-		_ = localstackContainer.Terminate(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }

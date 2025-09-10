@@ -1,23 +1,20 @@
 package relay
 
 import (
-	"context"
-	"github.com/Layr-Labs/eigenda/common"
+	"testing"
+	"time"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestReadWrite(t *testing.T) {
+	ctx := t.Context()
 	tu.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	blobStore := buildBlobStore(t, logger)
 
@@ -31,12 +28,12 @@ func TestReadWrite(t *testing.T) {
 		require.NoError(t, err)
 		expectedData[blobKey] = data
 
-		err = blobStore.StoreBlob(context.Background(), blobKey, data)
+		err = blobStore.StoreBlob(ctx, blobKey, data)
 		require.NoError(t, err)
 	}
 
 	server, err := newBlobProvider(
-		context.Background(),
+		ctx,
 		logger,
 		blobStore,
 		1024*1024*32,
@@ -47,7 +44,7 @@ func TestReadWrite(t *testing.T) {
 
 	// Read the blobs back.
 	for key, data := range expectedData {
-		blob, err := server.GetBlob(context.Background(), key)
+		blob, err := server.GetBlob(ctx, key)
 
 		require.NoError(t, err)
 		require.Equal(t, data, blob)
@@ -55,7 +52,7 @@ func TestReadWrite(t *testing.T) {
 
 	// Read the blobs back again to test caching.
 	for key, data := range expectedData {
-		blob, err := server.GetBlob(context.Background(), key)
+		blob, err := server.GetBlob(ctx, key)
 
 		require.NoError(t, err)
 		require.Equal(t, data, blob)
@@ -63,18 +60,16 @@ func TestReadWrite(t *testing.T) {
 }
 
 func TestNonExistentBlob(t *testing.T) {
+	ctx := t.Context()
 	tu.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	setup(t)
-	defer teardown()
+	defer teardown(t)
 
 	blobStore := buildBlobStore(t, logger)
 
 	server, err := newBlobProvider(
-		context.Background(),
+		ctx,
 		logger,
 		blobStore,
 		1024*1024*32,
@@ -84,7 +79,7 @@ func TestNonExistentBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		blob, err := server.GetBlob(context.Background(), v2.BlobKey(tu.RandomBytes(32)))
+		blob, err := server.GetBlob(ctx, v2.BlobKey(tu.RandomBytes(32)))
 		require.Error(t, err)
 		require.Nil(t, blob)
 	}
