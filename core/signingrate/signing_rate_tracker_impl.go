@@ -30,6 +30,9 @@ type signingRateTracker struct {
 	// The duration of each bucket. Buckets loaded from storage may have different spans, but new buckets will
 	// always have this span.
 	bucketSpan time.Duration
+
+	// A function that returns the current time.
+	timeSource func() time.Time
 }
 
 // Create a new SigningRateTracker.
@@ -41,6 +44,7 @@ func NewSigningRateTracker(
 	logger logging.Logger,
 	timeSpan time.Duration,
 	bucketSpan time.Duration,
+	timeSource func() time.Time,
 ) (SigningRateTracker, error) {
 
 	if timeSpan.Seconds() < 1 {
@@ -53,6 +57,7 @@ func NewSigningRateTracker(
 		timeSpan:         timeSpan,
 		bucketSpan:       bucketSpan,
 		unflushedBuckets: make(map[time.Time]*SigningRateBucket),
+		timeSource:       timeSource,
 	}
 
 	return store, nil
@@ -64,13 +69,15 @@ func (s *signingRateTracker) Close() {
 
 // Report that a validator has successfully signed a batch of the given size.
 func (s *signingRateTracker) ReportSuccess(
-	now time.Time,
+	quorum core.QuorumID,
 	id core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
+	now := s.timeSource()
+
 	bucket := s.getMutableBucket(now)
-	bucket.ReportSuccess(id, batchSize, signingLatency)
+	bucket.ReportSuccess(quorum, id, batchSize, signingLatency)
 	s.markUnflushed(bucket)
 
 	s.garbageCollectBuckets(now)
@@ -78,19 +85,22 @@ func (s *signingRateTracker) ReportSuccess(
 
 // Report that a validator has failed to sign a batch of the given size.
 func (s *signingRateTracker) ReportFailure(
-	now time.Time,
+	quorum core.QuorumID,
 	id core.OperatorID,
 	batchSize uint64,
 ) {
+	now := s.timeSource()
+
 	bucket := s.getMutableBucket(now)
-	bucket.ReportFailure(id, batchSize)
+	bucket.ReportFailure(quorum, id, batchSize)
 	s.markUnflushed(bucket)
 
 	s.garbageCollectBuckets(now)
 }
 
 func (s *signingRateTracker) GetValidatorSigningRate(
-	operatorID []byte,
+	quorum core.QuorumID,
+	id core.OperatorID,
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
@@ -102,7 +112,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	if s.buckets.Size() == 0 {
 		// Special case: no data available.
 		return &validator.ValidatorSigningRate{
-			Id: operatorID,
+			Id: id[:],
 		}, nil
 	}
 
@@ -125,7 +135,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	}
 
 	totalSigningRate := &validator.ValidatorSigningRate{
-		Id: operatorID,
+		Id: id[:],
 	}
 
 	iterator, err := s.buckets.IteratorFrom(startIndex)
@@ -135,7 +145,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 			break
 		}
 
-		signingRate, exists := bucket.getValidatorIfExists(core.OperatorID(operatorID))
+		signingRate, exists := bucket.getValidatorIfExists(quorum, id)
 		if !exists {
 			// No info for validator during this bucket, skip it.
 			continue

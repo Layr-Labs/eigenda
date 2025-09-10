@@ -32,7 +32,7 @@ func validateTrackerDump(
 
 	if len(dumpedBuckets) == 0 {
 		// It is ok to return zero dumped buckets iff no data has been added yet.
-		require.Equal(t, 0, len(expectedBuckets[0].validatorInfo))
+		require.Equal(t, 0, len(expectedBuckets[0].signingRateInfo))
 		return
 	}
 
@@ -60,7 +60,7 @@ func validateTrackerDump(
 		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), dumpedBucket.GetEndTimestamp())
 		for _, signingRate := range dumpedBucket.GetValidatorSigningRates() {
 			validatorID := core.OperatorID(signingRate.GetId())
-			expectedSigningRate := expectedBucket.validatorInfo[validatorID]
+			expectedSigningRate := expectedBucket.signingRateInfo[validatorID]
 			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 		}
 	}
@@ -120,11 +120,11 @@ func validateTracker(
 			// This bucket is entirely after the requested time range.
 			break
 		}
-		expectedSigningRate.SignedBatches += bucket.validatorInfo[validatorID].GetSignedBatches()
-		expectedSigningRate.SignedBytes += bucket.validatorInfo[validatorID].GetSignedBytes()
-		expectedSigningRate.UnsignedBatches += bucket.validatorInfo[validatorID].GetUnsignedBatches()
-		expectedSigningRate.UnsignedBytes += bucket.validatorInfo[validatorID].GetUnsignedBytes()
-		expectedSigningRate.SigningLatency += bucket.validatorInfo[validatorID].GetSigningLatency()
+		expectedSigningRate.SignedBatches += bucket.signingRateInfo[validatorID].GetSignedBatches()
+		expectedSigningRate.SignedBytes += bucket.signingRateInfo[validatorID].GetSignedBytes()
+		expectedSigningRate.UnsignedBatches += bucket.signingRateInfo[validatorID].GetUnsignedBatches()
+		expectedSigningRate.UnsignedBytes += bucket.signingRateInfo[validatorID].GetUnsignedBytes()
+		expectedSigningRate.SigningLatency += bucket.signingRateInfo[validatorID].GetSigningLatency()
 	}
 
 	reportedSigningRate, err := tracker.GetValidatorSigningRate(validatorID[:], startTime, endTime)
@@ -377,7 +377,7 @@ func unflushedBucketsTest(
 		require.Equal(t, uint64(expectedBucket.endTimestamp.Unix()), bucket.GetEndTimestamp())
 		for _, signingRate := range bucket.GetValidatorSigningRates() {
 			validatorID := core.OperatorID(signingRate.GetId())
-			expectedSigningRate := expectedBucket.validatorInfo[validatorID]
+			expectedSigningRate := expectedBucket.signingRateInfo[validatorID]
 			require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 		}
 	}

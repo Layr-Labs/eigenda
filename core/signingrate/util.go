@@ -11,15 +11,22 @@ import (
 
 // Sort buckets by start time. Modifies the input slice.
 func sortValidatorSigningRateBuckets(buckets []*validator.SigningRateBucket) {
-	sort.Slice(buckets, func(i, j int) bool {
+	sort.Slice(buckets, func(i int, j int) bool {
 		return buckets[i].GetStartTimestamp() < buckets[j].GetStartTimestamp()
 	})
 }
 
-// Sort validator signing rates by ID. Modifies the input slice.
-func sortValidatorSigningRate(rates []*validator.ValidatorSigningRate) {
-	sort.Slice(rates, func(i, j int) bool {
+// Sort validator signing rates by validator ID. Modifies the input slice.
+func sortValidatorSigningRates(rates []*validator.ValidatorSigningRate) {
+	sort.Slice(rates, func(i int, j int) bool {
 		return bytes.Compare(rates[i].GetId(), rates[j].GetId()) < 0
+	})
+}
+
+// Sort quorum signing rates by quorum ID. Modifies the input slice.
+func sortQuorumSigningRates(quorums []*validator.QuorumSigningRate) {
+	sort.Slice(quorums, func(i int, j int) bool {
+		return quorums[i].QuorumId < quorums[j].QuorumId
 	})
 }
 

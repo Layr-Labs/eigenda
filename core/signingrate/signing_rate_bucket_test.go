@@ -54,7 +54,7 @@ func TestProtoConversion(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, validatorID := range validatorIDs {
-		bucket.validatorInfo[validatorID] = &validator.ValidatorSigningRate{
+		bucket.signingRateInfo[validatorID] = &validator.ValidatorSigningRate{
 			Id:             validatorID[:],
 			SignedBatches:  rand.Uint64(),
 			SignedBytes:    rand.Uint64(),
@@ -68,7 +68,7 @@ func TestProtoConversion(t *testing.T) {
 	require.Equal(t, uint64(bucket.startTimestamp.Unix()), pb.GetStartTimestamp())
 	require.Equal(t, uint64(bucket.endTimestamp.Unix()), pb.GetEndTimestamp())
 	for index := range pb.GetValidatorSigningRates() {
-		expected := bucket.validatorInfo[validatorIDs[index]]
+		expected := bucket.signingRateInfo[validatorIDs[index]]
 		actual := pb.GetValidatorSigningRates()[index]
 		require.True(t, areSigningRatesEqual(expected, actual))
 		require.True(t, expected != actual, "Expected a deep copy of the signing rate info")
@@ -82,8 +82,8 @@ func TestProtoConversion(t *testing.T) {
 	bucket2 := NewBucketFromProto(pb)
 	require.Equal(t, bucket.startTimestamp.Unix(), bucket2.startTimestamp.Unix())
 	require.Equal(t, bucket.endTimestamp.Unix(), bucket2.endTimestamp.Unix())
-	for id, info := range bucket.validatorInfo {
-		info2, exists := bucket2.validatorInfo[id]
+	for id, info := range bucket.signingRateInfo {
+		info2, exists := bucket2.signingRateInfo[id]
 		require.True(t, exists, "Validator ID missing in converted bucket")
 		require.True(t, areSigningRatesEqual(info, info2))
 		require.True(t, info != info2, "Expected a deep copy of the signing rate info")

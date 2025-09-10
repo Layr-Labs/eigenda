@@ -18,8 +18,8 @@ type SigningRateBucket struct {
 	// The timestamp when the last data could have been added to this bucket.
 	endTimestamp time.Time
 
-	// Signing rate info. The first key is the quorum ID, the second key is the operator ID.
-	validatorInfo map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate
+	// The signing rate information for the time period covered by this bucket.
+	signingRateInfo map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate
 
 	// A cached protobuf representation of this bucket. Set to nil whenever the bucket is modified.
 	cachedProtobuf *validator.SigningRateBucket
@@ -39,9 +39,9 @@ func NewSigningRateBucket(startTime time.Time, span time.Duration) (*SigningRate
 
 	validatorInfo := make(map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate)
 	bucket := &SigningRateBucket{
-		startTimestamp: startTimestamp,
-		endTimestamp:   endTimestamp,
-		validatorInfo:  validatorInfo,
+		startTimestamp:  startTimestamp,
+		endTimestamp:    endTimestamp,
+		signingRateInfo: validatorInfo,
 	}
 
 	return bucket, nil
@@ -53,19 +53,24 @@ func NewBucketFromProto(pb *validator.SigningRateBucket) *SigningRateBucket {
 	startTime := time.Unix(int64(pb.GetStartTimestamp()), 0)
 	endTime := time.Unix(int64(pb.GetEndTimestamp()), 0)
 
-	validatorInfo := make(map[core.OperatorID]*validator.ValidatorSigningRate)
+	signingRateInfo := make(map[core.QuorumID]map[core.OperatorID]*validator.ValidatorSigningRate)
 
-	// TODO future cody: refactor this so it works with quorums
-	for _, info := range pb.GetValidatorSigningRates() {
-		var id core.OperatorID
-		copy(id[:], info.GetId())
-		validatorInfo[id] = info
+	for _, quorumInfo := range pb.GetQuorumSigningRates() {
+		quorumID := core.QuorumID(quorumInfo.GetQuorumId())
+		signingRateInfo[quorumID] = make(map[core.OperatorID]*validator.ValidatorSigningRate)
+
+		for _, validatorInfo := range quorumInfo.GetValidatorSigningRates() {
+			validatorID := core.OperatorID{}
+			copy(validatorID[:], validatorInfo.GetId())
+
+			signingRateInfo[quorumID][validatorID] = cloneValidatorSigningRate(validatorInfo)
+		}
 	}
 
 	return &SigningRateBucket{
-		startTimestamp: startTime,
-		endTimestamp:   endTime,
-		validatorInfo:  validatorInfo,
+		startTimestamp:  startTime,
+		endTimestamp:    endTime,
+		signingRateInfo: signingRateInfo,
 	}
 }
 
@@ -85,18 +90,28 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 	start := uint64(b.startTimestamp.Unix())
 	end := uint64(b.endTimestamp.Unix())
 
-	validatorSigningRates := make([]*validator.ValidatorSigningRate, 0, len(b.validatorInfo))
-	for _, info := range b.validatorInfo {
-		validatorSigningRates = append(validatorSigningRates, cloneValidatorSigningRate(info))
-	}
+	quorumSigningRates := make([]*validator.QuorumSigningRate, len(b.signingRateInfo))
 
-	// Sort for deterministic output. Not strictly necessary, but sometimes nice to have.
-	sortValidatorSigningRate(validatorSigningRates)
+	for quorumID, quorumInfo := range b.signingRateInfo {
+		validatorSigningRates := make([]*validator.ValidatorSigningRate, 0, len(b.signingRateInfo))
+
+		for _, validatorInfo := range quorumInfo {
+			validatorSigningRates = append(validatorSigningRates, cloneValidatorSigningRate(validatorInfo))
+		}
+		sortValidatorSigningRates(validatorSigningRates)
+
+		quorumSigningRates = append(quorumSigningRates,
+			&validator.QuorumSigningRate{
+				QuorumId:              uint64(quorumID),
+				ValidatorSigningRates: validatorSigningRates,
+			})
+	}
+	sortQuorumSigningRates(quorumSigningRates)
 
 	b.cachedProtobuf = &validator.SigningRateBucket{
-		StartTimestamp:        start,
-		EndTimestamp:          end,
-		ValidatorSigningRates: validatorSigningRates,
+		StartTimestamp:     start,
+		EndTimestamp:       end,
+		QuorumSigningRates: quorumSigningRates,
 	}
 	return b.cachedProtobuf
 }
@@ -105,12 +120,12 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 //
 // If the validator was previously Down, it will be marked as Up.
 func (b *SigningRateBucket) ReportSuccess(
+	quorum core.QuorumID,
 	id core.OperatorID,
-	quorum uint64,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
-	info := b.getValidator(id)
+	info := b.getValidator(quorum, id)
 
 	info.SignedBatches += 1
 	info.SignedBytes += batchSize
@@ -122,8 +137,8 @@ func (b *SigningRateBucket) ReportSuccess(
 // Report that a validator has failed to sign a batch of the given size.
 //
 // If the validator was previously Up, it will be marked as Down.
-func (b *SigningRateBucket) ReportFailure(id core.OperatorID, quorum uint64, batchSize uint64) {
-	info := b.getValidator(id)
+func (b *SigningRateBucket) ReportFailure(quorum core.QuorumID, id core.OperatorID, batchSize uint64) {
+	info := b.getValidator(quorum, id)
 
 	info.UnsignedBatches += 1
 	info.UnsignedBytes += batchSize
@@ -146,29 +161,35 @@ func (b *SigningRateBucket) Contains(t time.Time) bool {
 	return !t.Before(b.startTimestamp) && t.Before(b.endTimestamp)
 }
 
-// Get the signing rate info for a validator, creating a new entry if necessary. Is not a deep copy.
-func (b *SigningRateBucket) getValidator(id core.OperatorID) *validator.ValidatorSigningRate {
-	info, exists := b.validatorInfo[id]
+// Get the signing rate info for a validator in a particular quorum, creating a new entry if necessary. Is not a deep copy.
+func (b *SigningRateBucket) getValidator(quorum core.QuorumID, id core.OperatorID) *validator.ValidatorSigningRate {
+	quorumSigningRate, exists := b.signingRateInfo[quorum]
 	if !exists {
-		info = b.newValidator(id)
+		quorumSigningRate = make(map[core.OperatorID]*validator.ValidatorSigningRate)
+		b.signingRateInfo[quorum] = quorumSigningRate
 	}
-	return info
+
+	validatorSigningRate, exists := quorumSigningRate[id]
+	if !exists {
+		validatorSigningRate = &validator.ValidatorSigningRate{
+			Id: id[:],
+		}
+		quorumSigningRate[id] = validatorSigningRate
+	}
+	return validatorSigningRate
 }
 
-// Get the signing rate info for a validator if it is registered, or nil if it is not. Is not a deep copy.
+// Get the signing rate info for a validator in a quorum if it is registered, or nil if it is not. Is not a deep copy.
 func (b *SigningRateBucket) getValidatorIfExists(
+	quorum core.QuorumID,
 	id core.OperatorID,
 ) (signingRate *validator.ValidatorSigningRate, exists bool) {
 
-	signingRate, exists = b.validatorInfo[id]
-	return signingRate, exists
-}
-
-// Add a new validator to the set of validators tracked by this bucket.
-func (b *SigningRateBucket) newValidator(id core.OperatorID) *validator.ValidatorSigningRate {
-	signingRate := &validator.ValidatorSigningRate{
-		Id: id[:],
+	quorumSigningRate, exists := b.signingRateInfo[quorum]
+	if !exists {
+		return nil, false
 	}
-	b.validatorInfo[id] = signingRate
-	return signingRate
+
+	signingRate, exists = quorumSigningRate[id]
+	return signingRate, exists
 }

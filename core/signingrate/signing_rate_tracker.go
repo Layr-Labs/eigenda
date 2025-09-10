@@ -15,7 +15,8 @@ type SigningRateTracker interface {
 	//
 	// Returned data threadsafe to read, but should not be modified.
 	GetValidatorSigningRate(
-		operatorID []byte,
+		quorum core.QuorumID,
+		id core.OperatorID,
 		startTime time.Time,
 		endTime time.Time,
 	) (*validator.ValidatorSigningRate, error)
@@ -35,7 +36,7 @@ type SigningRateTracker interface {
 
 	// Report that a validator has successfully signed a batch of the given size.
 	ReportSuccess(
-		now time.Time,
+		quorum core.QuorumID,
 		id core.OperatorID,
 		batchSize uint64,
 		signingLatency time.Duration,
@@ -43,7 +44,7 @@ type SigningRateTracker interface {
 
 	// Report that a validator has failed to sign a batch of the given size.
 	ReportFailure(
-		now time.Time,
+		quorum core.QuorumID,
 		id core.OperatorID,
 		batchSize uint64,
 	)
@@ -59,7 +60,7 @@ type SigningRateTracker interface {
 	//
 	// This operation doesn't mark a bucket as unflushed. A bucket is only marked as unflushed when it is modified,
 	// not when it is provided whole-sale from an external source.
-	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket)
+	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) // TODO should this accept a timestamp?
 
 	// Get the start time of the last bucket in the store. If the store is empty, returns the zero time.
 	// Useful for determining how much data to request from a remote store when mirroring.
