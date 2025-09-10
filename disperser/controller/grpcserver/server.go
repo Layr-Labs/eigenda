@@ -118,8 +118,12 @@ func (s *Server) Start() error {
 
 	s.logger.Info("gRPC server listening", "port", s.config.GrpcPort, "address", listener.Addr().String())
 
-	// blocks until the server is stopped
-	return s.server.Serve(listener)
+	err = s.server.Serve(listener)
+	if err != nil {
+		return fmt.Errorf("serve: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Server) Stop() {
@@ -138,6 +142,7 @@ func (s *Server) AuthorizePayment(
 ) (*pb.AuthorizePaymentReply, error) {
 	if s.paymentAuthorizationHandler == nil {
 		s.metrics.ReportAuthorizePaymentAuthFailure()
+		//nolint:wrapcheck
 		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
 	}
 
@@ -182,7 +187,7 @@ func (s *Server) verifyDisperserSignature(requestHash []byte, signature []byte) 
 	// Remove the recovery ID (last byte) for verification
 	valid := crypto.VerifySignature(crypto.FromECDSAPub(s.disperserPublicKey), requestHash, signature[:64])
 	if !valid {
-		return status.Error(codes.Unauthenticated, "invalid disperser signature")
+		return status.Errorf(codes.Unauthenticated, "invalid disperser signature: %v", signature)
 	}
 
 	return nil

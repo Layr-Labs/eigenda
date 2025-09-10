@@ -115,7 +115,7 @@ func (c *ControllerClient) Close() error {
 		err := c.clientConnection.Close()
 		c.clientConnection = nil
 		c.serviceClient = nil
-		return err
+		return fmt.Errorf("close connection: %w", err)
 	}
 	return nil
 }
