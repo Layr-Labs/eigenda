@@ -22,7 +22,7 @@ var serializedG2PowerOf2Data []byte
 var G2PowerOf2SRS []bn254.G2Affine
 
 func init() {
-	// Note that we can't use bn254.NewDecoder(bytes.NewReader(g2PowerOf2Data)).Decode(&G2PowerOf2Data)
+	// Note that we can't use bn254.NewDecoder(bytes.NewReader(serializedG2PowerOf2Data)).Decode(&G2PowerOf2Data)
 	// because the file was not encoded using gnark-crypto's encoder.
 	// It only contains the 28 raw serialized points, each taking 64 bytes.
 	// gnark-crypto's encoder/decoder adds a 4 bytes header.
