@@ -20,7 +20,7 @@ type Config struct {
 	EnablePaymentAuthentication bool
 
 	// Port that the gRPC server listens on
-	GrpcPort string
+	GrpcPort uint16
 
 	// Maximum size of a gRPC message that the server will accept (in bytes)
 	MaxGRPCMessageSize int
@@ -41,7 +41,7 @@ type Config struct {
 func NewConfig(
 	enableServer bool,
 	enablePaymentAuthentication bool,
-	grpcPort string,
+	grpcPort uint16,
 	maxGRPCMessageSize int,
 	maxIdleConnectionAge time.Duration,
 	authorizationRequestMaxPastAge time.Duration,
@@ -49,9 +49,6 @@ func NewConfig(
 ) (Config, error) {
 
 	if enableServer {
-		if grpcPort == "" {
-			return Config{}, fmt.Errorf("grpc port is required")
-		}
 		if maxGRPCMessageSize < 0 {
 			return Config{}, fmt.Errorf("max grpc message size must be >= 0, got %d", maxGRPCMessageSize)
 		}

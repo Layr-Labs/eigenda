@@ -90,7 +90,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("controller gRPC server is disabled")
 	}
 
-	addr := fmt.Sprintf("0.0.0.0:%s", s.config.GrpcPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("start tcp listener: %w", err)
