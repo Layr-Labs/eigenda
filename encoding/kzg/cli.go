@@ -1,9 +1,11 @@
 package kzg
 
 import (
+	"fmt"
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/common"
+	_ "github.com/Layr-Labs/eigenda/resources/srs"
 	"github.com/urfave/cli"
 )
 
@@ -18,7 +20,10 @@ const (
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
 	CacheEncodedBlobsFlagName = "cache-encoded-blobs"
 	SRSLoadingNumberFlagName  = "kzg.srs-load"
-	G2PowerOf2PathFlagName    = "kzg.g2-power-of-2-path"
+
+	// Dynamically loading the g2.point.powerOf2 file is deprecated, as it is now embedded in the binary.
+	// See [srs.G2PowerOf2SRS] for details.
+	DeprecatedG2PowerOf2PathFlagName = "kzg.g2-power-of-2-path"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -85,10 +90,11 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "PRELOAD_ENCODER"),
 		},
 		cli.StringFlag{
-			Name:     G2PowerOf2PathFlagName,
+			Name:     DeprecatedG2PowerOf2PathFlagName,
 			Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
+			Hidden:   true, // deprecated so we hide it from help output
 		},
 	}
 }
@@ -104,7 +110,10 @@ func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
-	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
+
+	if ctx.GlobalString(DeprecatedG2PowerOf2PathFlagName) != "" {
+		fmt.Printf("Warning: --%s is deprecated. The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.", DeprecatedG2PowerOf2PathFlagName)
+	}
 
 	return cfg
 }
