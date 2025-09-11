@@ -310,7 +310,7 @@ func setupTestEnvironment(t *testing.T) *Environment {
 }
 ```
 
-Using t.Helper() will make it so that ...
+Using t.Helper() will make it so that the stack trace will point to the actual test function that called it — not the helper itself.
 
 ### 7.2 Common Test Utilities
 
