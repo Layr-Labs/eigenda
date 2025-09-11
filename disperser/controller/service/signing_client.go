@@ -2,25 +2,20 @@ package service
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Wraps the controller service client and handles signing of requests
 type SigningClient struct {
-	controllerAddress  string
-	disperserKMSKeyID  string
-	kmsClient          *kms.Client
-	disperserPublicKey *ecdsa.PublicKey
+	controllerAddress string
+	kmsSigner         *aws2.KMSSigner
 
 	clientConnection *grpc.ClientConn
 	serviceClient    controller.ControllerServiceClient
@@ -30,38 +25,13 @@ type SigningClient struct {
 func NewSigningClient(
 	ctx context.Context,
 	controllerAddress string,
-	kmsRegion string,
-	kmsEndpoint string,
-	disperserKMSKeyID string,
+	kmsSigner *aws2.KMSSigner,
 ) (*SigningClient, error) {
 	if controllerAddress == "" {
 		return nil, fmt.Errorf("controller address is required")
 	}
-	if disperserKMSKeyID == "" {
-		return nil, fmt.Errorf("disperser KMS key ID is required for controller client")
-	}
-	if kmsRegion == "" {
-		return nil, fmt.Errorf("KMS region is required for controller client")
-	}
-
-	var kmsClient *kms.Client
-	if kmsEndpoint != "" {
-		kmsClient = kms.New(kms.Options{
-			Region:       kmsRegion,
-			BaseEndpoint: &kmsEndpoint,
-		})
-	} else {
-		awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(kmsRegion))
-		if err != nil {
-			return nil, fmt.Errorf("load AWS config: %w", err)
-		}
-
-		kmsClient = kms.NewFromConfig(awsConfig)
-	}
-
-	publicKey, err := aws2.LoadPublicKeyKMS(ctx, kmsClient, disperserKMSKeyID)
-	if err != nil {
-		return nil, fmt.Errorf("load public key from KMS: %w", err)
+	if kmsSigner == nil {
+		return nil, fmt.Errorf("KMS signer is required")
 	}
 
 	clientConnection, err := grpc.NewClient(
@@ -75,12 +45,10 @@ func NewSigningClient(
 	serviceClient := controller.NewControllerServiceClient(clientConnection)
 
 	return &SigningClient{
-		controllerAddress:  controllerAddress,
-		disperserKMSKeyID:  disperserKMSKeyID,
-		kmsClient:          kmsClient,
-		disperserPublicKey: publicKey,
-		clientConnection:   clientConnection,
-		serviceClient:      serviceClient,
+		controllerAddress: controllerAddress,
+		kmsSigner:         kmsSigner,
+		clientConnection:  clientConnection,
+		serviceClient:     serviceClient,
 	}, nil
 }
 
@@ -93,7 +61,7 @@ func (c *SigningClient) AuthorizePayment(ctx context.Context, blobHeader *pbcomm
 		return fmt.Errorf("hash authorize payment request: %w", err)
 	}
 
-	signature, err := aws2.SignKMS(ctx, c.kmsClient, c.disperserKMSKeyID, c.disperserPublicKey, hash)
+	signature, err := c.kmsSigner.Sign(ctx, hash)
 	if err != nil {
 		return fmt.Errorf("sign authorization request: %w", err)
 	}

@@ -14,10 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -37,42 +33,25 @@ type Server struct {
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
 	replayGuardian              replay.ReplayGuardian
-	disperserAddress            gethcommon.Address
+	signatureVerifier           *aws.KMSSignatureVerifier
 }
 
 func NewServer(
 	ctx context.Context,
 	config Config,
-	awsClientConfig aws.ClientConfig,
-	disperserKMSKeyID string,
+	signatureVerifier *aws.KMSSignatureVerifier,
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 ) (*Server, error) {
+	if signatureVerifier == nil {
+		return nil, fmt.Errorf("signature verifier is required")
+	}
+
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.AuthorizationRequestMaxPastAge,
 		config.AuthorizationRequestMaxFutureAge)
-
-	var kmsClient *kms.Client
-	if awsClientConfig.EndpointURL != "" {
-		endpoint := awsClientConfig.EndpointURL
-		kmsClient = kms.New(kms.Options{
-			Region:       awsClientConfig.Region,
-			BaseEndpoint: &endpoint,
-		})
-	} else {
-		awsConfig, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(awsClientConfig.Region))
-		if err != nil {
-			return nil, fmt.Errorf("load AWS config: %w", err)
-		}
-		kmsClient = kms.NewFromConfig(awsConfig)
-	}
-
-	disperserPublicKey, err := aws.LoadPublicKeyKMS(ctx, kmsClient, disperserKMSKeyID)
-	if err != nil {
-		return nil, fmt.Errorf("get disperser public key from KMS: %w", err)
-	}
 
 	return &Server{
 		config:                      config,
@@ -80,7 +59,7 @@ func NewServer(
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
-		disperserAddress:            crypto.PubkeyToAddress(*disperserPublicKey),
+		signatureVerifier:           signatureVerifier,
 	}, nil
 }
 
@@ -156,11 +135,11 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
 	}
 
-	err = s.verifyDisperserSignature(requestHash, request.GetDisperserSignature())
+	err = s.signatureVerifier.VerifySignature(requestHash, request.GetDisperserSignature())
 	if err != nil {
-		s.metrics.ReportAuthorizePaymentSignatureFailure()
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "disperser signature verification failed: %v", err)
 	}
+
 	s.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(start))
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
@@ -178,23 +157,4 @@ func (s *Server) AuthorizePayment(
 	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
 
 	return reply, nil
-}
-
-// Verifies the disperser's signature on a request
-func (s *Server) verifyDisperserSignature(requestHash []byte, signature []byte) error {
-	if len(signature) != 65 {
-		return status.Errorf(codes.Unauthenticated, "invalid disperser signature length %d", len(signature))
-	}
-
-	signingPubkey, err := crypto.SigToPub(requestHash, signature)
-	if err != nil {
-		return status.Errorf(codes.Unauthenticated, "failed to recover public key from signature: %v", err)
-	}
-
-	signingAddress := crypto.PubkeyToAddress(*signingPubkey)
-	if signingAddress != s.disperserAddress {
-		return status.Errorf(codes.Unauthenticated, "signature doesn't match disperser address")
-	}
-
-	return nil
 }

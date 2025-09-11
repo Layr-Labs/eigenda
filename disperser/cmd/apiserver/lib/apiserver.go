@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -152,12 +153,20 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		var controllerClient *service.SigningClient
 		if config.UseControllerMediatedPayments {
+			kmsSigner, err := aws.NewKMSSigner(
+				context.Background(),
+				config.AwsClientConfig.Region,
+				config.DisperserKMSKeyID,
+				config.AwsClientConfig.EndpointURL,
+			)
+			if err != nil {
+				return fmt.Errorf("create KMS signer: %w", err)
+			}
+
 			controllerClient, err = service.NewSigningClient(
 				context.Background(),
 				config.ControllerAddress,
-				config.AwsClientConfig.Region,
-				config.AwsClientConfig.EndpointURL,
-				config.DisperserKMSKeyID,
+				kmsSigner,
 			)
 			if err != nil {
 				return fmt.Errorf("create controller client: %w", err)
