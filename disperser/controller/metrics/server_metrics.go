@@ -27,7 +27,7 @@ type ServerMetrics struct {
 
 func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *ServerMetrics {
 	if registry == nil {
-		registry = prometheus.NewRegistry()
+		return nil
 	}
 
 	grpcMetrics := grpcprom.NewServerMetrics()
@@ -88,25 +88,45 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 
 // Returns the gRPC server option that enables automatic GRPC metrics collection.
 func (m *ServerMetrics) GetGRPCServerOption() grpc.ServerOption {
+	if m == nil {
+		return nil
+	}
+
 	return m.grpcServerOption
 }
 
 // Reports the total latency of an AuthorizePayment RPC.
 func (m *ServerMetrics) ReportAuthorizePaymentLatency(duration time.Duration) {
+	if m == nil {
+		return
+	}
+
 	m.authorizePaymentLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 // Reports the latency of signature verification in AuthorizePayment.
 func (m *ServerMetrics) ReportAuthorizePaymentSignatureLatency(duration time.Duration) {
+	if m == nil {
+		return
+	}
+
 	m.authorizePaymentSignatureLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 // Increments the auth failure counter for AuthorizePayment.
 func (m *ServerMetrics) ReportAuthorizePaymentAuthFailure() {
+	if m == nil {
+		return
+	}
+
 	m.authorizePaymentAuthFailures.WithLabelValues().Inc()
 }
 
 // Increments the signature failure counter for AuthorizePayment.
 func (m *ServerMetrics) ReportAuthorizePaymentSignatureFailure() {
+	if m == nil {
+		return
+	}
+
 	m.authorizePaymentSignatureFailures.WithLabelValues().Inc()
 }
