@@ -52,6 +52,7 @@ CLAUDE.md file *in the relevant subdirectory*.
 | Subdirectory | Description                                         |
 |--------------|-----------------------------------------------------|
 | ./docs       | Documentation files describing the EigenDA system.  |
+| ./test       | Testing utilities and comprehensive testing guidelines. |
 
 ---
 

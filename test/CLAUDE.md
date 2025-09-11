@@ -27,6 +27,7 @@
 | Testing internals | Brittle/overfitted tests | Test behavior via public interfaces |
 | Fixed sleeps | Flaky under load | Polling with timeout/backoff |
 | Unmarked helpers | Noisy stack traces | t.Helper() in all helpers |
+| Error string matching | Brittle; breaks on wording changes | Check error types/sentinel errors |
 
 ---
 
