@@ -111,6 +111,7 @@ func NewClientLedger(
 			logger,
 			paymentVault,
 			updateInterval,
+			0,
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateReservation)
 		enforce.NilError(err, "new reservation vault monitor")
