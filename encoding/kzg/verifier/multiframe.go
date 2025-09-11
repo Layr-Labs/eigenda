@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -204,25 +205,15 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 
 	// lhs g1
-
 	var lhsG1 bn254.G1Affine
 	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {
 		return err
 	}
+
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.kzgConfig.SRSOrder, v.kzgConfig.G2PowerOf2Path)
-
-	if err != nil {
-		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, v.kzgConfig.SRSOrder, v.kzgConfig.G2Path)
-		if err != nil {
-			return err
-		}
-		fmt.Println("Accessed the entire G2")
-	}
-
+	G2atD := srs.G2PowerOf2SRS[exponent]
 	lhsG2 := &G2atD
 
 	// rhs g2
