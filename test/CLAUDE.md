@@ -22,7 +22,7 @@
 | Anti-Pattern | Problem | Prefer |
 |--------------|--------------|-----------------|
 | Global test state | Interdependent tests; order sensitivity | Test-scoped setup/fixtures |
-| Silent failures | Hard to debug | Always include failure messages |
+| Silent failures | Hard to debug | Include meaningful failure messages |
 | Missing cleanup | Resource leaks; flakiness | Use t.Cleanup() with timeouts |
 | Testing internals | Brittle/overfitted tests | Test behavior via public interfaces |
 | Fixed sleeps | Flaky under load | Polling with timeout/backoff |
@@ -178,15 +178,26 @@ assert.Equal(t, expected2, actual2, "second check failed")
 assert.Equal(t, expected3, actual3, "third check failed")
 ```
 
-### 4.2 Always Include Descriptive Messages
-```go
-// Bad
-require.NoError(t, err)
-require.Equal(t, expected, actual)
+### 4.2 Meaningful Assertion Messages
 
-// Good
+Include messages that add context about what's being tested or why it matters. Avoid redundant messages that merely restate the assertion.
+
+```go
+// Bad - redundant messages
+require.Equal(t, a, b, "a should equal b")
+require.NoError(t, err, "err should be nil")
+
+// Good - adds context
 require.NoError(t, err, "failed to create signer")
 require.Equal(t, expected, actual, "hash mismatch for valid signature")
+require.True(t, isValid, "signature verification failed")
+```
+
+Messages are optional when the assertion itself is self-explanatory:
+```go
+// Acceptable - self-explanatory
+require.NotNil(t, client)
+require.Len(t, results, 3)
 ```
 
 ---
