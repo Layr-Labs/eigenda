@@ -47,7 +47,7 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Name:      "cumulative_payment",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
-			Help:      "Current cumulative payment balance (gwei)",
+			Help:      "Current cumulative payment balance (gwei).",
 		}),
 		OnDemandTotalDeposits: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "ondemand_total_deposits",
@@ -59,13 +59,13 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Name:      "reservation_remaining_capacity",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
-			Help:      "Remaining capacity in reservation bucket (symbols)",
+			Help:      "Remaining capacity in reservation bucket (symbols). This is part of the leaky-bucket payment system.",
 		}),
 		ReservationBucketCapacity: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "reservation_bucket_size",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
-			Help:      "Total reservation bucket size (symbols)",
+			Help:      "Total reservation bucket size (symbols). This is part of the leaky-bucket payment system.",
 		}),
 		factory: factory,
 	}
