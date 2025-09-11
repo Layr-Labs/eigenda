@@ -11,7 +11,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-const namespace = "eigenda_controller"
+const (
+	namespace                  = "eigenda_controller"
+	authorizePaymentsSubsystem = "authorize_payments"
+)
 
 // Encapsulates metrics for the controller GRPC server
 type ServerMetrics struct {
@@ -40,6 +43,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "authorize_payment_latency_ms",
+			Subsystem:  authorizePaymentsSubsystem,
 			Help:       "Total latency of the AuthorizePayment RPC",
 			Objectives: objectives,
 		},
@@ -50,6 +54,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "authorize_payment_auth_failure_count",
+			Subsystem: authorizePaymentsSubsystem,
 			Help:      "Number of AuthorizePayment RPC authentication failures",
 		},
 		[]string{},
