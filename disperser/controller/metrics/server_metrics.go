@@ -19,10 +19,8 @@ type ServerMetrics struct {
 	grpcServerOption grpc.ServerOption
 
 	// AuthorizePayment metrics
-	authorizePaymentLatency           *prometheus.SummaryVec
-	authorizePaymentSignatureLatency  *prometheus.SummaryVec
-	authorizePaymentAuthFailures      *prometheus.CounterVec
-	authorizePaymentSignatureFailures *prometheus.CounterVec
+	authorizePaymentLatency      *prometheus.SummaryVec
+	authorizePaymentAuthFailures *prometheus.CounterVec
 }
 
 func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *ServerMetrics {
@@ -42,17 +40,7 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "authorize_payment_latency_ms",
-			Help:       "Total latency of the AuthorizePayment RPC, including signature verification",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	authorizePaymentSignatureLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  namespace,
-			Name:       "authorize_payment_signature_latency_ms",
-			Help:       "Latency of signature verification in AuthorizePayment RPC",
+			Help:       "Total latency of the AuthorizePayment RPC",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -62,27 +50,16 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "authorize_payment_auth_failure_count",
-			Help:      "Number of AuthorizePayment RPC authentication failures, not including signature verification failures",
-		},
-		[]string{},
-	)
-
-	authorizePaymentSignatureFailures := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "authorize_payment_signature_failure_count",
-			Help:      "Number of AuthorizePayment RPC signature verification failures",
+			Help:      "Number of AuthorizePayment RPC authentication failures",
 		},
 		[]string{},
 	)
 
 	return &ServerMetrics{
-		logger:                            logger,
-		grpcServerOption:                  grpcServerOption,
-		authorizePaymentLatency:           authorizePaymentLatency,
-		authorizePaymentSignatureLatency:  authorizePaymentSignatureLatency,
-		authorizePaymentAuthFailures:      authorizePaymentAuthFailures,
-		authorizePaymentSignatureFailures: authorizePaymentSignatureFailures,
+		logger:                       logger,
+		grpcServerOption:             grpcServerOption,
+		authorizePaymentLatency:      authorizePaymentLatency,
+		authorizePaymentAuthFailures: authorizePaymentAuthFailures,
 	}
 }
 
@@ -104,15 +81,6 @@ func (m *ServerMetrics) ReportAuthorizePaymentLatency(duration time.Duration) {
 	m.authorizePaymentLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-// Reports the latency of signature verification in AuthorizePayment.
-func (m *ServerMetrics) ReportAuthorizePaymentSignatureLatency(duration time.Duration) {
-	if m == nil {
-		return
-	}
-
-	m.authorizePaymentSignatureLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
 // Increments the auth failure counter for AuthorizePayment.
 func (m *ServerMetrics) ReportAuthorizePaymentAuthFailure() {
 	if m == nil {
@@ -120,13 +88,4 @@ func (m *ServerMetrics) ReportAuthorizePaymentAuthFailure() {
 	}
 
 	m.authorizePaymentAuthFailures.WithLabelValues().Inc()
-}
-
-// Increments the signature failure counter for AuthorizePayment.
-func (m *ServerMetrics) ReportAuthorizePaymentSignatureFailure() {
-	if m == nil {
-		return
-	}
-
-	m.authorizePaymentSignatureFailures.WithLabelValues().Inc()
 }
