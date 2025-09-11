@@ -114,23 +114,28 @@ func (s *Server) AuthorizePayment(
 	request *pb.AuthorizePaymentRequest,
 ) (*pb.AuthorizePaymentResponse, error) {
 	start := time.Now()
+	success := false
+	defer func() {
+		if success {
+			s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
+		} else {
+			s.metrics.ReportAuthorizePaymentAuthFailure()
+		}
+	}()
 
 	if s.paymentAuthorizationHandler == nil {
-		s.metrics.ReportAuthorizePaymentAuthFailure()
 		//nolint:wrapcheck
 		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
 	}
 
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
-		s.metrics.ReportAuthorizePaymentAuthFailure()
 		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
 	}
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
 	if err != nil {
-		s.metrics.ReportAuthorizePaymentAuthFailure()
 		return nil, status.Errorf(codes.InvalidArgument, "replay protection check failed: %v", err)
 	}
 
@@ -140,7 +145,7 @@ func (s *Server) AuthorizePayment(
 		//nolint:wrapcheck // payment handler returns properly formatted grpc errors
 		return nil, err
 	}
-	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
 
+	success = true
 	return response, nil
 }
