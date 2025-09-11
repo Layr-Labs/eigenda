@@ -37,6 +37,10 @@ jobs:
           experimental: true
       - run: go version
 
+      - name: Build and compile contracts
+        run: make compile
+        working-directory: contracts
+
       - name: Build
         run: make build
 
