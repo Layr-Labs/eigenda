@@ -53,7 +53,7 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Name:      "ondemand_total_deposits",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
-			Help:      "Total on-demand deposits available (gwei)",
+			Help:      "Total on-demand deposits available (gwei). This value comes from the on-chain PaymentVault.",
 		}),
 		ReservationRemainingCapacity: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "reservation_remaining_capacity",
