@@ -124,11 +124,7 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 
 	errorGroup, groupCtx := errgroup.WithContext(ctx)
 
-	for index, batch := range accountBatches {
-		// Capture loop variables for goroutine
-		batchIndex := index
-		batchAccounts := batch
-
+	for batchIndex, batchAccounts := range accountBatches {
 		errorGroup.Go(func() error {
 			newReservations, err := vm.paymentVault.GetReservations(groupCtx, batchAccounts)
 			if err != nil {
