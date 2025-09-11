@@ -15,10 +15,8 @@ import (
 
 type ParametrizedVerifier struct {
 	*kzg.KzgConfig
-	Srs *kzg.SRS
-
-	Fs *fft.FFTSettings
-	Ks *kzg.KZGSettings
+	Srs kzg.SRS
+	Fs  *fft.FFTSettings
 }
 
 func (v *ParametrizedVerifier) VerifyFrame(
@@ -34,7 +32,7 @@ func (v *ParametrizedVerifier) VerifyFrame(
 		return fmt.Errorf("ReadG2Point: %w", err)
 	}
 
-	err = verifyFrame(frame, v.Ks, commitment, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn)
+	err = verifyFrame(frame, v.Srs, commitment, &v.Fs.ExpandedRootsOfUnity[j], &g2Atn)
 	if err != nil {
 		return fmt.Errorf("VerifyFrame: %w", err)
 	}
@@ -43,7 +41,7 @@ func (v *ParametrizedVerifier) VerifyFrame(
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
 func verifyFrame(
-	frame *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
+	frame *encoding.Frame, srs kzg.SRS, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
 ) error {
 	var xPow fr.Element
 	xPow.SetOne()
@@ -66,7 +64,7 @@ func verifyFrame(
 	// [interpolation_polynomial(s)]_1
 	var is1 bn254.G1Affine
 	config := ecc.MultiExpConfig{}
-	_, err := is1.MultiExp(ks.Srs.G1[:len(frame.Coeffs)], frame.Coeffs, config)
+	_, err := is1.MultiExp(srs.G1[:len(frame.Coeffs)], frame.Coeffs, config)
 	if err != nil {
 		return fmt.Errorf("MultiExp: %w", err)
 	}

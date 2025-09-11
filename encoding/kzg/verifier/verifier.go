@@ -21,7 +21,7 @@ type Verifier struct {
 	kzgConfig *kzg.KzgConfig
 	encoder   *rs.Encoder
 
-	Srs        *kzg.SRS
+	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
 
 	// mu protects access to ParametrizedVerifiers
@@ -84,10 +84,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 			log.Println("verifier requires accesses to entire g2 points. It is a legacy usage. For most operators, it is likely because G2_POWER_OF_2_PATH is improperly configured.")
 		}
 	}
-	srs, err := kzg.NewSrs(s1, s2)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SRS: %v", err)
-	}
+	srs := kzg.NewSrs(s1, s2)
 
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
@@ -137,14 +134,10 @@ func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
 
-	// Create KZG settings
-	ks := kzg.NewKZGSettings(fs, v.Srs)
-
 	return &ParametrizedVerifier{
 		KzgConfig: v.kzgConfig,
 		Srs:       v.Srs,
 		Fs:        fs,
-		Ks:        ks,
 	}, nil
 }
 
