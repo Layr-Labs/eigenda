@@ -308,7 +308,7 @@ func RunController(ctx *cli.Context) error {
 		go func() {
 			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
 			if err := grpcServer.Start(); err != nil {
-				logger.Error("gRPC server failed", "error", err)
+				panic(fmt.Sprintf("gRPC server failed: %v", err))
 			}
 		}()
 	} else {
