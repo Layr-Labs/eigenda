@@ -42,7 +42,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		// Use the new controller-based payment system
 		err := s.controllerClient.AuthorizePayment(ctx, req.GetBlobHeader())
 		if err != nil {
-			// Pass through the structured error from the controller
+			// nolint:wrapcheck // Pass through the structured error from the controller
 			return nil, err
 		}
 	} else {
