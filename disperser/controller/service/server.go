@@ -8,7 +8,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
@@ -33,21 +32,15 @@ type Server struct {
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 	metrics                     *metrics.ServerMetrics
 	replayGuardian              replay.ReplayGuardian
-	signatureVerifier           *aws.KMSSignatureVerifier
 }
 
 func NewServer(
 	ctx context.Context,
 	config Config,
-	signatureVerifier *aws.KMSSignatureVerifier,
 	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 ) (*Server, error) {
-	if signatureVerifier == nil {
-		return nil, fmt.Errorf("signature verifier is required")
-	}
-
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.AuthorizationRequestMaxPastAge,
@@ -59,7 +52,6 @@ func NewServer(
 		metrics:                     metrics.NewServerMetrics(metricsRegistry, logger),
 		paymentAuthorizationHandler: paymentAuthorizationHandler,
 		replayGuardian:              replayGuardian,
-		signatureVerifier:           signatureVerifier,
 	}, nil
 }
 
@@ -135,13 +127,6 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
 	}
 
-	err = s.signatureVerifier.VerifySignature(requestHash, request.GetDisperserSignature())
-	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "disperser signature verification failed: %v", err)
-	}
-
-	s.metrics.ReportAuthorizePaymentSignatureLatency(time.Since(start))
-
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
 	if err != nil {
@@ -149,12 +134,13 @@ func (s *Server) AuthorizePayment(
 		return nil, status.Errorf(codes.InvalidArgument, "replay protection check failed: %v", err)
 	}
 
-	reply, err := s.paymentAuthorizationHandler.AuthorizePayment(ctx, request.GetBlobHeader())
+	response, err := s.paymentAuthorizationHandler.AuthorizePayment(
+		ctx, request.GetBlobHeader(), request.GetClientSignature())
 	if err != nil {
 		//nolint:wrapcheck // payment handler returns properly formatted grpc errors
 		return nil, err
 	}
 	s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
 
-	return reply, nil
+	return response, nil
 }

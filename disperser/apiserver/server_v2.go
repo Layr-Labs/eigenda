@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -18,12 +19,12 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/controller/service"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
@@ -71,12 +72,9 @@ type DispersalServerV2 struct {
 	// TODO(litt3): this field should be removed once the migration to the new payments system is complete
 	useControllerMediatedPayments bool
 
-	// Handles communication with the controller GRPC server
-	//
-	// TODO(litt3): Must be non-nil if any part of the system needs to communicate with the controller GRPC server.
-	// Features that rely on the controller GRPC server are currently in development: once fully implemented, this
-	// field will be required, and this comment should be removed.
-	controllerClient *service.SigningClient
+	// Controller gRPC client connection and service client
+	controllerConnection *grpc.ClientConn
+	controllerClient     controller.ControllerServiceClient
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -95,8 +93,8 @@ func NewDispersalServerV2(
 	metricsConfig disperser.MetricsConfig,
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
-	// must be non-nil if useControllerMediatedPayments is true
-	controllerClient *service.SigningClient,
+	// must be non-empty if useControllerMediatedPayments is true
+	controllerAddress string,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -125,10 +123,23 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
+	var controllerConnection *grpc.ClientConn
+	var controllerClient controller.ControllerServiceClient
 	if useControllerMediatedPayments {
-		if controllerClient == nil {
-			return nil, errors.New("controller client is required to use new payment system")
+		if controllerAddress == "" {
+			return nil, errors.New("controller address is required to use new payment system")
 		}
+
+		connection, err := grpc.NewClient(
+			controllerAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create controller connection: %w", err)
+		}
+		controllerConnection = connection
+		controllerClient = controller.NewControllerServiceClient(connection)
+
 		logger.Info("Using controller-based payment system")
 	} else {
 		logger.Info("Using legacy payment metering system")
@@ -153,6 +164,7 @@ func NewDispersalServerV2(
 
 		ReservedOnly:                  ReservedOnly,
 		useControllerMediatedPayments: useControllerMediatedPayments,
+		controllerConnection:          controllerConnection,
 		controllerClient:              controllerClient,
 	}, nil
 }
@@ -396,4 +408,14 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
+}
+
+// Gracefully shuts down the server and closes any open connections
+func (s *DispersalServerV2) Stop() error {
+	if s.controllerConnection != nil {
+		if err := s.controllerConnection.Close(); err != nil {
+			s.logger.Error("failed to close controller connection", "error", err)
+		}
+	}
+	return nil
 }

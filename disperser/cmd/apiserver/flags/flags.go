@@ -217,12 +217,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
 	}
-	DisperserKMSKeyIDFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "disperser-kms-key-id"),
-		Usage:    "KMS key ID for signing payment authorization requests (key must be stored in AWS KMS under this name)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
-	}
 	UseControllerMediatedPayments = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
 		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
@@ -328,7 +322,6 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxFutureAge,
 	ReservedOnly,
 	ControllerAddressFlag,
-	DisperserKMSKeyIDFlag,
 	UseControllerMediatedPayments,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,

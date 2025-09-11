@@ -47,7 +47,6 @@ type Config struct {
 	MaxNumSymbolsPerBlob          uint
 	OnchainStateRefreshInterval   time.Duration
 	ControllerAddress             string
-	DisperserKMSKeyID             string
 	UseControllerMediatedPayments bool
 
 	EigenDADirectory                string
@@ -125,7 +124,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EnablePaymentMeterer:          ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservedOnly:                  ctx.GlobalBoolT(flags.ReservedOnly.Name),
 		ControllerAddress:             ctx.GlobalString(flags.ControllerAddressFlag.Name),
-		DisperserKMSKeyID:             ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
 		UseControllerMediatedPayments: ctx.GlobalBool(flags.UseControllerMediatedPayments.Name),
 		ReservationsTableName:         ctx.GlobalString(flags.ReservationsTableName.Name),
 		OnDemandTableName:             ctx.GlobalString(flags.OnDemandTableName.Name),

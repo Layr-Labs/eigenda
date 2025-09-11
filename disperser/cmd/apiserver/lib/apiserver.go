@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -19,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/controller/service"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -151,31 +149,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
-		var controllerClient *service.SigningClient
-		if config.UseControllerMediatedPayments {
-			kmsSigner, err := aws.NewKMSSigner(
-				context.Background(),
-				config.AwsClientConfig.Region,
-				config.DisperserKMSKeyID,
-				config.AwsClientConfig.EndpointURL,
-			)
-			if err != nil {
-				return fmt.Errorf("create KMS signer: %w", err)
-			}
-
-			controllerClient, err = service.NewSigningClient(
-				context.Background(),
-				config.ControllerAddress,
-				kmsSigner,
-			)
-			if err != nil {
-				return fmt.Errorf("create controller client: %w", err)
-			}
-			logger.Info("Controller client created", "address", config.ControllerAddress)
-		} else if config.ControllerAddress != "" {
-			logger.Warn("Controller address provided but legacy payment system is enabled; controller will not be used")
-		}
-
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -191,7 +164,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.MetricsConfig,
 			config.ReservedOnly,
 			config.UseControllerMediatedPayments,
-			controllerClient,
+			config.ControllerAddress,
 		)
 		if err != nil {
 			return err

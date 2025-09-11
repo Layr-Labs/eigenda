@@ -24,8 +24,9 @@ message AuthorizePaymentRequest {
   // 2. Contains the quorums being dispersed to
   common.v2.BlobHeader blob_header = 1;
 
-  // Signature over the keccak hash of this AuthorizePaymentRequest (excluding this signature field).
-  bytes disperser_signature = 2;
+  // Client's ECDSA signature over the blob header's blobKey (keccak hash of the blob header).
+  // This signature can be verified against the account ID in the payment header.
+  bytes client_signature = 2;
 }
 
 // AuthorizePaymentResponse is returned after the controller does accounting and metering.

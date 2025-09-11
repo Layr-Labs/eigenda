@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -40,7 +41,11 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 
 	if s.useControllerMediatedPayments {
 		// Use the new controller-based payment system
-		err := s.controllerClient.AuthorizePayment(ctx, req.GetBlobHeader())
+		authorizePaymentRequest := &controller.AuthorizePaymentRequest{
+			BlobHeader:      req.GetBlobHeader(),
+			ClientSignature: req.GetSignature(),
+		}
+		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
 		if err != nil {
 			// nolint:wrapcheck // Pass through the structured error from the controller
 			return nil, err

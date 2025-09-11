@@ -584,7 +584,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 		false, // enable both reservation and on-demand
 		false, // use old style payments
-		nil,   // No controller client in tests
+		"",    // No controller client in tests
 	)
 	require.NoError(t, err)
 

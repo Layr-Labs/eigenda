@@ -19,7 +19,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -284,20 +283,9 @@ func RunController(ctx *cli.Context) error {
 			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
 		}
 
-		signatureVerifier, err := aws.NewKMSSignatureVerifier(
-			c,
-			config.AwsClientConfig.Region,
-			config.DisperserKMSKeyID,
-			config.AwsClientConfig.EndpointURL,
-		)
-		if err != nil {
-			return fmt.Errorf("create KMS signature verifier: %w", err)
-		}
-
 		grpcServer, err := service.NewServer(
 			c,
 			config.ServerConfig,
-			signatureVerifier,
 			logger,
 			metricsRegistry,
 			paymentAuthorizationHandler)

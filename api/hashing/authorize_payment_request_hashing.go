@@ -10,7 +10,6 @@ import (
 // ControllerAuthorizePaymentRequestDomain is the domain for hashing AuthorizePaymentRequest messages.
 const ControllerAuthorizePaymentRequestDomain = "controller.AuthorizePaymentRequest"
 
-// HashAuthorizePaymentRequest hashes the given AuthorizePaymentRequest (excluding the disperser_signature field).
 func HashAuthorizePaymentRequest(request *controller.AuthorizePaymentRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
 
@@ -21,7 +20,7 @@ func HashAuthorizePaymentRequest(request *controller.AuthorizePaymentRequest) ([
 		return nil, fmt.Errorf("hash blob header: %w", err)
 	}
 
-	// We intentionally do not hash the disperser_signature field, otherwise that signature would be self referential
+	hasher.Write(request.GetClientSignature())
 
 	return hasher.Sum(nil), nil
 }
