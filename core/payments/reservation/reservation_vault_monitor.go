@@ -21,7 +21,7 @@ type ReservationVaultMonitor struct {
 	paymentVault payments.PaymentVault
 	// how frequently to fetch state from the PaymentVault to check for updates
 	updateInterval time.Duration
-	// maximum number of accounts to fetch in a single RPC call (0 = no batching)
+	// maximum number of accounts to fetch in a single RPC call (0 = unlimited batch size)
 	rpcBatchSize uint32
 	// function to get accounts that need to be updated
 	getAccountsToUpdate func() []gethcommon.Address
@@ -108,7 +108,7 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 	// Split accounts into accountBatches to avoid RPC size limits
 	var accountBatches [][]gethcommon.Address
 
-	// Special case: 0 means no batching
+	// Special case: 0 means unlimited batch size, i.e. all accounts are included in a single batch
 	if vm.rpcBatchSize == 0 {
 		accountBatches = [][]gethcommon.Address{accountIDs}
 	} else {
