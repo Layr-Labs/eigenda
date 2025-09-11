@@ -28,8 +28,8 @@ import {IEigenDACertVerifierRouter} from "src/integrations/cert/interfaces/IEige
 contract EigenDAProofValidator is ICustomDAProofValidator {
     address immutable eigenDACertVeriferRouter;
 
-    constructor(address _eigenDACertVeriferRouter) {
-        eigenDACertVeriferRouter = _eigenDACertVeriferRouter;
+    constructor(address _eigenDACertVerifierRouter) {
+        eigenDACertVeriferRouter = _eigenDACertVerifierRouter;
     }
     /**
      * @notice Validates a EigenDA preimage proof and returns the preimage chunk
@@ -120,6 +120,6 @@ contract EigenDAProofValidator is ICustomDAProofValidator {
         // correctness would be violated.
 
         uint8 statusCode = IEigenDACertVerifierRouter(eigenDACertVeriferRouter).checkDACert(certificate[3:]);
-        return statusCode == 1 ? true : false;
+        return statusCode == 1;
     }
 }
