@@ -84,8 +84,6 @@ func (x *AuthorizePaymentRequest) GetDisperserSignature() []byte {
 // AuthorizePaymentResponse is returned after the controller does accounting and metering.
 //
 // A GRPC error indicates that there was a problem with the payment authorization. No error means everything succeeded.
-//
-// TODO(litt3): We should document the potential errors that could be returned.
 type AuthorizePaymentResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

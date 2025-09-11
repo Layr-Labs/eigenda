@@ -31,6 +31,6 @@ message AuthorizePaymentRequest {
 // AuthorizePaymentResponse is returned after the controller does accounting and metering.
 //
 // A GRPC error indicates that there was a problem with the payment authorization. No error means everything succeeded.
-//
-// TODO(litt3): We should document the potential errors that could be returned.
-message AuthorizePaymentResponse {}
+message AuthorizePaymentResponse {
+  // TODO(litt3): We should document the potential errors that could be returned.
+}
