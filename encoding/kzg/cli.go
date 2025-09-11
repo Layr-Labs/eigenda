@@ -112,7 +112,7 @@ func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
 
 	if ctx.GlobalString(DeprecatedG2PowerOf2PathFlagName) != "" {
-		fmt.Printf("Warning: --%s is deprecated. The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.", DeprecatedG2PowerOf2PathFlagName)
+		fmt.Printf("Warning: --%s is deprecated. The g2.point.powerOf2 file is now embedded in the binary, so this flag is no longer needed.\n", DeprecatedG2PowerOf2PathFlagName)
 	}
 
 	return cfg
