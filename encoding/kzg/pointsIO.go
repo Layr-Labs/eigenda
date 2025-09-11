@@ -175,7 +175,7 @@ func readPointSection[T bn254.G1Affine | bn254.G2Affine](
 
 	_, err = file.Seek(int64(from)*int64(pointSizeBytes), io.SeekStart)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error seeking to byte %v: %w", from*pointSizeBytes, err)
 	}
 
 	if n < numWorker {
@@ -246,7 +246,7 @@ func readBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 	_, err := io.ReadFull(reader, buf)
 	// Note that ReadFull() guarantees the bytes read is len(buf) IFF err is nil.
 	if err != nil {
-		return nil, fmt.Errorf("cannot read file %w", err)
+		return nil, fmt.Errorf("reading %v bytes: %w", numBytesToRead, err)
 	}
 	return buf, nil
 }

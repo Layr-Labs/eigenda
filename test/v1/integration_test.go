@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"net"
@@ -17,61 +16,54 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-units"
-	"github.com/gammazero/workerpool"
-
-	"github.com/stretchr/testify/require"
-
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
+	"github.com/Layr-Labs/eigenda/common"
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/apiserver"
+	"github.com/Layr-Labs/eigenda/disperser/batcher"
+	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
+	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/testbed"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
-	"github.com/Layr-Labs/eigenda/disperser/encoder"
-	"github.com/Layr-Labs/eigenda/retriever"
-	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/Layr-Labs/eigensdk-go/metrics"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
-	"github.com/prometheus/client_golang/prometheus"
-	"google.golang.org/grpc/peer"
-
-	"github.com/Layr-Labs/eigenda/common"
-	commonmock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/batcher"
-	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
-	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
-
-	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
-
+	"github.com/Layr-Labs/eigenda/retriever"
+	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
+	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigensdk-go/metrics"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/docker/go-units"
 	"github.com/ethereum/go-ethereum"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-
+	"github.com/gammazero/workerpool"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/peer"
 )
 
 var (
-	p   encoding.Prover
-	v   encoding.Verifier
-	asn core.AssignmentCoordinator
+	logger = testutils.GetLogger()
+	p      encoding.Prover
+	v      encoding.Verifier
+	asn    core.AssignmentCoordinator
 
 	gettysburgAddressBytes  = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 	serviceManagerAddress   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000000")
@@ -79,239 +71,25 @@ var (
 
 	localstackContainer *testbed.LocalStackContainer
 	clientConfig        commonaws.ClientConfig
-
-	deployLocalStack bool
-	localStackPort   = "4565"
+	deployLocalStack    bool
+	localStackPort      = "4565"
 )
 
 const (
-	numOperators         = 10
-	disperserGrpcPort    = 4000
-	encoderPort          = "3100"
+	// Operator configuration
+	numOperators = 10
+
+	// Service ports
+	disperserGrpcPort = 4000
+	encoderPort       = "3100"
+
+	// Quorum parameters
 	q0AdversaryThreshold = uint8(80)
 	q0QuorumThreshold    = uint8(100)
-	testMaxBlobSize      = 2 * 1024 * 1024
+
+	// Blob configuration
+	testMaxBlobSize = 2 * 1024 * 1024
 )
-
-func init() {
-	p, v = mustMakeTestComponents()
-	asn = &core.StdAssignmentCoordinator{}
-}
-
-// makeTestEncoder makes an encoder currently using the only supported backend.
-func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
-	config := &kzg.KzgConfig{
-		G1Path:          "../../resources/srs/g1.point",
-		G2Path:          "../../resources/srs/g2.point",
-		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    true,
-	}
-
-	p, err := prover.NewProver(config, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	v, err := verifier.NewVerifier(config, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return p, v
-}
-
-func mustMakeTestBlob() core.Blob {
-	blob := core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			SecurityParams: []*core.SecurityParam{
-				{
-					QuorumID:              0,
-					AdversaryThreshold:    q0AdversaryThreshold,
-					ConfirmationThreshold: q0QuorumThreshold,
-				},
-			},
-		},
-		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
-	}
-	return blob
-}
-
-type TestDisperser struct {
-	batcher       *batcher.Batcher
-	server        *apiserver.DispersalServer
-	encoderServer *encoder.EncoderServer
-	transactor    *coremock.MockWriter
-	txnManager    *batchermock.MockTxnManager
-}
-
-func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore, logger logging.Logger) TestDisperser {
-	dispatcherConfig := &dispatcher.Config{
-		Timeout: time.Second,
-	}
-	batcherMetrics := batcher.NewMetrics("9100", logger)
-	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger, batcherMetrics.DispatcherMetrics)
-
-	transactor := &coremock.MockWriter{}
-	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
-	agg, err := core.NewStdSignatureAggregator(logger, transactor)
-	require.NoError(t, err)
-
-	batcherConfig := batcher.Config{
-		PullInterval:             5 * time.Second,
-		NumConnections:           1,
-		EncoderSocket:            fmt.Sprintf("localhost:%s", encoderPort),
-		EncodingRequestQueueSize: 100,
-		SRSOrder:                 3000,
-	}
-	timeoutConfig := batcher.TimeoutConfig{
-		EncodingTimeout:         10 * time.Second,
-		AttestationTimeout:      10 * time.Second,
-		BatchAttestationTimeout: 12 * time.Second,
-		ChainReadTimeout:        10 * time.Second,
-		ChainWriteTimeout:       10 * time.Second,
-		TxnBroadcastTimeout:     10 * time.Second,
-	}
-
-	p0, _ := mustMakeTestComponents()
-	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
-	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
-		GrpcPort:              encoderPort,
-		MaxConcurrentRequests: 16,
-		RequestPoolSize:       32,
-	}, logger, p0, metrics, grpcprom.NewServerMetrics())
-
-	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	finalizer := batchermock.NewFinalizer()
-
-	disperserMetrics := disperser.NewMetrics(prometheus.NewRegistry(), "9100", logger)
-	txnManager := batchermock.NewTxnManager()
-
-	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, transactor, txnManager, logger, batcherMetrics, handleBatchLivenessChan)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ratelimiter := &commonmock.NoopRatelimiter{}
-	rateConfig := apiserver.RateConfig{
-		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
-			0: {
-				PerUserUnauthThroughput: 0,
-				TotalUnauthThroughput:   0,
-			},
-		},
-	}
-
-	serverConfig := disperser.ServerConfig{
-		GrpcPort: fmt.Sprint(disperserGrpcPort),
-	}
-	tx := &coremock.MockWriter{}
-	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
-	tx.On("GetQuorumCount").Return(1, nil)
-
-	// this is disperser client's private key used in tests
-	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
-	require.NoError(t, err, "failed to create ECDSA private key from hex string")
-	publicKey := crypto.PubkeyToAddress(privateKey.PublicKey)
-
-	mockState := &coremock.MockOnchainPaymentState{}
-	reservationLimit := uint64(1024)
-	paymentLimit := big.NewInt(512)
-	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
-		return account == publicKey
-	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
-	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
-
-	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
-		return account == publicKey
-	})).Return(&core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
-	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{}, errors.New("payment not found"))
-	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
-	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1024), nil)
-	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint32(1), nil)
-	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint32(128), nil)
-	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
-	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
-
-	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
-	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
-	}
-
-	if deployLocalStack {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb", "kms"}
-		cfg.Port = localStackPort
-		cfg.Host = "0.0.0.0"
-
-		var err error
-		localstackContainer, err = testbed.NewLocalStackContainer(ctx, cfg)
-		if err != nil {
-			teardown()
-			panic("failed to start localstack container: " + err.Error())
-		}
-	}
-
-	clientConfig = commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-	}
-
-	table_names := []string{"reservations_integration", "ondemand_integration", "global_integration"}
-
-	err = meterer.CreateReservationTable(clientConfig, table_names[0])
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(clientConfig, table_names[1])
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, table_names[2])
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
-	}
-
-	meteringStore, err := meterer.NewDynamoDBMeteringStore(
-		clientConfig,
-		table_names[0],
-		table_names[1],
-		table_names[2],
-		logger,
-	)
-	if err != nil {
-		panic("failed to create offchain store")
-	}
-
-	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
-		panic("failed to make initial query to the on-chain state")
-	}
-
-	mt := meterer.NewMeterer(meterer.Config{}, mockState, meteringStore, logger)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
-
-	return TestDisperser{
-		batcher:       batcher,
-		server:        server,
-		encoderServer: grpcEncoder,
-		transactor:    transactor,
-		txnManager:    txnManager,
-	}
-}
 
 type TestOperator struct {
 	Node     *node.Node
@@ -319,177 +97,36 @@ type TestOperator struct {
 	ServerV2 *nodegrpc.ServerV2
 }
 
-func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging.Logger) map[core.OperatorID]TestOperator {
-	bn := uint(0)
-	state := cst.GetTotalOperatorState(context.Background(), bn)
-
-	ops := make(map[core.OperatorID]TestOperator, len(state.IndexedOperators))
-
-	setRegisteredQuorums := true
-	for id, op := range state.PrivateOperators {
-
-		idStr := hexutil.Encode(id[:])
-		fmt.Println("Operator: ", idStr)
-
-		dbPath := fmt.Sprintf("testdata/%v/db", idStr)
-		logPath := fmt.Sprintf("testdata/%v/log", idStr)
-
-		err := os.RemoveAll(dbPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.RemoveAll(logPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.MkdirAll(dbPath, os.ModePerm)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = os.MkdirAll(logPath, os.ModePerm)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		registeredQuorums := []core.QuorumID{}
-		if setRegisteredQuorums {
-			registeredQuorums = []core.QuorumID{0}
-			setRegisteredQuorums = false
-		}
-
-		config := &node.Config{
-			Hostname:                            op.Host,
-			DispersalPort:                       op.DispersalPort,
-			RetrievalPort:                       op.RetrievalPort,
-			InternalRetrievalPort:               op.RetrievalPort,
-			InternalDispersalPort:               op.DispersalPort,
-			V2DispersalPort:                     op.V2DispersalPort,
-			V2RetrievalPort:                     op.V2RetrievalPort,
-			EnableMetrics:                       false,
-			Timeout:                             10,
-			ExpirationPollIntervalSec:           10,
-			DbPath:                              dbPath,
-			LogPath:                             logPath,
-			ID:                                  id,
-			QuorumIDList:                        registeredQuorums,
-			DispersalAuthenticationKeyCacheSize: 1024,
-			DisableDispersalAuthentication:      false,
-			RelayMaxMessageSize:                 units.GiB,
-			EnableV1:                            true,
-			EnableV2:                            false,
-		}
-
-		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
-		_, v0 := mustMakeTestComponents()
-		val := core.NewShardValidator(v0, asn, cst, id)
-
-		tx := &coremock.MockWriter{}
-		tx.On("RegisterBLSPublicKey").Return(nil)
-		tx.On("RegisterOperator").Return(nil)
-		tx.On("GetRegisteredQuorumIdsForOperator").Return(registeredQuorums, nil)
-		tx.On("UpdateOperatorSocket").Return(nil)
-		tx.On("GetBlockStaleMeasure").Return(nil)
-		tx.On("GetStoreDurationBlocks").Return(nil)
-		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
-		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort, config.V2RetrievalPort)
-		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
-
-		noopMetrics := metrics.NewNoopMetrics()
-		reg := prometheus.NewRegistry()
-		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", config.ID, -1, tx, cst)
-		store, err := node.NewLevelDBStore(
-			config.DbPath+"/chunk",
-			logger,
-			metrics,
-			1e9,
-			true,
-			false,
-			1e9)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		mockOperatorSocketsFilterer := &coremock.MockOperatorSocketsFilterer{}
-
-		mockSocketChan := make(chan string)
-		mockOperatorSocketsFilterer.On("WatchOperatorSocketUpdate").Return(mockSocketChan, nil)
-
-		pubIPProvider := pubip.CustomProvider(
-			pubip.RequestDoerFunc(func(req *http.Request) (*http.Response, error) {
-				w := httptest.NewRecorder()
-				_, _ = w.WriteString("8.8.8.8")
-				return w.Result(), nil
-			}), "custom", "")
-
-		n := &node.Node{
-			Config:                  config,
-			Logger:                  logger,
-			KeyPair:                 op.KeyPair,
-			BLSSigner:               op.Signer,
-			Metrics:                 metrics,
-			Store:                   store,
-			ChainState:              cst,
-			Validator:               val,
-			Transactor:              tx,
-			PubIPProvider:           pubIPProvider,
-			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
-			ValidationPool:          workerpool.New(1),
-		}
-
-		rateLimiter := &commonmock.NoopRatelimiter{}
-
-		// TODO(cody-littley): Once we switch this test to use the v2 disperser, we will need to properly set up
-		//  the disperser's public/private keys for signing StoreChunks() requests
-		disperserAddress := gethcommon.Address{}
-		reader := &coremock.MockWriter{}
-		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
-
-		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
-		serverV2, err := nodegrpc.NewServerV2(
-			context.Background(),
-			config,
-			n,
-			logger,
-			rateLimiter,
-			prometheus.NewRegistry(),
-			reader)
-		require.NoError(t, err)
-
-		ops[id] = TestOperator{
-			Node:     n,
-			ServerV1: serverV1,
-			ServerV2: serverV2,
-		}
-	}
-
-	return ops
-}
-
 type TestRetriever struct {
 	Server *retriever.Server
 }
 
-func mustMakeRetriever(logger logging.Logger) (*commonmock.MockEthClient, TestRetriever) {
-	config := &retriever.Config{
-		Timeout: 5 * time.Second,
-	}
-	gethClient := &commonmock.MockEthClient{}
-	retrievalClient := &clientsmock.MockRetrievalClient{}
-	chainClient := retrievermock.NewMockChainClient()
-	server := retriever.NewServer(config, logger, retrievalClient, chainClient)
-
-	return gethClient, TestRetriever{
-		Server: server,
-	}
-}
-
 func TestMain(m *testing.M) {
+	// Setup test components
+	p, v = mustMakeTestComponents()
+	asn = &core.StdAssignmentCoordinator{}
+
+	// Run tests
 	code := m.Run()
-	teardown()
+
+	// Cleanup global resources
+	if deployLocalStack && localstackContainer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := localstackContainer.Terminate(ctx); err != nil {
+			logger.Error("Failed to terminate localstack container", "error", err)
+		}
+	}
+
 	os.Exit(code)
 }
 
 func TestDispersalAndRetrieval(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	baseCtx := t.Context()
 
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
@@ -497,7 +134,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 			Port: 3000,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(baseCtx, p)
 
 	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -508,18 +145,18 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger := testutils.GetLogger()
-	require.NoError(t, err)
 	store := inmem.NewBlobStore()
-	dis := mustMakeDisperser(t, cst, store, logger)
+	dis := mustMakeDisperser(t, cst, store)
 	go func() {
 		_ = dis.encoderServer.Start()
 	}()
 	t.Cleanup(func() {
 		dis.encoderServer.Close()
 	})
-	ops := mustMakeOperators(t, cst, logger)
-	gethClient, _ := mustMakeRetriever(logger)
+
+	ops := mustMakeOperators(t, cst)
+
+	gethClient, _ := mustMakeRetriever()
 
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
@@ -534,14 +171,14 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	blob := mustMakeTestBlob()
+	blob := makeTestBlob()
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := store.StoreBlob(ctx, &blob, requestedAt)
 	require.NoError(t, err)
 	out := make(chan batcher.EncodingResultOrStatus)
-	err = dis.batcher.EncodingStreamer.RequestEncoding(context.Background(), out)
+	err = dis.batcher.EncodingStreamer.RequestEncoding(baseCtx, out)
 	require.NoError(t, err)
-	err = dis.batcher.EncodingStreamer.ProcessEncodedBlobs(context.Background(), <-out)
+	err = dis.batcher.EncodingStreamer.ProcessEncodedBlobs(baseCtx, <-out)
 	require.NoError(t, err)
 	dis.batcher.EncodingStreamer.Pool.StopWait()
 
@@ -722,8 +359,350 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	require.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 }
 
-func teardown() {
-	if deployLocalStack && localstackContainer != nil {
-		_ = localstackContainer.Terminate(context.Background())
+func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
+	config := &kzg.KzgConfig{
+		G1Path:          "../../resources/srs/g1.point",
+		G2Path:          "../../resources/srs/g2.point",
+		CacheDir:        "../../resources/srs/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
+	}
+
+	p, err := prover.NewProver(config, nil)
+	if err != nil {
+		panic(fmt.Errorf("failed to create prover: %w", err))
+	}
+	v, err := verifier.NewVerifier(config, nil)
+	if err != nil {
+		panic(fmt.Errorf("failed to create verifier: %w", err))
+	}
+
+	return p, v
+}
+
+func makeTestBlob() core.Blob {
+	return core.Blob{
+		RequestHeader: core.BlobRequestHeader{
+			SecurityParams: []*core.SecurityParam{
+				{
+					QuorumID:              0,
+					AdversaryThreshold:    q0AdversaryThreshold,
+					ConfirmationThreshold: q0QuorumThreshold,
+				},
+			},
+		},
+		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
+	}
+}
+
+type TestDisperser struct {
+	batcher       *batcher.Batcher
+	server        *apiserver.DispersalServer
+	encoderServer *encoder.EncoderServer
+	transactor    *coremock.MockWriter
+	txnManager    *batchermock.MockTxnManager
+}
+
+func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser.BlobStore) *TestDisperser {
+	ctx := t.Context()
+
+	dispatcherConfig := &dispatcher.Config{
+		Timeout: time.Second,
+	}
+	batcherMetrics := batcher.NewMetrics("9100", logger)
+	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger, batcherMetrics.DispatcherMetrics)
+
+	transactor := &coremock.MockWriter{}
+	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
+	agg, err := core.NewStdSignatureAggregator(logger, transactor)
+	require.NoError(t, err)
+
+	batcherConfig := batcher.Config{
+		PullInterval:             5 * time.Second,
+		NumConnections:           1,
+		EncoderSocket:            fmt.Sprintf("localhost:%s", encoderPort),
+		EncodingRequestQueueSize: 100,
+		SRSOrder:                 3000,
+	}
+	timeoutConfig := batcher.TimeoutConfig{
+		EncodingTimeout:         10 * time.Second,
+		AttestationTimeout:      10 * time.Second,
+		BatchAttestationTimeout: 12 * time.Second,
+		ChainReadTimeout:        10 * time.Second,
+		ChainWriteTimeout:       10 * time.Second,
+		TxnBroadcastTimeout:     10 * time.Second,
+	}
+
+	p0, _ := mustMakeTestComponents()
+
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
+		GrpcPort:              encoderPort,
+		MaxConcurrentRequests: 16,
+		RequestPoolSize:       32,
+	}, logger, p0, metrics, grpcprom.NewServerMetrics())
+
+	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
+	require.NoError(t, err, "failed to create encoder client")
+
+	finalizer := batchermock.NewFinalizer()
+	disperserMetrics := disperser.NewMetrics(prometheus.NewRegistry(), "9100", logger)
+	txnManager := batchermock.NewTxnManager()
+
+	batcher, err := batcher.NewBatcher(batcherConfig, timeoutConfig, store, dispatcher, cst, asn, encoderClient, agg, &commonmock.MockEthClient{}, finalizer, transactor, txnManager, logger, batcherMetrics, handleBatchLivenessChan)
+	require.NoError(t, err, "failed to create batcher")
+
+	ratelimiter := &commonmock.NoopRatelimiter{}
+	rateConfig := apiserver.RateConfig{
+		QuorumRateInfos: map[core.QuorumID]apiserver.QuorumRateInfo{
+			0: {
+				PerUserUnauthThroughput: 0,
+				TotalUnauthThroughput:   0,
+			},
+		},
+	}
+
+	serverConfig := disperser.ServerConfig{
+		GrpcPort: fmt.Sprint(disperserGrpcPort),
+	}
+	tx := &coremock.MockWriter{}
+	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
+	tx.On("GetQuorumCount").Return(1, nil)
+
+	// this is disperser client's private key used in tests
+	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
+	require.NoError(t, err, "failed to create ECDSA private key from hex string")
+
+	publicKey := crypto.PubkeyToAddress(privateKey.PublicKey)
+	mockState := &coremock.MockOnchainPaymentState{}
+	reservationLimit := uint64(1024)
+	paymentLimit := big.NewInt(512)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+		return account == publicKey
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
+
+	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+		return account == publicKey
+	})).Return(&core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
+	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{}, errors.New("payment not found"))
+	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1024), nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint32(1), nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint32(128), nil)
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+
+	if deployLocalStack {
+		var err error
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localStackPort,
+			Logger:         logger,
+		})
+		require.NoError(t, err, "failed to start localstack container")
+	}
+
+	clientConfig = commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+	}
+
+	table_names := []string{"reservations_integration", "ondemand_integration", "global_integration"}
+
+	err = meterer.CreateReservationTable(clientConfig, table_names[0])
+	require.NoError(t, err, "failed to create reservation table")
+
+	err = meterer.CreateOnDemandTable(clientConfig, table_names[1])
+	require.NoError(t, err, "failed to create ondemand table")
+
+	err = meterer.CreateGlobalReservationTable(clientConfig, table_names[2])
+	require.NoError(t, err, "failed to create global reservation table")
+
+	meteringStore, err := meterer.NewDynamoDBMeteringStore(
+		clientConfig,
+		table_names[0],
+		table_names[1],
+		table_names[2],
+		logger,
+	)
+	require.NoError(t, err, "failed to create metering store")
+
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+	err = mockState.RefreshOnchainPaymentState(ctx)
+	require.NoError(t, err, "failed to refresh on-chain payment state")
+
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, meteringStore, logger)
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
+
+	return &TestDisperser{
+		batcher:       batcher,
+		server:        server,
+		encoderServer: grpcEncoder,
+		transactor:    transactor,
+		txnManager:    txnManager,
+	}
+}
+
+func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock) map[core.OperatorID]TestOperator {
+	ctx := t.Context()
+	bn := uint(0)
+	state := cst.GetTotalOperatorState(ctx, bn)
+
+	ops := make(map[core.OperatorID]TestOperator, len(state.IndexedOperators))
+
+	setRegisteredQuorums := true
+	for id, op := range state.PrivateOperators {
+
+		idStr := hexutil.Encode(id[:])
+		fmt.Println("Operator: ", idStr)
+
+		dbPath := fmt.Sprintf("testdata/%v/db", idStr)
+		logPath := fmt.Sprintf("testdata/%v/log", idStr)
+
+		err := os.RemoveAll(dbPath)
+		require.NoError(t, err, "failed to remove db path")
+
+		err = os.RemoveAll(logPath)
+		require.NoError(t, err, "failed to remove log path")
+
+		err = os.MkdirAll(dbPath, os.ModePerm)
+		require.NoError(t, err, "failed to create db path")
+
+		err = os.MkdirAll(logPath, os.ModePerm)
+		require.NoError(t, err, "failed to create log path")
+
+		registeredQuorums := []core.QuorumID{}
+		if setRegisteredQuorums {
+			registeredQuorums = []core.QuorumID{0}
+			setRegisteredQuorums = false
+		}
+
+		config := &node.Config{
+			Hostname:                            op.Host,
+			DispersalPort:                       op.DispersalPort,
+			RetrievalPort:                       op.RetrievalPort,
+			InternalRetrievalPort:               op.RetrievalPort,
+			InternalDispersalPort:               op.DispersalPort,
+			V2DispersalPort:                     op.V2DispersalPort,
+			V2RetrievalPort:                     op.V2RetrievalPort,
+			EnableMetrics:                       false,
+			Timeout:                             10,
+			ExpirationPollIntervalSec:           10,
+			DbPath:                              dbPath,
+			LogPath:                             logPath,
+			ID:                                  id,
+			QuorumIDList:                        registeredQuorums,
+			DispersalAuthenticationKeyCacheSize: 1024,
+			DisableDispersalAuthentication:      false,
+			RelayMaxMessageSize:                 units.GiB,
+			EnableV1:                            true,
+			EnableV2:                            false,
+		}
+
+		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
+		_, v0 := mustMakeTestComponents()
+		val := core.NewShardValidator(v0, asn, cst, id)
+
+		tx := &coremock.MockWriter{}
+		tx.On("RegisterBLSPublicKey").Return(nil)
+		tx.On("RegisterOperator").Return(nil)
+		tx.On("GetRegisteredQuorumIdsForOperator").Return(registeredQuorums, nil)
+		tx.On("UpdateOperatorSocket").Return(nil)
+		tx.On("GetBlockStaleMeasure").Return(nil)
+		tx.On("GetStoreDurationBlocks").Return(nil)
+		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
+		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort, config.V2RetrievalPort)
+		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
+
+		noopMetrics := metrics.NewNoopMetrics()
+		reg := prometheus.NewRegistry()
+		metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", config.ID, -1, tx, cst)
+		store, err := node.NewLevelDBStore(
+			config.DbPath+"/chunk",
+			logger,
+			metrics,
+			1e9,
+			true,
+			false,
+			1e9)
+		require.NoError(t, err, "failed to create leveldb store")
+
+		mockOperatorSocketsFilterer := &coremock.MockOperatorSocketsFilterer{}
+
+		mockSocketChan := make(chan string)
+		mockOperatorSocketsFilterer.On("WatchOperatorSocketUpdate").Return(mockSocketChan, nil)
+
+		pubIPProvider := pubip.CustomProvider(
+			pubip.RequestDoerFunc(func(req *http.Request) (*http.Response, error) {
+				w := httptest.NewRecorder()
+				_, _ = w.WriteString("8.8.8.8")
+				return w.Result(), nil
+			}), "custom", "")
+
+		n := &node.Node{
+			Config:                  config,
+			Logger:                  logger,
+			KeyPair:                 op.KeyPair,
+			BLSSigner:               op.Signer,
+			Metrics:                 metrics,
+			Store:                   store,
+			ChainState:              cst,
+			Validator:               val,
+			Transactor:              tx,
+			PubIPProvider:           pubIPProvider,
+			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
+			ValidationPool:          workerpool.New(1),
+		}
+
+		rateLimiter := &commonmock.NoopRatelimiter{}
+
+		// TODO(cody-littley): Once we switch this test to use the v2 disperser, we will need to properly set up
+		//  the disperser's public/private keys for signing StoreChunks() requests
+		disperserAddress := gethcommon.Address{}
+		reader := &coremock.MockWriter{}
+		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+
+		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+		serverV2, err := nodegrpc.NewServerV2(
+			ctx,
+			config,
+			n,
+			logger,
+			rateLimiter,
+			prometheus.NewRegistry(),
+			reader)
+		require.NoError(t, err)
+
+		ops[id] = TestOperator{
+			Node:     n,
+			ServerV1: serverV1,
+			ServerV2: serverV2,
+		}
+	}
+
+	return ops
+}
+
+func mustMakeRetriever() (*commonmock.MockEthClient, *TestRetriever) {
+	config := &retriever.Config{
+		Timeout: 5 * time.Second,
+	}
+	gethClient := &commonmock.MockEthClient{}
+	retrievalClient := &clientsmock.MockRetrievalClient{}
+	chainClient := retrievermock.NewMockChainClient()
+	server := retriever.NewServer(config, logger, retrievalClient, chainClient)
+
+	return gethClient, &TestRetriever{
+		Server: server,
 	}
 }

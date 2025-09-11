@@ -49,6 +49,7 @@ import (
 )
 
 var (
+	logger          = testutils.GetLogger()
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
@@ -68,6 +69,9 @@ var (
 	mockCommitment   = encoding.BlobCommitments{}
 )
 
+// TODO: Refactor to use t.Run subtests pattern instead of TestMain
+// This would allow setup to run once with subtests, eliminating global state
+// and enabling potential parallel execution within the main test function
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
@@ -161,7 +165,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(t.Context(), p)
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 
@@ -216,7 +220,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(t.Context(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
@@ -243,7 +247,7 @@ func TestGetBlobStatus(t *testing.T) {
 	require.Equal(t, status, pb.BlobStatus_PROCESSING)
 	require.NotNil(t, requestID)
 
-	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err := dispersalServer.GetBlobStatus(t.Context(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	require.NoError(t, err)
@@ -264,7 +268,7 @@ func TestGetBlobStatus(t *testing.T) {
 	}
 	confirmedMetadata := simulateBlobConfirmation(t, requestID, blobSize, securityParams, 0)
 
-	reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err = dispersalServer.GetBlobStatus(t.Context(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	require.NoError(t, err)
@@ -325,13 +329,13 @@ func TestGetBlobDispersingStatus(t *testing.T) {
 	require.NotNil(t, requestID)
 	blobKey, err := disperser.ParseBlobKey(string(requestID))
 	require.NoError(t, err)
-	err = queue.MarkBlobDispersing(context.Background(), blobKey)
+	err = queue.MarkBlobDispersing(t.Context(), blobKey)
 	require.NoError(t, err)
-	meta, err := queue.GetBlobMetadata(context.Background(), blobKey)
+	meta, err := queue.GetBlobMetadata(t.Context(), blobKey)
 	require.NoError(t, err)
 	require.Equal(t, meta.BlobStatus, disperser.Dispersing)
 
-	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err := dispersalServer.GetBlobStatus(t.Context(), &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	require.NoError(t, err)
@@ -353,7 +357,7 @@ func TestRetrieveBlob(t *testing.T) {
 		require.Equal(t, status, pb.BlobStatus_PROCESSING)
 		require.NotNil(t, requestID)
 
-		reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+		reply, err := dispersalServer.GetBlobStatus(t.Context(), &pb.BlobStatusRequest{
 			RequestId: requestID,
 		})
 		require.NoError(t, err)
@@ -375,14 +379,14 @@ func TestRetrieveBlob(t *testing.T) {
 		}
 		_ = simulateBlobConfirmation(t, requestID, blobSize, securityParams, 1)
 
-		reply, err = dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+		reply, err = dispersalServer.GetBlobStatus(t.Context(), &pb.BlobStatusRequest{
 			RequestId: requestID,
 		})
 		require.NoError(t, err)
 		require.Equal(t, reply.GetStatus(), pb.BlobStatus_CONFIRMED)
 
 		// Retrieve the blob and compare it with the original data
-		retrieveData, err := retrieveBlob(dispersalServer, requestID, 1)
+		retrieveData, err := retrieveBlob(t, dispersalServer, requestID, 1)
 		require.NoError(t, err)
 
 		require.Equal(t, data, retrieveData)
@@ -391,6 +395,8 @@ func TestRetrieveBlob(t *testing.T) {
 }
 
 func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
+	ctx := t.Context()
+
 	// Create random data
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -403,14 +409,14 @@ func TestRetrieveBlobFailsWhenBlobNotConfirmed(t *testing.T) {
 	require.Equal(t, status, pb.BlobStatus_PROCESSING)
 	require.NotNil(t, requestID)
 
-	reply, err := dispersalServer.GetBlobStatus(context.Background(), &pb.BlobStatusRequest{
+	reply, err := dispersalServer.GetBlobStatus(ctx, &pb.BlobStatusRequest{
 		RequestId: requestID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
 	// Try to retrieve the blob before it is confirmed
-	_, err = retrieveBlob(dispersalServer, requestID, 2)
+	_, err = retrieveBlob(t, dispersalServer, requestID, 2)
 	require.NotNil(t, err)
 	require.Equal(t,
 		"rpc error: code = NotFound desc = no metadata found for the given batch header hash and blob index",
@@ -431,7 +437,7 @@ func TestDisperseBlobWithExceedSizeLimit(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(t.Context(), p)
 
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
@@ -603,6 +609,7 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 }
 
 func overwriteFile(t *testing.T, f *os.File, content string) {
+	t.Helper()
 	err := f.Truncate(0)
 	require.NoError(t, err)
 	_, err = f.Seek(0, 0)
@@ -612,10 +619,11 @@ func overwriteFile(t *testing.T, f *os.File, content string) {
 }
 
 func setup() {
+	ctx := context.Background()
 	var err error
 	allowlistFile, err = os.CreateTemp("", "allowlist.*.json")
 	if err != nil {
-		panic("failed to create allowlist file")
+		logger.Fatal("Failed to create allowlist file:", err)
 	}
 
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
@@ -624,31 +632,30 @@ func setup() {
 	}
 
 	if deployLocalStack {
-		cfg := testbed.DefaultLocalStackConfig()
-		cfg.Services = []string{"s3", "dynamodb"}
-		cfg.Port = localstackPort
-		cfg.Host = "0.0.0.0"
-
-		localstackContainer, err = testbed.NewLocalStackContainer(context.Background(), cfg)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardown()
-			panic("failed to start localstack container: " + err.Error())
+			logger.Fatal("Failed to start localstack container:", err)
 		}
 
 		// Deploy resources using the testbed DeployResources function
-		logger := testutils.GetLogger()
 		deployConfig := testbed.DeployResourcesConfig{
-			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", cfg.Host, cfg.Port),
+			LocalStackEndpoint:  fmt.Sprintf("http://%s:%s", "0.0.0.0", localstackPort),
 			MetadataTableName:   metadataTableName,
 			BucketTableName:     bucketTableName,
 			V2MetadataTableName: v2MetadataTableName,
 			Logger:              logger,
 		}
 
-		err = testbed.DeployResources(context.Background(), deployConfig)
+		err = testbed.DeployResources(ctx, deployConfig)
 		if err != nil {
 			teardown()
-			panic("failed to deploy AWS resources: " + err.Error())
+			logger.Fatal("Failed to deploy AWS resources:", err)
 		}
 	}
 
@@ -675,7 +682,7 @@ func setup() {
 	prover, err = p.NewProver(config, nil)
 	if err != nil {
 		teardown()
-		panic(fmt.Sprintf("failed to initialize KZG prover: %s", err.Error()))
+		logger.Fatal("Failed to initialize KZG prover:", err)
 	}
 
 	dispersalServer = newTestServer(transactor, "setup")
@@ -688,22 +695,22 @@ func setup() {
 	_, err = lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
 	if err != nil {
 		teardown()
-		panic("failed to create mock commitment: " + err.Error())
+		logger.Fatal("Failed to create mock commitment:", err)
 	}
 	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
 	if err != nil {
 		teardown()
-		panic("failed to create mock commitment: " + err.Error())
+		logger.Fatal("Failed to create mock commitment:", err)
 	}
 	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
 	if err != nil {
 		teardown()
-		panic("failed to create mock commitment: " + err.Error())
+		logger.Fatal("Failed to create mock commitment:", err)
 	}
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
 	if err != nil {
 		teardown()
-		panic("failed to create mock commitment: " + err.Error())
+		logger.Fatal("Failed to create mock commitment:", err)
 	}
 
 	var lengthProof, lengthCommitment bn254.G2Affine
@@ -729,7 +736,6 @@ func teardown() {
 	if deployLocalStack && localstackContainer != nil {
 		ctx := context.Background()
 		if err := localstackContainer.Terminate(ctx); err != nil {
-			logger := testutils.GetLogger()
 			logger.Error("Failed to terminate localstack container", "error", err)
 		}
 	}
@@ -739,21 +745,20 @@ func teardown() {
 }
 
 func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	logger := testutils.GetLogger()
-
+	ctx := context.Background()
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	s3Client, err := s3.NewClient(context.Background(), awsConfig, logger)
+	s3Client, err := s3.NewClient(ctx, awsConfig, logger)
 	if err != nil {
-		panic("failed to create s3 client")
+		logger.Fatal("Failed to create s3 client:", err)
 	}
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	if err != nil {
-		panic("failed to create dynamoDB client")
+		logger.Fatal("Failed to create dynamoDB client:", err)
 	}
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
 
@@ -764,13 +769,13 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](1000)
 	if err != nil {
-		panic("failed to create bucket store")
+		logger.Fatal("Failed to create bucket store:", err)
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
-		panic("failed to make initial query to the on-chain state")
+	if err := mockState.RefreshOnchainPaymentState(ctx); err != nil {
+		logger.Fatal("Failed to make initial query to the on-chain state:", err)
 	}
 
 	mockState.On("GetPricePerSymbol").Return(uint32(encoding.BYTES_PER_SYMBOL), nil)
@@ -794,17 +799,17 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
 	if err != nil {
 		teardown()
-		panic("failed to create reservation table")
+		logger.Fatal("Failed to create reservation table:", err)
 	}
 	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
 	if err != nil {
 		teardown()
-		panic("failed to create ondemand table")
+		logger.Fatal("Failed to create ondemand table:", err)
 	}
 	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
 	if err != nil {
 		teardown()
-		panic("failed to create global reservation table")
+		logger.Fatal("Failed to create global reservation table:", err)
 	}
 
 	store, err := meterer.NewDynamoDBMeteringStore(
@@ -816,12 +821,12 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create metering store")
+		logger.Fatal("Failed to create metering store:", err)
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
-	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
+	err = mt.ChainPaymentState.RefreshOnchainPaymentState(ctx)
 	if err != nil {
-		panic("failed to make initial query to the on-chain state")
+		logger.Fatal("Failed to make initial query to the on-chain state:", err)
 	}
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
@@ -883,13 +888,15 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {
+	t.Helper()
+
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(t.Context(), p)
 
 	reply, err := server.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
@@ -899,14 +906,17 @@ func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) 
 	return reply.GetResult(), uint(len(data)), reply.GetRequestId()
 }
 
-func retrieveBlob(server *apiserver.DispersalServer, requestID []byte, blobIndex uint32) ([]byte, error) {
+func retrieveBlob(t *testing.T, server *apiserver.DispersalServer, requestID []byte, blobIndex uint32) ([]byte, error) {
+	t.Helper()
+	baseCtx := t.Context()
+
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(context.Background(), p)
+	ctx := peer.NewContext(baseCtx, p)
 
 	batchHeaderHash := crypto.Keccak256(requestID)
 	reply, err := server.RetrieveBlob(ctx, &pb.RetrieveBlobRequest{
@@ -921,7 +931,8 @@ func retrieveBlob(server *apiserver.DispersalServer, requestID []byte, blobIndex
 }
 
 func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, securityParams []*core.SecurityParam, blobIndex uint32) *disperser.BlobMetadata {
-	ctx := context.Background()
+	t.Helper()
+	ctx := t.Context()
 
 	metadataKey, err := disperser.ParseBlobKey(string(requestID))
 	require.NoError(t, err)

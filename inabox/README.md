@@ -155,11 +155,12 @@ Alternatively, you can start and stop the EigenDA services in detached mode by r
 
 Disperse a blob:
 ```
-# This command uses `grpcurl`, a tool to send gRPC request in cli
-# To install `grpcurl`, run `brew install grpcurl` or `go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest`
+# This command uses `grpcurl`, a tool to send gRPC request in cli, and `kzgpad` to encode payloads into blobs.
+# To install `grpcurl`, run `brew install grpcurl` or `go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest`.
+# To install `kzgpad`, run `go install github.com/Layr-Labs/eigenda/tools/kzgpad@latest`
 
 # From top level eigenda directory
-$ grpcurl -plaintext -d '{"data": "'$(tools/kzgpad/bin/kzgpad -e hello)'"}' \
+$ grpcurl -plaintext -d '{"data": "'$(kzgpad -e hello)'"}' \
   localhost:32003 disperser.Disperser/DisperseBlob
 ```
 
