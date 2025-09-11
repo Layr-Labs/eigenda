@@ -16,7 +16,7 @@ type ReservationPaymentValidator struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked
 	ledgerCache *ReservationLedgerCache
-	timeSource   func() time.Time
+	timeSource  func() time.Time
 }
 
 func NewReservationPaymentValidator(
@@ -86,4 +86,3 @@ func (pv *ReservationPaymentValidator) Debit(
 
 	return nil
 }
-
