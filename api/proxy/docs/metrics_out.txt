@@ -1,15 +1,15 @@
-|                       METRIC                        |                    DESCRIPTION                     |                   LABELS                   |   TYPE    |
-|-----------------------------------------------------|----------------------------------------------------|--------------------------------------------|-----------|
-| eigenda_proxy_default_up                            | 1 if the proxy server has finished starting up     |                                            | gauge     |
-| eigenda_proxy_default_info                          | Pseudo-metric tracking version and config info     | version                                    | gauge     |
-| eigenda_proxy_http_server_requests_total            | Total requests to the HTTP server                  | method,status,commitment_mode,cert_version | counter   |
-| eigenda_proxy_http_server_requests_bad_header_total | Total requests to the HTTP server with bad headers | method,error_type                          | counter   |
-| eigenda_proxy_http_server_request_duration_seconds  | Histogram of HTTP server request durations         | method                                     | histogram |
-| eigenda_proxy_secondary_requests_total              | Total requests to the secondary storage            | backend_type,method,status                 | counter   |
-| eigenda_proxy_secondary_request_duration_seconds    | Histogram of secondary storage request durations   | backend_type                               | histogram |
-| eigenda_accountant_cumulative_payment               | Current cumulative payment balance (gwei)          | account_id                                 | gauge     |
-| eigenda_accountant_ondemand_total_deposits          | Total on-demand deposits available (gwei)          | account_id                                 | gauge     |
-| eigenda_accountant_reservation_remaining_capacity   | Remaining capacity in reservation bucket (symbols) |                                            | gauge     |
-| eigenda_accountant_reservation_bucket_size          | Total reservation bucket size (symbols)            |                                            | gauge     |
-| eigenda_dispersal_blob_size_bytes                   | Size of blobs created from payloads in bytes       |                                            | histogram |
-| eigenda_retrieval_payload_size_bytes                | Size of decoded payloads in bytes                  |                                            | histogram |
+|                       METRIC                        |                                             DESCRIPTION                                              |                   LABELS                   |   TYPE    |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------|--------------------------------------------|-----------|
+| eigenda_proxy_default_up                            | 1 if the proxy server has finished starting up                                                       |                                            | gauge     |
+| eigenda_proxy_default_info                          | Pseudo-metric tracking version and config info                                                       | version                                    | gauge     |
+| eigenda_proxy_http_server_requests_total            | Total requests to the HTTP server                                                                    | method,status,commitment_mode,cert_version | counter   |
+| eigenda_proxy_http_server_requests_bad_header_total | Total requests to the HTTP server with bad headers                                                   | method,error_type                          | counter   |
+| eigenda_proxy_http_server_request_duration_seconds  | Histogram of HTTP server request durations                                                           | method                                     | histogram |
+| eigenda_proxy_secondary_requests_total              | Total requests to the secondary storage                                                              | backend_type,method,status                 | counter   |
+| eigenda_proxy_secondary_request_duration_seconds    | Histogram of secondary storage request durations                                                     | backend_type                               | histogram |
+| eigenda_accountant_cumulative_payment               | Current cumulative payment balance (gwei).                                                           |                                            | gauge     |
+| eigenda_accountant_ondemand_total_deposits          | Total on-demand deposits available (gwei). This value comes from the on-chain PaymentVault.          |                                            | gauge     |
+| eigenda_accountant_reservation_remaining_capacity   | Remaining capacity in reservation bucket (symbols). This is part of the leaky-bucket payment system. |                                            | gauge     |
+| eigenda_accountant_reservation_bucket_size          | Total reservation bucket size (symbols). This is part of the leaky-bucket payment system.            |                                            | gauge     |
+| eigenda_dispersal_blob_size_bytes                   | Size of blobs created from payloads in bytes                                                         |                                            | histogram |
+| eigenda_retrieval_payload_size_bytes                | Size of decoded payloads in bytes                                                                    |                                            | histogram |
