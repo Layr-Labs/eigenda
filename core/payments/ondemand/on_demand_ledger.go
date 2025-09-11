@@ -11,8 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments"
 )
 
-// TODO: add unit tests for this struct
-
 // Keeps track of the cumulative payment state for on-demand dispersals for a single account.
 //
 // On-demand payments use a cumulative payment system where, each time a dispersal is made, we keep track of the total
