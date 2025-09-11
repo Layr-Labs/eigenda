@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller/service"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -149,9 +150,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
-		var controllerClient *apiserver.ControllerClient
+		var controllerClient *service.SigningClient
 		if config.UseControllerMediatedPayments {
-			controllerClient, err = apiserver.NewControllerClient(
+			controllerClient, err = service.NewSigningClient(
 				context.Background(),
 				config.ControllerAddress,
 				config.AwsClientConfig.Region,

@@ -18,6 +18,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/controller/service"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -75,7 +76,7 @@ type DispersalServerV2 struct {
 	// TODO(litt3): Must be non-nil if any part of the system needs to communicate with the controller GRPC server.
 	// Features that rely on the controller GRPC server are currently in development: once fully implemented, this
 	// field will be required, and this comment should be removed.
-	controllerClient *ControllerClient
+	controllerClient *service.SigningClient
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -95,7 +96,7 @@ func NewDispersalServerV2(
 	ReservedOnly bool,
 	useControllerMediatedPayments bool,
 	// must be non-nil if useControllerMediatedPayments is true
-	controllerClient *ControllerClient,
+	controllerClient *service.SigningClient,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")

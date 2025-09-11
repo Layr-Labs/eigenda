@@ -1,4 +1,4 @@
-package apiserver
+package service
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// ControllerClient wraps the controller service client and handles signing of requests
-type ControllerClient struct {
+// Wraps the controller service client and handles signing of requests
+type SigningClient struct {
 	controllerAddress  string
 	disperserKMSKeyID  string
 	kmsClient          *kms.Client
@@ -27,13 +27,13 @@ type ControllerClient struct {
 }
 
 // Creates a client for communicating with the controller GRPC server
-func NewControllerClient(
+func NewSigningClient(
 	ctx context.Context,
 	controllerAddress string,
 	kmsRegion string,
 	kmsEndpoint string,
 	disperserKMSKeyID string,
-) (*ControllerClient, error) {
+) (*SigningClient, error) {
 	if controllerAddress == "" {
 		return nil, fmt.Errorf("controller address is required")
 	}
@@ -74,7 +74,7 @@ func NewControllerClient(
 
 	serviceClient := controller.NewControllerServiceClient(clientConnection)
 
-	return &ControllerClient{
+	return &SigningClient{
 		controllerAddress:  controllerAddress,
 		disperserKMSKeyID:  disperserKMSKeyID,
 		kmsClient:          kmsClient,
@@ -85,7 +85,7 @@ func NewControllerClient(
 }
 
 // Sends a signed payment authorization request to the controller
-func (c *ControllerClient) AuthorizePayment(ctx context.Context, blobHeader *pbcommon.BlobHeader) error {
+func (c *SigningClient) AuthorizePayment(ctx context.Context, blobHeader *pbcommon.BlobHeader) error {
 	authorizePaymentRequest := &controller.AuthorizePaymentRequest{BlobHeader: blobHeader}
 
 	hash, err := hashing.HashAuthorizePaymentRequest(authorizePaymentRequest)
@@ -109,7 +109,7 @@ func (c *ControllerClient) AuthorizePayment(ctx context.Context, blobHeader *pbc
 }
 
 // Closes the grpc connection to the controller server
-func (c *ControllerClient) Close() error {
+func (c *SigningClient) Close() error {
 	if c.clientConnection != nil {
 		err := c.clientConnection.Close()
 		if err != nil {

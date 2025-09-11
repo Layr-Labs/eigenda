@@ -10,7 +10,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/grpcserver"
+	"github.com/Layr-Labs/eigenda/disperser/controller/service"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -40,7 +40,7 @@ type Config struct {
 	MetricsPort                  int
 	ControllerReadinessProbePath string
 	ControllerHealthProbePath    string
-	ServerConfig                 grpcserver.Config
+	ServerConfig                 service.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -65,7 +65,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		relays[i] = corev2.RelayKey(relay)
 	}
 
-	serverConfig, err := grpcserver.NewConfig(
+	serverConfig, err := service.NewConfig(
 		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
 		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
 		ctx.GlobalString(flags.GrpcPortFlag.Name),
