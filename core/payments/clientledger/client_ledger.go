@@ -208,7 +208,7 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
-	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
 
 	return paymentMetadata, nil
 }
@@ -263,7 +263,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
-	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
 
 	return paymentMetadata, nil
 }
@@ -285,7 +285,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("revert on-demand debit: %w", err)
 		}
 
-		cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), newCumulativePayment)
+		cl.accountantMetricer.RecordCumulativePayment(newCumulativePayment)
 	} else {
 		enforce.NotNil(cl.reservationLedger,
 			"payment metadata is for a reservation payment, but ReservationLedger is nil")
@@ -329,7 +329,7 @@ func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTota
 		return fmt.Errorf("update total deposits: %w", err)
 	}
 
-	cl.accountantMetricer.RecordOnDemandTotalDeposits(cl.accountID.Hex(), newTotalDeposit)
+	cl.accountantMetricer.RecordOnDemandTotalDeposits(newTotalDeposit)
 
 	return nil
 }
