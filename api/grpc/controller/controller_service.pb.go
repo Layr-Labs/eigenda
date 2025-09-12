@@ -83,8 +83,11 @@ func (x *AuthorizePaymentRequest) GetClientSignature() []byte {
 }
 
 // AuthorizePaymentResponse is returned after the controller does accounting and metering.
+// - *Accounting* involves checking that there are enough funds/reservation bandwidth available to pay for a dispersal
+// - *Metering* involves checking that EigenDA throughput limits are respected, irrespective of client payment validity
 //
-// A GRPC error indicates that there was a problem with the payment authorization. No error means everything succeeded.
+// A GRPC error indicates that there was a problem with either accounting or metering.
+// No error means everything succeeded.
 type AuthorizePaymentResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
