@@ -1,3 +1,4 @@
+//nolint:wrapcheck // Directly returning errors from the api package is the correct pattern
 package service
 
 import (
@@ -6,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -15,10 +17,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 )
 
 // The controller GRPC server
@@ -124,25 +124,23 @@ func (s *Server) AuthorizePayment(
 	}()
 
 	if s.paymentAuthorizationHandler == nil {
-		//nolint:wrapcheck
-		return nil, status.Error(codes.FailedPrecondition, "payment authorization handler not configured")
+		return nil, api.NewErrorInternal("payment authorization handler not configured")
 	}
 
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to hash request: %v", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v", err))
 	}
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "replay protection check failed: %v", err)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("replay protection check failed: %v", err))
 	}
 
 	response, err := s.paymentAuthorizationHandler.AuthorizePayment(
 		ctx, request.GetBlobHeader(), request.GetClientSignature())
 	if err != nil {
-		//nolint:wrapcheck // payment handler returns properly formatted grpc errors
 		return nil, err
 	}
 
