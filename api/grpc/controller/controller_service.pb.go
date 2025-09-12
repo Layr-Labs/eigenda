@@ -88,6 +88,11 @@ func (x *AuthorizePaymentRequest) GetClientSignature() []byte {
 //
 // A GRPC error indicates that there was a problem with either accounting or metering.
 // No error means everything succeeded.
+//
+// Possible error cases (not an exhaustive list):
+// - Unauthenticated: Invalid client signature
+// - PermissionDenied: Client signature is valid, but payment is insufficient or account has exceeded reservation limits
+// - ResourceExhausted: Metering check failed - total network on-demand throughput is exhausted
 type AuthorizePaymentResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
