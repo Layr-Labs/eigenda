@@ -14,6 +14,15 @@ service ControllerService {
   //
   // This is intended to be called by API server instances that are handling dispersal requests. The controller
   // is responsible for accounting and metering for the dispersal.
+  //
+  // While this endpoint *does* verify the client signature for each dispersal, it *does not* have any type of auth
+  // implemented between the API Server and Controller:
+  // - This is an internal API protected by firewall rules, so it is unlikely that an unauthorized party would be able
+  // to gain access to it.
+  // - In the event that an unauthorized party were to gain access to this endpoint, the attack surface area is still
+  // minimal: client signatures are being checked, and we protect against replay. Therefore, the attacker wouldn't be
+  // able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
+  // volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
   rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentResponse) {}
 }
 
