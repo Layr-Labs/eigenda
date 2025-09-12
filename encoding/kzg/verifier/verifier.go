@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -13,9 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
-	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -23,10 +20,11 @@ type Verifier struct {
 	kzgConfig *kzg.KzgConfig
 	encoder   *rs.Encoder
 
-	Srs        *kzg.SRS
+	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
-	mu         sync.Mutex
 
+	// mu protects access to ParametrizedVerifiers
+	mu                    sync.Mutex
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
@@ -68,11 +66,6 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		}
 	}
 
-	srs, err := kzg.NewSrs(s1, s2)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SRS: %v", err)
-	}
-
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %v", err)
@@ -81,7 +74,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
 		encoder:               encoder,
-		Srs:                   srs,
+		Srs:                   kzg.NewSrs(s1, s2),
 		G2Trailing:            g2Trailing,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}
@@ -89,21 +82,14 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	return encoderGroup, nil
 }
 
-type ParametrizedVerifier struct {
-	*kzg.KzgConfig
-	Srs *kzg.SRS
-
-	Fs *fft.FFTSettings
-	Ks *kzg.KZGSettings
-}
-
 func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
 	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
 		return nil, err
 	}
+
+	// protect access to ParametrizedVerifiers
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
 	ver, ok := v.ParametrizedVerifiers[params]
 	if ok {
@@ -111,37 +97,27 @@ func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*Parametrized
 	}
 
 	ver, err := v.newKzgVerifier(params)
-	if err == nil {
-		v.ParametrizedVerifiers[params] = ver
+	if err != nil {
+		return nil, fmt.Errorf("new KZG verifier: %w", err)
 	}
 
-	return ver, err
-}
-
-func (g *Verifier) NewKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	return g.newKzgVerifier(params)
+	v.ParametrizedVerifiers[params] = ver
+	return ver, nil
 }
 
 func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
 	if err := params.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid encoding params: %w", err)
 	}
 
 	// Create FFT settings based on params
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
 
-	// Create KZG settings
-	ks, err := kzg.NewKZGSettings(fs, v.Srs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
-	}
-
 	return &ParametrizedVerifier{
 		KzgConfig: v.kzgConfig,
 		Srs:       v.Srs,
 		Fs:        fs,
-		Ks:        ks,
 	}, nil
 }
 
@@ -159,15 +135,14 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254
 
 	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig.SRSOrder, v.kzgConfig.G1Path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read g1 point: %w", err)
 	}
 
 	err = VerifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
 	if err != nil {
-		return fmt.Errorf("%v . %v ", "low degree proof fails", err)
-	} else {
-		return nil
+		return fmt.Errorf("low degree proof: %w", err)
 	}
+	return nil
 }
 
 // The function verify low degree proof against a poly commitment
@@ -197,9 +172,9 @@ func (v *Verifier) VerifyFrames(
 
 	for ind := range frames {
 		err = verifier.VerifyFrame(
-			(*bn254.G1Affine)(commitments.Commitment),
 			frames[ind],
 			uint64(indices[ind]),
+			(*bn254.G1Affine)(commitments.Commitment),
 			params.NumChunks,
 		)
 
@@ -209,72 +184,6 @@ func (v *Verifier) VerifyFrames(
 	}
 
 	return nil
-}
-
-func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64, numChunks uint64) error {
-
-	j, err := rs.GetLeadingCosetIndex(
-		uint64(index),
-		numChunks,
-	)
-	if err != nil {
-		return err
-	}
-
-	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.SRSOrder, v.G2Path)
-	if err != nil {
-		return err
-	}
-
-	err = VerifyFrame(f, v.Ks, commit, &v.Ks.ExpandedRootsOfUnity[j], &g2Atn)
-
-	if err != nil {
-		return fmt.Errorf("%v . %v ", "VerifyFrame Error", err)
-	} else {
-		return nil
-	}
-}
-
-// Verify function assumes the Data stored is coefficients of coset's interpolating poly
-func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine) error {
-	var xPow fr.Element
-	xPow.SetOne()
-
-	for i := 0; i < len(f.Coeffs); i++ {
-		xPow.Mul(&xPow, x)
-	}
-
-	var xPowBigInt big.Int
-
-	// [x^n]_2
-	var xn2 bn254.G2Affine
-
-	xn2.ScalarMultiplication(&kzg.GenG2, xPow.BigInt(&xPowBigInt))
-
-	// [s^n - x^n]_2
-	var xnMinusYn bn254.G2Affine
-	xnMinusYn.Sub(g2Atn, &xn2)
-
-	// [interpolation_polynomial(s)]_1
-	var is1 bn254.G1Affine
-	config := ecc.MultiExpConfig{}
-	_, err := is1.MultiExp(ks.Srs.G1[:len(f.Coeffs)], f.Coeffs, config)
-	if err != nil {
-		return err
-	}
-
-	// [commitment - interpolation_polynomial(s)]_1 = [commit]_1 - [interpolation_polynomial(s)]_1
-	var commitMinusInterpolation bn254.G1Affine
-	commitMinusInterpolation.Sub(commitment, &is1)
-
-	// Verify the pairing equation
-	//
-	// e([commitment - interpolation_polynomial(s)], [1]) = e([proof],  [s^n - x^n])
-	//    equivalent to
-	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
-	//
-
-	return PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &f.Proof, &xnMinusYn)
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
@@ -305,7 +214,7 @@ func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, 
 
 	ok, err := bn254.PairingCheck(P[:], Q[:])
 	if err != nil {
-		return err
+		return fmt.Errorf("PairingCheck: %w", err)
 	}
 	if !ok {
 		return errors.New("PairingCheck pairing not ok. SRS is invalid")
