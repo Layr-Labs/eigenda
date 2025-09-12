@@ -33,7 +33,7 @@ func main() {
 	app.Name = "eigenda-proxy"
 	app.Usage = "EigenDA Proxy Sidecar Service"
 	app.Description = "Service for more trustless and secure interactions with EigenDA"
-	app.Action = StartProxySvr
+	app.Action = StartProxyService
 	app.Commands = []*cli.Command{
 		{
 			Name:        "doc",

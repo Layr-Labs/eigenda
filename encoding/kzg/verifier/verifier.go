@@ -3,7 +3,6 @@ package verifier
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"sync"
 
@@ -45,7 +44,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
 
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
+	// PreloadEncoder is by default not used by operator node.
 	if config.LoadG2Points {
 		if len(config.G2Path) == 0 {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
@@ -65,26 +64,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		if err != nil {
 			return nil, fmt.Errorf("failed to read trailing G2 points from %s: %v", config.G2Path, err)
 		}
-	} else {
-		if len(config.G2PowerOf2Path) == 0 && len(config.G2Path) == 0 {
-			return nil, errors.New("both G2Path and G2PowerOf2Path are empty. However, object needs to load G2Points")
-		}
-
-		if len(config.G2PowerOf2Path) != 0 {
-			if config.SRSOrder == 0 {
-				return nil, errors.New("SRS order cannot be 0")
-			}
-
-			maxPower := uint64(math.Log2(float64(config.SRSOrder)))
-			_, err := kzg.ReadG2PointSection(config.G2PowerOf2Path, 0, maxPower, 1)
-			if err != nil {
-				return nil, fmt.Errorf("file located at %v is invalid", config.G2PowerOf2Path)
-			}
-		} else {
-			log.Println("verifier requires accesses to entire g2 points. It is a legacy usage. For most operators, it is likely because G2_POWER_OF_2_PATH is improperly configured.")
-		}
 	}
-	srs := kzg.NewSrs(s1, s2)
 
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
@@ -94,7 +74,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
 		encoder:               encoder,
-		Srs:                   srs,
+		Srs:                   kzg.NewSrs(s1, s2),
 		G2Trailing:            g2Trailing,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
 	}
