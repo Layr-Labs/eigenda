@@ -1,5 +1,5 @@
 //nolint:wrapcheck // Directly returning errors from the api package is the correct pattern
-package service
+package server
 
 import (
 	"context"

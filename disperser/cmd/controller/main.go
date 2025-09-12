@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
-	"github.com/Layr-Labs/eigenda/disperser/controller/service"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -283,7 +283,7 @@ func RunController(ctx *cli.Context) error {
 			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
 		}
 
-		grpcServer, err := service.NewServer(
+		grpcServer, err := server.NewServer(
 			c,
 			config.ServerConfig,
 			logger,
