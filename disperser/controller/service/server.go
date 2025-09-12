@@ -41,10 +41,7 @@ func NewServer(
 	metricsRegistry *prometheus.Registry,
 	paymentAuthorizationHandler *payments.PaymentAuthorizationHandler,
 ) (*Server, error) {
-	replayGuardian := replay.NewReplayGuardian(
-		time.Now,
-		config.AuthorizationRequestMaxPastAge,
-		config.AuthorizationRequestMaxFutureAge)
+	replayGuardian := replay.NewReplayGuardian(time.Now, config.RequestMaxPastAge, config.RequestMaxFutureAge)
 
 	return &Server{
 		config:                      config,

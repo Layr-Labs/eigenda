@@ -65,9 +65,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		relays[i] = corev2.RelayKey(relay)
 	}
 
-	serverConfig, err := service.NewConfig(
+	grpcServerConfig, err := common.NewGRPCServerConfig(
 		ctx.GlobalBool(flags.GrpcServerEnableFlag.Name),
-		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
 		uint16(ctx.GlobalUint64(flags.GrpcPortFlag.Name)),
 		ctx.GlobalInt(flags.GrpcMaxMessageSizeFlag.Name),
 		ctx.GlobalDuration(flags.GrpcMaxIdleConnectionAgeFlag.Name),
@@ -76,6 +75,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	)
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid gRPC server config: %w", err)
+	}
+
+	serverConfig, err := service.NewConfig(
+		grpcServerConfig,
+		ctx.GlobalBool(flags.GrpcPaymentAuthenticationFlag.Name),
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("invalid controller service config: %w", err)
 	}
 
 	config := Config{
