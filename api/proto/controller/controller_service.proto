@@ -49,5 +49,4 @@ message AuthorizePaymentRequest {
 // - Unauthenticated: Invalid client signature
 // - PermissionDenied: Client signature is valid, but payment is insufficient or account has exceeded reservation limits
 // - ResourceExhausted: Metering check failed - total network on-demand throughput is exhausted
-message AuthorizePaymentResponse {
-}
+message AuthorizePaymentResponse {}
