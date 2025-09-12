@@ -103,11 +103,6 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
 			}
 		}
-	} else {
-		// todo, there are better ways to handle it
-		if len(kzgConfig.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
-		}
 	}
 
 	srs, err := kzg.NewSrs(s1, s2)

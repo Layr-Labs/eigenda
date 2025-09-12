@@ -39,7 +39,6 @@ func setup() {
 	kzgConfig = &kzg.KzgConfig{
 		G1Path:          "../../../resources/srs/g1.point",
 		G2Path:          "../../../resources/srs/g2.point",
-		G2PowerOf2Path:  "../../../resources/srs/g2.point.powerOf2",
 		CacheDir:        "../../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 2900,
