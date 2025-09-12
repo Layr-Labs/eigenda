@@ -13,7 +13,7 @@ import {IndexRegistry} from "lib/eigenlayer-middleware/src/IndexRegistry.sol";
 import {IStakeRegistry, StakeRegistry} from "lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
-import {RegistryCoordinator, IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {EigenDARegistryCoordinator, IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
@@ -197,7 +197,7 @@ contract DeployEigenDA is Script {
         upgrade(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME, "");
 
         impl[AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME] = address(
-            new RegistryCoordinator(
+            new EigenDARegistryCoordinator(
                 IServiceManager(directory.getAddress(AddressDirectoryConstants.SERVICE_MANAGER_NAME)),
                 IStakeRegistry(directory.getAddress(AddressDirectoryConstants.STAKE_REGISTRY_NAME)),
                 IBLSApkRegistry(directory.getAddress(AddressDirectoryConstants.BLS_APK_REGISTRY_NAME)),
@@ -208,7 +208,7 @@ contract DeployEigenDA is Script {
         upgrade(
             AddressDirectoryConstants.REGISTRY_COORDINATOR_NAME,
             abi.encodeCall(
-                RegistryCoordinator.initialize,
+                EigenDARegistryCoordinator.initialize,
                 (
                     cfg.initialOwner(),
                     cfg.churnApprover(),

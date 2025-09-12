@@ -63,8 +63,13 @@ contract EigenDAThresholdRegistryImmutableV1 is IEigenDAThresholdRegistry {
         return (quorumBitmap & BitmapUtils.orderedBytesArrayToBitmap(quorumNumbersRequired) == quorumBitmap);
     }
 
-    // @notice Gets the quorum numbers that are required. Disabled for this immutable version since its only
-    // usable for EigenDA V2.
+    /// @notice Returns the next blob version. Disabled for this immutable version since its only usable for EigenDA V2.
+    function nextBlobVersion() public view virtual returns (uint16) {
+        revert("EigenDAThresholdRegistryImmutableV1: Blob version not supported");
+    }
+
+    /// @notice Gets the quorum numbers that are required. Disabled for this immutable version since its only
+    /// usable for EigenDA V2.
     function getBlobParams(uint16) public pure returns (DATypesV1.VersionedBlobParams memory) {
         revert("EigenDAThresholdRegistryImmutableV1: Blob params not supported");
     }

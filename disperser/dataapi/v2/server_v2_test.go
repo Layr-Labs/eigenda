@@ -34,7 +34,7 @@ import (
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -42,11 +42,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/ory/dockertest/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/shurcooL/graphql"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -68,19 +66,17 @@ var (
 	logger = testutils.GetLogger()
 
 	// Local stack
-	localStackPort     = "4566"
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	deployLocalStack   bool
+	localstackPort      = "4574"
+	localstackContainer *testbed.LocalStackContainer
+	deployLocalStack    bool
 
 	dynamoClient dynamodb.Client
 
 	serverVersion     = uint(2)
-	mockLogger        = testutils.GetLogger()
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
-	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
+	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, logger)
 
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
@@ -142,25 +138,34 @@ type MockHealthCheckService struct {
 
 func TestMain(m *testing.M) {
 	setup(m)
-	m.Run()
+	code := m.Run()
 	teardown()
+	os.Exit(code)
 }
 
 func teardown() {
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
+	ctx := context.Background()
 	// Start localstack
 	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
 			teardown()
 			panic("failed to start localstack container: " + err.Error())
@@ -172,9 +177,10 @@ func setup(m *testing.M) {
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
-	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTable(ctx, cfg, metadataTableName,
+		blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())
@@ -191,8 +197,10 @@ func setup(m *testing.M) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	metrics := dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), blobMetadataStore, "9001", mockLogger)
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, metrics)
+	metrics := dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), blobMetadataStore, "9001", logger)
+	testDataApiServerV2, err = serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger, metrics)
 	if err != nil {
 		teardown()
 		panic("failed to create v2 server: " + err.Error())
@@ -201,15 +209,16 @@ func setup(m *testing.M) {
 
 // makeCommitment returns a test hardcoded BlobCommitments
 func makeCommitment(t *testing.T) encoding.BlobCommitments {
+	t.Helper()
 	var lengthXA0, lengthXA1, lengthYA0, lengthYA1 fp.Element
 	_, err := lengthXA0.SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthXA0")
 	_, err = lengthXA1.SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthXA1")
 	_, err = lengthYA0.SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthYA0")
 	_, err = lengthYA1.SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to set lengthYA1")
 
 	var lengthProof bn254.G2Affine
 	lengthProof.X.A0 = lengthXA0
@@ -230,17 +239,18 @@ func makeCommitment(t *testing.T) encoding.BlobCommitments {
 
 // makeBlobHeaderV2 returns a test hardcoded V2 BlobHeader
 func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
+	t.Helper()
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random account bytes")
 	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random timestamp")
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random cumulative payment")
 	sig := make([]byte, 32)
 	_, err = rand.Read(sig)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to generate random signature")
 	return &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0, 1},
@@ -258,6 +268,7 @@ func setUpRouter() *gin.Engine {
 }
 
 func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
+	t.Helper()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, url, nil)
 	router.ServeHTTP(w, req)
@@ -266,42 +277,47 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 }
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
+	t.Helper()
 	body := w.Result().Body
-	defer core.CloseLogOnError(body, "response body", mockLogger)
+	defer core.CloseLogOnError(body, "response body", logger)
 	data, err := io.ReadAll(body)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read response body")
 
 	var response T
 	err = json.Unmarshal(data, &response)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to unmarshal response body")
 	return response
 }
 
 func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	t.Helper()
 	bk, err := blobHeader.BlobKey()
-	assert.Nil(t, err)
-	assert.Equal(t, blobKey, bk)
+	require.Nil(t, err, "failed to get blob key from header")
+	require.Equal(t, blobKey, bk)
 }
 
 func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.OperatorSigningInfo) {
-	assert.Equal(t, expected.OperatorId, actual.OperatorId)
-	assert.Equal(t, expected.OperatorAddress, actual.OperatorAddress)
-	assert.Equal(t, expected.QuorumId, actual.QuorumId)
-	assert.Equal(t, expected.TotalUnsignedBatches, actual.TotalUnsignedBatches)
-	assert.Equal(t, expected.TotalResponsibleBatches, actual.TotalResponsibleBatches)
-	assert.Equal(t, expected.TotalBatches, actual.TotalBatches)
+	t.Helper()
+	require.Equal(t, expected.OperatorId, actual.OperatorId)
+	require.Equal(t, expected.OperatorAddress, actual.OperatorAddress)
+	require.Equal(t, expected.QuorumId, actual.QuorumId)
+	require.Equal(t, expected.TotalUnsignedBatches, actual.TotalUnsignedBatches)
+	require.Equal(t, expected.TotalResponsibleBatches, actual.TotalResponsibleBatches)
+	require.Equal(t, expected.TotalBatches, actual.TotalBatches)
 }
 
 func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+	t.Helper()
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
-	require.NoError(t, err)
-	assert.True(t, cursor.Equal(requestedAt, &blobKey))
+	require.NoError(t, err, "failed to parse cursor token")
+	require.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
 func deleteItems(t *testing.T, keys []dynamodb.Key) {
-	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
-	assert.NoError(t, err)
-	assert.Len(t, failed, 0)
+	t.Helper()
+	failed, err := dynamoClient.DeleteItems(t.Context(), metadataTableName, keys)
+	require.NoError(t, err, "failed to delete test items from DynamoDB")
+	require.Len(t, failed, 0)
 }
 
 func TestFetchBlob(t *testing.T) {
@@ -317,7 +333,7 @@ func TestFetchBlob(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	err := blobMetadataStore.PutBlobMetadata(t.Context(), metadata)
 	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
@@ -328,16 +344,16 @@ func TestFetchBlob(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex())
 	response := decodeResponseBody[serverv2.BlobResponse](t, w)
 
-	assert.Equal(t, "Queued", response.Status)
-	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
-	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
-	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
+	require.Equal(t, "Queued", response.Status)
+	require.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
+	require.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
+	require.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
+	require.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
 func TestFetchOperatorDispersalFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	numRequests := 60
 	opID := core.OperatorID{16, 32}
@@ -470,7 +486,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 			var errResp serverv2.ErrorResponse
 			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
-			assert.Contains(t, errResp.Error, tt.wantError)
+			require.Contains(t, errResp.Error, tt.wantError)
 		}
 	})
 
@@ -491,13 +507,13 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Dispersals))
 		for i := 0; i < 20; i++ {
-			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 			if (1+i)%2 == 0 {
-				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+				require.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
 			} else {
-				assert.Equal(t, "", response.Dispersals[i].Signature)
+				require.Equal(t, "", response.Dispersals[i].Signature)
 			}
 		}
 	})
@@ -509,9 +525,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Dispersals))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[1+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
@@ -521,9 +537,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Dispersals))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, dispersedAt[i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
@@ -534,9 +550,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 29, len(response.Dispersals))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, dispersedAt[21+i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[21+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[21+i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[21+i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -547,9 +563,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Dispersals))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
@@ -559,9 +575,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Dispersals))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[59-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
@@ -572,9 +588,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
 		require.Equal(t, 29, len(response.Dispersals))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, dispersedAt[49-i], response.Dispersals[i].DispersedAt)
-			assert.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[49-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
+			require.Equal(t, dispersedAt[49-i], response.Dispersals[i].DispersedAt)
+			require.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[49-i].BatchRoot[:]), response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -596,7 +612,7 @@ func TestFetchBlobCertificate(t *testing.T) {
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}
-	err = blobMetadataStore.PutBlobCertificate(context.Background(), blobCert, fragmentInfo)
+	err = blobMetadataStore.PutBlobCertificate(t.Context(), blobCert, fragmentInfo)
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
@@ -604,14 +620,14 @@ func TestFetchBlobCertificate(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
 	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
 
-	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
-	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
-	assert.Equal(t, blobCert.Signature, response.Certificate.Signature)
+	require.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
+	require.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
+	require.Equal(t, blobCert.Signature, response.Certificate.Signature)
 }
 
 func TestFetchBlobFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a timeline of test blobs:
 	// - Total of 103 blobs
@@ -755,7 +771,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 			var errResp serverv2.ErrorResponse
 			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
-			assert.Contains(t, errResp.Error, tt.wantError)
+			require.Contains(t, errResp.Error, tt.wantError)
 		}
 	})
 
@@ -769,9 +785,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 	})
 
@@ -783,9 +799,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 2: 2-hour window captures all test blobs
@@ -801,9 +817,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobMetadata.BlobHeader)
 		for i := 3; i < numBlobs; i++ {
 			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 3: Custom end time with 1-hour window
@@ -816,9 +832,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
 			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[41+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[41+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[100], keys[100])
 	})
 
@@ -830,9 +846,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
 			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[43], keys[43])
 
 		// Test 2: 2-hour window captures all test blobs
@@ -848,9 +864,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[numBlobs-1].BlobMetadata.BlobHeader)
 		for i := 3; i < numBlobs; i++ {
 			checkBlobKeyEqual(t, keys[i], response.Blobs[numBlobs-i-1].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[i], response.Blobs[numBlobs-i-1].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[i], response.Blobs[numBlobs-i-1].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[0], firstBlobKeys[0])
 
 		// Test 3: Custom end time with 1-hour window
@@ -863,9 +879,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
 			checkBlobKeyEqual(t, keys[100-i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[100-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[100-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[41], keys[41])
 	})
 
@@ -883,9 +899,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 
 		// Request next page using pagination cursor
@@ -895,9 +911,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
 			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[63+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[63+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[82], keys[82])
 	})
 
@@ -915,9 +931,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
 			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[83], keys[83])
 
 		// Request next page using pagination cursor
@@ -927,9 +943,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 3, len(response.Blobs))
 		for i := 0; i < 3; i++ {
 			checkBlobKeyEqual(t, keys[82-i], response.Blobs[i].BlobMetadata.BlobHeader)
-			assert.Equal(t, requestedAt[82-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[82-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.Cursor) > 0)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[80], keys[80])
 	})
 
@@ -947,9 +963,9 @@ func TestFetchBlobFeed(t *testing.T) {
 		require.Equal(t, 2, len(response.Blobs))
 		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobMetadata.BlobHeader)
 		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobMetadata.BlobHeader)
-		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
-		assert.Equal(t, firstBlobTime, response.Blobs[1].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.Cursor) > 0)
+		require.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
+		require.Equal(t, firstBlobTime, response.Blobs[1].BlobMetadata.RequestedAt)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[1], firstBlobKeys[1])
 
 		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
@@ -963,16 +979,16 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobMetadata.BlobHeader)
 		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobMetadata.BlobHeader)
 		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobMetadata.BlobHeader)
-		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
-		assert.Equal(t, requestedAt[3], response.Blobs[1].BlobMetadata.RequestedAt)
-		assert.Equal(t, requestedAt[4], response.Blobs[2].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.Cursor) > 0)
+		require.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
+		require.Equal(t, requestedAt[3], response.Blobs[1].BlobMetadata.RequestedAt)
+		require.Equal(t, requestedAt[4], response.Blobs[2].BlobMetadata.RequestedAt)
+		require.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[4], keys[4])
 	})
 }
 
 func TestFetchBlobAttestationInfo(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	r := setUpRouter()
 
 	// Set up blob inclusion info
@@ -985,7 +1001,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	err := blobMetadataStore.PutBlobMetadata(t.Context(), metadata)
 	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
@@ -994,7 +1010,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		ReferenceBlockNumber: 10,
 	}
 	bhh, err := batchHeader.Hash()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -1045,7 +1061,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 	// Set up attestation
 	keyPair, err := core.GenRandomBlsKeys()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	apk := keyPair.GetPubKeyG2()
 	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
@@ -1067,7 +1083,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		},
 	}
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
 		10: core.OperatorStakes{
@@ -1119,10 +1135,10 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		w := executeRequest(t, r, http.MethodGet, reqStr)
 		response := decodeResponseBody[serverv2.BlobAttestationInfoResponse](t, w)
 
-		assert.Equal(t, blobKey.Hex(), response.BlobKey)
-		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
-		assert.Equal(t, hex.EncodeToString(inclusionInfo.InclusionProof[:]), response.InclusionInfo.InclusionProof)
-		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
+		require.Equal(t, blobKey.Hex(), response.BlobKey)
+		require.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
+		require.Equal(t, hex.EncodeToString(inclusionInfo.InclusionProof[:]), response.InclusionInfo.InclusionProof)
+		require.Equal(t, attestation, response.AttestationInfo.Attestation)
 
 		signers := map[uint8][]serverv2.OperatorIdentity{
 			0: []serverv2.OperatorIdentity{
@@ -1163,12 +1179,12 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		for key, expectedSigners := range signers {
 			actualSigners, exists := response.AttestationInfo.Signers[key]
 			require.True(t, exists)
-			assert.ElementsMatch(t, expectedSigners, actualSigners)
+			require.ElementsMatch(t, expectedSigners, actualSigners)
 		}
 		for key, expectedNonsigners := range nonsigners {
 			actualNonsigners, exists := response.AttestationInfo.Nonsigners[key]
 			require.True(t, exists)
-			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+			require.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 		}
 	})
 
@@ -1219,7 +1235,7 @@ func TestFetchBatch(t *testing.T) {
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 10,
 	}
-	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
+	err := blobMetadataStore.PutBatchHeader(t.Context(), batchHeader)
 	require.NoError(t, err)
 	batchHeaderHashBytes, err := batchHeader.Hash()
 	require.NoError(t, err)
@@ -1238,12 +1254,12 @@ func TestFetchBatch(t *testing.T) {
 		BatchHeader:      batchHeader,
 		BlobCertificates: []*corev2.BlobCertificate{blobCert},
 	}
-	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	err = blobMetadataStore.PutBatch(t.Context(), batch)
 	require.NoError(t, err)
 
 	// Set up attestation in metadata store
 	keyPair, err := core.GenRandomBlsKeys()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	apk := keyPair.GetPubKeyG2()
 	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
@@ -1264,7 +1280,7 @@ func TestFetchBatch(t *testing.T) {
 			1: 80,
 		},
 	}
-	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
+	err = blobMetadataStore.PutAttestation(t.Context(), attestation)
 	require.NoError(t, err)
 
 	mockTx.On("BatchOperatorIDToAddress").Return(
@@ -1328,15 +1344,15 @@ func TestFetchBatch(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/batches/"+batchHeaderHash)
 	response := decodeResponseBody[serverv2.BatchResponse](t, w)
 
-	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
-	assert.Equal(t, hex.EncodeToString(batchHeader.BatchRoot[:]), response.SignedBatch.BatchHeader.BatchRoot)
-	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
-	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
-	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
-	assert.Equal(t, 1, len(response.BlobKeys))
-	assert.Equal(t, blobKey.Hex(), response.BlobKeys[0])
-	assert.Equal(t, 1, len(response.BlobCertificates))
-	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
+	require.Equal(t, batchHeaderHash, response.BatchHeaderHash)
+	require.Equal(t, hex.EncodeToString(batchHeader.BatchRoot[:]), response.SignedBatch.BatchHeader.BatchRoot)
+	require.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
+	require.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
+	require.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+	require.Equal(t, 1, len(response.BlobKeys))
+	require.Equal(t, blobKey.Hex(), response.BlobKeys[0])
+	require.Equal(t, 1, len(response.BlobCertificates))
+	require.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
 
 	signers := map[uint8][]serverv2.OperatorIdentity{
 		0: []serverv2.OperatorIdentity{
@@ -1377,12 +1393,12 @@ func TestFetchBatch(t *testing.T) {
 	for key, expectedSigners := range signers {
 		actualSigners, exists := response.SignedBatch.AttestationInfo.Signers[key]
 		require.True(t, exists)
-		assert.ElementsMatch(t, expectedSigners, actualSigners)
+		require.ElementsMatch(t, expectedSigners, actualSigners)
 	}
 	for key, expectedNonsigners := range nonsigners {
 		actualNonsigners, exists := response.SignedBatch.AttestationInfo.Nonsigners[key]
 		require.True(t, exists)
-		assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+		require.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 	}
 
 	mockTx.ExpectedCalls = nil
@@ -1405,7 +1421,7 @@ func TestFetchBatch(t *testing.T) {
 
 func TestFetchBatchFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a timeline of test batches
 	numBatches := 72
@@ -1423,7 +1439,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		bhh, err := batchHeaders[i].Hash()
 		require.NoError(t, err)
 		keyPair, err := core.GenRandomBlsKeys()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		apk := keyPair.GetPubKeyG2()
 		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
 		attestation := &corev2.Attestation{
@@ -1462,7 +1478,10 @@ func TestFetchBatchFeed(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1549,7 +1568,7 @@ func TestFetchBatchFeed(t *testing.T) {
 
 			var errResp serverv2.ErrorResponse
 			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
-			assert.Contains(t, errResp.Error, tt.wantError)
+			require.Contains(t, errResp.Error, tt.wantError)
 		}
 
 	})
@@ -1563,9 +1582,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Batches))
 		for i := 0; i < 20; i++ {
-			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1576,9 +1595,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[13+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
@@ -1588,9 +1607,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 72, len(response.Batches))
 		for i := 0; i < 72; i++ {
-			assert.Equal(t, attestedAt[i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 3: Custom end time with 1-hour window
@@ -1602,9 +1621,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[7+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[7+i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1615,9 +1634,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
@@ -1627,9 +1646,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 72, len(response.Batches))
 		for i := 0; i < 72; i++ {
-			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[71-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 3: Custom end time with 1-hour window
@@ -1642,9 +1661,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, attestedAt[65-i], response.Batches[i].AttestedAt)
-			assert.Equal(t, batchHeaders[65-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, hex.EncodeToString(batchHeaders[65-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
+			require.Equal(t, attestedAt[65-i], response.Batches[i].AttestedAt)
+			require.Equal(t, batchHeaders[65-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			require.Equal(t, hex.EncodeToString(batchHeaders[65-i].BatchRoot[:]), response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -1652,7 +1671,7 @@ func TestFetchBatchFeed(t *testing.T) {
 
 func TestFetchOperatorSigningInfo(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	/*
 		Test data setup
@@ -1939,7 +1958,10 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIndexedChainState, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2200,13 +2222,13 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, 1, len(response.Operators))
-	assert.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
-	assert.Equal(t, false, response.Operators[0].DispersalOnline)
-	assert.Equal(t, "", response.Operators[0].DispersalStatus)
-	assert.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
-	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
-	assert.Equal(t, "", response.Operators[0].RetrievalStatus)
+	require.Equal(t, 1, len(response.Operators))
+	require.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
+	require.Equal(t, false, response.Operators[0].DispersalOnline)
+	require.Equal(t, "", response.Operators[0].DispersalStatus)
+	require.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
+	require.Equal(t, false, response.Operators[0].RetrievalOnline)
+	require.Equal(t, "", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -2235,7 +2257,10 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(
+		config, blobMetadataStore, prometheusClient, subgraphClient,
+		mockTx, mockChainState, mockIcs, logger,
+		dataapi.NewMetrics(serverVersion, prometheus.NewRegistry(), nil, "9001", logger))
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
@@ -2244,13 +2269,13 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, 1, len(response.Operators))
-	assert.Equal(t, "", response.Operators[0].DispersalSocket)
-	assert.Equal(t, false, response.Operators[0].DispersalOnline)
-	assert.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
-	assert.Equal(t, "", response.Operators[0].RetrievalSocket)
-	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
+	require.Equal(t, 1, len(response.Operators))
+	require.Equal(t, "", response.Operators[0].DispersalSocket)
+	require.Equal(t, false, response.Operators[0].DispersalOnline)
+	require.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
+	require.Equal(t, "", response.Operators[0].RetrievalSocket)
+	require.Equal(t, false, response.Operators[0].RetrievalOnline)
+	require.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -2258,7 +2283,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 
 func TestFetchAccountBlobFeed(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	numBlobs := 60
 	now := uint64(time.Now().UnixNano())
@@ -2357,12 +2382,12 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 			req, _ := http.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
 
-			assert.Equal(t, tc.expectedStatus, w.Code)
+			require.Equal(t, tc.expectedStatus, w.Code)
 
 			var response serverv2.ErrorResponse
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			require.NoError(t, err)
-			assert.Contains(t, response.Error, tc.expectedError)
+			require.Contains(t, response.Error, tc.expectedError)
 		}
 	})
 
@@ -2381,10 +2406,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		// - Result will first 20 blobs
 		w := executeRequest(t, r, http.MethodGet, baseUrl)
 		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
-		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, accountId.Hex(), response.AccountId)
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
-			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 	})
 
@@ -2393,10 +2418,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		// With 1h ending time at now, this retrieves blobs[1] through blobs[59] (59 blobs)
 		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
 		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
-		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, accountId.Hex(), response.AccountId)
 		require.Equal(t, 59, len(response.Blobs))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 
 		// Test 2: 2-hour window captures all test blobs
@@ -2404,10 +2429,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
-		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, accountId.Hex(), response.AccountId)
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 
 		// Teste 3: custom end time
@@ -2420,7 +2445,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
 		require.Equal(t, 29, len(response.Blobs))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, requestedAt[21+i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[21+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 	})
 
@@ -2429,10 +2454,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		// With 1h ending time at now, this retrieves blobs[59] through blobs[1] (59 blobs)
 		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
 		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
-		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, accountId.Hex(), response.AccountId)
 		require.Equal(t, 59, len(response.Blobs))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 
 		// Test 2: 2-hour window captures all test blobs
@@ -2440,10 +2465,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
-		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, accountId.Hex(), response.AccountId)
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 
 		// Teste 3: custom end time
@@ -2456,14 +2481,14 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
 		require.Equal(t, 29, len(response.Blobs))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, requestedAt[49-i], response.Blobs[i].BlobMetadata.RequestedAt)
+			require.Equal(t, requestedAt[49-i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 	})
 }
 
 func TestFetchOperatorDispersalResponse(t *testing.T) {
 	r := setUpRouter()
-	ctx := context.Background()
+	ctx := t.Context()
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 0, 2, 4},
@@ -2489,7 +2514,7 @@ func TestFetchOperatorDispersalResponse(t *testing.T) {
 		Error:            "error",
 	}
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Set up the other dispersal response in metadata store
 	operatorId2 := core.OperatorID{2, 3}
@@ -2507,7 +2532,7 @@ func TestFetchOperatorDispersalResponse(t *testing.T) {
 		Error:            "",
 	}
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	r.GET("/v2/operators/:operator_id/dispersals/:batch_header_hash/response", testDataApiServerV2.FetchOperatorDispersalResponse)
 
@@ -2553,26 +2578,26 @@ func TestFetchOperatorsStake(t *testing.T) {
 	require.Equal(t, 2, len(response.StakeRankedOperators))
 	checkAddress := func(op *dataapi.OperatorStake) {
 		if op.OperatorId == opId0.Hex() {
-			assert.Equal(t, addr0.Hex(), op.OperatorAddress)
+			require.Equal(t, addr0.Hex(), op.OperatorAddress)
 		}
 		if op.OperatorId == opId1.Hex() {
-			assert.Equal(t, addr1.Hex(), op.OperatorAddress)
+			require.Equal(t, addr1.Hex(), op.OperatorAddress)
 		}
 	}
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
-	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
-	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
+	require.Equal(t, opId0.Hex(), ops[0].OperatorId)
+	require.Equal(t, opId1.Hex(), ops[1].OperatorId)
 	checkAddress(ops[0])
 	checkAddress(ops[1])
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
-	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
-	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
+	require.Equal(t, opId1.Hex(), ops[0].OperatorId)
+	require.Equal(t, opId0.Hex(), ops[1].OperatorId)
 	checkAddress(ops[0])
 	checkAddress(ops[1])
 }
@@ -2582,7 +2607,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 
 	s := new(model.SampleStream)
 	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
@@ -2593,7 +2618,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
+	require.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
@@ -2601,7 +2626,7 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 
 	s := new(model.SampleStream)
 	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
@@ -2617,10 +2642,10 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 		totalThroughput += v.Throughput
 	}
 
-	assert.Equal(t, 3361, len(response))
-	assert.Equal(t, float64(12000), response[0].Throughput)
-	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
-	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+	require.Equal(t, 3361, len(response))
+	require.Equal(t, float64(12000), response[0].Throughput)
+	require.Equal(t, uint64(1701292920), response[0].Timestamp)
+	require.Equal(t, float64(3.503022666666651e+07), totalThroughput)
 }
 
 func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
@@ -2628,7 +2653,7 @@ func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
 
 	s := new(model.SampleStream)
 	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
 	matrix = append(matrix, s)
@@ -2640,12 +2665,12 @@ func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
 	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
 
 	require.Equal(t, 2, len(response.QuorumSigningRates))
-	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
 	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
-	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
-	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
-	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
-	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
+	require.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	require.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	require.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(
@@ -2663,7 +2688,7 @@ func createAttestation(
 		ReferenceBlockNumber: refBlockNumber,
 	}
 	keyPair, err := core.GenRandomBlsKeys()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	apk := keyPair.GetPubKeyG2()
 	return &corev2.Attestation{
 		BatchHeader:      batchHeader,

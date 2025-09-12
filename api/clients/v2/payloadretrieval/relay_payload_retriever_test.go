@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const g1Path = "../../../../inabox/resources/kzg/g1.point"
+const g1Path = "../../../../resources/srs/g1.point"
 const maxPayloadBytes = 1025 // arbitrary value
 
 type RelayPayloadRetrieverTester struct {
@@ -110,9 +110,9 @@ func buildCertFromBlobBytes(
 ) (core.BlobKey, *coretypes.EigenDACertV3) {
 
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../../../inabox/resources/kzg/g2.point",
-		CacheDir:        "../../../../inabox/resources/kzg/SRSTables",
+		G1Path:          "../../../../resources/srs/g1.point",
+		G2Path:          "../../../../resources/srs/g2.point",
+		CacheDir:        "../../../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),

@@ -72,7 +72,7 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    G2PowerOf2PathFlagNameDeprecated,
-			Usage:   "path to g2.point.powerOf2 file. Deprecated.",
+			Usage:   "Path to g2.point.powerOf2 file. Deprecated.",
 			EnvVars: []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_POWER_OF_2_PATH")},
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf(
@@ -83,22 +83,28 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 			Hidden:   true,
 		},
 		&cli.StringFlag{
-			Name:     G2PathFlagName,
-			Usage:    "path to g2.point file.",
+			Name: G2PathFlagName,
+			Usage: fmt.Sprintf("Path to g2.point file, which is needed to generate and verify blob length proofs. "+
+				"If this flag doesn't point to a complete 16GiB G2 SRS file, "+
+				"then the --%s flag must be used to specify a trailing segment of that file, of equivalent length "+
+				"to the initial segment pointed to by this flag.", G2TrailingPathFlagName),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_PATH")},
 			Value:    "resources/g2.point",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:     G2TrailingPathFlagName,
-			Usage:    "path to g2.trailing.point file.",
+			Name: G2TrailingPathFlagName,
+			Usage: fmt.Sprintf("Path to g2.trailing.point file, which is needed to generate and verify blob length proofs. "+
+				"If --%s is pointing to the entire 16GiB G2 SRS file which contains 268435456 G2 points, this flag is not needed. "+
+				"Otherwise, users can truncate the G2 file by taking an initial segment, and a trailing segment (both of the same size).",
+				G2PathFlagName),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_TRAILING_PATH")},
 			Value:    "resources/g2.trailing.point",
 			Category: category,
 		},
 		&cli.StringFlag{
 			Name:     CachePathFlagName,
-			Usage:    "path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
+			Usage:    "Path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_CACHE_PATH")},
 			Value:    "resources/SRSTables/",
 			Category: category,
