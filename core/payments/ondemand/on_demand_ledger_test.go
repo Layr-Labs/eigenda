@@ -1,7 +1,6 @@
 package ondemand_test
 
 import (
-	"context"
 	"errors"
 	"math/big"
 	"testing"
@@ -18,17 +17,17 @@ func TestDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
-		cumulativePayment, err := ledger.Debit(context.Background(), 50, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 50, []core.QuorumID{0})
 		require.NoError(t, err)
 		require.NotNil(t, cumulativePayment)
 		require.Equal(t, big.NewInt(50), cumulativePayment)
 
 		// verify the store was updated
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(50), storedPayment)
 	})
@@ -38,12 +37,12 @@ func TestDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// quorum 5 not supported
-		cumulativePayment, err := ledger.Debit(context.Background(), 50, []core.QuorumID{0, 1, 5})
+		cumulativePayment, err := ledger.Debit(t.Context(), 50, []core.QuorumID{0, 1, 5})
 
 		require.Error(t, err)
 		require.Nil(t, cumulativePayment)
@@ -52,7 +51,7 @@ func TestDebit(t *testing.T) {
 		require.True(t, errors.As(err, &quorumNotSupportedError))
 
 		// verify the store was not updated
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(0), storedPayment)
 	})
@@ -62,19 +61,19 @@ func TestDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(100), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(100), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// attempt to debit more than total deposits
-		cumulativePayment, err := ledger.Debit(context.Background(), 2000, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 2000, []core.QuorumID{0})
 		require.Error(t, err)
 		require.Nil(t, cumulativePayment)
 		var insufficientFundsError *ondemand.InsufficientFundsError
 		require.True(t, errors.As(err, &insufficientFundsError))
 
 		// verify the store was not updated
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(0), storedPayment)
 	})
@@ -84,18 +83,18 @@ func TestDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// debit 5 symbols, but minNumSymbols is 10
-		cumulativePayment, err := ledger.Debit(context.Background(), 5, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 5, []core.QuorumID{0})
 		require.NoError(t, err)
 		require.NotNil(t, cumulativePayment)
 		require.Equal(t, big.NewInt(10), cumulativePayment)
 
 		// verify the store was updated with minimum charge
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(10), storedPayment)
 	})
@@ -107,27 +106,27 @@ func TestRevertDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// debit first
-		cumulativePayment, err := ledger.Debit(context.Background(), 100, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 100, []core.QuorumID{0})
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(100), cumulativePayment)
 
 		// verify the store has the debit
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(100), storedPayment)
 
 		// revert the debit
-		cumulativePayment, err = ledger.RevertDebit(context.Background(), 50)
+		cumulativePayment, err = ledger.RevertDebit(t.Context(), 50)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(50), cumulativePayment)
 
 		// verify the store was updated after revert
-		storedPayment, err = store.GetCumulativePayment(context.Background())
+		storedPayment, err = store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(50), storedPayment)
 	})
@@ -137,27 +136,27 @@ func TestRevertDebit(t *testing.T) {
 		defer cleanup()
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// debit 5 (charged 10 due to minimum)
-		cumulativePayment, err := ledger.Debit(context.Background(), 5, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 5, []core.QuorumID{0})
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(10), cumulativePayment)
 
 		// verify the store has the minimum charge
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(10), storedPayment)
 
 		// revert 5 (should revert 10 due to minimum)
-		cumulativePayment, err = ledger.RevertDebit(context.Background(), 5)
+		cumulativePayment, err = ledger.RevertDebit(t.Context(), 5)
 		require.NoError(t, err)
 		require.Equal(t, 0, cumulativePayment.Cmp(big.NewInt(0)))
 
 		// verify the store was updated to 0
-		storedPayment, err = store.GetCumulativePayment(context.Background())
+		storedPayment, err = store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(0), storedPayment)
 	})
@@ -203,27 +202,27 @@ func TestOnDemandLedgerFromStore(t *testing.T) {
 		defer cleanup()
 
 		// set initial cumulative payment in store
-		err := store.StoreCumulativePayment(context.Background(), big.NewInt(500))
+		err := store.StoreCumulativePayment(t.Context(), big.NewInt(500))
 		require.NoError(t, err)
 
 		ledger, err := ondemand.OnDemandLedgerFromStore(
-			context.Background(), big.NewInt(1000), big.NewInt(1), 10, store)
+			t.Context(), big.NewInt(1000), big.NewInt(1), 10, store)
 		require.NoError(t, err)
 		require.NotNil(t, ledger)
 
 		// verify ledger works with the initial cumulative payment
-		cumulativePayment, err := ledger.Debit(context.Background(), 100, []core.QuorumID{0})
+		cumulativePayment, err := ledger.Debit(t.Context(), 100, []core.QuorumID{0})
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(600), cumulativePayment)
 
 		// verify the store was updated
-		storedPayment, err := store.GetCumulativePayment(context.Background())
+		storedPayment, err := store.GetCumulativePayment(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(600), storedPayment)
 	})
 
 	t.Run("nil store", func(t *testing.T) {
-		ledger, err := ondemand.OnDemandLedgerFromStore(context.Background(), big.NewInt(1000), big.NewInt(1), 10, nil)
+		ledger, err := ondemand.OnDemandLedgerFromStore(t.Context(), big.NewInt(1000), big.NewInt(1), 10, nil)
 		require.Error(t, err)
 		require.Nil(t, ledger)
 	})
