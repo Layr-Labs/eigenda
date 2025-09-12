@@ -5,8 +5,8 @@ The `vault` package contains utilities for interacting with the `PaymentVault` c
 ## Concepts
 
 - `PaymentVault`: This is the [EigenDA ethereum contract](../../../../contracts/src/core/PaymentVault.sol) that defines
-global payment parameters, reservations that have allocated to users, and keeps track of user deposits that can be used
-for on-demand dispersal.
+global payment parameters, reservations that have been allocated to users, and keeps track of user deposits that can be
+used for on-demand dispersal.
 
 ## Files
 
