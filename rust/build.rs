@@ -15,7 +15,7 @@ fn main() {
     let path = "resources/g1.point";
 
     if !Path::new(path).exists() {
-        panic!("g1.point file not found at {}", path);
+        panic!("g1.point file not found at {path}");
     }
 
     let srs = SRS::new(path, 268435456, POINTS_TO_LOAD).expect("Failed to create SRS");

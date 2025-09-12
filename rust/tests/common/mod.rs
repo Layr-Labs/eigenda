@@ -15,16 +15,16 @@ use sov_rollup_interface::da::DaVerifier;
 
 pub static SEQUENCER_SIGNER: &str =
     "0x354945e623e9a9070ef2be9dec2a71c49784a6e8348f4bfb6ace91622df91d83";
-pub static ROLLUP_BATCH_NAMESPACE: &str = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
-pub static ROLLUP_PROOF_NAMESPACE: &str = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+pub static ROLLUP_BATCH_NAMESPACE: &str = "0xaa20cC3C0Cae6aDC23659aE5E8488dE2098932ab";
+pub static ROLLUP_PROOF_NAMESPACE: &str = "0xbb7F59238c5FEe337c003dfae48f5d04C1307AC9";
 pub static CERT_RECENCY_WINDOW: u64 = 3200;
 
 pub async fn setup_adapter(
     proxy_url: String,
 ) -> Result<(EigenDaService, EigenDaVerifier), EigenDaServiceError> {
     let config = EigenDaConfig {
-        network: Network::Holesky,
-        ethereum_rpc_url: "wss://ethereum-holesky-rpc.publicnode.com".to_string(),
+        network: Network::Sepolia,
+        ethereum_rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com".to_string(),
         sequencer_signer: SEQUENCER_SIGNER.to_string(),
         ethereum_compute_units: None,
         ethereum_max_retry_times: None,

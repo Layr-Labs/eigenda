@@ -71,6 +71,7 @@ impl Debug for EigenDaConfig {
 pub enum Network {
     Mainnet,
     Holesky,
+    Sepolia,
 }
 
 /// EigenDA relevant contracts.
@@ -190,6 +191,20 @@ impl EigenDaContracts {
     /// <https://docs.eigencloud.xyz/products/eigenda/networks/holesky#contract-addresses>
     pub async fn holesky(provider: &DynProvider) -> Result<Self, EigenDaServiceError> {
         let directory_address = address!("0x90776Ea0E99E4c38aA1Efe575a61B3E40160A2FE");
+        let eigen_da_contracts = Self::from_directory(provider, directory_address).await?;
+        Ok(eigen_da_contracts)
+    }
+
+    /// Initialize contracts used by the Sepolia.
+    ///
+    /// The EigenDA Directory contract address on Sepolia is
+    /// `0x9620dC4B3564198554e4D2b06dEFB7A369D90257`. This address serves as the
+    /// central registry for all EigenDA contract addresses. The method
+    /// dynamically queries the EigenDADirectory contract to retrieve [`EigenDaContracts`].
+    ///
+    /// <https://docs.eigencloud.xyz/products/eigenda/networks/sepolia#contract-addresses>
+    pub async fn sepolia(provider: &DynProvider) -> Result<Self, EigenDaServiceError> {
+        let directory_address = address!("0x9620dC4B3564198554e4D2b06dEFB7A369D90257");
         let eigen_da_contracts = Self::from_directory(provider, directory_address).await?;
         Ok(eigen_da_contracts)
     }

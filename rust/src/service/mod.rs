@@ -102,6 +102,7 @@ impl EigenDaService {
         let contracts = match config.network {
             Network::Mainnet => EigenDaContracts::mainnet(&ethereum).await,
             Network::Holesky => EigenDaContracts::holesky(&ethereum).await,
+            Network::Sepolia => EigenDaContracts::sepolia(&ethereum).await,
         }?;
 
         info!(?config, ?params, "EigenDa service initialized");

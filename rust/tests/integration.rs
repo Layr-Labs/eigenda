@@ -22,13 +22,16 @@ use sov_rollup_interface::{
 };
 use tracing::info;
 
-use crate::common::{proxy::start_proxy, setup_adapter};
+use crate::common::{
+    proxy::{ProxyNetwork, start_proxy},
+    setup_adapter,
+};
 
 #[tokio::test]
 async fn submit_extract_verify_e2e() {
     common::tracing::init_tracing();
 
-    let (proxy_url, _proxy_container) = start_proxy().await.unwrap();
+    let (proxy_url, _proxy_container) = start_proxy(ProxyNetwork::Sepolia).await.unwrap();
     let (service, verifier) = setup_adapter(proxy_url).await.unwrap();
 
     let mut rng = rand::thread_rng();
