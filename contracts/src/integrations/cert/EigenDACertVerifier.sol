@@ -28,6 +28,7 @@ contract EigenDACertVerifier is
 {
     error InvalidSecurityThresholds();
     error InvalidQuorumNumbersRequired(uint256 length);
+    error ZeroCheckDACertGasLimit();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
 
@@ -35,11 +36,28 @@ contract EigenDACertVerifier is
 
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
+    // Each quorum that is part of this list MUST meet the confirmationThreshold defined in _securityThresholds
+    // in order for a cert to be considered valid.
+    // Recommended default value is 0x0001 to require the ETH and EIGEN quorums to sign.
     bytes internal _quorumNumbersRequired;
+
+    // This gas limit is passed to the checkDACertReverts call inside checkDACert.
+    // Any cert that causes checkDACertReverts to exceed this gas limit will be labeled with an INTERNAL_ERROR status code,
+    // because there is no way to distinguish out-of-gas errors from other low-level evm reverts in a try/catch...
+    // See https://rareskills.io/post/try-catch-solidity#gdvnie-9-what-gets-returned-during-an-out-of-gas?
+    // The main gas cost associated with verifying cert is the for loop that iterates on all non-signing operators.
+    //
+    // We recommend setting this to 15M gas for optimistic rollups that need the checkDACert call to be executed onchain
+    // in the one step prover contract, to allow for some buffer room for other gas costs in the one step prover tx.
+    // This is because Fusaka is introducing a 16,777,216 per-tx gas limit: https://eips.ethereum.org/EIPS/eip-7825
+    //
+    // For zk rollups and optimistic rollups with zk fraud proofs, this limit is less crucial, but still useful to enforce
+    // a max limit on the amount of prover compute units needs to validate a cert.
+    uint32 internal immutable _checkDACertGasLimit;
 
     uint8 internal constant MAJOR_VERSION = 3;
     uint8 internal constant MINOR_VERSION = 1;
-    uint8 internal constant PATCH_VERSION = 0;
+    uint8 internal constant PATCH_VERSION = 1;
 
     /// @notice Status codes for certificate verification results
     /// @dev checkDACert calls are classified into: success (200), invalid_cert (400), and internal_error (500).
@@ -63,7 +81,8 @@ contract EigenDACertVerifier is
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
         IEigenDASignatureVerifier initEigenDASignatureVerifier,
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
-        bytes memory initQuorumNumbersRequired
+        bytes memory initQuorumNumbersRequired,
+        uint32 initCheckDACertGasLimit
     ) {
         if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
@@ -71,10 +90,14 @@ contract EigenDACertVerifier is
         if (initQuorumNumbersRequired.length == 0 || initQuorumNumbersRequired.length > 256) {
             revert InvalidQuorumNumbersRequired(initQuorumNumbersRequired.length);
         }
+        if (initCheckDACertGasLimit == 0) {
+            revert ZeroCheckDACertGasLimit();
+        }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
         _eigenDASignatureVerifier = initEigenDASignatureVerifier;
         _securityThresholds = initSecurityThresholds;
         _quorumNumbersRequired = initQuorumNumbersRequired;
+        _checkDACertGasLimit = initCheckDACertGasLimit;
     }
 
     /// @notice Decodes a certificate from bytes to an EigenDACertV3
@@ -108,9 +131,7 @@ contract EigenDACertVerifier is
         // 1. success
         // 2. invalid cert (any failing require statement; we assume all require statements return either a string or custom error)
         // 3. internal error (everything else, including solidity panics and low-level evm reverts, basically anything unexpected)
-        // TODO(samlaf): certVerifier should be set with a maxGas param that will be passed here, to enforce deterministic behavior
-        // between different execution environments: EVM running onchain during optimistic rollup fraud proofs, zkVM, eth-call with higher gas limit.
-        try this.checkDACertReverts(daCert) {
+        try this.checkDACertReverts{gas: _checkDACertGasLimit}(daCert) {
             return uint8(StatusCode.SUCCESS);
         } catch Error(string memory) /*reason*/ {
             // This matches any require(..., "string reason") revert that is pre custom errors,
@@ -125,6 +146,10 @@ contract EigenDACertVerifier is
             if (reason.length == 0) {
                 // This matches low-level evm reverts like out-of-gas or stack too few values.
                 // See https://rareskills.io/post/try-catch-solidity for more info.
+                //
+                // Ideally we would like to distinguish out-of-gas errors and label them as INVALID_CERT instead...
+                // but the evm currently does not support this. For this reason, we recommend discarding INTERNAL_ERROR
+                // labeled certs from rollups' derivation pipelines.
                 return uint8(StatusCode.INTERNAL_ERROR);
             } else if (reason.length < 4) {
                 // Don't think this is possible...
@@ -163,6 +188,11 @@ contract EigenDACertVerifier is
     /// @inheritdoc IEigenDACertVerifier
     function quorumNumbersRequired() external view returns (bytes memory) {
         return _quorumNumbersRequired;
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function checkDACertGasLimit() external view returns (uint32) {
+        return _checkDACertGasLimit;
     }
 
     /// @inheritdoc IVersionedEigenDACertVerifier
