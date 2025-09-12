@@ -86,6 +86,25 @@ that its total bucket capacity is less than the max blob size, which would preve
 to max size.
 - By permitting a single overfill, even the smallest reservation can disperse blobs of maximum size
 
+#### 2.1.4 Reservation Usage Persistence
+
+The leaky bucket algorithm does not require persisting reservation usage state across system restarts. Different
+system components initialize their buckets with opposing biases to maintain system integrity without persistence:
+
+**Client Initialization (Conservative Bias)**
+- Clients initialize their leaky bucket as completely full (no capacity available) upon restart
+- They must wait for symbols to leak out before dispersing, guaranteeing compliance with reservation rate limits
+- While this may result in slight underutilization if usage was low before restart, it prevents violation of
+reservation limits
+
+**Validator Initialization (Permissive Bias)**
+- Validators initialize leaky buckets as completely empty (full capacity available) upon restart
+- This ensures they never incorrectly deny service to users entitled to a reservation
+- In the worst case, a malicious client timing dispersals with validator restarts might be able to cause a small amount
+of extra work for that specific validator
+
+This dual-bias approach eliminates the complexity of distributed reservation state persistence.
+
 ### 2.2 On-Demand Payments
 
 - On-demand payments allow users to pay per dispersal from funds deposited in the PaymentVault contract
