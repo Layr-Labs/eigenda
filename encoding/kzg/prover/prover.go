@@ -20,7 +20,6 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-// Prover
 type Prover struct {
 	Config     *encoding.Config
 	KzgConfig  *kzg.KzgConfig
