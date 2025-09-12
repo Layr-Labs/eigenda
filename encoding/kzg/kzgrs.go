@@ -4,8 +4,6 @@ type KzgConfig struct {
 	G1Path          string
 	G2Path          string
 	G2TrailingPath  string
-	G1PowerOf2Path  string
-	G2PowerOf2Path  string
 	CacheDir        string
 	NumWorker       uint64
 	SRSOrder        uint64 // Order is the total size of SRS

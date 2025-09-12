@@ -7,7 +7,9 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc"
@@ -26,7 +28,10 @@ type Sample struct {
 }
 
 // the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
-func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.EncodingParams, ks *kzg.KZGSettings, proofs []bn254.G1Affine) (*bn254.G1Affine, error) {
+func genRhsG1(
+	samples []Sample, randomsFr []fr.Element, m int,
+	params encoding.EncodingParams, fftSettings *fft.FFTSettings, srs kzg.SRS, proofs []bn254.G1Affine,
+) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
 	D := params.ChunkLength
@@ -85,7 +90,7 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 
 	// All samples in a subBatch has identical chunkLen
 	var aggPolyG1 bn254.G1Affine
-	_, err = aggPolyG1.MultiExp(ks.Srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	_, err = aggPolyG1.MultiExp(srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +106,7 @@ func genRhsG1(samples []Sample, randomsFr []fr.Element, m int, params encoding.E
 	for k := 0; k < n; k++ {
 
 		// got the leading coset field element
-		h := ks.ExpandedRootsOfUnity[samples[k].X]
+		h := fftSettings.ExpandedRootsOfUnity[samples[k].X]
 		var hPow fr.Element
 		hPow.Exp(h, bigD)
 		leadingDs[k].Set(&hPow)
@@ -176,7 +181,6 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	if err != nil {
 		return err
 	}
-	ks := verifier.Ks
 
 	D := params.ChunkLength
 
@@ -204,25 +208,15 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 
 	// lhs g1
-
 	var lhsG1 bn254.G1Affine
 	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {
 		return err
 	}
+
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.kzgConfig.SRSOrder, v.kzgConfig.G2PowerOf2Path)
-
-	if err != nil {
-		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, v.kzgConfig.SRSOrder, v.kzgConfig.G2Path)
-		if err != nil {
-			return err
-		}
-		fmt.Println("Accessed the entire G2")
-	}
-
+	G2atD := srs.G2PowerOf2SRS[exponent]
 	lhsG2 := &G2atD
 
 	// rhs g2
@@ -234,7 +228,8 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 		randomsFr,
 		m,
 		params,
-		ks,
+		verifier.Fs,
+		verifier.Srs,
 		proofs,
 	)
 	if err != nil {
