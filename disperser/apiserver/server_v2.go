@@ -10,7 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
-	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"

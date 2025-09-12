@@ -1,9 +1,9 @@
 syntax = "proto3";
-package controller.v1;
+package controller;
 
 import "common/v2/common_v2.proto";
 
-option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller/v1";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
 
 // ControllerService defines the APIs for the controller.
 //

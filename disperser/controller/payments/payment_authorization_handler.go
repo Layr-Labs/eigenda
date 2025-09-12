@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	pb "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc/codes"
@@ -27,7 +27,7 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	ctx context.Context,
 	blobHeader *common.BlobHeader,
 	clientSignature []byte,
-) (*pb.AuthorizePaymentResponse, error) {
+) (*controller.AuthorizePaymentResponse, error) {
 	if len(clientSignature) != 65 {
 		return nil, status.Errorf(codes.InvalidArgument, "signature length is unexpected: %d", len(clientSignature))
 	}

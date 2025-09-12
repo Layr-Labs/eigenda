@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: controller/v1/controller_service.proto
+// source: controller/controller_service.proto
 
-package v1
+package controller
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ControllerService_AuthorizePayment_FullMethodName = "/controller.v1.ControllerService/AuthorizePayment"
+	ControllerService_AuthorizePayment_FullMethodName = "/controller.ControllerService/AuthorizePayment"
 )
 
 // ControllerServiceClient is the client API for ControllerService service.
@@ -104,7 +104,7 @@ func _ControllerService_AuthorizePayment_Handler(srv interface{}, ctx context.Co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ControllerService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "controller.v1.ControllerService",
+	ServiceName: "controller.ControllerService",
 	HandlerType: (*ControllerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -113,5 +113,5 @@ var ControllerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "controller/v1/controller_service.proto",
+	Metadata: "controller/controller_service.proto",
 }

@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -23,7 +23,7 @@ import (
 
 // The controller GRPC server
 type Server struct {
-	pb.UnimplementedControllerServiceServer
+	controller.UnimplementedControllerServiceServer
 
 	config                      Config
 	logger                      logging.Logger
@@ -83,8 +83,8 @@ func (s *Server) Start() error {
 
 	s.server = grpc.NewServer(opts...)
 	reflection.Register(s.server)
-	pb.RegisterControllerServiceServer(s.server, s)
-	healthcheck.RegisterHealthServer(pb.ControllerService_ServiceDesc.ServiceName, s.server)
+	controller.RegisterControllerServiceServer(s.server, s)
+	healthcheck.RegisterHealthServer(controller.ControllerService_ServiceDesc.ServiceName, s.server)
 
 	s.logger.Infof("gRPC server listening at %v", listener.Addr().String())
 
@@ -111,8 +111,8 @@ func (s *Server) Stop() {
 // Handles an AuthorizePaymentRequest
 func (s *Server) AuthorizePayment(
 	ctx context.Context,
-	request *pb.AuthorizePaymentRequest,
-) (*pb.AuthorizePaymentResponse, error) {
+	request *controller.AuthorizePaymentRequest,
+) (*controller.AuthorizePaymentResponse, error) {
 	start := time.Now()
 	success := false
 	defer func() {

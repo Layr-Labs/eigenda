@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	controller "github.com/Layr-Labs/eigenda/api/grpc/controller/v1"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
