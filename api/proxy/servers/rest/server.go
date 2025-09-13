@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -26,12 +26,7 @@ type Config struct {
 	// When empty (default), no special API endpoints are registered.
 	// Example: If it contains "admin", administrative endpoints like
 	// /admin/eigenda-dispersal-backend will be available.
-	EnabledAPIs []string
-}
-
-// IsAPIEnabled checks if a specific API type is enabled
-func (c *Config) IsAPIEnabled(apiType string) bool {
-	return slices.Contains(c.EnabledAPIs, apiType)
+	EnabledAPIs *enabled_apis.EnabledAPIs
 }
 
 type Server struct {

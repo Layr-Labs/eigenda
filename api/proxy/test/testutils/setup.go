@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
@@ -335,17 +336,30 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
 		builderConfig.S3Config = createS3Config()
 	}
+
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: pk,
 		EthRPCURL:        ethRPC,
 	}
+
+	enabledAPIs, err := enabled_apis.NewEnabledAPIs(
+		[]string{enabled_apis.Admin.ToString(), enabled_apis.OpGenericCommitment.ToString(),
+			enabled_apis.OpKeccakCommitment.ToString(), enabled_apis.StandardCommitment.ToString()},
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
 	return config.AppConfig{
 		StoreBuilderConfig: builderConfig,
 		SecretConfig:       secretConfig,
+		EnabledAPIs:        enabledAPIs,
 		MetricsSvrConfig:   proxy_metrics.Config{},
 		RestSvrCfg: rest.Config{
-			Host: host,
-			Port: 0,
+			Host:        host,
+			Port:        0,
+			EnabledAPIs: enabledAPIs,
 		},
 	}
 }

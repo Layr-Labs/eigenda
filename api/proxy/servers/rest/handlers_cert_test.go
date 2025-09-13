@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
@@ -27,11 +28,15 @@ import (
 )
 
 var (
-	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	testCfg    = Config{
+	testLogger         = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
+	enabledRestAPIs, _ = enabled_apis.NewEnabledAPIs([]string{enabled_apis.Admin.ToString(),
+		enabled_apis.OpGenericCommitment.ToString(), enabled_apis.OpKeccakCommitment.ToString(),
+		enabled_apis.StandardCommitment.ToString()}) // Enable rest APIs for testing
+
+	testCfg = Config{
 		Host:        "localhost",
 		Port:        0,
-		EnabledAPIs: []string{AdminAPIType}, // Enable admin API for testing
+		EnabledAPIs: enabledRestAPIs,
 	}
 )
 

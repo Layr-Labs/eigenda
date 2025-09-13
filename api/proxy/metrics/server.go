@@ -11,9 +11,8 @@ import (
 
 // Config ... Metrics server configuration
 type Config struct {
-	Host    string
-	Port    int
-	Enabled bool
+	Host string
+	Port int
 }
 
 func NewServer(registry *prometheus.Registry, cfg Config) *ophttp.HTTPServer {
