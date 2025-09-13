@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"slices"
@@ -14,7 +15,8 @@ import (
 )
 
 const (
-	EnabledFlagName    = "metrics.enabled"
+	DeprecatedEnabledFlagName = "metrics.enabled"
+
 	ListenAddrFlagName = "metrics.addr"
 	PortFlagName       = "metrics.port"
 	defaultListenAddr  = "0.0.0.0"
@@ -31,21 +33,30 @@ func withEnvPrefix(envPrefix, s string) []string {
 
 func DefaultConfig() Config {
 	return Config{
-		Enabled: false,
-		Host:    defaultListenAddr,
-		Port:    defaultListenPort,
+		Host: defaultListenAddr,
+		Port: defaultListenPort,
 	}
 }
 
-func CLIFlags(envPrefix string, category string) []cli.Flag {
+func DeprecatedCLIFlags(envPrefix string, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
-			Name:     EnabledFlagName,
+			Name: DeprecatedEnabledFlagName,
+
 			Usage:    "Enable the metrics server. On by default, so use --metrics.enabled=false to disable.",
 			Category: category,
 			Value:    true,
 			EnvVars:  withEnvPrefix(envPrefix, "ENABLED"),
-		},
+			Action: func(*cli.Context, bool) error {
+				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --apis.enabled with `metrics` to turn on instead",
+					DeprecatedEnabledFlagName, withEnvPrefix(envPrefix, "ENABLED"))
+			},
+			Hidden: true,
+		}}
+}
+
+func CLIFlags(envPrefix string, category string) []cli.Flag {
+	return []cli.Flag{
 		&cli.StringFlag{
 			Name:     ListenAddrFlagName,
 			Usage:    "Metrics listening address",
@@ -64,10 +75,6 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 }
 
 func (m Config) Check() error {
-	if !m.Enabled {
-		return nil
-	}
-
 	if m.Port < 0 || m.Port > math.MaxUint16 {
 		return ErrInvalidPort
 	}
@@ -77,9 +84,8 @@ func (m Config) Check() error {
 
 func ReadConfig(ctx *cli.Context) Config {
 	return Config{
-		Enabled: ctx.Bool(EnabledFlagName),
-		Host:    ctx.String(ListenAddrFlagName),
-		Port:    ctx.Int(PortFlagName),
+		Host: ctx.String(ListenAddrFlagName),
+		Port: ctx.Int(PortFlagName),
 	}
 }
 

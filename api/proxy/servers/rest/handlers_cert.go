@@ -28,6 +28,10 @@ const (
 
 // handleGetOPKeccakCommitment handles GET requests for optimism keccak commitments.
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.EnabledAPIs.RestALTDAOPKeccak() {
+		return fmt.Errorf("op-keccak DA Commitment type detected but `op-keccak` API is not enabled")
+	}
+
 	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
 		return proxyerrors.NewParsingError(fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path))
@@ -56,11 +60,19 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 
 // handleGetOPGenericCommitment handles the GET request for optimism generic commitments.
 func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.EnabledAPIs.RestALTDAOPGeneric() {
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
 // handleGetStdCommitment handles the GET request for std commitments.
 func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.EnabledAPIs.RestALTStandard() {
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handleGetShared(w, r)
 }
 
