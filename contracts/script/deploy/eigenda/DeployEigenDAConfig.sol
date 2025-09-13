@@ -10,6 +10,7 @@ import {IPauserRegistry} from
 import {IEjectionManager} from "lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
 import "forge-std/StdToml.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 library InitParamsLib {
     function initialOwner(string memory configData) internal pure returns (address) {
@@ -165,5 +166,14 @@ library InitParamsLib {
             quorumNumbersRequiredBytes[i] = bytes1(uint8(certQuorumNumbersRequired[i]));
         }
         return quorumNumbersRequiredBytes;
+    }
+
+    function dispersers(string memory configData) internal pure returns (address[] memory) {
+        return stdToml.readAddressArray(configData, ".initParams.eigenDA.disperser.dispersers");
+    }
+
+    function relayInfos(string memory configData) internal pure returns (EigenDATypesV2.RelayInfo[] memory) {
+        bytes memory relayInfosRaw = stdToml.parseRaw(configData, ".initParams.eigenDA.relay.relays");
+        return abi.decode(relayInfosRaw, (EigenDATypesV2.RelayInfo[]));
     }
 }
