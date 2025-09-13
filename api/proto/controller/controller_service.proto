@@ -1,0 +1,52 @@
+syntax = "proto3";
+package controller;
+
+import "common/v2/common_v2.proto";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/controller";
+
+// ControllerService defines the APIs for the controller.
+//
+// Currently, this API is only intended for *internal* consumption: this is a way for different parts of the disperser
+// to communicate with each other
+service ControllerService {
+  // AuthorizePayment handles payment authorization for blob dispersal
+  //
+  // This is intended to be called by API server instances that are handling dispersal requests. The controller
+  // is responsible for accounting and metering for the dispersal.
+  //
+  // While this endpoint *does* verify the client signature for each dispersal, it *does not* have any type of auth
+  // implemented between the API Server and Controller:
+  // - This is an internal API protected by firewall rules, so it is unlikely that an unauthorized party would be able
+  // to gain access to it.
+  // - In the event that an unauthorized party were to gain access to this endpoint, the attack surface area is still
+  // minimal: client signatures are being checked, and we protect against replay. Therefore, the attacker wouldn't be
+  // able to waste user funds. They would only be able to attack the liveness of the Controller through high submission
+  // volume, which would be a vulnerability regardless of whether we had auth between the API server and the Controller.
+  rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentResponse) {}
+}
+
+// Contains all information necessary for the controller to evaluate the validity of a dispersal payment
+message AuthorizePaymentRequest {
+  // The blob header is used for the following purposes:
+  // 1. Contains the PaymentHeader, which describes the payment being offered
+  // 2. Contains the quorums being dispersed to
+  common.v2.BlobHeader blob_header = 1;
+
+  // Client's ECDSA signature over the blob header's blobKey (keccak hash of the blob header).
+  // This signature can be verified against the account ID in the payment header.
+  bytes client_signature = 2;
+}
+
+// AuthorizePaymentResponse is returned after the controller does accounting and metering.
+// - *Accounting* involves checking that there are enough funds/reservation bandwidth available to pay for a dispersal
+// - *Metering* involves checking that EigenDA throughput limits are respected, irrespective of client payment validity
+//
+// A GRPC error indicates that there was a problem with either accounting or metering.
+// No error means everything succeeded.
+//
+// Possible error cases (not an exhaustive list):
+// - Unauthenticated: Invalid client signature
+// - PermissionDenied: Client signature is valid, but payment is insufficient or account has exceeded reservation limits
+// - ResourceExhausted: Metering check failed - total network on-demand throughput is exhausted
+message AuthorizePaymentResponse {}

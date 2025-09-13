@@ -233,6 +233,53 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
 		Value:    &defaultSigningThresholds,
 	}
+	GrpcServerEnableFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-server-enable"),
+		Usage:    "enable the controller gRPC server. default: false",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_SERVER_ENABLE"),
+	}
+	GrpcPaymentAuthenticationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-payment-authentication"),
+		Usage:    "If true, use the new payment authentication system running on the controller; if false, payment authentication is disabled and request validation will always fail. Defaults to disabled.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PAYMENT_AUTHENTICATION"),
+	}
+	GrpcPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
+		Usage:    "the port for the controller gRPC server",
+		Required: false,
+		Value:    "32001",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
+	}
+	GrpcMaxMessageSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-max-message-size"),
+		Usage:    "maximum size of a gRPC message (in bytes). default: 1MB",
+		Required: false,
+		Value:    1024 * 1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_MAX_MESSAGE_SIZE"),
+	}
+	GrpcMaxIdleConnectionAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-max-idle-connection-age"),
+		Usage:    "maximum time a connection can be idle before it is closed",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_MAX_IDLE_CONNECTION_AGE"),
+	}
+	GrpcAuthorizationRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-past-age"),
+		Usage:    "the maximum age of an authorization request in the past that the server will accept",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_PAST_AGE"),
+	}
+	GrpcAuthorizationRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-authorization-request-max-future-age"),
+		Usage:    "the maximum age of an authorization request in the future that the server will accept",
+		Required: false,
+		Value:    3 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -271,6 +318,13 @@ var optionalFlags = []cli.Flag{
 	SignificantSigningMetricsThresholdsFlag,
 	EigenDAContractDirectoryAddressFlag,
 	BatchMetadataUpdatePeriodFlag,
+	GrpcServerEnableFlag,
+	GrpcPaymentAuthenticationFlag,
+	GrpcPortFlag,
+	GrpcMaxMessageSizeFlag,
+	GrpcMaxIdleConnectionAgeFlag,
+	GrpcAuthorizationRequestMaxPastAgeFlag,
+	GrpcAuthorizationRequestMaxFutureAgeFlag,
 }
 
 var Flags []cli.Flag

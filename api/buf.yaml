@@ -33,6 +33,7 @@ lint:
     PACKAGE_VERSION_SUFFIX:
       - proto/churner/churner.proto
       - proto/common/common.proto
+      - proto/controller/controller_service.proto
       - proto/disperser/disperser.proto
       - proto/node/node.proto
       - proto/relay/relay.proto

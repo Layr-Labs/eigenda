@@ -163,6 +163,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
+			config.UseControllerMediatedPayments,
+			config.ControllerAddress,
 		)
 		if err != nil {
 			return err
