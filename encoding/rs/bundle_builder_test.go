@@ -1,13 +1,14 @@
 package rs_test
 
 import (
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestParsingBundle(t *testing.T) {

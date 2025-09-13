@@ -96,7 +96,7 @@ docker-release-build:
 # TODO: we should break these up into short and long unit-tests.
 unit-tests:
 	go clean -testcache
-	CI=true go test -short ./... -coverprofile=coverage.out
+	CI=true gotestsum --format pkgname -- -short ./... -coverprofile=coverage.out
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common

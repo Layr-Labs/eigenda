@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("zero interval", func(t *testing.T) {
 		monitor, err := ondemand.NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
 			func() []gethcommon.Address { return nil },
@@ -29,8 +31,8 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 
 	t.Run("negative interval", func(t *testing.T) {
 		monitor, err := ondemand.NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
 			func() []gethcommon.Address { return nil },
@@ -43,9 +45,9 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 
 // tests basic vault monitor behavior
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	updateInterval := 1 * time.Millisecond
 	address := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 

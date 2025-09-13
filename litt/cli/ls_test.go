@@ -5,19 +5,17 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLs(t *testing.T) {
 	t.Parallel()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 

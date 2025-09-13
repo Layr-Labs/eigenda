@@ -4,15 +4,14 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"io"
 	"math/big"
 	"math/rand"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // charset is the set of characters that can be used to generate random strings

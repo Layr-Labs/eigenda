@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDebitMultipleAccounts(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	tableName := createPaymentTable(t, "TestDebitMultipleAccounts")
 	defer deleteTable(t, tableName)
@@ -28,7 +28,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		10,
 		testVault,
 		dynamoClient,
@@ -52,7 +52,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 }
 
 func TestDebitInsufficientFunds(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	tableName := createPaymentTable(t, "TestDebitInsufficientFunds")
 	defer deleteTable(t, tableName)
@@ -65,7 +65,7 @@ func TestDebitInsufficientFunds(t *testing.T) {
 
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		10,
 		testVault,
 		dynamoClient,

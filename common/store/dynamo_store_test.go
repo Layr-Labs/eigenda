@@ -13,13 +13,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	localStackContainer *testbed.LocalStackContainer
 

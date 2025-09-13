@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("nil payment vault", func(t *testing.T) {
 		cache, err := ondemand.NewOnDemandLedgerCache(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			10,
 			nil, // nil payment vault
 			time.Second,
@@ -30,8 +32,8 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 
 	t.Run("nil dynamo client", func(t *testing.T) {
 		cache, err := ondemand.NewOnDemandLedgerCache(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			10,
 			vault.NewTestPaymentVault(),
 			time.Second,
@@ -44,7 +46,7 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 }
 
 func TestLRUCacheEvictionAndReload(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	tableName := createPaymentTable(t, "TestLRUCacheEvictionAndReload")
 	defer deleteTable(t, tableName)
@@ -62,7 +64,7 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 
 	ledgerCache, err := ondemand.NewOnDemandLedgerCache(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		2, // Small cache size to force eviction
 		testVault,
 		time.Millisecond, // update frequently

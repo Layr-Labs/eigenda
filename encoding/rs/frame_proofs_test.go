@@ -1,12 +1,13 @@
 package rs_test
 
 import (
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // randomG1 generates a random G1 point. There is no direct way to generate a random G1 point in the bn254 library,

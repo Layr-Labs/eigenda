@@ -1,16 +1,15 @@
 package eth_test
 
 import (
-	"context"
 	"encoding/hex"
 	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,8 +17,9 @@ import (
 )
 
 func TestFetchBatchHeader(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &damock.MockEthClient{}
-	logger := testutils.GetLogger()
 	serviceManagerAddress := gcommon.HexToAddress("0x0000000000000000000000000000000000000000")
 	batchHeaderHash := []byte("hashhash")
 	chainClient := eth.NewChainClient(ethClient, logger)
@@ -76,7 +76,7 @@ func TestFetchBatchHeader(t *testing.T) {
 			R:          r,
 			S:          s,
 		}), false, nil)
-	batchHeader, err := chainClient.FetchBatchHeader(context.Background(), serviceManagerAddress, batchHeaderHash, big.NewInt(int64(refBlock)), nil)
+	batchHeader, err := chainClient.FetchBatchHeader(ctx, serviceManagerAddress, batchHeaderHash, big.NewInt(int64(refBlock)), nil)
 	assert.Nil(t, err)
 	assert.Equal(t, batchHeader.BlobHeadersRoot, expectedHeader.BlobHeadersRoot)
 	assert.Equal(t, batchHeader.QuorumNumbers, expectedHeader.QuorumNumbers)

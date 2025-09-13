@@ -1,15 +1,14 @@
 package clientledger
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +22,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("zero address panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				common.Address{}, // zero address
 				ClientLedgerModeReservationOnly,
@@ -37,7 +36,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("nil getNow panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeReservationOnly,
@@ -51,7 +50,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("invalid mode panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerMode("invalid_mode"),
@@ -65,7 +64,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-only mode with nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeReservationOnly,
@@ -79,7 +78,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-only mode with non-nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeReservationOnly,
@@ -93,7 +92,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("on-demand-only mode with nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeOnDemandOnly,
@@ -107,7 +106,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("on-demand-only mode with non-nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeOnDemandOnly,
@@ -121,7 +120,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-and-on-demand mode with nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeReservationAndOnDemand,
@@ -135,7 +134,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-and-on-demand mode with nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
-				testutils.GetLogger(),
+				test.GetLogger(),
 				nil,
 				accountID,
 				ClientLedgerModeReservationAndOnDemand,
@@ -148,9 +147,10 @@ func TestClientLedgerConstructor(t *testing.T) {
 }
 
 func TestReservationOnly(t *testing.T) {
+	ctx := t.Context()
 	t.Run("insufficient capacity error", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationOnly,
@@ -161,7 +161,7 @@ func TestReservationOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		// first dispersal is permitted, even though it overfills bucket
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 1000, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
@@ -169,7 +169,7 @@ func TestReservationOnly(t *testing.T) {
 		require.Equal(t, accountID, paymentMetadata.AccountID)
 
 		// any additional symbols aren't permitted
-		paymentMetadata, err = clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+		paymentMetadata, err = clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		require.Error(t, err, "should be over capacity")
 		require.Nil(t, paymentMetadata)
 	})
@@ -181,7 +181,7 @@ func TestReservationOnly(t *testing.T) {
 		}
 
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationOnly,
@@ -192,21 +192,21 @@ func TestReservationOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		// First debit to establish a time baseline
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		require.NotNil(t, paymentMetadata)
 		require.NoError(t, err)
 
 		// Move time backward
 		currentTime = testStartTime.Add(-time.Minute)
 
-		paymentMetadata, err = clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+		paymentMetadata, err = clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		require.Error(t, err, "time moved backward should cause error")
 		require.Nil(t, paymentMetadata)
 	})
 
 	t.Run("quorum not permitted panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationOnly,
@@ -217,13 +217,13 @@ func TestReservationOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
+			_, _ = clientLedger.Debit(ctx, 1, []core.QuorumID{99})
 		})
 	})
 
 	t.Run("time out of range panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationOnly,
@@ -234,15 +234,17 @@ func TestReservationOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+			_, _ = clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		}, "expired reservation should cause fatal panic")
 	})
 }
 
 func TestOnDemandOnly(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("successful debit with cumulative payment", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeOnDemandOnly,
@@ -252,7 +254,7 @@ func TestOnDemandOnly(t *testing.T) {
 		)
 		require.NotNil(t, clientLedger)
 
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.True(t, paymentMetadata.IsOnDemand())
@@ -263,7 +265,7 @@ func TestOnDemandOnly(t *testing.T) {
 
 	t.Run("insufficient funds panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeOnDemandOnly,
@@ -274,13 +276,13 @@ func TestOnDemandOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(context.Background(), 1001, []core.QuorumID{0, 1})
+			_, _ = clientLedger.Debit(ctx, 1001, []core.QuorumID{0, 1})
 		}, "insufficient funds should cause fatal panic in on-demand only mode")
 	})
 
 	t.Run("fatal errors cause panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeOnDemandOnly,
@@ -291,15 +293,17 @@ func TestOnDemandOnly(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
+			_, _ = clientLedger.Debit(ctx, 1, []core.QuorumID{99})
 		}, "forbidden quorum should cause fatal panic")
 	})
 }
 
 func TestReservationAndOnDemand(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("fallback to on-demand", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationAndOnDemand,
@@ -310,13 +314,13 @@ func TestReservationAndOnDemand(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		// First debit uses all reservation capacity
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 1000, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
 
 		// Second debit should fallback to on-demand
-		paymentMetadata, err = clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
+		paymentMetadata, err = clientLedger.Debit(ctx, 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.True(t, paymentMetadata.IsOnDemand())
@@ -332,7 +336,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 		}
 
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationAndOnDemand,
@@ -343,7 +347,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		// First debit to establish a time baseline
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
@@ -351,14 +355,14 @@ func TestReservationAndOnDemand(t *testing.T) {
 		// Move time backward
 		currentTime = testStartTime.Add(-time.Minute)
 
-		paymentMetadata, err = clientLedger.Debit(context.Background(), 1, []core.QuorumID{0, 1})
+		paymentMetadata, err = clientLedger.Debit(ctx, 1, []core.QuorumID{0, 1})
 		require.Error(t, err, "time moved backward should cause retriable error")
 		require.Nil(t, paymentMetadata)
 	})
 
 	t.Run("insufficient funds error from on-demand", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationAndOnDemand,
@@ -369,20 +373,20 @@ func TestReservationAndOnDemand(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		// First debit uses all reservation capacity
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 1000, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 1000, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
 
 		// Second debit should fallback to on-demand but fails due to insufficient funds
-		paymentMetadata, err = clientLedger.Debit(context.Background(), 1001, []core.QuorumID{0, 1})
+		paymentMetadata, err = clientLedger.Debit(ctx, 1001, []core.QuorumID{0, 1})
 		require.Error(t, err, "insufficient funds in on-demand should cause retriable error in combined mode")
 		require.Nil(t, paymentMetadata)
 	})
 
 	t.Run("fatal errors cause panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationAndOnDemand,
@@ -393,15 +397,17 @@ func TestReservationAndOnDemand(t *testing.T) {
 		require.NotNil(t, clientLedger)
 
 		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(context.Background(), 1, []core.QuorumID{99})
+			_, _ = clientLedger.Debit(ctx, 1, []core.QuorumID{99})
 		}, "forbidden quorum should cause fatal panic")
 	})
 }
 
 func TestRevertDebit(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("successful reservation revert", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeReservationOnly,
@@ -411,18 +417,18 @@ func TestRevertDebit(t *testing.T) {
 		)
 		require.NotNil(t, clientLedger)
 
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.False(t, paymentMetadata.IsOnDemand())
 
-		err = clientLedger.RevertDebit(context.Background(), paymentMetadata, 100)
+		err = clientLedger.RevertDebit(ctx, paymentMetadata, 100)
 		require.NoError(t, err)
 	})
 
 	t.Run("successful on-demand revert", func(t *testing.T) {
 		clientLedger := NewClientLedger(
-			testutils.GetLogger(),
+			test.GetLogger(),
 			nil,
 			accountID,
 			ClientLedgerModeOnDemandOnly,
@@ -432,17 +438,19 @@ func TestRevertDebit(t *testing.T) {
 		)
 		require.NotNil(t, clientLedger)
 
-		paymentMetadata, err := clientLedger.Debit(context.Background(), 100, []core.QuorumID{0, 1})
+		paymentMetadata, err := clientLedger.Debit(ctx, 100, []core.QuorumID{0, 1})
 		require.NoError(t, err)
 		require.NotNil(t, paymentMetadata)
 		require.True(t, paymentMetadata.IsOnDemand())
 
-		err = clientLedger.RevertDebit(context.Background(), paymentMetadata, 100)
+		err = clientLedger.RevertDebit(ctx, paymentMetadata, 100)
 		require.NoError(t, err)
 	})
 }
 
 func buildReservationLedger(t *testing.T) *reservation.ReservationLedger {
+	t.Helper()
+
 	res, err := reservation.NewReservation(
 		10, testStartTime.Add(-time.Hour), testStartTime.Add(time.Hour), []core.QuorumID{0, 1})
 	require.NotNil(t, res)
@@ -461,6 +469,8 @@ func buildReservationLedger(t *testing.T) *reservation.ReservationLedger {
 }
 
 func buildOnDemandLedger(t *testing.T) *ondemand.OnDemandLedger {
+	t.Helper()
+
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
 		big.NewInt(10000),
 		big.NewInt(10),

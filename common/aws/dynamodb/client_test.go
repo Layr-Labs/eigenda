@@ -11,7 +11,7 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	localstackContainer *testbed.LocalStackContainer
 	dynamoClient        commondynamodb.Client

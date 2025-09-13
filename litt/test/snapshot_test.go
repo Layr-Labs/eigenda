@@ -1,33 +1,31 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSnapshot(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 
 	rootPathCount := rand.Uint64Range(2, 5)
 	rootPaths := make([]string, rootPathCount)
@@ -183,7 +181,7 @@ func TestSnapshot(t *testing.T) {
 	err = db.Close()
 	require.NoError(t, err)
 
-	errorMonitor = util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor = util.NewErrorMonitor(ctx, logger, nil)
 
 	err = os.RemoveAll(snapshotDir)
 	require.NoError(t, err)
@@ -218,14 +216,12 @@ func TestSnapshot(t *testing.T) {
 func TestSnapshotRebuilding(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
-
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 	rootPathCount := rand.Uint64Range(2, 5)
 	rootPaths := make([]string, rootPathCount)
 	for i := uint64(0); i < rootPathCount; i++ {
@@ -315,7 +311,7 @@ func TestSnapshotRebuilding(t *testing.T) {
 	err = db.Close()
 	require.NoError(t, err)
 
-	errorMonitor = util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor = util.NewErrorMonitor(ctx, logger, nil)
 
 	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err)
@@ -437,13 +433,12 @@ func TestSnapshotRebuilding(t *testing.T) {
 func TestSnapshotLowerBound(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 
 	rootPathCount := rand.Uint64Range(2, 5)
 	rootPaths := make([]string, rootPathCount)
@@ -544,7 +539,7 @@ func TestSnapshotLowerBound(t *testing.T) {
 	err = db.Close()
 	require.NoError(t, err)
 
-	errorMonitor = util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor = util.NewErrorMonitor(ctx, logger, nil)
 
 	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err)

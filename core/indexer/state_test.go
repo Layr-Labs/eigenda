@@ -10,27 +10,24 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/inmem"
 	"github.com/Layr-Labs/eigenda/indexer/leveldb"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var (
@@ -48,7 +45,6 @@ func init() {
 }
 
 func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
-
 	for _, op := range env.Operators {
 		tx := mustMakeOperatorTransactor(env, op, logger)
 
@@ -74,7 +70,6 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 }
 
 func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Writer {
-
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
 
@@ -95,7 +90,6 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 }
 
 func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.Logger) (common.EthClient, common.RPCEthClient) {
-
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
 
@@ -166,7 +160,7 @@ var _ = Describe("Indexer", func() {
 				Skip("No test path provided")
 			}
 
-			logger := testutils.GetLogger()
+			logger := test.GetLogger()
 			ctx, cancel := context.WithCancel(context.Background())
 			_ = cancel
 
@@ -225,6 +219,5 @@ var _ = Describe("Indexer", func() {
 			// TODO: add further tests
 
 		})
-
 	})
 })

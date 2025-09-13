@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -30,7 +29,7 @@ var (
 	templateName string
 	testName     string
 
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 
 	// Shared test resources
 	anvilContainer *testbed.AnvilContainer
@@ -216,8 +215,6 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	_, privateKey, err := plugin.GetECDSAPrivateKey(operator.NODE_ECDSA_KEY_FILE, operator.NODE_ECDSA_KEY_PASSWORD)
 	require.NoError(t, err)
 	require.NotNil(t, privateKey)
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
 	require.NoError(t, err)
 
 	ethConfig := geth.EthClientConfig{
@@ -252,10 +249,6 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	t.Helper()
 
 	hexPk := strings.TrimPrefix(testConfig.Pks.EcdsaMap[testConfig.Deployers[0].Name].PrivateKey, "0x")
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	require.NoError(t, err)
-
 	ethConfig := geth.EthClientConfig{
 		RPCURLs:          []string{operator.NODE_CHAIN_RPC},
 		PrivateKeyString: hexPk,

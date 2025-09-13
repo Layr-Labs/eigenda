@@ -12,8 +12,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -22,17 +20,22 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var duplicatedIndex uint32 = 1
+var (
+	duplicatedIndex uint32 = 1
+)
 
 // TestNonMockedValidatorClientWorkflow tests validator client retrieval using real KZG prover and verifier
 // This creates actual encoded blobs with proper KZG commitments, rather than using mocked components
 func TestNonMockedValidatorClientWorkflow(t *testing.T) {
+	ctx := t.Context()
+
 	// Set up KZG components (prover and verifier)
 	p, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
@@ -40,8 +43,6 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
 
@@ -79,7 +80,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Prepare blobs with real encoding
 	// This creates actual sharded blobs for each operator with valid KZG proofs
-	operatorState, err := dat.GetOperatorState(context.Background(), 0, quorumNumbers)
+	operatorState, err := dat.GetOperatorState(ctx, 0, quorumNumbers)
 	require.NoError(t, err)
 
 	// Get encoding parameters
@@ -162,7 +163,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create a worker with all the real components
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,

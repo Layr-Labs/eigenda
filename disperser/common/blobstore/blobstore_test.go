@@ -11,15 +11,15 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	awsmock "github.com/Layr-Labs/eigenda/common/aws/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/google/uuid"
 )
 
 var (
-	logger         = testutils.GetLogger()
+	logger         = test.GetLogger()
 	securityParams = []*core.SecurityParam{{
 		QuorumID:           1,
 		AdversaryThreshold: 80,

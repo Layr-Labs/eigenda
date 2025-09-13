@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/testbed"
 	"gopkg.in/yaml.v3"
 )
 
-var logger = testutils.GetLogger()
+var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {

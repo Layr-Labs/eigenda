@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	v2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,14 +96,16 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 		maxItems,
 		fetcher.fetch,
 		timestampFn,
-		dataapi.NewMetrics(uint(2), prometheus.NewRegistry(), nil, "9001", testutils.GetLogger()).BatchFeedCacheMetrics,
+		dataapi.NewMetrics(uint(2), prometheus.NewRegistry(), nil, "9001", test.GetLogger()).BatchFeedCacheMetrics,
 	)
 
 	return cache, fetcher, baseTime
 }
 
-func syncCacheGet(cache *v2.FeedCache[testItem], start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
-	items, err := cache.Get(context.Background(), start, end, order, limit)
+func syncCacheGet(t *testing.T, cache *v2.FeedCache[testItem], start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
+	t.Helper()
+	ctx := t.Context()
+	items, err := cache.Get(ctx, start, end, order, limit)
 	cache.WaitForCacheUpdates()
 	return items, err
 }
@@ -113,7 +115,7 @@ func TestInvalidParameters(t *testing.T) {
 	cache, _, baseTime := setupTestCache(100)
 
 	// Test with end before start
-	_, err := syncCacheGet(cache, baseTime.Add(5*time.Minute), baseTime, v2.Ascending, 0)
+	_, err := syncCacheGet(t, cache, baseTime.Add(5*time.Minute), baseTime, v2.Ascending, 0)
 	assert.Error(t, err)
 }
 
@@ -125,7 +127,7 @@ func TestFullCacheHit(t *testing.T) {
 		// Initial fetch with specified direction
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, direction, 0)
+		_, err := syncCacheGet(t, cache, start, end, direction, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -133,7 +135,7 @@ func TestFullCacheHit(t *testing.T) {
 		subEnd := baseTime.Add(3 * time.Minute)
 
 		// Sub range query ascending: full cache hit
-		items, err := syncCacheGet(cache, subStart, subEnd, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, subStart, subEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -142,13 +144,13 @@ func TestFullCacheHit(t *testing.T) {
 			assert.Equal(t, expectedTime, item.ts)
 		}
 		// With limit
-		items, err = syncCacheGet(cache, subStart, subEnd, v2.Ascending, 1)
+		items, err = syncCacheGet(t, cache, subStart, subEnd, v2.Ascending, 1)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		assert.Equal(t, subStart, items[0].ts)
 
 		// Sub range query descending: full cache hit
-		items, err = syncCacheGet(cache, subStart, subEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, subStart, subEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -157,7 +159,7 @@ func TestFullCacheHit(t *testing.T) {
 			assert.Equal(t, expectedTime, item.ts)
 		}
 		// With limit
-		items, err = syncCacheGet(cache, subStart, subEnd, v2.Descending, 1)
+		items, err = syncCacheGet(t, cache, subStart, subEnd, v2.Descending, 1)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		assert.Equal(t, subEnd.Add(-time.Minute), items[0].ts)
@@ -214,25 +216,25 @@ func TestNoOverlap_NewerRange(t *testing.T) {
 			// Initial fetch
 			start := baseTime
 			end := baseTime.Add(5 * time.Minute)
-			_, err := syncCacheGet(cache, start, end, tc.initialDirection, 0)
+			_, err := syncCacheGet(t, cache, start, end, tc.initialDirection, 0)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedFetchCounts[0], fetcher.getFetchCount())
 
 			// Query non-overlapping but newer range
 			newStart := baseTime.Add(10 * time.Minute)
 			newEnd := baseTime.Add(15 * time.Minute)
-			items, err := syncCacheGet(cache, newStart, newEnd, tc.newerRangeDirection, 0)
+			items, err := syncCacheGet(t, cache, newStart, newEnd, tc.newerRangeDirection, 0)
 			require.NoError(t, err)
 			require.Len(t, items, 5)
 			assert.Equal(t, tc.expectedFetchCounts[1], fetcher.getFetchCount())
 
 			// The old cache was dropped
-			_, err = syncCacheGet(cache, start, end, tc.initialDirection, 0)
+			_, err = syncCacheGet(t, cache, start, end, tc.initialDirection, 0)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedFetchCounts[2], fetcher.getFetchCount())
 
 			// Query the new range again - should hit the cache
-			_, err = syncCacheGet(cache, newStart, newEnd, tc.newerRangeDirection, 0)
+			_, err = syncCacheGet(t, cache, newStart, newEnd, tc.newerRangeDirection, 0)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedFetchCounts[3], fetcher.getFetchCount())
 		})
@@ -246,7 +248,7 @@ func TestNoOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 	// Initial fetch
 	start := baseTime
 	end := baseTime.Add(5 * time.Minute)
-	_, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+	_, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 	require.NoError(t, err)
 	assert.Equal(t, int(1), fetcher.getFetchCount())
 
@@ -254,23 +256,23 @@ func TestNoOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 	// With limit = 2, it'll just fetch 10:00, 11:00
 	newStart := baseTime.Add(10 * time.Minute)
 	newEnd := baseTime.Add(15 * time.Minute)
-	items, err := syncCacheGet(cache, newStart, newEnd, v2.Ascending, 2)
+	items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 2)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 	assert.Equal(t, 2, fetcher.getFetchCount())
 
 	// The old cache was dropped
-	_, err = syncCacheGet(cache, start, end, v2.Ascending, 0)
+	_, err = syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 3, fetcher.getFetchCount())
 
 	// Query [10:00, 11:00+1ns) should have full cache hit
-	_, err = syncCacheGet(cache, newStart, newStart.Add(time.Minute).Add(time.Nanosecond), v2.Ascending, 0)
+	_, err = syncCacheGet(t, cache, newStart, newStart.Add(time.Minute).Add(time.Nanosecond), v2.Ascending, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 3, fetcher.getFetchCount())
 
 	// Query the new range again - should fetch DB
-	_, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 0)
+	_, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 4, fetcher.getFetchCount())
 }
@@ -316,7 +318,7 @@ func TestNoOverlap_OlderRange(t *testing.T) {
 			// Initial fetch
 			start := baseTime.Add(5 * time.Minute)
 			end := baseTime.Add(10 * time.Minute)
-			items, err := syncCacheGet(cache, start, end, tc.initialDirection, 0)
+			items, err := syncCacheGet(t, cache, start, end, tc.initialDirection, 0)
 			require.NoError(t, err)
 			require.Len(t, items, 5)
 			assert.Equal(t, tc.expectedFetchCounts[0], fetcher.getFetchCount())
@@ -324,17 +326,17 @@ func TestNoOverlap_OlderRange(t *testing.T) {
 			// Query older range
 			oldStart := baseTime
 			oldEnd := baseTime.Add(3 * time.Minute)
-			items, err = syncCacheGet(cache, oldStart, oldEnd, tc.olderRangeDirection, 0)
+			items, err = syncCacheGet(t, cache, oldStart, oldEnd, tc.olderRangeDirection, 0)
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			assert.Equal(t, tc.expectedFetchCounts[1], fetcher.getFetchCount())
 
 			// Query the new range again - should hit the cache
 			for limit := 0; limit <= 5; limit++ {
-				_, err = syncCacheGet(cache, start, end, v2.Ascending, limit)
+				_, err = syncCacheGet(t, cache, start, end, v2.Ascending, limit)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedFetchCounts[2], fetcher.getFetchCount())
-				_, err = syncCacheGet(cache, start, end, v2.Descending, limit)
+				_, err = syncCacheGet(t, cache, start, end, v2.Descending, limit)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expectedFetchCounts[2], fetcher.getFetchCount())
 			}
@@ -352,7 +354,7 @@ func TestWithLimit(t *testing.T) {
 	limit := 3
 
 	// Resulting in cache [0:00, 2:00+ns)
-	items, err := syncCacheGet(cache, start, end, v2.Ascending, limit)
+	items, err := syncCacheGet(t, cache, start, end, v2.Ascending, limit)
 	require.NoError(t, err)
 	require.Len(t, items, limit)
 	for i, item := range items {
@@ -362,24 +364,24 @@ func TestWithLimit(t *testing.T) {
 	assert.Equal(t, 1, fetcher.getFetchCount())
 
 	// Full cache hit
-	_, err = syncCacheGet(cache, start, start.Add(2*time.Minute).Add(time.Nanosecond), v2.Ascending, limit)
+	_, err = syncCacheGet(t, cache, start, start.Add(2*time.Minute).Add(time.Nanosecond), v2.Ascending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fetcher.getFetchCount())
 
 	// [0:00, 3:00) with limit=3 should also have full cache, because there are already 3 items in
 	// the cache, so it won't do more fetches for [2:00+ns, 3:00).
-	_, err = syncCacheGet(cache, start, start.Add(3*time.Minute), v2.Ascending, limit)
+	_, err = syncCacheGet(t, cache, start, start.Add(3*time.Minute), v2.Ascending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fetcher.getFetchCount())
 	// However, with descending, it will have to fetch [2:00+ns, 3:00) first (instead of using cache),
 	// so this will cause an increase in fetch count.
-	_, err = syncCacheGet(cache, start, start.Add(3*time.Minute), v2.Descending, limit)
+	_, err = syncCacheGet(t, cache, start, start.Add(3*time.Minute), v2.Descending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 2, fetcher.getFetchCount())
 
 	// Fetch with descending order and limit
 	// Resulting in cache [7:00, 10:00)
-	items, err = syncCacheGet(cache, start, end, v2.Descending, limit)
+	items, err = syncCacheGet(t, cache, start, end, v2.Descending, limit)
 	require.NoError(t, err)
 	require.Len(t, items, limit)
 	for i, item := range items {
@@ -391,12 +393,12 @@ func TestWithLimit(t *testing.T) {
 	// Old cache dropped
 	// And this result won't be cached (remain as [7:00, 10:00)) as it's strictly older than
 	// what's in cache
-	_, err = syncCacheGet(cache, start, start.Add(3*time.Minute), v2.Ascending, limit)
+	_, err = syncCacheGet(t, cache, start, start.Add(3*time.Minute), v2.Ascending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 4, fetcher.getFetchCount())
 
 	// Full hit new cache
-	_, err = syncCacheGet(cache, start.Add(7*time.Minute), end, v2.Ascending, limit)
+	_, err = syncCacheGet(t, cache, start.Add(7*time.Minute), end, v2.Ascending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 4, fetcher.getFetchCount())
 }
@@ -447,7 +449,7 @@ func TestPartialOverlap_NewerRange(t *testing.T) {
 			// Initial fetch [0:00, 5:00)
 			start := baseTime
 			end := baseTime.Add(5 * time.Minute)
-			_, err := syncCacheGet(cache, start, end, tc.initialDirection, 0)
+			_, err := syncCacheGet(t, cache, start, end, tc.initialDirection, 0)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedFetchCounts[0], fetcher.getFetchCount())
 
@@ -455,7 +457,7 @@ func TestPartialOverlap_NewerRange(t *testing.T) {
 			newStart := baseTime.Add(3 * time.Minute)
 			newEnd := baseTime.Add(8 * time.Minute)
 
-			items, err := syncCacheGet(cache, newStart, newEnd, tc.overlapDirection, 0)
+			items, err := syncCacheGet(t, cache, newStart, newEnd, tc.overlapDirection, 0)
 			require.NoError(t, err)
 			require.Len(t, items, 5)
 			assert.Equal(t, tc.expectedFetchCounts[1], fetcher.getFetchCount())
@@ -472,7 +474,7 @@ func TestPartialOverlap_NewerRange(t *testing.T) {
 			// Query within the extended range - should be a cache hit
 			subStart := baseTime
 			subEnd := baseTime.Add(8 * time.Minute)
-			_, err = syncCacheGet(cache, subStart, subEnd, tc.subRangeDirection, 0)
+			_, err = syncCacheGet(t, cache, subStart, subEnd, tc.subRangeDirection, 0)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedFetchCounts[2], fetcher.getFetchCount())
 		})
@@ -487,7 +489,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [0:00, 5:00)
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -495,7 +497,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// With limit=4, it'll cut off at 6:00 (the cache end set to +1ns)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Ascending, 4)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 4)
 		require.NoError(t, err)
 		require.Len(t, items, 4)
 		for i, item := range items {
@@ -504,12 +506,12 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [0:00, 6:00) will have full cache hit
-		_, err = syncCacheGet(cache, baseTime, baseTime.Add(6*time.Minute), v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime, baseTime.Add(6*time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [0:00, 8:00) will have to fetch DB
-		_, err = syncCacheGet(cache, start, newEnd, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -520,7 +522,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [0:00, 5:00)
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -529,7 +531,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// and there is no DB fetch needed
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Ascending, 2)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -538,12 +540,12 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Querying [0:00, 5:00) will have full cache hit
-		_, err = syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Querying [0:00, 6:00) will have to fetch DB
-		_, err = syncCacheGet(cache, start, end.Add(time.Minute), v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, end.Add(time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 	})
@@ -554,7 +556,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [0:00, 5:00)
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -562,7 +564,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// high-end of items [6:00, 8:00) in the range
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Descending, 2)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -571,12 +573,12 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [6:00, 8:00) will have full cache hit
-		_, err = syncCacheGet(cache, baseTime.Add(6*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime.Add(6*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [0:00, 5:00) will have to fetch DB
-		_, err = syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -587,7 +589,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [0:00, 5:00)
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -595,7 +597,7 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		// This will find 4 items [4:00, 8:00), which is connected to cache and can extend it
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Descending, 4)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 4)
 		require.NoError(t, err)
 		require.Len(t, items, 4)
 		for i, item := range items {
@@ -604,12 +606,12 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [2:00, 8:00) will have full cache hit
-		_, err = syncCacheGet(cache, baseTime.Add(2*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime.Add(2*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [1:00, 8:00) will have to fetch DB (the cache range is [2:00, 8:00))
-		_, err = syncCacheGet(cache, baseTime.Add(1*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime.Add(1*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -623,7 +625,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Descending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Descending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -632,7 +634,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// This results in cache [4:00, 10:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Descending, 4)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 4)
 		require.NoError(t, err)
 		require.Len(t, items, 4)
 		for i, item := range items {
@@ -641,12 +643,12 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [4:00, 10:00) will have full cache hit
-		_, err = syncCacheGet(cache, baseTime.Add(4*time.Minute), end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime.Add(4*time.Minute), end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [0:00, 8:00) will have to fetch DB
-		_, err = syncCacheGet(cache, baseTime, newEnd, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -657,7 +659,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Descending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Descending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -666,7 +668,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// So the cache remains as [5:00, 10:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Descending, 2)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -675,12 +677,12 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Querying [5:00, 10:00) will have full cache hit
-		_, err = syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Querying [3:00, 8:00) will have to fetch DB
-		_, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 	})
@@ -691,7 +693,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Descending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Descending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -700,7 +702,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// so has no effect
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Ascending, 2)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -709,12 +711,12 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [5:00, 10:00) will have full cache hit
-		_, err = syncCacheGet(cache, start, end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [3:00, 8:00) will have to fetch DB
-		_, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -725,7 +727,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		_, err := syncCacheGet(cache, start, end, v2.Descending, 0)
+		_, err := syncCacheGet(t, cache, start, end, v2.Descending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
@@ -733,7 +735,7 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		// This could have created cache [3:00, 10:00), but with eviction it'll be [4:00, 10:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := syncCacheGet(cache, newStart, newEnd, v2.Ascending, 3)
+		items, err := syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 3)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		for i, item := range items {
@@ -742,12 +744,12 @@ func TestPartialOverlap_OlderRange(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [4:00, 10:00) will have full cache hit
-		_, err = syncCacheGet(cache, baseTime.Add(4*time.Minute), end, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, baseTime.Add(4*time.Minute), end, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [3:00, 8:00) will have to fetch DB
-		_, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 0)
+		_, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 	})
@@ -761,7 +763,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -770,7 +772,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// With limit=2, it will not hit any data in cache [5:00, 10:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(12 * time.Minute)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 2)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -779,12 +781,12 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [5:00, 10:00) will hit full cache
-		items, err = syncCacheGet(cache, start, end, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, start, end, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 2)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		assert.Equal(t, 3, fetcher.getFetchCount())
@@ -796,7 +798,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -806,7 +808,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// The resulting cache is [3:00, 10:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(12 * time.Minute)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 3)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 3)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		for i, item := range items {
@@ -815,20 +817,20 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [3:00, 10:00) will hit full cache
-		items, err = syncCacheGet(cache, newStart, end, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, newStart, end, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 7)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Query a larger range [3:00, 12:00)
 		// With limit=8, this will cover from 3:00 to  10:00
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 8)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 8)
 		require.NoError(t, err)
 		require.Len(t, items, 8)
 		assert.Equal(t, 3, fetcher.getFetchCount())
 
 		// Querying [3:00, 10:00+1ns) will have full cache
-		items, err = syncCacheGet(cache, newStart, baseTime.Add(10*time.Minute).Add(time.Nanosecond), v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, newStart, baseTime.Add(10*time.Minute).Add(time.Nanosecond), v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 8)
 		assert.Equal(t, 3, fetcher.getFetchCount())
@@ -840,7 +842,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -853,7 +855,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// The resulting cache is [10:00, 12:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(12 * time.Minute)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Descending, 2)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		for i, item := range items {
@@ -862,19 +864,19 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [10:00, 12:00) will hit full cache
-		items, err = syncCacheGet(cache, end, newEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, end, newEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [3:00, 12:00) again with limit=2, should have full cache
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Descending, 2)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 2)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [3:00, 12:00) again without limit will have to fetch DB
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Ascending, 0)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 9)
 		assert.Equal(t, 3, fetcher.getFetchCount())
@@ -886,7 +888,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -897,7 +899,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// The resulting cache is [5:00, 12:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(12 * time.Minute)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Descending, 3)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 3)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		for i, item := range items {
@@ -906,14 +908,14 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [5:00, 12:00) will hit full cache
-		items, err = syncCacheGet(cache, start, newEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, start, newEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 7)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// With limit=8, it will retrieve backward up to 4:00
 		// Resulting cache [4:00, 12:00)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Descending, 8)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 8)
 		require.NoError(t, err)
 		require.Len(t, items, 8)
 		for i, item := range items {
@@ -922,7 +924,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 3, fetcher.getFetchCount())
 
 		// Querying [4:00, 12:00) will hit full cache
-		items, err = syncCacheGet(cache, baseTime.Add(4*time.Minute), newEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, baseTime.Add(4*time.Minute), newEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 8)
 		assert.Equal(t, 3, fetcher.getFetchCount())
@@ -934,7 +936,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// Initial fetch [5:00, 10:00)
 		start := baseTime.Add(5 * time.Minute)
 		end := baseTime.Add(10 * time.Minute)
-		items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+		items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 5)
 		assert.Equal(t, 1, fetcher.getFetchCount())
@@ -943,7 +945,7 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		// This could have created cache [5:00, 12:00), but with eviction it'll be [6:00, 12:00)
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(12 * time.Minute)
-		items, err = syncCacheGet(cache, newStart, newEnd, v2.Descending, 3)
+		items, err = syncCacheGet(t, cache, newStart, newEnd, v2.Descending, 3)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		for i, item := range items {
@@ -952,13 +954,13 @@ func TestPartialOverlap_NewerAndOlderRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [6:00, 12:00) will have full cache hit
-		items, err = syncCacheGet(cache, start.Add(time.Minute), newEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, start.Add(time.Minute), newEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 6)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
 		// Querying [5:00, 12:00) will fetch DB to cover 5:00
-		items, err = syncCacheGet(cache, start, newEnd, v2.Descending, 0)
+		items, err = syncCacheGet(t, cache, start, newEnd, v2.Descending, 0)
 		require.NoError(t, err)
 		require.Len(t, items, 7)
 		assert.Equal(t, 3, fetcher.getFetchCount())
@@ -973,7 +975,7 @@ func TestPartialOverlap_NewerAndOlderRange(t *testing.T) {
 	// Initial fetch [5:00, 10:00)
 	start := baseTime.Add(5 * time.Minute)
 	end := baseTime.Add(10 * time.Minute)
-	items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+	items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 	require.NoError(t, err)
 	require.Len(t, items, 5)
 	assert.Equal(t, 1, fetcher.getFetchCount())
@@ -981,7 +983,7 @@ func TestPartialOverlap_NewerAndOlderRange(t *testing.T) {
 	// Query a larger range [3:00, 12:00)
 	extendedStart := baseTime.Add(3 * time.Minute)
 	extendedEnd := baseTime.Add(12 * time.Minute)
-	items, err = syncCacheGet(cache, extendedStart, extendedEnd, v2.Ascending, 0)
+	items, err = syncCacheGet(t, cache, extendedStart, extendedEnd, v2.Ascending, 0)
 	require.NoError(t, err)
 	require.Len(t, items, 9)
 
@@ -995,7 +997,7 @@ func TestPartialOverlap_NewerAndOlderRange(t *testing.T) {
 	}
 
 	// Query within the extended range - should be a cache hit
-	_, err = syncCacheGet(cache, extendedStart, extendedEnd, v2.Ascending, 0)
+	_, err = syncCacheGet(t, cache, extendedStart, extendedEnd, v2.Ascending, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 3, fetcher.getFetchCount())
 }
@@ -1007,7 +1009,7 @@ func TestEviction(t *testing.T) {
 	// Fetch 5 minutes worth of data
 	start := baseTime
 	end := baseTime.Add(5 * time.Minute)
-	items, err := syncCacheGet(cache, start, end, v2.Ascending, 0)
+	items, err := syncCacheGet(t, cache, start, end, v2.Ascending, 0)
 	require.NoError(t, err)
 	require.Len(t, items, 5)
 	assert.Equal(t, 1, fetcher.getFetchCount())
@@ -1016,7 +1018,7 @@ func TestEviction(t *testing.T) {
 	// Only the most recent 3 items should be in cache due to maxItems
 	start2 := baseTime
 	end2 := baseTime.Add(5 * time.Minute)
-	items2, err := syncCacheGet(cache, start2, end2, v2.Ascending, 0)
+	items2, err := syncCacheGet(t, cache, start2, end2, v2.Ascending, 0)
 	require.NoError(t, err)
 	require.Len(t, items2, 5)
 	assert.Equal(t, 2, fetcher.getFetchCount()) // Need to fetch older items not in cache
@@ -1024,7 +1026,7 @@ func TestEviction(t *testing.T) {
 	// Query just the most recent 3 items - should be a cache hit
 	recentStart := baseTime.Add(2 * time.Minute)
 	recentEnd := baseTime.Add(5 * time.Minute)
-	items3, err := syncCacheGet(cache, recentStart, recentEnd, v2.Ascending, 0)
+	items3, err := syncCacheGet(t, cache, recentStart, recentEnd, v2.Ascending, 0)
 	require.NoError(t, err)
 	require.Len(t, items3, 3)
 	assert.Equal(t, 2, fetcher.getFetchCount()) // No new fetch needed
@@ -1032,6 +1034,7 @@ func TestEviction(t *testing.T) {
 
 // Test concurrent access to cache
 func TestConcurrentAccess(t *testing.T) {
+	ctx := t.Context()
 	cache, _, baseTime := setupTestCache(100)
 
 	var wg sync.WaitGroup
@@ -1048,7 +1051,7 @@ func TestConcurrentAccess(t *testing.T) {
 			if offset%2 == 0 {
 				direction = v2.Descending
 			}
-			items, err := cache.Get(context.Background(), start, end, direction, 0)
+			items, err := cache.Get(ctx, start, end, direction, 0)
 			require.NoError(t, err)
 			require.Equal(t, 5, len(items))
 			if direction == v2.Ascending {
