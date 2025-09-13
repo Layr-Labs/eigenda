@@ -8,6 +8,7 @@ package directory
 const (
 	EigenDAEjectionManager ContractName = "EIGEN_DA_EJECTION_MANAGER"
 	OperatorStateRetriever ContractName = "OPERATOR_STATE_RETRIEVER"
+	PaymentVault           ContractName = "PAYMENT_VAULT"
 	RegistryCoordinator    ContractName = "REGISTRY_COORDINATOR"
 	RelayRegistry          ContractName = "RELAY_REGISTRY"
 	ServiceManager         ContractName = "SERVICE_MANAGER"
@@ -17,6 +18,7 @@ const (
 var knownContracts = []ContractName{
 	EigenDAEjectionManager,
 	OperatorStateRetriever,
+	PaymentVault,
 	RegistryCoordinator,
 	RelayRegistry,
 	ServiceManager,

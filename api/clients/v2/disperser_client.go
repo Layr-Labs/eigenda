@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -34,24 +35,22 @@ type DisperserClientConfig struct {
 type DisperserClient interface {
 	// Close closes the grpc connection to the disperser server.
 	Close() error
-	// DisperseBlob disperses a blob with the given data, blob version, and quorums.
+	// Disperses a blob with the given data, blob version, and quorums.
 	DisperseBlob(
 		ctx context.Context,
 		data []byte,
 		blobVersion corev2.BlobVersion,
-		quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
-	// DisperseBlobWithProbe is similar to DisperseBlob, but also takes a SequenceProbe to capture metrics.
-	// If the probe is nil, no metrics are captured.
-	DisperseBlobWithProbe(
-		ctx context.Context,
-		data []byte,
-		blobVersion corev2.BlobVersion,
 		quorums []core.QuorumID,
-		probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error)
+		// if nil, no metrics are captured
+		probe *common.SequenceProbe,
+		// if nil, will be constructed with the legacy accountant
+		paymentMetadata *core.PaymentMetadata) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	// GetBlobStatus returns the status of a blob with the given blob key.
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	// GetBlobCommitment returns the blob commitment for a given blob payload.
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
+	// GetPaymentState returns the payment state of the disperser client
+	GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error)
 }
 type disperserClient struct {
 	logger                  logging.Logger
@@ -174,25 +173,16 @@ func (c *disperserClient) Close() error {
 	return nil
 }
 
+// Disperses a blob with the given data, blob version, and quorums.
 func (c *disperserClient) DisperseBlob(
 	ctx context.Context,
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-	return c.DisperseBlobWithProbe(ctx, data, blobVersion, quorums, nil)
-}
-
-// DisperseBlobWithProbe disperses a blob with the given data, blob version, and quorums. If sequenceProbe is not nil,
-// the probe is used to capture metrics during the dispersal process.
-func (c *disperserClient) DisperseBlobWithProbe(
-	ctx context.Context,
-	data []byte,
-	blobVersion corev2.BlobVersion,
-	quorums []core.QuorumID,
 	probe *common.SequenceProbe,
+	// if this is nil, that indicates we will use the legacy payment system to create the paymentMetadata
+	paymentMetadata *core.PaymentMetadata,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
-
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
@@ -205,10 +195,22 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		}
 	}
 
-	probe.SetStage("acquire_accountant_lock")
-	c.accountantLock.Lock()
+	if paymentMetadata == nil && c.accountant == nil {
+		return nil, [32]byte{}, errors.New("either payment metadata or accountant must be non nil")
+	}
 
-	probe.SetStage("accountant")
+	if paymentMetadata != nil && c.accountant != nil {
+		return nil, [32]byte{}, errors.New("if payment metadata is non nil, then the legacy accountant must be nil")
+	}
+
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+
+	if paymentMetadata == nil {
+		// we are using the legacy payment system
+		probe.SetStage("acquire_accountant_lock")
+		c.accountantLock.Lock()
+
+		probe.SetStage("accountant")
 
 	err := c.initOncePopulateAccountant(ctx)
 	if err != nil {
@@ -216,25 +218,25 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("error initializing accountant: %w", err)
 	}
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
+		paymentMetadata, err = c.accountant.AccountBlob(time.Now().UnixNano(), uint64(symbolLength), quorums)
+		if err != nil {
+			c.accountantLock.Unlock()
+			return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+		}
 
-	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
-		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
-		c.accountantLock.Unlock()
-	} else {
-		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
-		defer c.accountantLock.Unlock()
+		if paymentMetadata.CumulativePayment == nil || paymentMetadata.CumulativePayment.Sign() == 0 {
+			// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+			c.accountantLock.Unlock()
+		} else {
+			// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+			defer c.accountantLock.Unlock()
+		}
 	}
 
 	probe.SetStage("verify_field_element")
 
 	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
+	_, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf(
 			"encountered an error to convert a 32-bytes into a valid field element, "+
@@ -281,7 +283,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: *payment,
+		PaymentMetadata: *paymentMetadata,
 	}
 
 	probe.SetStage("sign_blob_request")

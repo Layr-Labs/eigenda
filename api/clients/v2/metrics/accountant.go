@@ -17,14 +17,20 @@ var (
 
 type AccountantMetricer interface {
 	RecordCumulativePayment(accountID string, wei *big.Int)
+	RecordOnDemandTotalDeposits(accountID string, wei *big.Int)
+
 	RecordReservationPayment(remainingCapacity float64)
+	RecordReservationBucketCapacity(bucketSize float64)
 
 	Document() []metrics.DocumentedMetric
 }
 
 type AccountantMetrics struct {
-	CumulativePayment            *prometheus.GaugeVec
+	CumulativePayment     *prometheus.GaugeVec
+	OnDemandTotalDeposits *prometheus.GaugeVec
+
 	ReservationRemainingCapacity prometheus.Gauge
+	ReservationBucketCapacity    prometheus.Gauge
 
 	factory *metrics.Documentor
 }
@@ -45,11 +51,25 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 		}, []string{
 			"account_id",
 		}),
+		OnDemandTotalDeposits: factory.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "ondemand_total_deposits",
+			Namespace: namespace,
+			Subsystem: accountantSubsystem,
+			Help:      "Total on-demand deposits available (gwei)",
+		}, []string{
+			"account_id",
+		}),
 		ReservationRemainingCapacity: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "reservation_remaining_capacity",
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
 			Help:      "Remaining capacity in reservation bucket (symbols)",
+		}),
+		ReservationBucketCapacity: factory.NewGauge(prometheus.GaugeOpts{
+			Name:      "reservation_bucket_size",
+			Namespace: namespace,
+			Subsystem: accountantSubsystem,
+			Help:      "Total reservation bucket size (symbols)",
 		}),
 		factory: factory,
 	}
@@ -65,8 +85,18 @@ func (m *AccountantMetrics) RecordCumulativePayment(accountID string, wei *big.I
 	m.CumulativePayment.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
+func (m *AccountantMetrics) RecordOnDemandTotalDeposits(accountID string, wei *big.Int) {
+	gwei := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(gweiFactor))
+	gweiFloat64, _ := gwei.Float64()
+	m.OnDemandTotalDeposits.WithLabelValues(accountID).Set(gweiFloat64)
+}
+
 func (m *AccountantMetrics) RecordReservationPayment(remainingCapacity float64) {
 	m.ReservationRemainingCapacity.Set(remainingCapacity)
+}
+
+func (m *AccountantMetrics) RecordReservationBucketCapacity(bucketCapacity float64) {
+	m.ReservationBucketCapacity.Set(bucketCapacity)
 }
 
 func (m *AccountantMetrics) Document() []metrics.DocumentedMetric {
@@ -81,7 +111,13 @@ var NoopAccountantMetrics AccountantMetricer = new(noopAccountantMetricer)
 func (n *noopAccountantMetricer) RecordCumulativePayment(_ string, _ *big.Int) {
 }
 
+func (n *noopAccountantMetricer) RecordOnDemandTotalDeposits(_ string, _ *big.Int) {
+}
+
 func (n *noopAccountantMetricer) RecordReservationPayment(_ float64) {
+}
+
+func (n *noopAccountantMetricer) RecordReservationBucketCapacity(_ float64) {
 }
 
 func (n *noopAccountantMetricer) Document() []metrics.DocumentedMetric {

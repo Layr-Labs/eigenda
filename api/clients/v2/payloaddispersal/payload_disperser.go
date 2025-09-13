@@ -13,7 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -29,6 +31,7 @@ type PayloadDisperser struct {
 	certBuilder     *clients.CertBuilder
 	certVerifier    *verification.CertVerifier
 	stageTimer      *common.StageTimer
+	clientLedger    *clientledger.ClientLedger
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -47,6 +50,8 @@ func NewPayloadDisperser(
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,
+	// Manages payment state for the client. May be nil for legacy payment mode.
+	clientLedger *clientledger.ClientLedger,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
@@ -66,6 +71,7 @@ func NewPayloadDisperser(
 		certBuilder:     certBuilder,
 		certVerifier:    certVerifier,
 		stageTimer:      stageTimer,
+		clientLedger:    clientLedger,
 	}, nil
 }
 
@@ -108,20 +114,40 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
+	symbolCount := blob.LenSymbols()
+
+	var paymentMetadata *core.PaymentMetadata
+	if pd.clientLedger != nil {
+		// we are using the new payment system if clientLedger is non nil
+		probe.SetStage("debit")
+		paymentMetadata, err = pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
+		if err != nil {
+			return nil, fmt.Errorf("debit: %w", err)
+		}
+	}
+
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 
-	// TODO (litt3): eventually, we should consider making DisperseBlob accept an actual blob object, instead of the
+	// TODO (litt3): DisperseBlob should accept an actual blob object, instead of the
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
 	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
 	//  many areas of code, though.
-	blobStatus, blobKey, err := pd.disperserClient.DisperseBlobWithProbe(
+	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
 		timeoutCtx,
 		blob.Serialize(),
 		pd.config.BlobVersion,
 		requiredQuorums,
-		probe)
+		probe,
+		paymentMetadata)
 	if err != nil {
+		if pd.clientLedger != nil {
+			revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
+			if revertErr != nil {
+				return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
+			}
+		}
+
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
 	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
@@ -187,7 +213,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 // logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
 // required signing thresholds
-func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+func (pd *PayloadDisperser) logSigningPercentages(blobKey corev2.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
 	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
 	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
 		pd.logger.Error("quorum number count and signed percentage count don't match. This should never happen",
@@ -231,7 +257,7 @@ func (pd *PayloadDisperser) Close() error {
 // failure.
 func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
-	blobKey core.BlobKey,
+	blobKey corev2.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
