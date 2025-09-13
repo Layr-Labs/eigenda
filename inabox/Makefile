@@ -26,9 +26,10 @@ deploy-all:
 	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
 
 stop-infra:
-	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	# Stop localstack based on container name
+# Stop anvil
+	docker ps -q --filter "ancestor=ghcr.io/foundry-rs/foundry" | xargs -r docker stop 2>/dev/null || true
+# Stop localstack based on container name
 	docker ps -q --filter "ancestor=localstack/localstack" | xargs -r docker stop 2>/dev/null || true
 
 run-e2e:
