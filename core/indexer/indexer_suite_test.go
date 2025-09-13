@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

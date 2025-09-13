@@ -54,7 +54,7 @@ func LoadPrivateKeys(input LoadPrivateKeysInput) (*PrivateKeyMaps, error) {
 
 	// Use testbed secrets for other services
 	// The secrets are located in the testbed directory
-	keyPath := filepath.Join("..", "testbed", "secrets")
+	keyPath := filepath.Join("../..", "test", "testbed", "secrets")
 
 	// Build the list of service names
 	names := make([]string, 0)
@@ -312,7 +312,7 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		_ = os.Chdir(origDir)
 	}()
 
-	contractsDir := "../contracts"
+	contractsDir := "../../contracts"
 	if err := os.Chdir(contractsDir); err != nil {
 		return nil, fmt.Errorf("failed to change to contracts directory: %w", err)
 	}

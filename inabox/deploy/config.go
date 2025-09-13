@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/test"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"gopkg.in/yaml.v3"
 )
 

@@ -20,7 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
