@@ -28,7 +28,6 @@ stop-infra:
 	docker ps -q --filter "ancestor=localstack/localstack" | xargs -r docker stop 2>/dev/null || true
 # Stop graph node stack based on container names
 	docker ps -q --filter "ancestor=graphprotocol/graph-node:v0.35.0" | xargs -r docker stop 2>/dev/null || true
-	docker ps -q --filter "ancestor=ipfs/kubo" | xargs -r docker stop 2>/dev/null || true
 	docker ps -q --filter "ancestor=ipfs/kubo:v0.24.0" | xargs -r docker stop 2>/dev/null || true
 	docker ps -q --filter "ancestor=postgres:13" | xargs -r docker stop 2>/dev/null || true
 run-e2e:
