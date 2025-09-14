@@ -155,7 +155,6 @@ jobs:
           -e EIGENDA_PROXY_PORT=6666 \
           -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
           -e EIGENDA_PROXY_APIS_TO_ENABLE=op-generic \
-
           ghcr.io/layr-labs/eigenda-proxy:dev
         working-directory: api/proxy
       - name: Wait for rpc to come up
