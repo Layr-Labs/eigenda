@@ -19,7 +19,6 @@ GLOBAL OPTIONS:
    Arbitrum Custom DA JSON RPC Server
 
    --arbitrum-da.addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ARB_DA_ADDR]
-   --arbitrum-da.enabled     Whether or not to enable Arbitrum Custom DA JSON RPC API (default: false) [$EIGENDA_PROXY_ARB_DA_ENABLED]
    --arbitrum-da.port value  Server listening port (default: 3101) [$EIGENDA_PROXY_ARB_DA_PORT]
 
    Cert Verifier (V1 only)
@@ -90,6 +89,10 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    --eigenda.v2.signer-payment-key-hex value      Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
    --eigenda.v2.validator-timeout value           Timeout used when retrieving chunks directly from EigenDA validators. This is a secondary retrieval method, in case retrieval from the relay network fails. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_VALIDATOR_TIMEOUT]
 
+   Enabled APIs
+
+   --apis.enabled value [ --apis.enabled value ]  Which proxy application APIs to enable. supported options are admin, standard, op-generic, op-keccak, arb, metrics [$EIGENDA_PROXY_APIS_TO_ENABLE]
+
    KZG
 
    --eigenda.cache-path value        Path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
@@ -114,14 +117,12 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    Metrics
 
    --metrics.addr value  Metrics listening address (default: "0.0.0.0") [$EIGENDA_PROXY_METRICS_ADDR]
-   --metrics.enabled     Enable the metrics server. On by default, so use --metrics.enabled=false to disable. (default: true) [$EIGENDA_PROXY_METRICS_ENABLED]
    --metrics.port value  Metrics listening port (default: 7300) [$EIGENDA_PROXY_METRICS_PORT]
 
    Proxy REST API Server (compatible with OP Stack ALT DA and standard commitment clients)
 
-   --addr value                                 Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
-   --api-enabled value [ --api-enabled value ]  List of API types to enable (e.g. admin) [$EIGENDA_PROXY_API_ENABLED]
-   --port value                                 Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
+   --addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
+   --port value  Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
 
    S3 Cache/Fallback
 

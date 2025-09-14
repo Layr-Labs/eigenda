@@ -57,6 +57,13 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("read proxy config: %w", err)
 	}
 
+	// NOTE: double passing of the `enabledAPIs` type to both the
+	//       the AppConfig and Rest server config is an abstraction leak.
+	//       given rest endpoint logic is guarded by the enabledAPIs it
+	//       makes sense to be like this. otherwise a separate env var
+	//       could be introduced that provides enablement toggles purely
+	//       for the REST server's code paths.
+	//
 	enabledAPIs := enabled_apis.ReadEnabledAPIs(ctx)
 
 	return AppConfig{

@@ -13,6 +13,10 @@ type EnabledAPIs struct {
 	apis []API
 }
 
+func (e EnabledAPIs) Count() uint {
+	return uint(len(e.apis))
+}
+
 // ArbCustomDA ... Is Arbitrum Custom DA enabled?
 func (e EnabledAPIs) ArbCustomDA() bool {
 	return e.has(ArbCustomDAServer)
@@ -51,6 +55,10 @@ func (e EnabledAPIs) Metrics() bool {
 
 // Check ... Ensures that expression of the enabled API set is correct
 func (e EnabledAPIs) Check() error {
+	if e.Count() == 0 {
+		return fmt.Errorf("expected at least one \"apis.enabled\" value to be provided")
+	}
+
 	if e.Metrics() && (!e.RestALTDA() && !e.ArbCustomDA()) {
 		return fmt.Errorf("metrics cannot be enabled unless `arb` and/or `rest` also is")
 	}

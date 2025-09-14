@@ -16,7 +16,6 @@ func withEnvPrefix(envPrefix, s string) []string {
 
 func ReadEnabledAPIs(ctx *cli.Context) *EnabledAPIs {
 	enabledAPIStrings := ctx.StringSlice(EnabledAPIsFlagName)
-	println(fmt.Sprintf("enabled APIs: %+v ", enabledAPIStrings))
 
 	enabledAPIs, err := NewEnabledAPIs(enabledAPIStrings)
 	if err != nil {
@@ -33,7 +32,7 @@ func CLIFlags(category string, envPrefix string) []cli.Flag {
 			"%s, %s, %s, %s, %s, %s", Admin.ToString(), StandardCommitment.ToString(),
 			OpGenericCommitment.ToString(), OpKeccakCommitment.ToString(),
 			ArbCustomDAServer.ToString(), MetricsServer.ToString()),
-		Required: true,
+		Value:    cli.NewStringSlice(),
 		EnvVars:  withEnvPrefix(envPrefix, "APIS_TO_ENABLE"),
 		Category: category,
 	}}
