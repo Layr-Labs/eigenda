@@ -171,11 +171,6 @@ func (g *GraphNodeContainer) HTTPURL() string {
 	return g.httpURL
 }
 
-// WebSocketURL returns the Graph Node WebSocket endpoint
-func (g *GraphNodeContainer) WebSocketURL() string {
-	return g.wsURL
-}
-
 // AdminURL returns the Graph Node admin endpoint for deployments
 func (g *GraphNodeContainer) AdminURL() string {
 	return g.adminURL
@@ -226,60 +221,6 @@ func (g *GraphNodeContainer) Terminate(ctx context.Context) error {
 
 	g.logger.Debug("Graph Node cluster terminated successfully")
 	return nil
-}
-
-// GetPostgres returns the PostgreSQL container for external access
-func (g *GraphNodeContainer) GetPostgres() testcontainers.Container {
-	return g.postgres
-}
-
-// GetIPFS returns the IPFS container for external access
-func (g *GraphNodeContainer) GetIPFS() testcontainers.Container {
-	return g.ipfs
-}
-
-// GetGraphNode returns the Graph Node container for external access
-func (g *GraphNodeContainer) GetGraphNode() testcontainers.Container {
-	return g.graphNode
-}
-
-// IPFSURL returns the IPFS API endpoint URL
-func (g *GraphNodeContainer) IPFSURL(ctx context.Context) (string, error) {
-	if g.ipfs == nil {
-		return "", fmt.Errorf("IPFS container not available")
-	}
-
-	host, err := g.ipfs.Host(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get IPFS host: %w", err)
-	}
-
-	port, err := g.ipfs.MappedPort(ctx, "5001")
-	if err != nil {
-		return "", fmt.Errorf("failed to get IPFS port: %w", err)
-	}
-
-	return fmt.Sprintf("http://%s:%s", host, port.Port()), nil
-}
-
-// PostgresURL returns the PostgreSQL connection URL
-func (g *GraphNodeContainer) PostgresURL(ctx context.Context) (string, error) {
-	if g.postgres == nil {
-		return "", fmt.Errorf("PostgreSQL container not available")
-	}
-
-	host, err := g.postgres.Host(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get PostgreSQL host: %w", err)
-	}
-
-	port, err := g.postgres.MappedPort(ctx, "5432")
-	if err != nil {
-		return "", fmt.Errorf("failed to get PostgreSQL port: %w", err)
-	}
-
-	// Return connection string format
-	return fmt.Sprintf("postgresql://graph-node:let-me-in@%s:%s/graph-node", host, port.Port()), nil
 }
 
 // startPostgres creates and starts a PostgreSQL container
@@ -432,4 +373,3 @@ func startGraphNode(
 
 	return testcontainers.GenericContainer(ctx, genericReq)
 }
-
