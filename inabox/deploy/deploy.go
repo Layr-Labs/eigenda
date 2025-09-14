@@ -384,7 +384,7 @@ func (env *Config) StopBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	err := execCmd("./bin.sh", []string{"stop"}, []string{}, true)
+	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
 	}

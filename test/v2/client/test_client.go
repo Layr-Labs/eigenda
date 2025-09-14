@@ -22,7 +22,7 @@ import (
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
-	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/server"
+	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -379,12 +379,12 @@ func NewTestClient(
 				SignerPaymentKey: privateKey,
 				EthRPCURL:        ethRPCUrls[0],
 			},
-			ServerConfig: proxyserver.Config{
+			RestSvrCfg: proxyserver.Config{
 				Host:        "localhost",
 				Port:        config.ProxyPort,
 				EnabledAPIs: []string{"admin"},
 			},
-			MetricsServerConfig: proxymetrics.Config{
+			MetricsSvrConfig: proxymetrics.Config{
 				Enabled: false, // TODO (cody.littley) enable proxy metrics
 			},
 			StoreBuilderConfig: builder.Config{

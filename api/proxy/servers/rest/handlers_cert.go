@@ -1,7 +1,7 @@
 // handlers_cert.go contains the main HTTP handlers for the Eigenda Proxy server.
 // These are the handlers that process POST (payload->commitment) and GET (commitment->payload) requests.
 // Handlers in this file SHOULD be wrapped in middlewares.
-package server
+package rest
 
 import (
 	"encoding/hex"
@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda/api/proxy/server/middleware"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest/middleware"
 	"github.com/gorilla/mux"
 )
 

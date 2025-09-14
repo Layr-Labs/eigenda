@@ -29,17 +29,12 @@ import (
 )
 
 type SRS struct {
-
 	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G1 []bn254.G1Affine
 	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G2 []bn254.G2Affine
 }
 
-func NewSrs(G1 []bn254.G1Affine, G2 []bn254.G2Affine) (*SRS, error) {
-
-	return &SRS{
-		G1: G1,
-		G2: G2,
-	}, nil
+func NewSrs(G1 []bn254.G1Affine, G2 []bn254.G2Affine) SRS {
+	return SRS{G1: G1, G2: G2}
 }
