@@ -48,7 +48,6 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
-		G2PowerOf2Path:  "../../resources/srs/g2.point.powerOf2",
 		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,

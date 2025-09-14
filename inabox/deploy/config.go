@@ -469,7 +469,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 
 		RETRIEVER_G1_PATH:             "",
 		RETRIEVER_G2_PATH:             "",
-		RETRIEVER_G2_POWER_OF_2_PATH:  "",
 		RETRIEVER_CACHE_PATH:          "",
 		RETRIEVER_SRS_ORDER:           "",
 		RETRIEVER_SRS_LOAD:            "",
