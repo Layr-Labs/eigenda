@@ -494,7 +494,8 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, test.GetLogger())
-	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, 1, dataapi.Deregistered)
+	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(
+		ctx, 1, dataapi.Deregistered)
 	assert.NoError(t, err)
 
 	operators := indexedDeregisteredOperatorState.Operators
@@ -524,7 +525,8 @@ func TestQueryIndexedRegisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
 	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, test.GetLogger())
-	indexedRegisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, 1, dataapi.Registered)
+	indexedRegisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(
+		ctx, 1, dataapi.Registered)
 	assert.NoError(t, err)
 
 	operators := indexedRegisteredOperatorState.Operators

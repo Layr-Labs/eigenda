@@ -76,7 +76,8 @@ func TestFetchBatchHeader(t *testing.T) {
 			R:          r,
 			S:          s,
 		}), false, nil)
-	batchHeader, err := chainClient.FetchBatchHeader(ctx, serviceManagerAddress, batchHeaderHash, big.NewInt(int64(refBlock)), nil)
+	batchHeader, err := chainClient.FetchBatchHeader(
+		ctx, serviceManagerAddress, batchHeaderHash, big.NewInt(int64(refBlock)), nil)
 	assert.Nil(t, err)
 	assert.Equal(t, batchHeader.BlobHeadersRoot, expectedHeader.BlobHeadersRoot)
 	assert.Equal(t, batchHeader.QuorumNumbers, expectedHeader.QuorumNumbers)

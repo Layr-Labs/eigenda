@@ -102,7 +102,8 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 	return cache, fetcher, baseTime
 }
 
-func syncCacheGet(t *testing.T, cache *v2.FeedCache[testItem], start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
+func syncCacheGet(t *testing.T, cache *v2.FeedCache[testItem], start, end time.Time,
+	order v2.FetchOrder, limit int) ([]*testItem, error) {
 	t.Helper()
 	ctx := t.Context()
 	items, err := cache.Get(ctx, start, end, order, limit)
