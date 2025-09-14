@@ -92,7 +92,7 @@ func setupTest(t *testing.T) (
 		PostgresDB:     "graph-node",
 		PostgresUser:   "graph-node",
 		PostgresPass:   "let-me-in",
-		EthereumRPC:    "http://host.docker.internal:8545",
+		EthereumRPC:    "http://localhost:8545",
 		ExposeHostPort: true,
 		HostHTTPPort:   "8000",
 		HostWSPort:     "8001",

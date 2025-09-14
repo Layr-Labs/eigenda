@@ -48,8 +48,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
-	anvilContainer      *testbed.AnvilContainer
-	graphNodeContainer  *testbed.GraphNodeContainer
+	anvilContainer     *testbed.AnvilContainer
+	graphNodeContainer *testbed.GraphNodeContainer
 
 	templateName      string
 	testName          string
@@ -155,7 +155,7 @@ var _ = BeforeSuite(func() {
 				PostgresDB:     "graph-node",
 				PostgresUser:   "graph-node",
 				PostgresPass:   "let-me-in",
-				EthereumRPC:    "http://host.docker.internal:8545",
+				EthereumRPC:    "http://localhost:8545",
 				ExposeHostPort: true,
 				HostHTTPPort:   "8000",
 				HostWSPort:     "8001",
