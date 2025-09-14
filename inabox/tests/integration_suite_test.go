@@ -48,7 +48,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
-	anvilContainer *testbed.AnvilContainer
+	anvilContainer     *testbed.AnvilContainer
+	graphNodeContainer *testbed.GraphNodeContainer
 
 	templateName      string
 	testName          string
@@ -174,7 +175,22 @@ func setupSuite() error {
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
 			logger.Info("Starting graph node")
-			testConfig.StartGraphNode()
+			graphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+				PostgresDB:     "graph-node",
+				PostgresUser:   "graph-node",
+				PostgresPass:   "let-me-in",
+				EthereumRPC:    "http://host.docker.internal:8545",
+				ExposeHostPort: true,
+				HostHTTPPort:   "8000",
+				HostWSPort:     "8001",
+				HostAdminPort:  "8020",
+				HostIPFSPort:   "5001",
+				Logger:         logger,
+			})
+			Expect(err).To(BeNil())
+			// Wait for Graph Node to be ready
+			logger.Info("Waiting for Graph Node to be ready")
+			time.Sleep(10 * time.Second)
 		}
 
 		logger.Info("Deploying experiment")
@@ -509,8 +525,10 @@ func teardownSuite() {
 		}
 	}
 
-	logger.Info("Stopping graph node")
-	testConfig.StopGraphNode()
+	if graphNodeContainer != nil {
+		logger.Info("Stopping graph node")
+		_ = graphNodeContainer.Terminate(context.Background())
+	}
 
 	if localstackContainer != nil {
 		logger.Info("Stopping localstack container")
