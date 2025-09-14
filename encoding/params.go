@@ -8,10 +8,6 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-var (
-	ErrInvalidParams = errors.New("invalid encoding params")
-)
-
 type EncodingParams struct {
 	ChunkLength uint64 // ChunkSize is the length of the chunk in symbols
 	NumChunks   uint64
@@ -26,15 +22,12 @@ func (p EncodingParams) NumEvaluations() uint64 {
 }
 
 func (p EncodingParams) Validate() error {
-
-	if NextPowerOf2(p.NumChunks) != p.NumChunks {
-		return ErrInvalidParams
+	if !IsPowerOfTwo(p.NumChunks) {
+		return fmt.Errorf("number of chunks must be a power of 2, got %d", p.NumChunks)
 	}
-
-	if NextPowerOf2(p.ChunkLength) != p.ChunkLength {
-		return ErrInvalidParams
+	if !IsPowerOfTwo(p.ChunkLength) {
+		return fmt.Errorf("chunk length must be a power of 2, got %d", p.ChunkLength)
 	}
-
 	return nil
 }
 

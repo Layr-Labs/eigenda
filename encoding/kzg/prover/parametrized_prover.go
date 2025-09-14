@@ -19,7 +19,6 @@ type ParametrizedProver struct {
 	*rs.Encoder
 
 	KzgConfig *kzg.KzgConfig
-	Ks        *kzg.KZGSettings
 
 	KzgMultiProofBackend  KzgMultiProofsBackend
 	KzgCommitmentsBackend KzgCommitmentsBackend
