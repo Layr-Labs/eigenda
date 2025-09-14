@@ -63,15 +63,15 @@ type BlockHandler struct {
 type Networks map[string]map[string]map[string]any
 
 type subgraphUpdater interface {
-	UpdateSubgraph(s *Subgraph, startBlock int)
-	UpdateNetworks(n Networks, startBlock int)
+	updateSubgraph(s *Subgraph, startBlock int)
+	updateNetworks(n Networks, startBlock int)
 }
 
 type eigenDAOperatorStateSubgraphUpdater struct {
 	c *Config
 }
 
-func (u eigenDAOperatorStateSubgraphUpdater) UpdateSubgraph(s *Subgraph, startBlock int) {
+func (u eigenDAOperatorStateSubgraphUpdater) updateSubgraph(s *Subgraph, startBlock int) {
 	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.RegistryCoordinator, "0x")
 	s.DataSources[0].Source.StartBlock = startBlock
 	s.DataSources[1].Source.Address = strings.TrimPrefix(u.c.EigenDA.BlsApkRegistry, "0x")
@@ -84,7 +84,7 @@ func (u eigenDAOperatorStateSubgraphUpdater) UpdateSubgraph(s *Subgraph, startBl
 	s.DataSources[4].Source.StartBlock = startBlock
 }
 
-func (u eigenDAOperatorStateSubgraphUpdater) UpdateNetworks(n Networks, startBlock int) {
+func (u eigenDAOperatorStateSubgraphUpdater) updateNetworks(n Networks, startBlock int) {
 	n["devnet"]["RegistryCoordinator"]["address"] = u.c.EigenDA.RegistryCoordinator
 	n["devnet"]["RegistryCoordinator"]["startBlock"] = startBlock
 	n["devnet"]["RegistryCoordinator_Operator"]["address"] = u.c.EigenDA.RegistryCoordinator
@@ -102,12 +102,12 @@ type eigenDAUIMonitoringUpdater struct {
 	c *Config
 }
 
-func (u eigenDAUIMonitoringUpdater) UpdateSubgraph(s *Subgraph, startBlock int) {
+func (u eigenDAUIMonitoringUpdater) updateSubgraph(s *Subgraph, startBlock int) {
 	s.DataSources[0].Source.Address = strings.TrimPrefix(u.c.EigenDA.ServiceManager, "0x")
 	s.DataSources[0].Source.StartBlock = startBlock
 }
 
-func (u eigenDAUIMonitoringUpdater) UpdateNetworks(n Networks, startBlock int) {
+func (u eigenDAUIMonitoringUpdater) updateNetworks(n Networks, startBlock int) {
 	n["devnet"]["EigenDAServiceManager"]["address"] = u.c.EigenDA.ServiceManager
 	n["devnet"]["EigenDAServiceManager"]["startBlock"] = startBlock
 }
@@ -215,7 +215,7 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 	if err := json.Unmarshal([]byte(networkData), &networkTemplate); err != nil {
 		logger.Fatal("Failed to unmarshal networks.json", "error", err)
 	}
-	updater.UpdateNetworks(networkTemplate, startBlock)
+	updater.updateNetworks(networkTemplate, startBlock)
 	networkJson, err := json.MarshalIndent(networkTemplate, "", "  ")
 	if err != nil {
 		logger.Fatal("Error marshaling networks.json", "error", err)
@@ -235,7 +235,7 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 	if err := yaml.Unmarshal(subgraphTemplateData, &sub); err != nil {
 		logger.Fatal("Error unmarshaling subgraph.yaml", "error", err)
 	}
-	updater.UpdateSubgraph(&sub, startBlock)
+	updater.updateSubgraph(&sub, startBlock)
 	subgraphYaml, err := yaml.Marshal(&sub)
 	if err != nil {
 		logger.Fatal("Error marshaling subgraph", "error", err)
@@ -244,36 +244,4 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 		logger.Fatal("Error writing subgraph.yaml", "error", err)
 	}
 	logger.Info("subgraph.yaml written")
-}
-
-func (env *Config) StartGraphNode() {
-	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		logger.Fatal("Error changing directories", "error", err)
-	}
-
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil {
-		logger.Info("Successfully changed to absolute path", "path", cwd)
-	}
-
-	err := execCmd("./bin.sh", []string{"start-graph"}, []string{}, true)
-	if err != nil {
-		logger.Fatal("Failed to start graph node", "error", err)
-	}
-}
-
-func (env *Config) StopGraphNode() {
-	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
-		logger.Fatal("Error changing directories", "error", err)
-	}
-
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil {
-		logger.Info("Successfully changed to absolute path", "path", cwd)
-	}
-
-	err := execCmd("./bin.sh", []string{"stop-graph"}, []string{}, true)
-	if err != nil {
-		logger.Fatal("Failed to stop graph node", "error", err)
-	}
 }

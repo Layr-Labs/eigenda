@@ -150,7 +150,24 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		fmt.Println("Starting graph node")
-		config.StartGraphNode()
+		_, err := testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+			PostgresDB:     "graph-node",
+			PostgresUser:   "graph-node",
+			PostgresPass:   "let-me-in",
+			EthereumRPC:    "http://host.docker.internal:8545",
+			ExposeHostPort: true,
+			HostHTTPPort:   "8000",
+			HostWSPort:     "8001",
+			HostAdminPort:  "8020",
+			HostIPFSPort:   "5001",
+			Logger:         logger,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to start graph node: %w", err)
+		}
+		// Wait for Graph Node to be ready
+		fmt.Println("Waiting for Graph Node to be ready...")
+		time.Sleep(10 * time.Second)
 	}
 
 	return nil

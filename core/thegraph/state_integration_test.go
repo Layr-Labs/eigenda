@@ -40,7 +40,7 @@ func init() {
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
 
-func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *testbed.GraphNodeContainer, *deploy.Config) {
 	t.Helper()
 
 	if testing.Short() {
@@ -86,7 +86,26 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 	require.NoError(t, err, "failed to start anvil container")
 
 	logger.Info("Starting graph node")
-	testConfig.StartGraphNode()
+	graphNodeContainer, err := testbed.NewGraphNodeContainerWithOptions(ctx, testbed.GraphNodeOptions{
+		PostgresDB:     "graph-node",
+		PostgresUser:   "graph-node",
+		PostgresPass:   "let-me-in",
+		EthereumRPC:    "http://host.docker.internal:8545",
+		ExposeHostPort: true,
+		HostHTTPPort:   "8000",
+		HostWSPort:     "8001",
+		HostAdminPort:  "8020",
+		HostIPFSPort:   "5001",
+		Logger:         logger,
+	})
+	require.NoError(t, err, "failed to start graph node")
+
+	// Wait for Graph Node to be ready for subgraph deployment
+	logger.Info("Waiting for Graph Node to be ready", "adminURL", graphNodeContainer.AdminURL())
+	time.Sleep(10 * time.Second)
+
+	// Update the graph URL to use the new container
+	graphUrl = graphNodeContainer.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
 	logger.Info("Deploying experiment")
 	err = testConfig.DeployExperiment()
@@ -104,18 +123,18 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 		testConfig.StopBinaries()
 
 		logger.Info("Stop graph node")
-		testConfig.StopGraphNode()
+		_ = graphNodeContainer.Terminate(ctx)
 
 		_ = anvilContainer.Terminate(ctx)
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	return anvilContainer, localstackContainer, testConfig
+	return anvilContainer, localstackContainer, graphNodeContainer, testConfig
 }
 
 func TestIndexerIntegration(t *testing.T) {
 	ctx := t.Context()
-	_, _, testConfig := setupTest(t)
+	_, _, _, testConfig := setupTest(t)
 
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(
