@@ -25,13 +25,11 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints disabled - they should not be accessible
 	t.Run("Admin Endpoints Disabled", func(t *testing.T) {
 		// Create server config with admin endpoints disabled
-		enabledAPIs, err := enabled_apis.NewEnabledAPIs([]string{})
-		require.NoError(t, err)
 
 		adminDisabledCfg := Config{
 			Host:        "localhost",
 			Port:        0,
-			EnabledAPIs: enabledAPIs, // Empty list means no APIs are enabled
+			EnabledAPIs: enabled_apis.New([]enabled_apis.API{}), // Empty list means no APIs are enabled
 		}
 
 		// Test GET endpoint with admin disabled

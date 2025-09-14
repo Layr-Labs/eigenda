@@ -28,10 +28,8 @@ import (
 )
 
 var (
-	testLogger         = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	enabledRestAPIs, _ = enabled_apis.NewEnabledAPIs([]string{enabled_apis.Admin.ToString(),
-		enabled_apis.OpGenericCommitment.ToString(), enabled_apis.OpKeccakCommitment.ToString(),
-		enabled_apis.StandardCommitment.ToString()}) // Enable rest APIs for testing
+	testLogger      = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
+	enabledRestAPIs = enabled_apis.New(enabled_apis.AllRestAPIs()) // Enable rest APIs for testing
 
 	testCfg = Config{
 		Host:        "localhost",

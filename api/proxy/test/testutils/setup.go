@@ -342,11 +342,9 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		EthRPCURL:        ethRPC,
 	}
 
-	enabledAPIs, err := enabled_apis.NewEnabledAPIs(
-		[]string{enabled_apis.Admin.ToString(), enabled_apis.OpGenericCommitment.ToString(),
-			enabled_apis.OpKeccakCommitment.ToString(), enabled_apis.StandardCommitment.ToString()},
+	enabledAPIs := enabled_apis.New(
+		enabled_apis.AllRestAPIs(),
 	)
-
 	if err != nil {
 		panic(err)
 	}

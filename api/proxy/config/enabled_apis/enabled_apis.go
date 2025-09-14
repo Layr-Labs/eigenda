@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/Layr-Labs/eigenda/api/proxy/common"
 )
 
 // EnabledAPIs is a wrapper type of the APIs set enum and provides
@@ -59,6 +61,10 @@ func (e EnabledAPIs) Check() error {
 		return fmt.Errorf("expected at least one \"apis.enabled\" value to be provided")
 	}
 
+	if common.ContainsDuplicates(e.apis) {
+		return fmt.Errorf("enabled apis contains duplicate: %+v", e.apis)
+	}
+
 	if e.Metrics() && (!e.RestALTDA() && !e.ArbCustomDA()) {
 		return fmt.Errorf("metrics cannot be enabled unless `arb` and/or `rest` also is")
 	}
@@ -72,9 +78,7 @@ func (e EnabledAPIs) Check() error {
 	return nil
 }
 
-// NewEnabledAPIs processes a string slice passed from user CLI
-// into an API enum set
-func NewEnabledAPIs(strSlice []string) (*EnabledAPIs, error) {
+func StringsToEnabledAPIs(strSlice []string) (*EnabledAPIs, error) {
 	enabledAPIs := EnabledAPIs{
 		make([]API, len(strSlice)),
 	}
@@ -85,15 +89,18 @@ func NewEnabledAPIs(strSlice []string) (*EnabledAPIs, error) {
 			return nil, fmt.Errorf("could not read string into API enum type: %w", err)
 		}
 
-		// SET data structure enforcement
-		if enabledAPIs.has(enabledAPI) {
-			return nil, fmt.Errorf("cannot pass the same API type more than once: %s", enabledAPI.ToString())
-		}
-
 		enabledAPIs.apis[i] = enabledAPI
 	}
 
 	return &enabledAPIs, nil
+}
+
+// New processes a string slice passed from user CLI
+// into an API enum set
+func New(apis []API) *EnabledAPIs {
+	return &EnabledAPIs{
+		apis,
+	}
 }
 
 func (e EnabledAPIs) has(api API) bool {
@@ -111,6 +118,12 @@ const (
 	ArbCustomDAServer   API = 5
 	MetricsServer       API = 6
 )
+
+func AllRestAPIs() []API {
+	return []API{
+		Admin, OpGenericCommitment, OpKeccakCommitment, StandardCommitment,
+	}
+}
 
 func (api API) ToString() string {
 	switch api {

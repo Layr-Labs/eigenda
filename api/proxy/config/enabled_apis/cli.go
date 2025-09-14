@@ -17,12 +17,12 @@ func withEnvPrefix(envPrefix, s string) []string {
 func ReadEnabledAPIs(ctx *cli.Context) *EnabledAPIs {
 	enabledAPIStrings := ctx.StringSlice(EnabledAPIsFlagName)
 
-	enabledAPIs, err := NewEnabledAPIs(enabledAPIStrings)
+	apis, err := StringsToEnabledAPIs(enabledAPIStrings)
 	if err != nil {
 		panic(err)
 	}
 
-	return enabledAPIs
+	return apis
 }
 
 func CLIFlags(category string, envPrefix string) []cli.Flag {
