@@ -40,7 +40,9 @@ func init() {
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
 
-func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *testbed.GraphNodeContainer, *deploy.Config) {
+func setupTest(t *testing.T) (
+	*testbed.AnvilContainer, *testbed.LocalStackContainer, *testbed.GraphNodeContainer, *deploy.Config,
+) {
 	t.Helper()
 
 	if testing.Short() {

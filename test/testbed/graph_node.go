@@ -30,18 +30,20 @@ const (
 
 // GraphNodeOptions configures The Graph node container
 type GraphNodeOptions struct {
-	PostgresDB     string                        // Database name for Graph Node
-	PostgresUser   string                        // Database user
-	PostgresPass   string                        // Database password
-	EthereumRPC    string                        // Ethereum RPC endpoint (will be set to Anvil RPC if Anvil is enabled)
-	IPFSEndpoint   string                        // Optional external IPFS endpoint
-	ExposeHostPort bool                          // If true, binds container ports to host
-	HostHTTPPort   string                        // Custom host port for HTTP (defaults to "8000" if empty and ExposeHostPort is true)
-	HostWSPort     string                        // Custom host port for WebSocket (defaults to "8001" if empty and ExposeHostPort is true)
-	HostAdminPort  string                        // Custom host port for Admin (defaults to "8020" if empty and ExposeHostPort is true)
-	HostIPFSPort   string                        // Custom host port for IPFS (defaults to "5001" if empty and ExposeHostPort is true)
-	Logger         logging.Logger                // Logger for container operations (required)
-	Network        *testcontainers.DockerNetwork // Optional Docker network to use
+	PostgresDB   string // Database name for Graph Node
+	PostgresUser string // Database user
+	PostgresPass string // Database password
+	EthereumRPC  string // Ethereum RPC endpoint (will be set to Anvil RPC if Anvil is enabled)
+
+	ExposeHostPort bool   // If true, binds container ports to host
+	IPFSEndpoint   string // Optional external IPFS endpoint
+	HostHTTPPort   string // Custom host port for HTTP (defaults to "8000" if empty and ExposeHostPort is true)
+	HostWSPort     string // Custom host port for WebSocket (defaults to "8001" if empty and ExposeHostPort is true)
+	HostAdminPort  string // Custom host port for Admin (defaults to "8020" if empty and ExposeHostPort is true)
+	HostIPFSPort   string // Custom host port for IPFS (defaults to "5001" if empty and ExposeHostPort is true)
+
+	Logger  logging.Logger                // Logger for container operations (required)
+	Network *testcontainers.DockerNetwork // Optional Docker network to use
 }
 
 // GraphNodeContainer manages a Graph Node cluster with PostgreSQL and IPFS
@@ -225,7 +227,8 @@ func (g *GraphNodeContainer) Terminate(ctx context.Context) error {
 
 // startPostgres creates and starts a PostgreSQL container
 func startPostgres(
-	ctx context.Context, opts GraphNodeOptions, nw *testcontainers.DockerNetwork, containerName string, logger logging.Logger,
+	ctx context.Context, opts GraphNodeOptions, nw *testcontainers.DockerNetwork,
+	containerName string, logger logging.Logger,
 ) (testcontainers.Container, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        PostgresImage,
@@ -236,9 +239,10 @@ func startPostgres(
 			"POSTGRES_PASSWORD":    opts.PostgresPass,
 			"POSTGRES_INITDB_ARGS": "--locale=C --encoding=UTF8",
 		},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(60 * time.Second),
-		Name:       containerName,
-		Networks:   []string{nw.Name},
+		WaitingFor: wait.ForLog("database system is ready to accept connections").
+			WithOccurrence(2).WithStartupTimeout(60 * time.Second),
+		Name:     containerName,
+		Networks: []string{nw.Name},
 		NetworkAliases: map[string][]string{
 			nw.Name: {containerName, "postgres"},
 		},
@@ -250,11 +254,18 @@ func startPostgres(
 		Logger:           newTestcontainersLogger(logger),
 	}
 
-	return testcontainers.GenericContainer(ctx, genericReq)
+	container, err := testcontainers.GenericContainer(ctx, genericReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start postgres container: %w", err)
+	}
+	return container, nil
 }
 
 // startIPFS creates and starts an IPFS container
-func startIPFS(ctx context.Context, opts GraphNodeOptions, nw *testcontainers.DockerNetwork, containerName string, logger logging.Logger) (testcontainers.Container, error) {
+func startIPFS(
+	ctx context.Context, opts GraphNodeOptions, nw *testcontainers.DockerNetwork,
+	containerName string, logger logging.Logger,
+) (testcontainers.Container, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        IPFSImage,
 		ExposedPorts: []string{IPFSAPIPort, IPFSGatewayPort},
@@ -288,7 +299,11 @@ func startIPFS(ctx context.Context, opts GraphNodeOptions, nw *testcontainers.Do
 		Logger:           newTestcontainersLogger(logger),
 	}
 
-	return testcontainers.GenericContainer(ctx, genericReq)
+	container, err := testcontainers.GenericContainer(ctx, genericReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start IPFS container: %w", err)
+	}
+	return container, nil
 }
 
 // startGraphNode creates and starts a Graph Node container
@@ -300,7 +315,8 @@ func startGraphNode(
 	logger logging.Logger,
 ) (testcontainers.Container, error) {
 	// Construct postgres connection string
-	postgresURL := fmt.Sprintf("postgresql://%s:%s@%s:5432/%s", opts.PostgresUser, opts.PostgresPass, postgresName, opts.PostgresDB)
+	postgresURL := fmt.Sprintf("postgresql://%s:%s@%s:5432/%s",
+		opts.PostgresUser, opts.PostgresPass, postgresName, opts.PostgresDB)
 
 	req := testcontainers.ContainerRequest{
 		Image: GraphNodeImage,
@@ -371,5 +387,9 @@ func startGraphNode(
 		Logger:           newTestcontainersLogger(logger),
 	}
 
-	return testcontainers.GenericContainer(ctx, genericReq)
+	container, err := testcontainers.GenericContainer(ctx, genericReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start Graph Node container: %w", err)
+	}
+	return container, nil
 }
