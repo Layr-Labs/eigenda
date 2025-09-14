@@ -51,6 +51,8 @@ var (
 )
 
 func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+	t.Helper()
+
 	if testing.Short() {
 		t.Skip("Skipping churner test in short mode")
 	}
@@ -83,7 +85,8 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 	require.NoError(t, err, "failed to start anvil container")
 
 	logger.Info("Deploying experiment")
-	testConfig.DeployExperiment()
+	err = testConfig.DeployExperiment()
+	require.NoError(t, err, "failed to deploy experiment")
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers")
