@@ -56,8 +56,8 @@ type Handlers struct {
 	//
 	// TODO: Logging - the underlying go-ethereum (geth) RPC server framework uses geth logging for capturing
 	//       invalid namespace/method and deserialization errors when targeting through meta-level reflection.
-	///      This can result in consistency issues since this is a geth native logger where we use a custom logger
-	//       maintained in https://github.com/Layr-Labs/eigensdk-go/tree/dev/logging.
+	///      This can result in std out consistency issues since this is a geth native logger where we use a
+	//       custom logger maintained in https://github.com/Layr-Labs/eigensdk-go/tree/dev/logging.
 	//
 	//       We should dig into this underlying logging and see if there's a way to intuitively override, disable,
 	//       or enforce consistency between log outputs.
@@ -75,8 +75,8 @@ func NewHandlers(m *store.EigenDAManager) *Handlers {
 // Arbitrum Nitro does this check via a bitwise AND which can cause overlapping and requires careful future
 // management. while we could determine a byte value with bits that don't overlap - it's more maintainable
 // to do a literal comparison and assume OCL NOR our competitors would never introduce a conflicting byte value
-func (h *Handlers) IsValidHeaderByte(ctx context.Context, headerByte byte) (IsValidHeaderByteResult, error) {
-	return IsValidHeaderByteResult{
+func (h *Handlers) IsValidHeaderByte(ctx context.Context, headerByte byte) (*IsValidHeaderByteResult, error) {
+	return &IsValidHeaderByteResult{
 		IsValid: headerByte == EigenDAV2MessageHeaderByte,
 	}, nil
 }
@@ -251,8 +251,8 @@ func (h *Handlers) GenerateCertificateValidityProof(
 	ctx context.Context,
 	preimageType hexutil.Uint,
 	certificate hexutil.Bytes,
-) (GenerateCertificateValidityProofResult, error) {
-	return GenerateCertificateValidityProofResult{
+) (*GenerateCertificateValidityProofResult, error) {
+	return &GenerateCertificateValidityProofResult{
 		Proof: []byte{},
 	}, nil
 }
