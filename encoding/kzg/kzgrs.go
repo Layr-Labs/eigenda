@@ -39,7 +39,7 @@ type KzgConfig struct {
 	// PreloadEncoder is only used by the prover to generate kzg multiproofs.
 	// It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.
 	//
-	// If true, encoding params are read from CacheDir during initialization, and SRS tables are preloaded.
+	// If true, SRS tables are read from CacheDir during initialization.
 	// Generating these on startup would take hours otherwise.
 	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
