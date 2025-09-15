@@ -244,9 +244,12 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	// TODO set up logic to load tracker info from persistent storage
-	// TODO config
 
-	tracker, err := signingrate.NewSigningRateTracker(logger, 0, 0, time.Now)
+	tracker, err := signingrate.NewSigningRateTracker(
+		logger,
+		config.DispatcherConfig.SigningRateHistoryLength,
+		config.DispatcherConfig.SigningRateBucketSpan,
+		time.Now)
 	if err != nil {
 		return fmt.Errorf("failed to create signing rate tracker: %w", err)
 	}

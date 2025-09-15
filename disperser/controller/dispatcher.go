@@ -66,6 +66,14 @@ type DispatcherConfig struct {
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string
+
+	// The size of the time window for tracking signing rates. Smaller values gives more granular data, at the cost
+	// of more memory usage.
+	SigningRateBucketSpan time.Duration
+
+	// The length of the history for tracking signing rates. Longer values gives more historical data, at the cost
+	// of more memory usage.
+	SigningRateHistoryLength time.Duration
 }
 
 type Dispatcher struct {

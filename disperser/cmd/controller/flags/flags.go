@@ -280,6 +280,20 @@ var (
 		Value:    3 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
 	}
+	SigningRateBucketSpanFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-bucket-span"),
+		Usage:    "The time span of each signing rate bucket",
+		Required: false,
+		Value:    time.Hour,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_BUCKET_SPAN"),
+	}
+	SigningRateHistoryLengthFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-history-length"),
+		Usage:    "The length of time to keep signing rate history in memory",
+		Required: false,
+		Value:    time.Hour * 24 * 7 * 2, // 2 weeks
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_HISTORY_LENGTH"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -325,6 +339,8 @@ var optionalFlags = []cli.Flag{
 	GrpcMaxIdleConnectionAgeFlag,
 	GrpcAuthorizationRequestMaxPastAgeFlag,
 	GrpcAuthorizationRequestMaxFutureAgeFlag,
+	SigningRateBucketSpanFlag,
+	SigningRateHistoryLengthFlag,
 }
 
 var Flags []cli.Flag
