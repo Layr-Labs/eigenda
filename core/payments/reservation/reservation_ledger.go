@@ -122,6 +122,9 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (flo
 }
 
 // Checks if the underlying leaky bucket is empty.
+//
+// This method cannot be used as an oracle to determine whether the bucket will be empty at some point in the future:
+// it causes the ledger to update it's internal state, so only an *honest* representation of "now" should be provided.
 func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
