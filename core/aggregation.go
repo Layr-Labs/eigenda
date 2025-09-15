@@ -34,6 +34,10 @@ type SigningMessage struct {
 	AttestationLatencyMs float64
 	TimeReceived         time.Time
 	Err                  error
+	// True if the error is due to a timeout.
+	Timeout bool
+	// The time it took to call StoreChunks(), if successful
+	Latency time.Duration
 }
 
 // QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums
