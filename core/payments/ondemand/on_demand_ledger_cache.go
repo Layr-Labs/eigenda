@@ -101,6 +101,10 @@ func NewOnDemandLedgerCache(
 		logger,
 		paymentVault,
 		updateInterval,
+		// relatively arbitrary value. much higher than account number in practice, but much lower than what the RPC
+		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
+		// in a config value
+		1024,
 		ledgerCache.GetAccountsToUpdate,
 		ledgerCache.UpdateTotalDeposit,
 	)

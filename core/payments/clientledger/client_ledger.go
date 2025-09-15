@@ -123,6 +123,7 @@ func NewClientLedger(
 			logger,
 			paymentVault,
 			updateInterval,
+			0,
 			clientLedger.GetAccountsToUpdate,
 			clientLedger.UpdateTotalDeposit)
 		enforce.NilError(err, "new on demand vault monitor")
