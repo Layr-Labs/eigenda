@@ -122,11 +122,11 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (flo
 }
 
 // Checks if the underlying leaky bucket is empty.
-func (rl *ReservationLedger) IsBucketEmpty(now time.Time) (bool, error) {
+func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	return rl.leakyBucket.CheckFillLevel(now) <= 0, nil
+	return rl.leakyBucket.CheckFillLevel(now) <= 0
 }
 
 // UpdateReservation updates the reservation parameters and recreates the leaky bucket, if necessary

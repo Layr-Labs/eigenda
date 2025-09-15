@@ -18,7 +18,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 
 	t.Run("nil payment vault", func(t *testing.T) {
 		cache, err := reservation.NewReservationLedgerCache(
-			context.Background(),
+			t.Context(),
 			testutils.GetLogger(),
 			10,
 			nil, // nil payment vault
@@ -33,7 +33,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 
 	t.Run("nil time source", func(t *testing.T) {
 		cache, err := reservation.NewReservationLedgerCache(
-			context.Background(),
+			t.Context(),
 			testutils.GetLogger(),
 			10,
 			vault.NewTestPaymentVault(),
@@ -48,7 +48,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 
 	t.Run("invalid capacity duration", func(t *testing.T) {
 		cache, err := reservation.NewReservationLedgerCache(
-			context.Background(),
+			t.Context(),
 			testutils.GetLogger(),
 			10,
 			vault.NewTestPaymentVault(),
@@ -63,7 +63,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 }
 
 func TestLRUCacheEvictionAndReload(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -113,19 +113,19 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	ledgerA, err := ledgerCache.GetOrCreate(ctx, accountA)
 	require.NoError(t, err)
 	success, _, err := ledgerA.Debit(testTime, testTime, uint32(9), []uint8{0})
-	require.NoError(t, err, "first debit from account A should succeed")
+	require.NoError(t, err)
 	require.True(t, success, "first debit from account A should succeed")
 
 	// Add accounts B and C to cache, evicting account A
 	ledgerB, err := ledgerCache.GetOrCreate(ctx, accountB)
 	require.NoError(t, err)
 	success, _, err = ledgerB.Debit(testTime, testTime, uint32(3), []uint8{0})
-	require.NoError(t, err, "debit from account B should succeed")
+	require.NoError(t, err)
 	require.True(t, success, "debit from account B should succeed")
 	ledgerC, err := ledgerCache.GetOrCreate(ctx, accountC)
 	require.NoError(t, err)
 	success, _, err = ledgerC.Debit(testTime, testTime, uint32(2), []uint8{0})
-	require.NoError(t, err, "debit from account C should succeed")
+	require.NoError(t, err)
 	require.True(t, success, "debit from account C should succeed")
 
 	// At this point, account A should have been evicted from the LRU cache
@@ -139,12 +139,12 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	// Since bucket capacity is 1 second and rate is 8 symbols/sec, it can hold 8 symbols total
 	// The fresh bucket should allow the full capacity
 	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(8), []uint8{0})
-	require.NoError(t, err, "second debit from reloaded account A should not error")
+	require.NoError(t, err)
 	require.True(t, success, "second debit from reloaded account A should succeed with fresh bucket")
 
 	// Now trying to add 1 more symbol should fail on capacity since bucket is full
 	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(1), []uint8{0})
-	require.NoError(t, err, "third debit from account A should not error")
+	require.NoError(t, err)
 	require.False(t, success, "third debit from account A should fail due to insufficient capacity")
 
 	// simulate a new reservation update for account A with higher capacity
