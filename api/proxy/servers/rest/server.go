@@ -75,7 +75,7 @@ func (svr *Server) Start(r *mux.Router) error {
 
 	svr.endpoint = listener.Addr().String()
 
-	svr.log.Info("Starting DA server", "endpoint", svr.endpoint)
+	svr.log.Info("Starting REST ALT DA server", "endpoint", svr.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if err := svr.httpServer.Serve(svr.listener); err != nil {

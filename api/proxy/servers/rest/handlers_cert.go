@@ -29,6 +29,7 @@ const (
 // handleGetOPKeccakCommitment handles GET requests for optimism keccak commitments.
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
 	if !svr.config.EnabledAPIs.RestALTDAOPKeccak() {
+		w.WriteHeader(http.StatusForbidden)
 		return fmt.Errorf("op-keccak DA Commitment type detected but `op-keccak` API is not enabled")
 	}
 
@@ -61,6 +62,7 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 // handleGetOPGenericCommitment handles the GET request for optimism generic commitments.
 func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
 	if !svr.config.EnabledAPIs.RestALTDAOPGeneric() {
+		w.WriteHeader(http.StatusForbidden)
 		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
 	}
 
@@ -70,6 +72,7 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 // handleGetStdCommitment handles the GET request for std commitments.
 func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
 	if !svr.config.EnabledAPIs.RestALTStandard() {
+		w.WriteHeader(http.StatusForbidden)
 		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
 	}
 
@@ -165,11 +168,21 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 
 // handlePostStdCommitment handles the POST request for std commitments.
 func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.EnabledAPIs.RestALTStandard() {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.StandardCommitmentMode)
 }
 
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
 func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
+	if !svr.config.EnabledAPIs.RestALTDAOPGeneric() {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("op-generic DA Commitment type detected but `op-generic` API is not enabled")
+	}
+
 	return svr.handlePostShared(w, r, commitments.OptimismGenericCommitmentMode)
 }
 
@@ -179,6 +192,11 @@ func (svr *Server) handlePostShared(
 	r *http.Request,
 	mode commitments.CommitmentMode,
 ) error {
+	if !svr.config.EnabledAPIs.RestALTStandard() && mode == commitments.StandardCommitmentMode {
+		w.WriteHeader(http.StatusForbidden)
+		return fmt.Errorf("standard DA Commitment type detected but `standard` API is not enabled")
+	}
+
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
 	if err != nil {
 		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)

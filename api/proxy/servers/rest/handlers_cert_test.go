@@ -368,3 +368,75 @@ func TestHandlerPutKeccakErrors(t *testing.T) {
 			})
 	}
 }
+func TestHandlersReturn403WhenAPIDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEigenDAManager := mocks.NewMockIEigenDAManager(ctrl)
+	mockKeccakManager := mocks.NewMockIKeccakManager(ctrl)
+
+	type tc struct {
+		name    string
+		method  string
+		url     string
+		enabled []enabled_apis.API
+	}
+	cases := []tc{
+		{
+			name:   "GET keccak: 403 when OpKeccakCommitment disabled",
+			method: http.MethodGet,
+			url:    fmt.Sprintf("/get/0x00%s", testCommitStr),
+			// enable other REST APIs but explicitly ignore OpKeccakCommitment
+			enabled: []enabled_apis.API{
+				enabled_apis.OpGenericCommitment,
+				enabled_apis.StandardCommitment,
+			},
+		},
+		{
+			name:   "GET op-generic: 403 when OpGenericCommitment disabled",
+			method: http.MethodGet,
+			url:    fmt.Sprintf("/get/0x010000%s", testCommitStr),
+			enabled: []enabled_apis.API{
+				enabled_apis.OpKeccakCommitment,
+				enabled_apis.StandardCommitment,
+			},
+		},
+		{
+			name:   "POST /put (op-generic default): 403 when OpGenericCommitment disabled",
+			method: http.MethodPost,
+			url:    "/put",
+			enabled: []enabled_apis.API{
+				enabled_apis.OpKeccakCommitment,
+				enabled_apis.StandardCommitment,
+			},
+		},
+		{
+			name:   "POST /put?commitment_mode=standard: 403 when StandardCommitment disabled",
+			method: http.MethodPost,
+			url:    "/put?commitment_mode=standard",
+			enabled: []enabled_apis.API{
+				enabled_apis.OpKeccakCommitment,
+				enabled_apis.OpGenericCommitment,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest(c.method, c.url, strings.NewReader("body"))
+			rec := httptest.NewRecorder()
+
+			r := mux.NewRouter()
+			cfg := Config{
+				Host:        "localhost",
+				Port:        0,
+				EnabledAPIs: enabled_apis.New(c.enabled),
+			}
+			server := NewServer(cfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
+			server.RegisterRoutes(r)
+
+			r.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusForbidden, rec.Code)
+		})
+	}
+}

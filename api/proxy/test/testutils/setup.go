@@ -134,6 +134,7 @@ func GetBackend() Backend {
 }
 
 type TestConfig struct {
+	APIsToEnable     *enabled_apis.EnabledAPIs
 	BackendsToEnable []common.EigenDABackend
 	DispersalBackend common.EigenDABackend
 	Backend          Backend
@@ -164,6 +165,7 @@ func NewTestConfig(
 	}
 
 	return TestConfig{
+		APIsToEnable:       enabled_apis.New(enabled_apis.AllRestAPIs()),
 		BackendsToEnable:   backendsToEnable,
 		DispersalBackend:   dispersalBackend,
 		Backend:            backend,
@@ -342,22 +344,15 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		EthRPCURL:        ethRPC,
 	}
 
-	enabledAPIs := enabled_apis.New(
-		enabled_apis.AllRestAPIs(),
-	)
-	if err != nil {
-		panic(err)
-	}
-
 	return config.AppConfig{
 		StoreBuilderConfig: builderConfig,
 		SecretConfig:       secretConfig,
-		EnabledAPIs:        enabledAPIs,
+		EnabledAPIs:        testCfg.APIsToEnable,
 		MetricsSvrConfig:   proxy_metrics.Config{},
 		RestSvrCfg: rest.Config{
 			Host:        host,
 			Port:        0,
-			EnabledAPIs: enabledAPIs,
+			EnabledAPIs: testCfg.APIsToEnable,
 		},
 	}
 }
