@@ -30,7 +30,7 @@ func DeprecatedCLIFlags(envPrefix string, category string) []cli.Flag {
 			Value:   cli.NewStringSlice(),
 			EnvVars: withEnvPrefix(envPrefix, "API_ENABLED"),
 			Action: func(*cli.Context, []string) error {
-				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --apis.enabled with and `admin` to turn on instead",
+				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --apis.enabled with `admin` to turn on instead",
 					DeprecatedAdminAPIType, withEnvPrefix(envPrefix, "API_ENABLED"))
 			},
 			Category: category,
