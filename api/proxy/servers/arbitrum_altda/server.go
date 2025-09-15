@@ -80,7 +80,7 @@ func (s *Server) Addr() string {
 	return s.svr.Addr
 }
 
-// Start creates a tcp listener and serves it on an independent go routine
+// Start serves a tcp listener on an independent go routine
 func (s *Server) Start() error {
 	go func() {
 		if err := s.svr.Serve(s.listener); err != nil &&

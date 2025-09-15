@@ -109,9 +109,9 @@ func (h *Handlers) RecoverPayloadFromBatch(
 	sequencerMsg hexutil.Bytes,
 	preimages PreimagesMap,
 	validateSeqMsg bool,
-) (RecoverPayloadFromBatchResult, error) {
+) (*RecoverPayloadFromBatchResult, error) {
 	if len(sequencerMsg) <= 1 {
-		return RecoverPayloadFromBatchResult{},
+		return nil,
 			fmt.Errorf("sequencer message expected to be >1 byte, got: %d", len(sequencerMsg))
 	}
 
@@ -127,10 +127,10 @@ func (h *Handlers) RecoverPayloadFromBatch(
 
 	payload, err := h.eigenDAManager.Get(ctx, versionedCert, proxy_common.GETOpts{})
 	if err != nil {
-		return RecoverPayloadFromBatchResult{}, fmt.Errorf("get rollup payload from DA Cert: %w", err)
+		return nil, fmt.Errorf("get rollup payload from DA Cert: %w", err)
 	}
 
-	return RecoverPayloadFromBatchResult{
+	return &RecoverPayloadFromBatchResult{
 		Payload: payload,
 	}, nil
 }
