@@ -134,31 +134,6 @@ func TestRevertDebit(t *testing.T) {
 	})
 }
 
-func TestIsBucketEmpty(t *testing.T) {
-	startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-	ledger := createTestLedger(t, 100, false, startTime)
-	dispersalTime := startTime.Add(time.Hour)
-
-	// initially empty
-	isEmpty, err := ledger.IsBucketEmpty(startTime)
-	require.NoError(t, err)
-	require.True(t, isEmpty)
-
-	// after debit, not empty
-	success, _, err := ledger.Debit(
-		startTime,
-		dispersalTime,
-		100,
-		[]core.QuorumID{0},
-	)
-	require.NoError(t, err)
-	require.True(t, success)
-
-	isEmpty, err = ledger.IsBucketEmpty(startTime)
-	require.NoError(t, err)
-	require.False(t, isEmpty)
-}
-
 func TestUpdateReservation(t *testing.T) {
 	startTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 	ledger := createTestLedger(t, 100, false, startTime)
