@@ -211,6 +211,18 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
 		Hidden:   false,
 	}
+	ControllerAddressFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-address"),
+		Usage:    "gRPC address of the controller service",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
+	}
+	UseControllerMediatedPayments = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -273,10 +285,11 @@ var kzgFlags = []cli.Flag{
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PRELOAD_ENCODER"),
 	},
 	cli.StringFlag{
-		Name:     kzg.G2PowerOf2PathFlagName,
+		Name:     kzg.DeprecatedG2PowerOf2PathFlagName,
 		Usage:    "Path to G2 SRS points that are on power of 2. Either this flag or G2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_POWER_OF_2_PATH"),
+		Hidden:   true, // deprecated so we hide it from help output
 	},
 }
 
@@ -309,6 +322,8 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
 	ReservedOnly,
+	ControllerAddressFlag,
+	UseControllerMediatedPayments,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,

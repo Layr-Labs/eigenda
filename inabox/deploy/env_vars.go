@@ -601,8 +601,6 @@ type RetrieverVars struct {
 
 	RETRIEVER_PRELOAD_ENCODER string
 
-	RETRIEVER_G2_POWER_OF_2_PATH string
-
 	RETRIEVER_CHAIN_RPC string
 
 	RETRIEVER_CHAIN_RPC_FALLBACK string
