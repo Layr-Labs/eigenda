@@ -111,24 +111,37 @@ func TestProtoConversion(t *testing.T) {
 	require.True(t, pb5 == pb6, "Expected the cached protobuf to be returned")
 }
 
-func TestReporting(t *testing.T) { // TODO augment this test to use multiple quorums
+func TestReporting(t *testing.T) {
 	rand := random.NewTestRandom()
 
-	expectedSuccesses := make(map[core.OperatorID]uint64)
-	expectedFailures := make(map[core.OperatorID]uint64)
-	expectedSuccessBytes := make(map[core.OperatorID]uint64)
-	expectedFailureBytes := make(map[core.OperatorID]uint64)
-	expectedLatency := make(map[core.OperatorID]uint64)
+	expectedSuccesses := make(map[core.QuorumID]map[core.OperatorID]uint64)
+	expectedFailures := make(map[core.QuorumID]map[core.OperatorID]uint64)
+	expectedSuccessBytes := make(map[core.QuorumID]map[core.OperatorID]uint64)
+	expectedFailureBytes := make(map[core.QuorumID]map[core.OperatorID]uint64)
+	expectedLatency := make(map[core.QuorumID]map[core.OperatorID]uint64)
+
+	quorumCount := core.QuorumID(5)
+	for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+		expectedSuccesses[quorum] = make(map[core.OperatorID]uint64)
+		expectedFailures[quorum] = make(map[core.OperatorID]uint64)
+		expectedSuccessBytes[quorum] = make(map[core.OperatorID]uint64)
+		expectedFailureBytes[quorum] = make(map[core.OperatorID]uint64)
+		expectedLatency[quorum] = make(map[core.OperatorID]uint64)
+	}
 
 	validatorCount := rand.IntRange(1, 10)
+
 	validatorIDs := make([]core.OperatorID, validatorCount)
 	for i := 0; i < validatorCount; i++ {
 		validatorIDs[i] = core.OperatorID(rand.Bytes(32))
-		expectedSuccesses[validatorIDs[i]] = 0
-		expectedFailures[validatorIDs[i]] = 0
-		expectedSuccessBytes[validatorIDs[i]] = 0
-		expectedFailureBytes[validatorIDs[i]] = 0
-		expectedLatency[validatorIDs[i]] = 0
+
+		for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+			expectedSuccesses[quorum][validatorIDs[i]] = 0
+			expectedFailures[quorum][validatorIDs[i]] = 0
+			expectedSuccessBytes[quorum][validatorIDs[i]] = 0
+			expectedFailureBytes[quorum][validatorIDs[i]] = 0
+			expectedLatency[quorum][validatorIDs[i]] = 0
+		}
 	}
 
 	span := rand.DurationRange(time.Second, time.Hour)
@@ -140,30 +153,33 @@ func TestReporting(t *testing.T) { // TODO augment this test to use multiple quo
 		batchSize := rand.Uint64Range(1, 1000)
 		validatorIndex := rand.Intn(validatorCount)
 		validatorID := validatorIDs[validatorIndex]
+		quorum := core.QuorumID(rand.Intn((int)(quorumCount)))
 
 		if rand.Bool() {
 			latency := rand.DurationRange(time.Second, time.Hour)
-			bucket.ReportSuccess(0, validatorID, batchSize, latency)
+			bucket.ReportSuccess(quorum, validatorID, batchSize, latency)
 
-			expectedSuccesses[validatorID] += 1
-			expectedSuccessBytes[validatorID] += batchSize
-			expectedLatency[validatorID] += uint64(latency.Nanoseconds())
+			expectedSuccesses[quorum][validatorID] += 1
+			expectedSuccessBytes[quorum][validatorID] += batchSize
+			expectedLatency[quorum][validatorID] += uint64(latency.Nanoseconds())
 		} else {
-			bucket.ReportFailure(0, validatorID, batchSize)
+			bucket.ReportFailure(quorum, validatorID, batchSize)
 
-			expectedFailures[validatorID] += 1
-			expectedFailureBytes[validatorID] += batchSize
+			expectedFailures[quorum][validatorID] += 1
+			expectedFailureBytes[quorum][validatorID] += batchSize
 		}
 	}
 
 	// Verify the results.
-	for _, validatorID := range validatorIDs {
-		signingRate := bucket.getValidator(0, validatorID)
-		require.Equal(t, expectedSuccesses[validatorID], signingRate.GetSignedBatches())
-		require.Equal(t, expectedSuccessBytes[validatorID], signingRate.GetSignedBytes())
-		require.Equal(t, expectedFailures[validatorID], signingRate.GetUnsignedBatches())
-		require.Equal(t, expectedFailureBytes[validatorID], signingRate.GetUnsignedBytes())
-		require.Equal(t, expectedLatency[validatorID], signingRate.GetSigningLatency())
+	for quorum := core.QuorumID(0); quorum < quorumCount; quorum++ {
+		for _, validatorID := range validatorIDs {
+			signingRate := bucket.getValidator(quorum, validatorID)
+			require.Equal(t, expectedSuccesses[quorum][validatorID], signingRate.GetSignedBatches())
+			require.Equal(t, expectedSuccessBytes[quorum][validatorID], signingRate.GetSignedBytes())
+			require.Equal(t, expectedFailures[quorum][validatorID], signingRate.GetUnsignedBatches())
+			require.Equal(t, expectedFailureBytes[quorum][validatorID], signingRate.GetUnsignedBytes())
+			require.Equal(t, expectedLatency[quorum][validatorID], signingRate.GetSigningLatency())
+		}
 	}
 }
 

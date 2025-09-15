@@ -192,6 +192,8 @@ func randomOperationsTest(
 		validatorIDs[i] = core.OperatorID(rand.Bytes(32))
 	}
 
+	quorumCount := rand.IntRange(1, 5)
+
 	testSpan := timeSpan * 2
 	totalBuckets := int(testSpan / bucketSpan)
 
@@ -223,15 +225,15 @@ func randomOperationsTest(
 			expectedBuckets = append(expectedBuckets, expectedBucket)
 		}
 
-		// TODO use more than just quorum 0
+		quorum := core.QuorumID(rand.Intn(quorumCount))
 
 		if rand.Bool() {
 			latency := rand.DurationRange(time.Second, time.Hour)
-			tracker.ReportSuccess(0, validatorID, batchSize, latency)
-			expectedBucket.ReportSuccess(0, validatorID, batchSize, latency)
+			tracker.ReportSuccess(quorum, validatorID, batchSize, latency)
+			expectedBucket.ReportSuccess(quorum, validatorID, batchSize, latency)
 		} else {
-			tracker.ReportFailure(0, validatorID, batchSize)
-			expectedBucket.ReportFailure(0, validatorID, batchSize)
+			tracker.ReportFailure(quorum, validatorID, batchSize)
+			expectedBucket.ReportFailure(quorum, validatorID, batchSize)
 		}
 
 		// On average, validate once per bucket.
