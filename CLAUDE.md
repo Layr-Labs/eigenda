@@ -51,6 +51,7 @@ CLAUDE.md file *in the relevant subdirectory*.
 
 | Subdirectory | Description                                         |
 |--------------|-----------------------------------------------------|
+| ./core       | Core business logic and components of EigenDA       |
 | ./docs       | Documentation files describing the EigenDA system.  |
 
 ---

@@ -133,7 +133,7 @@ func (a *Accountant) blobPaymentInfo(
 			return big.NewInt(0), err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
-		a.metrics.RecordCumulativePayment(a.accountID.Hex(), a.cumulativePayment)
+		a.metrics.RecordCumulativePayment(a.cumulativePayment)
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
