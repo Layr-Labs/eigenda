@@ -14,6 +14,23 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	// DynamoDB attribute names
+	attrStartTimestamp = "StartTimestamp"
+	attrBucketType     = "BucketType"
+	attrEndTimestamp   = "EndTimestamp"
+	attrBucket         = "Bucket"
+
+	endTimestampIndex = "EndTimestampIndex"
+
+	// DynamoDB expression placeholders
+	placeholderBucket       = ":bucket"
+	placeholderEndTimestamp = ":endTimestamp"
+	placeholderBucketType   = ":bucketType"
+	placeholderBT           = ":bt"
+	placeholderStart        = ":start"
+)
+
 var _ SigningRateStorage = (*dynamoSigningRateStorage)(nil)
 
 // A DynamoDB implementation of the SigningRateStorage interface.
@@ -70,13 +87,16 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *Sign
 	// a partition key. So we create a dummy partition key that is always the same value.
 
 	_, err = d.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:        d.tableName,
-		Key:              key,
-		UpdateExpression: aws.String("SET Bucket = :bucket, EndTimestamp = :endTimestamp, BucketType = :bucketType"),
+		TableName: d.tableName,
+		Key:       key,
+		UpdateExpression: aws.String(fmt.Sprintf("SET %s = %s, %s = %s, %s = %s",
+			attrBucket, placeholderBucket,
+			attrEndTimestamp, placeholderEndTimestamp,
+			attrBucketType, placeholderBucketType)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":bucket":       &types.AttributeValueMemberB{Value: value},
-			":endTimestamp": &types.AttributeValueMemberS{Value: timestampToString(bucket.EndTimestamp())},
-			":bucketType":   &types.AttributeValueMemberS{Value: "Bucket"},
+			placeholderBucket:       &types.AttributeValueMemberB{Value: value},
+			placeholderEndTimestamp: &types.AttributeValueMemberS{Value: timestampToString(bucket.EndTimestamp())},
+			placeholderBucketType:   &types.AttributeValueMemberS{Value: attrBucket},
 		},
 	})
 
@@ -91,7 +111,7 @@ func getDynamoBucketKey(bucket *SigningRateBucket) map[string]types.AttributeVal
 	timestamp := bucket.StartTimestamp()
 
 	return map[string]types.AttributeValue{
-		"StartTimestamp": &types.AttributeValueMemberS{Value: timestampToString(timestamp)},
+		attrStartTimestamp: &types.AttributeValueMemberS{Value: timestampToString(timestamp)},
 	}
 }
 
@@ -109,14 +129,16 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 ) ([]*SigningRateBucket, error) {
 
 	input := &dynamodb.QueryInput{
-		TableName:              d.tableName,
-		IndexName:              aws.String("EndTimestampIndex"),
-		KeyConditionExpression: aws.String("BucketType = :bt AND EndTimestamp > :start"),
+		TableName: d.tableName,
+		IndexName: aws.String(endTimestampIndex),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = %s AND %s > %s",
+			attrBucketType, placeholderBT,
+			attrEndTimestamp, placeholderStart)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":bt":    &types.AttributeValueMemberS{Value: "Bucket"},
-			":start": &types.AttributeValueMemberS{Value: timestampToString(startTimestamp)},
+			placeholderBT:    &types.AttributeValueMemberS{Value: attrBucket},
+			placeholderStart: &types.AttributeValueMemberS{Value: timestampToString(startTimestamp)},
 		},
-		ProjectionExpression: aws.String("Bucket"),
+		ProjectionExpression: aws.String(attrBucket),
 	}
 
 	var out []*SigningRateBucket
@@ -127,7 +149,7 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 		}
 
 		for _, item := range resp.Items {
-			bin, ok := item["Bucket"].(*types.AttributeValueMemberB)
+			bin, ok := item[attrBucket].(*types.AttributeValueMemberB)
 			if !ok {
 				// Row missing payload; skip
 				continue
@@ -173,20 +195,20 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 	_, err = d.dynamoClient.CreateTable(ctx, &dynamodb.CreateTableInput{
 		TableName: d.tableName,
 		AttributeDefinitions: []types.AttributeDefinition{
-			{AttributeName: aws.String("StartTimestamp"), AttributeType: types.ScalarAttributeTypeS},
-			{AttributeName: aws.String("BucketType"), AttributeType: types.ScalarAttributeTypeS},
-			{AttributeName: aws.String("EndTimestamp"), AttributeType: types.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attrStartTimestamp), AttributeType: types.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attrBucketType), AttributeType: types.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attrEndTimestamp), AttributeType: types.ScalarAttributeTypeS},
 		},
 		KeySchema: []types.KeySchemaElement{
-			{AttributeName: aws.String("StartTimestamp"), KeyType: types.KeyTypeHash},
+			{AttributeName: aws.String(attrStartTimestamp), KeyType: types.KeyTypeHash},
 		},
 		BillingMode: types.BillingModePayPerRequest,
 		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
 			{
-				IndexName: aws.String("EndTimestampIndex"),
+				IndexName: aws.String(endTimestampIndex),
 				KeySchema: []types.KeySchemaElement{
-					{AttributeName: aws.String("BucketType"), KeyType: types.KeyTypeHash},
-					{AttributeName: aws.String("EndTimestamp"), KeyType: types.KeyTypeRange},
+					{AttributeName: aws.String(attrBucketType), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String(attrEndTimestamp), KeyType: types.KeyTypeRange},
 				},
 				Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
 				// No ProvisionedThroughput because we're PAY_PER_REQUEST
@@ -221,7 +243,7 @@ func (d *dynamoSigningRateStorage) waitForTableActive(ctx context.Context) error
 				// Also verify the GSI is ACTIVE (created at table creation)
 				ok := true
 				for _, g := range out.Table.GlobalSecondaryIndexes {
-					if g.IndexName != nil && *g.IndexName == "EndTimestampIndex" &&
+					if g.IndexName != nil && *g.IndexName == endTimestampIndex &&
 						g.IndexStatus != types.IndexStatusActive {
 						ok = false
 						break
