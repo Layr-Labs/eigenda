@@ -26,13 +26,19 @@ package kzg
 
 import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	_ "github.com/Layr-Labs/eigenda/encoding"
 )
 
 type G1SRS []bn254.G1Affine
 
 type SRS struct {
+	// G1 points are used to generate commitments and proofs.
+	//
 	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G1 []bn254.G1Affine
+	// G2 points are used to generate length commitments and proofs.
+	// See [encoding.BlobCommitments] for details.
+	//
 	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G2 []bn254.G2Affine
 }
