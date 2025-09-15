@@ -134,7 +134,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk
 	Proof Proof
-	// Coeffs contains the coefficients of the interpolating polynomial of the chunk
+	// Coeffs contains the [EncodingParams.ChunkLength] coefficients of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 

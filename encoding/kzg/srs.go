@@ -28,6 +28,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
+type G1SRS []bn254.G1Affine
+
 type SRS struct {
 	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G1 []bn254.G1Affine

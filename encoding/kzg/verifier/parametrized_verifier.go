@@ -2,12 +2,14 @@ package verifier
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -15,8 +17,8 @@ import (
 
 type ParametrizedVerifier struct {
 	*kzg.KzgConfig
-	Srs kzg.SRS
-	Fs  *fft.FFTSettings
+	g1SRS kzg.G1SRS
+	Fs    *fft.FFTSettings
 }
 
 func (v *ParametrizedVerifier) VerifyFrame(
@@ -27,12 +29,10 @@ func (v *ParametrizedVerifier) VerifyFrame(
 		return fmt.Errorf("GetLeadingCosetIndex: %w", err)
 	}
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(frame.Coeffs)), v.SRSOrder, v.G2Path)
-	if err != nil {
-		return fmt.Errorf("ReadG2Point: %w", err)
-	}
+	exponent := uint64(math.Log2(float64(len(frame.Coeffs))))
+	G2atD := srs.G2PowerOf2SRS[exponent]
 
-	err = verifyFrame(frame, v.Srs, commitment, &v.Fs.ExpandedRootsOfUnity[j], &g2Atn)
+	err = verifyFrame(frame, v.g1SRS, commitment, &v.Fs.ExpandedRootsOfUnity[j], &G2atD)
 	if err != nil {
 		return fmt.Errorf("VerifyFrame: %w", err)
 	}
@@ -41,7 +41,7 @@ func (v *ParametrizedVerifier) VerifyFrame(
 
 // Verify function assumes the Data stored is coefficients of coset's interpolating poly
 func verifyFrame(
-	frame *encoding.Frame, srs kzg.SRS, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
+	frame *encoding.Frame, g1SRS kzg.G1SRS, commitment *bn254.G1Affine, x *fr.Element, g2Atn *bn254.G2Affine,
 ) error {
 	var xPow fr.Element
 	xPow.SetOne()
@@ -64,7 +64,7 @@ func verifyFrame(
 	// [interpolation_polynomial(s)]_1
 	var is1 bn254.G1Affine
 	config := ecc.MultiExpConfig{}
-	_, err := is1.MultiExp(srs.G1[:len(frame.Coeffs)], frame.Coeffs, config)
+	_, err := is1.MultiExp(g1SRS[:len(frame.Coeffs)], frame.Coeffs, config)
 	if err != nil {
 		return fmt.Errorf("MultiExp: %w", err)
 	}
