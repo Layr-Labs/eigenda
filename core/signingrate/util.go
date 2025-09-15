@@ -50,10 +50,6 @@ func cloneValidatorSigningRate(info *validator.ValidatorSigningRate) *validator.
 // the first bucket will start at the epoch, the second bucket will start exactly 10 minutes after the epoch, and so on.
 //
 // Bucket timestamps are always reported at second granularity (i.e. no fractional seconds).
-//
-// Although humans consuming information in a UI may find it aesthetically pleasing to have buckets aligned to
-// wall-clock boundaries (e.g. a 1-hour bucket starting at the top of the hour in UTC), such alignment is
-// disproportionately complex for the benefit it provides.
 func bucketStartTimestamp(bucketSpan time.Duration, targetTime time.Time) (time.Time, error) {
 	spanSeconds := uint64(bucketSpan.Seconds())
 	if spanSeconds == 0 {

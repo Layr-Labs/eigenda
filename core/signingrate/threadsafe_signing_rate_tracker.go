@@ -160,7 +160,7 @@ func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.Signi
 	case <-t.ctx.Done():
 		return nil, errors.New("signing rate tracker is shutting down")
 	case response := <-request.responseChan:
-		return response.result, nil
+		return response.result, response.err
 	}
 }
 
