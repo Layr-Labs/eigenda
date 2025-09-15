@@ -5,7 +5,6 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 
 // Records information about validator signing rate during a time period.
 message ValidatorSigningRate {
-
   // The unique identifier of the validator (i.e. the operator ID).
   bytes id = 1;
 
@@ -39,7 +38,6 @@ message QuorumSigningRate {
 
 // Signing rate information about validators during a particular time bucket.
 message SigningRateBucket {
-
   // The start time of the bucket in seconds since Unix epoch, inclusive.
   uint64 start_timestamp = 1;
 
