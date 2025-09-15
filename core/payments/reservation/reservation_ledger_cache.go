@@ -51,7 +51,7 @@ type ReservationLedgerCache struct {
 	overfillBehavior OverfillBehavior
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration
-	// minimum number of symbols to bill, from the PaymentVault
+	// minimum number of symbols to bill for a given dispersal, from the PaymentVault
 	minNumSymbols uint32
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
