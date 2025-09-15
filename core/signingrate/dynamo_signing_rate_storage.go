@@ -22,6 +22,7 @@ const (
 	attrBucket         = "Bucket"
 
 	endTimestampIndex = "EndTimestampIndex"
+	bucketTypeValue   = "Bucket"
 
 	// DynamoDB expression placeholders
 	placeholderBucket       = ":bucket"
@@ -96,7 +97,7 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *Sign
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			placeholderBucket:       &types.AttributeValueMemberB{Value: value},
 			placeholderEndTimestamp: &types.AttributeValueMemberS{Value: timestampToString(bucket.EndTimestamp())},
-			placeholderBucketType:   &types.AttributeValueMemberS{Value: attrBucket},
+			placeholderBucketType:   &types.AttributeValueMemberS{Value: bucketTypeValue},
 		},
 	})
 
@@ -135,7 +136,7 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 			attrBucketType, placeholderBT,
 			attrEndTimestamp, placeholderStart)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			placeholderBT:    &types.AttributeValueMemberS{Value: attrBucket},
+			placeholderBT:    &types.AttributeValueMemberS{Value: bucketTypeValue},
 			placeholderStart: &types.AttributeValueMemberS{Value: timestampToString(startTimestamp)},
 		},
 		ProjectionExpression: aws.String(attrBucket),
