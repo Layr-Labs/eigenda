@@ -171,7 +171,8 @@ fn verify_kzg_commitment(
 ) -> Result<(), BlobVerificationError> {
     use BlobVerificationError::*;
 
-    // for a large number of SRS points this is slow (~40s on a M2)
+    // for a large number of SRS points this is slow: ~40s in debug (~3s in release) on an M2 due to the 16MiB SRS one-time deserialization
+    // that is first materialized here when the LazyLock is first accessed
     let computed_commitment = KZG::new().commit_blob(blob, &SRS)?;
 
     let claimed_commitment: G1Affine = claimed_commitment.into();
@@ -183,20 +184,25 @@ fn verify_kzg_commitment(
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use ark_bn254::{Fq, G1Affine, G2Affine};
-
-    use crate::eigenda::{
-        cert::BlobCommitment,
-        verification::blob::{
-            codec::tests::encode_raw_payload, error::BlobVerificationError::*, verify,
-            verify_blob_symbols_len_against_commitment, verify_commitment_len_is_power_of_two,
-        },
+    use crate::eigenda::verification::blob::{
+        error::BlobVerificationError::*, verify_blob_symbols_len_against_commitment,
+        verify_commitment_len_is_power_of_two,
     };
 
+    // This test takes ~40s in debug (~3s in release) on an M2 due to 16MiB SRS one-time deserialization
+    // Using LazyLock is very advantageous for testing since many tests don't actually ever access
+    // the expensive SRS resource which means it doesn't ever get deserialized in tests that don't
+    // use it
     #[test]
+    #[cfg(not(debug_assertions))]
     fn verify_succeeds_with_known_commitment() {
+        use crate::eigenda::{
+            cert::BlobCommitment,
+            verification::blob::{codec::tests::encode_raw_payload, verify},
+        };
+        use ark_bn254::{Fq, G1Affine, G2Affine};
+        use std::str::FromStr;
+
         let raw_payload = [123; 512];
         let encoded_payload = encode_raw_payload(&raw_payload).unwrap();
 
