@@ -3,6 +3,8 @@ package signingrate
 import (
 	"context"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 )
 
 var _ SigningRateStorage = (*noOpSigningRateStorage)(nil)
@@ -16,13 +18,13 @@ func NewNoOpSigningRateStorage() SigningRateStorage {
 	return &noOpSigningRateStorage{}
 }
 
-func (n *noOpSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*SigningRateBucket) error {
+func (n *noOpSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*validator.SigningRateBucket) error {
 	return nil
 }
 
 func (n *noOpSigningRateStorage) LoadBuckets(
 	ctx context.Context,
 	startTimestamp time.Time,
-) ([]*SigningRateBucket, error) {
-	return make([]*SigningRateBucket, 0), nil
+) ([]*validator.SigningRateBucket, error) {
+	return make([]*validator.SigningRateBucket, 0), nil
 }

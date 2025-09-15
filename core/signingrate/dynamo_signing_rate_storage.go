@@ -17,18 +17,17 @@ import (
 const (
 	// DynamoDB attribute names
 	attrStartTimestamp = "StartTimestamp"
-	attrBucketType     = "BucketType"
+	attrPayloadType    = "PayloadType"
 	attrEndTimestamp   = "EndTimestamp"
-	attrBucket         = "Bucket"
+	attrPayload        = "Payload"
 
 	endTimestampIndex = "EndTimestampIndex"
-	bucketTypeValue   = "Bucket"
+	payloadTypeValue  = "Payload"
 
 	// DynamoDB expression placeholders
-	placeholderBucket       = ":bucket"
+	placeholderPayload      = ":payload"
 	placeholderEndTimestamp = ":endTimestamp"
-	placeholderBucketType   = ":bucketType"
-	placeholderBT           = ":bt"
+	placeholderPayloadType  = ":payloadType"
 	placeholderStart        = ":start"
 )
 
@@ -67,7 +66,7 @@ func NewDynamoSigningRateStorage(
 	return s, nil
 }
 
-func (d *dynamoSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*SigningRateBucket) error {
+func (d *dynamoSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*validator.SigningRateBucket) error {
 	for _, bucket := range buckets {
 		if err := d.storeBucket(ctx, bucket); err != nil {
 			return fmt.Errorf("error storing bucket: %w", err)
@@ -76,10 +75,10 @@ func (d *dynamoSigningRateStorage) StoreBuckets(ctx context.Context, buckets []*
 	return nil
 }
 
-func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *SigningRateBucket) error {
+func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *validator.SigningRateBucket) error {
 
 	key := getDynamoBucketKey(bucket)
-	value, err := proto.Marshal(bucket.ToProtobuf())
+	value, err := proto.Marshal(bucket)
 	if err != nil {
 		return fmt.Errorf("proto marshal failed: %w", err)
 	}
@@ -91,13 +90,13 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *Sign
 		TableName: d.tableName,
 		Key:       key,
 		UpdateExpression: aws.String(fmt.Sprintf("SET %s = %s, %s = %s, %s = %s",
-			attrBucket, placeholderBucket,
+			attrPayload, placeholderPayload,
 			attrEndTimestamp, placeholderEndTimestamp,
-			attrBucketType, placeholderBucketType)),
+			attrPayloadType, placeholderPayloadType)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			placeholderBucket:       &types.AttributeValueMemberB{Value: value},
-			placeholderEndTimestamp: &types.AttributeValueMemberS{Value: timestampToString(bucket.EndTimestamp())},
-			placeholderBucketType:   &types.AttributeValueMemberS{Value: bucketTypeValue},
+			placeholderPayload:      &types.AttributeValueMemberB{Value: value},
+			placeholderEndTimestamp: &types.AttributeValueMemberS{Value: timestampToString(bucket.GetEndTimestamp())},
+			placeholderPayloadType:  &types.AttributeValueMemberS{Value: payloadTypeValue},
 		},
 	})
 
@@ -108,8 +107,8 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *Sign
 }
 
 // Get the DynamoDB key for a given bucket. The primary key for a bucket is its starting timestamp.
-func getDynamoBucketKey(bucket *SigningRateBucket) map[string]types.AttributeValue {
-	timestamp := bucket.StartTimestamp()
+func getDynamoBucketKey(bucket *validator.SigningRateBucket) map[string]types.AttributeValue {
+	timestamp := bucket.GetStartTimestamp()
 
 	return map[string]types.AttributeValue{
 		attrStartTimestamp: &types.AttributeValueMemberS{Value: timestampToString(timestamp)},
@@ -119,30 +118,32 @@ func getDynamoBucketKey(bucket *SigningRateBucket) map[string]types.AttributeVal
 // Convert a timestamp to the string format used in DynamoDB. String is padded with zeros on the left to ensure
 // lexicographical ordering based on string comparison. This method assumes that timestamps are non-negative and
 // represent seconds since the Unix epoch (i.e. sub-second precision is not supported).
-func timestampToString(t time.Time) string {
+func timestampToString(unixTime uint64) string {
 	// 20 digits can hold a maximally sized uint64, so ensure that's how much we always use.
-	return fmt.Sprintf("%020d", t.Unix())
+	return fmt.Sprintf("%020d", unixTime)
 }
 
 func (d *dynamoSigningRateStorage) LoadBuckets(
 	ctx context.Context,
 	startTimestamp time.Time,
-) ([]*SigningRateBucket, error) {
+) ([]*validator.SigningRateBucket, error) {
 
 	input := &dynamodb.QueryInput{
 		TableName: d.tableName,
 		IndexName: aws.String(endTimestampIndex),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = %s AND %s > %s",
-			attrBucketType, placeholderBT,
+			attrPayloadType, placeholderPayloadType,
 			attrEndTimestamp, placeholderStart)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			placeholderBT:    &types.AttributeValueMemberS{Value: bucketTypeValue},
-			placeholderStart: &types.AttributeValueMemberS{Value: timestampToString(startTimestamp)},
+			placeholderPayloadType: &types.AttributeValueMemberS{Value: payloadTypeValue},
+			placeholderStart: &types.AttributeValueMemberS{
+				Value: timestampToString(uint64(startTimestamp.Unix())),
+			},
 		},
-		ProjectionExpression: aws.String(attrBucket),
+		ProjectionExpression: aws.String(attrPayload),
 	}
 
-	var out []*SigningRateBucket
+	var out []*validator.SigningRateBucket
 	for {
 		resp, err := d.dynamoClient.Query(ctx, input)
 		if err != nil {
@@ -150,7 +151,7 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 		}
 
 		for _, item := range resp.Items {
-			bin, ok := item[attrBucket].(*types.AttributeValueMemberB)
+			bin, ok := item[attrPayload].(*types.AttributeValueMemberB)
 			if !ok {
 				// Row missing payload; skip
 				continue
@@ -161,8 +162,7 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 				return nil, fmt.Errorf("unmarshal bucket proto: %w", err)
 			}
 
-			b := NewBucketFromProto(pb)
-			out = append(out, b)
+			out = append(out, pb)
 		}
 
 		if len(resp.LastEvaluatedKey) == 0 {
@@ -173,7 +173,7 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 
 	// Index returns rows ordered by EndTimestamp which may not be unique. Sort by StartTimestamp, which are unique.
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].StartTimestamp().Before(out[j].StartTimestamp())
+		return out[i].GetStartTimestamp() < out[j].GetStartTimestamp()
 	})
 
 	return out, nil
@@ -197,7 +197,7 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 		TableName: d.tableName,
 		AttributeDefinitions: []types.AttributeDefinition{
 			{AttributeName: aws.String(attrStartTimestamp), AttributeType: types.ScalarAttributeTypeS},
-			{AttributeName: aws.String(attrBucketType), AttributeType: types.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attrPayloadType), AttributeType: types.ScalarAttributeTypeS},
 			{AttributeName: aws.String(attrEndTimestamp), AttributeType: types.ScalarAttributeTypeS},
 		},
 		KeySchema: []types.KeySchemaElement{
@@ -208,7 +208,7 @@ func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error 
 			{
 				IndexName: aws.String(endTimestampIndex),
 				KeySchema: []types.KeySchemaElement{
-					{AttributeName: aws.String(attrBucketType), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String(attrPayloadType), KeyType: types.KeyTypeHash},
 					{AttributeName: aws.String(attrEndTimestamp), KeyType: types.KeyTypeRange},
 				},
 				Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
