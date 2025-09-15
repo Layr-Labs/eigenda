@@ -129,7 +129,7 @@ func (rl *ReservationLedger) IsBucketEmpty(now time.Time) (bool, error) {
 	return rl.leakyBucket.CheckFillLevel(now) <= 0, nil
 }
 
-// UpdateReservation updates the reservation parameters and recreates the leaky bucket
+// UpdateReservation updates the reservation parameters and recreates the leaky bucket, if necessary
 //
 // This method replaces the current reservation with a new one if the new reservation differs from the old.
 //

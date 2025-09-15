@@ -210,7 +210,7 @@ func (cl *ClientLedger) debitOnDemandOnly(
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
-	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
 
 	return paymentMetadata, nil
 }
@@ -265,7 +265,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	paymentMetadata, err := core.NewPaymentMetadata(cl.accountID, now, cumulativePayment)
 	enforce.NilError(err, "new payment metadata")
 
-	cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), cumulativePayment)
+	cl.accountantMetricer.RecordCumulativePayment(cumulativePayment)
 
 	return paymentMetadata, nil
 }
@@ -287,7 +287,7 @@ func (cl *ClientLedger) RevertDebit(
 			return fmt.Errorf("revert on-demand debit: %w", err)
 		}
 
-		cl.accountantMetricer.RecordCumulativePayment(cl.accountID.Hex(), newCumulativePayment)
+		cl.accountantMetricer.RecordCumulativePayment(newCumulativePayment)
 	} else {
 		enforce.NotNil(cl.reservationLedger,
 			"payment metadata is for a reservation payment, but ReservationLedger is nil")
@@ -310,11 +310,7 @@ func (cl *ClientLedger) GetAccountsToUpdate() []gethcommon.Address {
 
 // Updates the reservation for the client's account
 func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReservation *reservation.Reservation) error {
-	if accountID != cl.accountID {
-		panic(fmt.Sprintf(
-			"attempted to update reservation for the wrong account. Received account: %s, actual account: %s",
-			accountID, cl.accountID))
-	}
+	enforce.Equals(cl.accountID, accountID, "attempted to update reservation for the wrong account")
 
 	err := cl.reservationLedger.UpdateReservation(newReservation, cl.getNow())
 	if err != nil {
@@ -328,18 +324,14 @@ func (cl *ClientLedger) UpdateReservation(accountID gethcommon.Address, newReser
 
 // Updates the total deposit for the client's account
 func (cl *ClientLedger) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
-	if accountID != cl.accountID {
-		panic(fmt.Sprintf(
-			"attempted to update total deposit for the wrong account. Received account: %s, actual account: %s",
-			accountID, cl.accountID))
-	}
+	enforce.Equals(cl.accountID, accountID, "attempted to update total deposit for the wrong account")
 
 	err := cl.onDemandLedger.UpdateTotalDeposits(newTotalDeposit)
 	if err != nil {
 		return fmt.Errorf("update total deposits: %w", err)
 	}
 
-	cl.accountantMetricer.RecordOnDemandTotalDeposits(cl.accountID.Hex(), newTotalDeposit)
+	cl.accountantMetricer.RecordOnDemandTotalDeposits(newTotalDeposit)
 
 	return nil
 }

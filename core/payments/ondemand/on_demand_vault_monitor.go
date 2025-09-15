@@ -21,7 +21,7 @@ type OnDemandVaultMonitor struct {
 	paymentVault payments.PaymentVault
 	// how frequently to fetch state from the PaymentVault to check for updates
 	updateInterval time.Duration
-	// maximum number of accounts to fetch in a single RPC call (0 = no batching)
+	// maximum number of accounts to fetch in a single RPC call (0 = unlimited batch size)
 	rpcBatchSize uint32
 	// function to get accounts that need to be updated
 	getAccountsToUpdate func() []gethcommon.Address
@@ -94,7 +94,7 @@ func (vm *OnDemandVaultMonitor) fetchTotalDeposits(
 	// Split accounts into accountBatches to avoid RPC size limits
 	var accountBatches [][]gethcommon.Address
 
-	// Special case: 0 means no batching
+	// Special case: 0 means unlimited batch size, i.e. all accounts are included in a single batch
 	if vm.rpcBatchSize == 0 {
 		accountBatches = [][]gethcommon.Address{accountIDs}
 	} else {
@@ -109,12 +109,10 @@ func (vm *OnDemandVaultMonitor) fetchTotalDeposits(
 	var resultsMutex sync.Mutex
 
 	errorGroup, groupCtx := errgroup.WithContext(ctx)
+	// workload is CPU light. set a reasonable limit on the number of concurrent RPC calls
+	errorGroup.SetLimit(16)
 
-	for index, batch := range accountBatches {
-		// Capture loop variables for goroutine
-		batchIndex := index
-		batchAccounts := batch
-
+	for batchIndex, batchAccounts := range accountBatches {
 		errorGroup.Go(func() error {
 			newDeposits, err := vm.paymentVault.GetTotalDeposits(groupCtx, batchAccounts)
 			if err != nil {

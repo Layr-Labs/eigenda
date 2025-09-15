@@ -27,11 +27,12 @@ The legacy implementation uses a **fixed bin model** where:
 
 ## 3. New Payment System
 
-Reservation payments will be managed with a [leaky bucket](../../../../../core/payments/reservation/leaky_bucket.go)
-algorithm, instead of using fixed bins. This alternate algorithm smooths out bursts with smooth capacity recovery.
+The new payment system is implemented in the [`core/payments/`](../../../../../core/payments/) package.
 
-- Less severe bursts for each individual user: the maximum burst size from a single user is now limited by the size
-of the leaky bucket, compared to the fixed bin algorithm where maximum burst is 2x bin size
+Within this new implementation, reservation payments are managed with a leaky bucket algorithm, instead of using fixed
+bins. This alternate algorithm smooths out bursts with smooth capacity recovery:
+- Bursts are less severe bursts for each individual user: the maximum burst size from a single user is now limited by
+the size of the leaky bucket, compared to the fixed bin algorithm where maximum burst is 2x bin size
 - Network wide bursts are unlikely to be simultaneous, since there aren't synced bin boundaries
 
 ## 4. Migration Considerations
