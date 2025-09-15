@@ -12,6 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -273,6 +275,32 @@ func RunController(ctx *cli.Context) error {
 	err = dispatcher.Start(c)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
+	}
+
+	if config.ServerConfig.EnableServer {
+		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
+		if config.ServerConfig.EnablePaymentAuthentication {
+			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
+		}
+
+		grpcServer, err := server.NewServer(
+			c,
+			config.ServerConfig,
+			logger,
+			metricsRegistry,
+			paymentAuthorizationHandler)
+		if err != nil {
+			return fmt.Errorf("create gRPC server: %w", err)
+		}
+
+		go func() {
+			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				panic(fmt.Sprintf("gRPC server failed: %v", err))
+			}
+		}()
+	} else {
+		logger.Info("Controller gRPC server disabled")
 	}
 
 	go func() {

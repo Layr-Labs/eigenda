@@ -64,7 +64,6 @@ func setupLocalStackTest(t *testing.T) s3.Client {
 	return client
 }
 
-
 func runRandomOperationsTest(t *testing.T, client s3.Client) {
 	t.Helper()
 	ctx := t.Context()
@@ -97,7 +96,7 @@ func runRandomOperationsTest(t *testing.T, client s3.Client) {
 		for _, object := range objects {
 			totalSize += object.Size
 		}
-		require.Equal(t, int64(len(expected)), totalSize, 
+		require.Equal(t, int64(len(expected)), totalSize,
 			"total fragment size should match original data size for key %s", key)
 	}
 

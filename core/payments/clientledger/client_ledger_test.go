@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("zero address panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				common.Address{}, // zero address
@@ -30,6 +32,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t),
 				nil,
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "zero address should cause panic")
 	})
@@ -37,6 +41,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("nil getNow panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -44,13 +49,33 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t),
 				nil,
 				nil, // nil getNow
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "nil getNow should cause panic")
+	})
+
+	t.Run("nil payment vault panic", func(t *testing.T) {
+		require.Panics(t, func() {
+			NewClientLedger(
+				context.Background(),
+				testutils.GetLogger(),
+				nil,
+				accountID,
+				ClientLedgerModeReservationOnly,
+				buildReservationLedger(t),
+				nil,
+				func() time.Time { return testStartTime },
+				nil, // nil payment vault
+				time.Second,
+			)
+		}, "nil payment vault should cause panic")
 	})
 
 	t.Run("invalid mode panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -58,6 +83,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t),
 				nil,
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "invalid mode should cause panic")
 	})
@@ -65,6 +92,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-only mode with nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -72,6 +100,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				nil, // nil reservation ledger
 				nil,
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "reservation-only mode with nil reservation ledger should cause panic")
 	})
@@ -79,6 +109,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-only mode with non-nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -86,6 +117,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t),
 				buildOnDemandLedger(t), // should be nil
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "reservation-only mode with non-nil on-demand ledger should cause panic")
 	})
@@ -93,6 +126,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("on-demand-only mode with nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -100,6 +134,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				nil,
 				nil, // nil on-demand ledger
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "on-demand-only mode with nil on-demand ledger should cause panic")
 	})
@@ -107,6 +143,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("on-demand-only mode with non-nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -114,6 +151,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t), // should be nil
 				buildOnDemandLedger(t),
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "on-demand-only mode with non-nil reservation ledger should cause panic")
 	})
@@ -121,6 +160,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-and-on-demand mode with nil reservation ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -128,6 +168,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				nil, // nil reservation ledger
 				buildOnDemandLedger(t),
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "reservation-and-on-demand mode with nil reservation ledger should cause panic")
 	})
@@ -135,6 +177,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 	t.Run("reservation-and-on-demand mode with nil on-demand ledger panic", func(t *testing.T) {
 		require.Panics(t, func() {
 			NewClientLedger(
+				context.Background(),
 				testutils.GetLogger(),
 				nil,
 				accountID,
@@ -142,6 +185,8 @@ func TestClientLedgerConstructor(t *testing.T) {
 				buildReservationLedger(t),
 				nil, // nil on-demand ledger
 				func() time.Time { return testStartTime },
+				vault.NewTestPaymentVault(),
+				time.Second,
 			)
 		}, "reservation-and-on-demand mode with nil on-demand ledger should cause panic")
 	})
@@ -150,6 +195,7 @@ func TestClientLedgerConstructor(t *testing.T) {
 func TestReservationOnly(t *testing.T) {
 	t.Run("insufficient capacity error", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -157,6 +203,8 @@ func TestReservationOnly(t *testing.T) {
 			buildReservationLedger(t),
 			nil,
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -181,6 +229,7 @@ func TestReservationOnly(t *testing.T) {
 		}
 
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -188,6 +237,8 @@ func TestReservationOnly(t *testing.T) {
 			buildReservationLedger(t),
 			nil,
 			getNow,
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -206,6 +257,7 @@ func TestReservationOnly(t *testing.T) {
 
 	t.Run("quorum not permitted panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -213,6 +265,8 @@ func TestReservationOnly(t *testing.T) {
 			buildReservationLedger(t),
 			nil,
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -223,6 +277,7 @@ func TestReservationOnly(t *testing.T) {
 
 	t.Run("time out of range panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -230,6 +285,8 @@ func TestReservationOnly(t *testing.T) {
 			buildReservationLedger(t),
 			nil,
 			func() time.Time { return testStartTime.Add(2 * time.Hour) },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -242,6 +299,7 @@ func TestReservationOnly(t *testing.T) {
 func TestOnDemandOnly(t *testing.T) {
 	t.Run("successful debit with cumulative payment", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -249,6 +307,8 @@ func TestOnDemandOnly(t *testing.T) {
 			nil,
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -263,6 +323,7 @@ func TestOnDemandOnly(t *testing.T) {
 
 	t.Run("insufficient funds panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -270,6 +331,8 @@ func TestOnDemandOnly(t *testing.T) {
 			nil,
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -280,6 +343,7 @@ func TestOnDemandOnly(t *testing.T) {
 
 	t.Run("fatal errors cause panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -287,6 +351,8 @@ func TestOnDemandOnly(t *testing.T) {
 			nil,
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -299,6 +365,7 @@ func TestOnDemandOnly(t *testing.T) {
 func TestReservationAndOnDemand(t *testing.T) {
 	t.Run("fallback to on-demand", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -306,6 +373,8 @@ func TestReservationAndOnDemand(t *testing.T) {
 			buildReservationLedger(t),
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -332,6 +401,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 		}
 
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -339,6 +409,8 @@ func TestReservationAndOnDemand(t *testing.T) {
 			buildReservationLedger(t),
 			buildOnDemandLedger(t),
 			getNow,
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -358,6 +430,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 
 	t.Run("insufficient funds error from on-demand", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -365,6 +438,8 @@ func TestReservationAndOnDemand(t *testing.T) {
 			buildReservationLedger(t),
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -382,6 +457,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 
 	t.Run("fatal errors cause panic", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -389,6 +465,8 @@ func TestReservationAndOnDemand(t *testing.T) {
 			buildReservationLedger(t),
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -401,6 +479,7 @@ func TestReservationAndOnDemand(t *testing.T) {
 func TestRevertDebit(t *testing.T) {
 	t.Run("successful reservation revert", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -408,6 +487,8 @@ func TestRevertDebit(t *testing.T) {
 			buildReservationLedger(t),
 			nil,
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
@@ -422,6 +503,7 @@ func TestRevertDebit(t *testing.T) {
 
 	t.Run("successful on-demand revert", func(t *testing.T) {
 		clientLedger := NewClientLedger(
+			context.Background(),
 			testutils.GetLogger(),
 			nil,
 			accountID,
@@ -429,6 +511,8 @@ func TestRevertDebit(t *testing.T) {
 			nil,
 			buildOnDemandLedger(t),
 			func() time.Time { return testStartTime },
+			vault.NewTestPaymentVault(),
+			time.Second,
 		)
 		require.NotNil(t, clientLedger)
 
