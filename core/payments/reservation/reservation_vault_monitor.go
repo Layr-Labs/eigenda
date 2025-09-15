@@ -123,6 +123,8 @@ func (vm *ReservationVaultMonitor) fetchReservations(
 	var resultsMutex sync.Mutex
 
 	errorGroup, groupCtx := errgroup.WithContext(ctx)
+	// workload is CPU light. set a reasonable limit on the number of concurrent RPC calls
+	errorGroup.SetLimit(16)
 
 	for batchIndex, batchAccounts := range accountBatches {
 		errorGroup.Go(func() error {
