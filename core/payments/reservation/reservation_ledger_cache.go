@@ -14,23 +14,34 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
+const (
+	// maxReservationLRUCacheSize is the maximum number of reservation ledgers that can be stored in the cache.
+	// Set to 2^16 = 65,536 entries.
+	//
+	// To do some napkin math: each cache entry is <500 bytes in size, so 65k cache entries would have a memory
+	// footprint <33MiB. This isn't a catastrophic amount of memory, and 65k active reservation users is absurdly high.
+	maxReservationLRUCacheSize = 65536
+)
+
 // Stores a collection of ReservationLedgers in an LRU cache
 type ReservationLedgerCache struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked.
 	//
-	// Least recently used ReservationLedger entries are removed if the cache gets above the configured size. Since
-	// the LeakyBuckets that underlie the reservation ledgers are only in memory, evicting a ReservationLedger
-	// from this cache can result in data loss! If a ledger is deleted and then re-added, the new instance is
-	// instantiated *empty*, as if the user has had no recent dispersals. This errs on the side of permitting more
-	// throughput, since being more permissive is preferable to the alternative of *not* providing the amount of
-	// throughput guaranteed by a reservation.
+	// Least recently used ReservationLedger entries are removed if the cache gets above the configured size.
 	//
-	// IMPORTANT: If the cache size is configured to be too small and there is a lot of churn, then
-	// dishonest clients may be able to utilize more than their allotted reservations! Be sure to configure a large
-	// enough cache. If any ReservationLedgers are removed from this cache with non-empty buckets, the occurrence will
-	// be logged as an error. If such error logs are observed, this cache size must be increased.
+	// The LeakyBuckets that underlie the reservation ledgers are *only* in memory. This means that evicting a ledger
+	// prematurely from the cache (when the LeakyBucket isn't empty) results in information loss! If the prematurely
+	// evicted ledger were to be reinstantiated, it would start with an *empty* bucket, potentially permitting more
+	// throughput than it should (assuming a malicious client).
+	//
+	// The solution to prevent this from happening is that we will detect when a ledger is evicted prematurely, and
+	// automatically resize the cache in response. This prevents the cache from getting into a thrashy state, where
+	// many ledgers are being evicted prematurely and then reinstantiated.
 	cache *lru.Cache[gethcommon.Address, *ReservationLedger]
+	// current maximum number of ledgers the cache can hold (will be dynamically increased if premature evictions are
+	// observed)
+	maxLedgers int
 	// can access state of the PaymentVault contract
 	paymentVault payments.PaymentVault
 	// source of current time for the leaky bucket algorithm
@@ -74,22 +85,6 @@ func NewReservationLedgerCache(
 		return nil, errors.New("bucket capacity period must be > 0")
 	}
 
-	cache, err := lru.NewWithEvict(
-		maxLedgers,
-		func(accountAddress gethcommon.Address, reservationLedger *ReservationLedger) {
-			if !reservationLedger.IsBucketEmpty(timeSource()) {
-				logger.Errorf("evicted account %s from LRU reservation ledger cache, but the underlying leaky bucket "+
-					"wasn't empty! You must increase the ReservationLedgerCache LRU cache size", accountAddress.Hex())
-				return
-			}
-
-			logger.Debugf("evicted account %s from LRU reservation ledger cache", accountAddress.Hex())
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
-	}
-
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get min num symbols: %w", err)
@@ -97,7 +92,7 @@ func NewReservationLedgerCache(
 
 	ledgerCache := &ReservationLedgerCache{
 		logger:               logger,
-		cache:                cache,
+		maxLedgers:           maxLedgers,
 		paymentVault:         paymentVault,
 		timeSource:           timeSource,
 		overfillBehavior:     overfillBehavior,
@@ -106,7 +101,11 @@ func NewReservationLedgerCache(
 		ledgerCreationLock:   common.NewIndexLock(256),
 	}
 
-	// Create the vault monitor with callback functions
+	ledgerCache.cache, err = lru.NewWithEvict(maxLedgers, ledgerCache.handleEviction)
+	if err != nil {
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
+	}
+
 	ledgerCache.vaultMonitor, err = NewReservationVaultMonitor(
 		ctx,
 		logger,
@@ -137,9 +136,7 @@ func (c *ReservationLedgerCache) GetOrCreate(
 	}
 
 	// Slow path: acquire per-account lock and check again
-	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
-	c.ledgerCreationLock.Lock(accountIndex)
-	defer c.ledgerCreationLock.Unlock(accountIndex)
+	defer c.acquireLedgerLock(accountID)()
 
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
@@ -203,4 +200,53 @@ func (c *ReservationLedgerCache) UpdateReservation(accountID gethcommon.Address,
 
 	now := c.timeSource()
 	return ledger.UpdateReservation(newReservation, now)
+}
+
+// Called when an item is evicted from the LRU cache.
+//
+// If the evicted ledger has a non-empty bucket, it resizes the cache and re-adds the ledger.
+func (c *ReservationLedgerCache) handleEviction(
+	accountID gethcommon.Address,
+	reservationLedger *ReservationLedger,
+) {
+	if reservationLedger.IsBucketEmpty(c.timeSource()) {
+		c.logger.Debugf("evicted account %s from LRU reservation ledger cache", accountID.Hex())
+		return
+	}
+
+	// The bucket is not empty!!! This was a premature eviction: we must resize the cache
+
+	newSize := c.maxLedgers * 2
+	if newSize > maxReservationLRUCacheSize {
+		c.logger.Errorf(
+			"Cannot resize LRU reservation ledger cache beyond maximum size of %d entries. Current size: %d",
+			maxReservationLRUCacheSize, c.maxLedgers)
+		// We've hit the maximum cache size - still evict the entry but don't resize
+		return
+	}
+
+	c.logger.Infof("Resizing LRU reservation ledger cache from %d to %d entries.", c.maxLedgers, newSize)
+
+	c.maxLedgers = newSize
+	c.cache.Resize(c.maxLedgers)
+
+	// Add the evicted ledger back to the cache
+	defer c.acquireLedgerLock(accountID)()
+
+	// Don't bother checking if another routine already re-created this ledger. Even if another routine *did* create
+	// a new instance, it's reasonable to preference the old instance over the new. There may be some small discrepancy
+	// here, but there would be no feasible way for a malicious client to exploit this. In the worst case, the leaky
+	// bucket will be slightly less filled than it ought to have been. Since it's incredibly unlikely to happen in the
+	// first place, it's not worth contorting the design to address.
+	c.cache.Add(accountID, reservationLedger)
+}
+
+// Acquires the per-account lock for the given account address and returns a function that should be called to release
+// the lock via defer
+func (c *ReservationLedgerCache) acquireLedgerLock(accountID gethcommon.Address) func() {
+	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
+	c.ledgerCreationLock.Lock(accountIndex)
+	return func() {
+		c.ledgerCreationLock.Unlock(accountIndex)
+	}
 }
