@@ -34,8 +34,10 @@ type KzgConfig struct {
 	G2Path         string
 	G2TrailingPath string
 
-	// PreloadEncoder is only used by the prover for multiproofs. If true, encoding params
-	// are read from CacheDir during initialization, and SRS tables are preloaded.
+	// PreloadEncoder is only used by the prover to generate kzg multiproofs.
+	// It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.
+	//
+	// If true, encoding params are read from CacheDir during initialization, and SRS tables are preloaded.
 	// Generating these on startup would take hours otherwise.
 	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
