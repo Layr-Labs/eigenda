@@ -219,7 +219,7 @@ There is a synchronization risk that can temporarily cause dispersals to fail wh
 
 ### Rollup Stack Secure Integrations
 
-|                     | Nitro V1       | OP V1 (insecure) | Nitro V2       | OP V2                                                                                |
+|                     | Nitro V1       | OP V1 (trusted) | Nitro V2       | OP V2                                                                                |
 | ------------------- | -------------- | ---------------- | -------------- | ------------------------------------------------------------------------------------ |
 | Cert Verification   | SequencerInbox | x                | one-step proof | one-step proof: done in preimage oracle contract when uploading a blob field element |
 | Blob Verification   | one-step proof | x                | one-step proof | one-step proof                                                                       |

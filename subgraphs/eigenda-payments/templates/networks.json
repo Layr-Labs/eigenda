@@ -17,6 +17,12 @@
       "startBlock": 3379610
     }
   },
+  "hoodi": {
+    "PaymentVault": {
+      "address": "0xc043730ec3069171961aB995801f230d70B2bFb2",
+      "startBlock": 1106138
+    }
+  },
   "sepolia": {
     "PaymentVault": {
       "address": "0x2E1BDB221E7D6bD9B7b2365208d41A5FD70b24Ed",

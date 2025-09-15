@@ -7,51 +7,57 @@ import (
 	"testing"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	// used if DEPLOY_LOCALSTACK != "false"
-	defaultLocalStackPort = "4566"
+	defaultLocalstackPort = "4573"
 )
 
 var (
+	logger       = testutils.GetLogger()
 	dynamoClient *dynamodb.Client
 )
 
 // TestMain sets up Localstack/Dynamo for all tests in the ondemand package and tears down after.
 func TestMain(m *testing.M) {
-	localStackPort := defaultLocalStackPort
+	localstackPort := defaultLocalstackPort
 
-	var dockertestPool *dockertest.Pool
-	var dockertestResource *dockertest.Resource
+	var localstackContainer *testbed.LocalStackContainer
 	var deployLocalStack bool
+
+	ctx := context.Background()
 
 	if os.Getenv("DEPLOY_LOCALSTACK") != "false" {
 		deployLocalStack = true
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"dynamodb"},
+			Logger:         logger,
+		})
 		if err != nil {
-			deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
-
-			panic("failed to start localstack container: " + err.Error())
+			_ = localstackContainer.Terminate(ctx)
+			logger.Fatal("Failed to start localstack container:", err)
 		}
 	} else {
 		// localstack is already deployed
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	awsConfig := aws.Config{
@@ -78,7 +84,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		_ = localstackContainer.Terminate(ctx)
 	}
 	os.Exit(code)
 }
@@ -88,34 +94,36 @@ func TestMain(m *testing.M) {
 // our test table schema exactly matches the production schema.
 // Appends a random suffix to the table name to prevent collisions between tests.
 func createPaymentTable(t *testing.T, tableName string) string {
+	t.Helper()
 	testRandom := random.NewTestRandom()
 	randomSuffix := testRandom.Intn(999999)
 	fullTableName := fmt.Sprintf("%s_%d", tableName, randomSuffix)
 
 	// Create local client config for table creation
-	localStackPort := defaultLocalStackPort
+	localstackPort := defaultLocalstackPort
 	if os.Getenv("DEPLOY_LOCALSTACK") == "false" {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
+		localstackPort = os.Getenv("LOCALSTACK_PORT")
 	}
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
 		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localstackPort),
 	}
 
 	err := meterer.CreateOnDemandTable(clientConfig, fullTableName)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create on-demand table")
 
 	return fullTableName
 }
 
 // deleteTable deletes a DynamoDB table used in testing
 func deleteTable(t *testing.T, tableName string) {
-	ctx := context.Background()
+	t.Helper()
+	ctx := t.Context()
 	_, err := dynamoClient.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName),
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to delete table")
 }

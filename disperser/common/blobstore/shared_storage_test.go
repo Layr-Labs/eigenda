@@ -19,8 +19,8 @@ import (
 )
 
 func TestSharedBlobStore(t *testing.T) {
+	ctx := t.Context()
 	requestedAt := uint64(time.Now().UnixNano())
-	ctx := context.Background()
 	blobKey, err := sharedStorage.StoreBlob(ctx, blob, requestedAt)
 	assert.Nil(t, err)
 	assert.Equal(t, blobHash, blobKey.BlobHash)
@@ -180,7 +180,7 @@ func TestSharedBlobStore(t *testing.T) {
 
 	// Cleanup: Delete test items
 	t.Cleanup(func() {
-		deleteItems(t, []commondynamodb.Key{
+		deleteItemsWithBackgroundContext(t, []commondynamodb.Key{
 			{
 				"MetadataHash": &types.AttributeValueMemberS{Value: blobKey.MetadataHash},
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
@@ -194,7 +194,7 @@ func TestSharedBlobStore(t *testing.T) {
 }
 
 func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	blobKey1 := disperser.BlobKey{
 		BlobHash:     blobHash,
 		MetadataHash: "hash",
@@ -275,7 +275,7 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 
 	// Cleanup: Delete test items
 	t.Cleanup(func() {
-		deleteItems(t, []commondynamodb.Key{
+		deleteItemsWithBackgroundContext(t, []commondynamodb.Key{
 			{
 				"MetadataHash": &types.AttributeValueMemberS{Value: blobKey1.MetadataHash},
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey1.BlobHash},
@@ -289,7 +289,7 @@ func TestSharedBlobStoreBlobMetadataStoreOperationsWithPagination(t *testing.T) 
 }
 
 func TestSharedBlobStoreGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	batchHeaderHash := [32]byte{1, 2, 3}
 
 	// Create and store multiple blob metadata for the same batch
@@ -402,11 +402,13 @@ func TestSharedBlobStoreGetAllBlobMetadataByBatchWithPagination(t *testing.T) {
 				"BlobHash":     &types.AttributeValueMemberS{Value: blobKey.BlobHash},
 			})
 		}
-		deleteItems(t, keys)
+		deleteItemsWithBackgroundContext(t, keys)
 	})
 }
 
 func assertMetadata(t *testing.T, blobKey disperser.BlobKey, expectedBlobSize uint, expectedRequestedAt uint64, expectedStatus disperser.BlobStatus, actualMetadata *disperser.BlobMetadata) {
+	t.Helper()
+
 	assert.NotNil(t, actualMetadata)
 	assert.Equal(t, expectedStatus, actualMetadata.BlobStatus)
 	assert.Equal(t, blob.RequestHeader, actualMetadata.RequestMetadata.BlobRequestHeader)
@@ -414,18 +416,23 @@ func assertMetadata(t *testing.T, blobKey disperser.BlobKey, expectedBlobSize ui
 	assert.Equal(t, blobKey.MetadataHash, actualMetadata.MetadataHash)
 	assert.Equal(t, expectedBlobSize, actualMetadata.RequestMetadata.BlobSize)
 	assert.Equal(t, expectedRequestedAt, actualMetadata.RequestMetadata.RequestedAt)
-	metadataSuffix, err := metadataSuffix(actualMetadata.RequestMetadata.RequestedAt, actualMetadata.RequestMetadata.SecurityParams)
+	metadataSuffix, err := metadataSuffix(t, actualMetadata.RequestMetadata.RequestedAt,
+		actualMetadata.RequestMetadata.SecurityParams)
 	assert.Nil(t, err)
 	assert.Equal(t, metadataSuffix, actualMetadata.MetadataHash)
 }
 
 func assertBlob(t *testing.T, blob *core.Blob) {
+	t.Helper()
+
 	assert.NotNil(t, blob)
 	assert.Equal(t, blob.Data, blob.Data)
 	assert.Equal(t, blob.RequestHeader.SecurityParams, blob.RequestHeader.SecurityParams)
 }
 
-func metadataSuffix(requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
+func metadataSuffix(t *testing.T, requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
+	t.Helper()
+
 	var str string
 	str = fmt.Sprintf("%d/", requestedAt)
 	for _, param := range securityParams {
@@ -435,4 +442,14 @@ func metadataSuffix(requestedAt uint64, securityParams []*core.SecurityParam) (s
 	}
 	bytes := []byte(str)
 	return hex.EncodeToString(sha256.New().Sum(bytes)), nil
+}
+
+func deleteItemsWithBackgroundContext(t *testing.T, keys []commondynamodb.Key) {
+	t.Helper()
+	// Use context.Background() instead of t.Context() to avoid "context canceled" errors
+	// during cleanup. When tests complete or fail, t.Context() gets cancelled, which can
+	// interrupt database cleanup operations.
+	ctx := context.Background()
+	_, err := dynamoClient.DeleteItems(ctx, metadataTableName, keys)
+	assert.NoError(t, err)
 }

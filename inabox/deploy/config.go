@@ -2,20 +2,21 @@ package deploy
 
 import (
 	"crypto/rand"
-	"errors"
 	"fmt"
-	"log"
 	"math/big"
-	"path/filepath"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"gopkg.in/yaml.v3"
 )
 
-func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
+var logger = testutils.GetLogger()
 
+func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {
 		if deployer.Name == name {
 			return deployer, true
@@ -24,80 +25,64 @@ func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	return nil, false
 }
 
-// Constructs a mapping between service names/deployer names (e.g., 'dis0', 'opr1') and private keys. Order of priority: Map, List, File
+// Constructs a mapping between service names/deployer names (e.g., 'dis0', 'opr1') and private keys
 func (env *Config) loadPrivateKeys() error {
+	logger.Info("Loading private keys using testbed")
 
-	// construct full list of names
-	// nTotal := env.Services.Counts.NumDis + env.Services.Counts.NumOpr + env.Services.Counts.NumRet + env.Services.Counts.NumSeq + env.Services.Counts.NumCha
-	// names := make([]string, len(env.Deployers)+nTotal)
-	names := make([]string, 0)
+	// Use testbed's LoadPrivateKeys function
+	testbedKeys, err := testbed.LoadPrivateKeys(testbed.LoadPrivateKeysInput{
+		NumOperators: env.Services.Counts.NumOpr,
+		NumRelays:    env.Services.Counts.NumRelays,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to load private keys from testbed: %w", err)
+	}
+
+	// Convert testbed keys to our format
+	if env.Pks == nil {
+		env.Pks = &PkConfig{
+			EcdsaMap: make(map[string]KeyInfo),
+			BlsMap:   make(map[string]KeyInfo),
+		}
+	} else {
+		// Initialize maps if they're nil
+		if env.Pks.EcdsaMap == nil {
+			env.Pks.EcdsaMap = make(map[string]KeyInfo)
+		}
+		if env.Pks.BlsMap == nil {
+			env.Pks.BlsMap = make(map[string]KeyInfo)
+		}
+	}
+
+	// Copy testbed keys to our structure
+	for name, keyInfo := range testbedKeys.EcdsaMap {
+		env.Pks.EcdsaMap[name] = KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
+		}
+	}
+
+	for name, keyInfo := range testbedKeys.BlsMap {
+		env.Pks.BlsMap[name] = KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
+		}
+	}
+
+	// Add deployer keys if they don't exist (for backward compatibility)
 	for _, d := range env.Deployers {
-		names = append(names, d.Name)
-	}
-	addNames := func(prefix string, num int) {
-		for i := 0; i < num; i++ {
-			names = append(names, fmt.Sprintf("%v%v", prefix, i))
+		if _, exists := env.Pks.EcdsaMap[d.Name]; !exists {
+			// Use the same key as "deployer" if available
+			if deployerKey, ok := env.Pks.EcdsaMap["deployer"]; ok {
+				env.Pks.EcdsaMap[d.Name] = deployerKey
+				env.Pks.BlsMap[d.Name] = env.Pks.BlsMap["deployer"]
+			}
 		}
 	}
-	addNames("dis", 2)
-	addNames("opr", env.Services.Counts.NumOpr)
-	addNames("staker", env.Services.Counts.NumOpr)
-	addNames("retriever", 1)
-	addNames("relay", env.Services.Counts.NumRelays)
 
-	log.Println("service names:", names)
-
-	// Collect private keys from file
-	keyPath := "secrets"
-
-	// Read ECDSA private keys
-	fileData := readFile(filepath.Join(keyPath, "ecdsa_keys/private_key_hex.txt"))
-	ecdsaPks := strings.Split(string(fileData), "\n")
-	// Read ECDSA passwords
-	fileData = readFile(filepath.Join(keyPath, "ecdsa_keys/password.txt"))
-	ecdsaPwds := strings.Split(string(fileData), "\n")
-	// Read BLS private keys
-	fileData = readFile(filepath.Join(keyPath, "bls_keys/private_key_hex.txt"))
-	blsPks := strings.Split(string(fileData), "\n")
-	// Read BLS passwords
-	fileData = readFile(filepath.Join(keyPath, "bls_keys/password.txt"))
-	blsPwds := strings.Split(string(fileData), "\n")
-
-	if len(ecdsaPks) != len(blsPks) || len(blsPks) != len(ecdsaPwds) || len(ecdsaPwds) != len(blsPwds) {
-		return errors.New("the number of keys and passwords for ECDSA and BLS must be the same")
-	}
-
-	// Add missing items to map
-	if env.Pks.EcdsaMap == nil {
-		env.Pks.EcdsaMap = make(map[string]KeyInfo)
-	}
-	if env.Pks.BlsMap == nil {
-		env.Pks.BlsMap = make(map[string]KeyInfo)
-	}
-
-	ind := 0
-	for _, name := range names {
-		_, exists := env.Pks.EcdsaMap[name]
-		if !exists {
-
-			if ind >= len(ecdsaPks) {
-				return errors.New("not enough pks")
-			}
-
-			env.Pks.EcdsaMap[name] = KeyInfo{
-				PrivateKey: ecdsaPks[ind],
-				Password:   ecdsaPwds[ind],
-				KeyFile:    fmt.Sprintf("%s/ecdsa_keys/keys/%v.ecdsa.key.json", keyPath, ind+1),
-			}
-			env.Pks.BlsMap[name] = KeyInfo{
-				PrivateKey: blsPks[ind],
-				Password:   blsPwds[ind],
-				KeyFile:    fmt.Sprintf("%s/bls_keys/keys/%v.bls.key.json", keyPath, ind+1),
-			}
-
-			ind++
-		}
-	}
+	logger.Info("Successfully loaded private keys", "ecdsaKeys", len(env.Pks.EcdsaMap), "blsKeys", len(env.Pks.BlsMap))
 
 	return nil
 }
@@ -118,7 +103,6 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 
 	for key, value := range env.Services.Variables[stub] {
 		field := v.FieldByName(prefix + key)
-		fmt.Println(prefix + key)
 		if field.IsValid() && field.CanSet() {
 			field.SetString(value)
 		}
@@ -402,7 +386,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
-		log.Fatalf("Could not generate key: %v", err)
+		logger.Fatal("Could not generate key", "error", err)
 	}
 
 	//String representation of n in base 32
@@ -485,7 +469,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 
 		RETRIEVER_G1_PATH:             "",
 		RETRIEVER_G2_PATH:             "",
-		RETRIEVER_G2_POWER_OF_2_PATH:  "",
 		RETRIEVER_CACHE_PATH:          "",
 		RETRIEVER_SRS_ORDER:           "",
 		RETRIEVER_SRS_LOAD:            "",
@@ -502,7 +485,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 }
 
 // Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genService(compose testbed, name, image, envFile string, ports []string) {
+func (env *Config) genService(compose DockerCompose, name, image, envFile string, ports []string) {
 
 	for i, port := range ports {
 		ports[i] = port + ":" + port
@@ -514,7 +497,7 @@ func (env *Config) genService(compose testbed, name, image, envFile string, port
 		"ports":    ports,
 		"volumes": []string{
 			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
+			env.rootPath + "/testbed/secrets:/secrets",
 			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
@@ -524,7 +507,7 @@ func (env *Config) genService(compose testbed, name, image, envFile string, port
 }
 
 // Used to generate a docker compose file corresponding to the test environment
-func (env *Config) genNodeService(compose testbed, name, image, envFile string, ports []string) {
+func (env *Config) genNodeService(compose DockerCompose, name, image, envFile string, ports []string) {
 
 	for i, port := range ports {
 		ports[i] = port + ":" + port
@@ -535,7 +518,7 @@ func (env *Config) genNodeService(compose testbed, name, image, envFile string, 
 		"env_file": []string{envFile},
 		"volumes": []string{
 			env.Path + ":/data",
-			env.rootPath + "/inabox/secrets:/secrets",
+			env.rootPath + "/testbed/secrets:/secrets",
 			env.rootPath + "/resources/srs:/resources",
 		},
 		"extra_hosts": []string{
@@ -563,7 +546,7 @@ func (env *Config) genNodeService(compose testbed, name, image, envFile string, 
 	}
 }
 
-func genTelemetryServices(compose testbed, name, image string, volumes []string) {
+func genTelemetryServices(compose DockerCompose, name, image string, volumes []string) {
 	compose.Services[name] = map[string]interface{}{
 		"image":  image,
 		"volume": volumes,
@@ -584,17 +567,22 @@ func (env *Config) getPaths(name string) (logPath, dbPath, envFilename, envFile 
 	return
 }
 
-func (env *Config) getKey(name string) (key, address string) {
+func (env *Config) getKey(name string) (key, address string, err error) {
 	key = env.Pks.EcdsaMap[name].PrivateKey
-	log.Printf("name: %s, key: %v", name, key)
-	address = GetAddress(key)
-	return
+	logger.Debug("Getting key", "name", name, "key", key)
+	address, err = GetAddress(key)
+	if err != nil {
+		logger.Error("Failed to get address", "error", err)
+		return "", "", fmt.Errorf("failed to get address: %w", err)
+	}
+
+	return key, address, nil
 }
 
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
-func (env *Config) GenerateAllVariables() {
+func (env *Config) GenerateAllVariables() error {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
@@ -602,13 +590,24 @@ func (env *Config) GenerateAllVariables() {
 	env.localstackRegion = "us-east-1"
 
 	// Create envs directory
-	createDirectory(env.Path + "/envs")
-	changeDirectory(env.rootPath + "/inabox")
+	if err := createDirectory(env.Path + "/envs"); err != nil {
+		return fmt.Errorf("failed to create envs directory: %w", err)
+	}
+
+	logger.Info("Changing directories", "path", env.rootPath+"/inabox")
+	if err := changeDirectory(env.rootPath + "/inabox"); err != nil {
+		return fmt.Errorf("failed to change directories: %w", err)
+	}
+
+	// Log the current working directory (absolute path)
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Info("Successfully changed to absolute path", "path", cwd)
+	}
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
 	servicesMap := make(map[string]map[string]interface{})
-	compose := testbed{
+	compose := DockerCompose{
 		Services: servicesMap,
 	}
 
@@ -620,7 +619,9 @@ func (env *Config) GenerateAllVariables() {
 	port += 2
 	logPath, _, filename, envFile := env.getPaths(name)
 	churnerConfig := env.generateChurnerVars(0, graphUrl, logPath, fmt.Sprint(port))
-	writeEnv(churnerConfig.getEnvMap(), envFile)
+	if err := writeEnv(churnerConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Churner = churnerConfig
 	env.genService(
 		compose, name, churnerImage,
@@ -636,7 +637,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "dis0"
 	logPath, dbPath, filename, envFile := env.getPaths(name)
 	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
+	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
 	env.genService(
 		compose, name, disImage,
@@ -651,7 +654,9 @@ func (env *Config) GenerateAllVariables() {
 
 	// Convert key to address
 	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
-	writeEnv(disperserConfig.getEnvMap(), envFile)
+	if err := writeEnv(disperserConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Dispersers = append(env.Dispersers, disperserConfig)
 
 	env.genService(
@@ -669,12 +674,17 @@ func (env *Config) GenerateAllVariables() {
 
 		name := fmt.Sprintf("opr%v", i)
 		logPath, dbPath, filename, envFile := env.getPaths(name)
-		key, _ := env.getKey(name)
+		key, _, err := env.getKey(name)
+		if err != nil {
+			return fmt.Errorf("failed to get key for %s: %w", name, err)
+		}
 
 		// Convert key to address
 
 		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
-		writeEnv(operatorConfig.getEnvMap(), envFile)
+		if err := writeEnv(operatorConfig.getEnvMap(), envFile); err != nil {
+			return fmt.Errorf("failed to write env file: %w", err)
+		}
 		env.Operators = append(env.Operators, operatorConfig)
 
 		env.genNodeService(
@@ -685,9 +695,15 @@ func (env *Config) GenerateAllVariables() {
 	// Batcher
 	name = "batcher0"
 	logPath, _, filename, envFile = env.getPaths(name)
-	key, _ := env.getKey(name)
+	key, _, err := env.getKey(name)
+	if err != nil {
+		return fmt.Errorf("failed to get key for %s: %w", name, err)
+	}
+
 	batcherConfig := env.generateBatcherVars(0, key, graphUrl, logPath)
-	writeEnv(batcherConfig.getEnvMap(), envFile)
+	if err := writeEnv(batcherConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Batcher = append(env.Batcher, batcherConfig)
 	env.genService(
 		compose, name, batcherImage,
@@ -698,7 +714,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "enc0"
 	_, _, filename, envFile = env.getPaths(name)
 	encoderConfig := env.generateEncoderVars(0, "34000")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
+	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Encoder = append(env.Encoder, encoderConfig)
 	env.genService(
 		compose, name, encoderImage,
@@ -708,7 +726,9 @@ func (env *Config) GenerateAllVariables() {
 	name = "enc1"
 	_, _, filename, envFile = env.getPaths(name)
 	encoderConfig = env.generateEncoderV2Vars(0, "34001")
-	writeEnv(encoderConfig.getEnvMap(), envFile)
+	if err := writeEnv(encoderConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Encoder = append(env.Encoder, encoderConfig)
 	env.genService(
 		compose, name, encoderImage,
@@ -718,9 +738,12 @@ func (env *Config) GenerateAllVariables() {
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 
 		name := fmt.Sprintf("staker%v", i)
-		key, address := env.getKey(name)
+		key, address, err := env.getKey(name)
+		if err != nil {
+			return fmt.Errorf("failed to get key for %s: %w", name, err)
+		}
 
-		// Create staker paritipants
+		// Create staker participants
 		participant := Staker{
 			Address:    address,
 			PrivateKey: key[2:],
@@ -735,7 +758,9 @@ func (env *Config) GenerateAllVariables() {
 		port += 2
 		_, _, filename, envFile := env.getPaths(name)
 		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
-		writeEnv(relayConfig.getEnvMap(), envFile)
+		if err := writeEnv(relayConfig.getEnvMap(), envFile); err != nil {
+			return fmt.Errorf("failed to write env file: %w", err)
+		}
 		env.Relays = append(env.Relays, relayConfig)
 		env.genService(
 			compose, name, relayImage,
@@ -743,17 +768,25 @@ func (env *Config) GenerateAllVariables() {
 	}
 
 	name = "retriever0"
-	key, _ = env.getKey(name)
+	key, _, err = env.getKey(name)
+	if err != nil {
+		return fmt.Errorf("failed to get key for %s: %w", name, err)
+	}
+
 	logPath, _, _, envFile = env.getPaths(name)
 	retrieverConfig := env.generateRetrieverVars(0, key, graphUrl, logPath, fmt.Sprint(port+1))
-	writeEnv(retrieverConfig.getEnvMap(), envFile)
+	if err := writeEnv(retrieverConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Retriever = retrieverConfig
 
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
 	controllerConfig := env.generateControllerVars(0, graphUrl)
-	writeEnv(controllerConfig.getEnvMap(), envFile)
+	if err := writeEnv(controllerConfig.getEnvMap(), envFile); err != nil {
+		return fmt.Errorf("failed to write env file: %w", err)
+	}
 	env.Controller = controllerConfig
 
 	if env.Environment.IsLocal() {
@@ -775,9 +808,13 @@ func (env *Config) GenerateAllVariables() {
 		// Write to compose file
 		composeYaml, err := yaml.Marshal(&compose)
 		if err != nil {
-			log.Panicf("Error: %s", err.Error())
+			return fmt.Errorf("error marshalling compose file: %w", err)
 		}
 
-		writeFile(composeFile, composeYaml)
+		if err := writeFile(composeFile, composeYaml); err != nil {
+			return fmt.Errorf("error writing compose file: %w", err)
+		}
 	}
+
+	return nil
 }

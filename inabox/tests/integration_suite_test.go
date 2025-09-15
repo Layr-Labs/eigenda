@@ -22,23 +22,22 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/ory/dockertest/v3"
 )
 
 /*
@@ -49,19 +48,20 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
+	anvilContainer *testbed.AnvilContainer
+
 	templateName      string
 	testName          string
 	inMemoryBlobStore bool
 
-	testConfig         *deploy.Config
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	localStackPort     string
+	testConfig          *deploy.Config
+	localstackContainer *testbed.LocalStackContainer
+	localStackPort      string
 
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
 	metadataTableNameV2             = "test-BlobMetadata-v2"
-	logger                          logging.Logger
+	logger                          = testutils.GetLogger()
 	ethClient                       common.EthClient
 	rpcClient                       common.RPCEthClient
 	certBuilder                     *clientsv2.CertBuilder
@@ -114,35 +114,46 @@ var _ = BeforeSuite(func() {
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
+
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
-			fmt.Println("Using shared Blob Store")
+			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-			pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
+			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+				ExposeHostPort: true,
+				HostPort:       localStackPort,
+				Logger:         logger,
+			})
 			Expect(err).To(BeNil())
-			dockertestPool = pool
-			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
+			deployConfig := testbed.DeployResourcesConfig{
+				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+				MetadataTableName:   metadataTableName,
+				BucketTableName:     bucketTableName,
+				V2MetadataTableName: metadataTableNameV2,
+				Logger:              logger,
+			}
+			err = testbed.DeployResources(context.Background(), deployConfig)
 			Expect(err).To(BeNil())
 		} else {
-			fmt.Println("Using in-memory Blob Store")
+			logger.Info("Using in-memory Blob Store")
 		}
 
-		fmt.Println("Starting anvil")
-		testConfig.StartAnvil()
+		logger.Info("Starting anvil")
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+			ExposeHostPort: true,
+			HostPort:       "8545",
+			Logger:         logger,
+		})
+		Expect(err).To(BeNil())
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
-			fmt.Println("Starting graph node")
+			logger.Info("Starting graph node")
 			testConfig.StartGraphNode()
 		}
 
-		loggerConfig := common.DefaultLoggerConfig()
-		logger, err = common.NewLogger(loggerConfig)
-		Expect(err).To(BeNil())
-
-		fmt.Println("Deploying experiment")
+		logger.Info("Deploying experiment")
 		testConfig.DeployExperiment()
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
@@ -158,16 +169,7 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Registering blob versions and relays")
-		testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-		fmt.Println("Registering disperser keypair")
-		err = testConfig.RegisterDisperserKeypair(ethClient)
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Println("Starting binaries")
+		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
@@ -175,7 +177,7 @@ var _ = BeforeSuite(func() {
 		err = setupRetrievalClients(testConfig)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Building client verification and interaction components")
+		logger.Info("Building client verification and interaction components")
 
 		certBuilder, err = clientsv2.NewCertBuilder(
 			logger,
@@ -346,7 +348,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
-		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
@@ -429,15 +430,18 @@ var _ = AfterSuite(func() {
 			cancel()
 		}
 
-		fmt.Println("Stopping binaries")
+		logger.Info("Stopping binaries")
 		testConfig.StopBinaries()
 
-		fmt.Println("Stopping anvil")
-		testConfig.StopAnvil()
+		logger.Info("Stopping anvil")
+		_ = anvilContainer.Terminate(context.Background())
 
-		fmt.Println("Stopping graph node")
+		logger.Info("Stopping graph node")
 		testConfig.StopGraphNode()
 
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		if localstackContainer != nil {
+			logger.Info("Stopping localstack container")
+			_ = localstackContainer.Terminate(context.Background())
+		}
 	}
 })

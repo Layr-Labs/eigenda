@@ -16,6 +16,12 @@ GLOBAL OPTIONS:
    --help, -h     show help
    --version, -v  print the version
 
+   Arbitrum Custom DA JSON RPC Server
+
+   --arbitrum-da.addr value  Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ARB_DA_ADDR]
+   --arbitrum-da.enabled     Whether or not to enable Arbitrum Custom DA JSON RPC API (default: false) [$EIGENDA_PROXY_ARB_DA_ENABLED]
+   --arbitrum-da.port value  Server listening port (default: 3101) [$EIGENDA_PROXY_ARB_DA_PORT]
+
    Cert Verifier (V1 only)
 
    --eigenda.cert-verification-disabled  Whether to verify certificates received from EigenDA disperser. (default: false) [$EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED]
@@ -55,6 +61,7 @@ GLOBAL OPTIONS:
    --eigenda.v2.blob-version value               Blob params version used when dispersing. This refers to a global version maintained by EigenDA
 governance and is injected in the BlobHeader before dispersing. Currently only supports (0). (default: 0) [$EIGENDA_PROXY_EIGENDA_V2_BLOB_PARAMS_VERSION]
    --eigenda.v2.cert-verifier-router-or-immutable-verifier-addr value  Address of either the EigenDACertVerifierRouter or immutable EigenDACertVerifier (V3 or above) contract. Required for performing eth_calls to verify EigenDA certificates, as well as fetching required_quorums and signature_thresholds needed when creating new EigenDA certificates during dispersals (POST routes). [$EIGENDA_PROXY_EIGENDA_V2_CERT_VERIFIER_ROUTER_OR_IMMUTABLE_VERIFIER_ADDR]
+   --eigenda.v2.client-ledger-mode value                               Payment mode for the client. Options: 'legacy', 'reservation-only', 'on-demand-only', 'reservation-and-on-demand'. The current default is 'legacy', which means that payments will be tracked via the bin-based model, which is in the process of being deprecated. Eventually, the 'legacy' option will be removed, once the migration to the new leaky bucket payment model is complete. (default: "legacy") [$EIGENDA_PROXY_EIGENDA_V2_CLIENT_LEDGER_MODE]
    --eigenda.v2.contract-call-timeout value                            Timeout used when performing smart contract call operation (i.e, eth_call). (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_CONTRACT_CALL_TIMEOUT]
    --eigenda.v2.disable-point-evaluation                               Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISABLE_POINT_EVALUATION]
    --eigenda.v2.disable-tls                                            Disable TLS for gRPC communication with the EigenDA disperser and retrieval subnet. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS]
@@ -71,8 +78,9 @@ for the exact values getting set by this flag. All of those values can also be m
 set via their respective flags, and take precedence over the default values set by the network flag.
 If all of those other flags are manually configured, the network flag may be omitted. 
 Permitted EigenDANetwork values include mainnet, holesky_testnet, holesky_preprod, & sepolia_testnet. [$EIGENDA_PROXY_EIGENDA_V2_NETWORK]
-   --eigenda.v2.put-retries value              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
-   --eigenda.v2.rbn-recency-window-size value  Allowed distance (in L1 blocks) between the eigenDA cert's reference 
+   --eigenda.v2.payment-vault-monitor-interval value  Interval at which clients poll to check for changes to the PaymentVault contract (relevant updates include changes to reservation parameters, and new on-demand payment deposits) (default: 30s) [$EIGENDA_PROXY_EIGENDA_V2_PAYMENT_VAULT_MONITOR_INTERVAL]
+   --eigenda.v2.put-retries value                     Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
+   --eigenda.v2.rbn-recency-window-size value         Allowed distance (in L1 blocks) between the eigenDA cert's reference 
 block number (RBN) and the L1 block number at which the cert was included 
 in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
 and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
@@ -84,10 +92,10 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    KZG
 
-   --eigenda.cache-path value        path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
+   --eigenda.cache-path value        Path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this. (default: "resources/SRSTables/") [$EIGENDA_PROXY_EIGENDA_TARGET_CACHE_PATH]
    --eigenda.g1-path value           path to g1.point file. (default: "resources/g1.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH]
-   --eigenda.g2-path value           path to g2.point file. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
-   --eigenda.g2-path-trailing value  path to g2.trailing.point file. (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
+   --eigenda.g2-path value           Path to g2.point file, which is needed to generate and verify blob length proofs. If this flag doesn't point to a complete 16GiB G2 SRS file, then the --eigenda.g2-path-trailing flag must be used to specify a trailing segment of that file, of equivalent length to the initial segment pointed to by this flag. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
+   --eigenda.g2-path-trailing value  Path to g2.trailing.point file, which is needed to generate and verify blob length proofs. If --eigenda.g2-path is pointing to the entire 16GiB G2 SRS file which contains 268435456 G2 points, this flag is not needed. Otherwise, users can truncate the G2 file by taking an initial segment, and a trailing segment (both of the same size). (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
 
    Logging
 
@@ -109,7 +117,7 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
    --metrics.enabled     Enable the metrics server. On by default, so use --metrics.enabled=false to disable. (default: true) [$EIGENDA_PROXY_METRICS_ENABLED]
    --metrics.port value  Metrics listening port (default: 7300) [$EIGENDA_PROXY_METRICS_PORT]
 
-   Proxy Server
+   Proxy REST API Server (compatible with OP Stack ALT DA and standard commitment clients)
 
    --addr value                                 Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
    --api-enabled value [ --api-enabled value ]  List of API types to enable (e.g. admin) [$EIGENDA_PROXY_API_ENABLED]

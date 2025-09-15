@@ -25,7 +25,7 @@ type KzgMultiProofIcicleBackend struct {
 	FlatFFTPointsT []iciclebn254.Affine
 	SRSIcicle      []iciclebn254.Affine
 	SFs            *fft.FFTSettings
-	Srs            *kzg.SRS
+	Srs            kzg.SRS
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device

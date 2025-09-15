@@ -3,16 +3,15 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
@@ -27,23 +26,22 @@ import (
 	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	UUID               = uuid.New()
-	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	prover             *p.Prover
-	bucketName         = fmt.Sprintf("test-bucket-%v", UUID)
+	logger              = tu.GetLogger()
+	localstackContainer *testbed.LocalStackContainer
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	prover              *p.Prover
+	bucketName          = fmt.Sprintf("test-bucket-%v", UUID)
 )
 
 const (
@@ -52,6 +50,7 @@ const (
 )
 
 func setup(t *testing.T) {
+	ctx := t.Context()
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	_, b, _, _ := runtime.Caller(0)
@@ -60,7 +59,12 @@ func setup(t *testing.T) {
 
 	if deployLocalStack {
 		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+		localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			ExposeHostPort: true,
+			HostPort:       localstackPort,
+			Services:       []string{"s3", "dynamodb"},
+			Logger:         logger,
+		})
 		require.NoError(t, err)
 	}
 
@@ -84,30 +88,32 @@ func setup(t *testing.T) {
 func changeDirectory(path string) {
 	err := os.Chdir(path)
 	if err != nil {
-		log.Panicf("Failed to change directories. Error: %s", err)
+		logger.Fatal("Failed to change directories. Error: ", err)
 	}
 
 	newDir, err := os.Getwd()
 	if err != nil {
-		log.Panicf("Failed to get working directory. Error: %s", err)
+		logger.Fatal("Failed to get working directory. Error: ", err)
 	}
-	log.Printf("Current Working Directory: %s\n", newDir)
+	logger.Debug("Current Working Directory: %s", newDir)
 }
 
-func teardown() {
+func teardown(t *testing.T) {
+	t.Helper()
 	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
-		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = localstackContainer.Terminate(ctx)
 	}
 }
 
 func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
+	t.Helper()
+	ctx := t.Context()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
-	err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+	err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
 	require.NoError(t, err)
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
 	require.NoError(t, err)
@@ -120,7 +126,7 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 	}
 
 	_, err = test_utils.CreateTable(
-		context.Background(),
+		ctx,
 		cfg,
 		metadataTableName,
 		blobstore.GenerateTableSchema(metadataTableName, 10, 10))
@@ -140,22 +146,27 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 }
 
 func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
+	t.Helper()
+	ctx := t.Context()
+
 	cfg := aws.DefaultClientConfig()
 	cfg.Region = "us-east-1"
 	cfg.AccessKey = "localstack"
 	cfg.SecretAccessKey = "localstack"
 	cfg.EndpointURL = localstackHost
 
-	client, err := s3.NewClient(context.Background(), *cfg, logger)
+	client, err := s3.NewClient(ctx, *cfg, logger)
 	require.NoError(t, err)
 
-	err = client.CreateBucket(context.Background(), bucketName)
+	err = client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err)
 
 	return blobstore.NewBlobStore(bucketName, client, logger)
 }
 
 func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReader, chunkstore.ChunkWriter) {
+	t.Helper()
+	ctx := t.Context()
 
 	cfg := aws.ClientConfig{
 		Region:          "us-east-1",
@@ -164,10 +175,10 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 		EndpointURL:     localstackHost,
 	}
 
-	client, err := s3.NewClient(context.Background(), cfg, logger)
+	client, err := s3.NewClient(ctx, cfg, logger)
 	require.NoError(t, err)
 
-	err = client.CreateBucket(context.Background(), bucketName)
+	err = client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err)
 
 	// intentionally use very small fragment size
@@ -177,13 +188,15 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 	return chunkReader, chunkWriter
 }
 
-func newMockChainReader() *coremock.MockWriter {
+func newMockChainReader(t *testing.T) *coremock.MockWriter {
+	t.Helper()
 	w := &coremock.MockWriter{}
-	w.On("GetAllVersionedBlobParams", mock.Anything).Return(mockBlobParamsMap(), nil)
+	w.On("GetAllVersionedBlobParams", mock.Anything).Return(mockBlobParamsMap(t), nil)
 	return w
 }
 
-func mockBlobParamsMap() map[v2.BlobVersion]*core.BlobVersionParameters {
+func mockBlobParamsMap(t *testing.T) map[v2.BlobVersion]*core.BlobVersionParameters {
+	t.Helper()
 	blobParams := &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
@@ -196,6 +209,7 @@ func mockBlobParamsMap() map[v2.BlobVersion]*core.BlobVersionParameters {
 }
 
 func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
+	t.Helper()
 
 	data := tu.RandomBytes(225)
 
@@ -223,6 +237,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 }
 
 func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) {
+	t.Helper()
 	header, data := randomBlob(t)
 
 	params := encoding.ParamsFromMins(16, 16)
@@ -232,7 +247,8 @@ func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) 
 	return header, data, frames
 }
 
-func disassembleFrames(frames []*encoding.Frame) ([]rs.FrameCoeffs, []*encoding.Proof) {
+func disassembleFrames(t *testing.T, frames []*encoding.Frame) ([]rs.FrameCoeffs, []*encoding.Proof) {
+	t.Helper()
 	rsFrames := make([]rs.FrameCoeffs, len(frames))
 	proofs := make([]*encoding.Proof, len(frames))
 

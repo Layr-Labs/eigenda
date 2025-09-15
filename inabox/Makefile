@@ -1,18 +1,4 @@
-
-
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-
-setup-geth:
-	cd geth && rm -rf data && ./run.sh setup 10 ../secrets/ecdsa_keys/private_key_hex.txt ./secret/geth-account-password
-
-start-geth:
-	cd geth && docker compose up -d 
-	./wait-for http://0.0.0.0:8545 -- echo "Geth up"
-
-stop-geth:
-	cd geth && docker compose down
-
-
 .PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
@@ -22,7 +8,6 @@ new-anvil:
 new-anvil-nochurner:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
-
 
 new-docker-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -41,9 +26,11 @@ deploy-all:
 	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
 
 stop-infra:
-	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	docker stop localstack-test
+# Stop anvil
+	docker ps -q --filter "ancestor=ghcr.io/foundry-rs/foundry" | xargs -r docker stop 2>/dev/null || true
+# Stop localstack based on container name
+	docker ps -q --filter "ancestor=localstack/localstack" | xargs -r docker stop 2>/dev/null || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml

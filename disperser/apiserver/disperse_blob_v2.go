@@ -235,8 +235,9 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}
-	if !commitments.Equal(&blobHeader.BlobCommitments) {
-		return nil, errors.New("invalid blob commitment")
+	// TODO(samlaf): should differentiate 400 from 500 errors here
+	if err = commitments.Equal(&blobHeader.BlobCommitments); err != nil {
+		return nil, fmt.Errorf("invalid blob commitment: %w", err)
 	}
 
 	return blobHeader, nil

@@ -83,7 +83,7 @@ func NewErrorAlreadyExists(msg string) error {
 //
 // 3 reasons for returning api.ErrorFailover:
 //  1. Failed to put the blob in the disperser's queue (disperser is down)
-//  2. Timed out before getting confirmed onchain (batcher is down)
+//  2. Timed out before getting confirmed onchain (batcher/controller is down)
 //  3. Insufficient signatures (eigenda network is down)
 //
 // One can check if an error is an ErrorFailover by using errors.Is:

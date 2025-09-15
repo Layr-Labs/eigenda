@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# -d returns the directories, -t sorts by modification time (newest first), head -1 takes the first line
+# TODO: we should probably create a symlink "current" to the current testpath instead of relying on modification time
+testpath=$(ls -td ./testdata/*/ | head -1)
+
+# All processes started will have their PIDs stored here,
+# and dumped into $testpath/pids when started in detached mode,
+# so that they can be killed.
 pids=""
 function kill_processes {
     echo "STOP"
@@ -223,45 +230,36 @@ function start_detached {
     done
 }
 
-
+# Stops all detached processes started with start_detached
+# Meaning it walks through the pids file and kills those processes.
 function stop_detached {
 
     pid_file="$testpath/pids"
-    pids=$(cat $pid_file)
-
-    kill_processes
-
-    rm -f $pid_file
-}
-
-function start_anvil {
-
-    echo "Starting anvil server ....."
-    anvil --host 0.0.0.0 > /dev/null &
-    anvil_pid=$!
     
-    # Wait for anvil to be ready
-    ./wait-for 0.0.0.0:8545 -- echo "Anvil ready"
-    
-    if [ $? -ne 0 ]; then
-        echo "Failed to start anvil server"
-        exit 1
+    # Try to read PIDs from file if it exists
+    if [[ -f "$pid_file" ]]; then
+        pids=$(cat $pid_file)
+        kill_processes
+        rm -f $pid_file
     fi
-    
-    echo "Anvil server started ....."
 
-    echo $anvil_pid > ./anvil.pid
-
+    # We also call force_stop because the PID file approach is finicky
+    # and might not catch all processes if the file is deleted or corrupted.
+    force_stop
 }
 
-function stop_anvil {
-
-    pid_file="./anvil.pid"
-    anvil_pid=$(cat $pid_file)
-
-    kill $anvil_pid
-
-    rm -f $pid_file
+function force_stop {
+    echo "Force stopping all EigenDA processes..."
+    pkill -9 -f "churner/bin/server" || true
+    pkill -9 -f "disperser/bin/server" || true
+    pkill -9 -f "disperser/bin/encoder" || true
+    pkill -9 -f "disperser/bin/batcher" || true
+    pkill -9 -f "disperser/bin/controller" || true
+    pkill -9 -f "relay/bin/relay" || true
+    pkill -9 -f "node/bin/node" || true
+    pkill -9 -f "retriever/bin/server" || true
+    rm -f $testpath/pids
+    echo "All processes force killed"
 }
 
 function start_graph {
@@ -287,27 +285,36 @@ function stop_graph {
     popd
 }
 
-testpath=$(ls -td ./testdata/*/ | head -1)
+help() {
+    echo "Usage: $0 {start|start-detached|stop-detached|force-stop|start-graph|stop-graph}"
+    echo ""
+    echo "Commands:"
+    echo "  start               Start all services in the foreground with trap on SIGINT"
+    echo "  start-detached     Start all services in the background and log output to files"
+    echo "  stop-detached      Stop all background services started with start-detached"
+    echo "  force-stop         Force kill all EigenDA related processes"
+    echo "  start-graph        Start The Graph node using Docker Compose"
+    echo "  stop-graph         Stop The Graph node and remove associated volumes"
+    echo ""
+    echo "Logs are stored in $testpath/logs/"
+    echo "PIDs of detached processes are stored in $testpath/pids"
+}
 
 case "$1" in
-    help)
-        cat <<-EOF
-        Binary experiment tool
-EOF
-        ;;
     start)
         start_trap ${@:2} ;;
     start-detached)
         start_detached ${@:2} ;;
-    stop)
+    stop-detached)
         stop_detached ${@:2} ;;
-    start-anvil)
-        start_anvil ${@:2} ;;
-    stop-anvil)
-        stop_anvil ${@:2} ;;
+    force-stop)
+        force_stop ${@:2} ;;
     start-graph)
         start_graph ${@:2} ;;
     stop-graph)
         stop_graph ${@:2} ;;
+    help)
+        help;;
     *)
+        help;;
 esac
