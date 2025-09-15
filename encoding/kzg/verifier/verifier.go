@@ -128,6 +128,11 @@ func VerifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Ch
 	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
+// VerifyFrame verifies a single frame against a commitment.
+// If needing to verify multiple frames of the same chunk length, prefer [Verifier.UniversalVerify].
+//
+// This function is only used in the v1 and v2 validator (distributed) retrievers.
+// TODO(samlaf): replace these with UniversalVerify, and consider deleting this function.
 func (v *Verifier) VerifyFrames(
 	frames []*encoding.Frame,
 	indices []encoding.ChunkNumber,
