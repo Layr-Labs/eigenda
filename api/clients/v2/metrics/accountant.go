@@ -55,14 +55,6 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Subsystem: accountantSubsystem,
 			Help:      "Total on-demand deposits available (gwei). This value comes from the on-chain PaymentVault.",
 		}),
-		OnDemandTotalDeposits: factory.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "ondemand_total_deposits",
-			Namespace: namespace,
-			Subsystem: accountantSubsystem,
-			Help:      "Total on-demand deposits available (gwei)",
-		}, []string{
-			"account_id",
-		}),
 		ReservationRemainingCapacity: factory.NewGauge(prometheus.GaugeOpts{
 			Name:      "reservation_remaining_capacity",
 			Namespace: namespace,
@@ -74,12 +66,6 @@ func NewAccountantMetrics(registry *prometheus.Registry) AccountantMetricer {
 			Namespace: namespace,
 			Subsystem: accountantSubsystem,
 			Help:      "Total reservation bucket size (symbols). This is part of the leaky-bucket payment system.",
-		}),
-		ReservationBucketCapacity: factory.NewGauge(prometheus.GaugeOpts{
-			Name:      "reservation_bucket_size",
-			Namespace: namespace,
-			Subsystem: accountantSubsystem,
-			Help:      "Total reservation bucket size (symbols)",
 		}),
 		factory: factory,
 	}
@@ -99,12 +85,6 @@ func (m *AccountantMetrics) RecordOnDemandTotalDeposits(wei *big.Int) {
 	gwei := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(gweiFactor))
 	gweiFloat64, _ := gwei.Float64()
 	m.OnDemandTotalDeposits.Set(gweiFloat64)
-}
-
-func (m *AccountantMetrics) RecordOnDemandTotalDeposits(accountID string, wei *big.Int) {
-	gwei := new(big.Float).Quo(new(big.Float).SetInt(wei), big.NewFloat(gweiFactor))
-	gweiFloat64, _ := gwei.Float64()
-	m.OnDemandTotalDeposits.WithLabelValues(accountID).Set(gweiFloat64)
 }
 
 func (m *AccountantMetrics) RecordReservationPayment(remainingCapacity float64) {
@@ -128,9 +108,6 @@ func (n *noopAccountantMetricer) RecordCumulativePayment(_ *big.Int) {
 }
 
 func (n *noopAccountantMetricer) RecordOnDemandTotalDeposits(_ *big.Int) {
-}
-
-func (n *noopAccountantMetricer) RecordOnDemandTotalDeposits(_ string, _ *big.Int) {
 }
 
 func (n *noopAccountantMetricer) RecordReservationPayment(_ float64) {
