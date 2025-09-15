@@ -25,8 +25,8 @@
 package kzg
 
 import (
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	_ "github.com/Layr-Labs/eigenda/encoding"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 type G1SRS []bn254.G1Affine
