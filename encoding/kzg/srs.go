@@ -32,12 +32,18 @@ import (
 type G1SRS []bn254.G1Affine
 
 type SRS struct {
-	// G1 points are used to generate commitments and proofs.
+	// G1 points are used to:
+	// 1. On prover (in encoder): generate blob commitments (multiproofs are generated using SRSTables).
+	// 2. On prover (in proxy/client): generate blob commitments.
+	// 3. On verifier: verify blob multiproofs using initial chunk-length number of G1 points.
+	// 4. On verifier: verify length proofs using trailing G1 points.
 	//
 	// [b.multiply(b.G1, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G1 []bn254.G1Affine
-	// G2 points are used to generate length commitments and proofs.
-	// See [encoding.BlobCommitments] for details.
+	// G2 points are used to:
+	// 1. On prover (in encoder): generate length commitments and proofs (see [encoding.BlobCommitments]).
+	// 2. On prover (in proxy/client): generate length commitments and length proofs.
+	// 3. On verifier: verify blob multiproofs using 28 powerOf2 G2 points.
 	//
 	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G2 []bn254.G2Affine
