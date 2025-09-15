@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -171,30 +170,17 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 	verifyStart := time.Now()
 
 	if verifyResults {
+		v, err := verifier.NewVerifier(kzgConfig, nil)
+		if err != nil {
+			log.Fatalf("Failed to create verifier: %v", err)
+		}
+		verifier, err := v.GetKzgVerifier(params)
+		if err != nil {
+			log.Fatalf("Failed to create verifier: %v", err)
+		}
+
 		for i := 0; i < len(frames); i++ {
-			f := frames[i]
-			j := fIndices[i]
-			q, err := rs.GetLeadingCosetIndex(uint64(i), numChunks)
-			if err != nil {
-				log.Fatalf("%v", err)
-			}
-
-			if j != q {
-				log.Fatal("leading coset inconsistency")
-			}
-
-			rs, err := enc.GetRsEncoder(enc.EncodingParams)
-			if err != nil {
-				log.Fatalf("%v", err)
-			}
-			lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
-
-			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
-			if err != nil {
-				log.Fatalf("Load g2 %v failed\n", err)
-			}
-
-			err = verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn)
+			err = verifier.VerifyFrame(&frames[i], uint64(fIndices[i]), commit, params.NumChunks)
 			if err != nil {
 				verifyResult = false
 				break

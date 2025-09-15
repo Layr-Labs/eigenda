@@ -349,7 +349,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
-		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),

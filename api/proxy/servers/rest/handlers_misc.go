@@ -6,7 +6,7 @@
 // Handlers in this file thus need to do their own logging and error handling.
 //
 // DO NOT FORGET to add `http.WriteHeader(http.StatusCodes)` on every error path!
-package server
+package rest
 
 import (
 	"encoding/json"
