@@ -19,6 +19,7 @@ import (
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/math"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	contractIEigenDACertTypeBindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -59,7 +60,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	random := testrandom.NewTestRandom()
 
-	srsPointsToLoad := encoding.NextPowerOf2(codec.GetPaddedDataLength(maxPayloadBytes)) / encoding.BYTES_PER_SYMBOL
+	srsPointsToLoad := math.NextPowOf2u32(codec.GetPaddedDataLength(maxPayloadBytes)) / encoding.BYTES_PER_SYMBOL
 
 	g1Srs, err := kzg.ReadG1Points(g1Path, uint64(srsPointsToLoad), uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)

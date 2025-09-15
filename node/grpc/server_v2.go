@@ -12,11 +12,11 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -386,7 +386,7 @@ func (s *ServerV2) validateDispersalRequest(
 	if commitedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
 	}
-	if commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+	if commitedBlobLength != uint(math.NextPowOf2u64(uint64(commitedBlobLength))) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 

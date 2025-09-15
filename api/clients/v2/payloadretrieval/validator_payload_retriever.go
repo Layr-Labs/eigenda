@@ -10,8 +10,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/common/math"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -109,7 +109,7 @@ func (pr *ValidatorPayloadRetriever) GetEncodedPayload(
 
 	blobLengthSymbols := uint32(blobHeader.BlobCommitments.Length)
 	// TODO(samlaf): are there more properties of the Cert that should lead to [coretypes.MaliciousOperatorsError]s?
-	if !encoding.IsPowerOfTwo(blobLengthSymbols) {
+	if !math.IsPowerOfTwo(blobLengthSymbols) {
 		return nil, coretypes.ErrCertCommitmentBlobLengthNotPowerOf2MaliciousOperatorsError.WithBlobKey(blobKey.Hex())
 	}
 

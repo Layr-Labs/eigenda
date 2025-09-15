@@ -25,9 +25,10 @@ package fft
 
 import (
 	"errors"
-	"math"
+	gomath "math"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,15 +107,15 @@ func TestInvFFT(t *testing.T) {
 func TestIsPowerOfTwo(t *testing.T) {
 	var i uint64
 	for i = 0; i <= 1024; i++ {
-		result := isPowerOfTwo(i)
+		result := math.IsPowerOfTwo(i)
 
 		var expectedResult bool
 		if i == 0 {
-			// Special case: math.Log2() is undefined for 0
+			// Special case: gomath.Log2() is undefined for 0
 			expectedResult = false
 		} else {
 			// If a number is not a power of two then the log base 2 of that number will not be a whole integer.
-			logBase2 := math.Log2(float64(i))
+			logBase2 := gomath.Log2(float64(i))
 			truncatedLogBase2 := float64(uint64(logBase2))
 			expectedResult = logBase2 == truncatedLogBase2
 		}
