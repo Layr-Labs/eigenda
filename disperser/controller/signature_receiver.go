@@ -84,7 +84,10 @@ type signatureReceiver struct {
 	// TODO perhaps pull these into dispatcherMetrics?
 	// TODO ensure properly initialized
 	// Encapsulates metrics for validator signing rates.
-	signingRateMetrics signingrate.SigningRateMetrics
+	signingRateMetrics *signingrate.SigningRateMetrics
+
+	// The size of the batch in bytes.
+	batchSize uint64
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -109,7 +112,8 @@ func ReceiveSignatures(
 	tickInterval time.Duration,
 	significantSigningThresholdPercentage uint8,
 	signingRateTracker signingrate.SigningRateTracker,
-	signingRateMetrics signingrate.SigningRateMetrics,
+	signingRateMetrics *signingrate.SigningRateMetrics,
+	batchSize uint64,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -151,6 +155,7 @@ func ReceiveSignatures(
 		ticker:                                 time.NewTicker(tickInterval),
 		signingRateTracker:                     signingRateTracker,
 		signingRateMetrics:                     signingRateMetrics,
+		batchSize:                              batchSize,
 	}
 
 	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
@@ -218,18 +223,24 @@ func (sr *signatureReceiver) captureSigningRateMetrics() {
 	//  leads to a validator being missing from this set
 
 	for _, quorumID := range sr.quorumIDs {
-		for validatorID, _ := range sr.signatureMessageReceivedSet {
 
-			batchSizeForValidator := uint64(0) // TODO
+		totalStake := sr.indexedOperatorState.Totals[quorumID].Stake
+
+		for validatorID := range sr.signatureMessageReceivedSet {
+
+			stake := sr.indexedOperatorState.Totals[quorumID].Stake
+			stakeFraction, _ := new(big.Rat).SetFrac(stake, totalStake).Float64()
+
+			weightedByteSize := uint64(float64(sr.batchSize) * stakeFraction)
 
 			if _, valid := sr.validSignerSet[validatorID]; valid {
 				latency := sr.latencyMap[validatorID]
-				sr.signingRateMetrics.ReportSuccess(validatorID, batchSizeForValidator, latency, quorumID)
-				sr.signingRateTracker.ReportSuccess(quorumID, validatorID, batchSizeForValidator, latency)
+				sr.signingRateMetrics.ReportSuccess(validatorID, weightedByteSize, latency, quorumID)
+				sr.signingRateTracker.ReportSuccess(quorumID, validatorID, weightedByteSize, latency)
 			} else {
 				_, timeout := sr.timeoutSet[validatorID]
-				sr.signingRateMetrics.ReportFailure(validatorID, batchSizeForValidator, timeout, quorumID)
-				sr.signingRateTracker.ReportFailure(quorumID, validatorID, batchSizeForValidator)
+				sr.signingRateMetrics.ReportFailure(validatorID, weightedByteSize, timeout, quorumID)
+				sr.signingRateTracker.ReportFailure(quorumID, validatorID, weightedByteSize)
 			}
 		}
 	}
@@ -414,7 +425,7 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 		aggregateSignaturesCopy[quorumID] = &core.Signature{G1Point: aggregateSignature.Clone()}
 	}
 	validSignerSetCopy := make(map[core.OperatorID]bool, len(sr.validSignerSet))
-	for operatorID, _ := range sr.validSignerSet {
+	for operatorID := range sr.validSignerSet {
 		validSignerSetCopy[operatorID] = true
 	}
 

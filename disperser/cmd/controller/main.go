@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
@@ -242,6 +243,17 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
 
+	// TODO set up logic to load tracker info from persistent storage
+	// TODO config
+
+	tracker, err := signingrate.NewSigningRateTracker(logger, 0, 0, time.Now)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate tracker: %w", err)
+	}
+	tracker = signingrate.NewThreadsafeSigningRateTracker(tracker)
+
+	// TODO set up logic to periodically flush tracker to persistent storage
+
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
 		blobMetadataStore,
@@ -255,6 +267,7 @@ func RunController(ctx *cli.Context) error {
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		tracker,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)

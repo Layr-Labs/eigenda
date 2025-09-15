@@ -14,10 +14,16 @@ message ValidatorSigningRate {
   // The number of unsigned batches by the validator during the period.
   uint64 unsigned_batches = 3;
 
-  // The total number of bytes signed during the period.
+  // The total number of bytes signed during the period. Defined as the sum of the sizes of all batches (in bytes)
+  // signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
+  // This will not be the same as the actual quantity of data stored by a validator, since that depends on things
+  // like encoding rates and chunk assignments.
   uint64 signed_bytes = 4;
 
-  // The total number of bytes unsigned during the period.
+  // The total number of bytes unsigned during the period.  Defined as the sum of the sizes of all batches (in bytes)
+  // not signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
+  // This will not be the same as the actual quantity of data not stored by a validator, since that depends on things
+  // like encoding rates and chunk assignments.
   uint64 unsigned_bytes = 5;
 
   // Contains the sum of the time spent by the validator waiting for signing requests to be processed, in nanoseconds.

@@ -32,9 +32,15 @@ type ValidatorSigningRate struct {
 	SignedBatches uint64 `protobuf:"varint,2,opt,name=signed_batches,json=signedBatches,proto3" json:"signed_batches,omitempty"`
 	// The number of unsigned batches by the validator during the period.
 	UnsignedBatches uint64 `protobuf:"varint,3,opt,name=unsigned_batches,json=unsignedBatches,proto3" json:"unsigned_batches,omitempty"`
-	// The total number of bytes signed during the period.
+	// The total number of bytes signed during the period. Defined as the sum of the sizes of all batches (in bytes)
+	// signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
+	// This will not be the same as the actual quantity of data stored by a validator, since that depends on things
+	// like encoding rates and chunk assignments.
 	SignedBytes uint64 `protobuf:"varint,4,opt,name=signed_bytes,json=signedBytes,proto3" json:"signed_bytes,omitempty"`
-	// The total number of bytes unsigned during the period.
+	// The total number of bytes unsigned during the period.  Defined as the sum of the sizes of all batches (in bytes)
+	// not signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
+	// This will not be the same as the actual quantity of data not stored by a validator, since that depends on things
+	// like encoding rates and chunk assignments.
 	UnsignedBytes uint64 `protobuf:"varint,5,opt,name=unsigned_bytes,json=unsignedBytes,proto3" json:"unsigned_bytes,omitempty"`
 	// Contains the sum of the time spent by the validator waiting for signing requests to be processed, in nanoseconds.
 	// Only batches that are signed are considered (i.e. if the validator does not succeed in signing a batch,

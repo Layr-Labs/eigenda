@@ -100,7 +100,7 @@ type Dispatcher struct {
 	// TODO perhaps pull these into dispatcherMetrics?
 	// TODO ensure properly initialized
 	// Encapsulates metrics for validator signing rates.
-	signingRateMetrics signingrate.SigningRateMetrics
+	signingRateMetrics *signingrate.SigningRateMetrics
 }
 
 type batchData struct {
@@ -433,6 +433,11 @@ func (d *Dispatcher) HandleSignatures(
 			"batchHeaderHash", batchHeaderHash)
 	}
 
+	var batchSize uint64
+	for _, blobMetadata := range batchData.Metadata {
+		batchSize += blobMetadata.BlobSize
+	}
+
 	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
 	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
 	// signatures.
@@ -443,10 +448,11 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan,
-		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdPercentage,
+		d.SignatureTickInterval,
+		d.SignificantSigningThresholdPercentage,
 		d.signingRateTracker,
-		d.signingRateMetrics)
+		d.signingRateMetrics,
+		batchSize)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
