@@ -1,18 +1,19 @@
 package rs_test
 
 import (
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // randomG1 generates a random G1 point. There is no direct way to generate a random G1 point in the bn254 library,
 // but we can generate a random BLS key and steal the public key.
-func randomG1() (*bn254.G1Point, error) {
-	key, err := bn254.GenRandomBlsKeys()
+func randomG1() (*core.G1Point, error) {
+	key, err := core.GenRandomBlsKeys()
 	if err != nil {
 		return nil, err
 	}
