@@ -37,7 +37,7 @@ contract EigenDACertVerifier is
     /// @dev Checked inside {EigenDACertVerificationLib-checkDACert}. Constraints to respect:
     ///      - confirmationThreshold > adversaryThreshold (constructor-enforced)
     ///      - confirmationThreshold - adversaryThreshold > reconstructionThreshold
-    ///        (see eigenda/docs/spec/src/protocol/architecture/security-parameters.md 
+    ///        (see eigenda/docs/spec/src/protocol/architecture/security-parameters.md
     ///         for the definition of reconstructionThreshold and more info)
     DATypesV1.SecurityThresholds internal _securityThresholds;
 
