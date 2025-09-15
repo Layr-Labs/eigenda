@@ -11,7 +11,8 @@ type KzgConfig struct {
 	// SRSOrder is the total size of SRS.
 	// TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant.
 	SRSOrder uint64
-	// Number of G1 (and optionally G2) points to be loaded from the SRS files (G1Path, and optionally G2Path and G2TrailingPath).
+	// Number of G1 (and optionally G2) points to be loaded from the SRS files:
+	// G1Path, and optionally G2Path and G2TrailingPath.
 	// This number times 32 bytes will be loaded from G1Path, and if LoadG2Points is true,
 	// this number times 64 bytes will be loaded from G2Path and optionally G2TrailingPath.
 	SRSNumberToLoad uint64
@@ -27,8 +28,9 @@ type KzgConfig struct {
 	//
 	// There are 2 ways to configure G2 points:
 	// 1. Entire G2 SRS file (16GiB) is provided via G2Path
-	// 2. G2Path and G2TrailingPath both contain at least SRSNumberToLoad points, where G2Path contains the first part of the G2 SRS file,
-	//    and G2TrailingPath contains the trailing end of the G2 SRS file.
+	// 2. G2Path and G2TrailingPath both contain at least SRSNumberToLoad points,
+	//    where G2Path contains the first part of the G2 SRS file, and G2TrailingPath
+	//    contains the trailing end of the G2 SRS file.
 	// TODO(samlaf): to prevent misconfigurations and simplify the code, we should probably not multiplex G2Path like this,
 	// and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used.
 	G2Path         string
