@@ -211,6 +211,18 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
 		Hidden:   false,
 	}
+	ControllerAddressFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-address"),
+		Usage:    "gRPC address of the controller service",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_ADDRESS"),
+	}
+	UseControllerMediatedPayments = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-controller-mediated-payments"),
+		Usage:    "If true, use the new payment system running on the controller; if false, use the legacy payment system running on the API server. Defaults to using legacy system.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_CONTROLLER_MEDIATED_PAYMENTS"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -310,6 +322,8 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxPastAge,
 	AuthPmtStateRequestMaxFutureAge,
 	ReservedOnly,
+	ControllerAddressFlag,
+	UseControllerMediatedPayments,
 	OperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
 	EigenDADirectoryFlag,
