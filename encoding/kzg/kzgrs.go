@@ -34,12 +34,12 @@ type KzgConfig struct {
 	G2Path         string
 	G2TrailingPath string
 
-	// PreloadEncoder is only used by the prover. If true, encoding params
-	// are read from the CacheDir during initialization, and SRS tables are preloaded.
+	// PreloadEncoder is only used by the prover for multiproofs. If true, encoding params
+	// are read from CacheDir during initialization, and SRS tables are preloaded.
+	// Generating these on startup would take hours otherwise.
 	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
 	// because the prover will write the SRS tables to this directory if they are not already present.
-	// TODO(samlaf): is this really needed/useful?
 	CacheDir string
 
 	// NumWorker is used in a few places:
