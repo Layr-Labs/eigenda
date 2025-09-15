@@ -33,11 +33,13 @@ lint:
     PACKAGE_VERSION_SUFFIX:
       - proto/churner/churner.proto
       - proto/common/common.proto
+      - proto/controller/controller_service.proto
       - proto/disperser/disperser.proto
       - proto/node/node.proto
       - proto/relay/relay.proto
       - proto/retriever/retriever.proto
       - proto/validator/node_v2.proto
+      - proto/validator/signing_rate.proto
       - proto/encoder/encoder.proto
     RPC_REQUEST_RESPONSE_UNIQUE:
       - proto/node/node.proto
