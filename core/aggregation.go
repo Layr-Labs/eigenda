@@ -33,10 +33,7 @@ type SigningMessage struct {
 	// Undefined if this value <= 0.
 	AttestationLatencyMs float64
 	TimeReceived         time.Time
-	// If an error occurred while attempting to get the signature, it is recorded here.
-	Err error
-	// True if the Err is due to a timeout.
-	Timeout bool
+	Err                  error
 }
 
 // QuorumAttestation contains the results of aggregating signatures from a set of operators by quorums

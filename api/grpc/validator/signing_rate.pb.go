@@ -28,9 +28,9 @@ type ValidatorSigningRate struct {
 
 	// The unique identifier of the validator (i.e. the operator ID).
 	Id []byte `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// The number of signed by the validator during the period.
+	// The number of signed batches by the validator during the period.
 	SignedBatches uint64 `protobuf:"varint,2,opt,name=signed_batches,json=signedBatches,proto3" json:"signed_batches,omitempty"`
-	// The number of unsigned by the validator during the period.
+	// The number of unsigned batches by the validator during the period.
 	UnsignedBatches uint64 `protobuf:"varint,3,opt,name=unsigned_batches,json=unsignedBatches,proto3" json:"unsigned_batches,omitempty"`
 	// The total number of bytes signed during the period.
 	SignedBytes uint64 `protobuf:"varint,4,opt,name=signed_bytes,json=signedBytes,proto3" json:"signed_bytes,omitempty"`

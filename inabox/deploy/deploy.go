@@ -2,12 +2,9 @@ package deploy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +16,7 @@ import (
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -37,99 +35,39 @@ const (
 	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
 )
 
-// getKeyString retrieves a ECDSA private key string for a given Ethereum account
-func (env *Config) getKeyString(name string) (string, error) {
-	key, _, err := env.getKey(name)
-	if err != nil {
-		return "", fmt.Errorf("could not get key for %s: %w", name, err)
+// convertToTestbedPrivateKeys converts the current PkConfig to testbed.PrivateKeyMaps
+func (env *Config) convertToTestbedPrivateKeys() *testbed.PrivateKeyMaps {
+	if env.Pks == nil {
+		return nil
 	}
 
-	keyInt, ok := new(big.Int).SetString(key, 0)
-	if !ok {
-		return "", fmt.Errorf("could not parse key %s", key)
+	result := &testbed.PrivateKeyMaps{
+		EcdsaMap: make(map[string]testbed.KeyInfo),
+		BlsMap:   make(map[string]testbed.KeyInfo),
 	}
 
-	return keyInt.String(), nil
-}
-
-// generateV1CertVerifierDeployConfig generates the input config used for deploying the V1 CertVerifier
-// NOTE: this will be killed in the future with eventual deprecation of V1
-func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient) V1CertVerifierDeployConfig {
-	config := V1CertVerifierDeployConfig{
-		ServiceManager:                env.EigenDA.ServiceManager,
-		RequiredQuorums:               []uint32{0, 1},
-		RequiredAdversarialThresholds: []uint32{33, 33},
-		RequiredConfirmationQuorums:   []uint32{55, 55},
-	}
-
-	return config
-}
-
-// generateEigenDADeployConfig generates input config fed into SetUpEigenDA.s.sol foundry script
-func (env *Config) generateEigenDADeployConfig() (EigenDADeployConfig, error) {
-
-	operators := make([]string, 0)
-	stakers := make([]string, 0)
-	maxOperatorCount := env.Services.Counts.NumMaxOperatorCount
-
-	numStrategies := len(env.Services.Stakes)
-	total := make([]float32, numStrategies)
-	stakes := make([][]string, numStrategies)
-
-	for quorum, stake := range env.Services.Stakes {
-		for _, s := range stake.Distribution {
-			total[quorum] += s
+	for name, keyInfo := range env.Pks.EcdsaMap {
+		result.EcdsaMap[name] = testbed.KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
 		}
 	}
 
-	for quorum := 0; quorum < numStrategies; quorum++ {
-		stakes[quorum] = make([]string, len(env.Services.Stakes[quorum].Distribution))
-		for ind, stake := range env.Services.Stakes[quorum].Distribution {
-			stakes[quorum][ind] = strconv.FormatFloat(float64(stake/total[quorum]*env.Services.Stakes[quorum].Total), 'f', 0, 32)
+	for name, keyInfo := range env.Pks.BlsMap {
+		result.BlsMap[name] = testbed.KeyInfo{
+			PrivateKey: keyInfo.PrivateKey,
+			Password:   keyInfo.Password,
+			KeyFile:    keyInfo.KeyFile,
 		}
 	}
 
-	for i := 0; i < len(env.Services.Stakes[0].Distribution); i++ {
-		stakerName := fmt.Sprintf("staker%d", i)
-		operatorName := fmt.Sprintf("opr%d", i)
-
-		// Get keys for staker and operator
-		stakerKey, err := env.getKeyString(stakerName)
-		if err != nil {
-			return EigenDADeployConfig{}, fmt.Errorf("failed to get key for %s: %w", stakerName, err)
-		}
-
-		operatorKey, err := env.getKeyString(operatorName)
-		if err != nil {
-			return EigenDADeployConfig{}, fmt.Errorf("failed to get key for %s: %w", operatorName, err)
-		}
-
-		stakers = append(stakers, stakerKey)
-		operators = append(operators, operatorKey)
-	}
-
-	// Get batcher0 key
-	batcherKey, err := env.getKeyString("batcher0")
-	if err != nil {
-		return EigenDADeployConfig{}, fmt.Errorf("failed to get key for batcher0: %w", err)
-	}
-
-	config := EigenDADeployConfig{
-		UseDefaults:         true,
-		NumStrategies:       numStrategies,
-		MaxOperatorCount:    maxOperatorCount,
-		StakerPrivateKeys:   stakers,
-		StakerTokenAmounts:  stakes,
-		OperatorPrivateKeys: operators,
-		ConfirmerPrivateKey: batcherKey,
-	}
-
-	return config, nil
+	return result
 }
 
 // deployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
 func (env *Config) deployEigenDAContracts() error {
-	logger.Info("Deploy the EigenDA and EigenLayer contracts")
+	logger.Info("Deploy the EigenDA and EigenLayer contracts using testbed")
 
 	// get deployer
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
@@ -137,89 +75,46 @@ func (env *Config) deployEigenDAContracts() error {
 		return fmt.Errorf("deployer improperly configured")
 	}
 
-	if err := changeDirectory(filepath.Join(env.rootPath, "contracts")); err != nil {
-		return fmt.Errorf("failed to change directories: %w", err)
+	// Convert Stakes to testbed format
+	stakes := make([]testbed.Stakes, len(env.Services.Stakes))
+	for i, stake := range env.Services.Stakes {
+		stakes[i] = testbed.Stakes{
+			Total:        stake.Total,
+			Distribution: stake.Distribution,
+		}
 	}
 
-	// Log the current working directory (absolute path)
-	if cwd, err := os.Getwd(); err == nil {
-		logger.Info("Successfully changed to absolute path", "path", cwd)
+	// Create deployment config for testbed
+	deployConfig := testbed.DeploymentConfig{
+		AnvilRPCURL:      deployer.RPC,
+		DeployerKey:      env.Pks.EcdsaMap[deployer.Name].PrivateKey,
+		NumOperators:     env.Services.Counts.NumOpr,
+		NumRelays:        env.Services.Counts.NumRelays,
+		Stakes:           stakes,
+		MaxOperatorCount: env.Services.Counts.NumMaxOperatorCount,
+		PrivateKeys:      env.convertToTestbedPrivateKeys(),
+		Logger:           logger,
 	}
 
-	eigendaDeployConfig, err := env.generateEigenDADeployConfig()
+	// Deploy contracts using testbed
+	result, err := testbed.DeployEigenDAContracts(deployConfig)
 	if err != nil {
-		return fmt.Errorf("error generating eigenda deploy config: %w", err)
+		return fmt.Errorf("failed to deploy EigenDA contracts: %w", err)
 	}
 
-	data, err := json.Marshal(&eigendaDeployConfig)
-	if err != nil {
-		return fmt.Errorf("error marshaling eigenda deploy config: %w", err)
+	// Copy results to env
+	env.EigenDA = EigenDAContract{
+		Deployer:               env.EigenDA.Deployer,
+		EigenDADirectory:       result.EigenDA.EigenDADirectory,
+		ServiceManager:         result.EigenDA.ServiceManager,
+		OperatorStateRetriever: result.EigenDA.OperatorStateRetriever,
+		BlsApkRegistry:         result.EigenDA.BlsApkRegistry,
+		RegistryCoordinator:    result.EigenDA.RegistryCoordinator,
+		CertVerifierLegacy:     result.EigenDA.CertVerifierLegacy,
+		CertVerifier:           result.EigenDA.CertVerifier,
+		CertVerifierRouter:     result.EigenDA.CertVerifierRouter,
 	}
-	err = writeFile("script/input/eigenda_deploy_config.json", data)
-	if err != nil {
-		return fmt.Errorf("error writing eigenda deploy config: %w", err)
-	}
-
-	logger.Info("Executing EigenDA deployer script", "script", "script/SetUpEigenDA.s.sol:SetupEigenDA", "rpc", deployer.RPC, "deployer", deployer.Name, "privateKey", env.Pks.EcdsaMap[deployer.Name].PrivateKey)
-	err = execForgeScript(
-		"script/SetUpEigenDA.s.sol:SetupEigenDA",
-		env.Pks.EcdsaMap[deployer.Name].PrivateKey,
-		deployer,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to execute EigenDA deployer script: %w", err)
-	}
-
-	// Add relevant addresses to path
-	data, err = readFile("script/output/eigenda_deploy_output.json")
-	if err != nil {
-		return fmt.Errorf("error reading eigenda deploy output: %w", err)
-	}
-
-	err = json.Unmarshal(data, &env.EigenDA)
-	if err != nil {
-		return fmt.Errorf("error unmarshaling eigenda deploy output: %w", err)
-	}
-
-	ethClient, err := geth.NewClient(geth.EthClientConfig{
-		RPCURLs:          []string{deployer.RPC},
-		PrivateKeyString: env.Pks.EcdsaMap[deployer.Name].PrivateKey[2:],
-		NumConfirmations: 0,
-		NumRetries:       0,
-	}, gcommon.Address{}, 0, logger)
-	if err != nil {
-		return fmt.Errorf("error creating eth client: %w", err)
-	}
-
-	certVerifierV1DeployCfg := env.generateV1CertVerifierDeployConfig(ethClient)
-	data, err = json.Marshal(&certVerifierV1DeployCfg)
-	if err != nil {
-		return fmt.Errorf("error marshaling certverifier config: %w", err)
-	}
-
-	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
-	//       can be deprecated.
-	if err := writeFile("script/deploy/certverifier/config/v1/inabox_deploy_config_v1.json", data); err != nil {
-		return fmt.Errorf("error writing certverifier config: %w", err)
-	}
-
-	logger.Info("Executing CertVerifierDeployerV1 script", "script", "script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", "rpc", deployer.RPC, "deployer", deployer.Name, "privateKey", env.Pks.EcdsaMap[deployer.Name].PrivateKey)
-	if err := execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"}); err != nil {
-		return fmt.Errorf("failed to execute CertVerifierDeployerV1 script: %w", err)
-	}
-
-	data, err = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
-	if err != nil {
-		return fmt.Errorf("error reading certverifier output: %w", err)
-	}
-
-	var verifierAddress struct{ EigenDACertVerifier string }
-	err = json.Unmarshal(data, &verifierAddress)
-	if err != nil {
-		return fmt.Errorf("error unmarshaling verifier address: %w", err)
-	}
-	env.EigenDAV1CertVerifier = verifierAddress.EigenDACertVerifier
+	env.EigenDAV1CertVerifier = result.EigenDAV1CertVerifier
 
 	return nil
 }
@@ -489,7 +384,7 @@ func (env *Config) StopBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	err := execCmd("./bin.sh", []string{"stop"}, []string{}, true)
+	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
 	}

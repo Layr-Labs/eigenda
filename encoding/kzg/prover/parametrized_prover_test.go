@@ -1,11 +1,9 @@
 package prover_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -24,26 +22,16 @@ func TestProveAllCosetThreads(t *testing.T) {
 	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
 	assert.Nil(t, err)
 
-	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+	commit, _, _, frames, _, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
-	for i := 0; i < len(frames); i++ {
-		f := frames[i]
-		j := fIndices[i]
+	verifierGroup, err := verifier.NewVerifier(kzgConfig, nil)
+	require.Nil(t, err)
+	verifier, err := verifierGroup.GetKzgVerifier(params)
+	require.Nil(t, err)
 
-		q, err := rs.GetLeadingCosetIndex(uint64(i), numSys+numPar)
+	for i, frame := range frames {
+		err = verifier.VerifyFrame(&frame, uint64(i), commit, params.NumChunks)
 		require.Nil(t, err)
-
-		assert.Equal(t, j, q, "leading coset inconsistency")
-
-		fmt.Printf("frame %v leading coset %v\n", i, j)
-		rs, err := enc.GetRsEncoder(params)
-		require.Nil(t, err)
-
-		lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
-
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
-		require.Nil(t, err)
-		assert.Nil(t, verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}
 }

@@ -3,7 +3,6 @@ package disperser.v2;
 
 import "common/common.proto";
 import "common/v2/common_v2.proto";
-import "validator/signing_rate.proto";
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
@@ -35,9 +34,6 @@ service Disperser {
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
-
-  // GetValidatorSigningRate returns the signing rate of a validator during a time range.
-  rpc GetValidatorSigningRate(GetValidatorSigningRateRequest) returns (GetValidatorSigningRateReply) {}
 }
 
 // Requests and Replies
@@ -262,27 +258,4 @@ message PeriodRecord {
   uint32 index = 1;
   // symbol usage recorded
   uint64 usage = 2;
-}
-
-// A request to get the signing rate of a validator during a time range. The time range of the returned data may not
-// exactly match the requested time range, as the data is aggregated into fixed size buckets.
-message GetValidatorSigningRateRequest {
-  // The unique identifier of the validator (i.e. the operator ID).
-  bytes validator_id = 1;
-  // The time range to query the signing rate for, in seconds since Unix epoch.
-  uint64 start_timestamp = 2;
-  // The end time of the range, in seconds since Unix epoch, exclusive.
-  uint64 end_timestamp = 3;
-}
-
-// A reply containing the signing rate of a validator during a time range.
-message GetValidatorSigningRateReply {
-  // The start time of the range, in seconds since Unix epoch, inclusive. May be different from the requested start time
-  // (in order to align with bucket boundaries).
-  uint64 start_timestamp = 1;
-  // The end time of the range, in seconds since Unix epoch, exclusive. May be different from the requested end time
-  // (in order to align with bucket boundaries).
-  uint64 end_timestamp = 2;
-  // The signing rate of the validator during the time range.
-  validator.ValidatorSigningRate validator_signing_rate = 3;
 }

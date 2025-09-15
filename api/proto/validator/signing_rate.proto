@@ -9,10 +9,10 @@ message ValidatorSigningRate {
   // The unique identifier of the validator (i.e. the operator ID).
   bytes id = 1;
 
-  // The number of signed by the validator during the period.
+  // The number of signed batches by the validator during the period.
   uint64 signed_batches = 2;
 
-  // The number of unsigned by the validator during the period.
+  // The number of unsigned batches by the validator during the period.
   uint64 unsigned_batches = 3;
 
   // The total number of bytes signed during the period.

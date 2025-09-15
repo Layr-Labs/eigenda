@@ -93,7 +93,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 	quorumSigningRates := make([]*validator.QuorumSigningRate, len(b.signingRateInfo))
 
 	for quorumID, quorumInfo := range b.signingRateInfo {
-		validatorSigningRates := make([]*validator.ValidatorSigningRate, 0, len(b.signingRateInfo))
+		validatorSigningRates := make([]*validator.ValidatorSigningRate, 0)
 
 		for _, validatorInfo := range quorumInfo {
 			validatorSigningRates = append(validatorSigningRates, cloneValidatorSigningRate(validatorInfo))

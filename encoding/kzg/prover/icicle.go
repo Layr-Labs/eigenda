@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	gnarkprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/gnark"
 	icicleprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/icicle"
 )
@@ -22,7 +21,7 @@ const (
 	MAX_NTT_SIZE = 25
 )
 
-func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedProver, error) {
 	_, fftPointsT, err := p.SetupFFTPoints(params)
 	if err != nil {
 		return nil, err
@@ -66,7 +65,6 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		EncodingParams:        params,
 		Encoder:               p.encoder,
 		KzgConfig:             p.KzgConfig,
-		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
 		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil

@@ -1,5 +1,5 @@
 //nolint:lll // long lines are expected in this file
-package server
+package rest
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda/api/proxy/server/middleware"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest/middleware"
 	"github.com/gorilla/mux"
 )
 

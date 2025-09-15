@@ -21,14 +21,14 @@ import (
 )
 
 type Prover struct {
-	Config    *encoding.Config
-	KzgConfig *kzg.KzgConfig
-	encoder   *rs.Encoder
-	encoding.BackendType
-	Srs        *kzg.SRS
+	Config     *encoding.Config
+	KzgConfig  *kzg.KzgConfig
+	encoder    *rs.Encoder
+	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
-	mu         sync.Mutex
 
+	// mu protects access to ParametrizedProvers
+	mu                  sync.Mutex
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
@@ -46,8 +46,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	// read the whole order, and treat it as entire SRS for low degree proof
 	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 	if err != nil {
-		log.Println("failed to read G1 points", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read G1 points: %w", err)
 	}
 
 	s2 := make([]bn254.G2Affine, 0)
@@ -61,15 +60,14 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		s2, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to read G2 points: %w", err)
 		}
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
 			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
 			if errStat != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot stat the G2TrailingPath: %w", errStat)
 			}
 			fileSizeByte := fileStat.Size()
 			if fileSizeByte%64 != 0 {
@@ -88,6 +86,10 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 				numG2point, // last exclusive
 				kzgConfig.NumWorker,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read G2 trailing points (%v to %v) from file %v: %w",
+					numG2point-kzgConfig.SRSNumberToLoad, numG2point, kzgConfig.G2TrailingPath, err)
+			}
 		} else {
 			// require entire g2 srs be available on disk
 			g2Trailing, err = kzg.ReadG2PointSection(
@@ -96,23 +98,14 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 				kzgConfig.SRSOrder, // last exclusive
 				kzgConfig.NumWorker,
 			)
-		}
-
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// todo, there are better ways to handle it
-		if len(kzgConfig.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
+			if err != nil {
+				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
+					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
+			}
 		}
 	}
 
-	srs, err := kzg.NewSrs(s1, s2)
-	if err != nil {
-		log.Println("Could not create srs", err)
-		return nil, err
-	}
+	srs := kzg.NewSrs(s1, s2)
 
 	// Create RS encoder
 	rsEncoder, err := rs.NewEncoder(encoderConfig)
@@ -300,11 +293,12 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	}
 
 	enc, err := g.newProver(params)
-	if err == nil {
-		g.ParametrizedProvers[params] = enc
+	if err != nil {
+		return nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	return enc, err
+	g.ParametrizedProvers[params] = enc
+	return enc, nil
 }
 
 func (g *Prover) GetSRSOrder() uint64 {
@@ -391,24 +385,20 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 	fs := fft.NewFFTSettings(n)
 
-	// Create base KZG settings
-	ks, err := kzg.NewKZGSettings(fs, p.Srs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
-	}
-
 	switch p.Config.BackendType {
 	case encoding.GnarkBackend:
-		return p.createGnarkBackendProver(params, fs, ks)
+		return p.createGnarkBackendProver(params, fs)
 	case encoding.IcicleBackend:
-		return p.createIcicleBackendProver(params, fs, ks)
+		return p.createIcicleBackendProver(params, fs)
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)
 	}
 
 }
 
-func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+func (p *Prover) createGnarkBackendProver(
+	params encoding.EncodingParams, fs *fft.FFTSettings,
+) (*ParametrizedProver, error) {
 	if p.Config.GPUEnable {
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
@@ -441,14 +431,15 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 		Encoder:               p.encoder,
 		EncodingParams:        params,
 		KzgConfig:             p.KzgConfig,
-		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
 		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil
 }
 
-func (p *Prover) createIcicleBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
-	return CreateIcicleBackendProver(p, params, fs, ks)
+func (p *Prover) createIcicleBackendProver(
+	params encoding.EncodingParams, fs *fft.FFTSettings,
+) (*ParametrizedProver, error) {
+	return CreateIcicleBackendProver(p, params, fs)
 }
 
 // Helper methods for setup

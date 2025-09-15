@@ -3,7 +3,8 @@ package config
 import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	eigenda_v2_flags "github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
-	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 
@@ -25,7 +26,8 @@ const (
 	S3Category              = "S3 Cache/Fallback"
 	VerifierCategory        = "Cert Verifier (V1 only)"
 	KZGCategory             = "KZG"
-	ProxyServerCategory     = "Proxy Server"
+	ProxyRestServerCategory = "Proxy REST API Server (compatible with OP Stack ALT DA and standard commitment clients)"
+	ArbCustomDASvrCategory  = "Arbitrum Custom DA JSON RPC Server"
 
 	DeprecatedRedisCategory = "Redis Cache/Fallback"
 )
@@ -38,7 +40,8 @@ const GlobalEnvVarPrefix = "EIGENDA_PROXY"
 var Flags = []cli.Flag{}
 
 func init() {
-	Flags = append(Flags, server.CLIFlags(GlobalEnvVarPrefix, ProxyServerCategory)...)
+	Flags = append(Flags, rest.CLIFlags(GlobalEnvVarPrefix, ProxyRestServerCategory)...)
+	Flags = append(Flags, arbitrum_altda.CLIFlags(GlobalEnvVarPrefix, ArbCustomDASvrCategory)...)
 	Flags = append(Flags, logging.CLIFlags(GlobalEnvVarPrefix, LoggingFlagsCategory)...)
 	Flags = append(Flags, metrics.CLIFlags(GlobalEnvVarPrefix, MetricsFlagCategory)...)
 	Flags = append(Flags, eigendaflags.CLIFlags(GlobalEnvVarPrefix, EigenDAClientCategory)...)
