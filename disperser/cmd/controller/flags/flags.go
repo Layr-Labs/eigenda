@@ -294,6 +294,13 @@ var (
 		Value:    time.Hour * 24 * 7 * 2, // 2 weeks
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_HISTORY_LENGTH"),
 	}
+	SigningRateFlushPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signing-rate-flush-period"),
+		Usage:    "The period at which to flush signing rate data to persistent storage",
+		Required: false,
+		Value:    time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNING_RATE_FLUSH_PERIOD"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -341,6 +348,7 @@ var optionalFlags = []cli.Flag{
 	GrpcAuthorizationRequestMaxFutureAgeFlag,
 	SigningRateBucketSpanFlag,
 	SigningRateHistoryLengthFlag,
+	SigningRateFlushPeriodFlag,
 }
 
 var Flags []cli.Flag

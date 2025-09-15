@@ -245,6 +245,7 @@ func RunController(ctx *cli.Context) error {
 
 	// TODO set up logic to load tracker info from persistent storage
 
+	// Set up signing rate tracking.
 	tracker, err := signingrate.NewSigningRateTracker(
 		logger,
 		config.DispatcherConfig.SigningRateHistoryLength,
@@ -255,7 +256,42 @@ func RunController(ctx *cli.Context) error {
 	}
 	tracker = signingrate.NewThreadsafeSigningRateTracker(tracker)
 
-	// TODO set up logic to periodically flush tracker to persistent storage
+	// Set up persistent storage for signing rate info.
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		context.Background(),
+		dynamoClient.GetRawClient(),
+		"ValidatorSigningRate")
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load historical signing rate info into tracker.
+	startTime := time.Now().Add(-config.DispatcherConfig.SigningRateHistoryLength)
+	buckets, err := signingRateStorage.LoadBuckets(context.Background(), startTime)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate info: %w", err)
+	}
+	for _, bucket := range buckets {
+		tracker.UpdateLastBucket(time.Now(), bucket)
+	}
+
+	// Periodically flush signing rate info to persistent storage.
+	go func() {
+		ticker := time.NewTicker(config.DispatcherConfig.SigningRateFlushPeriod)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			unflushedBuckets, err := tracker.GetUnflushedBuckets()
+			if err != nil {
+				logger.Error("Failed to get unflushed signing rate buckets", "err", err)
+				continue
+			}
+			err = signingRateStorage.StoreBuckets(context.Background(), unflushedBuckets)
+			if err != nil {
+				logger.Error("Failed to store signing rate bucket", "err", err)
+			}
+		}
+	}()
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,

@@ -74,6 +74,9 @@ type DispatcherConfig struct {
 	// The length of the history for tracking signing rates. Longer values gives more historical data, at the cost
 	// of more memory usage.
 	SigningRateHistoryLength time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
 }
 
 type Dispatcher struct {

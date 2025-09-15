@@ -116,6 +116,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
 			SigningRateBucketSpan:                 ctx.GlobalDuration(flags.SigningRateBucketSpanFlag.Name),
 			SigningRateHistoryLength:              ctx.GlobalDuration(flags.SigningRateHistoryLengthFlag.Name),
+			SigningRateFlushPeriod:                ctx.GlobalDuration(flags.SigningRateFlushPeriodFlag.Name),
 		},
 		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
