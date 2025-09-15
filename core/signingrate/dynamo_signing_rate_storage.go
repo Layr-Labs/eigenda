@@ -2,6 +2,7 @@ package signingrate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -40,9 +41,9 @@ func NewDynamoSigningRateStorage(
 		tableName:    aws.String(tableName),
 	}
 
-	err := s.buildEndTimestampIndex(ctx)
+	err := s.ensureTableExists(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error ensuring EndTimestamp index exists: %w", err)
+		return nil, fmt.Errorf("error ensuring table exists: %w", err)
 	}
 
 	return s, nil
@@ -155,91 +156,78 @@ func (d *dynamoSigningRateStorage) LoadBuckets(
 	return out, nil
 }
 
-// If it doesn't yet exist, ensure that dynamo table has an index on EndTimestamp.
-// This index is needed to efficiently query for all buckets after a certain time.
-func (d *dynamoSigningRateStorage) buildEndTimestampIndex(ctx context.Context) error {
-	td, err := d.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+func (d *dynamoSigningRateStorage) ensureTableExists(ctx context.Context) error {
+	_, err := d.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: d.tableName,
 	})
-	if err != nil {
+	if err == nil {
+		// Table exists, wait until ACTIVE
+		return d.waitForTableActive(ctx)
+	}
+
+	var rnfe *types.ResourceNotFoundException
+	if !errors.As(err, &rnfe) {
 		return fmt.Errorf("describe table: %w", err)
 	}
 
-	// Already present?
-	for _, g := range td.Table.GlobalSecondaryIndexes {
-		if aws.ToString(g.IndexName) == "EndTimestampIndex" {
-			if g.IndexStatus == types.IndexStatusActive {
-				return nil
-			}
-			// wait until it's ACTIVE
-			err = d.waitForIndexActive(ctx, "EndTimestampIndex")
-			if err != nil {
-				return fmt.Errorf("wait for index active: %w", err)
-			}
-			return nil
-		}
-	}
-
-	// Build the create request
-	create := types.CreateGlobalSecondaryIndexAction{
-		IndexName: aws.String("EndTimestampIndex"),
-		KeySchema: []types.KeySchemaElement{
-			{AttributeName: aws.String("BucketType"), KeyType: types.KeyTypeHash},
-			{AttributeName: aws.String("EndTimestamp"), KeyType: types.KeyTypeRange},
-		},
-		Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
-	}
-
-	// Only needed if the table uses provisioned throughput (not on-demand)
-	isProvisioned := td.Table.BillingModeSummary == nil ||
-		td.Table.BillingModeSummary.BillingMode == types.BillingModeProvisioned
-	if isProvisioned {
-		create.ProvisionedThroughput = &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(5),
-			WriteCapacityUnits: aws.Int64(5),
-		}
-	}
-
-	_, err = d.dynamoClient.UpdateTable(ctx, &dynamodb.UpdateTableInput{
+	_, err = d.dynamoClient.CreateTable(ctx, &dynamodb.CreateTableInput{
 		TableName: d.tableName,
 		AttributeDefinitions: []types.AttributeDefinition{
+			{AttributeName: aws.String("StartTimestamp"), AttributeType: types.ScalarAttributeTypeS},
 			{AttributeName: aws.String("BucketType"), AttributeType: types.ScalarAttributeTypeS},
 			{AttributeName: aws.String("EndTimestamp"), AttributeType: types.ScalarAttributeTypeS},
 		},
-		GlobalSecondaryIndexUpdates: []types.GlobalSecondaryIndexUpdate{
-			{Create: &create},
+		KeySchema: []types.KeySchemaElement{
+			{AttributeName: aws.String("StartTimestamp"), KeyType: types.KeyTypeHash},
+		},
+		BillingMode: types.BillingModePayPerRequest,
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String("EndTimestampIndex"),
+				KeySchema: []types.KeySchemaElement{
+					{AttributeName: aws.String("BucketType"), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String("EndTimestamp"), KeyType: types.KeyTypeRange},
+				},
+				Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
+				// No ProvisionedThroughput because we're PAY_PER_REQUEST
+			},
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("create GSI: %w", err)
+		return fmt.Errorf("create table: %w", err)
 	}
 
-	err = d.waitForIndexActive(ctx, "EndTimestampIndex")
-	if err != nil {
-		return fmt.Errorf("wait for index active: %w", err)
-	}
-
-	return nil
+	// Wait for table ACTIVE
+	return d.waitForTableActive(ctx)
 }
 
-func (d *dynamoSigningRateStorage) waitForIndexActive(ctx context.Context, indexName string) error {
+func (d *dynamoSigningRateStorage) waitForTableActive(ctx context.Context) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	timeout := time.After(5 * time.Minute)
+	timeout := time.After(10 * time.Minute)
 
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("timeout waiting for index %s to become ACTIVE", indexName)
+			return fmt.Errorf("timeout waiting for table to become ACTIVE")
 		case <-ticker.C:
-			td, err := d.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+			out, err := d.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 				TableName: d.tableName,
 			})
 			if err != nil {
 				return fmt.Errorf("describe table while waiting: %w", err)
 			}
-			for _, g := range td.Table.GlobalSecondaryIndexes {
-				if aws.ToString(g.IndexName) == indexName && g.IndexStatus == types.IndexStatusActive {
+			if out.Table != nil && out.Table.TableStatus == types.TableStatusActive {
+				// Also verify the GSI is ACTIVE (created at table creation)
+				ok := true
+				for _, g := range out.Table.GlobalSecondaryIndexes {
+					if g.IndexName != nil && *g.IndexName == "EndTimestampIndex" &&
+						g.IndexStatus != types.IndexStatusActive {
+						ok = false
+						break
+					}
+				}
+				if ok {
 					return nil
 				}
 			}
