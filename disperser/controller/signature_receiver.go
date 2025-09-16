@@ -81,11 +81,6 @@ type signatureReceiver struct {
 	// Responsible for recording information about validator signing rates.
 	signingRateTracker signingrate.SigningRateTracker
 
-	// TODO perhaps pull these into dispatcherMetrics?
-	// TODO ensure properly initialized
-	// Encapsulates metrics for validator signing rates.
-	signingRateMetrics *signingrate.SigningRateMetrics
-
 	// The size of the batch in bytes.
 	batchSize uint64
 }
@@ -112,7 +107,6 @@ func ReceiveSignatures(
 	tickInterval time.Duration,
 	significantSigningThresholdPercentage uint8,
 	signingRateTracker signingrate.SigningRateTracker,
-	signingRateMetrics *signingrate.SigningRateMetrics,
 	batchSize uint64,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
@@ -154,7 +148,6 @@ func ReceiveSignatures(
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
 		ticker:                                 time.NewTicker(tickInterval),
 		signingRateTracker:                     signingRateTracker,
-		signingRateMetrics:                     signingRateMetrics,
 		batchSize:                              batchSize,
 	}
 
@@ -235,11 +228,11 @@ func (sr *signatureReceiver) captureSigningRateMetrics() {
 
 			if _, valid := sr.validSignerSet[validatorID]; valid {
 				latency := sr.latencyMap[validatorID]
-				sr.signingRateMetrics.ReportSuccess(validatorID, weightedByteSize, latency, quorumID)
+				sr.metrics.ReportSigningSuccess(validatorID, weightedByteSize, latency, quorumID)
 				sr.signingRateTracker.ReportSuccess(quorumID, validatorID, weightedByteSize, latency)
 			} else {
 				_, timeout := sr.timeoutSet[validatorID]
-				sr.signingRateMetrics.ReportFailure(validatorID, weightedByteSize, timeout, quorumID)
+				sr.metrics.ReportSigningFailure(validatorID, weightedByteSize, timeout, quorumID)
 				sr.signingRateTracker.ReportFailure(quorumID, validatorID, weightedByteSize)
 			}
 		}

@@ -107,11 +107,6 @@ type Dispatcher struct {
 
 	// Responsible for recording information about validator signing rates.
 	signingRateTracker signingrate.SigningRateTracker
-
-	// TODO perhaps pull these into dispatcherMetrics?
-	// TODO ensure properly initialized
-	// Encapsulates metrics for validator signing rates.
-	signingRateMetrics *signingrate.SigningRateMetrics
 }
 
 type batchData struct {
@@ -462,7 +457,6 @@ func (d *Dispatcher) HandleSignatures(
 		d.SignatureTickInterval,
 		d.SignificantSigningThresholdPercentage,
 		d.signingRateTracker,
-		d.signingRateMetrics,
 		batchSize)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)

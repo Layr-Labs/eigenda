@@ -198,7 +198,6 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 		50*time.Millisecond,
 		55,
 		signingrate.NewNoOpSigningRateTracker(),
-		nil,
 		0)
 	require.NoError(t, err)
 
@@ -237,7 +236,6 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 		50*time.Millisecond,
 		55,
 		signingrate.NewNoOpSigningRateTracker(),
-		nil,
 		0)
 	require.NoError(t, err)
 
@@ -279,7 +277,6 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 		50*time.Millisecond,
 		55,
 		signingrate.NewNoOpSigningRateTracker(),
-		nil,
 		0)
 	require.NoError(t, err)
 
@@ -325,7 +322,6 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 		50*time.Millisecond,
 		55,
 		signingrate.NewNoOpSigningRateTracker(),
-		nil,
 		0)
 	require.NoError(t, err)
 
@@ -367,7 +363,6 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 		1*time.Millisecond,
 		55,
 		signingrate.NewNoOpSigningRateTracker(),
-		nil,
 		0)
 	require.NoError(t, err)
 
