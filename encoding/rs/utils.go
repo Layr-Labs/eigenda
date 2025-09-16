@@ -24,7 +24,7 @@ func ToFrArray(inputData []byte) ([]fr.Element, error) {
 	// TODO(samlaf): should we pad in the prover only instead?
 	// Padding here will force all dispersed data over the wire to be a power of 2,
 	// possibly sending a bunch of zeros over the wire.
-	outputElements := make([]fr.Element, NextPowerOf2(uint64(elementCount)))
+	outputElements := make([]fr.Element, elementCount)
 	for i := 0; i < elementCount; i++ {
 		destinationStartIndex := i * encoding.BYTES_PER_SYMBOL
 		destinationEndIndex := destinationStartIndex + encoding.BYTES_PER_SYMBOL
