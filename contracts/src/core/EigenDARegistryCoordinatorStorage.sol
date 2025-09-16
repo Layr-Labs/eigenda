@@ -15,6 +15,10 @@ abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
      *
      */
 
+    /// @notice The EIP-712 typehash for the `DelegationApproval` struct used by the contract
+    bytes32 public constant OPERATOR_CHURN_APPROVAL_TYPEHASH = keccak256(
+        "OperatorChurnApproval(address registeringOperator,bytes32 registeringOperatorId,OperatorKickParam[] operatorKickParams,bytes32 salt,uint256 expiry)OperatorKickParam(uint8 quorumNumber,address operator)"
+    );
     /// @notice The EIP-712 typehash used for registering BLS public keys
     bytes32 public constant PUBKEY_REGISTRATION_TYPEHASH = keccak256("BN254PubkeyRegistration(address operator)");
     /// @notice The maximum value of a quorum bitmap
@@ -55,13 +59,15 @@ abstract contract EigenDARegistryCoordinatorStorage is IRegistryCoordinator {
     mapping(bytes32 => QuorumBitmapUpdate[]) internal _operatorBitmapHistory;
     /// @notice maps operator address => operator id and status
     mapping(address => OperatorInfo) internal _operatorInfo;
-    mapping(bytes32 => bool) internal __deprecated_0;
+    /// @notice whether the salt has been used for an operator churn approval
+    mapping(bytes32 => bool) public isChurnApproverSaltUsed;
     /// @notice mapping from quorum number to the latest block that all quorums were updated all at once
     mapping(uint8 => uint256) public quorumUpdateBlockNumber;
 
     /// @notice the dynamic-length array of the registries this coordinator is coordinating
     address[] public registries;
-    address internal __deprecated_1;
+    /// @notice the address of the entity allowed to sign off on operators getting kicked out of the AVS during registration
+    address public churnApprover;
     /// @notice the address of the entity allowed to eject operators from the AVS
     address public ejector;
 
