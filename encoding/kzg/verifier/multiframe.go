@@ -30,7 +30,7 @@ type Sample struct {
 // the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(
 	samples []Sample, randomsFr []fr.Element, m int,
-	params encoding.EncodingParams, fftSettings *fft.FFTSettings, srs kzg.SRS, proofs []bn254.G1Affine,
+	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS kzg.G1SRS, proofs []bn254.G1Affine,
 ) (*bn254.G1Affine, error) {
 	n := len(samples)
 	commits := make([]bn254.G1Affine, m)
@@ -90,7 +90,7 @@ func genRhsG1(
 
 	// All samples in a subBatch has identical chunkLen
 	var aggPolyG1 bn254.G1Affine
-	_, err = aggPolyG1.MultiExp(srs.G1[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
+	_, err = aggPolyG1.MultiExp(g1SRS[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 		m,
 		params,
 		verifier.Fs,
-		verifier.Srs,
+		verifier.g1SRS,
 		proofs,
 	)
 	if err != nil {

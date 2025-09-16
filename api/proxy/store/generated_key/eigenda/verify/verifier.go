@@ -129,16 +129,16 @@ func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 		return nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
 
-	if len(v.kzgVerifier.Srs.G1) < len(inputFr) {
+	if len(v.kzgVerifier.G1SRS) < len(inputFr) {
 		return nil, fmt.Errorf(
 			"cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v",
-			len(v.kzgVerifier.Srs.G1),
+			len(v.kzgVerifier.G1SRS),
 			len(inputFr))
 	}
 
 	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
-	_, err = commitment.MultiExp(v.kzgVerifier.Srs.G1[:len(inputFr)], inputFr, config)
+	_, err = commitment.MultiExp(v.kzgVerifier.G1SRS[:len(inputFr)], inputFr, config)
 	if err != nil {
 		return nil, err
 	}
