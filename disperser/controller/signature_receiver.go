@@ -32,7 +32,7 @@ type signatureReceiver struct {
 	// A set of validators that did not sign due to a timeout.
 	timeoutSet map[core.OperatorID]struct{}
 	// For each signing validator, the latency required to receive the signature.
-	latencyMap map[core.OperatorID]time.Duration // TODO populate
+	latencyMap map[core.OperatorID]time.Duration
 	// aggregateSignatures stores the accumulated BLS signatures for each quorum
 	aggregateSignatures map[core.QuorumID]*core.Signature
 	// aggregateSignersG2PubKeys stores the accumulated G2 public keys of signers for each quorum
