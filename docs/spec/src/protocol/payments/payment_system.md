@@ -24,7 +24,7 @@ payments. All payment logic is implemented in the [`core/payments`](../../../../
 
 - Reservations provide guaranteed bandwidth for a specified time period.
    - Users reserve capacity in advance, and must "use it or lose it".
-   - Reservations are procured out-of-band, through EigenDA.
+   - Reservations are procured out-of-band, through Eigen Labs.
 - The system uses a [leaky bucket algorithm](../../../../../core/payments/reservation/leaky_bucket.go) to manage usage:
   symbols are added to the bucket each time a blob is dispersed, and these leak out over time. A user can only make a
   dispersal if the leaky bucket has available capacity.
