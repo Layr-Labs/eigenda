@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-/// @notice Interface for the EigenDA Directory
-///         This interface currently only includes functions for managing a directory of addresses by name.
-///         In the future, it may be extended to include access control as well.
-interface IEigenDADirectory {
+interface IEigenDAAddressDirectory {
     error AddressAlreadyExists(string name);
     error AddressDoesNotExist(string name);
     error ZeroAddress();
@@ -42,3 +39,10 @@ interface IEigenDADirectory {
     /// @notice Gets all names in the directory.
     function getAllNames() external view returns (string[] memory);
 }
+
+interface IEigenDAConfigRegistry {}
+
+/// @notice Interface for the EigenDA Directory
+///         This interface currently only includes functions for managing a directory of addresses by name.
+///         In the future, it may be extended to include access control as well.
+interface IEigenDADirectory is IEigenDAAddressDirectory, IEigenDAConfigRegistry {}
