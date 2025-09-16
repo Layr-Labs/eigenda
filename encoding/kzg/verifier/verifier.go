@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/bits"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -104,15 +106,18 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
-func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
-	// This is broken for all tests because we don't have the full 2^28 G1 SRS File.
-	// TODO(samlaf): We only need 28 points. Embed those 28 G1 points like we do for G2.
-	g1Challenge, err := kzg.ReadG1Point(encoding.SRSOrder-length, v.kzgConfig.G1Path)
-	if err != nil {
-		return fmt.Errorf("read g1 point: %w", err)
+func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64) error {
+	if !encoding.IsPowerOfTwo(commitmentLength) {
+		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
+	commitmentLengthLog := bits.TrailingZeros64(commitmentLength)
+	if commitmentLengthLog > 28 {
+		return fmt.Errorf("commitment length %d is > max possible 2^28", commitmentLength)
+	}
+	// TODO(samlaf): document how this works...
+	g1Challenge := srs.G1PowerOf2SRS[commitmentLengthLog]
 
-	err = VerifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
+	err := VerifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
 	if err != nil {
 		return fmt.Errorf("low degree proof: %w", err)
 	}

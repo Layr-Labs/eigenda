@@ -191,8 +191,9 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
 	}
-
+	// TODO(samlaf): we never enforce that data is a power of 2 symbols... I think we should.
 	length := uint(len(symbols))
+
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),

@@ -19,7 +19,12 @@ func ToFrArray(inputData []byte) ([]fr.Element, error) {
 	bytes := padToBytesPerSymbolMultiple(inputData)
 
 	elementCount := len(bytes) / encoding.BYTES_PER_SYMBOL
-	outputElements := make([]fr.Element, elementCount)
+	// We pad to the next power of 2, because blobs are always a power of 2 symbols,
+	// and our prover currently doesn't pad to the next power of 2.
+	// TODO(samlaf): should we pad in the prover only instead?
+	// Padding here will force all dispersed data over the wire to be a power of 2,
+	// possibly sending a bunch of zeros over the wire.
+	outputElements := make([]fr.Element, NextPowerOf2(uint64(elementCount)))
 	for i := 0; i < elementCount; i++ {
 		destinationStartIndex := i * encoding.BYTES_PER_SYMBOL
 		destinationEndIndex := destinationStartIndex + encoding.BYTES_PER_SYMBOL

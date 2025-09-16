@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -23,21 +22,6 @@ const (
 	// Num of bytes per G2 point in (compressed) serialized format in file.
 	G2PointBytes = bn254.SizeOfG2AffineCompressed
 )
-
-// Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, g1Path string) (bn254.G1Affine, error) {
-	// TODO: Do we really need to check srsOrder here? Or can we just read the file and let the error propagate if n is out of bounds?
-	if n >= encoding.SRSOrder {
-		return bn254.G1Affine{}, fmt.Errorf("requested point %v is larger than SRSOrder %v", n, encoding.SRSOrder)
-	}
-
-	g1point, err := ReadG1PointSection(g1Path, n, n+1, 1)
-	if err != nil {
-		return bn254.G1Affine{}, fmt.Errorf("read g1 point section %w", err)
-	}
-
-	return g1point[0], nil
-}
 
 // Convenience wrapper around [readPointSection] for reading a section of G1 points.
 func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G1Affine, error) {
@@ -62,19 +46,6 @@ func ReadG1PointsUncompressed(filepath string, n uint64, numWorker uint64) ([]bn
 	}
 
 	return result, nil
-}
-
-// Read the n-th G2 point from SRS.
-func ReadG2Point(n uint64, srsOrder uint64, g2Path string) (bn254.G2Affine, error) {
-	if n >= srsOrder {
-		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, srsOrder)
-	}
-
-	g2point, err := ReadG2PointSection(g2Path, n, n+1, 1)
-	if err != nil {
-		return bn254.G2Affine{}, fmt.Errorf("error read g2 point section %w", err)
-	}
-	return g2point[0], nil
 }
 
 // Convenience wrapper around [readPointSection] for reading G2 points from the start of the file.
