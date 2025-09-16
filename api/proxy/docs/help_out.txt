@@ -91,7 +91,7 @@ This check is optional and will be skipped when set to 0. (default: 0) [$EIGENDA
 
    Enabled APIs
 
-   --apis.enabled value [ --apis.enabled value ]  Which proxy application APIs to enable. supported options are admin, standard, op-generic, op-keccak, arb, metrics [$EIGENDA_PROXY_APIS_TO_ENABLE]
+   --apis.enabled value [ --apis.enabled value ]  Which proxy application APIs to enable. supported options are admin, standard, op-keccak, op-generic, arb, metrics [$EIGENDA_PROXY_APIS_TO_ENABLE]
 
    KZG
 

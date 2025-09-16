@@ -33,7 +33,7 @@ func CLIFlags(category string, envPrefix string) []cli.Flag {
 			OpGenericCommitment, OpKeccakCommitment,
 			ArbCustomDAServer, MetricsServer),
 		Value:    cli.NewStringSlice(),
-		Required: true,
+		Required: false,
 		EnvVars:  withEnvPrefix(envPrefix, "APIS_TO_ENABLE"),
 		Category: category,
 	}}
