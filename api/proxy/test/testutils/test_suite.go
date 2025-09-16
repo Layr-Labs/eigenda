@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
-	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -19,7 +19,7 @@ type TestSuite struct {
 	Ctx     context.Context
 	Log     logging.Logger
 	Metrics *proxy_metrics.EmulatedMetricer
-	Server  *server.Server
+	Server  *rest.Server
 }
 
 // TestSuiteWithLogger returns a function which overrides the logger for a TestSuite
@@ -78,7 +78,7 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	proxyServer := server.NewServer(appConfig.ServerConfig, certMgr, keccakMgr, logger, metrics)
+	proxyServer := rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)
 	if appConfig.StoreBuilderConfig.MemstoreEnabled {

@@ -140,6 +140,14 @@ type Config struct {
 	// Set this to zero to disable this feature.
 	LittMinimumFlushInterval time.Duration
 
+	// If set, the directory where littDB incremental snapshots are stored.
+	//
+	// WARNING: if snapshots are written to this directory, the responsibility of pruning those snapshots lies
+	// external to the node. LittDB will write to this directory, but never delete anything from it. If data is not
+	// periodically pruned, the disk will eventually fill up. It is highly suggested to use the LittDB cli
+	// for managing this directory.
+	LittSnapshotDirectory string
+
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
 	GetChunksHotCacheReadLimitMB float64
@@ -421,6 +429,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
 		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
 		LittMinimumFlushInterval:      ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
+		LittSnapshotDirectory:         ctx.GlobalString(flags.LittSnapshotDirectoryFlag.Name),
 		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),

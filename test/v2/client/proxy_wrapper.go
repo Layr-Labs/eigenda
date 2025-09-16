@@ -8,7 +8,7 @@ import (
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
 	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
-	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
@@ -19,7 +19,7 @@ import (
 // This is intended to be used as a lightweight test utility, not as something that should be deployed outside of
 // test settings.
 type ProxyWrapper struct {
-	proxyServer *server.Server
+	proxyServer *rest.Server
 	client      *standard_client.Client
 }
 
@@ -50,7 +50,7 @@ func NewProxyWrapper(
 		return nil, fmt.Errorf("build store manager: %w", err)
 	}
 
-	proxyServer := server.NewServer(proxyConfig.ServerConfig, certMgr, keccakMgr, logger, proxyMetrics)
+	proxyServer := rest.NewServer(proxyConfig.RestSvrCfg, certMgr, keccakMgr, logger, proxyMetrics)
 
 	router := mux.NewRouter()
 	proxyServer.RegisterRoutes(router)
@@ -62,7 +62,7 @@ func NewProxyWrapper(
 
 	client := standard_client.New(
 		&standard_client.Config{
-			URL: fmt.Sprintf("http://localhost:%d", proxyConfig.ServerConfig.Port),
+			URL: fmt.Sprintf("http://localhost:%d", proxyConfig.RestSvrCfg.Port),
 		})
 
 	return &ProxyWrapper{

@@ -120,3 +120,75 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (flo
 
 	return remainingCapacity, nil
 }
+
+// Checks if the underlying leaky bucket is empty.
+//
+// This method cannot be used as an oracle to determine whether the bucket will be empty at some point in the future:
+// it causes the ledger to update it's internal state, so only an *honest* representation of "now" should be provided.
+func (rl *ReservationLedger) IsBucketEmpty(now time.Time) bool {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	return rl.leakyBucket.CheckFillLevel(now) <= 0
+}
+
+// UpdateReservation updates the reservation parameters and recreates the leaky bucket, if necessary
+//
+// This method replaces the current reservation with a new one if the new reservation differs from the old.
+//
+// When an update occurs, the leaky bucket is recreated with the new parameters, but the old bucket
+// state is preserved by starting the new bucket with the same fill level as the old.
+//
+// Returns an error if:
+//   - newReservation is nil
+//   - the new reservation configuration is invalid
+//   - there's an error creating the new leaky bucket
+func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now time.Time) error {
+	if newReservation == nil {
+		return fmt.Errorf("newReservation cannot be nil")
+	}
+
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	if rl.config.reservation.Equal(newReservation) {
+		// if the reservation didn't change, there isn't anything to do
+		return nil
+	}
+
+	// Create new config with the updated reservation
+	newConfig := ReservationLedgerConfig{
+		reservation:            *newReservation,
+		startFull:              rl.config.startFull,
+		overfillBehavior:       rl.config.overfillBehavior,
+		bucketCapacityDuration: rl.config.bucketCapacityDuration,
+	}
+
+	previousFillLevel := rl.leakyBucket.CheckFillLevel(now)
+
+	newLeakyBucket, err := NewLeakyBucket(
+		newConfig.reservation.symbolsPerSecond,
+		newConfig.bucketCapacityDuration,
+		false, // fill level is explicitly set below
+		newConfig.overfillBehavior,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("new leaky bucket: %w", err)
+	}
+
+	newLeakyBucket.currentFillLevel = previousFillLevel
+
+	rl.config = newConfig
+	rl.leakyBucket = newLeakyBucket
+
+	return nil
+}
+
+// Returns the total bucket capacity in symbols
+func (rl *ReservationLedger) GetBucketCapacity() float64 {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	return rl.leakyBucket.bucketCapacity
+}

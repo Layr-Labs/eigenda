@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -38,9 +39,23 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 
-	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
-		return nil, err
+	if s.useControllerMediatedPayments {
+		// Use the new controller-based payment system
+		authorizePaymentRequest := &controller.AuthorizePaymentRequest{
+			BlobHeader:      req.GetBlobHeader(),
+			ClientSignature: req.GetSignature(),
+		}
+		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
+		if err != nil {
+			// nolint:wrapcheck // Pass through the structured error from the controller
+			return nil, err
+		}
+	} else {
+		// Use the legacy payment metering system
+		// Check against payment meter to make sure there is quota remaining
+		if err := s.checkPaymentMeter(ctx, req, start); err != nil {
+			return nil, err
+		}
 	}
 
 	finishedValidation := time.Now()
@@ -235,8 +250,9 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}
-	if !commitments.Equal(&blobHeader.BlobCommitments) {
-		return nil, errors.New("invalid blob commitment")
+	// TODO(samlaf): should differentiate 400 from 500 errors here
+	if err = commitments.Equal(&blobHeader.BlobCommitments); err != nil {
+		return nil, fmt.Errorf("invalid blob commitment: %w", err)
 	}
 
 	return blobHeader, nil

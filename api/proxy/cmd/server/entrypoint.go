@@ -7,7 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_logging "github.com/Layr-Labs/eigenda/api/proxy/logging"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
-	"github.com/Layr-Labs/eigenda/api/proxy/server"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/gorilla/mux"
@@ -17,7 +18,10 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
 )
 
-func StartProxySvr(cliCtx *cli.Context) error {
+// TODO: Explore better encapsulation patterns that binds common interfaces / usage patterns
+// across the three servers (arb-altda, rest, metrics) that can be spun-up under the proxy service.
+// Especially if there's ever a need for an additional stack specific ALT DA server type to be introduced.
+func StartProxyService(cliCtx *cli.Context) error {
 	logCfg, err := proxy_logging.ReadLoggerCLIConfig(cliCtx)
 	if err != nil {
 		return err
@@ -28,7 +32,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		return err
 	}
 
-	log.Info("Starting EigenDA Proxy Server", "version", Version, "date", Date, "commit", Commit)
+	log.Info("Starting EigenDA Proxy Service", "version", Version, "date", Date, "commit", Commit)
 
 	cfg, err := config.ReadAppConfig(cliCtx)
 	if err != nil {
@@ -43,7 +47,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		return fmt.Errorf("convert config json to string: %w", err)
 	}
 
-	log.Infof("Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v", configString)
+	log.Infof("Initializing EigenDA proxy service with config (\"*****\" fields are hidden): %v", configString)
 
 	registry := prometheus.NewRegistry()
 	metrics := proxy_metrics.NewMetrics(registry)
@@ -63,30 +67,52 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		return fmt.Errorf("build storage managers: %w", err)
 	}
 
-	proxyServer := server.NewServer(cfg.ServerConfig, certMgr, keccakMgr, log, metrics)
+	restServer := rest.NewServer(cfg.RestSvrCfg, certMgr, keccakMgr, log, metrics)
 	router := mux.NewRouter()
-	proxyServer.RegisterRoutes(router)
+	restServer.RegisterRoutes(router)
 	if cfg.StoreBuilderConfig.MemstoreEnabled {
 		memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
 	}
 
-	if err := proxyServer.Start(router); err != nil {
-		return fmt.Errorf("start proxy server: %w", err)
+	if err := restServer.Start(router); err != nil {
+		return fmt.Errorf("start proxy rest server: %w", err)
 	}
 
-	log.Info("Started EigenDA proxy server")
+	log.Info("Started EigenDA proxy REST ALT DA server")
 
 	defer func() {
-		if err := proxyServer.Stop(); err != nil {
-			log.Error("failed to stop DA server", "err", err)
+		if err := restServer.Stop(); err != nil {
+			log.Error("failed to stop REST ALT DA server", "err", err)
 		}
 
-		log.Info("Successfully shutdown API server")
+		log.Info("Successfully shutdown REST ALT DA server")
 	}()
 
-	if cfg.MetricsServerConfig.Enabled {
-		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
-		svr := proxy_metrics.NewServer(registry, cfg.MetricsServerConfig)
+	if cfg.ArbCustomDASvrCfg.Enable {
+		h := arbitrum_altda.NewHandlers(certMgr)
+
+		arbitrumRpcServer, err := arbitrum_altda.NewServer(ctx, &cfg.ArbCustomDASvrCfg, h)
+		if err != nil {
+			return fmt.Errorf("new arbitrum custom da json rpc server: %w", err)
+		}
+
+		if err := arbitrumRpcServer.Start(); err != nil {
+			return fmt.Errorf("start arbitrum custom da json rpc server: %w", err)
+		}
+
+		defer func() {
+			if err := arbitrumRpcServer.Stop(); err != nil {
+				log.Error("failed to stop arbitrum custom da json rpc server", "err", err)
+			}
+			log.Info("Successfully shutdown Arbitrum Custom DA server")
+		}()
+
+		log.Info("Started Arbitrum Custom DA JSON RPC server", "addr", arbitrumRpcServer.Addr())
+	}
+
+	if cfg.MetricsSvrConfig.Enabled {
+		log.Info("Starting metrics server", "addr", cfg.MetricsSvrConfig.Host, "port", cfg.MetricsSvrConfig.Port)
+		svr := proxy_metrics.NewServer(registry, cfg.MetricsSvrConfig)
 		err := svr.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)

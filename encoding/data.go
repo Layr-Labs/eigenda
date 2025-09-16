@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"bytes"
+	"fmt"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -57,49 +58,52 @@ func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
 	}, nil
 }
 
-// Equal checks if two BlobCommitments are equal
-func (c *BlobCommitments) Equal(c1 *BlobCommitments) bool {
+// Equal checks if two BlobCommitments are equal, and returns an error if not.
+// TODO(samlaf): should return structured errors to diffentiate 400 from 500 errors
+// Any error returned here is currently returned as a 400 to users, but failing to Serialize a commitment
+// should return a 500.
+func (c *BlobCommitments) Equal(c1 *BlobCommitments) error {
 	if c.Length != c1.Length {
-		return false
+		return fmt.Errorf("lengths are different: %d vs %d", c.Length, c1.Length)
 	}
 
 	cCommitment, err := c.Commitment.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize commitment: %w", err)
 	}
 	c1Commitment, err := c1.Commitment.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize c1 commitment: %w", err)
 	}
 	if !bytes.Equal(cCommitment, c1Commitment) {
-		return false
+		return fmt.Errorf("commitments are different: %v vs %v", cCommitment, c1Commitment)
 	}
 
 	cLengthCommitment, err := c.LengthCommitment.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize length commitment: %w", err)
 	}
 	c1LengthCommitment, err := c1.LengthCommitment.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize c1 length commitment: %w", err)
 	}
 	if !bytes.Equal(cLengthCommitment, c1LengthCommitment) {
-		return false
+		return fmt.Errorf("length commitments are different: %v vs %v", cLengthCommitment, c1LengthCommitment)
 	}
 
 	cLengthProof, err := c.LengthProof.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize length proof: %w", err)
 	}
 	c1LengthProof, err := c1.LengthProof.Serialize()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to serialize c1 length proof: %w", err)
 	}
 	if !bytes.Equal(cLengthProof, c1LengthProof) {
-		return false
+		return fmt.Errorf("length proofs are different: %v vs %v", cLengthProof, c1LengthProof)
 	}
 
-	return true
+	return nil
 }
 
 func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {
@@ -130,7 +134,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk
 	Proof Proof
-	// Coeffs contains the coefficients of the interpolating polynomial of the chunk
+	// Coeffs contains the [EncodingParams.ChunkLength] coefficients of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 
