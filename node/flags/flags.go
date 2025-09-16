@@ -461,6 +461,12 @@ var (
 		Value:    100 * time.Millisecond,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_MINIMUM_FLUSH_INTERVAL"),
 	}
+	LittSnapshotDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-snapshot-directory"),
+		Usage:    "The directory where LittDB snapshots are stored. If not provided, no snapshots are taken.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_SNAPSHOT_DIRECTORY"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool.",
@@ -684,6 +690,7 @@ var optionalFlags = []cli.Flag{
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
 	OperatorStateCacheSizeFlag,
+	LittSnapshotDirectoryFlag,
 }
 
 func init() {
