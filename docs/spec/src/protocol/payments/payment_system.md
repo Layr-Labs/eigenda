@@ -6,7 +6,7 @@ The EigenDA payment system allows users to pay for blob dispersals through two m
 payments. All payment logic is implemented in the [`core/payments`](../../../../../core/payments/) package.
 
 **Key Concepts:**
-- Blob sizes are measured in *symbols*, where each symbol contains 32 bytes of data.
+- Blob sizes are measured in *symbols*, where each symbol is 32 bytes.
 - Blob sizes are measured **post-blob encoding**: user payloads expand to some degree during blob encoding.
 - Blob sizes are constrained to powers-of-two: dispersals are rounded up to the next power-of-two number of symbols
   when computing size.
