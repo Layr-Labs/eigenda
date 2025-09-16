@@ -62,7 +62,7 @@ func validateTrackerDump(
 		for _, quorumInfo := range dumpedBucket.GetQuorumSigningRates() {
 			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
 			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
-				validatorID := core.OperatorID(signingRate.GetId())
+				validatorID := core.OperatorID(signingRate.GetValidatorId())
 				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
 				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 			}
@@ -113,7 +113,7 @@ func validateTracker(
 	endTime := startTime.Add(time.Duration(rand.Float64Range(0, float64(timeSpan))))
 
 	expectedSigningRate := &validator.ValidatorSigningRate{
-		Id: validatorID[:],
+		ValidatorId: validatorID[:],
 	}
 	for _, bucket := range expectedBuckets {
 		if bucket.endTimestamp.Before(startTime) {
@@ -162,7 +162,7 @@ func validateTrackerClone(
 	dump, err := tracker.GetSigningRateDump(dumpStartTimestamp)
 	require.NoError(t, err)
 	for _, dumpedBucket := range dump {
-		trackerClone.UpdateLastBucket(now, dumpedBucket)
+		trackerClone.UpdateLastBucket(dumpedBucket)
 	}
 
 	validateTracker(t, now, expectedBuckets, validatorIDs, trackerClone, timeSpan, rand, empty)
@@ -408,7 +408,7 @@ func unflushedBucketsTest(
 		for _, quorumInfo := range bucket.GetQuorumSigningRates() {
 			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
 			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
-				validatorID := core.OperatorID(signingRate.GetId())
+				validatorID := core.OperatorID(signingRate.GetValidatorId())
 				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
 				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 			}

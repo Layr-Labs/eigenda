@@ -6,7 +6,7 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 // Records information about validator signing rate during a time period.
 message ValidatorSigningRate {
   // The unique identifier of the validator (i.e. the operator ID).
-  bytes id = 1;
+  bytes validator_id = 1;
 
   // The number of signed batches by the validator during the period.
   uint64 signed_batches = 2;

@@ -17,13 +17,16 @@ func areSigningRatesEqual(a *validator.ValidatorSigningRate, b *validator.Valida
 	if a == nil || b == nil {
 		return a == b
 	}
-	if !bytes.Equal(a.GetId(), b.GetId()) {
+	if !bytes.Equal(a.GetValidatorId(), b.GetValidatorId()) {
 		return false
 	}
 	if a.GetSignedBatches() != b.GetSignedBatches() {
 		return false
 	}
 	if a.GetSignedBytes() != b.GetSignedBytes() {
+		return false
+	}
+	if a.GetUnsignedBatches() != b.GetUnsignedBatches() {
 		return false
 	}
 	if a.GetUnsignedBytes() != b.GetUnsignedBytes() {
@@ -58,7 +61,7 @@ func TestProtoConversion(t *testing.T) {
 		bucket.signingRateInfo[quorum] = make(map[core.OperatorID]*validator.ValidatorSigningRate)
 		for _, validatorID := range validatorIDs {
 			bucket.signingRateInfo[quorum][validatorID] = &validator.ValidatorSigningRate{
-				Id:             validatorID[:],
+				ValidatorId:    validatorID[:],
 				SignedBatches:  rand.Uint64(),
 				SignedBytes:    rand.Uint64(),
 				UnsignedBytes:  rand.Uint64(),
@@ -187,7 +190,7 @@ func TestCloneValidatorSigningRate(t *testing.T) {
 	rand := random.NewTestRandom()
 
 	signingRate := &validator.ValidatorSigningRate{
-		Id:             rand.Bytes(32),
+		ValidatorId:    rand.Bytes(32),
 		SignedBatches:  rand.Uint64(),
 		SignedBytes:    rand.Uint64(),
 		UnsignedBytes:  rand.Uint64(),

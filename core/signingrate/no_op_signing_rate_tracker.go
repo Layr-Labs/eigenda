@@ -20,12 +20,12 @@ func NewNoOpSigningRateTracker() SigningRateTracker {
 
 func (n *noOpSigningRateTracker) GetValidatorSigningRate(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
 	return &validator.ValidatorSigningRate{
-		Id:              id[:],
+		ValidatorId:     validatorID[:],
 		SignedBatches:   0,
 		UnsignedBatches: 0,
 		SignedBytes:     0,
@@ -44,7 +44,7 @@ func (n *noOpSigningRateTracker) GetUnflushedBuckets() ([]*validator.SigningRate
 
 func (n *noOpSigningRateTracker) ReportSuccess(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
@@ -53,14 +53,14 @@ func (n *noOpSigningRateTracker) ReportSuccess(
 
 func (n *noOpSigningRateTracker) ReportFailure(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 ) {
 
 	// no-op
 }
 
-func (n *noOpSigningRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
+func (n *noOpSigningRateTracker) UpdateLastBucket(bucket *validator.SigningRateBucket) {
 	// no-op
 }
 

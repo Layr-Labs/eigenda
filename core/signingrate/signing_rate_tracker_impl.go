@@ -36,19 +36,20 @@ type signingRateTracker struct {
 }
 
 // Create a new SigningRateTracker.
-//
-//   - signingRateDatabase: The database to use for storing historical signing rate information.
-//   - timeSpan: The amount of time to keep in memory. Queries are only supported for this timeSpan.
-//   - bucketSpan: The duration of each bucket.
 func NewSigningRateTracker(
 	logger logging.Logger,
+// The amount of time to keep in memory. Queries are only supported for this timeSpan.
 	timeSpan time.Duration,
+// The duration of each bucket
 	bucketSpan time.Duration,
 	timeSource func() time.Time,
 ) (SigningRateTracker, error) {
 
 	if timeSpan.Seconds() < 1 {
 		return nil, fmt.Errorf("time span must be at least one second, got %s", timeSpan)
+	}
+	if bucketSpan.Seconds() < 1 {
+		return nil, fmt.Errorf("bucket span must be at least one second, got %s", bucketSpan)
 	}
 
 	store := &signingRateTracker{
@@ -70,14 +71,14 @@ func (s *signingRateTracker) Close() {
 // Report that a validator has successfully signed a batch of the given size.
 func (s *signingRateTracker) ReportSuccess(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
 	now := s.timeSource()
 
 	bucket := s.getMutableBucket(now)
-	bucket.ReportSuccess(quorum, id, batchSize, signingLatency)
+	bucket.ReportSuccess(quorum, validatorID, batchSize, signingLatency)
 	s.markUnflushed(bucket)
 
 	s.garbageCollectBuckets(now)
@@ -86,13 +87,13 @@ func (s *signingRateTracker) ReportSuccess(
 // Report that a validator has failed to sign a batch of the given size.
 func (s *signingRateTracker) ReportFailure(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 ) {
 	now := s.timeSource()
 
 	bucket := s.getMutableBucket(now)
-	bucket.ReportFailure(quorum, id, batchSize)
+	bucket.ReportFailure(quorum, validatorID, batchSize)
 	s.markUnflushed(bucket)
 
 	s.garbageCollectBuckets(now)
@@ -100,19 +101,19 @@ func (s *signingRateTracker) ReportFailure(
 
 func (s *signingRateTracker) GetValidatorSigningRate(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
 
-	if endTime.Before(startTime) {
-		return nil, fmt.Errorf("end time %v is before start time %v", endTime, startTime)
+	if !endTime.After(startTime) {
+		return nil, fmt.Errorf("end time %v is not after start time %v", endTime, startTime)
 	}
 
 	if s.buckets.Size() == 0 {
 		// Special case: no data available.
 		return &validator.ValidatorSigningRate{
-			Id: id[:],
+			ValidatorId: validatorID[:],
 		}, nil
 	}
 
@@ -122,6 +123,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 		if unixTimestamp < bucket.startTimestamp.Unix() {
 			return -1
 		} else if unixTimestamp >= bucket.endTimestamp.Unix() {
+			// unixTimestamp == bucket.endTimestamp.Unix(), then timestamp is "after" the bucket since end is exclusive
 			return 1
 		}
 		return 0
@@ -135,7 +137,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	}
 
 	totalSigningRate := &validator.ValidatorSigningRate{
-		Id: id[:],
+		ValidatorId: validatorID[:],
 	}
 
 	iterator, err := s.buckets.IteratorFrom(startIndex)
@@ -145,7 +147,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 			break
 		}
 
-		signingRate, exists := bucket.getValidatorIfExists(quorum, id)
+		signingRate, exists := bucket.getValidatorIfExists(quorum, validatorID)
 		if !exists {
 			// No info for validator during this bucket, skip it.
 			continue
@@ -169,10 +171,10 @@ func (s *signingRateTracker) GetSigningRateDump(
 
 	// Iterate backwards. In general, dump requests will only be used to fetch recent data, so
 	// we should optimize the case where we are requesting a few buckets from the end of the deque.
-	// Wost case scenario, we iterate the entire deque. If we do that, we are about to transmit the contents
+	// Worst case scenario, we iterate the entire deque. If we do that, we are about to transmit the contents
 	// of the deque over a network connection. And so in that case, the cost of iteration doesn't really matter.
 	for _, bucket := range s.buckets.ReverseIterator() {
-		if bucket.EndTimestamp().Before(startTime) || bucket.EndTimestamp().Equal(startTime) {
+		if !bucket.EndTimestamp().After(startTime) || bucket.EndTimestamp().Equal(startTime) {
 			// This bucket is too old, skip it and stop iterating.
 			break
 		}
@@ -199,7 +201,7 @@ func (s *signingRateTracker) GetUnflushedBuckets() ([]*validator.SigningRateBuck
 	return buckets, nil
 }
 
-func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
+func (s *signingRateTracker) UpdateLastBucket(bucket *validator.SigningRateBucket) {
 	convertedBucket := NewBucketFromProto(bucket)
 
 	if s.buckets.Size() == 0 {
@@ -229,7 +231,7 @@ func (s *signingRateTracker) UpdateLastBucket(now time.Time, bucket *validator.S
 	// Add the new bucket to the end of the list.
 	s.buckets.PushBack(convertedBucket)
 
-	s.garbageCollectBuckets(now)
+	s.garbageCollectBuckets(s.timeSource())
 }
 
 func (s *signingRateTracker) GetLastBucketStartTime() (time.Time, error) {

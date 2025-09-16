@@ -19,7 +19,7 @@ func sortValidatorSigningRateBuckets(buckets []*validator.SigningRateBucket) {
 // Sort validator signing rates by validator ID. Modifies the input slice.
 func sortValidatorSigningRates(rates []*validator.ValidatorSigningRate) {
 	sort.Slice(rates, func(i int, j int) bool {
-		return bytes.Compare(rates[i].GetId(), rates[j].GetId()) < 0
+		return bytes.Compare(rates[i].GetValidatorId(), rates[j].GetValidatorId()) < 0
 	})
 }
 
@@ -33,7 +33,7 @@ func sortQuorumSigningRates(quorums []*validator.QuorumSigningRate) {
 // Performs a deep copy of a ValidatorSigningRate.
 func cloneValidatorSigningRate(info *validator.ValidatorSigningRate) *validator.ValidatorSigningRate {
 	return &validator.ValidatorSigningRate{
-		Id:              info.GetId(),
+		ValidatorId:     info.GetValidatorId(),
 		SignedBatches:   info.GetSignedBatches(),
 		SignedBytes:     info.GetSignedBytes(),
 		UnsignedBatches: info.GetUnsignedBatches(),
