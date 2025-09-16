@@ -28,8 +28,9 @@ payments. All payment logic is implemented in the [`core/payments`](../../../../
 - The system uses a [leaky bucket algorithm](../../../../../core/payments/reservation/leaky_bucket.go) to manage usage:
   symbols are added to the bucket each time a blob is dispersed, and these leak out over time. A user can only make a
   dispersal if the leaky bucket has available capacity.
-   - The total capacity of the leaky bucket is defined in terms of a *duration*. The size of the bucket in symbols is
-`reservationRate * bucketDuration`. This calculation controls the burstiness of reservation usage.
+   - The total capacity of the leaky bucket is parameterized by *reservation rate* and *duration*. The size of the
+   bucket in symbols is `reservationRate * bucketDuration`. This calculation controls the burstiness of reservation
+   usage.
 - Parameters describing active user reservations are kept in the `PaymentVault` contract
    - `symbolsPerSecond`: the reservation bandwidth rate
    - `startTimestamp` and `endTimestamp`: define when the reservation is active
