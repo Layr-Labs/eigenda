@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -160,12 +159,7 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("verify received blob key: %w", err)
 	}
 
-	initialBlobStatus, err := dispv2.BlobStatusFromProtobuf(reply.GetResult())
-	if err != nil {
-		return nil, fmt.Errorf("blob status from protobuf: %w", err)
-	}
-
-	return pd.buildEigenDACert(ctx, initialBlobStatus, blobKey, probe)
+	return pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
 }
 
 // Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures
@@ -173,7 +167,7 @@ func (pd *PayloadDisperser) SendPayload(
 // If the blob does not become fully signed before the BlobCompleteTimeout timeout elapses, returns an error
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
-	initialBlobStatus dispv2.BlobStatus,
+	initialBlobStatus dispgrpc.BlobStatus,
 	blobKey corev2.BlobKey,
 	probe *common.SequenceProbe,
 ) (coretypes.EigenDACert, error) {
@@ -184,7 +178,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	// confirmation thresholds, a terminal error, or a timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus, probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
