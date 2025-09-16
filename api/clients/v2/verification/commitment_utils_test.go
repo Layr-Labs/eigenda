@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"math"
 	"runtime"
 	"testing"
 
@@ -15,7 +14,7 @@ const g1Path = "../../../../resources/srs/g1.point"
 
 // computeSrsNumber computes the number of SRS elements that need to be loaded for a message of given byte count
 func computeSrsNumber(byteCount int) uint64 {
-	return uint64(math.Ceil(float64(byteCount) / 32))
+	return uint64(codec.PayloadSizeToBlobSize(uint32(byteCount)))
 }
 
 // randomlyModifyBytes picks a random byte from the input array, and increments it
@@ -35,12 +34,12 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
 
 	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
-	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
+	require.NotNil(t, g1Srs)
 
 	commitment, err := GenerateBlobCommitment(g1Srs, randomBytes)
-	require.NotNil(t, commitment)
 	require.NoError(t, err)
+	require.NotNil(t, commitment)
 
 	// make sure the commitment verifies correctly
 	result, err := GenerateAndCompareBlobCommitment(
@@ -107,7 +106,7 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 }
 
 func TestGenerateBlobCommitmentTooLong(t *testing.T) {
-	srsNumberToLoad := uint64(500)
+	srsNumberToLoad := uint64(512)
 
 	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
@@ -119,12 +118,12 @@ func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	// an array of exactly this size should be fine
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
 	commitment1, err := GenerateBlobCommitment(g1Srs, almostTooLongBytes)
-	require.NotNil(t, commitment1)
 	require.NoError(t, err)
+	require.NotNil(t, commitment1)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
 	commitment2, err := GenerateBlobCommitment(g1Srs, tooLongBytes)
-	require.Nil(t, commitment2)
 	require.NotNil(t, err)
+	require.Nil(t, commitment2)
 }
