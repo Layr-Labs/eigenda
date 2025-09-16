@@ -31,7 +31,7 @@ message BlobCommitment {
   // It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
   // P(x) is polynomial of degree n representing the blob.
   bytes length_proof = 3;
-  // The length of the blob in symbols (field elements), which must be a power of 2.
+  // The length of the blob in symbols (field elements), which must be a power of 2 (v2 only).
   // This also specifies the degree of the polynomial used to generate the blob commitment,
   // since length = degree + 1.
   uint32 length = 4;
