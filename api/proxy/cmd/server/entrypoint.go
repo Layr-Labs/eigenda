@@ -81,10 +81,10 @@ func StartProxyService(cliCtx *cli.Context) error {
 		}
 
 		log.Info("Started EigenDA Proxy REST ALT DA server",
-			enabled_apis.Admin.ToString(), cfg.EnabledAPIs.RestALTDAWithAdmin(),
-			enabled_apis.StandardCommitment.ToString(), cfg.EnabledAPIs.RestALTStandard(),
-			enabled_apis.OpGenericCommitment.ToString(), cfg.EnabledAPIs.RestALTDAOPGeneric(),
-			enabled_apis.OpKeccakCommitment.ToString(), cfg.EnabledAPIs.RestALTDAOPKeccak())
+			enabled_apis.Admin, cfg.EnabledAPIs.RestALTDAWithAdmin(),
+			enabled_apis.StandardCommitment, cfg.EnabledAPIs.RestALTStandard(),
+			enabled_apis.OpGenericCommitment, cfg.EnabledAPIs.RestALTDAOPGeneric(),
+			enabled_apis.OpKeccakCommitment, cfg.EnabledAPIs.RestALTDAOPKeccak())
 
 		defer func() {
 			if err := restServer.Stop(); err != nil {

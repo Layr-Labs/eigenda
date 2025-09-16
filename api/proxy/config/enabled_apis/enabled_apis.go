@@ -65,8 +65,8 @@ func (e EnabledAPIs) Check() error {
 		return fmt.Errorf("enabled apis contains duplicate: %+v", e.apis)
 	}
 
-	if e.Metrics() && (!e.RestALTDA() && !e.ArbCustomDA()) {
-		return fmt.Errorf("metrics cannot be enabled unless `arb` and/or `rest` also is")
+	if !e.RestALTDA() || !e.ArbCustomDA() {
+		return fmt.Errorf("an `arb` or REST ALT DA Server api type must be provided to start application")
 	}
 
 	if e.RestALTDAWithAdmin() &&
@@ -108,44 +108,20 @@ func (e EnabledAPIs) has(api API) bool {
 }
 
 // API represents the different APIs that can be exposed on the proxy application
-type API uint8
+type API string
 
 const (
-	Admin               API = 1
-	OpKeccakCommitment  API = 2
-	OpGenericCommitment API = 3
-	StandardCommitment  API = 4
-	ArbCustomDAServer   API = 5
-	MetricsServer       API = 6
+	Admin               API = "admin"
+	OpKeccakCommitment  API = "op-generic"
+	OpGenericCommitment API = "op-keccak"
+	StandardCommitment  API = "standard"
+	ArbCustomDAServer   API = "arb"
+	MetricsServer       API = "metrics"
 )
 
 func AllRestAPIs() []API {
 	return []API{
 		Admin, OpGenericCommitment, OpKeccakCommitment, StandardCommitment,
-	}
-}
-
-func (api API) ToString() string {
-	switch api {
-	case Admin:
-		return "admin"
-
-	case OpGenericCommitment:
-		return "op-generic"
-
-	case OpKeccakCommitment:
-		return "op-keccak"
-
-	case StandardCommitment:
-		return "standard"
-
-	case ArbCustomDAServer:
-		return "arb"
-
-	case MetricsServer:
-		return "metrics"
-	default:
-		return "unknown"
 	}
 }
 
@@ -167,6 +143,6 @@ func APIFromString(s string) (API, error) {
 	case "metrics":
 		return MetricsServer, nil
 	default:
-		return 0, fmt.Errorf("unknown API string: %s", s)
+		return "", fmt.Errorf("unknown API string: %s", s)
 	}
 }

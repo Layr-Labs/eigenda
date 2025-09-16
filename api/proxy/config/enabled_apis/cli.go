@@ -29,10 +29,11 @@ func CLIFlags(category string, envPrefix string) []cli.Flag {
 	return []cli.Flag{&cli.StringSliceFlag{
 		Name: EnabledAPIsFlagName,
 		Usage: fmt.Sprintf("Which proxy application APIs to enable. supported options are "+
-			"%s, %s, %s, %s, %s, %s", Admin.ToString(), StandardCommitment.ToString(),
-			OpGenericCommitment.ToString(), OpKeccakCommitment.ToString(),
-			ArbCustomDAServer.ToString(), MetricsServer.ToString()),
+			"%s, %s, %s, %s, %s, %s", Admin, StandardCommitment,
+			OpGenericCommitment, OpKeccakCommitment,
+			ArbCustomDAServer, MetricsServer),
 		Value:    cli.NewStringSlice(),
+		Required: true,
 		EnvVars:  withEnvPrefix(envPrefix, "APIS_TO_ENABLE"),
 		Category: category,
 	}}
