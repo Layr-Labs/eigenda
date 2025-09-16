@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -50,7 +51,7 @@ type ReservationLedgerCache struct {
 	overfillBehavior OverfillBehavior
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration
-	// minimum number of symbols to bill, from the PaymentVault
+	// minimum number of symbols to bill for a given dispersal, from the PaymentVault
 	minNumSymbols uint32
 	// protects concurrent access to the ledgers cache during ledger creation
 	//
@@ -59,6 +60,9 @@ type ReservationLedgerCache struct {
 	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
 	// new object for the same account key, and try to add them to the cache.
 	ledgerCreationLock *common.IndexLock
+	// protects the cache eviction process, ensures that only one eviction can be processed at a time and preventing
+	// race conditions during cache resizing
+	evictionLock sync.Mutex
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
 	vaultMonitor *ReservationVaultMonitor
 }
@@ -209,6 +213,9 @@ func (c *ReservationLedgerCache) handleEviction(
 	accountID gethcommon.Address,
 	reservationLedger *ReservationLedger,
 ) {
+	c.evictionLock.Lock()
+	defer c.evictionLock.Unlock()
+
 	if reservationLedger.IsBucketEmpty(c.timeSource()) {
 		c.logger.Debugf("evicted account %s from LRU reservation ledger cache", accountID.Hex())
 		return
@@ -229,9 +236,6 @@ func (c *ReservationLedgerCache) handleEviction(
 
 	c.maxLedgers = newSize
 	c.cache.Resize(c.maxLedgers)
-
-	// Add the evicted ledger back to the cache
-	defer c.acquireLedgerLock(accountID)()
 
 	// Don't bother checking if another routine already re-created this ledger. Even if another routine *did* create
 	// a new instance, it's reasonable to preference the old instance over the new. There may be some small discrepancy
