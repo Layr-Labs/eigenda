@@ -38,7 +38,7 @@ func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst Chai
 
 func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *BlobMessage, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, *encoding.EncodingParams, error) {
 	if err := ValidateSecurityParam(uint32(quorumHeader.ConfirmationThreshold), uint32(quorumHeader.AdversaryThreshold)); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("validate security param: %w", err)
 	}
 
 	// Check if the operator is a member of the quorum
@@ -49,7 +49,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	// Get the assignments for the quorum
 	assignment, info, err := v.assignment.GetOperatorAssignment(operatorState, blob.BlobHeader, quorumHeader.QuorumID, v.operatorID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("get operator assignment: %w", err)
 	}
 
 	// Validate the number of chunks
@@ -94,7 +94,7 @@ func (v *shardValidator) ValidateBatch(batchHeader *BatchHeader, blobs []*BlobMe
 	}
 	err := ValidateBatchHeaderRoot(batchHeader, headers)
 	if err != nil {
-		return err
+		return fmt.Errorf("validate batch header root: %w", err)
 	}
 
 	return v.ValidateBlobs(blobs, operatorState, pool)
@@ -119,7 +119,7 @@ func (v *shardValidator) ValidateBlobs(blobs []*BlobMessage, operatorState *Oper
 			if errors.Is(err, ErrBlobQuorumSkip) {
 				continue
 			} else if err != nil {
-				return err
+				return fmt.Errorf("validate blob quorum: %w", err)
 			} else {
 				// Check the received chunks against the commitment
 				blobIndex := 0
