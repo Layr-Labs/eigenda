@@ -102,7 +102,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 
 		quorumSigningRates = append(quorumSigningRates,
 			&validator.QuorumSigningRate{
-				QuorumId:              uint64(quorumID),
+				QuorumId:              uint32(quorumID),
 				ValidatorSigningRates: validatorSigningRates,
 			})
 	}

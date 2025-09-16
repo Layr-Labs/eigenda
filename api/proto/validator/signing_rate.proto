@@ -28,9 +28,8 @@ message ValidatorSigningRate {
 
 // Contains signing rate information about a specific quorum.
 message QuorumSigningRate {
-  // The unique identifier of the quorum. Technically quorums are stored in a a uint8,
-  // but using uint64 here to future-proof things.
-  uint64 quorum_id = 1;
+  // The unique identifier of the quorum.
+  uint32 quorum_id = 1;
 
   // The signing rates of individual validators in this quorum.
   repeated ValidatorSigningRate validator_signing_rates = 2;
