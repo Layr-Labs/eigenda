@@ -58,4 +58,4 @@ echo "Running tests for:"
 printf '%s\n' $PKGS
 
 # Run tests (coverage output like your prior script)
-go test -short $PKGS -coverprofile=coverage.out
+CI=true go test -short $PKGS -coverprofile=coverage.out

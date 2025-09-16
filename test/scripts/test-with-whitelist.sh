@@ -44,5 +44,4 @@ fi
 echo "Running tests for whitelist:"
 printf '%s\n' $PKGS
 
-go clean -testcache
-go test -short $PKGS -coverprofile=coverage.out
+CI=true go test -short $PKGS -coverprofile=coverage.out
