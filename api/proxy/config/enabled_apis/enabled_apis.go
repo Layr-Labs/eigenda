@@ -65,7 +65,7 @@ func (e EnabledAPIs) Check() error {
 		return fmt.Errorf("enabled apis contains duplicate: %+v", e.apis)
 	}
 
-	if !e.RestALTDA() || !e.ArbCustomDA() {
+	if !e.RestALTDA() && !e.ArbCustomDA() {
 		return fmt.Errorf("an `arb` or REST ALT DA Server api type must be provided to start application")
 	}
 
