@@ -6,10 +6,10 @@ The EigenDA payment system allows users to pay for blob dispersals through two m
 payments. All payment logic is implemented in the [`core/payments`](../../../../../core/payments/) package.
 
 **Key Concepts:**
-- Blob sizes are measured in *symbols*, where each symbol contains 32 bytes of data
-- Blob sizes are measured **post-blob encoding**: user payloads expand to some degree during blob encoding
+- Blob sizes are measured in *symbols*, where each symbol contains 32 bytes of data.
+- Blob sizes are measured **post-blob encoding**: user payloads expand to some degree during blob encoding.
 - Blob sizes are constrained to powers-of-two: dispersals are rounded up to the next power-of-two number of symbols
-  when computing size
+  when computing size.
 - The [PaymentVault](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol) contract
   stores all on-chain payment-related data:
   - User reservation parameters
@@ -24,7 +24,7 @@ payments. All payment logic is implemented in the [`core/payments`](../../../../
 
 - Reservations provide guaranteed bandwidth for a specified time period.
    - Users reserve capacity in advance, and must "use it or lose it".
-   - Reservations are procured out-of-band, through EigenDA
+   - Reservations are procured out-of-band, through EigenDA.
 - The system uses a [leaky bucket algorithm](../../../../../core/payments/reservation/leaky_bucket.go) to manage usage:
   symbols are added to the bucket each time a blob is dispersed, and these leak out over time. A user can only make a
   dispersal if the leaky bucket has available capacity.
@@ -39,20 +39,20 @@ payments. All payment logic is implemented in the [`core/payments`](../../../../
 
 - Validator nodes are the source of truth for reservation usage.
    - Each validator keeps track of the dispersals from each user account, and will reject dispersals if the user doesn't
-   have enough capacity
+   have enough capacity.
    - Clients keep a local reckoning of their own reservation usage, so that they can stay within the bounds of their
-   reserved bandwidth
+   reserved bandwidth.
    - Dispersers also keep a local reckoning of client reservation usage, but a malicious client can bypass this check
    by intentionally dispersing too much data spread out over multiple dispersers. From the perspective of any given
    disperser, the client is within reservation limits. But in total, the client is over the limit. This isn't a problem,
    because validator nodes will catch the misbehavior. By having dispersers keep track of reservation usage, we are 
    imposing a limit on how severely a client can misbehave in this way: in a system with N dispersers, a malicious
-   client can disperse at most N * reservation rate
+   client can disperse at most N * reservation rate.
 - Reservation usage state agreement: since clients keep a local reckoning of reservation usage without any input from
 validators, it's all but guaranteed that their local state will differ (at least slightly) from the state on any given
 validator. This actually doesn't present a problem, so long as these key invariants are maintained:
-   - A client behaving honestly must be able to disperse blobs without payment failures
-   - The amount of "free" dispersals that can be stolen by a dishonest client must be tightly limited
+   - A client behaving honestly must be able to disperse blobs without payment failures.
+   - The amount of "free" dispersals that can be stolen by a dishonest client must be tightly limited.
 
 #### 2.1.2 Bucket Capacity Configuration
 
@@ -78,13 +78,13 @@ limits, as the faster leak rate ensures buckets tracked by the validators drain 
 
 The reservation leaky bucket implementation permits clients to overfill their buckets, with certain constraints:
 - If a client has *any* available capacity in their bucket, they may make a single dispersal up to the maximum blob
-size, even if that dispersal causes the bucket to exceed its maximum capacity
+size, even if that dispersal causes the bucket to exceed its maximum capacity.
 - When this happens, the bucket level actually goes above the maximum capacity, and the client must wait for the
-bucket to leak back down below full capacity before making the next dispersal
+bucket to leak back down below full capacity before making the next dispersal.
 - This feature exists to solve a problem with small reservations: without overfill, a reservation might be so small
 that its total bucket capacity is less than the max blob size, which would prevent the user from dispersing blobs up
 to max size.
-- By permitting a single overfill, even the smallest reservation can disperse blobs of maximum size
+- By permitting a single overfill, even the smallest reservation can disperse blobs of maximum size.
 
 #### 2.1.4 Reservation Usage Persistence
 
@@ -92,40 +92,40 @@ The leaky bucket algorithm does not require persisting reservation usage state a
 system components initialize their buckets with opposing biases to maintain system integrity without persistence:
 
 **Client Initialization (Conservative Bias)**
-- Clients initialize their leaky bucket as completely full (no capacity available) upon restart
-- They must wait for symbols to leak out before dispersing, guaranteeing compliance with reservation rate limits
+- Clients initialize their leaky bucket as completely full (no capacity available) upon restart.
+- They must wait for symbols to leak out before dispersing, guaranteeing compliance with reservation rate limits.
 - While this may result in slight underutilization if usage was low before restart, it prevents violation of
-reservation limits
+reservation limits.
 
 **Validator Initialization (Permissive Bias)**
-- Validators initialize leaky buckets as completely empty (full capacity available) upon restart
-- This ensures they never incorrectly deny service to users entitled to a reservation
+- Validators initialize leaky buckets as completely empty (full capacity available) upon restart.
+- This ensures they never incorrectly deny service to users entitled to a reservation.
 - In the worst case, a malicious client timing dispersals with validator restarts might be able to cause a small amount
-of extra work for that specific validator
+of extra work for that specific validator.
 
 This dual-bias approach eliminates the complexity of distributed reservation state persistence.
 
 ### 2.2 On-Demand Payments
 
-- On-demand payments allow users to pay per dispersal from funds deposited in the PaymentVault contract
-   - Once deposited, funds cannot be withdrawn - they can only be used for dispersals or abandoned
+- On-demand payments allow users to pay per dispersal from funds deposited in the PaymentVault contract.
+   - Once deposited, funds cannot be withdrawn - they can only be used for dispersals or abandoned.
 - Limited to quorums 0 (ETH) and 1 (EIGEN)
    - Custom quorums are not supported for on-demand payments because quorum resources are closely tailored to expected
    usage. Allowing on-demand payments could enable third parties to overutilize these limited resources.
-- Costs are calculated based on blob size (in symbols) multiplied by the `pricePerSymbol` parameter in PaymentVault
+- Costs are calculated based on blob size (in symbols) multiplied by the `pricePerSymbol` parameter in PaymentVault.
 - Payment usage is not tracked on-chain; instead, the EigenDA Disperser maintains a DynamoDB table recording total
-historical usage for all clients
+historical usage for all clients.
 - When processing a dispersal, the Disperser compares a user's total historical usage against their on-chain deposits
-in the PaymentVault to determine if they have sufficient funds
-- Clients fetch the latest cumulative payment state from the EigenDA Disperser on startup via the `GetPaymentState` RPC
+in the PaymentVault to determine if they have sufficient funds.
+- Clients fetch the latest cumulative payment state from the EigenDA Disperser on startup via the `GetPaymentState` RPC.
 
 #### 2.2.1 Why Only the EigenDA Disperser?
 
-- On-demand payments are supported only through the EigenDA Disperser
+- On-demand payments are supported only through the EigenDA Disperser.
 - Since EigenDA currently lacks a consensus mechanism, validators cannot easily coordinate to limit total on-demand
-throughput across the network
+throughput across the network.
 - Therefore, the EigenDA Disperser fills the role of arbiter, ensuring that total network throughput doesn't exceed
-configured levels
+configured levels.
 
 #### 2.2.2 Cumulative Payment
 
@@ -138,11 +138,11 @@ total cost (in wei) of all previous dispersals, plus the new dispersal.
   clients had to make sure that all on-demand dispersals were handled by the disperser in strict order. In practice,
   that meant waiting for the entire network roundtrip, for dispersal N to be confirmed before submitting dispersal N+1.
 - **Current implementation:** The system has been simplified to improve concurrency:
-   - Clients still populate the `cumulative_payment` field with their local calculation of cumulative payment
+   - Clients still populate the `cumulative_payment` field with their local calculation of cumulative payment.
    - However, the Disperser now only checks if this field is non-zero (to determine payment type) and ignores the exact
-   value
-   - The Disperser tracks each account's on-demand usage in DynamoDB, incrementing by the blob cost for each dispersal
-   - This removes the strict ordering requirement and allows for highly concurrent dispersals
+   value.
+   - The Disperser tracks each account's on-demand usage in DynamoDB, incrementing by the blob cost for each dispersal.
+   - This removes the strict ordering requirement and allows for highly concurrent dispersals.
 - **Why clients still populate the field:** Although currently unused beyond the zero/non-zero check, clients continue
   to populate this field with meaningful values. This preserves the option to reintroduce cumulative payment validation
   in the future if needed.
@@ -164,15 +164,15 @@ The payment header implicitly specifies which payment mechanism is being used:
 
 Clients can configure their payment strategy in three ways:
 
-1. **Reservation-only:** Client exclusively uses reservation payments
-   - `cumulative_payment` field always left empty
-   - Dispersals fail if reservation capacity is exhausted
+1. **Reservation-only:** Client exclusively uses reservation payments.
+   - `cumulative_payment` field is always left empty.
+   - Dispersals fail if reservation capacity is exhausted.
 
-2. **On-demand-only:** Client exclusively uses on-demand payments
-   - `cumulative_payment` field always populated
-   - All dispersals charged against deposited balance
+2. **On-demand-only:** Client exclusively uses on-demand payments.
+   - `cumulative_payment` field is always populated.
+   - All dispersals charged against deposited balance.
 
-3. **Hybrid with fallback:** Client uses both payment methods
-   - Primary: Uses reservation while capacity is available
-   - Fallback: Automatically switches to on-demand when reservation is exhausted
-   - Ensures continuous operation without manual intervention
+3. **Hybrid with fallback:** Client uses both payment methods.
+   - Primary: Uses reservation while capacity is available.
+   - Fallback: Automatically switches to on-demand when reservation is exhausted.
+   - Ensures continuous operation without manual intervention.
