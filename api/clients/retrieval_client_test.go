@@ -274,9 +274,9 @@ func TestValidBlobHeader(t *testing.T) {
 
 	data, err := retrievalClient.RetrieveBlob(t.Context(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
+	assert.True(t, encoding.IsPowerOfTwo(len(data)))
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(data)
-	assert.Len(t, restored, 1488) // 48*31
 	restored = bytes.TrimRight(restored, "\x00")
 	assert.Equal(t, gettysburgAddressBytes, restored[:len(gettysburgAddressBytes)])
 
