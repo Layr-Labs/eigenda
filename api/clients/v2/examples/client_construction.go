@@ -332,7 +332,6 @@ func createKzgConfig() kzg.KzgConfig {
 		G2Path:          filepath.Join(srsPath, "g2.point"),
 		G2TrailingPath:  filepath.Join(srsPath, "g2.trailing.point"),
 		CacheDir:        filepath.Join(srsPath, "SRSTables"),
-		SRSOrder:        268435456, // must always be this constant, which was used during eigenDA SRS generation
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
 	}

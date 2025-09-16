@@ -8,9 +8,6 @@ import (
 // Some of the configurations only apply to the prover or verifier.
 // TODO(samlaf): split into separate Prover and Verifier configs.
 type KzgConfig struct {
-	// SRSOrder is the total size of SRS.
-	// TODO(samlaf): this should always be 2^28. Get rid of this field and replace with hardcoded constant.
-	SRSOrder uint64
 	// Number of G1 (and optionally G2) points to be loaded from the SRS files:
 	// G1Path, and optionally G2Path and G2TrailingPath.
 	// This number times 32 bytes will be loaded from G1Path, and if LoadG2Points is true,

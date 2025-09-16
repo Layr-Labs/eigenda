@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -24,15 +25,15 @@ const (
 )
 
 // Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, srsOrder uint64, g1Path string) (bn254.G1Affine, error) {
+func ReadG1Point(n uint64, g1Path string) (bn254.G1Affine, error) {
 	// TODO: Do we really need to check srsOrder here? Or can we just read the file and let the error propagate if n is out of bounds?
-	if n >= srsOrder {
-		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, srsOrder)
+	if n >= encoding.SRSOrder {
+		return bn254.G1Affine{}, fmt.Errorf("requested point %v is larger than SRSOrder %v", n, encoding.SRSOrder)
 	}
 
 	g1point, err := ReadG1PointSection(g1Path, n, n+1, 1)
 	if err != nil {
-		return bn254.G1Affine{}, fmt.Errorf("error read g1 point section %w", err)
+		return bn254.G1Affine{}, fmt.Errorf("read g1 point section %w", err)
 	}
 
 	return g1point[0], nil
@@ -216,4 +217,20 @@ func readBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 		return nil, fmt.Errorf("reading %v bytes: %w", numBytesToRead, err)
 	}
 	return buf, nil
+}
+
+func NumberOfPointsInSRSFile(filePath string, pointsSize int64) (uint64, error) {
+	fileStat, errStat := os.Stat(filePath)
+	if errStat != nil {
+		return 0, fmt.Errorf("cannot stat the file %v: %w", filePath, errStat)
+	}
+	fileSizeByte := fileStat.Size()
+	if fileSizeByte%pointsSize != 0 {
+		return 0, fmt.Errorf("corrupted g2 point from the file %v. "+
+			"The size of the file on the provided path has size that is not multiple of %v, which is %v. "+
+			"It indicates there is an incomplete g2 point", filePath, pointsSize, fileSizeByte)
+	}
+	// get the size
+	numG2point := uint64(fileSizeByte / pointsSize)
+	return numG2point, nil
 }

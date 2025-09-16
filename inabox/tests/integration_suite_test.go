@@ -349,7 +349,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
-		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
 		NumWorker:       1,
 		PreloadEncoder:  false,

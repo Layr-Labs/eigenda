@@ -135,7 +135,6 @@ func NewTestClient(
 		G2Path:          g2Path,
 		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
-		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}

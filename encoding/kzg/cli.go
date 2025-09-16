@@ -14,7 +14,6 @@ const (
 	G2PathFlagName            = "kzg.g2-path"
 	G2TrailingPathFlagName    = "kzg.g2-trailing-path"
 	CachePathFlagName         = "kzg.cache-path"
-	SRSOrderFlagName          = "kzg.srs-order"
 	NumWorkerFlagName         = "kzg.num-workers"
 	VerboseFlagName           = "kzg.verbose"
 	PreloadEncoderFlagName    = "kzg.preload-encoder"
@@ -24,6 +23,8 @@ const (
 	// Dynamically loading the g2.point.powerOf2 file is deprecated, as it is now embedded in the binary.
 	// See [srs.G2PowerOf2SRS] for details.
 	DeprecatedG2PowerOf2PathFlagName = "kzg.g2-power-of-2-path"
+	// SRSOrder is now deprecated, as it should always be set to the true bn254 SRS order of 2^28.
+	DeprecatedSRSOrderFlagName = "kzg.srs-order"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -51,12 +52,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "Path to SRS Table directory",
 			Required: true,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "CACHE_PATH"),
-		},
-		cli.Uint64Flag{
-			Name:     SRSOrderFlagName,
-			Usage:    "Order of the SRS",
-			Required: true,
-			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_ORDER"),
 		},
 		cli.Uint64Flag{
 			Name:     SRSLoadingNumberFlagName,
@@ -96,6 +91,13 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_POWER_OF_2_PATH"),
 			Hidden:   true, // deprecated so we hide it from help output
 		},
+		cli.Uint64Flag{
+			Name:     DeprecatedSRSOrderFlagName,
+			Usage:    "Order of the SRS",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "SRS_ORDER"),
+			Hidden:   true, // deprecated so we hide it from help output
+		},
 	}
 }
 
@@ -105,7 +107,6 @@ func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
 	cfg.G2TrailingPath = ctx.GlobalString(G2TrailingPathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
-	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
 	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
 	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)

@@ -226,9 +226,9 @@ var (
 )
 
 var kzgFlags = []cli.Flag{
-	// KZG flags for encoding
-	// These are copied from encoding/kzg/cli.go as optional flags for compatibility between v1 and v2 dispersers
-	// These flags are only used in v2 disperser
+	// KZG flags for encoding. Copied from encoding/kzg/cli.go and all set Required to false
+	// for compatibility between v1 and v2 dispersers.
+	// The flags required for v2 are instead required manually in lib/config.go when v2 disperser is selected.
 	cli.StringFlag{
 		Name:     kzg.G1PathFlagName,
 		Usage:    "Path to G1 SRS",
@@ -242,16 +242,16 @@ var kzgFlags = []cli.Flag{
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_PATH"),
 	},
 	cli.StringFlag{
+		Name:     kzg.G2TrailingPathFlagName,
+		Usage:    "Path to trailing G2 SRS file. Its intended purpose is to allow local generation the blob length proof. If you already downloaded the entire G2 SRS file which contains 268435456 G2 points with total size 16GiB, this flag is not needed. With this G2TrailingPathFlag, user can use a smaller file that contains only the trailing end of the whole G2 SRS file. Ignoring this flag, the program assumes the entire G2 SRS file is provided. With this flag, the size of the provided file must be at least SRSLoadingNumberFlagName * 64 Bytes.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "G2_TRAILING_PATH"),
+	},
+	cli.StringFlag{
 		Name:     kzg.CachePathFlagName,
 		Usage:    "Path to SRS Table directory",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CACHE_PATH"),
-	},
-	cli.Uint64Flag{
-		Name:     kzg.SRSOrderFlagName,
-		Usage:    "Order of the SRS",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SRS_ORDER"),
 	},
 	cli.Uint64Flag{
 		Name:     kzg.SRSLoadingNumberFlagName,
@@ -283,6 +283,13 @@ var kzgFlags = []cli.Flag{
 		Usage:    "Set to enable Encoder PreLoading",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PRELOAD_ENCODER"),
+	},
+	cli.Uint64Flag{
+		Name:     kzg.DeprecatedSRSOrderFlagName,
+		Usage:    "Order of the SRS",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SRS_ORDER"),
+		Hidden:   true, // deprecated so we hide it from help output
 	},
 	cli.StringFlag{
 		Name:     kzg.DeprecatedG2PowerOf2PathFlagName,

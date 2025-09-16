@@ -54,7 +54,7 @@ func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
 }
 
 // ValidateEncodingParams takes in the encoding parameters and returns an error if they are invalid.
-func ValidateEncodingParams(params EncodingParams, SRSOrder uint64) error {
+func ValidateEncodingParams(params EncodingParams) error {
 	if params.NumChunks == 0 {
 		return errors.New("number of chunks must be greater than 0")
 	}
@@ -80,9 +80,9 @@ func ValidateEncodingParams(params EncodingParams, SRSOrder uint64) error {
 }
 
 // ValidateEncodingParamsAndBlobLength takes in the encoding parameters and blob length and returns an error if they are collectively invalid.
-func ValidateEncodingParamsAndBlobLength(params EncodingParams, blobLength, SRSOrder uint64) error {
+func ValidateEncodingParamsAndBlobLength(params EncodingParams, blobLength uint64) error {
 
-	if err := ValidateEncodingParams(params, SRSOrder); err != nil {
+	if err := ValidateEncodingParams(params); err != nil {
 		return err
 	}
 

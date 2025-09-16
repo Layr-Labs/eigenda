@@ -30,7 +30,7 @@ type Verifier struct {
 var _ encoding.Verifier = &Verifier{}
 
 func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
-	if config.SRSNumberToLoad > config.SRSOrder {
+	if config.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
@@ -56,7 +56,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 }
 
 func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
+	if err := encoding.ValidateEncodingParams(params); err != nil {
 		return nil, err
 	}
 
@@ -105,8 +105,9 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
-
-	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig.SRSOrder, v.kzgConfig.G1Path)
+	// This is broken for all tests because we don't have the full 2^28 G1 SRS File.
+	// TODO(samlaf): We only need 28 points. Embed those 28 G1 points like we do for G2.
+	g1Challenge, err := kzg.ReadG1Point(encoding.SRSOrder-length, v.kzgConfig.G1Path)
 	if err != nil {
 		return fmt.Errorf("read g1 point: %w", err)
 	}

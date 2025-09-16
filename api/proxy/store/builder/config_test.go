@@ -52,7 +52,6 @@ func validCfg() Config {
 			G2Path:         "path/to/g2",
 			G2TrailingPath: "path/to/trailing/g2",
 			CacheDir:       "path/to/cache",
-			SRSOrder:       maxBlobLengthBytes / 32,
 		},
 		MemstoreConfig: memconfig.NewSafeConfig(
 			memconfig.Config{

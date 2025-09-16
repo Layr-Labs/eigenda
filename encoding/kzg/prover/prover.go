@@ -39,7 +39,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		encoderConfig = encoding.DefaultConfig()
 	}
 
-	if kzgConfig.SRSNumberToLoad > kzgConfig.SRSOrder {
+	if kzgConfig.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
@@ -52,7 +52,6 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
 
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
 	if kzgConfig.LoadG2Points {
 		if len(kzgConfig.G2Path) == 0 {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
@@ -65,18 +64,13 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
-			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
-			if errStat != nil {
-				return nil, fmt.Errorf("cannot stat the G2TrailingPath: %w", errStat)
+			// TODO(samlaf): this function/check should probably be done in ReadG2PointSection
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2TrailingPath, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file %v: %w", kzgConfig.G2TrailingPath, err)
 			}
-			fileSizeByte := fileStat.Size()
-			if fileSizeByte%64 != 0 {
-				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point", fileSizeByte)
-			}
-			// get the size
-			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
 			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("insufficent number of g2 points from G2TrailingPath. Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
+				return nil, fmt.Errorf("kzgConfig.G2TrailingPath=%v contains %v G2 Points, which is < kzgConfig.SRSNumberToLoad=%v", kzgConfig.G2TrailingPath, numG2point, kzgConfig.SRSNumberToLoad)
 			}
 
 			// use g2 trailing file
@@ -91,16 +85,23 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 					numG2point-kzgConfig.SRSNumberToLoad, numG2point, kzgConfig.G2TrailingPath, err)
 			}
 		} else {
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2Path, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file: %w", err)
+			}
+			if numG2point < encoding.SRSOrder {
+				return nil, fmt.Errorf("no kzgConfig.G2TrailingPath was passed, yet the G2 SRS file %v is incomplete: contains %v < 2^28 G2 Points", kzgConfig.G2Path, numG2point)
+			}
 			// require entire g2 srs be available on disk
 			g2Trailing, err = kzg.ReadG2PointSection(
 				kzgConfig.G2Path,
-				kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-				kzgConfig.SRSOrder, // last exclusive
+				encoding.SRSOrder-kzgConfig.SRSNumberToLoad,
+				encoding.SRSOrder, // last exclusive
 				kzgConfig.NumWorker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
-					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
+					encoding.SRSOrder-kzgConfig.SRSNumberToLoad, encoding.SRSOrder, kzgConfig.G2Path, err)
 			}
 		}
 	}
@@ -301,10 +302,6 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	return enc, nil
 }
 
-func (g *Prover) GetSRSOrder() uint64 {
-	return g.KzgConfig.SRSOrder
-}
-
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of
 //
@@ -374,7 +371,7 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 }
 
 func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
-	if err := encoding.ValidateEncodingParams(params, p.KzgConfig.SRSOrder); err != nil {
+	if err := encoding.ValidateEncodingParams(params); err != nil {
 		return nil, err
 	}
 

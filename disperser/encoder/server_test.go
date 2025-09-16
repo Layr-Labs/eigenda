@@ -39,7 +39,6 @@ func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        3000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,

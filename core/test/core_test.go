@@ -48,7 +48,6 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,

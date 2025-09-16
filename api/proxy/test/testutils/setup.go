@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
@@ -283,7 +282,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			G2Path:          "../../resources/g2.point",
 			G2TrailingPath:  "../../resources/g2.trailing.point",
 			CacheDir:        "../../resources/SRSTables",
-			SRSOrder:        eigendaflags.SrsOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			LoadG2Points:    true,

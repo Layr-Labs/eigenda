@@ -673,7 +673,6 @@ func setup() {
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,

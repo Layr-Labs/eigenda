@@ -31,8 +31,8 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
+		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
@@ -272,7 +272,7 @@ func TestValidBlobHeader(t *testing.T) {
 	indexer.On("GetObject", mock.Anything, 0).Return(operatorPubKeys, nil).Once()
 	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
 
-	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
+	data, err := retrievalClient.RetrieveBlob(t.Context(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
 
 	restored := codec.RemoveEmptyByteFromPaddedBytes(data)

@@ -64,7 +64,6 @@ func main() {
 		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
 		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
 		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
-		SRSOrder:        268435456,
 		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,

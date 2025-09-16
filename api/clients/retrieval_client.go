@@ -163,7 +163,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	// Validate the blob length
 	err = r.verifier.VerifyBlobLength(blobHeader.BlobCommitments)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("verify blob length: %w", err)
 	}
 
 	// Validate the commitments are equivalent

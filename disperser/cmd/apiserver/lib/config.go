@@ -88,9 +88,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		if encodingConfig.CacheDir == "" {
 			return Config{}, fmt.Errorf("CacheDir must be specified for disperser version 2")
 		}
-		if encodingConfig.SRSOrder <= 0 {
-			return Config{}, fmt.Errorf("SRSOrder must be specified for disperser version 2")
-		}
 		if encodingConfig.SRSNumberToLoad <= 0 {
 			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
 		}

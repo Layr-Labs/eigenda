@@ -172,8 +172,8 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 		"Commiting_duration", commitmentResult.Duration,
 		"LengthCommit_duration", lengthCommitmentResult.Duration,
 		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
@@ -239,8 +239,8 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames
@@ -278,8 +278,8 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 		"Chunk_length", g.ChunkLength,
 		"Total_duration", end,
 		"Padding_duration", paddingEnd,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return proofs, err

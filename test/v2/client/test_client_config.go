@@ -50,8 +50,6 @@ type TestClientConfig struct {
 	EigenDACertVerifierAddressQuorums2 string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
-	// The SRS order to use for the test
-	SRSOrder uint64
 	// The SRS number to load, increasing this beyond necessary can cause the client to take a long time to start
 	SRSNumberToLoad uint64
 	// The maximum blob size supported by the EigenDA network
@@ -78,7 +76,6 @@ func DefaultTestClientConfig() *TestClientConfig {
 	return &TestClientConfig{
 		DisperserPort:                   443,
 		MaxBlobSize:                     16 * units.MiB,
-		SRSOrder:                        268435456,
 		MetricsPort:                     9101,
 		ValidatorReadConnectionPoolSize: 100,
 		ValidatorReadComputePoolSize:    20,

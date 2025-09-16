@@ -20,8 +20,6 @@ type Prover interface {
 	GetFrames(data []byte, params EncodingParams) ([]*Frame, error)
 
 	GetMultiFrameProofs(data []byte, params EncodingParams) ([]Proof, error)
-
-	GetSRSOrder() uint64
 }
 
 type Verifier interface {
