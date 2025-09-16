@@ -125,7 +125,7 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 }
 
@@ -175,7 +175,7 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 }
 
