@@ -43,15 +43,19 @@ func TestDebitMultipleAccounts(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
+	config, err := NewReservationLedgerCacheConfig(
+		10,
+		10*time.Second,
+		OverfillOncePermitted,
+		time.Second,
+	)
+	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		mockTimeSource,
-		OverfillOncePermitted,
-		10*time.Second,
-		time.Second,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -89,15 +93,19 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
+	config, err := NewReservationLedgerCacheConfig(
+		10,
+		1*time.Second,
+		OverfillOncePermitted,
+		time.Second,
+	)
+	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		mockTimeSource,
-		OverfillOncePermitted,
-		1*time.Second,
-		time.Second,
 	)
 	require.NoError(t, err)
 
