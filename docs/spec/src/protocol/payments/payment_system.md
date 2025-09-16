@@ -7,7 +7,7 @@ payments. All payment logic is implemented in the [`core/payments`](../../../../
 
 **Key Concepts:**
 - Blob sizes are measured in *symbols*, where each symbol is 32 bytes.
-- Blob sizes are measured **post-blob encoding**: user payloads expand to some degree during blob encoding.
+- Blob sizes are measured **post-blob encoding**.
 - Blob sizes are constrained to powers-of-two: dispersals are rounded up to the next power-of-two number of symbols
   when computing size.
 - The [PaymentVault](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/PaymentVault.sol) contract
