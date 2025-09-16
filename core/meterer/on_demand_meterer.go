@@ -17,13 +17,6 @@ type OnDemandMeterer struct {
 }
 
 // Creates a new OnDemandMeterer with the specified rate limiting parameters.
-//
-// TODO(litt3): we should consider alternate strategies for configuring burst size. Currently, globalSymbolsPerSecond *
-// globalRatePeriodInterval is being used to mirror the old implementation. Some thoughts:
-// 1. There isn't really any purpose in storing this configuration on-chain in the PaymentVault, which is where we
-// currently get these values
-// 2. It might be easier to simply define the burst size directly, instead of making it a function of rate *
-// a configured duration.
 func NewOnDemandMeterer(
 	globalSymbolsPerSecond uint64,
 	globalRatePeriodInterval uint64,
