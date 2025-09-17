@@ -45,6 +45,7 @@ import (
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -84,35 +85,22 @@ func BuildManagers(
 		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
-	var kzgVerifier *kzgverifier.Verifier
-	// there are two cases in which we need to construct the kzgVerifier:
-	// 1. V1
-	// 2. V2, when validator retrieval is enabled
-	if v1Enabled ||
-		v2Enabled && slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
-		// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
-		// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
-		// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
-		// sidestep the issue entirely.
-		kzgConfig := config.KzgConfig
-		kzgConfig.LoadG2Points = false
-
-		kzgVerifier, err = kzgverifier.NewVerifier(&kzgConfig, nil)
-		if err != nil {
-			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
-		}
-	}
-
-	if v1Enabled {
-		log.Info("Building EigenDA v1 storage backend")
-		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
-		if err != nil {
-			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
-		}
-	}
-
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
+		// kzgVerifier is only needed when validator retrieval is enabled
+		var kzgVerifier *kzgverifierv2.Verifier
+		if slices.Contains(config.ClientConfigV2.RetrieversToEnable, common.ValidatorRetrieverType) {
+			// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
+			// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
+			// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
+			// sidestep the issue entirely.
+			kzgConfig := config.KzgConfig
+			kzgConfig.LoadG2Points = false
+			kzgVerifier, err = kzgverifierv2.NewVerifier(&kzgConfig, nil)
+			if err != nil {
+				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
+			}
+		}
 		eigenDAV2Store, err = buildEigenDAV2Backend(ctx, log, config, secrets, kzgVerifier, registry)
 		if err != nil {
 			return nil, nil, fmt.Errorf("build v2 backend: %w", err)
@@ -209,7 +197,7 @@ func buildEigenDAV2Backend(
 	log logging.Logger,
 	config Config,
 	secrets common.SecretConfigV2,
-	kzgVerifier *kzgverifier.Verifier,
+	kzgVerifier *kzgverifierv2.Verifier,
 	registry *prometheus.Registry,
 ) (common.EigenDAV2Store, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
@@ -540,7 +528,7 @@ func buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	operatorStateRetrieverAddr geth_common.Address,
 	eigenDAServiceManagerAddr geth_common.Address,
-	kzgVerifier *kzgverifier.Verifier,
+	kzgVerifier *kzgverifierv2.Verifier,
 	g1Srs []bn254.G1Affine,
 	metrics metrics_v2.RetrievalMetricer,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
