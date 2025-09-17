@@ -1,0 +1,48 @@
+syntax = "proto3";
+package validator;
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
+
+// Records information about validator signing rate during a time period.
+message ValidatorSigningRate {
+  // The unique identifier of the validator (i.e. the operator ID).
+  bytes validator_id = 1;
+
+  // The number of signed batches by the validator during the period.
+  uint64 signed_batches = 2;
+
+  // The number of unsigned batches by the validator during the period.
+  uint64 unsigned_batches = 3;
+
+  // The total number of bytes signed during the period.
+  uint64 signed_bytes = 4;
+
+  // The total number of bytes unsigned during the period.
+  uint64 unsigned_bytes = 5;
+
+  // Contains the sum of the time spent by the validator waiting for signing requests to be processed, in nanoseconds.
+  // Only batches that are signed are considered (i.e. if the validator does not succeed in signing a batch,
+  // the time spend in the attempt is not counted).
+  uint64 signing_latency = 6;
+}
+
+// Contains signing rate information about a specific quorum.
+message QuorumSigningRate {
+  // The unique identifier of the quorum.
+  uint32 quorum_id = 1;
+
+  // The signing rates of individual validators in this quorum.
+  repeated ValidatorSigningRate validator_signing_rates = 2;
+}
+
+// Signing rate information about validators during a particular time bucket.
+message SigningRateBucket {
+  // The start time of the bucket in seconds since Unix epoch, inclusive.
+  uint64 start_timestamp = 1;
+
+  // The end time of the bucket in seconds since Unix epoch, exclusive.
+  uint64 end_timestamp = 2;
+
+  // The signing rates for each quorum during the bucket time period.
+  repeated QuorumSigningRate quorum_signing_rates = 3;
+}
