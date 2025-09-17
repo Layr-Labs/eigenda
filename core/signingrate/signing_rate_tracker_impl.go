@@ -170,7 +170,7 @@ func (s *signingRateTracker) GetSigningRateDump(
 	// Worst case scenario, we iterate the entire deque. If we do that, we are about to transmit the contents
 	// of the deque over a network connection. And so in that case, the cost of iteration doesn't really matter.
 	for _, bucket := range s.buckets.ReverseIterator() {
-		if !bucket.EndTimestamp().After(startTime) || bucket.EndTimestamp().Equal(startTime) {
+		if !bucket.EndTimestamp().After(startTime) {
 			// This bucket is too old, skip it and stop iterating.
 			break
 		}
