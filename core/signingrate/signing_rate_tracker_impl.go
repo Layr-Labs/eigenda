@@ -139,7 +139,7 @@ func (s *signingRateTracker) GetValidatorSigningRate(
 	iterator, err := s.buckets.IteratorFrom(startIndex)
 	enforce.NilError(err, "should be impossible with a valid index")
 	for _, bucket := range iterator {
-		if bucket.startTimestamp.After(endTime) {
+		if !bucket.startTimestamp.Before(endTime) {
 			break
 		}
 
