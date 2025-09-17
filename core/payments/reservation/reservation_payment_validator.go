@@ -61,13 +61,14 @@ func (pv *ReservationPaymentValidator) Debit(
 	}
 
 	now := pv.timeSource()
-	success, _, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
+	success, remainingCapacity, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
 	if err != nil {
 		return fmt.Errorf("debit reservation payment: %w", err)
 	}
 
 	if !success {
-		return fmt.Errorf("reservation debit failed: insufficient capacity")
+		return fmt.Errorf("reservation debit failed: insufficient capacity (remaining capacity in bucket: %.2f, "+
+			"total bucket capacity: %.2f symbols)", remainingCapacity, ledger.GetBucketCapacity())
 	}
 
 	return nil
