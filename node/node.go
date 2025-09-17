@@ -121,6 +121,19 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
+	blsSigner, err := blssigner.NewSigner(config.BlsSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create BLS signer: %w", err)
+	}
+	operatorID, err := blsSigner.GetOperatorId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operator ID: %w", err)
+	}
+	config.ID, err = core.OperatorIDFromHex(operatorID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert operator ID: %w", err)
+	}
+
 	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
@@ -171,19 +184,6 @@ func NewNode(
 
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
-
-	blsSigner, err := blssigner.NewSigner(config.BlsSignerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create BLS signer: %w", err)
-	}
-	operatorID, err := blsSigner.GetOperatorId()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get operator ID: %w", err)
-	}
-	config.ID, err = core.OperatorIDFromHex(operatorID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert operator ID: %w", err)
-	}
 
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
