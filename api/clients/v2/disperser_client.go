@@ -2,7 +2,6 @@ package clients
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"

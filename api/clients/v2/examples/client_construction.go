@@ -125,7 +125,6 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		certVerifier,
 		clientLedger,
 		nil,
-		nil,
 	)
 }
 
@@ -465,7 +464,7 @@ func createClientLedger(
 	ethClient common.EthClient,
 	accountID gethcommon.Address,
 	contractDirectory *directory.ContractDirectory,
-	disperserClient clients.DisperserClient,
+	disperserClient *clients.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -561,7 +560,7 @@ func createOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID gethcommon.Address,
 	minNumSymbols uint32,
-	disperserClient clients.DisperserClient,
+	disperserClient *clients.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {

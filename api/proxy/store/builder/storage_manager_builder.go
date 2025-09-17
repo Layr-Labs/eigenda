@@ -761,7 +761,7 @@ func buildOnDemandLedger(
 	paymentVault payments.PaymentVault,
 	accountID geth_common.Address,
 	minNumSymbols uint32,
-	disperserClient clients_v2.DisperserClient,
+	disperserClient *clients_v2.DisperserClient,
 ) (*ondemand.OnDemandLedger, error) {
 	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
 	if err != nil {
@@ -806,7 +806,7 @@ func buildClientLedger(
 	contractDirectory *directory.ContractDirectory,
 	accountantMetrics metrics_v2.AccountantMetricer,
 	getNow func() time.Time,
-	disperserClient clients_v2.DisperserClient,
+	disperserClient *clients_v2.DisperserClient,
 ) (*clientledger.ClientLedger, error) {
 	if config.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
 		return nil, nil
