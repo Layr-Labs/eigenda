@@ -27,8 +27,6 @@ type Verifier struct {
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
-var _ encoding.Verifier = &Verifier{}
-
 func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
@@ -37,12 +35,12 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 	// read the whole order, and treat it as entire SRS for low degree proof
 	g1SRS, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
+		return nil, fmt.Errorf("failed to read %d G1 points from %s: %w", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create encoder: %v", err)
+		return nil, fmt.Errorf("failed to create encoder: %w", err)
 	}
 
 	encoderGroup := &Verifier{
@@ -57,7 +55,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 
 func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
 	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
 
 	// protect access to ParametrizedVerifiers
@@ -166,13 +164,15 @@ func (v *Verifier) VerifyFrames(
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
-func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+func (v *Verifier) Decode(
+	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
+) ([]byte, error) {
 	frames := make([]rs.FrameCoeffs, len(chunks))
 	for i := range chunks {
 		frames[i] = chunks[i].Coeffs
 	}
 
-	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
+	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params) //nolint:wrapcheck
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

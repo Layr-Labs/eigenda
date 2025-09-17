@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
@@ -80,11 +81,6 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
 
-	config.EncoderConfig.LoadG2Points = true
-	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
-	}
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
@@ -101,8 +97,14 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 1 {
+		config.EncoderConfig.LoadG2Points = true
+		verifier, err := verifier.NewVerifier(&config.EncoderConfig, nil)
+		if err != nil {
+			log.Fatalln("could not start tcp listener", err)
+		}
+
 		agn := &core.StdAssignmentCoordinator{}
-		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, config.NumConnections)
+		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, verifier, config.NumConnections)
 		if err != nil {
 			log.Fatalln("could not start tcp listener", err)
 		}
@@ -126,10 +128,15 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
+		config.EncoderConfig.LoadG2Points = true
+		verifier, err := verifierv2.NewVerifier(&config.EncoderConfig, nil)
+		if err != nil {
+			log.Fatalln("could not start tcp listener", err)
+		}
 		clientConfig := clientsv2.DefaultClientConfig()
 		clientConfig.ConnectionPoolSize = config.NumConnections
 
-		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig, nil)
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, verifier, clientConfig, nil)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 

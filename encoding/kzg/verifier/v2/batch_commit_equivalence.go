@@ -3,6 +3,7 @@ package verifier
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -18,11 +19,11 @@ type CommitmentPair struct {
 }
 
 // Create a random number with crypto/rand.
-// Gnark provides SetRandom() function, but the implementation below is for explicity
+// Gnark provides SetRandom() function, but the implementation below is for explicitness
 func GetRandomFr() (fr.Element, error) {
 	r, err := rand.Int(rand.Reader, fr.Modulus())
 	if err != nil {
-		return fr.Element{}, err
+		return fr.Element{}, fmt.Errorf("get random int: %w", err)
 	}
 	var rElement fr.Element
 	rElement.SetBigInt(r)
@@ -73,13 +74,13 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 
 	randomsFr, err := CreateRandomnessVector(len(g1commits))
 	if err != nil {
-		return err
+		return fmt.Errorf("create randomness vector: %w", err)
 	}
 
 	var lhsG1 bn254.G1Affine
 	_, err = lhsG1.MultiExp(g1commits, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {
-		return err
+		return fmt.Errorf("compute lhsG1: %w", err)
 	}
 
 	lhsG2 := &kzg.GenG2
@@ -87,7 +88,7 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 	var rhsG2 bn254.G2Affine
 	_, err = rhsG2.MultiExp(g2commits, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {
-		return err
+		return fmt.Errorf("compute rhsG2: %w", err)
 	}
 	rhsG1 := &kzg.GenG1
 

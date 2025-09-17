@@ -27,7 +27,8 @@ type Sample struct {
 	X          uint // X is the evaluating index which corresponds to the leading coset
 }
 
-// the rhsG1 consists of three terms, see https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
+// the rhsG1 consists of three terms, see
+// https://ethresear.ch/t/a-universal-verification-equation-for-data-availability-sampling/13240/1
 func genRhsG1(
 	samples []Sample, randomsFr []fr.Element, m int,
 	params encoding.EncodingParams, fftSettings *fft.FFTSettings, g1SRS kzg.G1SRS, proofs []bn254.G1Affine,
@@ -41,7 +42,8 @@ func genRhsG1(
 	// first term
 	// get coeffs to compute the aggregated commitment
 	// note the coeff is affected by how many chunks are validated per blob
-	// if x chunks are sampled from one blob, we need to compute the sum of all x random field element corresponding to each sample
+	// if x chunks are sampled from one blob, we need to compute the sum of all
+	// x random field element corresponding to each sample
 	aggCommitCoeffs := make([]fr.Element, m)
 	setCommit := make([]bool, m)
 	for k := 0; k < n; k++ {
@@ -65,7 +67,7 @@ func genRhsG1(
 	var aggCommit bn254.G1Affine
 	_, err := aggCommit.MultiExp(commits, aggCommitCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("compute aggregated commitment G1: %w", err)
 	}
 
 	// second term
@@ -92,7 +94,7 @@ func genRhsG1(
 	var aggPolyG1 bn254.G1Affine
 	_, err = aggPolyG1.MultiExp(g1SRS[:D], aggPolyCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to compute aggregated polynomial G1: %w", err)
 	}
 
 	// third term
@@ -122,7 +124,7 @@ func genRhsG1(
 	var offsetG1 bn254.G1Affine
 	_, err = offsetG1.MultiExp(proofs, lcCoeffs, ecc.MultiExpConfig{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to compute offset G1: %w", err)
 	}
 
 	var rhsG1 bn254.G1Affine
@@ -134,7 +136,9 @@ func genRhsG1(
 }
 
 // TODO(mooselumph): Cleanup this function
-func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, samplesCore []encoding.Sample, numBlobs int) error {
+func (v *Verifier) UniversalVerifySubBatch(
+	params encoding.EncodingParams, samplesCore []encoding.Sample, numBlobs int,
+) error {
 
 	samples := make([]Sample, len(samplesCore))
 
@@ -144,7 +148,7 @@ func (v *Verifier) UniversalVerifySubBatch(params encoding.EncodingParams, sampl
 			params.NumChunks,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("get leading coset index: %w", err)
 		}
 
 		sample := Sample{
@@ -211,7 +215,7 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	var lhsG1 bn254.G1Affine
 	_, err = lhsG1.MultiExp(proofs, randomsFr, ecc.MultiExpConfig{})
 	if err != nil {
-		return err
+		return fmt.Errorf("compute lhsG1: %w", err)
 	}
 
 	// lhs g2
@@ -233,7 +237,7 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 		proofs,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("generate rhsG1: %w", err)
 	}
 
 	return PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
