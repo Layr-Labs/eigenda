@@ -635,6 +635,7 @@ func buildPayloadDisperser(
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
+		nil,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
