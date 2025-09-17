@@ -74,15 +74,18 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
 
-	err = paymentValidator.Debit(ctx, accountA, uint32(50), []uint8{}, testTime)
-	require.NoError(t, err, "first debit from account A should succeed")
+	success, err := paymentValidator.Debit(ctx, accountA, uint32(50), []uint8{}, testTime)
+	require.NoError(t, err)
+	require.True(t, success, "first debit from account A should succeed")
 
-	err = paymentValidator.Debit(ctx, accountB, uint32(75), []uint8{}, testTime)
-	require.NoError(t, err, "first debit from account B should succeed")
+	success, err = paymentValidator.Debit(ctx, accountB, uint32(75), []uint8{}, testTime)
+	require.NoError(t, err)
+	require.True(t, success, "first debit from account B should succeed")
 
 	// should reuse cached ledger
-	err = paymentValidator.Debit(ctx, accountA, uint32(25), []uint8{}, testTime)
-	require.NoError(t, err, "second debit from account A should succeed")
+	success, err = paymentValidator.Debit(ctx, accountA, uint32(25), []uint8{}, testTime)
+	require.NoError(t, err)
+	require.True(t, success, "second debit from account A should succeed")
 }
 
 func TestDebitInsufficientCapacity(t *testing.T) {
@@ -121,12 +124,14 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 	require.NoError(t, err)
 
 	// First debit exceeding capacity should succeed with OverfillOncePermitted
-	err = paymentValidator.Debit(ctx, accountID, uint32(20), []uint8{}, testTime)
-	require.NoError(t, err, "first debit should succeed with OverfillOncePermitted even when exceeding capacity")
+	success, err := paymentValidator.Debit(ctx, accountID, uint32(20), []uint8{}, testTime)
+	require.NoError(t, err)
+	require.True(t, success, "first debit should succeed with OverfillOncePermitted even when exceeding capacity")
 
 	// Second debit should fail since bucket is overfilled
-	err = paymentValidator.Debit(ctx, accountID, uint32(1), []uint8{}, testTime)
-	require.Error(t, err, "second debit should fail when bucket is overfilled")
+	success, err = paymentValidator.Debit(ctx, accountID, uint32(1), []uint8{}, testTime)
+	require.NoError(t, err)
+	require.False(t, success, "second debit should fail when bucket is overfilled")
 }
 
 func TestDebitNoReservation(t *testing.T) {
@@ -155,6 +160,7 @@ func TestDebitNoReservation(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{}, testTime)
-	require.Error(t, err, "debit should fail when no reservation exists")
+	success, err := paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{}, testTime)
+	require.Error(t, err)
+	require.False(t, success, "debit should fail when no reservation exists")
 }

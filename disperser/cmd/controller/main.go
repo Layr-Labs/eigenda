@@ -280,7 +280,10 @@ func RunController(ctx *cli.Context) error {
 	if config.ServerConfig.EnableServer {
 		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
-			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
+			// TODO(litt3): this will always fail in the current state when passing in nil parameters.
+			// This feature is in the process of being implemented. Passing in nils is fine for now, since payment
+			// authentication won't be enabled until the implementation is finished.
+			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler(nil, nil, nil)
 		}
 
 		grpcServer, err := server.NewServer(

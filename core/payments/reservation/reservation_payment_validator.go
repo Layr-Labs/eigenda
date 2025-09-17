@@ -62,27 +62,27 @@ func NewReservationPaymentValidator(
 
 // Validates a reservation payment for a blob dispersal
 // The caller is responsible for verifying the signature before calling this method
+//
+// Returns (true, nil) if the reservation has enough capacity to perform the debit.
+// Returns (false, nil) if the bucket lacks capacity to permit the dispersal.
+// Returns (false, error) if an error occurs during validation.
 func (pv *ReservationPaymentValidator) Debit(
 	ctx context.Context,
 	accountID gethcommon.Address,
 	symbolCount uint32,
 	quorumNumbers []uint8,
 	dispersalTime time.Time,
-) error {
+) (bool, error) {
 	ledger, err := pv.ledgerCache.GetOrCreate(ctx, accountID)
 	if err != nil {
-		return fmt.Errorf("get or create ledger: %w", err)
+		return false, fmt.Errorf("get or create ledger: %w", err)
 	}
 
 	now := pv.timeSource()
 	success, _, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
 	if err != nil {
-		return fmt.Errorf("debit reservation payment: %w", err)
+		return false, fmt.Errorf("debit reservation payment: %w", err)
 	}
 
-	if !success {
-		return fmt.Errorf("reservation debit failed: insufficient capacity")
-	}
-
-	return nil
+	return success, nil
 }
