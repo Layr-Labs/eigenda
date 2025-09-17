@@ -225,6 +225,8 @@ func TestUpdateReservation(t *testing.T) {
 }
 
 func createTestLedger(t *testing.T, symbolsPerSecond uint64, startFull bool, startTime time.Time) *ReservationLedger {
+	t.Helper()
+
 	endTime := startTime.Add(24 * time.Hour)
 	permittedQuorums := []core.QuorumID{0, 1}
 
