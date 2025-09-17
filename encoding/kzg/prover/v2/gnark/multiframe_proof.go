@@ -25,7 +25,9 @@ type WorkerResult struct {
 	err error
 }
 
-func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(
+	polyFr []fr.Element, numChunks, chunkLen, numWorker uint64,
+) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
@@ -34,7 +36,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element
 	// Pre-processing stage
 	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {
-		return nil, fmt.Errorf("coefficient computation error: %v", err)
+		return nil, fmt.Errorf("coefficient computation error: %w", err)
 	}
 	preprocessDone := time.Now()
 
@@ -53,8 +55,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element
 	for i := uint64(0); i < dimE*2; i++ {
 		err := <-msmErrors
 		if err != nil {
-			fmt.Println("Error. MSM while adding points", err)
-			return nil, err
+			return nil, fmt.Errorf("msm error: %w", err)
 		}
 	}
 
@@ -63,7 +64,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element
 	// only 1 ifft is needed
 	sumVecInv, err := p.Fs.FFTG1(sumVec, true)
 	if err != nil {
-		return nil, fmt.Errorf("fft error: %v", err)
+		return nil, fmt.Errorf("fft error: %w", err)
 	}
 
 	firstECNttDone := time.Now()
@@ -71,7 +72,7 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element
 	// outputs is out of order - buttefly
 	proofs, err := p.Fs.FFTG1(sumVecInv[:dimE], false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fft error: %w", err)
 	}
 
 	secondECNttDone := time.Now()
@@ -88,7 +89,9 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProofV2(polyFr []fr.Element
 }
 
 // Helper function to handle coefficient computation
-func (p *KzgMultiProofGnarkBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([][]fr.Element, error) {
+func (p *KzgMultiProofGnarkBackend) computeCoeffStore(
+	polyFr []fr.Element, numWorker, l, dimE uint64,
+) ([][]fr.Element, error) {
 	jobChan := make(chan uint64, numWorker)
 	results := make(chan WorkerResult, numWorker)
 
@@ -117,7 +120,7 @@ func (p *KzgMultiProofGnarkBackend) computeCoeffStore(polyFr []fr.Element, numWo
 	}
 
 	if lastErr != nil {
-		return nil, fmt.Errorf("proof worker error: %v", lastErr)
+		return nil, fmt.Errorf("proof worker error: %w", lastErr)
 	}
 
 	return coeffStore, nil
@@ -172,9 +175,13 @@ func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j,
 	// use precompute table
 	tm, err := toeplitz.NewToeplitz(toeV, p.SFs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("toeplitz new: %w", err)
 	}
-	return tm.GetFFTCoeff()
+	e, err := tm.GetFFTCoeff()
+	if err != nil {
+		return nil, fmt.Errorf("toeplitz get fft coeff: %w", err)
+	}
+	return e, nil
 }
 
 /*

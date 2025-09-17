@@ -3,8 +3,6 @@ package prover
 import (
 	"errors"
 	"fmt"
-	"log"
-	"log/slog"
 	"math"
 	"os"
 	"strconv"
@@ -74,7 +72,8 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			// get the size
 			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
 			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("insufficent number of g2 points from G2TrailingPath. Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
+				return nil, fmt.Errorf("insufficient number of g2 points from G2TrailingPath. "+
+					"Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
 			}
 
 			// use g2 trailing file
@@ -108,8 +107,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	// Create RS encoder
 	rsEncoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
-		slog.Error("Could not create RS encoder", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("create rs encoder: %w", err)
 	}
 
 	encoderGroup := &Prover{
@@ -125,13 +123,12 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		// create table dir if not exist
 		err := os.MkdirAll(kzgConfig.CacheDir, os.ModePerm)
 		if err != nil {
-			log.Println("Cannot make CacheDir", err)
-			return nil, err
+			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
 		err = encoderGroup.PreloadAllEncoders()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("preload all encoders: %w", err)
 		}
 	}
 
@@ -164,7 +161,9 @@ func (g *Prover) PreloadAllEncoders() error {
 	return nil
 }
 
-func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
+func (e *Prover) EncodeAndProve(
+	data []byte, params encoding.EncodingParams,
+) (encoding.BlobCommitments, []*encoding.Frame, error) {
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err
@@ -186,7 +185,7 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
-		return encoding.BlobCommitments{}, nil, err
+		return encoding.BlobCommitments{}, nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
 	length := uint(len(symbols))
@@ -203,17 +202,17 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
 	kzgFrames, _, err := enc.GetFrames(symbols)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get frames: %w", err)
 	}
 
 	chunks := make([]*encoding.Frame, len(kzgFrames))
@@ -233,7 +232,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
-		return encoding.BlobCommitments{}, err
+		return encoding.BlobCommitments{}, fmt.Errorf("ToFrArray: %w", err)
 	}
 
 	params := encoding.EncodingParams{
@@ -243,14 +242,14 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
-		return encoding.BlobCommitments{}, err
+		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
 	length := encoding.NextPowerOf2(uint64(len(symbols)))
 
 	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
 	if err != nil {
-		return encoding.BlobCommitments{}, err
+		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
 	}
 
 	commitments := encoding.BlobCommitments{
@@ -266,17 +265,17 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 func (e *Prover) GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
 	proofs, err := enc.GetMultiFrameProofs(symbols)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get multi frame proofs: %w", err)
 	}
 
 	return proofs, nil
@@ -314,8 +313,7 @@ func (g *Prover) GetSRSOrder() uint64 {
 func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
 	files, err := os.ReadDir(tableDir)
 	if err != nil {
-		log.Println("Error to list SRS Table directory", err)
-		return nil, err
+		return nil, fmt.Errorf("read srs table dir: %w", err)
 	}
 
 	tables := make([]encoding.EncodingParams, 0)
@@ -326,13 +324,11 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 
 		dimEValue, err := strconv.Atoi(tokens[0][4:])
 		if err != nil {
-			log.Println("Error to parse Dimension part of the Table", err)
-			return nil, err
+			return nil, fmt.Errorf("parse dimension part of the table: %w", err)
 		}
 		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
 		if err != nil {
-			log.Println("Error to parse Coset size of the Table", err)
-			return nil, err
+			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
 		}
 
 		params := encoding.EncodingParams{
@@ -346,7 +342,9 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
-func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
+func (p *Prover) Decode(
+	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
+) ([]byte, error) {
 	frames := make([]encoding.Frame, len(chunks))
 	for i := range chunks {
 		frames[i] = encoding.Frame{
@@ -373,7 +371,7 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 
 func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	if err := encoding.ValidateEncodingParams(params, p.KzgConfig.SRSOrder); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
 
 	// Create FFT settings based on params

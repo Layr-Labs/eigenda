@@ -20,7 +20,9 @@ func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofV2(coeffs []fr.Element) (
 	return p.ComputeLengthProofForLengthV2(coeffs, inputLength)
 }
 
-func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLengthV2(coeffs []fr.Element, length uint64) (*bn254.G2Affine, error) {
+func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLengthV2(
+	coeffs []fr.Element, length uint64,
+) (*bn254.G2Affine, error) {
 	if length < uint64(len(coeffs)) {
 		return nil, fmt.Errorf("length is less than the number of coefficients")
 	}
@@ -33,7 +35,7 @@ func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLengthV2(coeffs []fr.E
 	var lengthProof bn254.G2Affine
 	_, err := lengthProof.MultiExp(shiftedSecret, coeffs, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("multi exp: %w", err)
 	}
 
 	return &lengthProof, nil
@@ -45,7 +47,7 @@ func (p *KzgCommitmentsGnarkBackend) ComputeCommitmentV2(coeffs []fr.Element) (*
 	var commitment bn254.G1Affine
 	_, err := commitment.MultiExp(p.Srs.G1[:len(coeffs)], coeffs, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("multi exp: %w", err)
 	}
 	return &commitment, nil
 }
@@ -56,7 +58,7 @@ func (p *KzgCommitmentsGnarkBackend) ComputeLengthCommitmentV2(coeffs []fr.Eleme
 	var lengthCommitment bn254.G2Affine
 	_, err := lengthCommitment.MultiExp(p.Srs.G2[:len(coeffs)], coeffs, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("multi exp: %w", err)
 	}
 	return &lengthCommitment, nil
 }

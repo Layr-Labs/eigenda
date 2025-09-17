@@ -38,14 +38,12 @@ func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTa
 
 	err := os.MkdirAll(tableDir, os.ModePerm)
 	if err != nil {
-		log.Println("NEWSRSTABLE.ERR.1", err)
-		return nil, err
+		return nil, fmt.Errorf("create table dir: %w", err)
 	}
 
 	files, err := os.ReadDir(tableDir)
 	if err != nil {
-		log.Println("NEWSRSTABLE.ERR.2", err)
-		return nil, err
+		return nil, fmt.Errorf("read dir: %w", err)
 	}
 
 	tables := make(map[TableParam]SubTable)
@@ -56,13 +54,11 @@ func NewSRSTable(tableDir string, s1 []bn254.G1Affine, numWorker uint64) (*SRSTa
 
 		dimEValue, err := strconv.Atoi(tokens[0][4:])
 		if err != nil {
-			log.Println("NEWSRSTABLE.ERR.3", err)
-			return nil, err
+			return nil, fmt.Errorf("parsing dimE from filename %s: %w", filename, err)
 		}
 		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
 		if err != nil {
-			log.Println("NEWSRSTABLE.ERR.4", err)
-			return nil, err
+			return nil, fmt.Errorf("parsing cosetSize from filename %s: %w", filename, err)
 		}
 
 		param := TableParam{
@@ -178,7 +174,9 @@ func (p *SRSTable) Precompute(dim, dimE, l, m uint64, filePath string, numWorker
 	return fftPoints
 }
 
-func (p *SRSTable) precomputeWorker(fs *fft.FFTSettings, m, dim, dimE uint64, jobChan <-chan uint64, l uint64, results chan DispatchReturn) {
+func (p *SRSTable) precomputeWorker(
+	fs *fft.FFTSettings, m, dim, dimE uint64, jobChan <-chan uint64, l uint64, results chan DispatchReturn,
+) {
 	for j := range jobChan {
 		dr, err := p.PrecomputeSubTable(fs, m, dim, dimE, j, l)
 		if err != nil {
@@ -204,8 +202,7 @@ func (p *SRSTable) PrecomputeSubTable(fs *fft.FFTSettings, m, dim, dimE, j, l ui
 
 	y, err := fs.FFTG1(points, false)
 	if err != nil {
-		log.Println("PrecomputeSubTable.ERR.1", err)
-		return DispatchReturn{}, err
+		return DispatchReturn{}, fmt.Errorf("fft error: %w", err)
 	}
 
 	return DispatchReturn{
@@ -224,8 +221,7 @@ type Boundary struct {
 func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker uint64) ([][]bn254.G1Affine, error) {
 	g1f, err := os.Open(filePath)
 	if err != nil {
-		log.Println("TableReaderThreads.ERR.0", err)
-		return nil, err
+		return nil, fmt.Errorf("open file %s: %w", filePath, err)
 	}
 
 	// 2 due to circular FFT  mul
@@ -239,12 +235,11 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	reader := bufio.NewReaderSize(g1f, int(totalSubTableSize+l))
 	buf := make([]byte, totalSubTableSize+l)
 	if _, err := io.ReadFull(reader, buf); err != nil {
-		log.Println("TableReaderThreads.ERR.1", err, "file path:", filePath)
-		return nil, err
+		return nil, fmt.Errorf("read full file %s: %w", filePath, err)
 	}
 
 	boundaries := make([]Boundary, l)
-	for i := uint64(0); i < uint64(l); i++ {
+	for i := uint64(0); i < l; i++ {
 		start := (subTableSize + 1) * i
 		end := (subTableSize+1)*(i+1) - 1 // exclude \n
 		boundary := Boundary{
@@ -272,7 +267,7 @@ func (p *SRSTable) TableReaderThreads(filePath string, dimE, l uint64, numWorker
 	wg.Wait()
 
 	if err := g1f.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("close file: %w", err)
 	}
 
 	return fftPoints, nil
@@ -305,8 +300,7 @@ func (p *SRSTable) readWorker(
 func (p *SRSTable) TableWriter(fftPoints [][]bn254.G1Affine, dimE uint64, filePath string) error {
 	wf, err := os.Create(filePath)
 	if err != nil {
-		log.Println("TableWriter.ERR.0", err)
-		return err
+		return fmt.Errorf("create file: %w", err)
 	}
 
 	writer := bufio.NewWriter(wf)
@@ -319,23 +313,22 @@ func (p *SRSTable) TableWriter(fftPoints [][]bn254.G1Affine, dimE uint64, filePa
 
 			g1Bytes := fftPoints[j][i].Bytes()
 			if _, err := writer.Write(g1Bytes[:]); err != nil {
-				log.Println("TableWriter.ERR.2", err)
-				return err
+				return fmt.Errorf("write g1 bytes: %w", err)
 			}
 		}
 		// every line for each slice
 		if _, err := writer.Write(delimiter[:]); err != nil {
-			log.Println("TableWriter.ERR.3", err)
-			return err
+			return fmt.Errorf("write delimiter: %w", err)
 		}
 	}
 
 	if err = writer.Flush(); err != nil {
-		log.Println("TableWriter.ERR.4", err)
-		return err
+		return fmt.Errorf("flush writer: %w", err)
 	}
 
-	err = wf.Close()
+	if err = wf.Close(); err != nil {
+		return fmt.Errorf("close file: %w", err)
+	}
 
-	return err
+	return nil
 }
