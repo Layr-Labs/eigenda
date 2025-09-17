@@ -125,6 +125,7 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		certVerifier,
 		clientLedger,
 		nil,
+		nil,
 	)
 }
 
@@ -253,7 +254,7 @@ func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
 	kzgProver *prover.Prover,
-) (clients.DisperserClient, error) {
+) (*clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)

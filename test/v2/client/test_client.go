@@ -57,7 +57,7 @@ type TestClient struct {
 	payloadClientConfig         *clientsv2.PayloadClientConfig
 	logger                      logging.Logger
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
-	disperserClient             clientsv2.DisperserClient
+	disperserClient             *clientsv2.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
 	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
@@ -527,7 +527,7 @@ func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
 }
 
 // GetDisperserClient returns the test client's disperser client.
-func (c *TestClient) GetDisperserClient() clientsv2.DisperserClient {
+func (c *TestClient) GetDisperserClient() *clientsv2.DisperserClient {
 	return c.disperserClient
 }
 
