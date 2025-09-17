@@ -38,9 +38,9 @@ type signingRateTracker struct {
 // Create a new SigningRateTracker.
 func NewSigningRateTracker(
 	logger logging.Logger,
-// The amount of time to keep in memory. Queries are only supported for this timeSpan.
+	// The amount of time to keep in memory. Queries are only supported for this timeSpan.
 	timeSpan time.Duration,
-// The duration of each bucket
+	// The duration of each bucket
 	bucketSpan time.Duration,
 	timeSource func() time.Time,
 ) (SigningRateTracker, error) {
