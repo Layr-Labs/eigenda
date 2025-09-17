@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	eigenda_v2_flags "github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"

@@ -1,4 +1,4 @@
-package enabled_apis
+package enablement
 
 import (
 	"fmt"
@@ -14,15 +14,15 @@ func withEnvPrefix(envPrefix, s string) []string {
 	return []string{envPrefix + "_" + s}
 }
 
-func ReadEnabledAPIs(ctx *cli.Context) *EnabledAPIs {
+func ReadEnabledServersCfg(ctx *cli.Context) *EnabledServersConfig {
 	enabledAPIStrings := ctx.StringSlice(EnabledAPIsFlagName)
 
-	apis, err := StringsToEnabledAPIs(enabledAPIStrings)
+	cfg, err := APIStringsToEnabledServersConfig(enabledAPIStrings)
 	if err != nil {
 		panic(err)
 	}
 
-	return apis
+	return cfg
 }
 
 func CLIFlags(category string, envPrefix string) []cli.Flag {

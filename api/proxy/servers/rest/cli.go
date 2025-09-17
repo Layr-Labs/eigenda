@@ -3,7 +3,7 @@ package rest
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/urfave/cli/v2"
 )
 
@@ -59,10 +59,10 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 	return flags
 }
 
-func ReadConfig(ctx *cli.Context, enabledAPIs *enabled_apis.EnabledAPIs) Config {
+func ReadConfig(ctx *cli.Context, apisEnabled *enablement.RestApisEnabled) Config {
 	return Config{
 		Host:        ctx.String(ListenAddrFlagName),
 		Port:        ctx.Int(PortFlagName),
-		EnabledAPIs: enabledAPIs,
+		APIsEnabled: apisEnabled,
 	}
 }

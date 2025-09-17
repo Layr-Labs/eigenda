@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
@@ -20,7 +20,7 @@ type AppConfig struct {
 	StoreBuilderConfig builder.Config
 	SecretConfig       common.SecretConfigV2
 
-	EnabledAPIs *enabled_apis.EnabledAPIs
+	EnabledServersConfig *enabled_apis.EnabledServersConfig
 
 	ArbCustomDASvrCfg arbitrum_altda.Config
 	RestSvrCfg        rest.Config
@@ -43,7 +43,7 @@ func (c AppConfig) Check() error {
 		}
 	}
 
-	err = c.EnabledAPIs.Check()
+	err = c.EnabledServersConfig.Check()
 	if err != nil {
 		return fmt.Errorf("check enabled APIs: %w", err)
 	}
@@ -57,22 +57,12 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("read proxy config: %w", err)
 	}
 
-	// NOTE: double passing of the `enabledAPIs` type to both the
-	//       the AppConfig and Rest server config is an abstraction leak.
-	//       given rest endpoint logic is guarded by the enabledAPIs it
-	//       makes sense to be like this. otherwise a separate env var
-	//       could be introduced that provides enablement toggles purely
-	//       for the REST server's code paths.
-	//
-	enabledAPIs := enabled_apis.ReadEnabledAPIs(ctx)
-
 	return AppConfig{
-		StoreBuilderConfig: storeBuilderConfig,
-		SecretConfig:       eigendaflags.ReadSecretConfigV2(ctx),
-		EnabledAPIs:        enabledAPIs,
+		StoreBuilderConfig:   storeBuilderConfig,
+		SecretConfig:         eigendaflags.ReadSecretConfigV2(ctx),
+		EnabledServersConfig: enabled_apis.ReadEnabledServersCfg(ctx),
 
 		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:        rest.ReadConfig(ctx, enabledAPIs),
 		MetricsSvrConfig:  metrics.ReadConfig(ctx),
 	}, nil
 }

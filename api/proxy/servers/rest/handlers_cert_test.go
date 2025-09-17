@@ -15,7 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/proxyerrors"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
@@ -28,13 +28,17 @@ import (
 )
 
 var (
-	testLogger      = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	enabledRestAPIs = enabled_apis.New(enabled_apis.AllRestAPIs()) // Enable rest APIs for testing
+	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 
 	testCfg = Config{
-		Host:        "localhost",
-		Port:        0,
-		EnabledAPIs: enabledRestAPIs,
+		Host: "localhost",
+		Port: 0,
+		APIsEnabled: &enabled_apis.RestApisEnabled{
+			Admin:               true,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		},
 	}
 )
 
@@ -379,7 +383,7 @@ func TestHandlersReturn403WhenAPIDisabled(t *testing.T) {
 		name    string
 		method  string
 		url     string
-		enabled []enabled_apis.API
+		enabled *enabled_apis.RestApisEnabled
 	}
 	cases := []tc{
 		{
@@ -387,50 +391,50 @@ func TestHandlersReturn403WhenAPIDisabled(t *testing.T) {
 			method: http.MethodGet,
 			url:    fmt.Sprintf("/get/0x00%s", testCommitStr),
 			// enable other REST APIs but explicitly ignore OpKeccakCommitment
-			enabled: []enabled_apis.API{
-				enabled_apis.OpGenericCommitment,
-				enabled_apis.StandardCommitment,
+			enabled: &enabled_apis.RestApisEnabled{
+				OpGenericCommitment: true,
+				StandardCommitment:  true,
 			},
 		},
 		{
 			name:   "GET op-generic: 403 when OpGenericCommitment disabled",
 			method: http.MethodGet,
 			url:    fmt.Sprintf("/get/0x010000%s", testCommitStr),
-			enabled: []enabled_apis.API{
-				enabled_apis.OpKeccakCommitment,
-				enabled_apis.StandardCommitment,
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment: true,
+				StandardCommitment: true,
 			},
 		},
 		{
 			name:   "POST /put (op-generic default): 403 when OpGenericCommitment disabled",
 			method: http.MethodPost,
 			url:    "/put",
-			enabled: []enabled_apis.API{
-				enabled_apis.OpKeccakCommitment,
-				enabled_apis.StandardCommitment,
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment: true,
+				StandardCommitment: true,
 			},
 		},
 		{
 			name:   "POST /put?commitment_mode=standard: 403 when StandardCommitment disabled",
 			method: http.MethodPost,
 			url:    "/put?commitment_mode=standard",
-			enabled: []enabled_apis.API{
-				enabled_apis.OpKeccakCommitment,
-				enabled_apis.OpGenericCommitment,
+			enabled: &enabled_apis.RestApisEnabled{
+				OpKeccakCommitment:  true,
+				OpGenericCommitment: true,
 			},
 		},
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			req := httptest.NewRequest(c.method, c.url, strings.NewReader("body"))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.url, strings.NewReader("body"))
 			rec := httptest.NewRecorder()
 
 			r := mux.NewRouter()
 			cfg := Config{
 				Host:        "localhost",
 				Port:        0,
-				EnabledAPIs: enabled_apis.New(c.enabled),
+				APIsEnabled: tc.enabled,
 			}
 			server := NewServer(cfg, mockEigenDAManager, mockKeccakManager, testLogger, metrics.NoopMetrics)
 			server.RegisterRoutes(r)

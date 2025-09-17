@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
@@ -134,7 +134,7 @@ func GetBackend() Backend {
 }
 
 type TestConfig struct {
-	APIsToEnable     *enabled_apis.EnabledAPIs
+	EnabledRestAPIs  *enablement.RestApisEnabled
 	BackendsToEnable []common.EigenDABackend
 	DispersalBackend common.EigenDABackend
 	Backend          Backend
@@ -165,7 +165,12 @@ func NewTestConfig(
 	}
 
 	return TestConfig{
-		APIsToEnable:       enabled_apis.New(enabled_apis.AllRestAPIs()),
+		EnabledRestAPIs: &enablement.RestApisEnabled{
+			Admin:               false,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		},
 		BackendsToEnable:   backendsToEnable,
 		DispersalBackend:   dispersalBackend,
 		Backend:            backend,
@@ -347,12 +352,16 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	return config.AppConfig{
 		StoreBuilderConfig: builderConfig,
 		SecretConfig:       secretConfig,
-		EnabledAPIs:        testCfg.APIsToEnable,
-		MetricsSvrConfig:   proxy_metrics.Config{},
+		EnabledServersConfig: &enablement.EnabledServersConfig{
+			Metric:        false,
+			ArbCustomDA:   false,
+			RestAPIConfig: *testCfg.EnabledRestAPIs,
+		},
+		MetricsSvrConfig: proxy_metrics.Config{},
 		RestSvrCfg: rest.Config{
 			Host:        host,
 			Port:        0,
-			EnabledAPIs: testCfg.APIsToEnable,
+			APIsEnabled: testCfg.EnabledRestAPIs,
 		},
 	}
 }

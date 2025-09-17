@@ -10,7 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/enabled_apis"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
@@ -33,10 +33,9 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	}
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
-	testCfg.APIsToEnable = enabled_apis.New(
-		[]enabled_apis.API{enabled_apis.OpGenericCommitment},
-	)
-
+	testCfg.EnabledRestAPIs = &enabled_apis.RestApisEnabled{
+		OpGenericCommitment: true,
+	}
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)
