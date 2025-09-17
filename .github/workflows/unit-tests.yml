@@ -10,8 +10,8 @@ env:
   MISE_VERSION: 2024.12.14
 
 jobs:
-  unit-tests:
-    name: Unit Tests
+  main-unit-tests:
+    name: Main Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Add LocalStack AWS Credentials
@@ -52,7 +52,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
         with:
-          name: unit-tests-coverage
+          name: main-unit-tests-coverage
           path: unit-tests-coverage.out
 
       - name: Extract coverage
@@ -61,9 +61,60 @@ jobs:
           COVERAGE=$(go tool cover -func="unit-tests-coverage.out" | tail -1 | grep -Eo '[0-9]+\.[0-9]')
           echo "coverage: $COVERAGE% of statements"
 
+  litt-unit-tests:
+    name: LittDB Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add LocalStack AWS Credentials
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+
+          echo '[default]' >> ~/.aws/credentials
+          echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+          echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+      - name: Set Test Profile to default
+        run: |
+          aws configure --profile test-profile set region us-east-1
+          aws configure --profile test-profile set source_profile default
+
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: go version
+
+      - name: Build and compile contracts
+        run: make compile
+        working-directory: contracts
+
+      - name: Build
+        run: make build
+
+      - name: Test LittDB
+        run: COVERAGE_FILE=litt-unit-tests-coverage.out make litt-unit-tests
+        env:
+          COVERAGE_FILE: litt-unit-tests-coverage.out
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
+        with:
+          name: litt-unit-tests-coverage
+          path: litt-unit-tests-coverage.out
+
+      - name: Extract coverage
+        shell: bash
+        run: |
+          COVERAGE=$(go tool cover -func="litt-unit-tests-coverage.out" | tail -1 | grep -Eo '[0-9]+\.[0-9]')
+          echo "coverage: $COVERAGE% of statements"
+
   coverage-report:
     name: Coverage Report
-    needs: unit-tests
+    needs: [main-unit-tests, litt-unit-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
@@ -73,18 +124,17 @@ jobs:
           version: ${{ env.MISE_VERSION }}
           experimental: true
 
-      - name: Download unit tests coverage
+      - name: Download main unit tests coverage
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          name: unit-tests-coverage
+          name: main-unit-tests-coverage
           path: ./coverage-artifacts
 
-      - name: Download litt unit tests coverage (if available)
+      - name: Download litt unit tests coverage
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: litt-unit-tests-coverage
           path: ./coverage-artifacts
-        continue-on-error: true
 
       - name: Merge coverage files
         shell: bash
@@ -95,10 +145,10 @@ jobs:
             # Skip the first line (mode declaration) from each file and append
             tail -n +2 unit-tests-coverage.out >> ../coverage.out
             tail -n +2 litt-unit-tests-coverage.out >> ../coverage.out
-            echo "Merged coverage from both unit-tests and litt-unit-tests"
+            echo "Merged coverage from both main-unit-tests and litt-unit-tests"
           elif [ -f unit-tests-coverage.out ]; then
             cp unit-tests-coverage.out ../coverage.out
-            echo "Using unit-tests coverage only"
+            echo "Using main-unit-tests coverage only"
           else
             echo "No coverage files found"
             exit 1
