@@ -64,10 +64,6 @@ func NewSigningRateTracker(
 	return store, nil
 }
 
-func (s *signingRateTracker) Close() {
-	// This implementation has no resources that the garbage collector won't clean up, so nothing to do here.
-}
-
 // Report that a validator has successfully signed a batch of the given size.
 func (s *signingRateTracker) ReportSuccess(
 	quorum core.QuorumID,

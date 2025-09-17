@@ -73,7 +73,4 @@ type SigningRateTracker interface {
 	// Several methods on this interface may asynchronously modify internal state. This method blocks
 	// until all previously queued modifications have been applied.
 	Flush() error
-
-	// Close the store and free any associated resources.
-	Close()
 }

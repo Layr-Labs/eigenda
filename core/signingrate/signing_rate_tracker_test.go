@@ -286,11 +286,9 @@ func TestRandomOperations(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer tracker.Close()
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer trackerClone.Close()
 
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
@@ -305,13 +303,11 @@ func TestRandomOperations(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		tracker = NewThreadsafeSigningRateTracker(tracker)
-		defer tracker.Close()
+		tracker = NewThreadsafeSigningRateTracker(t.Context(), tracker)
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		trackerClone = NewThreadsafeSigningRateTracker(trackerClone)
-		defer trackerClone.Close()
+		trackerClone = NewThreadsafeSigningRateTracker(t.Context(), trackerClone)
 
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
@@ -444,7 +440,6 @@ func TestUnflushedBuckets(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer tracker.Close()
 
 		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})
@@ -459,8 +454,7 @@ func TestUnflushedBuckets(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		tracker = NewThreadsafeSigningRateTracker(tracker)
-		defer tracker.Close()
+		tracker = NewThreadsafeSigningRateTracker(t.Context(), tracker)
 
 		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})

@@ -23,8 +23,7 @@ const channelSize = 4096
 // for performance. These methods are called many times for each batch processed, and we don't want
 // to block the main processing loop on mutex contention.
 type threadsafeSigningRateTracker struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	// The base signing rate tracker that does the actual work.
 	base SigningRateTracker
@@ -33,12 +32,13 @@ type threadsafeSigningRateTracker struct {
 	requests chan any
 }
 
-func NewThreadsafeSigningRateTracker(base SigningRateTracker) SigningRateTracker {
-	ctx, cancel := context.WithCancel(context.Background())
+// Construct a new threadsafe SigningRateTracker that wraps the given base SigningRateTracker.
+//
+// This method starts a background goroutine. Canceling the provided ctx will stop the goroutine.
+func NewThreadsafeSigningRateTracker(ctx context.Context, base SigningRateTracker) SigningRateTracker {
 
 	tracker := &threadsafeSigningRateTracker{
 		ctx:      ctx,
-		cancel:   cancel,
 		base:     base,
 		requests: make(chan any, channelSize),
 	}
@@ -289,10 +289,6 @@ func (t *threadsafeSigningRateTracker) Flush() error {
 	case err := <-request.responseChan:
 		return err
 	}
-}
-
-func (t *threadsafeSigningRateTracker) Close() {
-	t.cancel()
 }
 
 // Serialize access to the underlying SigningRateTracker.
