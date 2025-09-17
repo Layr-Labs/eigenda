@@ -1,4 +1,4 @@
-// nolint: wrapcheck
+//nolint: wrapcheck
 package mock
 
 import (
