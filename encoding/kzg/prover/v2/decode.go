@@ -1,6 +1,8 @@
 package prover
 
 import (
+	"fmt"
+
 	enc "github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
@@ -11,5 +13,9 @@ func (g *ParametrizedProver) Decode(frames []enc.Frame, indices []uint64, maxInp
 		rsFrames[ind] = frame.Coeffs
 	}
 
-	return g.Encoder.Decode(rsFrames, indices, maxInputSize, g.EncodingParams)
+	b, err := g.Encoder.Decode(rsFrames, indices, maxInputSize, g.EncodingParams)
+	if err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+	return b, nil
 }
