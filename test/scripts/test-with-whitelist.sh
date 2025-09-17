@@ -44,4 +44,5 @@ fi
 echo "Running tests for whitelist:"
 printf '%s\n' $PKGS
 
-CI=true go test -short $PKGS -coverprofile=coverage.out
+COVERAGE_FILE="${COVERAGE_FILE:-coverage.out}"
+CI=true go test -short $PKGS -coverprofile="$COVERAGE_FILE"
