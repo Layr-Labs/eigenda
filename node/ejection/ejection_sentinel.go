@@ -118,8 +118,8 @@ func (s *EjectionSentinel) run() {
 // checkEjectionStatus checks if the validator is being ejected and performs necessary actions based on the result.
 func (s *EjectionSentinel) checkEjectionStatus() error {
 
-	s.logger.Info("Checking ejection status...")         // TODO remove
-	defer s.logger.Info("done checking ejection status") // TODO remove
+	s.logger.Info("Checking ejection status for %s...", s.selfAddress.Hex()) // TODO remove
+	defer s.logger.Info("done checking ejection status")                     // TODO remove
 
 	// This method will return the ID of the entity attempting an ejection if an ejection is in progress,
 	// or the zero address if no ejection is in progress.
