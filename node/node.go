@@ -121,7 +121,19 @@ func NewNode(
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
-	err := configureMemoryLimits(nodeLogger, config)
+	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	validatorAddress, err := eth.ValidatorIDToAddress(ctx, client, registryCoordinatorAddress, config.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get validator address from ID: %w", err)
+	}
+
+	logger.Infof("Starting validator. ID: %s,address: %s", config.ID.Hex(), validatorAddress.Hex())
+
+	err = configureMemoryLimits(nodeLogger, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure memory limits: %w", err)
 	}
@@ -143,11 +155,6 @@ func NewNode(
 	serviceManagerAddress, err := contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service manager address from contract directory: %w", err)
-	}
-
-	registryCoordinatorAddress, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
 	}
 
 	operatorStateRetrieverAddress, err :=
@@ -287,7 +294,7 @@ func NewNode(
 		logger,
 		ejectionContractAddress,
 		client,
-		gethcommon.HexToAddress(config.ID.Hex()),
+		validatorAddress,
 		config.EjectionSentinelPeriod,
 		config.EjectionDefenseEnabled,
 		config.IgnoreVersionForEjectionDefense)
