@@ -87,6 +87,10 @@ func BuildManagers(
 
 	if v1Enabled {
 		log.Info("Building EigenDA v1 storage backend")
+		// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
+		// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
+		// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
+		// sidestep the issue entirely.
 		kzgConfig := config.KzgConfig
 		kzgConfig.LoadG2Points = false
 		kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
