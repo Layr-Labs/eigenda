@@ -26,14 +26,19 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	testVault.SetTotalDeposit(accountA, big.NewInt(10000))
 	testVault.SetTotalDeposit(accountB, big.NewInt(20000))
 
+	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		10,
+		tableName,
+		time.Second,
+	)
+	require.NoError(t, err)
+
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		dynamoClient,
-		tableName,
-		time.Second,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -63,14 +68,19 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	testVault.SetPricePerSymbol(1000)
 	testVault.SetTotalDeposit(accountID, big.NewInt(5000))
 
+	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		10,
+		tableName,
+		time.Second,
+	)
+	require.NoError(t, err)
+
 	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		dynamoClient,
-		tableName,
-		time.Second,
 	)
 	require.NoError(t, err)
 

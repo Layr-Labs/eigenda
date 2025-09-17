@@ -2,7 +2,6 @@ package reservation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -22,32 +21,19 @@ type ReservationPaymentValidator struct {
 func NewReservationPaymentValidator(
 	ctx context.Context,
 	logger logging.Logger,
-	// the maximum number of ReservationLedger entries to be kept in the LRU cache
-	maxLedgers int,
+	config ReservationLedgerCacheConfig,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time,
-	// how to handle requests that would overfill the bucket
-	overfillBehavior OverfillBehavior,
-	// duration used to calculate bucket capacity
-	bucketCapacityPeriod time.Duration,
-	// interval for checking for payment updates
-	updateInterval time.Duration,
 ) (*ReservationPaymentValidator, error) {
-	if timeSource == nil {
-		return nil, errors.New("timeSource cannot be nil")
-	}
 
 	ledgerCache, err := NewReservationLedgerCache(
 		ctx,
 		logger,
-		maxLedgers,
+		config,
 		paymentVault,
 		timeSource,
-		overfillBehavior,
-		bucketCapacityPeriod,
-		updateInterval,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger cache: %w", err)

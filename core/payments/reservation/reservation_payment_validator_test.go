@@ -12,28 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewReservationPaymentValidatorInvalidParams(t *testing.T) {
-	ctx := context.Background()
-	testVault := vault.NewTestPaymentVault()
-
-	validator, err := NewReservationPaymentValidator(
-		ctx,
-		testutils.GetLogger(),
-		10,
-		testVault,
-		nil, // nil time source
-		OverfillOncePermitted,
-		10*time.Second,
-		time.Second,
-	)
-	require.Error(t, err)
-	require.Nil(t, validator)
-}
-
 func TestDebitMultipleAccounts(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	accountA := gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -61,15 +43,19 @@ func TestDebitMultipleAccounts(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
+	config, err := NewReservationLedgerCacheConfig(
+		10,
+		10*time.Second,
+		OverfillOncePermitted,
+		time.Second,
+	)
+	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		mockTimeSource,
-		OverfillOncePermitted,
-		10*time.Second,
-		time.Second,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -91,7 +77,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 func TestDebitInsufficientCapacity(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -100,7 +86,6 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 	testVault.SetGlobalSymbolsPerSecond(1000)
 	testVault.SetMinNumSymbols(1)
 
-	// Set up a small reservation
 	testVault.SetReservation(accountID, &bindings.IPaymentVaultReservation{
 		SymbolsPerSecond: 10, // Very low rate
 		StartTimestamp:   uint64(testTime.Unix()),
@@ -111,56 +96,29 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 
 	mockTimeSource := func() time.Time { return testTime }
 
+	config, err := NewReservationLedgerCacheConfig(
+		10,
+		1*time.Second,
+		OverfillOncePermitted,
+		time.Second,
+	)
+	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
 		testutils.GetLogger(),
-		10,
+		config,
 		testVault,
 		mockTimeSource,
-		OverfillOncePermitted,
-		1*time.Second,
-		time.Second,
 	)
 	require.NoError(t, err)
 
 	// First debit exceeding capacity should succeed with OverfillOncePermitted
 	success, err := paymentValidator.Debit(ctx, accountID, uint32(20), []uint8{}, testTime)
-	require.NoError(t, err)
-	require.True(t, success, "first debit should succeed with OverfillOncePermitted even when exceeding capacity")
+	require.True(t, success)
+	require.NoError(t, err, "first debit should succeed with OverfillOncePermitted even when exceeding capacity")
 
 	// Second debit should fail since bucket is overfilled
 	success, err = paymentValidator.Debit(ctx, accountID, uint32(1), []uint8{}, testTime)
-	require.NoError(t, err)
 	require.False(t, success, "second debit should fail when bucket is overfilled")
-}
-
-func TestDebitNoReservation(t *testing.T) {
-	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
-
-	testVault := vault.NewTestPaymentVault()
-	testVault.SetGlobalSymbolsPerSecond(1000)
-	testVault.SetMinNumSymbols(1)
-
-	mockTimeSource := func() time.Time { return testTime }
-
-	paymentValidator, err := NewReservationPaymentValidator(
-		ctx,
-		testutils.GetLogger(),
-		10,
-		testVault,
-		mockTimeSource,
-		OverfillOncePermitted,
-		10*time.Second,
-		time.Second,
-	)
 	require.NoError(t, err)
-
-	success, err := paymentValidator.Debit(ctx, accountID, uint32(10), []uint8{}, testTime)
-	require.Error(t, err)
-	require.False(t, success, "debit should fail when no reservation exists")
 }

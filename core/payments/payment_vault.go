@@ -21,6 +21,9 @@ type PaymentVault interface {
 	// Retrieves the global rate limit (symbols per second) for on-demand dispersals.
 	GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error)
 
+	// Retrieves the global rate period interval (in seconds) for on-demand dispersals.
+	GetGlobalRatePeriodInterval(ctx context.Context) (uint64, error)
+
 	// Retrieves the minimum billable size for all dispersals.
 	// Dispersals are rounded up to the nearest multiple of this value for accounting.
 	//

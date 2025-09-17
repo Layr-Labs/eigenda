@@ -11,8 +11,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
-	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -31,6 +35,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
@@ -278,12 +284,20 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	if config.ServerConfig.EnableServer {
-		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
+		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
-			// TODO(litt3): this will always fail in the current state when passing in nil parameters.
-			// This feature is in the process of being implemented. Passing in nils is fine for now, since payment
-			// authentication won't be enabled until the implementation is finished.
-			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler(nil, nil, nil)
+			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
+				c,
+				config.OnDemandConfig,
+				config.ReservationConfig,
+				contractDirectory,
+				gethClient,
+				dynamoClient.GetAwsClient(),
+				logger,
+			)
+			if err != nil {
+				return fmt.Errorf("build payment authorization handler: %w", err)
+			}
 		}
 
 		grpcServer, err := server.NewServer(
@@ -336,4 +350,68 @@ func RunController(ctx *cli.Context) error {
 	}()
 
 	return nil
+}
+
+func buildPaymentAuthorizationHandler(
+	ctx context.Context,
+	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
+	reservationConfig reservation.ReservationLedgerCacheConfig,
+	contractDirectory *directory.ContractDirectory,
+	ethClient common.EthClient,
+	awsDynamoClient *awsdynamodb.Client,
+	logger logging.Logger,
+) (*controllerpayments.PaymentAuthorizationHandler, error) {
+	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(logger, ethClient, paymentVaultAddress)
+	if err != nil {
+		return nil, fmt.Errorf("create payment vault: %w", err)
+	}
+
+	globalSymbolsPerSecond, err := paymentVault.GetGlobalSymbolsPerSecond(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global symbols per second: %w", err)
+	}
+
+	globalRatePeriodInterval, err := paymentVault.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get global rate period interval: %w", err)
+	}
+
+	onDemandMeterer := meterer.NewOnDemandMeterer(
+		globalSymbolsPerSecond,
+		globalRatePeriodInterval,
+		time.Now,
+	)
+
+	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
+		ctx,
+		logger,
+		onDemandConfig,
+		paymentVault,
+		awsDynamoClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
+	}
+
+	reservationValidator, err := reservation.NewReservationPaymentValidator(
+		ctx,
+		logger,
+		reservationConfig,
+		paymentVault,
+		time.Now,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create reservation payment validator: %w", err)
+	}
+
+	return controllerpayments.NewPaymentAuthorizationHandler(
+		onDemandMeterer,
+		onDemandValidator,
+		reservationValidator,
+	), nil
 }
