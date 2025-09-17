@@ -552,9 +552,10 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "ejection-sentinel-period"),
 		Usage:    "The period at which the ejection sentinel runs to check for ejection conditions.",
 		Required: false,
-		Value:    5 * time.Minute,
+		Value:    1 * time.Minute, // TODO default should be 5 minutes, fix before merge
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
 	}
+	// TODO(cody.littley): this needs to be enabled by default prior to allowing third parties to eject.
 	EjectionDefenseEnabledFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
 		Usage:    "Whether to enable the ejection defense mechanism.",

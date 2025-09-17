@@ -281,6 +281,7 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ejection contract address: %w", err)
 	}
+	config.EjectionDefenseEnabled = true // TODO temporary, just for testing, remove prior to merge
 	_, err = ejection.NewEjectionSentinel(
 		ctx,
 		logger,
