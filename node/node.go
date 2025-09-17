@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/node/ejection"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
@@ -273,6 +274,24 @@ func NewNode(
 		config.operatorStateCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
+	}
+
+	// Start the ejection sentinel in a background goroutine.
+	ejectionContractAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ejection contract address: %w", err)
+	}
+	_, err = ejection.NewEjectionSentinel(
+		ctx,
+		logger,
+		ejectionContractAddress,
+		client,
+		gethcommon.HexToAddress(config.ID.Hex()),
+		config.EjectionSentinelPeriod,
+		config.EjectionDefenseEnabled,
+		config.IgnoreVersionForEjectionDefense)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ejection sentinel: %w", err)
 	}
 
 	n := &Node{
