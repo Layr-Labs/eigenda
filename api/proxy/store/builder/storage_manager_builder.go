@@ -85,6 +85,20 @@ func BuildManagers(
 		return nil, nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
+	if v1Enabled {
+		log.Info("Building EigenDA v1 storage backend")
+		kzgConfig := config.KzgConfig
+		kzgConfig.LoadG2Points = false
+		kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
+		}
+		eigenDAV1Store, err = buildEigenDAV1Backend(ctx, log, config, kzgVerifier)
+		if err != nil {
+			return nil, nil, fmt.Errorf("build v1 backend: %w", err)
+		}
+	}
+
 	if v2Enabled {
 		log.Info("Building EigenDA v2 storage backend")
 		// kzgVerifier is only needed when validator retrieval is enabled
