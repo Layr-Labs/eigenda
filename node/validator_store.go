@@ -115,6 +115,7 @@ func NewValidatorStore(
 	littConfig.DoubleWriteProtection = config.LittDBDoubleWriteProtection
 	littConfig.PurgeLocks = !config.LittRespectLocks
 	littConfig.MinimumFlushInterval = config.LittMinimumFlushInterval
+	littConfig.SnapshotDirectory = config.LittSnapshotDirectory
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new litt config: %w", err)
 	}

@@ -23,8 +23,7 @@ const channelSize = 4096
 // for performance. These methods are called many times for each batch processed, and we don't want
 // to block the main processing loop on mutex contention.
 type threadsafeSigningRateTracker struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	// The base signing rate tracker that does the actual work.
 	base SigningRateTracker
@@ -33,12 +32,13 @@ type threadsafeSigningRateTracker struct {
 	requests chan any
 }
 
-func NewThreadsafeSigningRateTracker(base SigningRateTracker) SigningRateTracker {
-	ctx, cancel := context.WithCancel(context.Background())
+// Construct a new threadsafe SigningRateTracker that wraps the given base SigningRateTracker.
+//
+// This method starts a background goroutine. Canceling the provided ctx will stop the goroutine.
+func NewThreadsafeSigningRateTracker(ctx context.Context, base SigningRateTracker) SigningRateTracker {
 
 	tracker := &threadsafeSigningRateTracker{
 		ctx:      ctx,
-		cancel:   cancel,
 		base:     base,
 		requests: make(chan any, channelSize),
 	}
@@ -51,7 +51,7 @@ func NewThreadsafeSigningRateTracker(base SigningRateTracker) SigningRateTracker
 // a request to invoke GetValidatorSigningRate
 type getValidatorSigningRateRequest struct {
 	quorum       core.QuorumID
-	id           core.OperatorID
+	validatorID  core.OperatorID
 	startTime    time.Time
 	endTime      time.Time
 	responseChan chan *getValidatorSigningRateResponse
@@ -65,14 +65,14 @@ type getValidatorSigningRateResponse struct {
 
 func (t *threadsafeSigningRateTracker) GetValidatorSigningRate(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	startTime time.Time,
 	endTime time.Time,
 ) (*validator.ValidatorSigningRate, error) {
 
 	request := &getValidatorSigningRateRequest{
 		quorum:       quorum,
-		id:           id,
+		validatorID:  validatorID,
 		startTime:    startTime,
 		endTime:      endTime,
 		responseChan: make(chan *getValidatorSigningRateResponse, 1),
@@ -167,28 +167,28 @@ func (t *threadsafeSigningRateTracker) GetUnflushedBuckets() ([]*validator.Signi
 // a request to invoke ReportSuccess
 type reportSuccessRequest struct {
 	quorum         core.QuorumID
-	id             core.OperatorID
+	validatorID    core.OperatorID
 	batchSize      uint64
 	signingLatency time.Duration
 }
 
 // a request to invoke ReportFailure
 type reportFailureRequest struct {
-	quorum    core.QuorumID
-	id        core.OperatorID
-	batchSize uint64
+	quorum      core.QuorumID
+	validatorID core.OperatorID
+	batchSize   uint64
 }
 
 func (t *threadsafeSigningRateTracker) ReportSuccess(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
 
 	request := &reportSuccessRequest{
 		quorum:         quorum,
-		id:             id,
+		validatorID:    validatorID,
 		batchSize:      batchSize,
 		signingLatency: signingLatency,
 	}
@@ -203,13 +203,13 @@ func (t *threadsafeSigningRateTracker) ReportSuccess(
 
 func (t *threadsafeSigningRateTracker) ReportFailure(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 ) {
 	request := &reportFailureRequest{
-		quorum:    quorum,
-		id:        id,
-		batchSize: batchSize,
+		quorum:      quorum,
+		validatorID: validatorID,
+		batchSize:   batchSize,
 	}
 
 	select {
@@ -222,13 +222,11 @@ func (t *threadsafeSigningRateTracker) ReportFailure(
 // a request to invoke UpdateLastBucket
 type updateLastBucketRequest struct {
 	bucket *validator.SigningRateBucket
-	now    time.Time
 }
 
-func (t *threadsafeSigningRateTracker) UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) {
+func (t *threadsafeSigningRateTracker) UpdateLastBucket(bucket *validator.SigningRateBucket) {
 	request := &updateLastBucketRequest{
 		bucket: bucket,
-		now:    now,
 	}
 
 	select {
@@ -293,10 +291,6 @@ func (t *threadsafeSigningRateTracker) Flush() error {
 	}
 }
 
-func (t *threadsafeSigningRateTracker) Close() {
-	t.cancel()
-}
-
 // Serialize access to the underlying SigningRateTracker.
 func (t *threadsafeSigningRateTracker) controlLoop() {
 	for {
@@ -309,7 +303,7 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 			case *getValidatorSigningRateRequest:
 				result, err := t.base.GetValidatorSigningRate(
 					typedRequest.quorum,
-					typedRequest.id,
+					typedRequest.validatorID,
 					typedRequest.startTime,
 					typedRequest.endTime)
 				typedRequest.responseChan <- &getValidatorSigningRateResponse{
@@ -325,7 +319,7 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 				}
 
 			case *updateLastBucketRequest:
-				t.base.UpdateLastBucket(typedRequest.now, typedRequest.bucket)
+				t.base.UpdateLastBucket(typedRequest.bucket)
 
 			case *getUnflushedBucketsRequest:
 				result, err := t.base.GetUnflushedBuckets()
@@ -337,12 +331,12 @@ func (t *threadsafeSigningRateTracker) controlLoop() {
 			case *reportSuccessRequest:
 				t.base.ReportSuccess(
 					typedRequest.quorum,
-					typedRequest.id,
+					typedRequest.validatorID,
 					typedRequest.batchSize,
 					typedRequest.signingLatency)
 
 			case *reportFailureRequest:
-				t.base.ReportFailure(typedRequest.quorum, typedRequest.id, typedRequest.batchSize)
+				t.base.ReportFailure(typedRequest.quorum, typedRequest.validatorID, typedRequest.batchSize)
 
 			case *getLastBucketStartTimeRequest:
 				startTime, err := t.base.GetLastBucketStartTime()

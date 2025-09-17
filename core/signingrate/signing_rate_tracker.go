@@ -8,6 +8,10 @@ import (
 )
 
 // Tracks signing rates for validators and serves queries about signing rates.
+//
+// This data structure is used by two main components:
+// 1. The controller keeps track of signing rates for all validators it disperses to.
+// 2. The API servers periodically download signing rate data from the controller to serve API requests.
 type SigningRateTracker interface {
 
 	// Get the signing rate for a validator over the specified time range. Start time is rounded forwards/backwards
@@ -16,7 +20,7 @@ type SigningRateTracker interface {
 	// Returned data threadsafe to read, but should not be modified.
 	GetValidatorSigningRate(
 		quorum core.QuorumID,
-		id core.OperatorID,
+		validatorID core.OperatorID,
 		startTime time.Time,
 		endTime time.Time,
 	) (*validator.ValidatorSigningRate, error)
@@ -37,7 +41,7 @@ type SigningRateTracker interface {
 	// Report that a validator has successfully signed a batch of the given size.
 	ReportSuccess(
 		quorum core.QuorumID,
-		id core.OperatorID,
+		validatorID core.OperatorID,
 		batchSize uint64,
 		signingLatency time.Duration,
 	)
@@ -60,7 +64,7 @@ type SigningRateTracker interface {
 	//
 	// This operation doesn't mark a bucket as unflushed. A bucket is only marked as unflushed when it is modified,
 	// not when it is provided whole-sale from an external source.
-	UpdateLastBucket(now time.Time, bucket *validator.SigningRateBucket) // TODO should this accept a timestamp?
+	UpdateLastBucket(bucket *validator.SigningRateBucket)
 
 	// Get the start time of the last bucket in the store. If the store is empty, returns the zero time.
 	// Useful for determining how much data to request from a remote store when mirroring.
@@ -69,7 +73,4 @@ type SigningRateTracker interface {
 	// Several methods on this interface may asynchronously modify internal state. This method blocks
 	// until all previously queued modifications have been applied.
 	Flush() error
-
-	// Close the store and free any associated resources.
-	Close()
 }

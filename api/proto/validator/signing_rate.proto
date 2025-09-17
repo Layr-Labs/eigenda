@@ -6,7 +6,7 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 // Records information about validator signing rate during a time period.
 message ValidatorSigningRate {
   // The unique identifier of the validator (i.e. the operator ID).
-  bytes id = 1;
+  bytes validator_id = 1;
 
   // The number of signed batches by the validator during the period.
   uint64 signed_batches = 2;
@@ -14,16 +14,12 @@ message ValidatorSigningRate {
   // The number of unsigned batches by the validator during the period.
   uint64 unsigned_batches = 3;
 
-  // The total number of bytes signed during the period. Defined as the sum of the sizes of all batches (in bytes)
-  // signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
-  // This will not be the same as the actual quantity of data stored by a validator, since that depends on things
-  // like encoding rates and chunk assignments.
+  // The total number of bytes signed during the period. This is a derived value equal to the size of the blobs
+  // not signed multiplied by this validator's stake fraction (between 0.0 and 1.0).
   uint64 signed_bytes = 4;
 
-  // The total number of bytes unsigned during the period.  Defined as the sum of the sizes of all batches (in bytes)
-  // not signed by the validator multiplied by the validator's stake percentage (as a fraction of 1.0) for each batch.
-  // This will not be the same as the actual quantity of data not stored by a validator, since that depends on things
-  // like encoding rates and chunk assignments.
+  // The total number of bytes unsigned during the period.This is a derived value equal to the size of the blobs
+  // not signed multiplied by this validator's stake fraction (between 0.0 and 1.0).
   uint64 unsigned_bytes = 5;
 
   // Contains the sum of the time spent by the validator waiting for signing requests to be processed, in nanoseconds.
@@ -34,9 +30,8 @@ message ValidatorSigningRate {
 
 // Contains signing rate information about a specific quorum.
 message QuorumSigningRate {
-  // The unique identifier of the quorum. Technically quorums are stored in a a uint8,
-  // but using uint64 here to future-proof things.
-  uint64 quorum_id = 1;
+  // The unique identifier of the quorum.
+  uint32 quorum_id = 1;
 
   // The signing rates of individual validators in this quorum.
   repeated ValidatorSigningRate validator_signing_rates = 2;

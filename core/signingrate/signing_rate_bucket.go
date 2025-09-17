@@ -61,7 +61,7 @@ func NewBucketFromProto(pb *validator.SigningRateBucket) *SigningRateBucket {
 
 		for _, validatorInfo := range quorumInfo.GetValidatorSigningRates() {
 			validatorID := core.OperatorID{}
-			copy(validatorID[:], validatorInfo.GetId())
+			copy(validatorID[:], validatorInfo.GetValidatorId())
 
 			signingRateInfo[quorumID][validatorID] = cloneValidatorSigningRate(validatorInfo)
 		}
@@ -90,7 +90,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 	start := uint64(b.startTimestamp.Unix())
 	end := uint64(b.endTimestamp.Unix())
 
-	quorumSigningRates := make([]*validator.QuorumSigningRate, len(b.signingRateInfo))
+	quorumSigningRates := make([]*validator.QuorumSigningRate, 0, len(b.signingRateInfo))
 
 	for quorumID, quorumInfo := range b.signingRateInfo {
 		validatorSigningRates := make([]*validator.ValidatorSigningRate, 0)
@@ -102,7 +102,7 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 
 		quorumSigningRates = append(quorumSigningRates,
 			&validator.QuorumSigningRate{
-				QuorumId:              uint64(quorumID),
+				QuorumId:              uint32(quorumID),
 				ValidatorSigningRates: validatorSigningRates,
 			})
 	}
@@ -121,11 +121,11 @@ func (b *SigningRateBucket) ToProtobuf() *validator.SigningRateBucket {
 // If the validator was previously Down, it will be marked as Up.
 func (b *SigningRateBucket) ReportSuccess(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
 ) {
-	info := b.getValidator(quorum, id)
+	info := b.getValidator(quorum, validatorID)
 
 	info.SignedBatches += 1
 	info.SignedBytes += batchSize
@@ -135,10 +135,8 @@ func (b *SigningRateBucket) ReportSuccess(
 }
 
 // Report that a validator has failed to sign a batch of the given size.
-//
-// If the validator was previously Up, it will be marked as Down.
-func (b *SigningRateBucket) ReportFailure(quorum core.QuorumID, id core.OperatorID, batchSize uint64) {
-	info := b.getValidator(quorum, id)
+func (b *SigningRateBucket) ReportFailure(quorum core.QuorumID, validatorID core.OperatorID, batchSize uint64) {
+	info := b.getValidator(quorum, validatorID)
 
 	info.UnsignedBatches += 1
 	info.UnsignedBytes += batchSize
@@ -163,19 +161,22 @@ func (b *SigningRateBucket) Contains(t time.Time) bool {
 
 // Get the signing rate info for a validator in a particular quorum, creating a new entry if necessary.
 // Is not a deep copy.
-func (b *SigningRateBucket) getValidator(quorum core.QuorumID, id core.OperatorID) *validator.ValidatorSigningRate {
+func (b *SigningRateBucket) getValidator(
+	quorum core.QuorumID,
+	validatorID core.OperatorID,
+) *validator.ValidatorSigningRate {
 	quorumSigningRate, exists := b.signingRateInfo[quorum]
 	if !exists {
 		quorumSigningRate = make(map[core.OperatorID]*validator.ValidatorSigningRate)
 		b.signingRateInfo[quorum] = quorumSigningRate
 	}
 
-	validatorSigningRate, exists := quorumSigningRate[id]
+	validatorSigningRate, exists := quorumSigningRate[validatorID]
 	if !exists {
 		validatorSigningRate = &validator.ValidatorSigningRate{
-			Id: id[:],
+			ValidatorId: validatorID[:],
 		}
-		quorumSigningRate[id] = validatorSigningRate
+		quorumSigningRate[validatorID] = validatorSigningRate
 	}
 	return validatorSigningRate
 }
@@ -183,7 +184,7 @@ func (b *SigningRateBucket) getValidator(quorum core.QuorumID, id core.OperatorI
 // Get the signing rate info for a validator in a quorum if it is registered, or nil if it is not. Is not a deep copy.
 func (b *SigningRateBucket) getValidatorIfExists(
 	quorum core.QuorumID,
-	id core.OperatorID,
+	validatorID core.OperatorID,
 ) (signingRate *validator.ValidatorSigningRate, exists bool) {
 
 	quorumSigningRate, exists := b.signingRateInfo[quorum]
@@ -191,6 +192,6 @@ func (b *SigningRateBucket) getValidatorIfExists(
 		return nil, false
 	}
 
-	signingRate, exists = quorumSigningRate[id]
+	signingRate, exists = quorumSigningRate[validatorID]
 	return signingRate, exists
 }

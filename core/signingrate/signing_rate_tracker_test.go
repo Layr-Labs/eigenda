@@ -62,7 +62,7 @@ func validateTrackerDump(
 		for _, quorumInfo := range dumpedBucket.GetQuorumSigningRates() {
 			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
 			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
-				validatorID := core.OperatorID(signingRate.GetId())
+				validatorID := core.OperatorID(signingRate.GetValidatorId())
 				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
 				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 			}
@@ -113,7 +113,7 @@ func validateTracker(
 	endTime := startTime.Add(time.Duration(rand.Float64Range(0, float64(timeSpan))))
 
 	expectedSigningRate := &validator.ValidatorSigningRate{
-		Id: validatorID[:],
+		ValidatorId: validatorID[:],
 	}
 	for _, bucket := range expectedBuckets {
 		if bucket.endTimestamp.Before(startTime) {
@@ -162,7 +162,7 @@ func validateTrackerClone(
 	dump, err := tracker.GetSigningRateDump(dumpStartTimestamp)
 	require.NoError(t, err)
 	for _, dumpedBucket := range dump {
-		trackerClone.UpdateLastBucket(now, dumpedBucket)
+		trackerClone.UpdateLastBucket(dumpedBucket)
 	}
 
 	validateTracker(t, now, expectedBuckets, validatorIDs, trackerClone, timeSpan, rand, empty)
@@ -286,11 +286,9 @@ func TestRandomOperations(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer tracker.Close()
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer trackerClone.Close()
 
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
@@ -305,13 +303,11 @@ func TestRandomOperations(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		tracker = NewThreadsafeSigningRateTracker(tracker)
-		defer tracker.Close()
+		tracker = NewThreadsafeSigningRateTracker(t.Context(), tracker)
 
 		trackerClone, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		trackerClone = NewThreadsafeSigningRateTracker(trackerClone)
-		defer trackerClone.Close()
+		trackerClone = NewThreadsafeSigningRateTracker(t.Context(), trackerClone)
 
 		randomOperationsTest(t, tracker, trackerClone, timeSpan, bucketSpan, currentTime)
 	})
@@ -408,7 +404,7 @@ func unflushedBucketsTest(
 		for _, quorumInfo := range bucket.GetQuorumSigningRates() {
 			quorumID := core.QuorumID(quorumInfo.GetQuorumId())
 			for _, signingRate := range quorumInfo.GetValidatorSigningRates() {
-				validatorID := core.OperatorID(signingRate.GetId())
+				validatorID := core.OperatorID(signingRate.GetValidatorId())
 				expectedSigningRate := expectedBucket.signingRateInfo[quorumID][validatorID]
 				require.True(t, areSigningRatesEqual(expectedSigningRate, signingRate))
 			}
@@ -444,7 +440,6 @@ func TestUnflushedBuckets(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		defer tracker.Close()
 
 		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})
@@ -459,8 +454,7 @@ func TestUnflushedBuckets(t *testing.T) {
 
 		tracker, err := NewSigningRateTracker(logger, timeSpan, bucketSpan, timeSource)
 		require.NoError(t, err)
-		tracker = NewThreadsafeSigningRateTracker(tracker)
-		defer tracker.Close()
+		tracker = NewThreadsafeSigningRateTracker(t.Context(), tracker)
 
 		unflushedBucketsTest(t, tracker, timeSpan, bucketSpan, currentTime)
 	})
