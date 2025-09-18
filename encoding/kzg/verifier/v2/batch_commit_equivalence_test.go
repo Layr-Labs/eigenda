@@ -16,7 +16,7 @@ import (
 func TestBatchEquivalence(t *testing.T) {
 	harness := getTestHarness()
 
-	group, err := prover.NewProver(harness.kzgConfig, nil)
+	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)

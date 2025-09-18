@@ -238,8 +238,9 @@ func createKzgVerifier() (*verifier.Verifier, error) {
 }
 
 func createKzgProver() (*prover.Prover, error) {
-	kzgConfig := createKzgConfig()
-	kzgProver, err := prover.NewProver(&kzgConfig, nil)
+	kzgConfigV1 := createKzgConfig()
+	kzgConfig := prover.KzgConfigFromV1Config(&kzgConfigV1)
+	kzgProver, err := prover.NewProver(kzgConfig, nil)
 	if err != nil {
 		return nil, err
 	}

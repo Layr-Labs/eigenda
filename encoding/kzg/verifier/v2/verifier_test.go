@@ -19,7 +19,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 
 	harness := getTestHarness()
 
-	p, err := prover.NewProver(harness.kzgConfig, nil)
+	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
@@ -76,7 +76,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 func BenchmarkVerifyBlob(b *testing.B) {
 	harness := getTestHarness()
 
-	p, err := prover.NewProver(harness.kzgConfig, nil)
+	p, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(b, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)

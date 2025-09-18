@@ -1,4 +1,4 @@
-package verifier_test
+package prover_test
 
 import (
 	"runtime"

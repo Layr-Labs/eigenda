@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -18,7 +17,7 @@ type ParametrizedProver struct {
 	encoding.EncodingParams
 	*rs.Encoder
 
-	KzgConfig *kzg.KzgConfig
+	KzgConfig *KzgConfig
 
 	KzgMultiProofBackend  KzgMultiProofsBackendV2
 	KzgCommitmentsBackend KzgCommitmentsBackendV2
@@ -183,8 +182,9 @@ func (g *ParametrizedProver) GetCommitments(
 		"Committing_duration", commitmentResult.Duration,
 		"LengthCommit_duration", lengthCommitmentResult.Duration,
 		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
@@ -251,8 +251,9 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames
@@ -291,8 +292,9 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 		"Chunk_length", g.ChunkLength,
 		"Total_duration", time.Since(start),
 		"Padding_duration", paddingEnd,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return proofs, nil

@@ -218,7 +218,7 @@ func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(config, nil)
+	p, err := prover.NewProver(prover.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -10,7 +10,6 @@ import (
 )
 
 type KzgCommitmentsGnarkBackend struct {
-	KzgConfig  *kzg.KzgConfig
 	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
 }
@@ -27,7 +26,7 @@ func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLengthV2(
 		return nil, fmt.Errorf("length is less than the number of coefficients")
 	}
 
-	start := p.KzgConfig.SRSNumberToLoad - length
+	start := uint64(len(p.G2Trailing)) - length
 	shiftedSecret := p.G2Trailing[start : start+uint64(len(coeffs))]
 	config := ecc.MultiExpConfig{}
 

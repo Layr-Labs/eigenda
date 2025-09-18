@@ -139,7 +139,7 @@ func NewTestClient(
 		NumWorker:       32,
 	}
 
-	kzgProver, err := prover.NewProver(kzgConfig, nil)
+	kzgProver, err := prover.NewProver(prover.KzgConfigFromV1Config(kzgConfig), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create KZG prover: %w", err)
 	}
