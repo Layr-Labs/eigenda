@@ -287,7 +287,6 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ejection contract address: %w", err)
 	}
-	config.EjectionDefenseEnabled = true // TODO temporary, just for testing, remove prior to merge
 
 	var privateKey *ecdsa.PrivateKey
 	if config.EthClientConfig.PrivateKeyString != "" {
@@ -371,11 +370,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 
-		blockNumber, err := tx.GetCurrentBlockNumber(context.Background())
+		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block number: %w", err)
 		}
-		quorumCount, err := tx.GetQuorumCount(context.Background(), blockNumber)
+		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
