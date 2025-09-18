@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	ListenAddrFlagName  = "addr"
-	PortFlagName        = "port"
-	APIsEnabledFlagName = "api-enabled"
+	ListenAddrFlagName = "addr"
+	PortFlagName       = "port"
 
-	DeprecatedAdminAPIType = "admin"
+	DeprecatedAPIsEnabledFlagName = "api-enabled"
+	DeprecatedAdminAPIType        = "admin"
 )
 
 // We don't add any _SERVER_ middlefix to the env vars like we do for other categories
@@ -25,7 +25,7 @@ func withEnvPrefix(prefix, s string) []string {
 func DeprecatedCLIFlags(envPrefix string, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringSliceFlag{
-			Name:    APIsEnabledFlagName,
+			Name:    DeprecatedAPIsEnabledFlagName,
 			Usage:   "List of API types to enable (e.g. admin)",
 			Value:   cli.NewStringSlice(),
 			EnvVars: withEnvPrefix(envPrefix, "API_ENABLED"),
