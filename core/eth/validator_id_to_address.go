@@ -33,7 +33,7 @@ func ValidatorIDToAddress(
 	}
 
 	if address == (geth.Address{}) {
-		return geth.Address{}, fmt.Errorf("no operator found with ID %s", validatorID.Hex())
+		return geth.Address{}, fmt.Errorf("no operator found with ID 0x%s", validatorID.Hex())
 	}
 
 	return address, nil
