@@ -43,6 +43,10 @@ func (e EnabledServersConfig) Check() error {
 // APIStringsToEnabledServersConfig takes a dynamic array of strings provided from user CLI
 // input and converts them into a high level enablement config
 func APIStringsToEnabledServersConfig(strSlice []string) (*EnabledServersConfig, error) {
+	if len(strSlice) == 0 {
+		return nil, fmt.Errorf("cannot provide empty values for `apis.enabled`")
+	}
+
 	apis := make([]API, 0)
 
 	for _, apiStr := range strSlice {
