@@ -10,14 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,10 +80,7 @@ func buildMemKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
+	logger := test.GetLogger()
 
 	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
@@ -134,10 +130,7 @@ func buildMemKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
+	logger := test.GetLogger()
 
 	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.MemKeymapType)
@@ -185,11 +178,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
+	logger := test.GetLogger()
 	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
@@ -235,11 +224,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
+	logger := test.GetLogger()
 	keymapPath := filepath.Join(paths[0], name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
@@ -402,8 +387,7 @@ func TestRestart(t *testing.T) {
 func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 
 	directory := t.TempDir()
 
@@ -526,9 +510,7 @@ func TestMiddleFileMissing(t *testing.T) {
 func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
@@ -720,9 +702,7 @@ func TestInitialFileMissing(t *testing.T) {
 func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
@@ -920,9 +900,7 @@ func TestLastFileMissing(t *testing.T) {
 func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
@@ -1152,9 +1130,7 @@ func TestTruncatedKeyFile(t *testing.T) {
 func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
@@ -1401,9 +1377,7 @@ func TestTruncatedValueFile(t *testing.T) {
 func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
@@ -2254,7 +2228,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// Walk the "directory" file tree and calculate the actual size of the table.
 	// There is some asynchrony in file deletion, so we retry a reasonable number of times.
-	testutils.AssertEventuallyTrue(t, func() bool {
+	test.AssertEventuallyTrue(t, func() bool {
 		actualSize := uint64(0)
 
 		err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
@@ -2296,7 +2270,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// Walk the "directory" file tree and calculate the actual size of the table.
 	// There is some asynchrony in file deletion, so we retry a reasonable number of times.
-	testutils.AssertEventuallyTrue(t, func() bool {
+	test.AssertEventuallyTrue(t, func() bool {
 		actualSize := uint64(0)
 		err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 			if err != nil {

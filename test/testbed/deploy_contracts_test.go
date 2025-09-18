@@ -1,18 +1,17 @@
 package testbed_test
 
 import (
-	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/stretchr/testify/require"
 )
 
 // TestDeployWithAnvilContainer demonstrates deploying contracts using Docker-based Anvil
 func TestDeployWithAnvilContainer(t *testing.T) {
-	ctx := context.Background()
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	// Start Anvil container
 	anvil, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{

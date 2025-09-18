@@ -1,23 +1,21 @@
 package batcher_test
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
-
 	m "github.com/stretchr/testify/mock"
 )
 
@@ -25,8 +23,9 @@ const timeout = 5 * time.Second
 const loopInterval = 6 * time.Minute
 
 func TestFinalizedBlob(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	queue := inmem.NewBlobStore()
-	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -47,7 +46,6 @@ func TestFinalizedBlob(t *testing.T) {
 		QuorumID:           0,
 		AdversaryThreshold: 80,
 	}})
-	ctx := context.Background()
 	metadataKey1, err := queue.StoreBlob(ctx, &blob, requestedAt)
 	assert.NoError(t, err)
 	metadataKey2, err := queue.StoreBlob(ctx, &blob, requestedAt+1)
@@ -103,7 +101,7 @@ func TestFinalizedBlob(t *testing.T) {
 	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
 	assert.NoError(t, err)
 
-	err = finalizer.FinalizeBlobs(context.Background())
+	err = finalizer.FinalizeBlobs(ctx)
 	assert.NoError(t, err)
 
 	metadatas, err := queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
@@ -123,9 +121,9 @@ func TestFinalizedBlob(t *testing.T) {
 }
 
 func TestUnfinalizedBlob(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	queue := inmem.NewBlobStore()
-	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -183,7 +181,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 	m, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
 	assert.NoError(t, err)
 	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
-	err = finalizer.FinalizeBlobs(context.Background())
+	err = finalizer.FinalizeBlobs(ctx)
 	assert.NoError(t, err)
 
 	metadatas, err := queue.GetBlobMetadataByStatus(ctx, disperser.Confirmed)
@@ -196,9 +194,9 @@ func TestUnfinalizedBlob(t *testing.T) {
 }
 
 func TestNoReceipt(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	queue := inmem.NewBlobStore()
-	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -254,7 +252,7 @@ func TestNoReceipt(t *testing.T) {
 	m, err := queue.MarkBlobConfirmed(ctx, metadata, confirmationInfo)
 	assert.NoError(t, err)
 	assert.Equal(t, disperser.Confirmed, m.BlobStatus)
-	err = finalizer.FinalizeBlobs(context.Background())
+	err = finalizer.FinalizeBlobs(ctx)
 	assert.NoError(t, err)
 
 	// status should be kept at confirmed

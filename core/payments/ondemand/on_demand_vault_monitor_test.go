@@ -6,17 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
 		monitor, err := NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
 			1024,
@@ -29,8 +30,8 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 
 	t.Run("negative interval", func(t *testing.T) {
 		monitor, err := NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
 			1024,
@@ -43,7 +44,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -68,7 +69,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 
 	monitor, err := NewOnDemandVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		2, // Small batch size to force multiple batches
@@ -119,7 +120,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -142,7 +143,7 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 
 	monitor, err := NewOnDemandVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		0, // Batch size 0 means no batching - all accounts in one call

@@ -13,14 +13,14 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
@@ -47,10 +47,12 @@ var (
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
 	numRetries                     = 0
 
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 )
 
 func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+	t.Helper()
+
 	if testing.Short() {
 		t.Skip("Skipping churner test in short mode")
 	}
@@ -83,7 +85,8 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 	require.NoError(t, err, "failed to start anvil container")
 
 	logger.Info("Deploying experiment")
-	testConfig.DeployExperiment()
+	err = testConfig.DeployExperiment()
+	require.NoError(t, err, "failed to deploy experiment")
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers")

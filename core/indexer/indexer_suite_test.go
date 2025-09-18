@@ -5,9 +5,9 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -46,7 +46,7 @@ var _ = BeforeSuite(func() {
 
 		testConfig = deploy.NewTestConfig(testName, rootPath)
 		testConfig.Deployers[0].DeploySubgraphs = false
-		logger := testutils.GetLogger()
+		logger := test.GetLogger()
 
 		if testConfig.Environment.IsLocal() {
 			logger.Info("Starting anvil")
