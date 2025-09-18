@@ -274,7 +274,7 @@ func setupPayloadDisperserWithRouter() error {
 		logger,
 		disperserClientConfig,
 		signer,
-		nil,
+		nil, // no prover so will query disperser for generating commitments
 		accountant,
 		metrics.NoopDispersalMetrics,
 	)

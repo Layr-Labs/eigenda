@@ -29,8 +29,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -58,7 +57,7 @@ var (
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
 	s3BucketName        = "test-eigenda-blobstore"
 	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
-	prover              *p.Prover
+	prover              *proverv2.Prover
 	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
@@ -666,17 +665,17 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	config := &kzg.KzgConfig{
+	config := &proverv2.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
+		G2TrailingPath:  "../../resources/srs/g2_trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
 
-	prover, err = p.NewProver(config, nil)
+	prover, err = proverv2.NewProver(config, nil)
 	if err != nil {
 		teardown()
 		logger.Fatal("Failed to initialize KZG prover:", err)
