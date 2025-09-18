@@ -478,7 +478,7 @@ func (n *Node) checkValidatorRegistration(ctx context.Context, socket string) {
 	registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
 	// Error out if registration on-chain is a requirement
 	if err != nil {
-		n.Logger.Warnf("failed to get operator socket: %w", err)
+		n.Logger.Warnf("failed to get operator socket: %v", err)
 	}
 	if registeredSocket != socket {
 		n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
