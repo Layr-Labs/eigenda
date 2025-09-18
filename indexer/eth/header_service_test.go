@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	cm "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/eth"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -19,11 +19,14 @@ import (
 )
 
 var (
-	logger            = testutils.GetLogger()
+	logger            = test.GetLogger()
 	blockNumber int64 = 17320293
 )
 
 func TestHeaderService_PullNewHeaders(t *testing.T) {
+	// HeaderService uses context.Background() internally, so tests will fail if you try to use t.Context()
+	// TODO: We should fix the HeaderService to accept a context so tests can use t.Context() and services
+	// dependent on it can properly propagate cancellation.
 	ctx := context.Background()
 
 	pullNewHeaders := func(
@@ -180,6 +183,7 @@ func TestHeaderService_PullNewHeaders(t *testing.T) {
 }
 
 func TestHeaderService_PullLatestHeader(t *testing.T) {
+	// HeaderService uses context.Background() internally, so tests must match
 	ctx := context.Background()
 
 	pullLatestHeader := func(

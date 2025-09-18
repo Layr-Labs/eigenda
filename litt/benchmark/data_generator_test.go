@@ -3,7 +3,7 @@ package benchmark
 import (
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 

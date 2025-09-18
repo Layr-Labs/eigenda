@@ -1,11 +1,13 @@
-package random
+package random_test
 
 import (
+	"math/rand"
+	"testing"
+
+	. "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"math/rand"
-	"testing"
 )
 
 // Tests that random seeding produces random results, and that consistent seeding produces consistent results

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/Layr-Labs/eigenda/test"
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,8 @@ func (m mockGraphQLQuerier) Query(ctx context.Context, q any, variables map[stri
 }
 
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -81,19 +82,20 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err = cs.Start(ctx)
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
+	headerNum, err := cs.GetCurrentBlockNumber(ctx)
 	assert.NoError(t, err)
 
-	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
+	indexedState, err := cs.GetIndexedOperatorState(ctx, headerNum, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(indexedState.IndexedOperators))
 }
 
 func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 2,
@@ -102,7 +104,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
-	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
+	state, err := chainState.GetOperatorState(ctx, 1, quorums)
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
@@ -149,18 +151,19 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err = cs.Start(ctx)
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
+	headerNum, err := cs.GetCurrentBlockNumber(ctx)
 	assert.NoError(t, err)
 
-	_, err = cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
+	_, err = cs.GetIndexedOperatorState(ctx, headerNum, quorums)
 	assert.ErrorContains(t, err, "not found in indexed state")
 }
 
 func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -169,7 +172,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
-	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
+	state, err := chainState.GetOperatorState(ctx, 1, quorums)
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
@@ -230,20 +233,21 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err = cs.Start(ctx)
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
+	headerNum, err := cs.GetCurrentBlockNumber(ctx)
 	assert.NoError(t, err)
 
-	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
+	indexedState, err := cs.GetIndexedOperatorState(ctx, headerNum, quorums)
 	assert.NoError(t, err)
 	assert.Len(t, indexedState.IndexedOperators, 1)
 
 }
 
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -252,7 +256,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	})
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
-	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
+	state, err := chainState.GetOperatorState(ctx, 1, quorums)
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
@@ -284,14 +288,14 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	}
 
 	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
-	err = cs.Start(context.Background())
+	err = cs.Start(ctx)
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
+	headerNum, err := cs.GetCurrentBlockNumber(ctx)
 	assert.NoError(t, err)
 
 	opID := ethcomm.HexToHash(id)
-	info, err := cs.GetIndexedOperatorInfoByOperatorId(context.Background(), core.OperatorID(opID.Bytes()), uint32(headerNum))
+	info, err := cs.GetIndexedOperatorInfoByOperatorId(ctx, core.OperatorID(opID.Bytes()), uint32(headerNum))
 	assert.NoError(t, err)
 	assert.Equal(t, "3336192159512049190945679273141887248666932624338963482128432381981287252980", info.PubkeyG1.X.String())
 	assert.Equal(t, "15195175002875833468883745675063986308012687914999552116603423331534089122704", info.PubkeyG1.Y.String())

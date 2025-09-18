@@ -1,22 +1,21 @@
 package controller_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/stretchr/testify/require"
 )
 
 const numObjects = 12
 
 func TestRecoverState(t *testing.T) {
-	logger := testutils.GetLogger()
-	ctx := context.Background()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	keys := make([]corev2.BlobKey, numObjects)
 	metadatas := make([]*v2.BlobMetadata, numObjects)
 	for i := 0; i < numObjects; i++ {
