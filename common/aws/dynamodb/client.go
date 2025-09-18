@@ -66,6 +66,8 @@ type Client interface {
 	DeleteItem(ctx context.Context, tableName string, key Key) error
 	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
 	TableExists(ctx context.Context, name string) error
+	// Fetch the raw underlying DynamoDB client.
+	GetRawClient() *dynamodb.Client
 }
 
 type client struct {
@@ -532,4 +534,8 @@ func (c *client) TableExists(ctx context.Context, name string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *client) GetRawClient() *dynamodb.Client {
+	return c.dynamoClient
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
@@ -53,7 +54,9 @@ func main() {
 	app.Usage = "EigenDA Controller"
 	app.Description = "EigenDA control plane for encoding and dispatching blobs"
 
-	app.Action = RunController
+	app.Action = func(cliContext *cli.Context) error {
+		return RunController(context.Background(), cliContext)
+	}
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
@@ -61,8 +64,8 @@ func main() {
 	select {}
 }
 
-func RunController(ctx *cli.Context) error {
-	config, err := NewConfig(ctx)
+func RunController(ctx context.Context, cliContext *cli.Context) error {
+	config, err := NewConfig(cliContext)
 	if err != nil {
 		return err
 	}
@@ -97,17 +100,17 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	operatorStateRetrieverAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.OperatorStateRetriever)
+		contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
 	if err != nil {
 		return fmt.Errorf("failed to get OperatorStateRetriever address: %w", err)
 	}
 	serviceManagerAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
+		contractDirectory.GetContractAddress(ctx, directory.ServiceManager)
 	if err != nil {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 	registryCoordinatorAddress, err :=
-		contractDirectory.GetContractAddress(context.Background(), directory.RegistryCoordinator)
+		contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
 	if err != nil {
 		return fmt.Errorf("failed to get registry coordinator address: %w", err)
 	}
@@ -210,7 +213,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("StoreChunks() signing is disabled")
 	} else {
 		requestSigner, err = clients.NewDispersalRequestSigner(
-			context.Background(),
+			ctx,
 			config.AwsClientConfig.Region,
 			config.AwsClientConfig.EndpointURL,
 			config.DisperserKMSKeyID)
@@ -230,7 +233,7 @@ func RunController(ctx *cli.Context) error {
 	dispatcherBlobSet := controller.NewBlobSet()
 
 	batchMetadataManager, err := metadata.NewBatchMetadataManager(
-		context.Background(),
+		ctx,
 		logger,
 		gethClient,
 		ics,
@@ -241,6 +244,56 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create batch metadata manager: %w", err)
 	}
+
+	// TODO set up logic to load tracker info from persistent storage
+
+	// Set up signing rate tracking.
+	tracker, err := signingrate.NewSigningRateTracker(
+		logger,
+		config.DispatcherConfig.SigningRateHistoryLength,
+		config.DispatcherConfig.SigningRateBucketSpan,
+		time.Now)
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate tracker: %w", err)
+	}
+	tracker = signingrate.NewThreadsafeSigningRateTracker(ctx, tracker)
+
+	// Set up persistent storage for signing rate info.
+	signingRateStorage, err := signingrate.NewDynamoSigningRateStorage(
+		ctx,
+		dynamoClient.GetRawClient(),
+		"ValidatorSigningRate")
+	if err != nil {
+		return fmt.Errorf("failed to create signing rate storage: %w", err)
+	}
+
+	// Load historical signing rate info into tracker.
+	startTime := time.Now().Add(-config.DispatcherConfig.SigningRateHistoryLength)
+	buckets, err := signingRateStorage.LoadBuckets(ctx, startTime)
+	if err != nil {
+		return fmt.Errorf("failed to load signing rate info: %w", err)
+	}
+	for _, bucket := range buckets {
+		tracker.UpdateLastBucket(bucket)
+	}
+
+	// Periodically flush signing rate info to persistent storage.
+	go func() {
+		ticker := time.NewTicker(config.DispatcherConfig.SigningRateFlushPeriod)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			unflushedBuckets, err := tracker.GetUnflushedBuckets()
+			if err != nil {
+				logger.Error("Failed to get unflushed signing rate buckets", "err", err)
+				continue
+			}
+			err = signingRateStorage.StoreBuckets(ctx, unflushedBuckets)
+			if err != nil {
+				logger.Error("Failed to store signing rate bucket", "err", err)
+			}
+		}
+	}()
 
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
@@ -255,24 +308,23 @@ func RunController(ctx *cli.Context) error {
 		beforeDispatch,
 		dispatcherBlobSet,
 		controllerLivenessChan,
+		tracker,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
 	}
 
-	c := context.Background()
-
-	err = controller.RecoverState(c, blobMetadataStore, logger)
+	err = controller.RecoverState(ctx, blobMetadataStore, logger)
 	if err != nil {
 		return fmt.Errorf("failed to recover state: %v", err)
 	}
 
-	err = encodingManager.Start(c)
+	err = encodingManager.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start encoding manager: %v", err)
 	}
 
-	err = dispatcher.Start(c)
+	err = dispatcher.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
@@ -284,7 +336,7 @@ func RunController(ctx *cli.Context) error {
 		}
 
 		grpcServer, err := server.NewServer(
-			c,
+			ctx,
 			config.ServerConfig,
 			logger,
 			metricsRegistry,

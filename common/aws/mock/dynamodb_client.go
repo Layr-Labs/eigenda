@@ -113,3 +113,7 @@ func (c *MockDynamoDBClient) TableExists(ctx context.Context, name string) error
 	args := c.Called()
 	return args.Error(0)
 }
+
+func (c *MockDynamoDBClient) GetRawClient() *awsdynamodb.Client {
+	panic("mock client has no underlying raw client")
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/signingrate"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -65,6 +66,17 @@ type DispatcherConfig struct {
 	// Important signing thresholds for metrics reporting.
 	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
 	SignificantSigningMetricsThresholds []string
+
+	// The size of the time window for tracking signing rates. Smaller values gives more granular data, at the cost
+	// of more memory usage.
+	SigningRateBucketSpan time.Duration
+
+	// The length of the history for tracking signing rates. Longer values gives more historical data, at the cost
+	// of more memory usage.
+	SigningRateHistoryLength time.Duration
+
+	// The period at which signing rate data is flushed to persistent storage.
+	SigningRateFlushPeriod time.Duration
 }
 
 type Dispatcher struct {
@@ -92,6 +104,9 @@ type Dispatcher struct {
 
 	// A utility responsible for fetching batch metadata (i.e. reference block number and operator state).
 	batchMetadataManager metadata.BatchMetadataManager
+
+	// Responsible for recording information about validator signing rates.
+	signingRateTracker signingrate.SigningRateTracker
 }
 
 type batchData struct {
@@ -115,6 +130,7 @@ func NewDispatcher(
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	blobSet BlobSet,
 	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
+	signingRateTracker signingrate.SigningRateTracker,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -158,6 +174,7 @@ func NewDispatcher(
 		blobSet:                blobSet,
 		controllerLivenessChan: controllerLivenessChan,
 		batchMetadataManager:   batchMetadataManager,
+		signingRateTracker:     signingRateTracker,
 	}, nil
 }
 
@@ -249,6 +266,8 @@ func (d *Dispatcher) HandleBatch(
 					BatchHeaderHash: batchData.BatchHeaderHash,
 					TimeReceived:    time.Now(),
 					Err:             fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+					Timeout:         false,
+					Latency:         0,
 				}
 				return
 			}
@@ -266,6 +285,8 @@ func (d *Dispatcher) HandleBatch(
 					BatchHeaderHash: batchData.BatchHeaderHash,
 					TimeReceived:    time.Now(),
 					Err:             err,
+					Timeout:         false,
+					Latency:         0,
 				}
 				return
 			}
@@ -289,16 +310,21 @@ func (d *Dispatcher) HandleBatch(
 					BatchHeaderHash: batchData.BatchHeaderHash,
 					TimeReceived:    time.Now(),
 					Err:             err,
+					Timeout:         false,
+					Latency:         0,
 				}
 				return
 			}
 
 			var i int
 			var lastErr error
+			var timeout bool
 			for i = 0; i < d.NumRequestRetries+1; i++ {
 				validatorProbe.SetStage("send_chunks")
 
-				sig, err := d.sendChunks(ctx, client, batch)
+				var sig *core.Signature
+				var latency time.Duration
+				sig, timeout, latency, err = d.sendChunks(ctx, client, batch)
 				lastErr = err
 				if err == nil {
 					validatorProbe.SetStage("put_dispersal_response")
@@ -318,6 +344,8 @@ func (d *Dispatcher) HandleBatch(
 						BatchHeaderHash: batchData.BatchHeaderHash,
 						TimeReceived:    time.Now(),
 						Err:             nil,
+						Timeout:         false,
+						Latency:         latency,
 					}
 					break
 				}
@@ -352,6 +380,7 @@ func (d *Dispatcher) HandleBatch(
 					BatchHeaderHash: batchData.BatchHeaderHash,
 					TimeReceived:    time.Now(),
 					Err:             lastErr,
+					Timeout:         timeout,
 				}
 			}
 			d.metrics.reportSendChunksRetryCount(float64(i))
@@ -410,6 +439,11 @@ func (d *Dispatcher) HandleSignatures(
 			"batchHeaderHash", batchHeaderHash)
 	}
 
+	var batchSize uint64
+	for _, blobMetadata := range batchData.Metadata {
+		batchSize += blobMetadata.BlobSize
+	}
+
 	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
 	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
 	// signatures.
@@ -420,8 +454,10 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan,
-		d.DispatcherConfig.SignatureTickInterval,
-		d.DispatcherConfig.SignificantSigningThresholdPercentage)
+		d.SignatureTickInterval,
+		d.SignificantSigningThresholdPercentage,
+		d.signingRateTracker,
+		batchSize)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
@@ -771,18 +807,22 @@ func (d *Dispatcher) sendChunks(
 	ctx context.Context,
 	client clients.NodeClient,
 	batch *corev2.Batch,
-) (*core.Signature, error) {
+) (sig *core.Signature, timeout bool, latency time.Duration, err error) {
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.AttestationTimeout)
-
 	defer cancel()
 
-	sig, err := client.StoreChunks(ctxWithTimeout, batch)
+	start := time.Now()
+	sig, err = client.StoreChunks(ctxWithTimeout, batch)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to store chunks: %w", err)
+		timeout = ctxWithTimeout.Err() != nil
+		return nil, timeout, 0, fmt.Errorf("failed to store chunks: %w", err)
 	}
 
-	return sig, nil
+	elapsed := time.Since(start)
+
+	return sig, false, elapsed, nil
 }
 
 // updateBatchStatus updates the status of the blobs in the batch based on the quorum results

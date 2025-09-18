@@ -507,20 +507,17 @@ func (m *dispatcherMetrics) ReportSigningSuccess(
 	id core.OperatorID,
 	batchSize uint64,
 	signingLatency time.Duration,
-	quorums []core.QuorumID) {
+	quorum core.QuorumID) {
 
 	if m == nil {
 		return
 	}
 
-	for _, quorum := range quorums {
-		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
+	label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-		m.signedBatchCount.With(label).Add(1)
-		m.signedByteCount.With(label).Add(float64(batchSize))
-		m.signingLatency.With(label).Observe(signingLatency.Seconds())
-	}
-
+	m.signedBatchCount.With(label).Add(1)
+	m.signedByteCount.With(label).Add(float64(batchSize))
+	m.signingLatency.With(label).Observe(signingLatency.Seconds())
 }
 
 // Report a failed signing event for a validator.
@@ -528,20 +525,18 @@ func (m *dispatcherMetrics) ReportSigningFailure(
 	id core.OperatorID,
 	batchSize uint64,
 	timeout bool,
-	quorums []core.QuorumID) {
+	quorum core.QuorumID) {
 
 	if m == nil {
 		return
 	}
 
-	for _, quorum := range quorums {
-		label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
+	label := prometheus.Labels{"id": id.Hex(), "quorum": fmt.Sprintf("%d", quorum)}
 
-		m.unsignedBatchCount.With(label).Add(1)
-		m.unsignedByteCount.With(label).Add(float64(batchSize))
-		if timeout {
-			m.timeoutBatchCount.With(label).Add(1)
-			m.timeoutByteCount.With(label).Add(float64(batchSize))
-		}
+	m.unsignedBatchCount.With(label).Add(1)
+	m.unsignedByteCount.With(label).Add(float64(batchSize))
+	if timeout {
+		m.timeoutBatchCount.With(label).Add(1)
+		m.timeoutByteCount.With(label).Add(float64(batchSize))
 	}
 }
