@@ -38,6 +38,7 @@ func main() {
 		{
 			Name:        "doc",
 			Subcommands: metrics.NewSubcommands(),
+			Args:        false,
 		},
 	}
 
