@@ -49,7 +49,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 	g2Trailing := make([]bn254.G2Affine, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if kzgConfig.LoadG2Points {
+	if kzgConfig.LoadG2Points { //nolint: nestif
 		if len(kzgConfig.G2Path) == 0 {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
