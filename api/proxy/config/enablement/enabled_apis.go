@@ -83,10 +83,11 @@ const (
 	MetricsServer       API = "metrics"
 )
 
-func AllRestAPIs() []API {
-	return []API{
-		Admin, OpGenericCommitment, OpKeccakCommitment, StandardCommitment,
-	}
+func AllAPIsString() string {
+	return fmt.Sprintf(
+		"%s, %s, %s, %s, %s, %s", Admin, StandardCommitment,
+		OpGenericCommitment, OpKeccakCommitment,
+		ArbCustomDAServer, MetricsServer)
 }
 
 func APIFromString(s string) (API, error) {
