@@ -82,7 +82,6 @@ func (i *indexer) Index(ctx context.Context) error {
 	}
 
 	// Find the latest block that we can fast forward to.
-
 	clientLatestHeader, err := i.HeaderService.PullLatestHeader(true)
 	if err != nil {
 		i.Logger.Error("Error pulling latest header", "err", err)

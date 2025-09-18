@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		config,
 		testVault,
 		mockTimeSource,
@@ -105,7 +105,7 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 	require.NoError(t, err)
 	paymentValidator, err := NewReservationPaymentValidator(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		config,
 		testVault,
 		mockTimeSource,

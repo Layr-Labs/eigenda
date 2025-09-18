@@ -12,7 +12,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -24,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +48,6 @@ type batcherComponents struct {
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func makeTestProver() (encoding.Prover, error) {
-
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
@@ -73,10 +72,9 @@ func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
 }
 
 func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.Time) {
-	// Common Components
-	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	// assert.NoError(t, err)
-	logger := testutils.GetLogger()
+	t.Helper()
+	ctx := t.Context()
+	logger := test.GetLogger()
 
 	finalizationBlockDelay := uint(75)
 
@@ -96,7 +94,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	p, err := makeTestProver()
 	assert.NoError(t, err)
 
-	state := cst.GetTotalOperatorState(context.Background(), 0)
+	state := cst.GetTotalOperatorState(ctx, 0)
 
 	// Disperser Components
 	dispatcher := dmock.NewDispatcher(state)
@@ -179,6 +177,8 @@ func queueBlob(t *testing.T, ctx context.Context, blob *core.Blob, blobStore dis
 }
 
 func TestBatcherIterations(t *testing.T) {
+	ctx := t.Context()
+
 	blob1 := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
 		AdversaryThreshold:    80,
@@ -216,7 +216,6 @@ func TestBatcherIterations(t *testing.T) {
 		TxHash:      txHash,
 	}
 	blobStore := components.blobStore
-	ctx := context.Background()
 	requestedAt1, blobKey1 := queueBlob(t, ctx, &blob1, blobStore)
 	_, blobKey2 := queueBlob(t, ctx, &blob2, blobStore)
 
@@ -303,6 +302,7 @@ func TestBatcherIterations(t *testing.T) {
 }
 
 func TestBlobFailures(t *testing.T) {
+	ctx := t.Context()
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
 		AdversaryThreshold:    80,
@@ -319,7 +319,6 @@ func TestBlobFailures(t *testing.T) {
 
 	confirmationErr := errors.New("error")
 	blobStore := components.blobStore
-	ctx := context.Background()
 	requestedAt, blobKey := queueBlob(t, ctx, &blob, blobStore)
 
 	// Start the batcher
@@ -410,6 +409,7 @@ func TestBlobFailures(t *testing.T) {
 
 // TestBlobRetry tests that the blob that has been dispersed to DA nodes but is pending onchain confirmation isn't re-dispersed.
 func TestBlobRetry(t *testing.T) {
+	ctx := t.Context()
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
 		AdversaryThreshold:    80,
@@ -425,7 +425,6 @@ func TestBlobRetry(t *testing.T) {
 	}()
 
 	blobStore := components.blobStore
-	ctx := context.Background()
 	_, blobKey := queueBlob(t, ctx, &blob, blobStore)
 
 	// Start the batcher
@@ -462,7 +461,7 @@ func TestBlobRetry(t *testing.T) {
 		t.Fatal("shouldn't have picked up any blobs to encode")
 	case <-timer.C:
 	}
-	batch, err := components.encodingStreamer.CreateBatch(context.Background())
+	batch, err := components.encodingStreamer.CreateBatch(ctx)
 	assert.ErrorContains(t, err, "no encoded results")
 	assert.Nil(t, batch)
 
@@ -477,7 +476,7 @@ func TestBlobRetry(t *testing.T) {
 	case <-timer.C:
 	}
 
-	batch, err = components.encodingStreamer.CreateBatch(context.Background())
+	batch, err = components.encodingStreamer.CreateBatch(ctx)
 	assert.ErrorContains(t, err, "no encoded results")
 	assert.Nil(t, batch)
 
@@ -517,6 +516,7 @@ func TestBlobRetry(t *testing.T) {
 }
 
 func TestRetryTxnReceipt(t *testing.T) {
+	ctx := t.Context()
 	var err error
 	blob := makeTestBlob([]*core.SecurityParam{{
 		QuorumID:              0,
@@ -558,7 +558,6 @@ func TestRetryTxnReceipt(t *testing.T) {
 	components.ethClient.On("TransactionReceipt").Return(invalidReceipt, nil).Twice()
 	components.ethClient.On("TransactionReceipt").Return(validReceipt, nil).Once()
 	blobStore := components.blobStore
-	ctx := context.Background()
 	requestedAt, blobKey := queueBlob(t, ctx, &blob, blobStore)
 
 	// Start the batcher
@@ -593,6 +592,7 @@ func TestRetryTxnReceipt(t *testing.T) {
 // TestBlobAttestationFailures tests a case where the attestation fails for all blobs in one quorum,
 // in which case the quorum should be omitted from the confirmation transaction.
 func TestBlobAttestationFailures(t *testing.T) {
+	ctx := t.Context()
 	blob0 := makeTestBlob([]*core.SecurityParam{
 		{
 			QuorumID:              0,
@@ -627,7 +627,6 @@ func TestBlobAttestationFailures(t *testing.T) {
 	components, batcher, _ := makeBatcher(t)
 
 	blobStore := components.blobStore
-	ctx := context.Background()
 	_, _ = queueBlob(t, ctx, &blob0, blobStore)
 	_, _ = queueBlob(t, ctx, &blob1, blobStore)
 
@@ -675,6 +674,7 @@ func TestBlobAttestationFailures(t *testing.T) {
 // TestBlobAttestationFailures2 tests a case where the attestation fails for some blobs in one quorum,
 // in which case the quorum should not be omitted from the confirmation transaction.
 func TestBlobAttestationFailures2(t *testing.T) {
+	ctx := t.Context()
 	blob0 := makeTestBlob([]*core.SecurityParam{
 		{
 			QuorumID:              0,
@@ -704,7 +704,6 @@ func TestBlobAttestationFailures2(t *testing.T) {
 	components, batcher, _ := makeBatcher(t)
 
 	blobStore := components.blobStore
-	ctx := context.Background()
 	_, _ = queueBlob(t, ctx, &blob0, blobStore)
 	_, _ = queueBlob(t, ctx, &blob1, blobStore)
 
@@ -756,6 +755,7 @@ func TestBlobAttestationFailures2(t *testing.T) {
 }
 
 func TestBatcherRecoverState(t *testing.T) {
+	ctx := t.Context()
 	blob0 := makeTestBlob([]*core.SecurityParam{
 		{
 			QuorumID:              0,
@@ -798,7 +798,6 @@ func TestBatcherRecoverState(t *testing.T) {
 	components, batcher, _ := makeBatcher(t)
 
 	blobStore := components.blobStore
-	ctx := context.Background()
 	_, key0 := queueBlob(t, ctx, &blob0, blobStore)
 	_, key1 := queueBlob(t, ctx, &blob1, blobStore)
 	_, key2 := queueBlob(t, ctx, &blob2, blobStore)
@@ -820,8 +819,7 @@ func TestBatcherRecoverState(t *testing.T) {
 	b2, err := blobStore.GetBlobMetadata(ctx, key2)
 	assert.NoError(t, err)
 	assert.Equal(t, b2.BlobStatus, disperser.Dispersing)
-
-	err = batcher.RecoverState(context.Background())
+	err = batcher.RecoverState(ctx)
 	assert.NoError(t, err)
 
 	b0, err = blobStore.GetBlobMetadata(ctx, key0)

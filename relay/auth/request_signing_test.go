@@ -5,7 +5,7 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 )
@@ -23,7 +23,7 @@ func randomGetChunksRequest() *pb.GetChunksRequest {
 			requestedChunks = append(requestedChunks, &pb.ChunkRequest{
 				Request: &pb.ChunkRequest_ByIndex{
 					ByIndex: &pb.ChunkRequestByIndex{
-						BlobKey:      tu.RandomBytes(32),
+						BlobKey:      random.RandomBytes(32),
 						ChunkIndices: indices,
 					},
 				},
@@ -32,7 +32,7 @@ func randomGetChunksRequest() *pb.GetChunksRequest {
 			requestedChunks = append(requestedChunks, &pb.ChunkRequest{
 				Request: &pb.ChunkRequest_ByRange{
 					ByRange: &pb.ChunkRequestByRange{
-						BlobKey:    tu.RandomBytes(32),
+						BlobKey:    random.RandomBytes(32),
 						StartIndex: rand.Uint32(),
 						EndIndex:   rand.Uint32(),
 					},
@@ -41,13 +41,13 @@ func randomGetChunksRequest() *pb.GetChunksRequest {
 		}
 	}
 	return &pb.GetChunksRequest{
-		OperatorId:    tu.RandomBytes(32),
+		OperatorId:    random.RandomBytes(32),
 		ChunkRequests: requestedChunks,
 	}
 }
 
 func TestHashGetChunksRequest(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	requestA := randomGetChunksRequest()
 	requestB := randomGetChunksRequest()
@@ -65,13 +65,13 @@ func TestHashGetChunksRequest(t *testing.T) {
 	require.NotEqual(t, hashA, hashB)
 
 	// Adding a signature should not affect the hash
-	requestA.OperatorSignature = tu.RandomBytes(32)
+	requestA.OperatorSignature = random.RandomBytes(32)
 	hashAA, err = hashing.HashGetChunksRequest(requestA)
 	require.NoError(t, err)
 	require.Equal(t, hashA, hashAA)
 
 	// Changing the requester ID should change the hash
-	requestA.OperatorId = tu.RandomBytes(32)
+	requestA.OperatorId = random.RandomBytes(32)
 	hashAA, err = hashing.HashGetChunksRequest(requestA)
 	require.NoError(t, err)
 	require.NotEqual(t, hashA, hashAA)

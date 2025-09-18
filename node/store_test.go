@@ -2,7 +2,6 @@ package node_test
 
 import (
 	"bytes"
-	"context"
 	cryptorand "crypto/rand"
 	"testing"
 	"time"
@@ -12,13 +11,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
@@ -212,7 +210,7 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 func createStore(t *testing.T) *node.Store {
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	tx := &coremock.MockWriter{}
 	dat, _ := coremock.MakeChainDataMock(map[uint8]int{
@@ -259,7 +257,7 @@ func TestEncodeDecodeChunks(t *testing.T) {
 
 func TestStoreBatchInvalidBlob(t *testing.T) {
 	s := createStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	batchHeader, blobs, blobsProto := CreateBatchWith(t, true)
 	blobsProto[0].Bundles[0].Chunks = [][]byte{[]byte{1}}
 	_, err := s.StoreBatch(ctx, batchHeader, blobs, blobsProto)
@@ -268,7 +266,7 @@ func TestStoreBatchInvalidBlob(t *testing.T) {
 
 func TestStoreBatchSuccess(t *testing.T) {
 	s := createStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Empty store
 	blobKey := []byte{1, 2}
@@ -358,7 +356,7 @@ func TestStoreBatchSuccess(t *testing.T) {
 }
 
 func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx int, chunkEncoding pb.ChunkEncodingFormat) []*encoding.Frame {
-	ctx := context.Background()
+	ctx := t.Context()
 	chunks, format, err := s.GetChunks(ctx, batchHeaderHash, blobIdx, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(chunks))
@@ -387,7 +385,7 @@ func checkBundleEquivalence(t *testing.T, bundle1, bundle2 []*encoding.Frame) {
 }
 
 func TestBundleEncodingEquivalence(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	// Gnark chunks
 	s1 := createStore(t)
 	batchHeader1, blobs1, blobsProto1 := CreateBatchWith(t, true)
