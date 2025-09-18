@@ -25,7 +25,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	commit, _, _, frames, _, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(kzgConfig, nil)
+	verifierGroup, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(kzgConfig), nil)
 	require.Nil(t, err)
 	verifier, err := verifierGroup.GetKzgVerifier(params)
 	require.Nil(t, err)

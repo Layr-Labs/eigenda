@@ -295,7 +295,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	verifierKzgConfig := kzgConfig
+	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
 	verifierKzgConfig.LoadG2Points = false
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {

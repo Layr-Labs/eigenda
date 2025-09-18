@@ -17,7 +17,7 @@ import (
 )
 
 type Verifier struct {
-	kzgConfig *kzg.KzgConfig
+	kzgConfig *KzgConfig
 	encoder   *rs.Encoder
 
 	G1SRS kzg.G1SRS
@@ -27,8 +27,8 @@ type Verifier struct {
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
-func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
-	if config.SRSNumberToLoad > config.SRSOrder {
+func NewVerifier(config *KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
+	if config.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
@@ -54,7 +54,7 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 }
 
 func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
+	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
 
@@ -104,7 +104,7 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
 
-	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig.SRSOrder, v.kzgConfig.G1Path)
+	g1Challenge, err := kzg.ReadG1Point(encoding.SRSOrder-length, encoding.SRSOrder, v.kzgConfig.G1Path)
 	if err != nil {
 		return fmt.Errorf("read g1 point: %w", err)
 	}

@@ -16,7 +16,7 @@ import (
 )
 
 type ParametrizedVerifier struct {
-	*kzg.KzgConfig
+	*KzgConfig
 	g1SRS kzg.G1SRS
 	Fs    *fft.FFTSettings
 }

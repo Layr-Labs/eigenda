@@ -112,9 +112,9 @@ func BuildManagers(
 			// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
 			// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
 			// sidestep the issue entirely.
-			kzgConfig := config.KzgConfig
+			kzgConfig := kzgverifierv2.KzgConfigFromV1Config(&config.KzgConfig)
 			kzgConfig.LoadG2Points = false
-			kzgVerifier, err = kzgverifierv2.NewVerifier(&kzgConfig, nil)
+			kzgVerifier, err = kzgverifierv2.NewVerifier(kzgConfig, nil)
 			if err != nil {
 				return nil, nil, fmt.Errorf("new kzg verifier: %w", err)
 			}

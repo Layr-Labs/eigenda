@@ -227,9 +227,10 @@ func createDisperserClient(
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
-	kzgConfig := createKzgConfig()
+	kzgConfigV := createKzgConfig()
+	kzgConfig := verifier.KzgConfigFromV1Config(&kzgConfigV)
 	kzgConfig.LoadG2Points = false
-	blobVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
+	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create blob verifier: %w", err)
 	}
@@ -333,7 +334,7 @@ func createKzgConfig() kzg.KzgConfig {
 		G2Path:          filepath.Join(srsPath, "g2.point"),
 		G2TrailingPath:  filepath.Join(srsPath, "g2.trailing.point"),
 		CacheDir:        filepath.Join(srsPath, "SRSTables"),
-		SRSOrder:        268435456, // must always be this constant, which was used during eigenDA SRS generation
+		SRSOrder:        encoding.SRSOrder,
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
 	}
