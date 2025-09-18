@@ -94,9 +94,13 @@ func NewEjectionSentinel(
 			return nil, fmt.Errorf("failed to get chain ID: %w", err)
 		}
 
-		signer = func(address gethcommon.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+		// Use bind.NewKeyedTransactorWithChainID like other parts of the codebase
+		transactOpts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transact opts: %w", err)
 		}
+
+		signer = transactOpts.Signer
 	} else {
 		logger.Info("ejection defense not enabled")
 	}
