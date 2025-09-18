@@ -90,9 +90,10 @@ func StartProxyService(cliCtx *cli.Context) error {
 		defer func() {
 			if err := restServer.Stop(); err != nil {
 				log.Error("failed to stop REST ALT DA server", "err", err)
+			} else {
+				log.Info("Successfully shutdown REST ALT DA server")
 			}
 
-			log.Info("Successfully shutdown REST ALT DA server")
 		}()
 	}
 
@@ -109,8 +110,9 @@ func StartProxyService(cliCtx *cli.Context) error {
 		defer func() {
 			if err := arbitrumRpcServer.Stop(); err != nil {
 				log.Error("failed to stop arbitrum custom da json rpc server", "err", err)
+			} else {
+				log.Info("Successfully shutdown Arbitrum Custom DA server")
 			}
-			log.Info("Successfully shutdown Arbitrum Custom DA server")
 		}()
 
 		log.Info("Started Arbitrum Custom DA JSON RPC server", "addr", arbitrumRpcServer.Addr())
@@ -126,6 +128,8 @@ func StartProxyService(cliCtx *cli.Context) error {
 		defer func() {
 			if err := svr.Stop(context.Background()); err != nil {
 				log.Error("failed to stop metrics server", "err", err)
+			} else {
+				log.Info("Successfully shutdown Metrics server")
 			}
 		}()
 		log.Info("started metrics server", "addr", svr.Addr())
