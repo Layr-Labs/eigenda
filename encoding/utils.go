@@ -1,19 +1,17 @@
 package encoding
 
 import (
-	"golang.org/x/exp/constraints"
-
-	"math"
+	"github.com/Layr-Labs/eigenda/common/math"
 )
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetBlobLength(blobSize uint) uint {
-	return RoundUpDivide(blobSize, BYTES_PER_SYMBOL)
+	return math.RoundUpDivide(blobSize, BYTES_PER_SYMBOL)
 }
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetBlobLengthPowerOf2(blobSize uint) uint {
-	return NextPowerOf2(GetBlobLength(blobSize))
+	return uint(math.NextPowOf2u32(uint32(GetBlobLength(blobSize))))
 }
 
 // GetBlobSize converts from blob length in symbols to blob size in bytes. This is not an exact conversion.
@@ -23,20 +21,5 @@ func GetBlobSize(blobLength uint) uint {
 
 // GetBlobLength converts from blob size in bytes to blob size in symbols
 func GetEncodedBlobLength(blobLength uint, quorumThreshold, advThreshold uint8) uint {
-	return RoundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
-}
-
-func RoundUpDivide[T constraints.Integer](a, b T) T {
-	return (a + b - 1) / b
-}
-
-// IsPowerOfTwo checks if a number is a power of 2
-func IsPowerOfTwo[T constraints.Integer](d T) bool {
-	return (d&(d-1) == 0) && (d != 0)
-}
-
-// NextPowerOf2 returns the next power of 2 greater than or equal to d
-func NextPowerOf2[T constraints.Integer](d T) T {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return T(math.Pow(2.0, nextPower))
+	return math.RoundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
 }

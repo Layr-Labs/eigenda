@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -97,7 +98,7 @@ func padPoly(out []fr.Element, poly []fr.Element) {
 // The input polynomials must not be empty, and sum to no larger than the output.
 func (fs *FFTSettings) reduceLeaves(scratch []fr.Element, dst []fr.Element, ps [][]fr.Element) ([]fr.Element, error) {
 	n := uint64(len(dst))
-	if !isPowerOfTwo(n) {
+	if !math.IsPowerOfTwo(n) {
 		return nil, fmt.Errorf("destination must be a power of two, got %d", n)
 	}
 	if len(ps) == 0 {
@@ -162,7 +163,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	if length > fs.MaxWidth {
 		return nil, nil, fmt.Errorf("domain too small for requested length: %d > %d", length, fs.MaxWidth)
 	}
-	if !isPowerOfTwo(length) {
+	if !math.IsPowerOfTwo(length) {
 		return nil, nil, fmt.Errorf("length not a power of two: %d", length)
 	}
 	domainStride := fs.MaxWidth / length
@@ -187,7 +188,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	}
 
 	leafCount := (uint64(len(missingIndices)) + perLeaf - 1) / perLeaf
-	n := nextPowOf2(leafCount * perLeafPoly)
+	n := math.NextPowOf2u64(leafCount * perLeafPoly)
 
 	// The assumption here is that if the output is a power of two length, matching the sum of child leaf lengths,
 	// then the space can be reused.
@@ -226,7 +227,7 @@ func (fs *FFTSettings) ZeroPolyViaMultiplication(missingIndices []uint64, length
 	for len(leaves) > 1 {
 		reducedCount := (uint64(len(leaves)) + reductionFactor - 1) / reductionFactor
 		// all the leaves are the same. Except possibly the last leaf, but that's ok.
-		leafSize := nextPowOf2(uint64(len(leaves[0])))
+		leafSize := math.NextPowOf2u64(uint64(len(leaves[0])))
 		for i := uint64(0); i < reducedCount; i++ {
 			start := i * reductionFactor
 			end := start + reductionFactor

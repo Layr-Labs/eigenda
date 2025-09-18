@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -125,7 +126,7 @@ func (fs *FFTSettings) FFT(vals []fr.Element, inv bool) ([]fr.Element, error) {
 	if n > fs.MaxWidth {
 		return nil, fmt.Errorf("got %d values but only have %d roots of unity", n, fs.MaxWidth)
 	}
-	n = nextPowOf2(n)
+	n = math.NextPowOf2u64(n)
 	// We make a copy so we can mutate it during the work.
 	valsCopy := make([]fr.Element, n)
 	for i := 0; i < len(vals); i++ {
@@ -152,7 +153,7 @@ func (fs *FFTSettings) InplaceFFT(vals []fr.Element, out []fr.Element, inv bool)
 	if n > fs.MaxWidth {
 		return fmt.Errorf("got %d values but only have %d roots of unity", n, fs.MaxWidth)
 	}
-	if !isPowerOfTwo(n) {
+	if !math.IsPowerOfTwo(n) {
 		return NewFFTInputNotPowerOfTwoError(n)
 	}
 	if inv {
