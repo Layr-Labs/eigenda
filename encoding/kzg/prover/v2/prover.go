@@ -245,9 +245,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
-	length := encoding.NextPowerOf2(uint64(len(symbols)))
-
-	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
+	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols)
 	if err != nil {
 		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
 	}
@@ -256,7 +254,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           uint(length),
+		Length:           uint(encoding.NextPowerOf2(len(symbols))),
 	}
 
 	return commitments, nil
