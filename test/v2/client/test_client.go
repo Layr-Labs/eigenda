@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
-	proxymetrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -382,12 +382,15 @@ func NewTestClient(
 				EthRPCURL:        ethRPCUrls[0],
 			},
 			RestSvrCfg: proxyserver.Config{
-				Host:        "localhost",
-				Port:        config.ProxyPort,
-				EnabledAPIs: []string{"admin"},
-			},
-			MetricsSvrConfig: proxymetrics.Config{
-				Enabled: false, // TODO (cody.littley) enable proxy metrics
+				Host: "localhost",
+				Port: config.ProxyPort,
+				// TODO (cody.littley) enable proxy metrics
+				APIsEnabled: &enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
 			},
 			StoreBuilderConfig: builder.Config{
 				StoreConfig: store.Config{
