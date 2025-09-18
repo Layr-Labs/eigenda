@@ -105,7 +105,9 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 // VerifyLengthProof verifies the length proof (low degree proof).
 // See https://layr-labs.github.io/eigenda/protocol/architecture/encoding.html#validation-via-kzg
 // Since it doesn't depend on the encoding parameters, we leave it as a method of Verifier, not ParametrizedVerifier.
-func (v *Verifier) VerifyLengthProof(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64) error {
+func (v *Verifier) VerifyLengthProof(
+	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
+) error {
 	if !encoding.IsPowerOfTwo(commitmentLength) {
 		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
