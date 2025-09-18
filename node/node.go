@@ -109,7 +109,6 @@ type Node struct {
 }
 
 // NewNode creates a new Node with the provided config.
-// TODO: better context management, don't just use context.Background() everywhere in here.
 func NewNode(
 	ctx context.Context,
 	reg *prometheus.Registry,
@@ -144,7 +143,7 @@ func NewNode(
 		return nil, fmt.Errorf("failed to get validator address from ID: %w", err)
 	}
 
-	logger.Infof("Starting validator. ID: %s,address: %s", config.ID.Hex(), validatorAddress.Hex())
+	logger.Infof("Starting validator. ID: 0x%s, address: %s", config.ID.Hex(), validatorAddress.Hex())
 
 	err = configureMemoryLimits(nodeLogger, config)
 	if err != nil {
