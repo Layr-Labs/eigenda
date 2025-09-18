@@ -606,6 +606,12 @@ func buildPayloadDisperser(
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
 	var accountant *clients_v2.Accountant
+	// The legacy `Accountant` is only initialized if using legacy payments.
+	//
+	// There isn't an `else` statement here, because `ClientLedger` (responsible for the new payment system)
+	// construction is handled below by the `buildClientLedger` helper function. The `ClientLedger` cannot be built
+	// here in the same place as the `Accountant` because it requires the `disperserClient` be already built, and the
+	// `Accountant`, if being used, is a part of the `disperserClient`
 	if clientConfigV2.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
 		// The accountant is populated lazily by disperserClient.PopulateAccountant
 		accountant = clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
@@ -832,7 +838,7 @@ func buildClientLedger(
 	var onDemandLedger *ondemand.OnDemandLedger
 	switch config.ClientLedgerMode {
 	case clientledger.ClientLedgerModeLegacy:
-		// Legacy mode - neither reservation nor on-demand ledger is needed
+		panic("impossible case- this is checked at the start of the method")
 	case clientledger.ClientLedgerModeReservationOnly:
 		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
 		if err != nil {
