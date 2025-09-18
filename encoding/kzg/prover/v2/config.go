@@ -1,6 +1,9 @@
 package prover
 
-import "github.com/Layr-Labs/eigenda/encoding/kzg"
+import (
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/urfave/cli"
+)
 
 // KzgConfig holds configuration for the V2 KZG prover.
 type KzgConfig struct {
@@ -13,8 +16,8 @@ type KzgConfig struct {
 	// G1 points are needed by both the prover and verifier, so G1Path is always needed.
 	G1Path string
 
-	// G2 SRS points are only needed by the prover, since the verifier uses hardcoded G2 powers of 2.
-	// See [srs.G2PowerOf2SRS] for details.
+	// G2 SRS points are only needed to compute length proofs.
+	// Hence this should be set to true by the apiserver, and false by the encoder.
 	LoadG2Points bool
 	// G2Path and G2TrailingPath are only needed if LoadG2Points is true.
 	// G2 points are used to generate the blob length proof.
@@ -63,4 +66,20 @@ func KzgConfigFromV1Config(v1 *kzg.KzgConfig) *KzgConfig {
 		NumWorker:       v1.NumWorker,
 		Verbose:         v1.Verbose,
 	}
+}
+
+func ReadCLIConfig(ctx *cli.Context) KzgConfig {
+	cfg := KzgConfig{
+		SRSNumberToLoad: ctx.GlobalUint64(kzg.SRSLoadingNumberFlagName),
+		G1Path:          ctx.GlobalString(kzg.G1PathFlagName),
+		// Set to false by default. apiserver needs to set this to true.
+		LoadG2Points:   false,
+		G2Path:         ctx.GlobalString(kzg.G2PathFlagName),
+		G2TrailingPath: ctx.GlobalString(kzg.G2TrailingPathFlagName),
+		CacheDir:       ctx.GlobalString(kzg.CachePathFlagName),
+		NumWorker:      ctx.GlobalUint64(kzg.NumWorkerFlagName),
+		Verbose:        ctx.GlobalBool(kzg.VerboseFlagName),
+		PreloadEncoder: ctx.GlobalBool(kzg.PreloadEncoderFlagName),
+	}
+	return cfg
 }
