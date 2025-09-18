@@ -30,13 +30,6 @@ type KzgConfig struct {
 	// and instead use a G2PrefixPath config. Then EITHER G2Path is used, OR both G2PrefixPath and G2TrailingPath are used.
 	G2Path         string
 	G2TrailingPath string
-
-	// PreloadEncoder is only used by the prover to generate kzg multiproofs.
-	// It is not needed by the clients/proxy, which only need to generate kzg commitments, not proofs.
-	//
-	// If true, SRS tables are read from CacheDir during initialization.
-	// Generating these on startup would take hours otherwise.
-	PreloadEncoder bool
 	// Path to SRS Table directory. Always required even if PreloadEncoder is false,
 	// because the prover will write the SRS tables to this directory if they are not already present.
 	CacheDir string
@@ -61,7 +54,6 @@ func KzgConfigFromV1Config(v1 *kzg.KzgConfig) *KzgConfig {
 		LoadG2Points:    v1.LoadG2Points,
 		G2Path:          v1.G2Path,
 		G2TrailingPath:  v1.G2TrailingPath,
-		PreloadEncoder:  v1.PreloadEncoder,
 		CacheDir:        v1.CacheDir,
 		NumWorker:       v1.NumWorker,
 		Verbose:         v1.Verbose,
