@@ -129,7 +129,6 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	if config.EigenDAVersion == 2 {
 		kzgConfig := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
-		kzgConfig.LoadG2Points = true
 		verifier, err := verifierv2.NewVerifier(kzgConfig, nil)
 		if err != nil {
 			log.Fatalln("new v2 verifier", err)

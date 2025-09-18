@@ -227,9 +227,8 @@ func createDisperserClient(
 }
 
 func createKzgVerifier() (*verifier.Verifier, error) {
-	kzgConfigV := createKzgConfig()
-	kzgConfig := verifier.KzgConfigFromV1Config(&kzgConfigV)
-	kzgConfig.LoadG2Points = false
+	kzgConfigV1 := createKzgConfig()
+	kzgConfig := verifier.KzgConfigFromV1Config(&kzgConfigV1)
 	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create blob verifier: %w", err)
