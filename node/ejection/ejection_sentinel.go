@@ -2,6 +2,7 @@ package ejection
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 // The EjectionSentinel watches for when ejection is initiated against this validator. If that happens, this utility
@@ -39,6 +41,9 @@ type EjectionSentinel struct {
 	// version number goes rogue, honest validators may want to contest ejection regardless of the claimed minimum
 	// version number.
 	ignoreVersion bool
+
+	// A function that can sign transactions from selfAddress. nil if ejectionDefenseEnabled is false.
+	signer func(address gethcommon.Address, tx *types.Transaction) (*types.Transaction, error)
 }
 
 // NewEjectionSentinel creates a new EjectionSentinel instance.
@@ -47,6 +52,7 @@ func NewEjectionSentinel(
 	logger logging.Logger,
 	ejectionContractAddress gethcommon.Address,
 	ethClient common.EthClient,
+	privateKey *ecdsa.PrivateKey,
 	selfAddress gethcommon.Address,
 	period time.Duration,
 	ejectionDefenseEnabled bool,
@@ -69,12 +75,27 @@ func NewEjectionSentinel(
 	}
 
 	var transactor *contractEigenDAEjectionManager.ContractIEigenDAEjectionManagerTransactor
+	var signer func(address gethcommon.Address, tx *types.Transaction) (*types.Transaction, error)
 	if ejectionDefenseEnabled {
+		if privateKey == nil {
+			return nil, fmt.Errorf("privateKey must be provided if ejection defense is enabled")
+		}
+
 		logger.Info("ejection defense enabled")
+
 		transactor, err = contractEigenDAEjectionManager.NewContractIEigenDAEjectionManagerTransactor(
 			ejectionContractAddress, ethClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ejection manager transactor: %w", err)
+		}
+
+		chainID, err := ethClient.ChainID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain ID: %w", err)
+		}
+
+		signer = func(address gethcommon.Address, tx *types.Transaction) (*types.Transaction, error) {
+			return types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
 		}
 	} else {
 		logger.Info("ejection defense not enabled")
@@ -89,6 +110,7 @@ func NewEjectionSentinel(
 		transactor:             transactor,
 		ejectionDefenseEnabled: ejectionDefenseEnabled,
 		ignoreVersion:          ignoreVersion,
+		signer:                 signer,
 	}
 	go sentinel.run()
 
@@ -100,7 +122,7 @@ func (s *EjectionSentinel) run() {
 	ticker := time.NewTicker(s.period)
 	defer ticker.Stop()
 
-	s.logger.Infof("ejection sentinel run() started, period is %s", s.period) // TODO remove
+	s.logger.Debugf("Ejection Sentinel is running with a period of %s", s.period)
 
 	for {
 		select {
@@ -150,19 +172,14 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 	//  Minimum software version is not currently written onchain so we can't write the offchain logic yet.
 
 	s.logger.Info("Submitting ejection cancellation transaction.")
+
 	txn, err := s.transactor.CancelEjection(&bind.TransactOpts{
 		From:    s.selfAddress,
 		Context: s.ctx,
+		Signer:  s.signer,
 	})
 	if err != nil {
-		if txn == nil {
-			// If something went wrong before we got a transaction hash, log without it.
-			return fmt.Errorf("failed to submit ejection cancellation transaction: %w", err)
-		} else {
-			// If the transaction was created but something went wrong onchain (e.g. it was reverted), the txn object
-			// will be non-nil and we can log the hash. TODO is this actually the case?
-			return fmt.Errorf("failed to submit ejection cancellation transaction %s: %w", txn.Hash().Hex(), err)
-		}
+		return fmt.Errorf("failed to submit ejection cancellation transaction: %w", err)
 	}
 
 	s.logger.Infof("Ejection cancellation transaction submitted: %s", txn.Hash().Hex())

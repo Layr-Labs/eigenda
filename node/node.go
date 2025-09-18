@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -282,17 +283,27 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create operator state cache: %w", err)
 	}
 
-	// Start the ejection sentinel in a background goroutine.
 	ejectionContractAddress, err := contractDirectory.GetContractAddress(ctx, directory.EigenDAEjectionManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ejection contract address: %w", err)
 	}
 	config.EjectionDefenseEnabled = true // TODO temporary, just for testing, remove prior to merge
+
+	var privateKey *ecdsa.PrivateKey
+	if config.EthClientConfig.PrivateKeyString != "" {
+		privateKey, err = crypto.HexToECDSA(config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+	}
+
+	// Start the ejection sentinel in a background goroutine.
 	_, err = ejection.NewEjectionSentinel(
 		ctx,
 		logger,
 		ejectionContractAddress,
 		client,
+		privateKey,
 		validatorAddress,
 		config.EjectionSentinelPeriod,
 		config.EjectionDefenseEnabled,
