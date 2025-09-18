@@ -134,6 +134,10 @@ func CreateTestSuite(
 }
 
 func (ts *TestSuite) RestAddress() string {
+	if ts.RestServer == nil {
+		panic("rest server is being referenced for test execution but was never configured")
+	}
+
 	// read port from listener
 	port := ts.RestServer.Port()
 
@@ -141,6 +145,10 @@ func (ts *TestSuite) RestAddress() string {
 }
 
 func (ts *TestSuite) ArbAddress() string {
+	if ts.ArbServer == nil {
+		panic("arb server is being referenced for test execution but was never configured")
+	}
+
 	// read port from listener
 	port := ts.ArbServer.Port()
 

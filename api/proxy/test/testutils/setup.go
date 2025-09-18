@@ -128,11 +128,10 @@ func ParseBackend(inputString string) (Backend, error) {
 }
 
 func GetBackend() Backend {
-	// TODO: uncomment
-	backend := MemstoreBackend
-	// if err != nil {
-	// 	panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
-	// }
+	backend, err := ParseBackend(os.Getenv(backendEnvVar))
+	if err != nil {
+		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
+	}
 	return backend
 }
 
