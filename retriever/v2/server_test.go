@@ -36,6 +36,7 @@ func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
+		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
