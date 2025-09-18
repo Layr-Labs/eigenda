@@ -52,8 +52,9 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel... this should have been documented.
-	// 12a1fcead77edb08d892e6e509c5ba812764264cadec7fc244b182c750bf7b67 has verified in solidity  with chisel
+	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
+	// This should have been documented.
+	// 12a1fcead77edb08d892e6e509c5ba812764264cadec7fc244b182c750bf7b67 has NOT been verified in solidity with chisel
 	assert.Equal(t, "12a1fcead77edb08d892e6e509c5ba812764264cadec7fc244b182c750bf7b67", blobKey.Hex())
 
 	// same blob key should be generated for the blob header with shuffled quorum numbers
@@ -83,8 +84,9 @@ func TestBatchHeaderHash(t *testing.T) {
 
 	hash, err := batchHeader.Hash()
 	assert.NoError(t, err)
-	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel... this should have been documented.
-	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 verified in solidity
+	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
+	// This should have been documented.
+	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 has NOT verified in solidity with chisel
 	assert.Equal(t, "891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2", hex.EncodeToString(hash[:]))
 }
 
