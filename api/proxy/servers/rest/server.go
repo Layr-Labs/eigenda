@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -20,18 +20,9 @@ import (
 
 // Config ... Config for the proxy HTTP server
 type Config struct {
-	Host string
-	Port int
-	// EnabledAPIs contains the list of API types that are enabled.
-	// When empty (default), no special API endpoints are registered.
-	// Example: If it contains "admin", administrative endpoints like
-	// /admin/eigenda-dispersal-backend will be available.
-	EnabledAPIs []string
-}
-
-// IsAPIEnabled checks if a specific API type is enabled
-func (c *Config) IsAPIEnabled(apiType string) bool {
-	return slices.Contains(c.EnabledAPIs, apiType)
+	Host        string
+	Port        int
+	APIsEnabled *enablement.RestApisEnabled
 }
 
 type Server struct {
@@ -80,7 +71,7 @@ func (svr *Server) Start(r *mux.Router) error {
 
 	svr.endpoint = listener.Addr().String()
 
-	svr.log.Info("Starting DA server", "endpoint", svr.endpoint)
+	svr.log.Info("Starting REST ALT DA server", "endpoint", svr.endpoint)
 	errCh := make(chan error, 1)
 	go func() {
 		if err := svr.httpServer.Serve(svr.listener); err != nil {

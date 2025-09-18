@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
@@ -13,17 +14,21 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// AppConfig ... Highest order config. Stores all relevant fields necessary for running both proxy & metrics servers.
+// AppConfig is the highest order config. Stores all relevant fields necessary for running
+// REST ALTDA, Arbitrum Custom DA, & metrics servers.
 type AppConfig struct {
 	StoreBuilderConfig builder.Config
 	SecretConfig       common.SecretConfigV2
+
+	EnabledServersConfig *enablement.EnabledServersConfig
 
 	ArbCustomDASvrCfg arbitrum_altda.Config
 	RestSvrCfg        rest.Config
 	MetricsSvrConfig  metrics.Config
 }
 
-// Check checks config invariants, and returns an error if there is a problem with the config struct
+// Check checks critical config invariants and returns an error
+// if there is a problem with the config struct's expression
 func (c AppConfig) Check() error {
 	err := c.StoreBuilderConfig.Check()
 	if err != nil {
@@ -38,6 +43,11 @@ func (c AppConfig) Check() error {
 		}
 	}
 
+	err = c.EnabledServersConfig.Check()
+	if err != nil {
+		return fmt.Errorf("check enabled APIs: %w", err)
+	}
+
 	return nil
 }
 
@@ -47,11 +57,15 @@ func ReadAppConfig(ctx *cli.Context) (AppConfig, error) {
 		return AppConfig{}, fmt.Errorf("read proxy config: %w", err)
 	}
 
+	enabledServersCfg := enablement.ReadEnabledServersCfg(ctx)
+
 	return AppConfig{
-		StoreBuilderConfig: storeBuilderConfig,
-		SecretConfig:       eigendaflags.ReadSecretConfigV2(ctx),
-		ArbCustomDASvrCfg:  arbitrum_altda.ReadConfig(ctx),
-		RestSvrCfg:         rest.ReadConfig(ctx),
-		MetricsSvrConfig:   metrics.ReadConfig(ctx),
+		StoreBuilderConfig:   storeBuilderConfig,
+		SecretConfig:         eigendaflags.ReadSecretConfigV2(ctx),
+		EnabledServersConfig: enabledServersCfg,
+
+		ArbCustomDASvrCfg: arbitrum_altda.ReadConfig(ctx),
+		RestSvrCfg:        rest.ReadConfig(ctx, &enabledServersCfg.RestAPIConfig),
+		MetricsSvrConfig:  metrics.ReadConfig(ctx),
 	}, nil
 }
