@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -125,22 +126,24 @@ func ParseBackend(inputString string) (Backend, error) {
 }
 
 func GetBackend() Backend {
-	backend, err := ParseBackend(os.Getenv(backendEnvVar))
-	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
-	}
+	// TODO: uncomment
+	backend := MemstoreBackend
+	// if err != nil {
+	// 	panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
+	// }
 	return backend
 }
 
 type TestConfig struct {
-	BackendsToEnable []common.EigenDABackend
-	DispersalBackend common.EigenDABackend
-	Backend          Backend
-	Retrievers       []common.RetrieverType
-	Expiration       time.Duration
-	MaxBlobLength    string
-	WriteThreadCount int
-	WriteOnCacheMiss bool
+	BackendsToEnable  []common.EigenDABackend
+	DispersalBackend  common.EigenDABackend
+	Backend           Backend
+	Retrievers        []common.RetrieverType
+	Expiration        time.Duration
+	MaxBlobLength     string
+	WriteThreadCount  int
+	WriteOnCacheMiss  bool
+	DeployArbCustomDA bool
 	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
@@ -346,6 +349,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		RestSvrCfg: rest.Config{
 			Host: host,
 			Port: 0,
+		},
+		ArbCustomDASvrCfg: arbitrum_altda.Config{
+			Enable: testCfg.DeployArbCustomDA,
+			Host:   host,
+			Port:   0,
 		},
 	}
 }

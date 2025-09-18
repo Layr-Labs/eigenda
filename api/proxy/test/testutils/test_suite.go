@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
@@ -16,10 +17,12 @@ import (
 
 // TestSuite contains necessary objects, to be able to execute a proxy test
 type TestSuite struct {
-	Ctx     context.Context
-	Log     logging.Logger
-	Metrics *proxy_metrics.EmulatedMetricer
-	Server  *rest.Server
+	Ctx context.Context
+	Log logging.Logger
+
+	Metrics    *proxy_metrics.EmulatedMetricer
+	RestServer *rest.Server
+	ArbServer  *arbitrum_altda.Server
 }
 
 // TestSuiteWithLogger returns a function which overrides the logger for a TestSuite
@@ -90,23 +93,45 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("start proxy server: %v", err.Error()))
 	}
 
+	arbHandlers := arbitrum_altda.NewHandlers(certMgr)
+	arbServer, err := arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
+	if err != nil {
+		panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
+	}
+
+	if err := arbServer.Start(); err != nil {
+		panic(fmt.Sprintf("start arbitrum server: %v", err.Error()))
+	}
+
 	kill := func() {
 		if err := proxyServer.Stop(); err != nil {
 			logger.Error("failed to stop proxy server", "err", err)
 		}
+
+		if err := arbServer.Stop(); err != nil {
+			logger.Error("failed to stop arb server", "err", err)
+		}
 	}
 
 	return TestSuite{
-		Ctx:     ctx,
-		Log:     logger,
-		Metrics: metrics,
-		Server:  proxyServer,
+		Ctx:        ctx,
+		Log:        logger,
+		Metrics:    metrics,
+		RestServer: proxyServer,
+		ArbServer:  arbServer,
 	}, kill
 }
 
-func (ts *TestSuite) Address() string {
+func (ts *TestSuite) RestAddress() string {
 	// read port from listener
-	port := ts.Server.Port()
+	port := ts.RestServer.Port()
+
+	return fmt.Sprintf("%s://%s:%d", transport, host, port)
+}
+
+func (ts *TestSuite) ArbAddress() string {
+	// read port from listener
+	port := ts.ArbServer.Port()
 
 	return fmt.Sprintf("%s://%s:%d", transport, host, port)
 }
