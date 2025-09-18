@@ -88,7 +88,7 @@ func (g *ParametrizedProver) Encode(
 	// inputFr is untouched
 	// compute chunks
 	go func() {
-		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr, uint64(len(inputFr)))
+		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr)
 
 		commitmentsChan <- commitmentsResult{
 			commitment:       commitment,
@@ -120,7 +120,7 @@ func (g *ParametrizedProver) Encode(
 }
 
 func (g *ParametrizedProver) GetCommitments(
-	inputFr []fr.Element, length uint64,
+	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
 	if err := g.validateInput(inputFr); err != nil {
 		return nil, nil, nil, err
@@ -155,7 +155,11 @@ func (g *ParametrizedProver) GetCommitments(
 
 	go func() {
 		start := time.Now()
-		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, length)
+		// blobLen must always be a power of 2 in V2
+		// inputFr is not modified because padding with 0s doesn't change the commitment,
+		// but we need to pretend like it was actually padded with 0s to get the correct length proof.
+		blobLen := uint64(encoding.NextPowerOf2(len(inputFr)))
+		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
 		lengthProofChan <- lengthProofResult{
 			LengthProof: lengthProof,
 			Err:         err,
