@@ -43,7 +43,7 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	testBlob := []byte("hello world")
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg) // standard commitment mode (should fail given disabled)
 
@@ -52,7 +52,8 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "403")
 
-	opGenericClient := altda.NewDAClient(ts.Address(), false, false) // now op-generic mode (should work e2e given enabled)
+	opGenericClient := altda.NewDAClient(ts.RestAddress(),
+		false, false) // now op-generic mode (should work e2e given enabled)
 
 	daCommit, err := opGenericClient.SetInput(ts.Ctx, testBlob)
 	require.NoError(t, err)

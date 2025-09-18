@@ -36,9 +36,8 @@ import (
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors
 type Config struct {
-	Enable bool
-	Host   string
-	Port   int
+	Host string
+	Port int
 }
 
 type Server struct {

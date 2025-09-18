@@ -69,6 +69,9 @@ func CreateTestSuite(
 	// 	configString,
 	// )
 
+	var restServer *rest.Server
+	var arbServer *arbitrum_altda.Server
+
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
@@ -81,35 +84,43 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	proxyServer := rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
-	router := mux.NewRouter()
-	proxyServer.RegisterRoutes(router)
-	if appConfig.StoreBuilderConfig.MemstoreEnabled {
-		memconfig.NewHandlerHTTP(logger, appConfig.StoreBuilderConfig.MemstoreConfig).
-			RegisterMemstoreConfigHandlers(router)
+	if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
+		router := mux.NewRouter()
+		restServer.RegisterRoutes(router)
+		if appConfig.StoreBuilderConfig.MemstoreEnabled {
+			memconfig.NewHandlerHTTP(logger, appConfig.StoreBuilderConfig.MemstoreConfig).
+				RegisterMemstoreConfigHandlers(router)
+		}
+
+		if err := restServer.Start(router); err != nil {
+			panic(fmt.Sprintf("start proxy server: %v", err.Error()))
+		}
 	}
 
-	if err := proxyServer.Start(router); err != nil {
-		panic(fmt.Sprintf("start proxy server: %v", err.Error()))
-	}
+	if appConfig.EnabledServersConfig.ArbCustomDA {
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr)
+		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
+		if err != nil {
+			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
+		}
 
-	arbHandlers := arbitrum_altda.NewHandlers(certMgr)
-	arbServer, err := arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
-	if err != nil {
-		panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
-	}
-
-	if err := arbServer.Start(); err != nil {
-		panic(fmt.Sprintf("start arbitrum server: %v", err.Error()))
+		if err := arbServer.Start(); err != nil {
+			panic(fmt.Sprintf("start arbitrum server: %v", err.Error()))
+		}
 	}
 
 	kill := func() {
-		if err := proxyServer.Stop(); err != nil {
-			logger.Error("failed to stop proxy server", "err", err)
+		if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+			if err := restServer.Stop(); err != nil {
+				logger.Error("failed to stop proxy server", "err", err)
+			}
 		}
 
-		if err := arbServer.Stop(); err != nil {
-			logger.Error("failed to stop arb server", "err", err)
+		if appConfig.EnabledServersConfig.ArbCustomDA {
+			if err := arbServer.Stop(); err != nil {
+				logger.Error("failed to stop arb server", "err", err)
+			}
 		}
 	}
 
@@ -117,7 +128,7 @@ func CreateTestSuite(
 		Ctx:        ctx,
 		Log:        logger,
 		Metrics:    metrics,
-		RestServer: proxyServer,
+		RestServer: restServer,
 		ArbServer:  arbServer,
 	}, kill
 }

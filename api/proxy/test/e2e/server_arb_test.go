@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -16,8 +17,13 @@ func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
-
 	appCfg := testutils.BuildTestSuiteConfig(testCfg)
+	appCfg.EnabledServersConfig = &enablement.EnabledServersConfig{
+		Metric:        false,
+		ArbCustomDA:   true,
+		RestAPIConfig: enablement.RestApisEnabled{},
+	}
+
 	testSuite, teardown := testutils.CreateTestSuite(appCfg)
 	defer teardown()
 
@@ -25,7 +31,8 @@ func TestArbCustomDAIsValidHeaderByte(t *testing.T) {
 	require.NoError(t, err)
 
 	var validHeaderByteResult *arbitrum_altda.IsValidHeaderByteResult
-	err = rpcClient.Call(&validHeaderByteResult, arbitrum_altda.MethodIsValidHeaderByte, arbitrum_altda.EigenDAV2MessageHeaderByte)
+	err = rpcClient.Call(&validHeaderByteResult,
+		arbitrum_altda.MethodIsValidHeaderByte, arbitrum_altda.EigenDAV2MessageHeaderByte)
 	require.NoError(t, err)
 
 	var validHeaderByteFalseResult *arbitrum_altda.IsValidHeaderByteResult
@@ -38,8 +45,13 @@ func TestArbCustomDAStoreAndRecoverPayloadFromBatch(t *testing.T) {
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
-
 	appCfg := testutils.BuildTestSuiteConfig(testCfg)
+	appCfg.EnabledServersConfig = &enablement.EnabledServersConfig{
+		Metric:        false,
+		ArbCustomDA:   true,
+		RestAPIConfig: enablement.RestApisEnabled{},
+	}
+
 	testSuite, teardown := testutils.CreateTestSuite(appCfg)
 	defer teardown()
 
