@@ -92,11 +92,15 @@ docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake proxy-release ${PUSH_FLAG}
 
-# Some of the unit test suites take > 1 min to run (e.g. relay and littdb tests).
-# TODO: we should break these up into short and long unit-tests.
+# Run all tests that don't have their own panel.
 unit-tests:
 	go clean -testcache
-	CI=true gotestsum --format pkgname -- -short ./... -coverprofile=coverage.out
+	./test/scripts/test-with-blacklist.sh . ./litt
+
+# Run the unit tests in litt/ only.
+litt-unit-tests:
+	go clean -testcache
+	./test/scripts/test-with-whitelist.sh . ./litt
 
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common

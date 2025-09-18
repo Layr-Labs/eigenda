@@ -86,6 +86,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		certBuilder,
 		certVerifier,
 		nil,
+		nil,
 	)
 }
 
@@ -125,7 +126,7 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 }
 
@@ -175,7 +176,7 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 }
 
@@ -204,7 +205,7 @@ func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
 	kzgProver *prover.Prover,
-) (clients.DisperserClient, error) {
+) (*clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)

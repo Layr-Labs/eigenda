@@ -8,12 +8,15 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,11 +27,12 @@ import (
 type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
-	disperserClient clients.DisperserClient
+	disperserClient *clients.DisperserClient
 	blockMonitor    *verification.BlockNumberMonitor
 	certBuilder     *clients.CertBuilder
 	certVerifier    *verification.CertVerifier
 	stageTimer      *common.StageTimer
+	clientLedger    *clientledger.ClientLedger
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -43,10 +47,12 @@ func NewPayloadDisperser(
 	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
-	disperserClient clients.DisperserClient,
+	disperserClient *clients.DisperserClient,
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,
+	// Manages payment state for the client. May be nil for legacy payment mode.
+	clientLedger *clientledger.ClientLedger,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
@@ -66,6 +72,7 @@ func NewPayloadDisperser(
 		certBuilder:     certBuilder,
 		certVerifier:    certVerifier,
 		stageTimer:      stageTimer,
+		clientLedger:    clientLedger,
 	}, nil
 }
 
@@ -108,31 +115,70 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
+	symbolCount := blob.LenSymbols()
+
+	var paymentMetadata *core.PaymentMetadata
+	if pd.clientLedger != nil {
+		// we are using the new payment system if clientLedger is non nil
+		probe.SetStage("debit")
+		paymentMetadata, err = pd.clientLedger.Debit(ctx, symbolCount, requiredQuorums)
+		if err != nil {
+			return nil, fmt.Errorf("debit: %w", err)
+		}
+	}
+
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 
-	// TODO (litt3): eventually, we should consider making DisperseBlob accept an actual blob object, instead of the
+	// TODO (litt3): DisperseBlob should accept an actual blob object, instead of the
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
 	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
 	//  many areas of code, though.
-	blobStatus, blobKey, err := pd.disperserClient.DisperseBlobWithProbe(
+	blobHeader, reply, err := pd.disperserClient.DisperseBlob(
 		timeoutCtx,
 		blob.Serialize(),
 		pd.config.BlobVersion,
 		requiredQuorums,
-		probe)
+		probe,
+		paymentMetadata)
 	if err != nil {
+		if pd.clientLedger != nil {
+			revertErr := pd.clientLedger.RevertDebit(ctx, paymentMetadata, symbolCount)
+			if revertErr != nil {
+				return nil, fmt.Errorf("disperse blob and revert debit: %w", errors.Join(err, revertErr))
+			}
+		}
+
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
-	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
+
+	probe.SetStage("verify_blob_key")
+
+	blobKey, err := verifyReceivedBlobKey(blobHeader, reply)
+	if err != nil {
+		return nil, fmt.Errorf("verify received blob key: %w", err)
+	}
+
+	return pd.buildEigenDACert(ctx, reply.GetResult(), blobKey, probe)
+}
+
+// Waits for a blob to be signed, and builds the EigenDA cert with the operator signatures
+//
+// If the blob does not become fully signed before the BlobCompleteTimeout timeout elapses, returns an error
+func (pd *PayloadDisperser) buildEigenDACert(
+	ctx context.Context,
+	initialBlobStatus dispgrpc.BlobStatus,
+	blobKey corev2.BlobKey,
+	probe *common.SequenceProbe,
+) (coretypes.EigenDACert, error) {
 
 	probe.SetStage("QUEUED")
 
 	// poll the disperser for the status of the blob until it's received adequate signatures in regards to
 	// confirmation thresholds, a terminal error, or a timeout
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, initialBlobStatus, probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
@@ -144,12 +190,14 @@ func (pd *PayloadDisperser) SendPayload(
 	// generic function or helper to enhance DRY
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.blockMonitor.WaitForBlockNumber(timeoutCtx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
+	err = pd.blockMonitor.WaitForBlockNumber(
+		timeoutCtx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	certVersion, err := pd.certVerifier.GetCertVersion(ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
+	certVersion, err := pd.certVerifier.GetCertVersion(
+		ctx, blobStatusReply.GetSignedBatch().GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
@@ -173,8 +221,8 @@ func (pd *PayloadDisperser) SendPayload(
 		var errInvalidCert *verification.CertVerifierInvalidCertError
 		if errors.As(err, &errInvalidCert) {
 			// Regardless of whether the cert is invalid (400) or certVerifier contract has a bug (500),
-			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry policy),
-			// then its safer for the rollup to failover to another DA layer.
+			// we send a failover signal. If we can't construct a valid cert after retrying a few times (proxy retry
+			// policy), then its safer for the rollup to failover to another DA layer.
 			return nil, api.NewErrorFailover(fmt.Errorf("checkDACert failed with blobKey %v: %w", blobKey.Hex(), err))
 		}
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
@@ -187,7 +235,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 // logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
 // required signing thresholds
-func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+func (pd *PayloadDisperser) logSigningPercentages(blobKey corev2.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
 	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
 	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
 		pd.logger.Error("quorum number count and signed percentage count don't match. This should never happen",
@@ -231,7 +279,7 @@ func (pd *PayloadDisperser) Close() error {
 // failure.
 func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
-	blobKey core.BlobKey,
+	blobKey corev2.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
@@ -317,4 +365,36 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 			}
 		}
 	}
+}
+
+// verifyReceivedBlobKey computes the BlobKey from the BlobHeader which was sent to the disperser, and compares it with
+// the BlobKey which was returned by the disperser in the DisperseBlobReply
+//
+// A successful verification guarantees that the disperser didn't make any modifications to the BlobHeader that it
+// received from this client.
+//
+// This function returns the verified blob key if the verification succeeds, and otherwise returns an error describing
+// the failure
+func verifyReceivedBlobKey(
+	// the blob header which was constructed locally and sent to the disperser
+	blobHeader *corev2.BlobHeader,
+	// the reply received back from the disperser
+	disperserReply *dispgrpc.DisperseBlobReply,
+) (corev2.BlobKey, error) {
+
+	actualBlobKey, err := blobHeader.BlobKey()
+	enforce.NilError(err, "compute blob key")
+
+	blobKeyFromDisperser, err := corev2.BytesToBlobKey(disperserReply.GetBlobKey())
+	if err != nil {
+		return corev2.BlobKey{}, fmt.Errorf("converting returned bytes to blob key: %w", err)
+	}
+
+	if actualBlobKey != blobKeyFromDisperser {
+		return corev2.BlobKey{}, fmt.Errorf(
+			"blob key returned by disperser (%v) doesn't match blob which was dispersed (%v)",
+			blobKeyFromDisperser, actualBlobKey)
+	}
+
+	return blobKeyFromDisperser, nil
 }

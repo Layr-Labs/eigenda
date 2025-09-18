@@ -10,27 +10,30 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/payments"
+	"github.com/Layr-Labs/eigenda/disperser/controller/server"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
-	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli"
 )
 
@@ -272,6 +275,32 @@ func RunController(ctx *cli.Context) error {
 	err = dispatcher.Start(c)
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
+	}
+
+	if config.ServerConfig.EnableServer {
+		var paymentAuthorizationHandler *payments.PaymentAuthorizationHandler
+		if config.ServerConfig.EnablePaymentAuthentication {
+			paymentAuthorizationHandler = payments.NewPaymentAuthorizationHandler()
+		}
+
+		grpcServer, err := server.NewServer(
+			c,
+			config.ServerConfig,
+			logger,
+			metricsRegistry,
+			paymentAuthorizationHandler)
+		if err != nil {
+			return fmt.Errorf("create gRPC server: %w", err)
+		}
+
+		go func() {
+			logger.Info("Starting controller gRPC server", "port", config.ServerConfig.GrpcPort)
+			if err := grpcServer.Start(); err != nil {
+				panic(fmt.Sprintf("gRPC server failed: %v", err))
+			}
+		}()
+	} else {
+		logger.Info("Controller gRPC server disabled")
 	}
 
 	go func() {

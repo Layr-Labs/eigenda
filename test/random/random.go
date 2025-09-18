@@ -245,3 +245,8 @@ func (r *TestRandom) Float32Range(min, max float32) float32 {
 func (r *TestRandom) Float64Range(min, max float64) float64 {
 	return r.Float64()*(max-min) + min
 }
+
+// DurationRange generates a random time.Duration between min (inclusive) and max (exclusive).
+func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Duration {
+	return time.Duration(r.Int63n(int64(max-min))) + min
+}

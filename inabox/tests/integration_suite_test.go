@@ -293,6 +293,7 @@ func setupPayloadDisperserWithRouter() error {
 		certBuilder,
 		routerCertVerifier,
 		nil,
+		nil,
 	)
 
 	return err
@@ -387,7 +388,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClientV2,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 
 	if err != nil {
@@ -418,7 +419,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 
 	return err
