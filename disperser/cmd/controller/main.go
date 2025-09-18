@@ -288,12 +288,12 @@ func RunController(ctx *cli.Context) error {
 		if config.ServerConfig.EnablePaymentAuthentication {
 			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
 				c,
+				logger,
 				config.OnDemandConfig,
 				config.ReservationConfig,
 				contractDirectory,
 				gethClient,
 				dynamoClient.GetAwsClient(),
-				logger,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
@@ -354,12 +354,12 @@ func RunController(ctx *cli.Context) error {
 
 func buildPaymentAuthorizationHandler(
 	ctx context.Context,
+	logger logging.Logger,
 	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
 	reservationConfig reservation.ReservationLedgerCacheConfig,
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
-	logger logging.Logger,
 ) (*controllerpayments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
