@@ -3,7 +3,6 @@ package ondemand
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -21,18 +20,12 @@ type OnDemandPaymentValidator struct {
 func NewOnDemandPaymentValidator(
 	ctx context.Context,
 	logger logging.Logger,
-	// the maximum number of OnDemandLedger entries to be kept in the LRU cache
-	maxLedgers int,
+	config OnDemandLedgerCacheConfig,
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
-	// the name of the dynamo table where on-demand payment information is stored
-	onDemandTableName string,
-	// interval for checking for payment updates
-	updateInterval time.Duration,
 ) (*OnDemandPaymentValidator, error) {
-	ledgerCache, err := NewOnDemandLedgerCache(
-		ctx, logger, maxLedgers, paymentVault, updateInterval, dynamoClient, onDemandTableName)
+	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, config, paymentVault, dynamoClient)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger cache: %w", err)
 	}
