@@ -34,12 +34,12 @@ func TestLengthProof(t *testing.T) {
 		_, lengthCommitment, lengthProof, _, _, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
-		length := len(inputFr)
-		assert.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(length)),
+		blobLen := encoding.NextPowerOf2(len(inputFr))
+		assert.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(blobLen)),
 			"low degree verification failed\n")
 
-		length = len(inputFr) - 10
-		assert.Error(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(length)),
+		blobLen = len(inputFr) - 10
+		assert.Error(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(blobLen)),
 			"low degree verification failed\n")
 	}
 }
