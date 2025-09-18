@@ -150,14 +150,17 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 	//  Minimum software version is not currently written onchain so we can't write the offchain logic yet.
 
 	s.logger.Info("Submitting ejection cancellation transaction.")
-	txn, err := s.transactor.CancelEjection(&bind.TransactOpts{Context: s.ctx})
+	txn, err := s.transactor.CancelEjection(&bind.TransactOpts{
+		From:    s.selfAddress,
+		Context: s.ctx,
+	})
 	if err != nil {
 		if txn == nil {
 			// If something went wrong before we got a transaction hash, log without it.
 			return fmt.Errorf("failed to submit ejection cancellation transaction: %w", err)
 		} else {
 			// If the transaction was created but something went wrong onchain (e.g. it was reverted), the txn object
-			// will be non-nil and we can log the hash.
+			// will be non-nil and we can log the hash. TODO is this actually the case?
 			return fmt.Errorf("failed to submit ejection cancellation transaction %s: %w", txn.Hash().Hex(), err)
 		}
 	}
