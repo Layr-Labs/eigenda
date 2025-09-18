@@ -65,7 +65,6 @@ func (s *DispersalServerV2) disperseBlob(
 		}
 		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
 		if err != nil {
-			s.logger.Warn("payment authorization failed", "err", err)
 			return nil, status.Convert(err)
 		}
 	} else {

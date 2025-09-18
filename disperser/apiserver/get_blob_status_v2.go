@@ -67,13 +67,6 @@ func (s *DispersalServerV2) getBlobStatus(
 
 	cert, _, err := s.blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
-		s.logger.Error(
-			"failed to get blob certificate for blob in GatheringSignatures/Complete status",
-			"err",
-			err,
-			"blobKey",
-			blobKey.Hex(),
-		)
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			return nil, status.New(codes.NotFound, "no such blob certificate found")
 		}
@@ -83,13 +76,11 @@ func (s *DispersalServerV2) getBlobStatus(
 	// For blobs in GatheringSignatures/Complete status, include signed batch and blob inclusion info
 	blobInclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob inclusion info for blob", "err", err, "blobKey", blobKey.Hex())
-		return nil, status.Newf(codes.Internal, "failed to get blob inclusion info: %v", err)
+		return nil, status.Newf(codes.Internal, "failed to get blob inclusion info for blob %s: %v", blobKey.Hex(), err)
 	}
 
 	if len(blobInclusionInfos) == 0 {
-		s.logger.Error("no blob inclusion info found for blob", "blobKey", blobKey.Hex())
-		return nil, status.New(codes.Internal, "no blob inclusion info found")
+		return nil, status.Newf(codes.Internal, "no blob inclusion info found for blob %s", blobKey.Hex())
 	}
 
 	if len(blobInclusionInfos) > 1 {
@@ -143,6 +134,5 @@ func (s *DispersalServerV2) getBlobStatus(
 		}, status.New(codes.OK, "")
 	}
 
-	s.logger.Error("no signed batch found for blob", "blobKey", blobKey.Hex())
-	return nil, status.New(codes.Internal, "no signed batch found")
+	return nil, status.Newf(codes.Internal, "no signed batch found for blob %s", blobKey.Hex())
 }
