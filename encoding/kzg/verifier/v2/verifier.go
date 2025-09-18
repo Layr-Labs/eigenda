@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/bits"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/resources/srs"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -93,23 +95,30 @@ func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 }
 
 func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return v.VerifyCommit(
+	return v.VerifyLengthProof(
 		(*bn254.G2Affine)(commitments.LengthCommitment),
 		(*bn254.G2Affine)(commitments.LengthProof),
 		uint64(commitments.Length),
 	)
 }
 
-// VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
-// we leave it as a method of the KzgEncoderGroup
-func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
-
-	g1Challenge, err := kzg.ReadG1Point(encoding.SRSOrder-length, encoding.SRSOrder, v.kzgConfig.G1Path)
-	if err != nil {
-		return fmt.Errorf("read g1 point: %w", err)
+// VerifyLengthProof verifies the length proof (low degree proof).
+// See https://layr-labs.github.io/eigenda/protocol/architecture/encoding.html#validation-via-kzg
+// Since it doesn't depend on the encoding parameters, we leave it as a method of Verifier, not ParametrizedVerifier.
+func (v *Verifier) VerifyLengthProof(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64) error {
+	if !encoding.IsPowerOfTwo(commitmentLength) {
+		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
 
-	err = VerifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
+	commitmentLengthLog := bits.TrailingZeros64(commitmentLength)
+	if commitmentLengthLog > 28 {
+		return fmt.Errorf("commitment length %d is > max possible 2^28", commitmentLength)
+	}
+	// g1Challenge = [x^(SRSOrder - commitmentLength)]_1
+	// G1PowerOf2SRS contains the 28 hardcoded points that we need.
+	g1Challenge := srs.G1PowerOf2SRS[commitmentLengthLog]
+
+	err := verifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
 	if err != nil {
 		return fmt.Errorf("low degree proof: %w", err)
 	}
@@ -122,8 +131,8 @@ func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254
 // proof = commit(shiftedPoly) on G1
 // so we can verify by checking
 // e( commit_1, [x^shift]_2) = e( proof_1, G_2 )
-func VerifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
-	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
+func verifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Challenge *bn254.G1Affine) error {
+	return pairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
 // VerifyFrame verifies a single frame against a commitment.
@@ -183,7 +192,7 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 	return res
 }
 
-func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
+func pairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, b2 *bn254.G2Affine) error {
 	var negB1 bn254.G1Affine
 	negB1.Neg(b1)
 
