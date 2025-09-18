@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"regexp"
 	"slices"
@@ -36,6 +37,11 @@ import (
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -360,6 +366,7 @@ func buildEigenDAV2Backend(
 		secrets,
 		ethClient,
 		kzgProver,
+		contractDirectory,
 		certVerifier,
 		operatorStateRetrieverAddr,
 		registryCoordinator,
@@ -579,6 +586,7 @@ func buildPayloadDisperser(
 	secrets common.SecretConfigV2,
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
+	contractDirectory *directory.ContractDirectory,
 	certVerifier *verification.CertVerifier,
 	operatorStateRetrieverAddr geth_common.Address,
 	registryCoordinatorAddr geth_common.Address,
@@ -597,8 +605,17 @@ func buildPayloadDisperser(
 	accountantMetrics := metrics_v2.NewAccountantMetrics(registry)
 	dispersalMetrics := metrics_v2.NewDispersalMetrics(registry)
 
-	// The accountant is populated lazily by disperserClient.PopulateAccountant
-	accountant := clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+	var accountant *clients_v2.Accountant
+	// The legacy `Accountant` is only initialized if using legacy payments.
+	//
+	// There isn't an `else` statement here, because `ClientLedger` (responsible for the new payment system)
+	// construction is handled below by the `buildClientLedger` helper function. The `ClientLedger` cannot be built
+	// here in the same place as the `Accountant` because it requires the `disperserClient` be already built, and the
+	// `Accountant`, if being used, is a part of the `disperserClient`
+	if clientConfigV2.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
+		// The accountant is populated lazily by disperserClient.PopulateAccountant
+		accountant = clients_v2.NewUnpopulatedAccountant(accountId, accountantMetrics)
+	}
 
 	disperserClient, err := clients_v2.NewDisperserClient(
 		log,
@@ -610,6 +627,21 @@ func buildPayloadDisperser(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
+	}
+
+	clientLedger, err := buildClientLedger(
+		ctx,
+		log,
+		clientConfigV2,
+		ethClient,
+		accountId,
+		contractDirectory,
+		accountantMetrics,
+		time.Now,
+		disperserClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build client ledger: %w", err)
 	}
 
 	blockNumMonitor, err := verification.NewBlockNumberMonitor(
@@ -635,6 +667,7 @@ func buildPayloadDisperser(
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
+		clientLedger,
 		registry)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
@@ -677,4 +710,172 @@ func buildLocalSigner(
 	}
 
 	return signer, nil
+}
+
+// buildReservationLedger creates a reservation ledger for a given account
+func buildReservationLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID geth_common.Address,
+	now time.Time,
+	minNumSymbols uint32,
+) (*reservation.ReservationLedger, error) {
+	reservationData, err := paymentVault.GetReservation(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation: %w", err)
+	}
+	if reservationData == nil {
+		return nil, fmt.Errorf("no reservation found for account %s", accountID.Hex())
+	}
+
+	clientReservation, err := reservation.NewReservation(
+		reservationData.SymbolsPerSecond,
+		time.Unix(int64(reservationData.StartTimestamp), 0),
+		time.Unix(int64(reservationData.EndTimestamp), 0),
+		reservationData.QuorumNumbers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerConfig(
+		*clientReservation,
+		minNumSymbols,
+		// start full since reservation usage isn't persisted: assume the worst case (heavy usage before startup)
+		true,
+		// this is a parameter for flexibility, but there aren't plans to operate with anything other than this value
+		reservation.OverfillOncePermitted,
+		// TODO(litt3): is there a different place we should define this? hardcoding makes sense... it's just a
+		// question of *where*
+		time.Minute,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger config: %w", err)
+	}
+
+	reservationLedger, err := reservation.NewReservationLedger(*reservationConfig, now)
+	if err != nil {
+		return nil, fmt.Errorf("new reservation ledger: %w", err)
+	}
+
+	return reservationLedger, nil
+}
+
+// buildOnDemandLedger creates an on-demand ledger for a given account
+func buildOnDemandLedger(
+	ctx context.Context,
+	paymentVault payments.PaymentVault,
+	accountID geth_common.Address,
+	minNumSymbols uint32,
+	disperserClient *clients_v2.DisperserClient,
+) (*ondemand.OnDemandLedger, error) {
+	pricePerSymbol, err := paymentVault.GetPricePerSymbol(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get price per symbol: %w", err)
+	}
+
+	totalDeposits, err := paymentVault.GetTotalDeposit(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get total deposit from vault: %w", err)
+	}
+
+	paymentState, err := disperserClient.GetPaymentState(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get payment state from disperser: %w", err)
+	}
+
+	if paymentState.GetCumulativePayment() == nil {
+		return nil, errors.New("received nil cumulative payment from disperser")
+	}
+
+	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
+		totalDeposits,
+		new(big.Int).SetUint64(pricePerSymbol),
+		minNumSymbols,
+		new(big.Int).SetBytes(paymentState.GetCumulativePayment()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new on-demand ledger: %w", err)
+	}
+
+	return onDemandLedger, nil
+}
+
+// buildClientLedger creates a ClientLedger for managing payment state
+// Returns nil for legacy mode
+func buildClientLedger(
+	ctx context.Context,
+	log logging.Logger,
+	config common.ClientConfigV2,
+	ethClient common_eigenda.EthClient,
+	accountID geth_common.Address,
+	contractDirectory *directory.ContractDirectory,
+	accountantMetrics metrics_v2.AccountantMetricer,
+	getNow func() time.Time,
+	disperserClient *clients_v2.DisperserClient,
+) (*clientledger.ClientLedger, error) {
+	if config.ClientLedgerMode == clientledger.ClientLedgerModeLegacy {
+		return nil, nil
+	}
+	paymentVaultAddr, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
+	if err != nil {
+		return nil, fmt.Errorf("get PaymentVault address: %w", err)
+	}
+
+	paymentVault, err := vault.NewPaymentVault(log, ethClient, paymentVaultAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new payment vault: %w", err)
+	}
+
+	now := getNow()
+
+	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get min num symbols: %w", err)
+	}
+
+	var reservationLedger *reservation.ReservationLedger
+	var onDemandLedger *ondemand.OnDemandLedger
+	switch config.ClientLedgerMode {
+	case clientledger.ClientLedgerModeLegacy:
+		panic("impossible case- this is checked at the start of the method")
+	case clientledger.ClientLedgerModeReservationOnly:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+	case clientledger.ClientLedgerModeOnDemandOnly:
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	case clientledger.ClientLedgerModeReservationAndOnDemand:
+		reservationLedger, err = buildReservationLedger(ctx, paymentVault, accountID, now, minNumSymbols)
+		if err != nil {
+			return nil, fmt.Errorf("build reservation ledger: %w", err)
+		}
+		onDemandLedger, err = buildOnDemandLedger(ctx, paymentVault, accountID, minNumSymbols, disperserClient)
+		if err != nil {
+			return nil, fmt.Errorf("build on-demand ledger: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unexpected client ledger mode: %s", config.ClientLedgerMode)
+	}
+
+	ledger := clientledger.NewClientLedger(
+		ctx,
+		log,
+		accountantMetrics,
+		accountID,
+		config.ClientLedgerMode,
+		reservationLedger,
+		onDemandLedger,
+		getNow,
+		paymentVault,
+		config.VaultMonitorInterval,
+	)
+
+	return ledger, nil
 }
