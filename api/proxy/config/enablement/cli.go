@@ -31,7 +31,7 @@ func CLIFlags(category string, envPrefix string) []cli.Flag {
 		Usage: fmt.Sprintf("Which proxy application APIs to enable. supported options are "+
 			"%s", AllAPIsString()),
 		Value:    cli.NewStringSlice(),
-		Required: true,
+		Required: false,
 		EnvVars:  withEnvPrefix(envPrefix, "APIS_TO_ENABLE"),
 		Category: category,
 	}}
