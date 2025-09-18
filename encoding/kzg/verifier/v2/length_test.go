@@ -14,7 +14,7 @@ import (
 func TestLengthProof(t *testing.T) {
 	harness := getTestHarness()
 
-	group, err := prover.NewProver(harness.kzgConfig, nil)
+	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
 	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)

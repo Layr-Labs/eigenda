@@ -10,10 +10,11 @@ import (
 )
 
 func FuzzOnlySystematic(f *testing.F) {
+	harness := getTestHarness()
 
-	f.Add(gettysburgAddressBytes)
+	f.Add(harness.paddedGettysburgAddressBytes)
 	f.Fuzz(func(t *testing.T, input []byte) {
-		group, err := prover.NewProver(kzgConfig, nil)
+		group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 		require.NoError(t, err)
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))

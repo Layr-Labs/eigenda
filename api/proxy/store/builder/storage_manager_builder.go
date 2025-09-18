@@ -217,10 +217,10 @@ func buildEigenDAV2Backend(
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
 	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
 	// simply set this value to whatever it needs to be prior to using it.
-	kzgConfig := config.KzgConfig
+	kzgConfig := kzgproverv2.KzgConfigFromV1Config(&config.KzgConfig)
 	kzgConfig.LoadG2Points = true
 
-	kzgProver, err := kzgproverv2.NewProver(&kzgConfig, nil)
+	kzgProver, err := kzgproverv2.NewProver(kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new KZG prover: %w", err)
 	}

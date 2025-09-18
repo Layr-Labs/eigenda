@@ -15,7 +15,7 @@ func TestVerify(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
-	proverGroup, err := prover.NewProver(harness.kzgConfig, nil)
+	proverGroup, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 	encoder, err := proverGroup.GetKzgEncoder(params)
 	require.Nil(t, err)
