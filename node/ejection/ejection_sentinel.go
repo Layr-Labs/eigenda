@@ -137,6 +137,7 @@ func (s *EjectionSentinel) run() {
 			}
 		case <-s.ctx.Done():
 			s.logger.Info("EjectionSentinel stopped")
+			return
 		}
 	}
 }
@@ -161,7 +162,7 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 	s.logger.Warnf("This validator is currently being ejected by %s", ejector.Hex())
 
 	if s.transactor == nil {
-		// TODO(cody-littley) Talk to Lulu about the "special log" we need to do to support validators
+		// TODO(cody.littley) Talk to Lulu about the "special log" we need to do to support validators
 		//  who want to sign cancellation with external key management systems. That log should happen here.
 
 		s.logger.Errorf("This validator is not configured to contest ejection. " +
@@ -169,7 +170,7 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 		return nil
 	}
 
-	// TODO(cody-littley) check if we are running a software version that permits ejection defense
+	// TODO(cody.littley) check if we are running a software version that permits ejection defense
 	//  Minimum software version is not currently written onchain so we can't write the offchain logic yet.
 
 	s.logger.Info("Submitting ejection cancellation transaction.")

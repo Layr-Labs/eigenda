@@ -139,6 +139,9 @@ func NewNode(
 		return nil, fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
 	}
 
+	// TODO this is a temporary hack to see if this is failing in inabox due to a timing issue.
+	time.Sleep(time.Minute)
+
 	validatorAddress, err := eth.ValidatorIDToAddress(ctx, client, registryCoordinatorAddress, config.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator address from ID: %w", err)
