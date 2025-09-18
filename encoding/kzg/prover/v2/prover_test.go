@@ -79,7 +79,7 @@ func TestEncoder(t *testing.T) {
 	p, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, nil)
+	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(kzgConfig), nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)

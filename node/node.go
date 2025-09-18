@@ -200,7 +200,8 @@ func NewNode(
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
 
-	verifierV2, err := verifierv2.NewVerifier(&config.EncoderConfig, nil)
+	verifierV2Config := verifierv2.KzgConfigFromV1Config(&config.EncoderConfig)
+	verifierV2, err := verifierv2.NewVerifier(verifierV2Config, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}

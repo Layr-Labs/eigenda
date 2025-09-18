@@ -223,7 +223,7 @@ func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, nil)
+	v, err := verifier.NewVerifier(verifier.KzgConfigFromV1Config(config), nil)
 	if err != nil {
 		return nil, nil, err
 	}
