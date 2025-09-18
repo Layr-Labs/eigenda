@@ -296,7 +296,6 @@ func NewTestClient(
 	}
 
 	verifierKzgConfig := verifier.KzgConfigFromV1Config(kzgConfig)
-	verifierKzgConfig.LoadG2Points = false
 	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
