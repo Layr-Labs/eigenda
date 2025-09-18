@@ -35,9 +35,9 @@ func TestLengthProof(t *testing.T) {
 		require.Nil(t, err)
 
 		length := len(inputFr)
-		assert.NoError(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
+		assert.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
 
 		length = len(inputFr) - 10
-		assert.Error(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
+		assert.Error(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
 	}
 }
