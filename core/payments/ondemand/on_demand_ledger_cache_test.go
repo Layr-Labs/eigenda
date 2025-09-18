@@ -15,28 +15,38 @@ import (
 
 func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 	t.Run("nil payment vault", func(t *testing.T) {
+		config, err := ondemand.NewOnDemandLedgerCacheConfig(
+			10,
+			"tableName",
+			time.Second,
+		)
+		require.NoError(t, err)
+
 		cache, err := ondemand.NewOnDemandLedgerCache(
 			context.Background(),
 			testutils.GetLogger(),
-			10,
+			config,
 			nil, // nil payment vault
-			time.Second,
 			dynamoClient,
-			"tableName",
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
 	})
 
 	t.Run("nil dynamo client", func(t *testing.T) {
+		config, err := ondemand.NewOnDemandLedgerCacheConfig(
+			10,
+			"tableName",
+			time.Second,
+		)
+		require.NoError(t, err)
+
 		cache, err := ondemand.NewOnDemandLedgerCache(
 			context.Background(),
 			testutils.GetLogger(),
-			10,
+			config,
 			vault.NewTestPaymentVault(),
-			time.Second,
 			nil, // nil dynamo client
-			"tableName",
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -60,14 +70,19 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	testVault.SetTotalDeposit(accountB, big.NewInt(5000))
 	testVault.SetTotalDeposit(accountC, big.NewInt(3000))
 
+	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		2, // Small cache size to force eviction
+		tableName,
+		time.Millisecond, // update frequently
+	)
+	require.NoError(t, err)
+
 	ledgerCache, err := ondemand.NewOnDemandLedgerCache(
 		ctx,
 		testutils.GetLogger(),
-		2, // Small cache size to force eviction
+		config,
 		testVault,
-		time.Millisecond, // update frequently
 		dynamoClient,
-		tableName,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)

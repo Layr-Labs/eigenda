@@ -41,49 +41,49 @@ type Config struct {
 }
 
 type Server struct {
-	cfg  *Config
-	svr  *http.Server
-	addr string
+	cfg      *Config
+	svr      *http.Server
+	listener net.Listener
 }
 
 // NewServer constructs the RPC server
-func NewServer(ctx context.Context, cfg *Config) (*Server, error) {
+func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on tcp: %w", err)
+	}
+
 	rpcServer := rpc.NewServer()
-	if err := rpcServer.RegisterName("daprovider", &Handlers{}); err != nil {
+	if err := rpcServer.RegisterName("daprovider", h); err != nil {
 		return nil, fmt.Errorf("failed to register daprovider: %w", err)
 	}
 
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		return nil, errors.New("failed getting provider server address from listener")
+	}
+
 	svr := &http.Server{
+		Addr:    "http://" + addr.String(),
 		Handler: rpcServer,
 	}
 
 	return &Server{
-		cfg: cfg,
-		svr: svr,
+		cfg:      cfg,
+		svr:      svr,
+		listener: listener,
 	}, nil
 
 }
 
 func (s *Server) Addr() string {
-	return s.addr
+	return s.svr.Addr
 }
 
-// Start creates a tcp listener and serves it on an independent go routine
+// Start serves a tcp listener on an independent go routine
 func (s *Server) Start() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port))
-	if err != nil {
-		return fmt.Errorf("new arbitrum altda server: %w", err)
-	}
-
-	addr, ok := listener.Addr().(*net.TCPAddr)
-	if !ok {
-		return errors.New("failed getting provider server address from listener")
-	}
-
-	s.addr = addr.String()
-
 	go func() {
-		if err := s.svr.Serve(listener); err != nil &&
+		if err := s.svr.Serve(s.listener); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			println(fmt.Sprintf("provider server's Serve method returned a non http.ErrServerClosed error: %s", err.Error()))
 		}
