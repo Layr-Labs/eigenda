@@ -156,7 +156,7 @@ func (s *EjectionSentinel) checkEjectionStatus() error {
 			// If something went wrong before we got a transaction hash, log without it.
 			return fmt.Errorf("failed to submit ejection cancellation transaction: %w", err)
 		} else {
-			// If the transaction was created but something went onchain (e.g. it was reverted), the txn object
+			// If the transaction was created but something went wrong onchain (e.g. it was reverted), the txn object
 			// will be non-nil and we can log the hash.
 			return fmt.Errorf("failed to submit ejection cancellation transaction %s: %w", txn.Hash().Hex(), err)
 		}
