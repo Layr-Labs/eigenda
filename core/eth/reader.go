@@ -96,37 +96,37 @@ func (t *Reader) updateContractBindings(
 ) error {
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "err", err)
+		t.logger.Error("Failed to fetch IEigenDAServiceManager contract", "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "err", err)
 		return err
 	}
 
 	delegationManagerAddr, err := contractEigenDAServiceManager.Delegation(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch DelegationManager address", "err", err)
+		t.logger.Error("Failed to fetch DelegationManager address", "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "err", err)
 		return err
 	}
 
 	avsDirectoryAddr, err := contractEigenDAServiceManager.AvsDirectory(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch AVSDirectory address", "err", err)
+		t.logger.Error("Failed to fetch AVSDirectory address", "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "err", err)
 		return err
 	}
 
 	contractAVSDirectory, err := avsdir.NewContractAVSDirectory(avsDirectoryAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch AVSDirectory contract", "err", err)
+		t.logger.Error("Failed to fetch AVSDirectory contract", "avsDirectoryAddr", avsDirectoryAddr.Hex(), "err", err)
 		return err
 	}
 
 	contractDelegationManager, err := delegationmgr.NewContractDelegationManager(delegationManagerAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch DelegationManager contract", "err", err)
+		t.logger.Error("Failed to fetch DelegationManager contract", "delegationManagerAddr", delegationManagerAddr.Hex(), "err", err)
 		return err
 	}
 
 	registryCoordinatorAddr, err := contractEigenDAServiceManager.RegistryCoordinator(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch RegistryCoordinator address", "err", err)
+		t.logger.Error("Failed to fetch RegistryCoordinator address", "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "err", err)
 		return err
 	}
 
@@ -135,30 +135,30 @@ func (t *Reader) updateContractBindings(
 		t.ethClient,
 	)
 	if err != nil {
-		t.logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "err", err)
+		t.logger.Error("Failed to fetch IBLSRegistryCoordinatorWithIndices contract", "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "err", err)
 		return err
 	}
 
 	contractEjectionManagerAddr, err := contractIRegistryCoordinator.Ejector(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch EjectionManager address", "err", err)
+		t.logger.Error("Failed to fetch EjectionManager address", "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "err", err)
 		return err
 	}
 	contractEjectionManager, err := ejectionmg.NewContractEjectionManager(contractEjectionManagerAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch EjectionManager contract", "err", err)
+		t.logger.Error("Failed to fetch EjectionManager contract", "contractEjectionManagerAddr", contractEjectionManagerAddr.Hex(), "err", err)
 		return err
 	}
 
 	contractOpStateRetr, err := opstateretriever.NewContractOperatorStateRetriever(operatorStateRetrieverAddr, t.ethClient)
 	if err != nil {
-		t.logger.Error("Failed to fetch OperatorStateRetriever contract", "err", err)
+		t.logger.Error("Failed to fetch OperatorStateRetriever contract", "operatorStateRetrieverAddr", operatorStateRetrieverAddr.Hex(), "err", err)
 		return err
 	}
 
 	blsPubkeyRegistryAddr, err := contractIRegistryCoordinator.BlsApkRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch BlsPubkeyRegistry address", "err", err)
+		t.logger.Error("Failed to fetch BlsPubkeyRegistry address", "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "err", err)
 		return err
 	}
 
