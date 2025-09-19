@@ -192,11 +192,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	if ctx.GlobalString(DeprecatedOperatorStateRetrieverFlag.Name) != "" {
-		return nil, errors.New("the operator-state-retriever flag is deprecated; please use the eigenda-directory flag instead. " +
+		return nil, errors.New("the operator-state-retriever flag is deprecated. " +
+			"Please use the eigenda-directory flag instead. " +
 			"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for the directory address")
 	}
 	if ctx.GlobalString(DeprecatedEigenDAServiceManagerFlag.Name) != "" {
-		return nil, errors.New("the eigenda-service-manager flag is deprecated; please use the eigenda-directory flag instead. " +
+		return nil, errors.New("the eigenda-service-manager flag is deprecated. " +
+			"Please use the eigenda-directory flag instead. " +
 			"See https://docs.eigencloud.xyz/products/eigenda/networks/mainnet#contract-addresses for the directory address")
 	}
 
