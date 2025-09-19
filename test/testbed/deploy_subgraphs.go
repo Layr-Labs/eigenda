@@ -279,6 +279,8 @@ func execYarnCmd(command string, args ...string) error {
 	args = append([]string{command}, args...)
 	cmd := exec.Command("yarn", args...)
 
+	fmt.Println("Executing command:", cmd.String())
+
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
