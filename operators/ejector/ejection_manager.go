@@ -9,6 +9,8 @@ import (
 	geth "github.com/ethereum/go-ethereum/common"
 )
 
+// TODO future cody: split this into a threaded version and a non-threaded version to make testing easier.
+
 // A utility that manages ejections and the ejection lifecycle. An ejection manager is responsible for executing
 // ejections, not deciding when it is appropriate to eject. That is to say, this utility does not monitor validator
 // signing rates.
@@ -33,7 +35,9 @@ type EjectionManager struct {
 	startedEjections map[geth.Address]time.Time
 
 	// The number of consecutive failed ejection attempts, keyed by validator address. If this exceeds a
-	// threshold, the validator is added to the ejection blacklist.
+	// threshold, the validator is added to the ejection blacklist. For the purposes of this counter,
+	// we only count failed attempts where we started an ejection, but the validator cancelled it on-chain.
+	// Golang errors are not counted towards this total.
 	failedEjectionAttempts map[geth.Address]uint32
 
 	// Submits ejection transactions.
@@ -234,6 +238,7 @@ func (em *EjectionManager) finalizeEjection(address geth.Address) {
 
 	em.logger.Infof("successfully completed ejection for validator %s", address.Hex())
 	delete(em.startedEjections, address)
+	delete(em.failedEjectionAttempts, address)
 }
 
 // Handle the case where a previously started ejection is no longer in progress.
