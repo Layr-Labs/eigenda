@@ -105,16 +105,19 @@ contract EigenDADirectory is IEigenDADirectory {
         return key.getAddress();
     }
 
+    /// @inheritdoc IEigenDAAddressDirectory
     function getName(bytes32 key) external view returns (string memory) {
         return AddressDirectoryLib.getName(key);
     }
 
+    /// @inheritdoc IEigenDAAddressDirectory
     function getAllNames() external view returns (string[] memory) {
         return AddressDirectoryLib.getNameList();
     }
 
     /// CONFIG REGISTRY FUNCTIONS ///
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function addConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (ConfigRegistryLib.isKeyRegisteredBytes32(key)) {
@@ -124,6 +127,7 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.registerKeyBytes32(name);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function addConfigBytes(string memory name, bytes memory value, string memory extraInfo) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (ConfigRegistryLib.isKeyRegisteredBytes(key)) {
@@ -133,6 +137,7 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.registerKeyBytes(name);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function replaceConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (!ConfigRegistryLib.isKeyRegisteredBytes32(key)) {
@@ -141,6 +146,7 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.setConfigBytes32(key, value, extraInfo);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function replaceConfigBytes(string memory name, bytes memory value, string memory extraInfo) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (!ConfigRegistryLib.isKeyRegisteredBytes(key)) {
@@ -149,6 +155,7 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.setConfigBytes(key, value, extraInfo);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function removeConfigBytes32(string memory name) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (!ConfigRegistryLib.isKeyRegisteredBytes32(key)) {
@@ -158,6 +165,7 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.deregisterKeyBytes32(name);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function removeConfigBytes(string memory name) external onlyOwner {
         bytes32 key = ConfigRegistryLib.getKey(name);
         if (!ConfigRegistryLib.isKeyRegisteredBytes(key)) {
@@ -167,38 +175,46 @@ contract EigenDADirectory is IEigenDADirectory {
         ConfigRegistryLib.deregisterKeyBytes(name);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes32(string memory name) external view returns (bytes32) {
         bytes32 key = ConfigRegistryLib.getKey(name);
         return ConfigRegistryLib.getConfigBytes32(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes32(bytes32 key) external view returns (bytes32) {
         return ConfigRegistryLib.getConfigBytes32(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes32ExtraInfo(string memory name) external view returns (string memory) {
         bytes32 key = ConfigRegistryLib.getKey(name);
         return ConfigRegistryLib.getConfigBytes32ExtraInfo(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes32ExtraInfo(bytes32 key) external view returns (string memory) {
         return ConfigRegistryLib.getConfigBytes32ExtraInfo(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes(string memory name) external view returns (bytes memory) {
         bytes32 key = ConfigRegistryLib.getKey(name);
         return ConfigRegistryLib.getConfigBytes(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytes(bytes32 key) external view returns (bytes memory) {
         return ConfigRegistryLib.getConfigBytes(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytesExtraInfo(string memory name) external view returns (string memory) {
         bytes32 key = ConfigRegistryLib.getKey(name);
         return ConfigRegistryLib.getConfigBytesExtraInfo(key);
     }
 
+    /// @inheritdoc IEigenDAConfigRegistry
     function getConfigBytesExtraInfo(bytes32 key) external view returns (string memory) {
         return ConfigRegistryLib.getConfigBytesExtraInfo(key);
     }
