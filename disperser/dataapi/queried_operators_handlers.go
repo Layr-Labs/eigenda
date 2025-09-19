@@ -169,7 +169,12 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 	return operatorEjections, nil
 }
 
-func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger, poolSize int) {
+func processOperatorOnlineCheck(
+	queriedOperatorsInfo *IndexedQueriedOperatorInfo,
+	operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata,
+	logger logging.Logger,
+	poolSize int,
+) {
 	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)
 
