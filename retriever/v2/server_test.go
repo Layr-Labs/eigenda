@@ -1,7 +1,6 @@
 package v2_test
 
 import (
-	"context"
 	"math/big"
 	"runtime"
 	"testing"
@@ -9,7 +8,6 @@ import (
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -18,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	retriever "github.com/Layr-Labs/eigenda/retriever/v2"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -61,7 +60,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 	var err error
 	config := &retriever.Config{}
 
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 
 	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
@@ -78,6 +77,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 }
 
 func TestRetrieveBlob(t *testing.T) {
+	ctx := t.Context()
 	server := newTestServer(t)
 	data := codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes)
 	retrievalClient.On(
@@ -122,7 +122,7 @@ func TestRetrieveBlob(t *testing.T) {
 	}
 	c, err := mockCommitment.ToProtobuf()
 	require.NoError(t, err)
-	retrievalReply, err := server.RetrieveBlob(context.Background(), &pb.BlobRequest{
+	retrievalReply, err := server.RetrieveBlob(ctx, &pb.BlobRequest{
 		BlobHeader: &commonpbv2.BlobHeader{
 			Version:       0,
 			QuorumNumbers: []uint32{0},

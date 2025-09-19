@@ -3,13 +3,13 @@ package cache
 import (
 	"testing"
 
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 )
 
 func TestExpirationOrder(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	maxWeight := uint64(10 + rand.Intn(10))
 	c := NewFIFOCache[int, int](maxWeight, nil, nil)
@@ -75,7 +75,7 @@ func TestExpirationOrder(t *testing.T) {
 }
 
 func TestWeightedValues(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	maxWeight := uint64(100 + rand.Intn(100))
 

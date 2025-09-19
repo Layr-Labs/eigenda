@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +23,7 @@ func deserializeBinaryFrames(t *testing.T, binaryFrames *core.ChunksData) []*enc
 
 func TestFetchingIndividualBlobs(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -110,7 +110,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 func TestFetchingBatchedBlobs(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)

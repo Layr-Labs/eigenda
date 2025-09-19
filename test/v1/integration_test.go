@@ -22,7 +22,6 @@ import (
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/pubip"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -42,7 +41,8 @@ import (
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/docker/go-units"
@@ -60,7 +60,7 @@ import (
 )
 
 var (
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 	p      encoding.Prover
 	v      encoding.Verifier
 	asn    core.AssignmentCoordinator
@@ -161,10 +161,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
 		fmt.Println("Operator: ", idStr)
-
-		fmt.Println("Starting node")
-		err = op.Node.Start(ctx)
-		require.NoError(t, err)
 
 		fmt.Println("Starting server")
 		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)

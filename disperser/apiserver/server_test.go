@@ -14,23 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/disperser/apiserver"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/testbed"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/google/uuid"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/urfave/cli"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -38,18 +21,34 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/apiserver"
+	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/uuid"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc/peer"
 )
 
 var (
-	logger          = testutils.GetLogger()
+	logger          = test.GetLogger()
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
@@ -92,7 +91,6 @@ func TestDisperseBlob(t *testing.T) {
 }
 
 func TestDisperseBlobAuth(t *testing.T) {
-
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	require.NoError(t, err)
@@ -114,7 +112,6 @@ func TestDisperseBlobAuth(t *testing.T) {
 }
 
 func TestDisperseBlobAuthTimeout(t *testing.T) {
-
 	data1KiB := make([]byte, 1024)
 	_, err := rand.Read(data1KiB)
 	require.NoError(t, err)
@@ -141,6 +138,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 }
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
+	ctx := t.Context()
 
 	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
@@ -151,7 +149,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
-	dispersalServer := newTestServer(transactor, t.Name())
+	dispersalServer := newTestServer(ctx, transactor, t.Name())
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -165,7 +163,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 			Port: 51001,
 		},
 	}
-	ctx := peer.NewContext(t.Context(), p)
+	ctx = peer.NewContext(ctx, p)
 
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 
@@ -207,7 +205,6 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
-
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	require.NoError(t, err)
@@ -685,7 +682,7 @@ func setup() {
 		logger.Fatal("Failed to initialize KZG prover:", err)
 	}
 
-	dispersalServer = newTestServer(transactor, "setup")
+	dispersalServer = newTestServer(ctx, transactor, "setup")
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
@@ -744,8 +741,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	ctx := context.Background()
+func newTestServer(ctx context.Context, transactor core.Writer, testName string) *apiserver.DispersalServer {
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",

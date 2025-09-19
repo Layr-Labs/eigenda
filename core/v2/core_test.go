@@ -1,7 +1,6 @@
 package v2_test
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -10,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -19,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +53,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	reader := &mock.MockWriter{}
 	reader.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, reader)
@@ -137,6 +136,8 @@ func prepareBlobs(
 	blobs [][]byte,
 	referenceBlockNumber uint64,
 ) (map[core.OperatorID][]*corev2.BlobShard, core.IndexedChainState) {
+	t.Helper()
+	ctx := t.Context()
 
 	cst, err := mock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
@@ -156,7 +157,7 @@ func prepareBlobs(
 		require.NoError(t, err)
 		chunks, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
-		state, err := cst.GetOperatorState(context.Background(), uint(referenceBlockNumber), header.QuorumNumbers)
+		state, err := cst.GetOperatorState(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 
 		require.NoError(t, err)
 
@@ -193,12 +194,12 @@ func checkBatchByUniversalVerifier(
 	packagedBlobs map[core.OperatorID][]*corev2.BlobShard,
 	pool common.WorkerPool,
 ) {
-
-	ctx := context.Background()
-	state, _ := cst.GetIndexedOperatorState(context.Background(), 0, quorumNumbers)
+	t.Helper()
+	ctx := t.Context()
+	state, _ := cst.GetIndexedOperatorState(ctx, 0, quorumNumbers)
 
 	for id := range state.IndexedOperators {
-		val := corev2.NewShardValidator(v, id, testutils.GetLogger())
+		val := corev2.NewShardValidator(v, id, test.GetLogger())
 		blobs := packagedBlobs[id]
 		st, err := cst.GetOperatorState(ctx, 0, quorumNumbers)
 		require.NoError(t, err)
