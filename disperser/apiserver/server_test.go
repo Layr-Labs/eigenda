@@ -58,7 +58,7 @@ var (
 	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
 	s3BucketName        = "test-eigenda-blobstore"
 	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
-	prover              encoding.Prover
+	prover              *p.Prover
 	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool

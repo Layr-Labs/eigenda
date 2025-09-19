@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -53,7 +54,7 @@ type DispersalServerV2 struct {
 
 	chainReader              core.Reader
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator
-	prover                   encoding.Prover
+	prover                   *prover.Prover
 	logger                   logging.Logger
 
 	// state
@@ -87,7 +88,7 @@ func NewDispersalServerV2(
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,

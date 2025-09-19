@@ -179,7 +179,7 @@ func setup(t *testing.T) {
 }
 
 // TODO: Good candidate to be extracted into test package as a utility
-func mustMakeTestComponents(t *testing.T) (encoding.Prover, encoding.Verifier) {
+func mustMakeTestComponents(t *testing.T) (*prover.Prover, *verifier.Verifier) {
 	t.Helper()
 
 	config := &kzg.KzgConfig{

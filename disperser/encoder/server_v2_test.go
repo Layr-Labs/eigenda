@@ -43,7 +43,7 @@ type testComponents struct {
 	dynamoDBClient   *mock.MockDynamoDBClient
 }
 
-func makeTestProver(numPoint uint64) (encoding.Prover, error) {
+func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
