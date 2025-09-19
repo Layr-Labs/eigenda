@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
