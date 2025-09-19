@@ -3,7 +3,7 @@
 
 coverage:
   # Coverage precision (number of decimal places)
-  precision: 1
+  precision: 2
   round: down
 
   # Coverage range for color coding (red to green)
@@ -71,68 +71,3 @@ ignore:
 
   # Resource files
   - "resources/**"
-
-# Comment configuration
-comment:
-  layout: "reach,diff,flags,files,footer"
-  behavior: default
-  require_changes: false
-  require_base: false
-  require_head: true
-
-# Flag configuration for different test types
-flags:
-  unit-tests:
-    paths:
-      - "!contracts/"
-      - "!litt/"
-    carryforward: false
-
-  litt-tests:
-    paths:
-      - "litt/"
-    carryforward: false
-
-# Codecov CI configuration
-codecov:
-  notify:
-    # Wait for all CI builds before sending notifications
-    wait_for_ci: true
-
-  # Require the codecov token for security
-  require_ci_to_pass: true
-
-# Component-based coverage tracking (optional)
-component_management:
-  individual_components:
-    - component_id: core
-      name: Core
-      paths:
-        - "core/**"
-
-    - component_id: api
-      name: API
-      paths:
-        - "api/**"
-        - "!api/grpc/**"
-        - "!api/**/mock/**"
-
-    - component_id: disperser
-      name: Disperser
-      paths:
-        - "disperser/**"
-        - "!disperser/cmd/**"
-        - "!disperser/**/mock/**"
-
-    - component_id: node
-      name: Node
-      paths:
-        - "node/**"
-        - "!node/cmd/**"
-        - "!node/**/mock/**"
-
-    - component_id: encoding
-      name: Encoding
-      paths:
-        - "encoding/**"
-        - "!encoding/**/mock/**"

@@ -132,3 +132,18 @@ jobs:
           fail_ci_if_error: true
           verbose: true
 
+  # Final job to satisfy branch protection rules
+  Unit Tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [main-unit-tests, litt-unit-tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [[ "${{ needs.main-unit-tests.result }}" != "success" || "${{ needs.litt-unit-tests.result }}" != "success" ]]; then
+            echo "One or more test jobs failed"
+            exit 1
+          fi
+          echo "All test jobs passed successfully"
+
