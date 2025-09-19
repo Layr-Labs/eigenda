@@ -29,6 +29,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
@@ -380,8 +381,13 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		return err
 	}
 
+	kzgVerifierV2, err := verifierv2.NewVerifier(kzgConfig, nil)
+	if err != nil {
+		return fmt.Errorf("new verifier v2: %w", err)
+	}
+
 	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),

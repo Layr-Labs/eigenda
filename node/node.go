@@ -26,11 +26,13 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/node/ejection"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -197,7 +199,12 @@ func NewNode(
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
-	validatorV2 := corev2.NewShardValidator(v, config.ID, logger)
+
+	verifierV2, err := verifierv2.NewVerifier(&config.EncoderConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create verifier: %w", err)
+	}
+	validatorV2 := corev2.NewShardValidator(verifierV2, config.ID, logger)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -385,7 +392,14 @@ func NewNode(
 func (n *Node) startEjectionSentinel() error {
 	ejectionContractAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.EigenDAEjectionManager)
 	if err != nil {
-		return fmt.Errorf("failed to get ejection contract address: %w", err)
+		n.Logger.Error("Failed to get ejection contract address, ejection defense will be disabled. " +
+			"If the new ejection contracts have not yet been deployed to this environment, " +
+			"then this is expected and this error can be ignored.")
+		return nil
+
+		// TODO(cody.littley): this should return a fatal error once we've
+		//  deployed the new ejection contracts to mainnet.
+		//return fmt.Errorf("failed to get ejection contract address: %w", err)
 	}
 
 	var privateKey *ecdsa.PrivateKey

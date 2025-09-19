@@ -7,17 +7,18 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 )
 
 type LocalEncoderClient struct {
 	mu sync.Mutex
 
-	prover encoding.Prover
+	prover *prover.Prover
 }
 
 var _ EncoderClient = (*LocalEncoderClient)(nil)
 
-func NewLocalEncoderClient(prover encoding.Prover) *LocalEncoderClient {
+func NewLocalEncoderClient(prover *prover.Prover) *LocalEncoderClient {
 	return &LocalEncoderClient{
 		prover: prover,
 	}
