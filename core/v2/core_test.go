@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -72,22 +71,27 @@ func TestMain(m *testing.M) {
 
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
 func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
-	config := &kzg.KzgConfig{
+	proverConfig := &prover.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
+		G2TrailingPath:  "../../resources/srs/g2.trailing.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    true,
 	}
+	verifierConfig := &verifier.KzgConfig{
+		SRSNumberToLoad: 8192,
+		G1Path:          "../../resources/srs/g1.point",
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
 
-	p, err := prover.NewProver(config, nil)
+	p, err := prover.NewProver(proverConfig, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, nil)
+	v, err := verifier.NewVerifier(verifierConfig, nil)
 	if err != nil {
 		return nil, nil, err
 	}

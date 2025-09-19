@@ -274,7 +274,7 @@ func setupPayloadDisperserWithRouter() error {
 		logger,
 		disperserClientConfig,
 		signer,
-		nil,
+		nil, // no prover so will query disperser for generating commitments
 		accountant,
 		metrics.NoopDispersalMetrics,
 	)
@@ -381,7 +381,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		return err
 	}
 
-	kzgVerifierV2, err := verifierv2.NewVerifier(kzgConfig, nil)
+	kzgVerifierV2, err := verifierv2.NewVerifier(verifierv2.KzgConfigFromV1Config(kzgConfig), nil)
 	if err != nil {
 		return fmt.Errorf("new verifier v2: %w", err)
 	}
