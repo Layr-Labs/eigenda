@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
@@ -294,6 +295,7 @@ func RunController(ctx *cli.Context) error {
 				gethClient,
 				dynamoClient.GetAwsClient(),
 				logger,
+				metricsRegistry,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
@@ -360,6 +362,7 @@ func buildPaymentAuthorizationHandler(
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
 	logger logging.Logger,
+	metricsRegistry *prometheus.Registry,
 ) (*controllerpayments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -409,9 +412,12 @@ func buildPaymentAuthorizationHandler(
 		return nil, fmt.Errorf("create reservation payment validator: %w", err)
 	}
 
+	paymentAuthMetrics := metrics.NewPaymentAuthorizationMetrics(metricsRegistry)
+
 	return controllerpayments.NewPaymentAuthorizationHandler(
 		onDemandMeterer,
 		onDemandValidator,
 		reservationValidator,
+		paymentAuthMetrics,
 	), nil
 }

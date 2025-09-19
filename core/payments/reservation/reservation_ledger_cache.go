@@ -247,3 +247,8 @@ func (c *ReservationLedgerCache) acquireLedgerLock(accountID gethcommon.Address)
 		c.ledgerCreationLock.Unlock(accountIndex)
 	}
 }
+
+// Returns the current number of entries in the cache.
+func (c *ReservationLedgerCache) Size() int {
+	return c.cache.Len()
+}
