@@ -3,14 +3,10 @@ pub mod tracing;
 
 use std::str::FromStr;
 
-use sov_eigenda_adapter::{
-    service::{
-        EigenDaService, EigenDaServiceError,
-        config::{EigenDaConfig, Network},
-    },
-    spec::{NamespaceId, RollupParams},
-    verifier::EigenDaVerifier,
-};
+use sov_eigenda_adapter::service::config::{EigenDaConfig, Network};
+use sov_eigenda_adapter::service::{EigenDaService, EigenDaServiceError};
+use sov_eigenda_adapter::spec::{NamespaceId, RollupParams};
+use sov_eigenda_adapter::verifier::EigenDaVerifier;
 use sov_rollup_interface::da::DaVerifier;
 
 pub static SEQUENCER_SIGNER: &str =

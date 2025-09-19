@@ -1,45 +1,39 @@
-use std::{hash::Hash, str::FromStr};
+use std::hash::Hash;
+use std::str::FromStr;
 
-use alloy_consensus::{
-    EthereumTxEnvelope, Header, Transaction, TxEip4844,
-    serde_bincode_compat::{self},
-};
+use alloy_consensus::serde_bincode_compat::{self};
+use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
 use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, B256, FixedBytes, TxHash, wrap_fixed_bytes};
 use borsh::{BorshDeserialize, BorshSerialize};
 use bytes::Bytes;
-use reth_trie_common::{AccountProof, proof::ProofVerificationError};
+use reth_trie_common::AccountProof;
+use reth_trie_common::proof::ProofVerificationError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sov_rollup_interface::{
-    BasicAddress,
-    da::{BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time},
-    sov_universal_wallet::UniversalWallet,
+use sov_rollup_interface::BasicAddress;
+use sov_rollup_interface::da::{
+    BlobReaderTrait, BlockHashTrait, BlockHeaderTrait, CountedBufReader, DaSpec, Time,
 };
+use sov_rollup_interface::sov_universal_wallet::UniversalWallet;
 use tracing::instrument;
 
+use crate::eigenda::cert::StandardCommitment;
+use crate::eigenda::extraction::{
+    ApkHistoryExtractor, DataDecoder, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
+    OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
+    SecurityThresholdsV2Extractor, TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
+};
 #[cfg(feature = "stale-stakes-forbidden")]
 use crate::eigenda::extraction::{
     MinWithdrawalDelayBlocksExtractor, QuorumUpdateBlockNumberExtractor,
     StaleStakesForbiddenExtractor,
 };
-
-use crate::{
-    eigenda::{
-        cert::StandardCommitment,
-        extraction::{
-            ApkHistoryExtractor, DataDecoder, NextBlobVersionExtractor,
-            OperatorBitmapHistoryExtractor, OperatorStakeHistoryExtractor, QuorumCountExtractor,
-            QuorumNumbersRequiredV2Extractor, SecurityThresholdsV2Extractor,
-            TotalStakeHistoryExtractor, VersionedBlobParamsExtractor,
-        },
-        verification::cert::{
-            CertVerificationInputs, error::CertVerificationError, types::Storage,
-        },
-    },
-    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
-};
+use crate::eigenda::verification::cert::CertVerificationInputs;
+use crate::eigenda::verification::cert::error::CertVerificationError;
+use crate::eigenda::verification::cert::types::Storage;
+use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof};
 
 /// A specification for the types used by a DA layer.
 #[derive(
@@ -534,8 +528,9 @@ mod tests {
 
     #[cfg(feature = "arbitrary")]
     mod proptest_tests {
-        use super::*;
         use test_strategy::proptest;
+
+        use super::*;
 
         #[proptest]
         fn validate_json_schema(input: EthereumAddress) {

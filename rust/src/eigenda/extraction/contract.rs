@@ -4,21 +4,17 @@
 //! aggregating the storage keys needed for certificate verification.
 
 use alloy_primitives::StorageKey;
-
 #[cfg(feature = "stale-stakes-forbidden")]
 pub use stale_stakes_forbidden::*;
 
+use crate::eigenda::cert::StandardCommitment;
 #[cfg(feature = "stale-stakes-forbidden")]
 use crate::eigenda::extraction::QuorumUpdateBlockNumberExtractor;
-
-use crate::eigenda::{
-    cert::StandardCommitment,
-    extraction::{
-        ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
-        OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-        SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
-        VersionedBlobParamsExtractor,
-    },
+use crate::eigenda::extraction::{
+    ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
+    OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
+    SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
+    VersionedBlobParamsExtractor,
 };
 
 /// Interface for the RegistryCoordinator contract
@@ -171,11 +167,9 @@ mod stale_stakes_forbidden {
 
     use alloy_primitives::StorageKey;
 
-    use crate::eigenda::{
-        cert::StandardCommitment,
-        extraction::{
-            MinWithdrawalDelayBlocksExtractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
-        },
+    use crate::eigenda::cert::StandardCommitment;
+    use crate::eigenda::extraction::{
+        MinWithdrawalDelayBlocksExtractor, StaleStakesForbiddenExtractor, StorageKeyProvider,
     };
 
     /// Interface for the EigenDA Service Manager contract (stale stakes functionality)
@@ -239,20 +233,17 @@ mod stale_stakes_forbidden {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::eigenda::{
-        cert::StandardCommitment,
-        extraction::{
-            ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
-            OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
-            SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
-            VersionedBlobParamsExtractor,
-            contract::{
-                BlsApkRegistry, EigenDaCertVerifier, EigenDaThresholdRegistry, RegistryCoordinator,
-                StakeRegistry,
-            },
-        },
+    use crate::eigenda::cert::StandardCommitment;
+    use crate::eigenda::extraction::contract::{
+        BlsApkRegistry, EigenDaCertVerifier, EigenDaThresholdRegistry, RegistryCoordinator,
+        StakeRegistry,
     };
-
+    use crate::eigenda::extraction::{
+        ApkHistoryExtractor, NextBlobVersionExtractor, OperatorBitmapHistoryExtractor,
+        OperatorStakeHistoryExtractor, QuorumCountExtractor, QuorumNumbersRequiredV2Extractor,
+        SecurityThresholdsV2Extractor, StorageKeyProvider, TotalStakeHistoryExtractor,
+        VersionedBlobParamsExtractor,
+    };
     #[cfg(feature = "stale-stakes-forbidden")]
     use crate::eigenda::extraction::{
         MinWithdrawalDelayBlocksExtractor, QuorumUpdateBlockNumberExtractor,

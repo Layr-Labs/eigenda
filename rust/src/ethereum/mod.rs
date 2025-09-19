@@ -10,9 +10,7 @@ use crate::eigenda::cert::StandardCommitment;
 /// certificate exists.
 #[instrument(skip_all)]
 pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<StandardCommitment> {
-    let eip4844_tx = tx.as_eip1559()?;
-    let raw_cert = eip4844_tx.input();
-
+    let raw_cert = tx.as_eip1559()?.input();
     StandardCommitment::from_rlp_bytes(raw_cert).ok()
 }
 
@@ -20,13 +18,12 @@ pub fn extract_certificate(tx: &EthereumTxEnvelope<TxEip4844>) -> Option<Standar
 pub mod tests {
     use std::borrow::Cow;
 
-    use alloy_provider::{RootProvider, ext::AnvilApi};
+    use alloy_provider::RootProvider;
+    use alloy_provider::ext::AnvilApi;
     use alloy_rpc_types::anvil::MineOptions;
-    use testcontainers::{
-        ContainerAsync, Image,
-        core::{ContainerPort, WaitFor},
-        runners::AsyncRunner,
-    };
+    use testcontainers::core::{ContainerPort, WaitFor};
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers::{ContainerAsync, Image};
 
     /// Start local ethereum development node.
     #[allow(dead_code)]

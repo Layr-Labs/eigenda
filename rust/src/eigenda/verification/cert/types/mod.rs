@@ -7,14 +7,15 @@
 pub mod conversions;
 pub mod history;
 
-use alloy_primitives::{B256, aliases::U96};
+use alloy_primitives::B256;
+use alloy_primitives::aliases::U96;
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
-use crate::eigenda::{
-    cert::solidity::VersionedBlobParams,
-    verification::cert::{bitmap::Bitmap, hash::TruncHash, types::history::History},
-};
+use crate::eigenda::cert::solidity::VersionedBlobParams;
+use crate::eigenda::verification::cert::bitmap::Bitmap;
+use crate::eigenda::verification::cert::hash::TruncHash;
+use crate::eigenda::verification::cert::types::history::History;
 
 /// Identifier for a quorum (0-255)
 pub type QuorumNumber = u8;

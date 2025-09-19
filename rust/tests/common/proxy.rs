@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
-use testcontainers::{
-    ContainerAsync, Image,
-    core::{ContainerPort, WaitFor},
-    runners::AsyncRunner,
-};
+use testcontainers::core::{ContainerPort, WaitFor};
+use testcontainers::runners::AsyncRunner;
+use testcontainers::{ContainerAsync, Image};
 
 use crate::common::SEQUENCER_SIGNER;
 

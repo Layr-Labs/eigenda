@@ -1,6 +1,8 @@
 pub mod config;
 
-use std::{ops::Not, str::FromStr, time::Duration};
+use std::ops::Not;
+use std::str::FromStr;
+use std::time::Duration;
 
 use alloy_consensus::TxEip4844;
 use alloy_consensus::transaction::SignerRecoverable;
@@ -12,38 +14,34 @@ use alloy_rpc_types_eth::{EIP1186AccountProofResponse, Transaction, TransactionR
 use alloy_signer_local::{LocalSigner, PrivateKeySigner};
 use alloy_transport::{RpcError, TransportErrorKind};
 use async_trait::async_trait;
-use backon::ExponentialBuilder;
-use backon::Retryable;
+use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use futures::future::try_join_all;
 use reth_trie_common::AccountProof;
 use serde::{Deserialize, Serialize};
-use sov_rollup_interface::{
-    common::HexHash,
-    da::{BlobReaderTrait, BlockHeaderTrait, DaProof, DaSpec, RelevantBlobs, RelevantProofs, Time},
-    node::da::{DaService, SlotData, SubmitBlobReceipt},
+use sov_rollup_interface::common::HexHash;
+use sov_rollup_interface::da::{
+    BlobReaderTrait, BlockHeaderTrait, DaProof, DaSpec, RelevantBlobs, RelevantProofs, Time,
 };
+use sov_rollup_interface::node::da::{DaService, SlotData, SubmitBlobReceipt};
 use thiserror::Error;
-use tokio::{sync::oneshot, time::sleep};
-use tracing::info;
-use tracing::{debug, error, instrument, warn};
+use tokio::sync::oneshot;
+use tokio::time::sleep;
+use tracing::{debug, error, info, instrument, warn};
 
+use crate::eigenda::cert::StandardCommitment;
+use crate::eigenda::extraction::contract;
+use crate::eigenda::proxy::{ProxyClient, ProxyError};
 use crate::eigenda::verification::blob::codec::decode_encoded_payload;
-use crate::{
-    eigenda::{
-        cert::StandardCommitment,
-        extraction::contract,
-        proxy::{ProxyClient, ProxyError},
-        verification::{verify_cert, verify_cert_recency},
-    },
-    ethereum::{extract_certificate, provider::init_ethereum_provider},
-    service::config::{EigenDaConfig, EigenDaContracts, Network},
-    spec::{
-        BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
-        EthereumHash, NamespaceId, RollupParams, TransactionWithBlob,
-    },
-    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier},
+use crate::eigenda::verification::{verify_cert, verify_cert_recency};
+use crate::ethereum::extract_certificate;
+use crate::ethereum::provider::init_ethereum_provider;
+use crate::service::config::{EigenDaConfig, EigenDaContracts, Network};
+use crate::spec::{
+    BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
+    EthereumHash, NamespaceId, RollupParams, TransactionWithBlob,
 };
+use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier};
 
 /// Possible errors that can happen when using [`EigenDaService`].
 #[derive(Debug, Error)]
@@ -217,7 +215,7 @@ impl EigenDaService {
             if let Err(err) =
                 verify_cert_recency(header, cert.reference_block(), self.cert_recency_window)
             {
-                warn!(
+                debug!(
                     ?header,
                     ?cert,
                     ?err,
@@ -238,7 +236,7 @@ impl EigenDaService {
             // Verify the certificate against the state
             let cert_state = self.fetch_cert_state(header.height(), &cert).await?;
             if let Err(err) = verify_cert(header, &cert_state, &cert) {
-                warn!(
+                debug!(
                     ?header,
                     ?cert,
                     ?err,
@@ -351,7 +349,9 @@ impl EigenDaService {
             stake_registry,
             cert_verifier,
             delegation_manager,
-        ]: [EIP1186AccountProofResponse; 7] = responses.try_into().expect("Expected 8 elements");
+        ]: [EIP1186AccountProofResponse; 7] = responses
+            .try_into()
+            .expect("Expected correct number of elements");
 
         #[cfg(not(feature = "stale-stakes-forbidden"))]
         let [
@@ -360,7 +360,9 @@ impl EigenDaService {
             bls_apk_registry,
             stake_registry,
             cert_verifier,
-        ]: [EIP1186AccountProofResponse; 5] = responses.try_into().expect("Expected 6 elements");
+        ]: [EIP1186AccountProofResponse; 5] = responses
+            .try_into()
+            .expect("Expected correct number of elements");
 
         Ok(CertificateStateData {
             threshold_registry: AccountProof::from(threshold_registry),

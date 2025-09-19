@@ -6,10 +6,11 @@
 
 use std::fmt::Display;
 
-use crate::eigenda::cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 use alloy_primitives::{B256, Keccak256, keccak256};
 use alloy_sol_types::SolValue;
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From, Into};
+
+use crate::eigenda::cert::{BatchHeaderV2, BlobCertificate, BlobHeaderV2};
 
 /// A truncated 24-byte hash used for aggregate public key identification.
 ///
@@ -104,10 +105,8 @@ mod tests {
 
     use alloy_primitives::{B256, Bytes, keccak256};
 
-    use crate::eigenda::{
-        cert::{BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2},
-        verification::cert::hash::{HashExt, TruncHash, streaming_keccak256},
-    };
+    use crate::eigenda::cert::{BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2};
+    use crate::eigenda::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
 
     #[test]
     fn blob_certificate_hash_ext() {

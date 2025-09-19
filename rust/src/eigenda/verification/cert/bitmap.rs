@@ -90,8 +90,9 @@ pub fn bit_indices_to_bitmap(
     bit_indices: &Bytes,
     upper_bound_bit_index: Option<u8>,
 ) -> Result<Bitmap, BitmapError> {
-    use BitmapError::*;
     use core::cmp::Ordering::*;
+
+    use BitmapError::*;
 
     let upper_bound_bit_index = upper_bound_bit_index.unwrap_or(u8::MAX);
 
@@ -128,8 +129,9 @@ pub fn bit_indices_to_bitmap(
 
 #[cfg(test)]
 mod tests {
+    use crate::eigenda::verification::cert::bitmap::BitmapError::*;
     use crate::eigenda::verification::cert::bitmap::{
-        Bitmap, BitmapError::*, MAX_BIT_INDICES_LENGTH, bit_indices_to_bitmap,
+        Bitmap, MAX_BIT_INDICES_LENGTH, bit_indices_to_bitmap,
     };
 
     #[test]

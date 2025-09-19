@@ -20,8 +20,7 @@
 pub(crate) mod solidity;
 
 use alloy_primitives::{B256, Bytes, FixedBytes, U256};
-use alloy_rlp::{Decodable, RlpDecodable, RlpEncodable};
-use alloy_rlp::{Encodable, Error};
+use alloy_rlp::{Decodable, Encodable, Error, RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -549,8 +548,9 @@ pub enum StandardCommitmentParseError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloy_primitives::{Bytes, U256};
+
+    use super::*;
 
     #[test]
     fn v2_serialization_round_trip() {

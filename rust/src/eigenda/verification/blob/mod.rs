@@ -53,16 +53,16 @@ pub mod srs;
 
 use std::sync::LazyLock;
 
-use crate::eigenda::{
-    cert::{BlobCommitment, G1Point},
-    verification::blob::codec::BYTES_PER_SYMBOL,
-};
 use ark_bn254::G1Affine;
 use ark_serialize::CanonicalDeserialize;
 use rust_kzg_bn254_primitives::blob::Blob;
-use rust_kzg_bn254_prover::{kzg::KZG, srs::SRS};
+use rust_kzg_bn254_prover::kzg::KZG;
+use rust_kzg_bn254_prover::srs::SRS;
 
-use crate::eigenda::verification::blob::{error::BlobVerificationError, srs::SerializableSRS};
+use crate::eigenda::cert::{BlobCommitment, G1Point};
+use crate::eigenda::verification::blob::codec::BYTES_PER_SYMBOL;
+use crate::eigenda::verification::blob::error::BlobVerificationError;
+use crate::eigenda::verification::blob::srs::SerializableSRS;
 
 const SRS_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/srs.bin"));
 
@@ -184,9 +184,9 @@ fn verify_kzg_commitment(
 
 #[cfg(test)]
 mod test {
+    use crate::eigenda::verification::blob::error::BlobVerificationError::*;
     use crate::eigenda::verification::blob::{
-        error::BlobVerificationError::*, verify_blob_symbols_len_against_commitment,
-        verify_commitment_len_is_power_of_two,
+        verify_blob_symbols_len_against_commitment, verify_commitment_len_is_power_of_two,
     };
 
     // This test takes ~40s in debug (~3s in release) on an M2 due to 16MiB SRS one-time deserialization
@@ -196,12 +196,13 @@ mod test {
     #[test]
     #[cfg(not(debug_assertions))]
     fn verify_succeeds_with_known_commitment() {
-        use crate::eigenda::{
-            cert::BlobCommitment,
-            verification::blob::{codec::tests::encode_raw_payload, verify},
-        };
-        use ark_bn254::{Fq, G1Affine, G2Affine};
         use std::str::FromStr;
+
+        use ark_bn254::{Fq, G1Affine, G2Affine};
+
+        use crate::eigenda::cert::BlobCommitment;
+        use crate::eigenda::verification::blob::codec::tests::encode_raw_payload;
+        use crate::eigenda::verification::blob::verify;
 
         let raw_payload = [123; 512];
         let encoded_payload = encode_raw_payload(&raw_payload).unwrap();

@@ -7,10 +7,8 @@
 use alloy_primitives::StorageKey;
 use reth_trie_common::StorageProof;
 
-use crate::eigenda::{
-    extraction::CertExtractionError,
-    verification::cert::types::history::{HistoryError, Update},
-};
+use crate::eigenda::extraction::CertExtractionError;
+use crate::eigenda::verification::cert::types::history::{HistoryError, Update};
 
 /// Find a storage proof by key and return error if missing
 ///
@@ -84,11 +82,9 @@ mod tests {
     use alloy_primitives::{B256, StorageKey, U256};
     use reth_trie_common::StorageProof;
 
-    use crate::eigenda::{
-        extraction::CertExtractionError, verification::cert::types::history::HistoryError,
-    };
-
     use super::{create_update, find_required_proof};
+    use crate::eigenda::extraction::CertExtractionError;
+    use crate::eigenda::verification::cert::types::history::HistoryError;
 
     fn create_test_storage_proof(key: StorageKey, value: U256) -> StorageProof {
         StorageProof {

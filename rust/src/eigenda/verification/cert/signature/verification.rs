@@ -23,13 +23,12 @@
 
 use alloy_primitives::B256;
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
-use ark_ec::{
-    AffineRepr, CurveGroup,
-    pairing::{Pairing, PairingOutput},
-};
+use ark_ec::pairing::{Pairing, PairingOutput};
+use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{AdditiveGroup, PrimeField};
 
-use crate::eigenda::verification::cert::{convert, hash::streaming_keccak256};
+use crate::eigenda::verification::cert::convert;
+use crate::eigenda::verification::cert::hash::streaming_keccak256;
 
 /// Verify a BLS signature using bilinear pairings.
 ///
@@ -114,10 +113,8 @@ mod tests {
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
     use ark_ec::{AffineRepr, CurveGroup, PrimeGroup};
 
-    use crate::eigenda::verification::cert::{
-        convert,
-        signature::verification::{compute_gamma, verify},
-    };
+    use crate::eigenda::verification::cert::convert;
+    use crate::eigenda::verification::cert::signature::verification::{compute_gamma, verify};
 
     #[test]
     fn signature_roundtrip() {

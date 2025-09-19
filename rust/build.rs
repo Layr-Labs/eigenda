@@ -1,11 +1,12 @@
 #[path = "src/eigenda/verification/blob/srs.rs"]
 mod srs;
 
+use std::env;
+use std::path::Path;
+
 use ark_serialize::CanonicalSerialize;
 use rust_kzg_bn254_prover::srs::SRS;
 use srs::SerializableSRS;
-use std::env;
-use std::path::Path;
 
 use crate::srs::POINTS_TO_LOAD;
 

@@ -1,4 +1,5 @@
-use alloy_consensus::{proofs::calculate_transaction_root, transaction::SignerRecoverable};
+use alloy_consensus::proofs::calculate_transaction_root;
+use alloy_consensus::transaction::SignerRecoverable;
 use alloy_primitives::B256;
 use bytes::Bytes;
 use reth_trie_common::proof::ProofVerificationError;
@@ -9,16 +10,13 @@ use sov_rollup_interface::da::{
 use thiserror::Error;
 use tracing::instrument;
 
-use crate::{
-    eigenda::verification::{
-        blob::{codec::decode_encoded_payload, error::BlobVerificationError},
-        verify_blob, verify_cert, verify_cert_recency,
-    },
-    ethereum::extract_certificate,
-    spec::{
-        BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash,
-        NamespaceId, TransactionWithBlob,
-    },
+use crate::eigenda::verification::blob::codec::decode_encoded_payload;
+use crate::eigenda::verification::blob::error::BlobVerificationError;
+use crate::eigenda::verification::{verify_blob, verify_cert, verify_cert_recency};
+use crate::ethereum::extract_certificate;
+use crate::spec::{
+    BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash, NamespaceId,
+    TransactionWithBlob,
 };
 
 /// Errors that may occur when verifying with the [`EigenDaVerifier`].
@@ -438,13 +436,15 @@ impl EigenDaInclusionProof {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::spec::EthereumBlockHeader;
+    use std::str::FromStr;
+
     use alloy_consensus::{EthereumTxEnvelope, Header, SignableTransaction, TxEip1559, TxEnvelope};
     use alloy_primitives::{Address, TxKind, address};
     use alloy_signer::Signature;
     use bytes::Bytes;
-    use std::str::FromStr;
+
+    use super::*;
+    use crate::spec::EthereumBlockHeader;
 
     fn create_test_header(
         number: u64,
@@ -691,7 +691,7 @@ mod tests {
         let hash1 = B256::from_slice(&[1; 32]);
         let hash2 = B256::from_slice(&[2; 32]);
         let merkle_error = CompletenessProofError::MerkleRootMismatch(hash1, hash2);
-        let merkle_string = format!("{}", merkle_error);
+        let merkle_string = format!("{merkle_error}");
         assert!(merkle_string.contains("Recomputed merkle root"));
     }
 
@@ -699,11 +699,11 @@ mod tests {
     fn test_inclusion_proof_error_display() {
         let tx_hash = B256::from_slice(&[1; 32]);
         let error = InclusionProofError::NotProvenTransaction(tx_hash);
-        let error_string = format!("{}", error);
+        let error_string = format!("{error}");
         assert!(error_string.contains("wasn't part of the completeness proof"));
 
         let incomplete_error = InclusionProofError::ProofIncomplete;
-        let incomplete_string = format!("{}", incomplete_error);
+        let incomplete_string = format!("{incomplete_error}");
         assert!(incomplete_string.contains("some relevant transactions are missing"));
     }
 }

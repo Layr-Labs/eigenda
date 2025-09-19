@@ -2,30 +2,24 @@
 
 mod common;
 
-use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use anyhow::Ok;
 use bytes::Bytes;
 use rand::{Rng, RngCore};
-use sov_eigenda_adapter::{
-    service::EigenDaService,
-    spec::{BlobWithSender, EthereumBlockHeader},
-    verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier},
+use sov_eigenda_adapter::service::EigenDaService;
+use sov_eigenda_adapter::spec::{BlobWithSender, EthereumBlockHeader};
+use sov_eigenda_adapter::verifier::{
+    EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVerifier,
 };
-use sov_rollup_interface::{
-    common::HexHash,
-    da::{BlobReaderTrait, DaVerifier, RelevantBlobs, RelevantProofs},
-    node::da::DaService,
-};
+use sov_rollup_interface::common::HexHash;
+use sov_rollup_interface::da::{BlobReaderTrait, DaVerifier, RelevantBlobs, RelevantProofs};
+use sov_rollup_interface::node::da::DaService;
 use tracing::info;
 
-use crate::common::{
-    proxy::{ProxyNetwork, start_proxy},
-    setup_adapter,
-};
+use crate::common::proxy::{ProxyNetwork, start_proxy};
+use crate::common::setup_adapter;
 
 #[tokio::test]
 async fn submit_extract_verify_e2e() {

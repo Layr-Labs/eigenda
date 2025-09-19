@@ -1,21 +1,18 @@
-use crate::eigenda::{
-    cert::{BlobCertificate, G1Point},
-    verification::cert::hash::{HashExt, streaming_keccak256},
-};
-use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
+use alloy_primitives::aliases::U96;
+use alloy_primitives::{B256, Bytes, keccak256};
 use alloy_sol_types::SolValue;
 use hashbrown::HashMap;
 use tracing::{Level, instrument};
 
-use crate::eigenda::{
-    cert::solidity::{SecurityThresholds, VersionedBlobParams},
-    verification::cert::{
-        bitmap::{Bitmap, bit_indices_to_bitmap},
-        convert,
-        error::CertVerificationError::{self, *},
-        hash::TruncHash,
-        types::{BlockNumber, NonSigner, Quorum, QuorumNumber, Version, history::History},
-    },
+use crate::eigenda::cert::solidity::{SecurityThresholds, VersionedBlobParams};
+use crate::eigenda::cert::{BlobCertificate, G1Point};
+use crate::eigenda::verification::cert::bitmap::{Bitmap, bit_indices_to_bitmap};
+use crate::eigenda::verification::cert::convert;
+use crate::eigenda::verification::cert::error::CertVerificationError::{self, *};
+use crate::eigenda::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
+use crate::eigenda::verification::cert::types::history::History;
+use crate::eigenda::verification::cert::types::{
+    BlockNumber, NonSigner, Quorum, QuorumNumber, Version,
 };
 
 const THRESHOLD_DENOMINATOR: u128 = 100; // uint256 in sol
@@ -479,7 +476,8 @@ fn leaf_node_belongs_to_merkle_tree(
 
 #[cfg(test)]
 mod test_blob_version {
-    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
 
     #[test]
     fn success_when_cert_version_less_than_next_version() {
@@ -502,7 +500,8 @@ mod test_blob_version {
 
 #[cfg(test)]
 mod test_equal_lengths_and_not_empty {
-    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
 
     #[test]
     fn equal_lengths_success() {
@@ -550,9 +549,9 @@ mod test_equal_lengths_and_not_empty {
 #[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_non_signers_strictly_sorted_by_hash {
-    use crate::eigenda::verification::cert::{
-        check, error::CertVerificationError::*, types::NonSigner,
-    };
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::types::NonSigner;
 
     #[test]
     fn strictly_sorted_by_hash() {
@@ -604,7 +603,8 @@ mod test_non_signers_strictly_sorted_by_hash {
 #[cfg(feature = "stale-stakes-forbidden")]
 #[cfg(test)]
 mod test_quorums_last_updated_after_most_recent_stale_block {
-    use crate::eigenda::verification::cert::{check, error::CertVerificationError::*};
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
 
     #[test]
     fn quorums_last_updated_after_most_recent_stale_block() {
@@ -733,15 +733,12 @@ mod test_cert_apks_equal_storage_apks {
     use ark_ec::{CurveGroup, PrimeGroup};
     use hashbrown::HashMap;
 
-    use crate::eigenda::verification::cert::{
-        check, convert,
-        error::CertVerificationError::*,
-        hash::TruncHash,
-        types::{
-            BlockNumber,
-            history::{History, HistoryError::*, Update},
-        },
-    };
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::hash::TruncHash;
+    use crate::eigenda::verification::cert::types::BlockNumber;
+    use crate::eigenda::verification::cert::types::history::HistoryError::*;
+    use crate::eigenda::verification::cert::types::history::{History, Update};
+    use crate::eigenda::verification::cert::{check, convert};
 
     #[test]
     fn cert_apk_equal_storage_apk() {
@@ -891,10 +888,10 @@ mod test_cert_apks_equal_storage_apks {
 mod test_security_assumptions_are_met {
     use hashbrown::HashMap;
 
-    use crate::eigenda::{
-        cert::solidity::{SecurityThresholds, VersionedBlobParams},
-        verification::cert::{check, error::CertVerificationError::*, types::Version},
-    };
+    use crate::eigenda::cert::solidity::{SecurityThresholds, VersionedBlobParams};
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::types::Version;
 
     #[test]
     fn success_when_security_assumptions_are_met() {
@@ -1038,9 +1035,10 @@ mod test_confirmed_quorums_contains_blob_quorums {
     use alloy_primitives::aliases::U96;
     use ark_bn254::G1Affine;
 
-    use crate::eigenda::verification::cert::{
-        bitmap::BitmapError::*, check, error::CertVerificationError::*, types::Quorum,
-    };
+    use crate::eigenda::verification::cert::bitmap::BitmapError::*;
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::types::Quorum;
 
     #[test]
     fn success_when_confirmed_quorums_contain_blob_quorums() {
@@ -1191,9 +1189,9 @@ mod test_confirmed_quorums_contains_blob_quorums {
 
 #[cfg(test)]
 mod test_blob_quorums_contains_required_quorums {
-    use crate::eigenda::verification::cert::{
-        bitmap::BitmapError::*, check, error::CertVerificationError::*,
-    };
+    use crate::eigenda::verification::cert::bitmap::BitmapError::*;
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
 
     #[test]
     fn success_when_blob_quorums_contain_required_quorums() {
@@ -1243,9 +1241,9 @@ mod test_blob_quorums_contains_required_quorums {
 mod test_leaf_node_belongs_to_merkle_tree {
     use alloy_primitives::FixedBytes;
 
-    use crate::eigenda::verification::cert::{
-        check, error::CertVerificationError::*, hash::streaming_keccak256,
-    };
+    use crate::eigenda::verification::cert::check;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::hash::streaming_keccak256;
 
     #[test]
     fn single_level_tree_left_child() {

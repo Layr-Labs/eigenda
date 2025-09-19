@@ -4,7 +4,8 @@ use alloy_signer_local::PrivateKeySigner;
 use alloy_transport::layers::RetryBackoffLayer;
 use rustls::crypto::{CryptoProvider, aws_lc_rs};
 
-use crate::service::{EigenDaServiceError, config::EigenDaConfig};
+use crate::service::EigenDaServiceError;
+use crate::service::config::EigenDaConfig;
 
 /// Default maximal number of times we retry requests.
 const DEFAULT_MAX_RETRY_TIMES: u32 = 10;

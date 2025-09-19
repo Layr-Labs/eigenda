@@ -100,8 +100,9 @@ pub fn nested_dynamic_array_key(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloy_primitives::hex;
+
+    use super::*;
 
     #[test]
     fn simple_slot_key_test() {

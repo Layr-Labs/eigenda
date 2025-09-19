@@ -41,13 +41,10 @@ pub mod cert;
 use sov_rollup_interface::da::BlockHeaderTrait;
 use tracing::instrument;
 
-use crate::{
-    eigenda::{
-        cert::StandardCommitment,
-        verification::{blob::error::BlobVerificationError, cert::error::CertVerificationError},
-    },
-    spec::{CertificateStateData, EthereumBlockHeader},
-};
+use crate::eigenda::cert::StandardCommitment;
+use crate::eigenda::verification::blob::error::BlobVerificationError;
+use crate::eigenda::verification::cert::error::CertVerificationError;
+use crate::spec::{CertificateStateData, EthereumBlockHeader};
 
 /// Validate certificate recency to prevent stale certificate attacks
 ///
@@ -159,10 +156,9 @@ pub fn verify_blob(
 mod tests {
     use alloy_consensus::Header;
 
-    use crate::{
-        eigenda::verification::{cert::error::CertVerificationError, verify_cert_recency},
-        spec::EthereumBlockHeader,
-    };
+    use crate::eigenda::verification::cert::error::CertVerificationError;
+    use crate::eigenda::verification::verify_cert_recency;
+    use crate::spec::EthereumBlockHeader;
 
     /// Helper function to create a mock EthereumBlockHeader with a given height
     fn create_mock_header(height: u64) -> EthereumBlockHeader {

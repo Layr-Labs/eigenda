@@ -25,10 +25,8 @@
 
 use ark_bn254::{Fr, G1Affine, G1Projective};
 
-use crate::eigenda::verification::cert::{
-    bitmap::{BitmapError, bit_indices_to_bitmap},
-    types::{NonSigner, Quorum},
-};
+use crate::eigenda::verification::cert::bitmap::{BitmapError, bit_indices_to_bitmap};
+use crate::eigenda::verification::cert::types::{NonSigner, Quorum};
 
 /// Compute the aggregate public key of operators who actually signed.
 ///
@@ -91,12 +89,11 @@ mod tests {
     use ark_ff::BigInteger256;
     use bitvec::array::BitArray;
 
-    use crate::eigenda::verification::cert::{
-        bitmap::{BitmapError::*, MAX_BIT_INDICES_LENGTH},
-        convert,
-        signature::aggregation::aggregate,
-        types::{NonSigner, Quorum},
-    };
+    use crate::eigenda::verification::cert::bitmap::BitmapError::*;
+    use crate::eigenda::verification::cert::bitmap::MAX_BIT_INDICES_LENGTH;
+    use crate::eigenda::verification::cert::convert;
+    use crate::eigenda::verification::cert::signature::aggregation::aggregate;
+    use crate::eigenda::verification::cert::types::{NonSigner, Quorum};
 
     #[test]
     fn compute_signers_apk_fails_with_too_many_quorums() {

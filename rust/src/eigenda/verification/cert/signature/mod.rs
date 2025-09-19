@@ -23,13 +23,12 @@ pub mod verification;
 mod tests {
     use std::str::FromStr;
 
-    use crate::eigenda::cert::{G1Point, G2Point, NonSignerStakesAndSignature};
     use alloy_primitives::{B256, U256};
 
-    use crate::eigenda::verification::cert::{
-        signature::{aggregation::aggregate, verification::verify},
-        types::{NonSigner, Quorum, Stake},
-    };
+    use crate::eigenda::cert::{G1Point, G2Point, NonSignerStakesAndSignature};
+    use crate::eigenda::verification::cert::signature::aggregation::aggregate;
+    use crate::eigenda::verification::cert::signature::verification::verify;
+    use crate::eigenda::verification::cert::types::{NonSigner, Quorum, Stake};
 
     #[test]
     fn signature_verification_without_non_signers() {

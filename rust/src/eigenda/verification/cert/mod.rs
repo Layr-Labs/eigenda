@@ -48,22 +48,20 @@ pub mod hash;
 mod signature;
 pub mod types;
 
-use crate::eigenda::{
-    cert::{BatchHeaderV2, BlobInclusionInfo, G1Point, NonSignerStakesAndSignature},
-    verification::cert::types::{BlockNumber, QuorumNumber, Stake, history::History},
-};
 use alloy_primitives::{B256, Bytes};
 use ark_bn254::{G1Affine, G2Affine};
 use hashbrown::HashMap;
 use tracing::instrument;
 
-use crate::eigenda::{
-    cert::solidity::SecurityThresholds,
-    verification::cert::{
-        error::CertVerificationError::{self, *},
-        hash::HashExt,
-        types::{NonSigner, Quorum, Storage},
-    },
+use crate::eigenda::cert::solidity::SecurityThresholds;
+use crate::eigenda::cert::{
+    BatchHeaderV2, BlobInclusionInfo, G1Point, NonSignerStakesAndSignature,
+};
+use crate::eigenda::verification::cert::error::CertVerificationError::{self, *};
+use crate::eigenda::verification::cert::hash::HashExt;
+use crate::eigenda::verification::cert::types::history::History;
+use crate::eigenda::verification::cert::types::{
+    BlockNumber, NonSigner, Quorum, QuorumNumber, Stake, Storage,
 };
 
 /// Input parameters for certificate verification
@@ -436,34 +434,28 @@ fn process_quorums(
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
+    use alloy_primitives::aliases::U96;
+    use alloy_primitives::{B256, Bytes, keccak256};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
     use ark_ec::{CurveGroup, PrimeGroup};
     use hashbrown::HashMap;
 
+    use crate::eigenda::cert::solidity::{SecurityThresholds, VersionedBlobParams};
+    use crate::eigenda::cert::{
+        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo, G1Point,
+        NonSignerStakesAndSignature,
+    };
+    use crate::eigenda::verification::cert::bitmap::Bitmap;
+    use crate::eigenda::verification::cert::bitmap::BitmapError::*;
+    use crate::eigenda::verification::cert::error::CertVerificationError::*;
+    use crate::eigenda::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
     #[cfg(feature = "stale-stakes-forbidden")]
     use crate::eigenda::verification::cert::types::Staleness;
-
-    use crate::eigenda::{
-        cert::{
-            BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
-            G1Point, NonSignerStakesAndSignature,
-            solidity::{SecurityThresholds, VersionedBlobParams},
-        },
-        verification::cert::{
-            CertVerificationInputs,
-            bitmap::{Bitmap, BitmapError::*},
-            convert,
-            error::CertVerificationError::*,
-            hash::{HashExt, TruncHash, streaming_keccak256},
-            types::{
-                Storage,
-                history::{History, HistoryError::*, Update},
-            },
-            verify,
-        },
-    };
+    use crate::eigenda::verification::cert::types::Storage;
+    use crate::eigenda::verification::cert::types::history::HistoryError::*;
+    use crate::eigenda::verification::cert::types::history::{History, Update};
+    use crate::eigenda::verification::cert::{CertVerificationInputs, convert, verify};
 
     #[test]
     fn success() {

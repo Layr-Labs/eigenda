@@ -1,16 +1,16 @@
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
+use std::time::Duration;
 
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use hex::encode;
-use reqwest::{Request, Url, header::CONTENT_TYPE};
+use reqwest::header::CONTENT_TYPE;
+use reqwest::{Request, Url};
 use thiserror::Error;
 use tracing::{error, trace};
 
-use crate::{
-    eigenda::cert::{StandardCommitment, StandardCommitmentParseError},
-    service::config::EigenDaConfig,
-};
+use crate::eigenda::cert::{StandardCommitment, StandardCommitmentParseError};
+use crate::service::config::EigenDaConfig;
 
 /// Default maximal number of times we retry requests.
 const DEFAULT_MAX_RETRY_TIMES: u64 = 10;
@@ -90,22 +90,12 @@ impl ProxyClient {
         match StandardCommitment::from_rlp_bytes(response.as_ref()) {
             Ok(cert) => Ok(cert),
             Err(err) => {
-                // Try to serialize a string from response bytes for a nicer
-                // error message. This error handling could be better. But
-                // currently, we don't really know what to expect from the proxy
-                // in cases when response is not a cert
-                match str::from_utf8(&response) {
-                    Ok(response_body) => {
-                        error!(?err, %response_body, "Error occurred while parsing proxy response");
-                    }
-                    Err(_) => {
-                        error!(
-                            ?err,
-                            response_body = ?response,
-                            "Error occurred while parsing proxy response"
-                        );
-                    }
-                }
+                let response = str::from_utf8(&response);
+                error!(
+                    ?err,
+                    ?response,
+                    "Error occurred while parsing proxy response"
+                );
 
                 Err(err.into())
             }
@@ -176,10 +166,11 @@ impl From<reqwest::Error> for ProxyError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::service::config::{EigenDaConfig, Network};
     use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    use super::*;
+    use crate::service::config::{EigenDaConfig, Network};
 
     fn create_test_config(proxy_url: String) -> EigenDaConfig {
         EigenDaConfig {

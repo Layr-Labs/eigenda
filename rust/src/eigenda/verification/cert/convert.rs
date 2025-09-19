@@ -4,10 +4,12 @@
 //! representation and arkworks' G1Affine, as well as utilities for
 //! deterministic hash-to-curve operations.
 
-use crate::eigenda::{cert::G1Point, verification::cert::hash::streaming_keccak256};
 use alloy_primitives::{B256, Uint};
 use ark_bn254::{Fq, G1Affine};
 use ark_ff::{BigInt, BigInteger, Field, MontFp, PrimeField};
+
+use crate::eigenda::cert::G1Point;
+use crate::eigenda::verification::cert::hash::streaming_keccak256;
 
 /// Field element one in Montgomery form
 const ONE: Fq = MontFp!("1");
@@ -110,11 +112,9 @@ mod tests {
     use ark_bn254::{Fq, G1Affine};
     use ark_ec::AffineRepr;
 
-    use crate::eigenda::{
-        cert::G1Point,
-        verification::cert::convert::{
-            self, fq_to_bytes_be, fq_to_uint, hash_to_big_int, hash_to_point,
-        },
+    use crate::eigenda::cert::G1Point;
+    use crate::eigenda::verification::cert::convert::{
+        self, fq_to_bytes_be, fq_to_uint, hash_to_big_int, hash_to_point,
     };
 
     #[test]

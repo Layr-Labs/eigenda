@@ -6,14 +6,11 @@
 
 use thiserror::Error;
 
-use crate::eigenda::{
-    extraction::CertExtractionError,
-    verification::cert::{
-        bitmap::BitmapError,
-        hash::TruncHash,
-        types::{Version, history::HistoryError},
-    },
-};
+use crate::eigenda::extraction::CertExtractionError;
+use crate::eigenda::verification::cert::bitmap::BitmapError;
+use crate::eigenda::verification::cert::hash::TruncHash;
+use crate::eigenda::verification::cert::types::Version;
+use crate::eigenda::verification::cert::types::history::HistoryError;
 
 /// Errors that can occur during certificate verification
 #[derive(Error, Debug, PartialEq)]

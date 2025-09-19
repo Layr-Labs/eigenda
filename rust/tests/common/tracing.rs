@@ -1,5 +1,6 @@
 use tracing::error;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{EnvFilter, Registry};
 use tracing_tree::HierarchicalLayer;
 
 pub fn init_tracing() {

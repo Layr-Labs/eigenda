@@ -216,10 +216,9 @@ impl Interval {
 mod tests {
     use hashbrown::HashMap;
 
-    use crate::eigenda::verification::cert::types::{
-        BlockNumber,
-        history::{History, HistoryError::*, Interval, Update},
-    };
+    use crate::eigenda::verification::cert::types::BlockNumber;
+    use crate::eigenda::verification::cert::types::history::HistoryError::*;
+    use crate::eigenda::verification::cert::types::history::{History, Interval, Update};
 
     #[test]
     fn element_before_left_is_not_in_interval() {

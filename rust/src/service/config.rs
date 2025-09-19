@@ -7,7 +7,8 @@ use alloy_sol_types::{SolCall, sol};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::service::{EigenDaServiceError, config::IEigenDADirectory::getAddressCall};
+use crate::service::EigenDaServiceError;
+use crate::service::config::IEigenDADirectory::getAddressCall;
 
 /// Configuration for the [`crate::service::EigenDaService`].
 #[derive(Clone, JsonSchema, PartialEq, Serialize, Deserialize)]

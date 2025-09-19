@@ -55,7 +55,8 @@ mod tests {
     use ark_bn254::G1Affine;
     use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-    use crate::eigenda::verification::blob::{SRS, srs::SerializableSRS};
+    use crate::eigenda::verification::blob::SRS;
+    use crate::eigenda::verification::blob::srs::SerializableSRS;
 
     #[test]
     fn srs_conversion_roundtrip() {

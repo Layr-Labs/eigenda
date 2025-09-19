@@ -136,10 +136,11 @@ pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVer
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::eigenda::verification::BlobVerificationError::{self, *};
-
-    use crate::eigenda::verification::blob::{
-        codec::{BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, decode_encoded_payload},
-        error::BlobVerificationError::{BlobTooSmallForHeader, BlobTooSmallForHeaderAndPayload},
+    use crate::eigenda::verification::blob::codec::{
+        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, decode_encoded_payload,
+    };
+    use crate::eigenda::verification::blob::error::BlobVerificationError::{
+        BlobTooSmallForHeader, BlobTooSmallForHeaderAndPayload,
     };
 
     /// Guard byte value used to prefix field elements in the EigenDA encoding.
@@ -504,10 +505,10 @@ pub(crate) mod tests {
 
 #[cfg(all(test, feature = "arbitrary"))]
 mod proptests {
-    use crate::eigenda::verification::blob::codec::{
-        decode_encoded_payload, tests::encode_raw_payload,
-    };
     use proptest::prelude::*;
+
+    use crate::eigenda::verification::blob::codec::decode_encoded_payload;
+    use crate::eigenda::verification::blob::codec::tests::encode_raw_payload;
 
     proptest! {
         #[test]
