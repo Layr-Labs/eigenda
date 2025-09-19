@@ -23,10 +23,10 @@ type EjectionSentinel struct {
 	// the time in between checks for ejection events
 	period time.Duration
 
-	// used execute read eth contract calls
+	// used to execute eth reads
 	caller *contractEigenDAEjectionManager.ContractIEigenDAEjectionManagerCaller
 
-	// used to execute write eth contract calls
+	// used to execute eth writes
 	transactor *contractEigenDAEjectionManager.ContractIEigenDAEjectionManagerTransactor
 
 	// the address of this validator
@@ -94,7 +94,6 @@ func NewEjectionSentinel(
 			return nil, fmt.Errorf("failed to get chain ID: %w", err)
 		}
 
-		// Use bind.NewKeyedTransactorWithChainID like other parts of the codebase
 		transactOpts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transact opts: %w", err)

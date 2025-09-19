@@ -369,8 +369,6 @@ func NewNode(
 		n.checkValidatorRegistration(n.CurrentSocket)
 	}
 
-	// TODO sleep required?
-
 	// Note: it is important to start the ejection sentinel after n.registerValidator(), since the ejection
 	// sentinel requires the validator to be registered onchain in order to properly function.
 	err = n.startEjectionSentinel()
