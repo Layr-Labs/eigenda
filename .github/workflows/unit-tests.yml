@@ -161,3 +161,11 @@ jobs:
         with:
           chart: true
           amend: true
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          flags: unit-tests
+          name: unit-tests-coverage
