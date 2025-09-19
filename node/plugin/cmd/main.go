@@ -143,7 +143,8 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Error: failed to get EigenDAServiceManager address from directory: %v", err)
 		return
 	}
-	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.OperatorStateRetriever)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.TODO(), directory.OperatorStateRetriever)
 	if err != nil {
 		log.Printf("Error: failed to get OperatorStateRetriever address from directory: %v", err)
 		return
