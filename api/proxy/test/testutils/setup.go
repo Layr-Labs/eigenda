@@ -148,6 +148,9 @@ type TestConfig struct {
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
 	UseS3Fallback      bool
+
+	ClientLedgerMode     clientledger.ClientLedgerMode
+	VaultMonitorInterval time.Duration
 }
 
 // NewTestConfig returns a new TestConfig
@@ -172,16 +175,18 @@ func NewTestConfig(
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
-		BackendsToEnable:   backendsToEnable,
-		DispersalBackend:   dispersalBackend,
-		Backend:            backend,
-		Retrievers:         []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-		Expiration:         14 * 24 * time.Hour,
-		UseKeccak256ModeS3: false,
-		UseS3Caching:       false,
-		UseS3Fallback:      false,
-		WriteThreadCount:   0,
-		WriteOnCacheMiss:   false,
+		BackendsToEnable:     backendsToEnable,
+		DispersalBackend:     dispersalBackend,
+		Backend:              backend,
+		Retrievers:           []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		Expiration:           14 * 24 * time.Hour,
+		UseKeccak256ModeS3:   false,
+		UseS3Caching:         false,
+		UseS3Fallback:        false,
+		WriteThreadCount:     0,
+		WriteOnCacheMiss:     false,
+		ClientLedgerMode:     clientledger.ClientLedgerModeLegacy,
+		VaultMonitorInterval: 30 * time.Second,
 	}
 }
 
