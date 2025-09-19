@@ -221,6 +221,12 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+
+		// V2 inabox test is setup with a client that doesn't setup a client for some reason,
+		// so it calls the grpc GetBlobCommitment to generate commitments.
+		// DisperserV2 uses the V2 prover which always uses SRSOrder=2^28.
+		// So it needs the trailing g2 points to generate correct length commitments.
+		DISPERSER_SERVER_G2_TRAILING_PATH: "../resources/srs/g2.trailing.point",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
