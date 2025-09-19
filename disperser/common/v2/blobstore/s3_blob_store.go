@@ -49,7 +49,7 @@ func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, er
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", ErrBlobNotFound, b.bucketName, err)
+		return nil, fmt.Errorf("%s, bucket: %s,: %w", ErrBlobNotFound.Error(), b.bucketName, err)
 	}
 	return data, nil
 }
