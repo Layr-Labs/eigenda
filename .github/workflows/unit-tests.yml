@@ -137,47 +137,8 @@ jobs:
           name: litt-unit-tests-coverage
           path: ./coverage-artifacts
 
-      - name: Merge coverage files
-        shell: bash
-        run: |
-          cd coverage-artifacts
-          if [ -f litt-unit-tests-coverage.out ] && [ -f unit-tests-coverage.out ]; then
-            # Use gocovmerge to properly merge coverage files
-            gocovmerge unit-tests-coverage.out litt-unit-tests-coverage.out > ../coverage.out
-            echo "Merged coverage from both main-unit-tests and litt-unit-tests"
-          elif [ -f unit-tests-coverage.out ]; then
-            cp unit-tests-coverage.out ../coverage.out
-            echo "Using main-unit-tests coverage only"
-          elif [ -f litt-unit-tests-coverage.out ]; then
-            cp litt-unit-tests-coverage.out ../coverage.out
-            echo "Using litt-unit-tests coverage only"
-          else
-            echo "No coverage files found"
-            exit 1
-          fi
-
-          # Validate the merged coverage file
-          cd ..
-          if ! go tool cover -func=coverage.out > /dev/null 2>&1; then
-            echo "Error: Invalid coverage file generated"
-            exit 1
-          fi
-
-          # Display coverage summary
-          echo "Coverage summary:"
-          go tool cover -func=coverage.out
-
-      - name: Update coverage badge
-        if: github.ref == 'refs/heads/master'
-        uses: ./.github/actions/test-coverage
-        with:
-          chart: true
-          amend: true
-
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.out
-          flags: unit-tests
           name: unit-tests-coverage
