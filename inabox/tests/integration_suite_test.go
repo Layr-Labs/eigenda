@@ -40,6 +40,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 )
 
@@ -53,6 +54,7 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 var (
 	anvilContainer     *testbed.AnvilContainer
 	graphNodeContainer *testbed.GraphNodeContainer
+	dockerNetwork      *testcontainers.DockerNetwork
 
 	templateName      string
 	testName          string
@@ -138,11 +140,11 @@ func setupSuite() error {
 
 	if testConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
-		nw, err := network.New(context.Background(),
+		dockerNetwork, err = network.New(context.Background(),
 			network.WithDriver("bridge"),
 			network.WithAttachable())
 		Expect(err).To(BeNil(), "failed to create Docker network")
-		logger.Info("Created Docker network", "name", nw.Name)
+		logger.Info("Created Docker network", "name", dockerNetwork.Name)
 
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
@@ -152,7 +154,7 @@ func setupSuite() error {
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
-				Network:        nw,
+				Network:        dockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start localstack: %w", err)
@@ -178,7 +180,7 @@ func setupSuite() error {
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
-			Network:        nw,
+			Network:        dockerNetwork,
 		})
 		Expect(err).To(BeNil())
 		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
@@ -198,7 +200,7 @@ func setupSuite() error {
 				HostAdminPort:  "8020",
 				HostIPFSPort:   "5001",
 				Logger:         logger,
-				Network:        nw,
+				Network:        dockerNetwork,
 			})
 			Expect(err).To(BeNil())
 		}
@@ -532,6 +534,11 @@ func teardownSuite() {
 	if anvilContainer != nil {
 		if err := anvilContainer.Terminate(ctx); err != nil {
 			logger.Warn("Failed to terminate anvil container", "error", err)
+		}
+
+		if dockerNetwork != nil {
+			logger.Info("Removing Docker network")
+			_ = dockerNetwork.Remove(context.Background())
 		}
 	}
 
