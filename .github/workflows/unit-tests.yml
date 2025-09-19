@@ -142,3 +142,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: unit-tests-coverage
+          files: ./coverage-artifacts/unit-tests-coverage.out,./coverage-artifacts/litt-unit-tests-coverage.out
+          flags: unit-tests,litt-tests
+          fail_ci_if_error: true
+          verbose: true
