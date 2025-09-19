@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
 
@@ -333,7 +332,6 @@ func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
-	Flags = append(Flags, indexer.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
 }

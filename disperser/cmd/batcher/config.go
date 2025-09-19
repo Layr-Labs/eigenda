@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
 
@@ -22,7 +21,6 @@ type Config struct {
 	EncoderConfig    kzg.KzgConfig
 	LoggerConfig     common.LoggerConfig
 	MetricsConfig    batcher.MetricsConfig
-	IndexerConfig    indexer.Config
 	KMSKeyConfig     common.KMSKeyConfig
 	ChainStateConfig thegraph.Config
 	UseGraph         bool
@@ -89,7 +87,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		OperatorStateRetrieverAddr: ctx.GlobalString(flags.OperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:  ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		IndexerDataDir:             ctx.GlobalString(flags.IndexerDataDirFlag.Name),
-		IndexerConfig:              indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:               kmsConfig,
 		EnableGnarkBundleEncoding:  ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 	}

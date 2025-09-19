@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
-	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
 
@@ -31,7 +30,6 @@ type Config struct {
 	DisperserStoreChunksSigningDisabled bool
 	DisperserKMSKeyID                   string
 	LoggerConfig                        common.LoggerConfig
-	IndexerConfig                       indexer.Config
 	ChainStateConfig                    thegraph.Config
 	UseGraph                            bool
 
@@ -118,7 +116,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		NumConcurrentEncodingRequests:   ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		NumConcurrentDispersalRequests:  ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
 		NodeClientCacheSize:             ctx.GlobalInt(flags.NodeClientCacheNumEntriesFlag.Name),
-		IndexerConfig:                   indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:                thegraph.ReadCLIConfig(ctx),
 		UseGraph:                        ctx.GlobalBool(flags.UseGraphFlag.Name),
 		EigenDAContractDirectoryAddress: ctx.GlobalString(flags.EigenDAContractDirectoryAddressFlag.Name),
