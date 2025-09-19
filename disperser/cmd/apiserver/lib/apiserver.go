@@ -136,7 +136,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		config.ProverKzgConfig.LoadG2Points = true // load G2 points because v2 apiserver exposes an rpc endpoint to compute kzg commitments
+		// load G2 points because v2 apiserver exposes an rpc endpoint to compute kzg commitments
+		config.ProverKzgConfig.LoadG2Points = true
 		prover, err := proverv2.NewProver(&config.ProverKzgConfig, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
