@@ -120,7 +120,6 @@ func (env *Config) deployEigenDAContracts() error {
 }
 
 // Deploys a EigenDA experiment
-// TODO: Figure out what necessitates experiment nomenclature
 func (env *Config) DeployExperiment() error {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		return fmt.Errorf("error changing directories: %w", err)

@@ -190,6 +190,19 @@ type Config struct {
 
 	// The size of the cache for operator states. Cache will remember operator states for this number of unique blocks.
 	operatorStateCacheSize uint64
+
+	// Controls how often the ejection sentinel checks to see if the node is being ejected. This should be configured
+	// to be smaller than the onchain ejection period.
+	EjectionSentinelPeriod time.Duration
+
+	// If true, the ejection sentinel will attempt to contest ejection by sending a transaction to cancel the ejection.
+	EjectionDefenseEnabled bool
+
+	// Under normal circumstances, honest validators should not contest an ejection if they are running software that
+	// does not meet the minimum version number as defined onchain. However, if the governing body in control of
+	// setting the minimum version number goes rogue, honest validators may want to contest ejection regardless of the
+	// claimed minimum version number.
+	IgnoreVersionForEjectionDefense bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -423,23 +436,26 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 		LittDBWriteCacheSizeBytes: uint64(ctx.GlobalFloat64(
 			flags.LittDBWriteCacheSizeGBFlag.Name) * units.GiB),
-		LittDBWriteCacheSizeFraction:  ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
-		LittDBReadCacheSizeBytes:      uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
-		LittDBReadCacheSizeFraction:   ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
-		LittDBStoragePaths:            ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
-		LittRespectLocks:              ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
-		LittMinimumFlushInterval:      ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
-		LittSnapshotDirectory:         ctx.GlobalString(flags.LittSnapshotDirectoryFlag.Name),
-		DownloadPoolSize:              ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
-		GetChunksHotCacheReadLimitMB:  ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
-		GetChunksHotBurstLimitMB:      ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
-		GetChunksColdCacheReadLimitMB: ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
-		GetChunksColdBurstLimitMB:     ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
-		GCSafetyBufferSizeBytes:       uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
-		GCSafetyBufferSizeFraction:    ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
-		StoreChunksBufferTimeout:      ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
-		StoreChunksBufferSizeFraction: ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
-		StoreChunksBufferSizeBytes:    uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
-		operatorStateCacheSize:        ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
+		LittDBWriteCacheSizeFraction:    ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
+		LittDBReadCacheSizeBytes:        uint64(ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name) * units.GiB),
+		LittDBReadCacheSizeFraction:     ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
+		LittDBStoragePaths:              ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
+		LittRespectLocks:                ctx.GlobalBool(flags.LittRespectLocksFlag.Name),
+		LittMinimumFlushInterval:        ctx.GlobalDuration(flags.LittMinimumFlushIntervalFlag.Name),
+		LittSnapshotDirectory:           ctx.GlobalString(flags.LittSnapshotDirectoryFlag.Name),
+		DownloadPoolSize:                ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:    ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB:   ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
+		GCSafetyBufferSizeBytes:         uint64(ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name) * units.GiB),
+		GCSafetyBufferSizeFraction:      ctx.GlobalFloat64(flags.GCSafetyBufferSizeFractionFlag.Name),
+		StoreChunksBufferTimeout:        ctx.GlobalDuration(flags.StoreChunksBufferTimeoutFlag.Name),
+		StoreChunksBufferSizeFraction:   ctx.GlobalFloat64(flags.StoreChunksBufferSizeFractionFlag.Name),
+		StoreChunksBufferSizeBytes:      uint64(ctx.GlobalFloat64(flags.StoreChunksBufferSizeGBFlag.Name) * units.GiB),
+		operatorStateCacheSize:          ctx.GlobalUint64(flags.OperatorStateCacheSizeFlag.Name),
+		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
+		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
+		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
 	}, nil
 }

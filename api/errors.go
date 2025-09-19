@@ -43,6 +43,11 @@ func NewErrorUnauthenticated(msg string) error {
 	return newErrorGRPC(codes.Unauthenticated, msg)
 }
 
+// HTTP Mapping: 403 Forbidden
+func NewErrorPermissionDenied(msg string) error {
+	return newErrorGRPC(codes.PermissionDenied, msg)
+}
+
 // HTTP Mapping: 500 Internal Server Error
 func NewErrorInternal(msg string) error {
 	return newErrorGRPC(codes.Internal, msg)

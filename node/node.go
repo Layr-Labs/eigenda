@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -25,6 +26,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/node/ejection"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,6 +67,7 @@ var (
 //  is mediated by methods.
 
 type Node struct {
+	CTX                     context.Context
 	Config                  *Config
 	Logger                  logging.Logger
 	KeyPair                 *core.KeyPair
@@ -104,6 +107,12 @@ type Node struct {
 
 	// Looks up operator state and maintains a cache of recently used operator states.
 	OperatorStateCache operatorstate.OperatorStateCache
+
+	// Used to look up contract addresses by name.
+	contractDirectory *directory.ContractDirectory
+
+	// A handle for sending Ethereum RPC requests.
+	client *geth.InstrumentedEthClient
 }
 
 // NewNode creates a new Node with the provided config.
@@ -274,6 +283,7 @@ func NewNode(
 	}
 
 	n := &Node{
+		CTX:                     ctx,
 		Config:                  config,
 		Logger:                  nodeLogger,
 		Metrics:                 metrics,
@@ -291,6 +301,8 @@ func NewNode(
 		ValidationPool:          validationPool,
 		StoreChunksSemaphore:    storeChunksSemaphore,
 		OperatorStateCache:      operatorStateCache,
+		contractDirectory:       contractDirectory,
+		client:                  client,
 	}
 
 	if config.EnableV2 {
@@ -345,29 +357,82 @@ func NewNode(
 	n.startMetrics()
 	n.startNodeAPI()
 	n.startV1()
-	n.startV2(ctx)
+	n.startV2()
 
 	n.CurrentSocket = n.buildSocket()
 	if n.Config.RegisterNodeAtStart {
-		err = n.registerValidator(ctx, n.CurrentSocket)
+		err = n.registerValidator(n.CurrentSocket)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register validator: %w", err)
 		}
 	} else {
-		n.checkValidatorRegistration(ctx, n.CurrentSocket)
+		n.checkValidatorRegistration(n.CurrentSocket)
 	}
 
-	n.startNodeIPUpdater(ctx)
+	// Note: it is important to start the ejection sentinel after n.registerValidator(), since the ejection
+	// sentinel requires the validator to be registered onchain in order to properly function.
+	err = n.startEjectionSentinel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start ejection sentinel: %w", err)
+	}
+
+	n.startNodeIPUpdater()
 
 	return n, nil
 }
 
+// Start the ejection sentinel, which is responsible for preventing this validator from being improperly ejected.
+func (n *Node) startEjectionSentinel() error {
+	ejectionContractAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.EigenDAEjectionManager)
+	if err != nil {
+		return fmt.Errorf("failed to get ejection contract address: %w", err)
+	}
+
+	var privateKey *ecdsa.PrivateKey
+	if n.Config.EthClientConfig.PrivateKeyString != "" {
+		privateKey, err = crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+	}
+
+	registryCoordinatorAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.RegistryCoordinator)
+	if err != nil {
+		return fmt.Errorf("failed to get RegistryCoordinator address from contract directory: %w", err)
+	}
+
+	validatorAddress, err := eth.ValidatorIDToAddress(n.CTX, n.client, registryCoordinatorAddress, n.Config.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get validator address from ID: %w", err)
+	}
+
+	n.Logger.Infof("Starting ejection sentinel, monitoring validator ID: 0x%s (address: %s)",
+		n.Config.ID.Hex(), validatorAddress.Hex())
+
+	// Start the ejection sentinel in a background goroutine.
+	_, err = ejection.NewEjectionSentinel(
+		n.CTX,
+		n.Logger,
+		ejectionContractAddress,
+		n.client,
+		privateKey,
+		validatorAddress,
+		n.Config.EjectionSentinelPeriod,
+		n.Config.EjectionDefenseEnabled,
+		n.Config.IgnoreVersionForEjectionDefense)
+	if err != nil {
+		return fmt.Errorf("failed to create ejection sentinel: %w", err)
+	}
+
+	return nil
+}
+
 // Start goroutines that periodically check and update the node's public IP address on-chain.
-func (n *Node) startNodeIPUpdater(ctx context.Context) {
+func (n *Node) startNodeIPUpdater() {
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
 	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
-		go n.checkRegisteredNodeIpOnChain(ctx)
-		go n.checkCurrentNodeIp(ctx)
+		go n.checkRegisteredNodeIpOnChain(n.CTX)
+		go n.checkCurrentNodeIp(n.CTX)
 	}
 }
 
@@ -380,10 +445,10 @@ func (n *Node) startV1() {
 }
 
 // start goroutines that need to run for the v2 API.
-func (n *Node) startV2(ctx context.Context) {
+func (n *Node) startV2() {
 	if n.Config.EnableV2 {
 		go func() {
-			_ = n.RefreshOnchainState(ctx)
+			_ = n.RefreshOnchainState()
 		}()
 		go n.checkNodeReachability(v2CheckPath)
 	}
@@ -425,7 +490,7 @@ func (n *Node) startPprof() {
 }
 
 // Register the validator onchain.
-func (n *Node) registerValidator(ctx context.Context, socket string) error {
+func (n *Node) registerValidator(socket string) error {
 	n.Logger.Info("Registering node on chain with the following parameters:",
 		"operatorId", n.Config.ID.Hex(),
 		"hostname", n.Config.Hostname,
@@ -454,13 +519,13 @@ func (n *Node) registerValidator(ctx context.Context, socket string) error {
 		n.Config.ChurnerUseSecureGrpc,
 		n.Config.Timeout,
 		n.Logger)
-	err = RegisterOperator(ctx, operator, n.Transactor, churnerClient, n.Logger)
+	err = RegisterOperator(n.CTX, operator, n.Transactor, churnerClient, n.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to register the operator: %w", err)
 	}
 
 	if operator.Address != "" {
-		operatorID, err := n.Transactor.OperatorAddressToID(ctx, gethcommon.HexToAddress(operator.Address))
+		operatorID, err := n.Transactor.OperatorAddressToID(n.CTX, gethcommon.HexToAddress(operator.Address))
 		if err != nil {
 			return fmt.Errorf("failed to get operator ID: %w", err)
 		}
@@ -474,8 +539,8 @@ func (n *Node) registerValidator(ctx context.Context, socket string) error {
 }
 
 // Check to see if the validator is registered onchain, and log a warning if not.
-func (n *Node) checkValidatorRegistration(ctx context.Context, socket string) {
-	registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
+func (n *Node) checkValidatorRegistration(socket string) {
+	registeredSocket, err := n.Transactor.GetOperatorSocket(n.CTX, n.Config.ID)
 	// Error out if registration on-chain is a requirement
 	if err != nil {
 		n.Logger.Warnf("failed to get operator socket: %v", err)
@@ -635,7 +700,7 @@ func (n *Node) expireLoop() {
 // It fetches the latest blob parameters from the chain and updates the BlobVersionParams.
 // It runs periodically based on the OnchainStateRefreshInterval.
 // WARNING: this method is not thread-safe and should not be called concurrently.
-func (n *Node) RefreshOnchainState(ctx context.Context) error {
+func (n *Node) RefreshOnchainState() error {
 	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
 		return nil
 	}
@@ -647,7 +712,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 		case <-ticker.C:
 			n.Logger.Info("Refreshing onchain state")
 			existingBlobParams := n.BlobVersionParams.Load()
-			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
+			blobParams, err := n.Transactor.GetAllVersionedBlobParams(n.CTX)
 			if err == nil {
 				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
 					n.BlobVersionParams.Store(corev2.NewBlobVersionParameterMap(blobParams))
@@ -655,9 +720,9 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
 			}
-			blockNumber, err := n.Transactor.GetCurrentBlockNumber(ctx)
+			blockNumber, err := n.Transactor.GetCurrentBlockNumber(n.CTX)
 			if err == nil {
-				quorumCount, err := n.Transactor.GetQuorumCount(ctx, blockNumber)
+				quorumCount, err := n.Transactor.GetQuorumCount(n.CTX, blockNumber)
 				if err == nil {
 					n.QuorumCount.Store(uint32(quorumCount))
 				} else {
@@ -666,8 +731,8 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching block number", "err", err)
 			}
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-n.CTX.Done():
+			return fmt.Errorf("ctx done: %w", n.CTX.Err())
 		}
 	}
 }

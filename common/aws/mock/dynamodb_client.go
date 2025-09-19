@@ -16,6 +16,14 @@ type MockDynamoDBClient struct {
 
 var _ dynamodb.Client = (*MockDynamoDBClient)(nil)
 
+func (c *MockDynamoDBClient) GetAwsClient() *awsdynamodb.Client {
+	args := c.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(*awsdynamodb.Client)
+}
+
 func (c *MockDynamoDBClient) DeleteTable(ctx context.Context, tableName string) error {
 	args := c.Called()
 	return args.Error(0)
