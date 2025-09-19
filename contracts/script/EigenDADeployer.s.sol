@@ -426,6 +426,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             estimatedGasUsedWithoutSig,
             estimatedGasUsedWithSig
         );
-        eigenDADirectory.addAddress(AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(eigenDAEjectionManager));
+        eigenDAEjectionManager.setCooldown(60);
+        eigenDAEjectionManager.setDelay(60);
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(eigenDAEjectionManager)
+        );
     }
 }
