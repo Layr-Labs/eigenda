@@ -277,20 +277,21 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 	paddingEnd := time.Since(paddingStart)
 
 	proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProofV2(paddedCoeffs, g.NumChunks, g.ChunkLength, g.KzgConfig.NumWorker) //nolint: lll
-
-	end := time.Since(start)
+	if err != nil {
+		return nil, fmt.Errorf("compute multi frame proofs: %w", err)
+	}
 
 	slog.Info("ComputeMultiFrameProofs process details",
 		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"Num_chunks", g.NumChunks,
 		"Chunk_length", g.ChunkLength,
-		"Total_duration", end,
+		"Total_duration", time.Since(start),
 		"Padding_duration", paddingEnd,
 		"SRSOrder", g.KzgConfig.SRSOrder,
 		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
 	)
 
-	return proofs, fmt.Errorf("compute multi frame proofs: %w", err)
+	return proofs, nil
 }
 
 func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
