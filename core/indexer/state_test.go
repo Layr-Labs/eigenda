@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
@@ -80,10 +81,17 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 		NumRetries:       0,
 	}
 
-	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
+	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err := eth.NewWriter(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
+	contractDirectory, err := directory.NewContractDirectory(context.TODO(), logger, client, gethcommon.HexToAddress(op.NODE_EIGENDA_DIRECTORY))
+	Expect(err).To(BeNil())
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.OperatorStateRetriever)
+	Expect(err).To(BeNil())
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.ServiceManager)
+	Expect(err).To(BeNil())
+
+	tx, err := eth.NewWriter(logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	Expect(err).To(BeNil())
 	return tx
 
