@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -35,9 +36,8 @@ import (
 // REST status code signals (i.e, "drop cert", "failover") into arbitrum specific
 // errors
 type Config struct {
-	Enable bool
-	Host   string
-	Port   int
+	Host string
+	Port int
 }
 
 type Server struct {
@@ -74,6 +74,13 @@ func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
 		listener: listener,
 	}, nil
 
+}
+
+func (svr *Server) Port() int {
+	// read from listener
+	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())
+	port, _ := strconv.Atoi(portStr)
+	return port
 }
 
 func (s *Server) Addr() string {

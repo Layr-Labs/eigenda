@@ -7,7 +7,6 @@ import (
 const (
 	ListenAddrFlagName = "arbitrum-da.addr"
 	PortFlagName       = "arbitrum-da.port"
-	Enabled            = "arbitrum-da.enabled"
 )
 
 func withEnvPrefix(prefix, s string) []string {
@@ -37,8 +36,7 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 
 func ReadConfig(ctx *cli.Context) Config {
 	return Config{
-		Host:   ctx.String(ListenAddrFlagName),
-		Port:   ctx.Int(PortFlagName),
-		Enable: ctx.Bool(Enabled),
+		Host: ctx.String(ListenAddrFlagName),
+		Port: ctx.Int(PortFlagName),
 	}
 }

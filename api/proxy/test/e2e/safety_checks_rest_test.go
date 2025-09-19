@@ -41,7 +41,7 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.
 
 	// nil commitment. Should return an error but currently is not. This needs to be fixed by OP
 	// Ref: https://github.com/ethereum-optimism/optimism/issues/11987
-	// daClient := altda.NewDAClient(ts.Address(), false, true)
+	// daClient := altda.NewDAClient(ts.RestAddress(), false, true)
 	// t.Run("nil commitment case", func(t *testing.T) {
 	//	var commit altda.CommitmentData
 	//	_, err := daClient.GetInput(ts.Ctx, commit)
@@ -49,7 +49,7 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.
 	//	assert.True(t, !isPanic(err.Error()))
 	// })
 
-	daClientPcFalse := altda.NewDAClient(ts.Address(), false, false)
+	daClientPcFalse := altda.NewDAClient(ts.RestAddress(), false, false)
 
 	t.Run(
 		"input bad data to SetInput & GetInput", func(t *testing.T) {
@@ -99,7 +99,7 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 			defer kill()
 
 			cfg := &standard_client.Config{
-				URL: ts.Address(),
+				URL: ts.RestAddress(),
 			}
 			daClient := standard_client.New(cfg)
 			testPreimage := []byte{1} // single byte preimage
@@ -115,7 +115,7 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 			defer kill()
 
 			cfg := &standard_client.Config{
-				URL: ts.Address(),
+				URL: ts.RestAddress(),
 			}
 			daClient := standard_client.New(cfg)
 			testPreimage := []byte("§§©ˆªªˆ˙√ç®∂§∞¶§ƒ¥√¨¥√¨¥ƒƒ©˙˜ø˜˜˜∫˙∫¥∫√†®®√ç¨ˆ¨˙ï") // many unicode characters
@@ -136,7 +136,7 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 			defer kill()
 
 			cfg := &standard_client.Config{
-				URL: ts.Address(),
+				URL: ts.RestAddress(),
 			}
 			daClient := standard_client.New(cfg)
 			testPreimage := []byte("") // Empty preimage
@@ -152,7 +152,7 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 			defer kill()
 
 			cfg := &standard_client.Config{
-				URL: ts.Address(),
+				URL: ts.RestAddress(),
 			}
 			daClient := standard_client.New(cfg)
 			testCert := []byte{06}
@@ -174,7 +174,7 @@ func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.Ei
 			defer kill()
 
 			cfg := &standard_client.Config{
-				URL: ts.Address(),
+				URL: ts.RestAddress(),
 			}
 			daClient := standard_client.New(cfg)
 			// TODO: we need to add the 0 version byte at the beginning.
@@ -213,7 +213,7 @@ func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, dispersalBac
 	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
-	daClient := altda.NewDAClient(ts.Address(), false, true)
+	daClient := altda.NewDAClient(ts.RestAddress(), false, true)
 
 	testPreimage := testutils.RandBytes(100)
 
@@ -240,7 +240,7 @@ func testOversizedBlobRequestErrors(t *testing.T, dispersalBackend common.EigenD
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 	//  17MB blob

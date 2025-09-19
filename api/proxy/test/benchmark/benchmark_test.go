@@ -39,7 +39,7 @@ func putsWithSecondary(b *testing.B, testCfg testutils.TestConfig) {
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 
