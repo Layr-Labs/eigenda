@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/core"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 )
 
 func deserializeBinaryFrames(t *testing.T, binaryFrames *core.ChunksData) []*encoding.Frame {

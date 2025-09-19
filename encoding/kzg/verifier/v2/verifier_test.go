@@ -60,8 +60,6 @@ func teardown() {
 	}
 }
 
-// var control interface{ Stop() }
-
 func TestBenchmarkVerifyChunks(t *testing.T) {
 	t.Skip("This test is meant to be run manually, not as part of the test suite")
 	p, err := prover.NewProver(kzgConfig, nil)
