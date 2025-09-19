@@ -83,30 +83,30 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	gethClient, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new multi homing client", err)
 	}
 
 	tx, err := eth.NewReader(logger, gethClient, config.OperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new reader", err)
 	}
 
 	cs := eth.NewChainState(tx, gethClient)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("new chain state", err)
 	}
 
 	if config.EigenDAVersion == 1 {
 		config.EncoderConfig.LoadG2Points = true
 		verifier, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 		if err != nil {
-			log.Fatalln("could not start tcp listener", err)
+			log.Fatalln("new verifier", err)
 		}
 
 		agn := &core.StdAssignmentCoordinator{}
 		retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, verifier, config.NumConnections)
 		if err != nil {
-			log.Fatalln("could not start tcp listener", err)
+			log.Fatalln("new retrieval client", err)
 		}
 
 		chainClient := retrivereth.NewChainClient(gethClient, logger)
@@ -131,7 +131,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		config.EncoderConfig.LoadG2Points = true
 		verifier, err := verifierv2.NewVerifier(&config.EncoderConfig, nil)
 		if err != nil {
-			log.Fatalln("could not start tcp listener", err)
+			log.Fatalln("new v2 verifier", err)
 		}
 		clientConfig := clientsv2.DefaultClientConfig()
 		clientConfig.ConnectionPoolSize = config.NumConnections
