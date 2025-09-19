@@ -25,10 +25,12 @@ type AnvilContainer struct {
 }
 
 // AnvilOptions configures the Anvil container
+//
+//nolint:lll // struct field documentation
 type AnvilOptions struct {
-	ExposeHostPort bool                           // If true, binds container port 8545 to host port 8545
-	HostPort       string                         // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
-	Logger         logging.Logger                 // Logger for container operations (required)
+	ExposeHostPort bool                          // If true, binds container port 8545 to host port 8545
+	HostPort       string                        // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
+	Logger         logging.Logger                // Logger for container operations (required)
 	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
 }
 

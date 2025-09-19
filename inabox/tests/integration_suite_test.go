@@ -38,6 +38,7 @@ import (
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 /*
@@ -117,6 +118,13 @@ var _ = BeforeSuite(func() {
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
+		// Create a shared Docker network for all containers
+		nw, err := network.New(context.Background(),
+			network.WithDriver("bridge"),
+			network.WithAttachable())
+		Expect(err).To(BeNil(), "failed to create Docker network")
+		logger.Info("Created Docker network", "name", nw.Name)
+
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
@@ -124,6 +132,7 @@ var _ = BeforeSuite(func() {
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
+				Network:        nw,
 			})
 			Expect(err).To(BeNil())
 
@@ -145,8 +154,11 @@ var _ = BeforeSuite(func() {
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
+			Network:        nw,
 		})
 		Expect(err).To(BeNil())
+		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
+		logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
@@ -155,18 +167,16 @@ var _ = BeforeSuite(func() {
 				PostgresDB:     "graph-node",
 				PostgresUser:   "graph-node",
 				PostgresPass:   "let-me-in",
-				EthereumRPC:    "http://localhost:8545",
+				EthereumRPC:    anvilInternalEndpoint,
 				ExposeHostPort: true,
 				HostHTTPPort:   "8000",
 				HostWSPort:     "8001",
 				HostAdminPort:  "8020",
 				HostIPFSPort:   "5001",
 				Logger:         logger,
+				Network:        nw,
 			})
 			Expect(err).To(BeNil())
-			// Wait for Graph Node to be ready
-			logger.Info("Waiting for Graph Node to be ready")
-			time.Sleep(10 * time.Second)
 		}
 
 		logger.Info("Deploying experiment")
