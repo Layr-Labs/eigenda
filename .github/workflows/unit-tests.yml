@@ -165,7 +165,7 @@ jobs:
 
           # Display coverage summary
           echo "Coverage summary:"
-          go tool cover -func=coverage.out | tail -5
+          go tool cover -func=coverage.out
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/master'
