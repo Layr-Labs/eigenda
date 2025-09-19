@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/test"
@@ -226,8 +227,15 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
+	contractDirectory, err := directory.NewContractDirectory(t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	require.NoError(t, err)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
+	require.NoError(t, err)
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.ServiceManager)
+	require.NoError(t, err)
+
 	transactor, err := eth.NewWriter(
-		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
+		logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	require.NoError(t, err)
 	require.NotNil(t, transactor)
 
@@ -259,8 +267,15 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
+	contractDirectory, err := directory.NewContractDirectory(t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	require.NoError(t, err)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
+	require.NoError(t, err)
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.ServiceManager)
+	require.NoError(t, err)
+
 	transactor, err := eth.NewWriter(
-		logger, client, operator.NODE_BLS_OPERATOR_STATE_RETRIVER, operator.NODE_EIGENDA_SERVICE_MANAGER)
+		logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	require.NoError(t, err)
 	require.NotNil(t, transactor)
 
