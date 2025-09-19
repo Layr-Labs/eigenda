@@ -392,7 +392,14 @@ func NewNode(
 func (n *Node) startEjectionSentinel() error {
 	ejectionContractAddress, err := n.contractDirectory.GetContractAddress(n.CTX, directory.EigenDAEjectionManager)
 	if err != nil {
-		return fmt.Errorf("failed to get ejection contract address: %w", err)
+		n.Logger.Error("Failed to get ejection contract address, ejection defense will be disabled. " +
+			"If the new ejection contracts have not yet been deployed to this environment, " +
+			"then this is expected and this error can be ignored.")
+		return nil
+
+		// TODO(cody.littley): this should return a fatal error once we've
+		//  deployed the new ejection contracts to mainnet.
+		//return fmt.Errorf("failed to get ejection contract address: %w", err)
 	}
 
 	var privateKey *ecdsa.PrivateKey
