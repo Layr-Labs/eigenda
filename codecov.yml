@@ -1,0 +1,138 @@
+# Codecov configuration
+# https://docs.codecov.io/docs/codecovyml-reference
+
+coverage:
+  # Coverage precision (number of decimal places)
+  precision: 1
+  round: down
+
+  # Coverage range for color coding (red to green)
+  range: "30...80"
+
+  status:
+    project:
+      default:
+        # Only fail the status if coverage drops by more than 1%
+        threshold: 1%
+        target: auto
+
+    patch:
+      default:
+        # Require at least 50% coverage on new/modified code
+        target: 50%
+        threshold: 5%
+
+# Files and paths to ignore in coverage calculations
+ignore:
+  # Auto-generated contract bindings
+  - "contracts/bindings/**"
+  - "**/bindings/**"
+
+  # Generated protobuf/grpc files
+  - "**/*.pb.go"
+  - "**/*.pb.gw.go"
+  - "**/grpc/**"
+
+  # Mock files
+  - "**/mock/**"
+  - "**/mocks/**"
+  - "**/*_mock.go"
+  - "**/*_mocks.go"
+
+  # Test files and test utilities
+  - "**/*_test.go"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/testutils/**"
+  - "**/testdata/**"
+
+  # Command-line entry points (main packages)
+  - "**/cmd/**"
+  - "**/main.go"
+
+  # Documentation and examples
+  - "**/docs/**"
+  - "**/examples/**"
+  - "**/example/**"
+
+  # Generated files
+  - "**/generated/**"
+  - "**/*.generated.go"
+  - "**/codegen/**"
+
+  # Third-party and vendor
+  - "vendor/**"
+  - "third_party/**"
+
+  # Build and deployment
+  - "**/build/**"
+  - "**/deploy/**"
+  - "**/scripts/**"
+
+  # Resource files
+  - "resources/**"
+
+# Comment configuration
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+# Flag configuration for different test types
+flags:
+  unit-tests:
+    paths:
+      - "!contracts/"
+      - "!litt/"
+    carryforward: false
+
+  litt-tests:
+    paths:
+      - "litt/"
+    carryforward: false
+
+# Codecov CI configuration
+codecov:
+  notify:
+    # Wait for all CI builds before sending notifications
+    wait_for_ci: true
+
+  # Require the codecov token for security
+  require_ci_to_pass: true
+
+# Component-based coverage tracking (optional)
+component_management:
+  individual_components:
+    - component_id: core
+      name: Core
+      paths:
+        - "core/**"
+
+    - component_id: api
+      name: API
+      paths:
+        - "api/**"
+        - "!api/grpc/**"
+        - "!api/**/mock/**"
+
+    - component_id: disperser
+      name: Disperser
+      paths:
+        - "disperser/**"
+        - "!disperser/cmd/**"
+        - "!disperser/**/mock/**"
+
+    - component_id: node
+      name: Node
+      paths:
+        - "node/**"
+        - "!node/cmd/**"
+        - "!node/**/mock/**"
+
+    - component_id: encoding
+      name: Encoding
+      paths:
+        - "encoding/**"
+        - "!encoding/**/mock/**"
