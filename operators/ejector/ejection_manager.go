@@ -76,17 +76,19 @@ func NewEjectionManager(
 ) (*EjectionManager, error) {
 
 	em := &EjectionManager{
-		ctx:                 ctx,
-		logger:              logger,
-		timeSource:          timeSource,
-		ejectionBlacklist:   make(map[geth.Address]struct{}),
-		recentEjections:     make(map[geth.Address]time.Time),
-		startedEjections:    make(map[geth.Address]time.Time),
-		transactor:          transactor,
-		ejectionDelay:       ejectionDelay,
-		retryDelay:          retryDelay,
-		ejectionRequestChan: make(chan geth.Address, 64),
-		period:              period,
+		ctx:                                  ctx,
+		logger:                               logger,
+		timeSource:                           timeSource,
+		ejectionBlacklist:                    make(map[geth.Address]struct{}),
+		recentEjections:                      make(map[geth.Address]time.Time),
+		startedEjections:                     make(map[geth.Address]time.Time),
+		failedEjectionAttempts:               make(map[geth.Address]uint32),
+		transactor:                           transactor,
+		ejectionDelay:                        ejectionDelay,
+		retryDelay:                           retryDelay,
+		ejectionRequestChan:                  make(chan geth.Address, 64),
+		maxConsecutiveFailedEjectionAttempts: maxConsecutiveFailedEjectionAttempts,
+		period:                               period,
 	}
 
 	go em.mainLoop()
