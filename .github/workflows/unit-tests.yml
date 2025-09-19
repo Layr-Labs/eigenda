@@ -142,18 +142,30 @@ jobs:
         run: |
           cd coverage-artifacts
           if [ -f litt-unit-tests-coverage.out ] && [ -f unit-tests-coverage.out ]; then
-            echo "mode: set" > ../coverage.out
-            # Skip the first line (mode declaration) from each file and append
-            tail -n +2 unit-tests-coverage.out >> ../coverage.out
-            tail -n +2 litt-unit-tests-coverage.out >> ../coverage.out
+            # Use gocovmerge to properly merge coverage files
+            gocovmerge unit-tests-coverage.out litt-unit-tests-coverage.out > ../coverage.out
             echo "Merged coverage from both main-unit-tests and litt-unit-tests"
           elif [ -f unit-tests-coverage.out ]; then
             cp unit-tests-coverage.out ../coverage.out
             echo "Using main-unit-tests coverage only"
+          elif [ -f litt-unit-tests-coverage.out ]; then
+            cp litt-unit-tests-coverage.out ../coverage.out
+            echo "Using litt-unit-tests coverage only"
           else
             echo "No coverage files found"
             exit 1
           fi
+
+          # Validate the merged coverage file
+          cd ..
+          if ! go tool cover -func=coverage.out > /dev/null 2>&1; then
+            echo "Error: Invalid coverage file generated"
+            exit 1
+          fi
+
+          # Display coverage summary
+          echo "Coverage summary:"
+          go tool cover -func=coverage.out | tail -5
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/master'
