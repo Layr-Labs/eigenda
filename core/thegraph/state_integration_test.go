@@ -18,6 +18,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 var (
@@ -62,11 +63,19 @@ func setupTest(t *testing.T) (
 	testConfig := deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
 
+	// Create a shared Docker network for all containers
+	nw, err := network.New(ctx,
+		network.WithDriver("bridge"),
+		network.WithAttachable())
+	require.NoError(t, err, "failed to create Docker network")
+	logger.Info("Created Docker network", "name", nw.Name)
+
 	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
 		Services:       []string{"s3", "dynamodb", "kms"},
 		Logger:         logger,
+		Network:        nw,
 	})
 	require.NoError(t, err, "failed to start localstack container")
 
@@ -84,21 +93,26 @@ func setupTest(t *testing.T) (
 		ExposeHostPort: true,
 		HostPort:       "8545",
 		Logger:         logger,
+		Network:        nw,
 	})
 	require.NoError(t, err, "failed to start anvil container")
+	anvilContainerPort := anvilContainer.RpcURL()
+	anvilInternalEndpoint := anvilContainer.InternalEndpoint()
+	logger.Info("Anvil RPC URL", "url", anvilContainerPort, "internal", anvilInternalEndpoint)
 
 	logger.Info("Starting graph node")
 	graphNodeContainer, err := testbed.NewGraphNodeContainerWithOptions(ctx, testbed.GraphNodeOptions{
 		PostgresDB:     "graph-node",
 		PostgresUser:   "graph-node",
 		PostgresPass:   "let-me-in",
-		EthereumRPC:    "http://localhost:8545",
+		EthereumRPC:    anvilInternalEndpoint,
 		ExposeHostPort: true,
 		HostHTTPPort:   "8000",
 		HostWSPort:     "8001",
 		HostAdminPort:  "8020",
 		HostIPFSPort:   "5001",
 		Logger:         logger,
+		Network:        nw,
 	})
 	require.NoError(t, err, "failed to start graph node")
 
@@ -129,6 +143,9 @@ func setupTest(t *testing.T) (
 
 		_ = anvilContainer.Terminate(ctx)
 		_ = localstackContainer.Terminate(ctx)
+
+		logger.Info("Removing Docker network")
+		_ = nw.Remove(ctx)
 	})
 
 	return anvilContainer, localstackContainer, graphNodeContainer, testConfig

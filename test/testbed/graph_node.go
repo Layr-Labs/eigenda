@@ -9,7 +9,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
@@ -43,7 +42,7 @@ type GraphNodeOptions struct {
 	HostIPFSPort   string // Custom host port for IPFS (defaults to "5001" if empty and ExposeHostPort is true)
 
 	Logger  logging.Logger                // Logger for container operations (required)
-	Network *testcontainers.DockerNetwork // Optional Docker network to use
+	Network *testcontainers.DockerNetwork // Docker network to use (required)
 }
 
 // GraphNodeContainer manages a Graph Node cluster with PostgreSQL and IPFS
@@ -77,24 +76,12 @@ func NewGraphNodeContainerWithOptions(ctx context.Context, opts GraphNodeOptions
 		opts.PostgresPass = "let-me-in"
 	}
 
-	// Create network if not provided
-	var nw *testcontainers.DockerNetwork
-	var err error
-	if opts.Network != nil {
-		nw = opts.Network
-		logger.Debug("Using provided Docker network")
-	} else {
-		// Create a new network for the Graph Node cluster
-		networkName := fmt.Sprintf("graph-node-network-%d", time.Now().UnixNano())
-		nw, err = network.New(ctx,
-			network.WithAttachable(),
-			network.WithLabels(map[string]string{"testbed": "graph-node"}),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create network: %w", err)
-		}
-		logger.Debug("Created Docker network", "name", networkName)
+	// Network must be provided
+	if opts.Network == nil {
+		return nil, fmt.Errorf("network is required in GraphNodeOptions")
 	}
+	nw := opts.Network
+	logger.Debug("Using provided Docker network")
 
 	// Generate unique names for all containers to avoid conflicts
 	timestamp := time.Now().UnixNano()
@@ -205,14 +192,6 @@ func (g *GraphNodeContainer) Terminate(ctx context.Context) error {
 		g.logger.Debug("Terminating PostgreSQL container")
 		if err := g.postgres.Terminate(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("failed to terminate postgres: %w", err))
-		}
-	}
-
-	// Only remove network if we created it (not provided externally)
-	if g.network != nil {
-		g.logger.Debug("Removing Docker network")
-		if err := g.network.Remove(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to remove network: %w", err))
 		}
 	}
 
