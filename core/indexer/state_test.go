@@ -3,11 +3,11 @@ package indexer_test
 import (
 	"context"
 	"crypto/rand"
-	"flag"
 	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -26,52 +26,43 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-var (
-	headerStoreType string
+	"github.com/stretchr/testify/require"
 )
 
 var (
 	quorums []core.QuorumID = []core.QuorumID{0}
 )
 
-// Get the location of the test folder from the flag
-func init() {
-	flag.StringVar(&headerStoreType, "headerStore", "leveldb",
-		"The header store implementation to be used (inmem, leveldb)")
-}
-
-func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
+func mustRegisterOperators(t *testing.T, env *deploy.Config, logger logging.Logger) {
+	t.Helper()
 	for _, op := range env.Operators {
-		tx := mustMakeOperatorTransactor(env, op, logger)
+		tx := mustMakeOperatorTransactor(t, env, op, logger)
 
 		signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
 			PrivateKey: op.NODE_TEST_PRIVATE_BLS,
 			SignerType: blssignerTypes.PrivateKey,
 		})
-		Expect(err).To(BeNil())
+		require.NoError(t, err, "failed to create signer")
 
 		socket := fmt.Sprintf("%v:%v", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT)
 
 		salt := [32]byte{}
 		_, err = rand.Read(salt[:])
-		Expect(err).To(BeNil())
+		require.NoError(t, err, "failed to generate salt")
 
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
 		privKey, err := crypto.HexToECDSA(op.NODE_PRIVATE_KEY)
-		Expect(err).To(BeNil())
+		require.NoError(t, err, "failed to parse private key")
 
 		err = tx.RegisterOperator(context.Background(), signer, socket, quorums, privKey, salt, expiry)
-		Expect(err).To(BeNil())
+		require.NoError(t, err, "failed to register operator")
 	}
 }
 
-func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Writer {
+func mustMakeOperatorTransactor(t *testing.T, env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Writer {
+	t.Helper()
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
-	Expect(ok).To(BeTrue())
+	require.True(t, ok, "deployer not found")
 
 	config := geth.EthClientConfig{
 		RPCURLs:          []string{deployer.RPC},
@@ -81,17 +72,17 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	}
 
 	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
-	Expect(err).ToNot(HaveOccurred())
+	require.NoError(t, err, "failed to create geth client")
 
 	tx, err := eth.NewWriter(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
-	Expect(err).To(BeNil())
+	require.NoError(t, err, "failed to create writer")
 	return tx
-
 }
 
-func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.Logger) (common.EthClient, common.RPCEthClient) {
+func mustMakeTestClients(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) (common.EthClient, common.RPCEthClient) {
+	t.Helper()
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
-	Expect(ok).To(BeTrue())
+	require.True(t, ok, "deployer not found")
 
 	config := geth.EthClientConfig{
 		RPCURLs:          []string{deployer.RPC},
@@ -101,24 +92,20 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 	}
 
 	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "failed to create geth client")
 
 	rpcClient, err := rpc.Dial(deployer.RPC)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "failed to create RPC client")
 
 	return client, rpcClient
-
 }
 
-func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *coreindexer.IndexedChainState {
-	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
+func mustMakeChainState(t *testing.T, env *deploy.Config, _ indexer.HeaderStore, logger logging.Logger) *coreindexer.IndexedChainState {
+	t.Helper()
+	client, rpcClient := mustMakeTestClients(t, env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
 	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
-	Expect(err).ToNot(HaveOccurred())
+	require.NoError(t, err, "failed to create writer")
 
 	var (
 		cs            = eth.NewChainState(tx, client)
@@ -134,90 +121,79 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 		env.EigenDA.ServiceManager,
 		logger,
 	)
-	Expect(err).ToNot(HaveOccurred())
+	require.NoError(t, err, "failed to create indexer")
 
 	chainState, err := coreindexer.NewIndexedChainState(cs, indexer)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err, "failed to create indexed chain state")
 	return chainState
 }
 
 // This test exercises the core indexer, which is not used in production. Since this test is flaky, disable it.
 var skip = true
 
-var _ = Describe("Indexer", func() {
-
+func TestIndexChainState(t *testing.T) {
 	if skip {
-		return
+		t.Skip("Test disabled - core indexer not used in production")
 	}
 
-	Context("when indexing a chain state", func() {
+	if testName == "" {
+		t.Skip("No test path provided")
+	}
 
-		It("should index the chain state", func() {
+	logger := test.GetLogger()
+	ctx := t.Context()
 
-			if testName == "" {
-				Skip("No test path provided")
-			}
+	var (
+		store indexer.HeaderStore
+		err   error
+	)
+	if headerStoreType == "leveldb" {
+		dbPath := filepath.Join(testConfig.Path, "db")
+		s, err := leveldb.NewHeaderStore(dbPath)
+		if err == nil {
+			defer s.Close()
+			defer func() { _ = os.RemoveAll(dbPath) }()
+			store = s
+		}
+	} else {
+		store = inmem.NewHeaderStore()
+	}
 
-			logger := test.GetLogger()
-			ctx, cancel := context.WithCancel(context.Background())
-			_ = cancel
+	require.NoError(t, err, "failed to create header store")
 
-			var (
-				store indexer.HeaderStore
-				err   error
-			)
-			if headerStoreType == "leveldb" {
-				dbPath := filepath.Join(testConfig.Path, "db")
-				s, err := leveldb.NewHeaderStore(dbPath)
-				if err == nil {
-					defer s.Close()
-					defer func() { _ = os.RemoveAll(dbPath) }()
-					store = s
-				}
-			} else {
-				store = inmem.NewHeaderStore()
-			}
+	chainState := mustMakeChainState(t, testConfig, store, logger)
+	err = chainState.Indexer.Index(ctx)
+	require.NoError(t, err, "failed to index")
 
-			Expect(err).ToNot(HaveOccurred())
+	time.Sleep(1 * time.Second)
 
-			chainState := mustMakeChainState(testConfig, store, logger)
-			err = chainState.Indexer.Index(ctx)
-			Expect(err).ToNot(HaveOccurred())
+	mustRegisterOperators(t, testConfig, logger)
 
-			time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
+	lastHeader, err := chainState.Indexer.GetLatestHeader(false)
+	require.NoError(t, err, "failed to get latest header")
+	obj, err := chainState.Indexer.GetObject(lastHeader, 0)
+	require.NoError(t, err, "failed to get object at index 0")
+	require.NotNil(t, obj, "object should not be nil")
 
-			mustRegisterOperators(testConfig, logger)
+	pubKeys, ok := obj.(*coreindexer.OperatorPubKeys)
+	require.True(t, ok, "object should be OperatorPubKeys")
+	require.Len(t, pubKeys.Operators, len(testConfig.Operators), "unexpected number of operators")
 
-			time.Sleep(1 * time.Second)
-			lastHeader, err := chainState.Indexer.GetLatestHeader(false)
-			Expect(err).ToNot(HaveOccurred())
-			obj, err := chainState.Indexer.GetObject(lastHeader, 0)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(obj).NotTo(BeNil())
+	obj, err = chainState.Indexer.GetObject(lastHeader, 1)
+	require.NoError(t, err, "failed to get object at index 1")
+	require.NotNil(t, obj, "object should not be nil")
 
-			pubKeys, ok := obj.(*coreindexer.OperatorPubKeys)
-			Expect(ok).To(BeTrue())
-			Expect(pubKeys.Operators).To(HaveLen(len(testConfig.Operators)))
+	sockets, ok := obj.(coreindexer.OperatorSockets)
+	require.True(t, ok, "object should be OperatorSockets")
+	require.Len(t, sockets, len(testConfig.Operators), "unexpected number of sockets")
 
-			obj, err = chainState.Indexer.GetObject(lastHeader, 1)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(obj).NotTo(BeNil())
+	header, err := chainState.Indexer.GetLatestHeader(false)
+	require.NoError(t, err, "failed to get latest header")
+	state, err := chainState.GetIndexedOperatorState(ctx, uint(header.Number), quorums)
+	require.NoError(t, err, "failed to get indexed operator state")
 
-			sockets, ok := obj.(coreindexer.OperatorSockets)
-			Expect(ok).To(BeTrue())
-			Expect(sockets).To(HaveLen(len(testConfig.Operators)))
+	require.Len(t, state.IndexedOperators, len(testConfig.Operators), "unexpected number of indexed operators")
 
-			header, err := chainState.Indexer.GetLatestHeader(false)
-			Expect(err).ToNot(HaveOccurred())
-			state, err := chainState.GetIndexedOperatorState(ctx, uint(header.Number), quorums)
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(state.IndexedOperators).To(HaveLen(len(testConfig.Operators)))
-
-			// TODO: add further tests
-
-		})
-	})
-})
+	// TODO: add further tests
+}
