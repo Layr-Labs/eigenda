@@ -122,10 +122,9 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	// simulate a new deposit by account A
 	testVault.SetTotalDeposit(accountA, big.NewInt(10000))
 
-	// sleep for long enough for the update to be picked up by the monitor
-	time.Sleep(time.Millisecond * 10)
-
-	// try the same debit again
-	_, err = ledgerAReloaded.Debit(ctx, uint32(3), []uint8{0})
-	require.NoError(t, err)
+	// wait for the monitor to pick up the deposit update
+	test.AssertEventuallyTrue(t, func() bool {
+		_, err := ledgerAReloaded.Debit(ctx, uint32(3), []uint8{0})
+		return err == nil
+	}, time.Second)
 }

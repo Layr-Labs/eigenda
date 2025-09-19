@@ -169,6 +169,10 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
+		// Force foundry to mine a block since it isn't auto-mining
+		err = rpcClient.CallContext(context.Background(), nil, "evm_mine")
+		Expect(err).To(BeNil())
+
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 

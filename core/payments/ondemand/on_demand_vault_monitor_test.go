@@ -79,9 +79,10 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 
-	time.Sleep(updateInterval * 10)
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
-	require.Equal(t, len(accounts), len(capturedUpdates))
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
@@ -97,10 +98,9 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	capturedUpdates = make(map[gethcommon.Address]*big.Int)
 
 	// Wait for the monitor to fetch the updated deposits
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated again
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
 	// Check that the specific account was updated correctly
 	updatedDeposit, ok := capturedUpdates[testAccount]
@@ -154,10 +154,9 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	// Wait for updates
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated correctly with no batching
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())

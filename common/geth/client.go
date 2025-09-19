@@ -75,6 +75,8 @@ func NewClient(config EthClientConfig, senderAddress gethcommon.Address, rpcInde
 		return nil, fmt.Errorf("NewClient: cannot get chainId: %w", err)
 	}
 
+	logger.Debugf("Creating eth client with sender address %s", accountAddress.Hex())
+
 	c := &EthClient{
 		RPCURL:           rpcUrl,
 		privateKey:       privateKey,
