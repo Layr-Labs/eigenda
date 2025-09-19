@@ -157,6 +157,9 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.NotNil(t, relayClient)
 
 	// Both updates fail
+	var cancel context.CancelFunc
+	c.node.CTX, cancel = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel()
 
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
 	c.relayClient.On("GetSockets").Return(nil)
@@ -178,6 +181,9 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Equal(t, quorumCount, uint32(2))
 
 	// Same relay URLs shouldn't trigger update
+	var cancel1 context.CancelFunc
+	c.node.CTX, cancel1 = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel1()
 
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
 	relayURLs := map[v2.RelayKey]string{
@@ -225,6 +231,9 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	require.False(t, ok)
 
 	// Blob params updated successfully
+	var cancel context.CancelFunc
+	c.node.CTX, cancel = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel()
 
 	blobParams2 := &core.BlobVersionParameters{
 		NumChunks:       111,
