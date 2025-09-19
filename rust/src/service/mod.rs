@@ -2,6 +2,8 @@ pub mod config;
 
 use std::{ops::Not, str::FromStr, time::Duration};
 
+use alloy_consensus::TxEip4844;
+use alloy_consensus::transaction::SignerRecoverable;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_network::TransactionBuilder;
 use alloy_primitives::TxHash;
@@ -34,7 +36,7 @@ use crate::{
         proxy::{ProxyClient, ProxyError},
         verification::{verify_cert, verify_cert_recency},
     },
-    ethereum::{extract_certificate, provider::init_ethereum_provider, tx::map_eip4844},
+    ethereum::{extract_certificate, provider::init_ethereum_provider},
     service::config::{EigenDaConfig, EigenDaContracts, Network},
     spec::{
         BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
@@ -186,7 +188,7 @@ impl EigenDaService {
         let mut block_transactions = Vec::with_capacity(transactions.len());
 
         for transaction in transactions {
-            let tx = map_eip4844(transaction.into_inner());
+            let tx = transaction.into_inner().map_eip4844(TxEip4844::from);
 
             // Transaction is not relevant for the rollup. We still need it for
             // later when proving the completeness
@@ -440,9 +442,8 @@ impl DaService for EigenDaService {
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
-        let header = block.header.into_consensus();
 
-        Ok(EthereumBlockHeader::from(header))
+        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
     }
 
     /// Fetch the head block of the most popular fork.
@@ -457,9 +458,8 @@ impl DaService for EigenDaService {
             .get_block(block)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No finalized block"))?;
-        let header = block.header.into_consensus();
 
-        Ok(EthereumBlockHeader::from(header))
+        Ok(EthereumBlockHeader::from(block.into_consensus_header()))
     }
 
     /// Extract the relevant transactions from a block.

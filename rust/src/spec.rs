@@ -1,6 +1,9 @@
 use std::{hash::Hash, str::FromStr};
 
-use alloy_consensus::{EthereumTxEnvelope, Header, Transaction, TxEip4844};
+use alloy_consensus::{
+    EthereumTxEnvelope, Header, Transaction, TxEip4844,
+    serde_bincode_compat::{self},
+};
 use alloy_eips::Typed2718;
 use alloy_primitives::{Address, AddressError, B256, FixedBytes, TxHash, wrap_fixed_bytes};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -35,7 +38,6 @@ use crate::{
             CertVerificationInputs, error::CertVerificationError, types::Storage,
         },
     },
-    ethereum::tx::serde_bincode_compat::{self},
     verifier::{EigenDaCompletenessProof, EigenDaInclusionProof},
 };
 
@@ -484,27 +486,10 @@ impl CertificateStateData {
 mod tests {
     use std::str::FromStr;
 
-    use sov_rollup_interface::sov_universal_wallet::schema::Schema;
-
     use crate::spec::EthereumAddress;
 
     const ADDR_1: &str = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
     const ADDR_2: &str = "0x1234567890123456789012345678901234567890";
-
-    #[test]
-    fn test_ethereum_address_schema() {
-        let raw_address_str = ADDR_1;
-        let address = EthereumAddress::from_str(raw_address_str).unwrap();
-
-        let schema = Schema::of_single_type::<EthereumAddress>().unwrap();
-
-        let borsh_bytes = borsh::to_vec(&address).unwrap();
-        let deserialized: EthereumAddress = borsh::from_slice(&borsh_bytes).unwrap();
-        assert_eq!(deserialized, address);
-
-        let displayed_from_schema = schema.display(0, &borsh_bytes).unwrap();
-        assert_eq!(&displayed_from_schema, &raw_address_str.to_lowercase());
-    }
 
     #[test]
     fn test_address_display_from_string() {

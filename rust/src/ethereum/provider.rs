@@ -41,7 +41,7 @@ pub async fn init_ethereum_provider(
 
     let provider = ProviderBuilder::new()
         .wallet(signer)
-        .on_client(client)
+        .connect_client(client)
         .erased();
 
     Ok(provider)

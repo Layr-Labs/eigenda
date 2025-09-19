@@ -1,4 +1,4 @@
-use alloy_consensus::proofs::calculate_transaction_root;
+use alloy_consensus::{proofs::calculate_transaction_root, transaction::SignerRecoverable};
 use alloy_primitives::B256;
 use bytes::Bytes;
 use reth_trie_common::proof::ProofVerificationError;
@@ -163,11 +163,7 @@ impl EigenDaCompletenessProof {
         }
 
         // Verify that the proof holds the complete list of transactions for the block
-        let transactions = self
-            .transactions
-            .iter()
-            .map(|t| t.tx.clone())
-            .collect::<Vec<_>>();
+        let transactions = self.transactions.iter().map(|t| &t.tx).collect::<Vec<_>>();
         let calculated_transactions_root = calculate_transaction_root(&transactions);
         if calculated_transactions_root != header.as_ref().transactions_root {
             return Err(CompletenessProofError::MerkleRootMismatch(

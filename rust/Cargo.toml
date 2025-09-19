@@ -4,27 +4,26 @@ name = "sov-eigenda-adapter"
 version = "0.1.0"
 
 [dependencies]
-# NOTE: Alloy dependencies are pinned to compatible versions to resolve c-kzg
-# native library conflicts. The conflict happens because `sovereign-sdk` is
-# using an older revm version that is still using the `c-kzg.version = 1`
-alloy-consensus = { version = "0.12.6", default-features = false, features = [
+alloy-consensus = { version = "1.0.32", default-features = false, features = [
   "serde",
   "serde-bincode-compat",
   "k256",
 ] }
-alloy-eips = { version = "0.12.6", default-features = false }
-alloy-network = { version = "0.12.6", default-features = false }
-alloy-primitives = { version = "0.8.25", default-features = false }
-alloy-provider = { version = "0.12.6", default-features = false }
+alloy-eips = { version = "1.0.32", default-features = false }
+alloy-network = { version = "1.0.32", default-features = false }
+alloy-primitives = { version = "1.3.1", default-features = false, features = [
+  "serde",
+] }
+alloy-provider = { version = "1.0.32", default-features = false }
 alloy-rlp = { version = "0.3.12", default-features = false }
-alloy-rpc-client = { version = "0.12.6", default-features = false }
-alloy-rpc-types = { version = "0.12.6", default-features = false }
-alloy-rpc-types-eth = { version = "0.12.6", default-features = false }
-alloy-signer = { version = "0.12.6", default-features = false }
-alloy-signer-local = { version = "0.12.6", default-features = false }
-alloy-sol-types = { version = "0.8.25", default-features = false }
-alloy-transport = { version = "0.12.6", default-features = false }
-anyhow = { version = "1.0.98", default-features = false }
+alloy-rpc-client = { version = "1.0.32", default-features = false }
+alloy-rpc-types = { version = "1.0.32", default-features = false }
+alloy-rpc-types-eth = { version = "1.0.32", default-features = false }
+alloy-signer = { version = "1.0.32", default-features = false }
+alloy-signer-local = { version = "1.0.32", default-features = false }
+alloy-sol-types = { version = "1.3.1", default-features = false }
+alloy-transport = { version = "1.0.32", default-features = false }
+anyhow = { version = "1.0.99", default-features = false }
 arbitrary = { version = "1.3", optional = true }
 ark-bn254 = { version = "0.5.0", default-features = false, features = [
   "curve",
@@ -47,7 +46,7 @@ hashbrown = { version = "0.15.4", default-features = false, features = [
 hex = { version = "0.4.3" }
 proptest = { version = "1.7.0", features = ["alloc", "std"], optional = true }
 reqwest = { version = "0.12.22", features = ["json"], optional = true }
-reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.3.4", default-features = false, features = [
+reth-trie-common = { git = "https://github.com/paradigmxyz/reth.git", tag = "v1.7.0", default-features = false, features = [
   "serde",
 ] }
 rust-kzg-bn254-primitives = { version = "0.1.2", default-features = false }
@@ -59,7 +58,7 @@ serde = { version = "1.0.219", default-features = false, features = [
 ] }
 serde_json = { version = "1.0.141" }
 serde_with = { version = "3.14.0" }
-sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk.git", rev = "464eedff20ed53fe96bc8d5befef5fddbe16b063" }
+sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.47.1", features = ["sync"], optional = true }
 tracing = { version = "0.1.41" }
@@ -69,14 +68,10 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 tracing-tree = "0.4"
 url = { version = "2.5.4" }
-
-# Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L250
+# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
 schemars = { version = "0.8.21", default-features = false, features = [
   "derive",
 ] }
-
-# Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L261
-risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 
 [build-dependencies]
 ark-bn254 = { version = "0.5.0", default-features = false }
@@ -87,13 +82,13 @@ bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
 rust-kzg-bn254-prover = { version = "0.1.1", default-features = false }
 
 [dev-dependencies]
-alloy-consensus = { version = "0.12.6", default-features = false, features = [
+alloy-consensus = { version = "1.0.32", default-features = false, features = [
   "arbitrary",
 ] }
-alloy-provider = { version = "0.12.6", default-features = false, features = [
+alloy-provider = { version = "1.0.32", default-features = false, features = [
   "anvil-api",
 ] }
-alloy-rpc-types = { version = "0.12.6", default-features = false, features = [
+alloy-rpc-types = { version = "1.0.32", default-features = false, features = [
   "anvil",
 ] }
 arbitrary = { version = "1.3" }
@@ -106,7 +101,7 @@ hex = "0.4.3"
 jsonschema = "0.33.0"
 rand = { version = "0.8" }
 reltester = { version = "2.0.0" }
-# Pinned so that it's same as https://github.com/Sovereign-Labs/sovereign-sdk/blob/508fb90f93f08a7695ddf5ceaddce7841fd31687/Cargo.toml#L261
+# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 test-strategy = { version = "0.4.3" }
 testcontainers = "0.25.0"
