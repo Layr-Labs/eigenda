@@ -59,7 +59,12 @@ func mustRegisterOperators(t *testing.T, env *deploy.Config, logger logging.Logg
 	}
 }
 
-func mustMakeOperatorTransactor(t *testing.T, env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Writer {
+func mustMakeOperatorTransactor(
+	t *testing.T,
+	env *deploy.Config,
+	op deploy.OperatorVars,
+	logger logging.Logger,
+) core.Writer {
 	t.Helper()
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	require.True(t, ok, "deployer not found")
@@ -79,7 +84,12 @@ func mustMakeOperatorTransactor(t *testing.T, env *deploy.Config, op deploy.Oper
 	return tx
 }
 
-func mustMakeTestClients(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) (common.EthClient, common.RPCEthClient) {
+func mustMakeTestClients(
+	t *testing.T,
+	env *deploy.Config,
+	privateKey string,
+	logger logging.Logger,
+) (common.EthClient, common.RPCEthClient) {
 	t.Helper()
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	require.True(t, ok, "deployer not found")
@@ -100,7 +110,12 @@ func mustMakeTestClients(t *testing.T, env *deploy.Config, privateKey string, lo
 	return client, rpcClient
 }
 
-func mustMakeChainState(t *testing.T, env *deploy.Config, _ indexer.HeaderStore, logger logging.Logger) *coreindexer.IndexedChainState {
+func mustMakeChainState(
+	t *testing.T,
+	env *deploy.Config,
+	_ indexer.HeaderStore,
+	logger logging.Logger,
+) *coreindexer.IndexedChainState {
 	t.Helper()
 	client, rpcClient := mustMakeTestClients(t, env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 

@@ -102,12 +102,20 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	// ensure that a verifier can't be added at the latest block number
 	latestBlock, err := ethClient.BlockNumber(ctx)
 	require.NoError(t, err)
-	_, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock), gethcommon.HexToAddress("0x0"))
+	_, err = eigenDACertVerifierRouter.AddCertVerifier(
+		deployerTransactorOpts,
+		uint32(latestBlock),
+		gethcommon.HexToAddress("0x0"),
+	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
 	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
-	tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress("0x0"))
+	tx, err := eigenDACertVerifierRouter.AddCertVerifier(
+		deployerTransactorOpts,
+		uint32(latestBlock)+2,
+		gethcommon.HexToAddress("0x0"),
+	)
 	require.NoError(t, err)
 	mineAnvilBlocks(t, 1)
 
@@ -138,7 +146,11 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	latestBlock, err = ethClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
-	tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
+	tx, err = eigenDACertVerifierRouter.AddCertVerifier(
+		deployerTransactorOpts,
+		uint32(latestBlock)+2,
+		gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier),
+	)
 	require.NoError(t, err)
 	mineAnvilBlocks(t, 10)
 
