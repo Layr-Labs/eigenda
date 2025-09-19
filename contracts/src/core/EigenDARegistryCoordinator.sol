@@ -150,6 +150,43 @@ contract EigenDARegistryCoordinator is
         }).numOperatorsPerQuorum;
 
         // For each quorum, validate that the new operator count does not exceed the maximum
+        // (If it does, an operator needs to be replaced -- see `registerOperatorWithChurn`)
+        for (uint256 i = 0; i < quorumNumbers.length; i++) {
+            uint8 quorumNumber = uint8(quorumNumbers[i]);
+
+            require(
+                numOperatorsPerQuorum[i] <= _quorumParams[quorumNumber].maxOperatorCount,
+                "RegCoord.registerOperator: operator count exceeds maximum"
+            );
+        }
+    }
+
+    function registerOperatorWithChurn(
+        bytes calldata quorumNumbers,
+        string calldata socket,
+        IBLSApkRegistry.PubkeyRegistrationParams calldata params,
+        SignatureWithSaltAndExpiry memory operatorSignature
+    ) external {
+        /**
+         * If the operator has NEVER registered a pubkey before, use `params` to register
+         * their pubkey in blsApkRegistry
+         *
+         * If the operator HAS registered a pubkey, `params` is ignored and the pubkey hash
+         * (operatorId) is fetched instead
+         */
+        bytes32 operatorId = _getOrCreateOperatorId(msg.sender, params);
+
+        // Register the operator in each of the registry contracts and update the operator's
+        // quorum bitmap and registration status
+        uint32[] memory numOperatorsPerQuorum = _registerOperator({
+            operator: msg.sender,
+            operatorId: operatorId,
+            quorumNumbers: quorumNumbers,
+            socket: socket,
+            operatorSignature: operatorSignature
+        }).numOperatorsPerQuorum;
+
+        // For each quorum, validate that the new operator count does not exceed the maximum
         // If it does, churns an operator via an exhaustive search through the operator set.
         for (uint256 i; i < quorumNumbers.length; i++) {
             uint8 quorumNumber = uint8(quorumNumbers[i]);
