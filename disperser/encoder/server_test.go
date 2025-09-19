@@ -1,4 +1,4 @@
-package encoder
+package encoder_test
 
 import (
 	"bytes"
@@ -10,31 +10,27 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	encmock "github.com/Layr-Labs/eigenda/disperser/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	encmock "github.com/Layr-Labs/eigenda/encoding/mock"
-
-	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
-	"github.com/Layr-Labs/eigenda/core"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 )
 
 var (
 	gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 )
 
-var logger = testutils.GetLogger()
-
-func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
+func makeTestProverV1(numPoint uint64) (*prover.Prover, encoder.ServerConfig) {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
@@ -46,7 +42,7 @@ func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 	}
 
 	p, _ := prover.NewProver(kzgConfig, nil)
-	encoderServerConfig := ServerConfig{
+	encoderServerConfig := encoder.ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
@@ -55,9 +51,12 @@ func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 	return p, encoderServerConfig
 }
 
-var testProver, testServerConfig = makeTestProver(3000)
+var testProver, testServerConfig = makeTestProverV1(3000)
 
-func getTestData() (core.Blob, encoding.EncodingParams) {
+func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
+	t.Helper()
+	ctx := t.Context()
+
 	var quorumID core.QuorumID = 0
 	var adversaryThreshold uint8 = 80
 	var quorumThreshold uint8 = 90
@@ -81,7 +80,7 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 		1: 10,
 		2: 10,
 	})
-	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
+	operatorState, err := indexedChainState.GetOperatorState(ctx, uint(0), []core.QuorumID{quorumID})
 	if err != nil {
 		log.Fatalf("failed to get operator state: %s", err)
 	}
@@ -110,14 +109,14 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 	return testBlob, testEncodingParams
 }
 
-func newEncoderTestServer(t *testing.T) *EncoderServer {
-	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
-	return NewEncoderServer(testServerConfig, logger, testProver, metrics, nil)
+func newEncoderTestServer(t *testing.T) *encoder.EncoderServer {
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	return encoder.NewEncoderServer(testServerConfig, logger, testProver, metrics, nil)
 }
 
-func TestEncodeBlob(t *testing.T) {
+func TestEncodeBlobV1(t *testing.T) {
 	server := newEncoderTestServer(t)
-	testBlobData, testEncodingParams := getTestData()
+	testBlobData, testEncodingParams := getTestData(t)
 
 	testEncodingParamsProto := &pb.EncodingParams{
 		ChunkLength: uint32(testEncodingParams.ChunkLength),
@@ -129,7 +128,7 @@ func TestEncodeBlob(t *testing.T) {
 		EncodingParams: testEncodingParamsProto,
 	}
 
-	reply, err := server.EncodeBlob(context.Background(), encodeBlobRequestProto)
+	reply, err := server.EncodeBlob(t.Context(), encodeBlobRequestProto)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply.GetChunks())
 
@@ -160,6 +159,7 @@ func TestEncodeBlob(t *testing.T) {
 }
 
 func TestThrottling(t *testing.T) {
+	ctx := t.Context()
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
 	Y1 = *Y1.SetBigInt(big.NewInt(2))
@@ -182,10 +182,10 @@ func TestThrottling(t *testing.T) {
 
 	lengthCommitment = lengthProof
 
-	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	concurrentRequests := 2
 	requestPoolSize := 4
-	encoder := &encmock.MockEncoder{
+	mockEncoder := &encmock.MockEncoder{
 		Delay: 500 * time.Millisecond,
 	}
 
@@ -199,14 +199,14 @@ func TestThrottling(t *testing.T) {
 		Length:           10,
 	}
 
-	encoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
-	encoderServerConfig := ServerConfig{
+	mockEncoder.On("EncodeAndProve", mock.Anything, mock.Anything).Return(blobCommitment, []*encoding.Frame{}, nil)
+	encoderServerConfig := encoder.ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: concurrentRequests,
 		RequestPoolSize:       requestPoolSize,
 	}
-	s := NewEncoderServer(encoderServerConfig, logger, encoder, metrics, nil)
-	testBlobData, testEncodingParams := getTestData()
+	s := encoder.NewEncoderServer(encoderServerConfig, logger, mockEncoder, metrics, nil)
+	testBlobData, testEncodingParams := getTestData(t)
 
 	testEncodingParamsProto := &pb.EncodingParams{
 		ChunkLength: uint32(testEncodingParams.ChunkLength),
@@ -224,7 +224,7 @@ func TestThrottling(t *testing.T) {
 		go func(i int) {
 			timeout := 200 * time.Millisecond
 			fmt.Println("Making request", i, timeout)
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 			_, err := s.EncodeBlob(ctx, encodeBlobRequestProto)
 			errs[i] = err
@@ -255,12 +255,13 @@ func TestThrottling(t *testing.T) {
 }
 
 func TestEncoderPointsLoading(t *testing.T) {
+	ctx := t.Context()
 	// encoder 1 only loads 1500 points
-	prover1, config1 := makeTestProver(1500)
-	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
-	server1 := NewEncoderServer(config1, logger, prover1, metrics, nil)
+	prover1, config1 := makeTestProverV1(1500)
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	server1 := encoder.NewEncoderServer(config1, logger, prover1, metrics, nil)
 
-	testBlobData, testEncodingParams := getTestData()
+	testBlobData, testEncodingParams := getTestData(t)
 
 	testEncodingParamsProto := &pb.EncodingParams{
 		ChunkLength: uint32(testEncodingParams.ChunkLength),
@@ -272,7 +273,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 		EncodingParams: testEncodingParamsProto,
 	}
 
-	reply1, err := server1.EncodeBlob(context.Background(), encodeBlobRequestProto)
+	reply1, err := server1.EncodeBlob(ctx, encodeBlobRequestProto)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply1.GetChunks())
 
@@ -301,10 +302,10 @@ func TestEncoderPointsLoading(t *testing.T) {
 	assert.Equal(t, restored, gettysburgAddressBytes)
 
 	// encoder 2 only loads 2900 points
-	encoder2, config2 := makeTestProver(2900)
-	server2 := NewEncoderServer(config2, logger, encoder2, metrics, nil)
+	encoder2, config2 := makeTestProverV1(2900)
+	server2 := encoder.NewEncoderServer(config2, logger, encoder2, metrics, nil)
 
-	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
+	reply2, err := server2.EncodeBlob(ctx, encodeBlobRequestProto)
 	assert.NoError(t, err)
 	assert.NotNil(t, reply2.GetChunks())
 

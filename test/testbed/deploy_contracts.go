@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -54,7 +55,12 @@ func LoadPrivateKeys(input LoadPrivateKeysInput) (*PrivateKeyMaps, error) {
 
 	// Use testbed secrets for other services
 	// The secrets are located in the testbed directory
-	keyPath := filepath.Join("..", "testbed", "secrets")
+	// First, try to find the secrets directory relative to this file's location
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, errors.New("failed to get caller information")
+	}
+	keyPath := filepath.Join(filepath.Dir(filename), "secrets")
 
 	// Build the list of service names
 	names := make([]string, 0)
@@ -312,7 +318,13 @@ func DeployEigenDAContracts(config DeploymentConfig) (*DeploymentResult, error) 
 		_ = os.Chdir(origDir)
 	}()
 
-	contractsDir := "../contracts"
+	// Find the contracts directory relative to this file's location
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, errors.New("failed to get caller information")
+	}
+	// Navigate from test/testbed to contracts (../../contracts from testbed)
+	contractsDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "contracts")
 	if err := os.Chdir(contractsDir); err != nil {
 		return nil, fmt.Errorf("failed to change to contracts directory: %w", err)
 	}

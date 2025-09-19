@@ -11,13 +11,14 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger = tu.GetLogger()
+	logger = test.GetLogger()
 )
 
 const (
@@ -72,10 +73,10 @@ func runRandomOperationsTest(t *testing.T, client s3.Client) {
 
 	fragmentSize := rand.Intn(1000) + 1000
 	for i := 0; i < numberToWrite; i++ {
-		key := tu.RandomString(10)
+		key := random.RandomString(10)
 		fragmentMultiple := rand.Float64() * 10
 		dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
-		data := tu.RandomBytes(dataSize)
+		data := random.RandomBytes(dataSize)
 		expectedData[key] = data
 		err := client.FragmentedUploadObject(ctx, bucket, key, data, fragmentSize)
 		require.NoError(t, err, "failed to upload fragmented object for key %s", key)
@@ -107,7 +108,7 @@ func runRandomOperationsTest(t *testing.T, client s3.Client) {
 }
 
 func TestRandomOperations(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
 		client := mock.NewS3Client()
@@ -121,7 +122,7 @@ func TestRandomOperations(t *testing.T) {
 }
 
 func TestReadNonExistentValue(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
 		client := mock.NewS3Client()
@@ -141,13 +142,13 @@ func runReadNonExistentValueTest(t *testing.T, client s3.Client) {
 	_, err := client.FragmentedDownloadObject(ctx, bucket, "nonexistent", 1000, 1000)
 	require.Error(t, err, "should fail to download non-existent object")
 
-	randomKey := tu.RandomString(10)
+	randomKey := random.RandomString(10)
 	_, err = client.FragmentedDownloadObject(ctx, bucket, randomKey, 0, 0)
 	require.Error(t, err, "should fail to download random non-existent object")
 }
 
 func TestHeadObject(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
 		client := mock.NewS3Client()
@@ -164,7 +165,7 @@ func runHeadObjectTest(t *testing.T, client s3.Client) {
 	t.Helper()
 	ctx := t.Context()
 
-	key := tu.RandomString(10)
+	key := random.RandomString(10)
 	err := client.UploadObject(ctx, bucket, key, []byte("test"))
 	require.NoError(t, err, "failed to upload test object")
 

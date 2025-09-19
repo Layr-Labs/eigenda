@@ -12,27 +12,30 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var duplicatedIndex uint32 = 1
+var (
+	duplicatedIndex uint32 = 1
+)
 
 // TestNonMockedValidatorClientWorkflow tests validator client retrieval using real KZG prover and verifier
 // This creates actual encoded blobs with proper KZG commitments, rather than using mocked components
 func TestNonMockedValidatorClientWorkflow(t *testing.T) {
+	ctx := t.Context()
+
 	// Set up KZG components (prover and verifier)
 	p, v, err := makeTestEncodingComponents()
 	require.NoError(t, err)
@@ -40,8 +43,6 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
 
@@ -79,7 +80,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Prepare blobs with real encoding
 	// This creates actual sharded blobs for each operator with valid KZG proofs
-	operatorState, err := dat.GetOperatorState(context.Background(), 0, quorumNumbers)
+	operatorState, err := dat.GetOperatorState(ctx, 0, quorumNumbers)
 	require.NoError(t, err)
 
 	// Get encoding parameters
@@ -142,15 +143,16 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// We're using the real deserializer and decoder, but tracking frame counts
 	originalChunkDeserializerFactory := config.UnsafeChunkDeserializerFactory
-	config.UnsafeChunkDeserializerFactory = func(assignments map[core.OperatorID]v2.Assignment, verifier encoding.Verifier) internal.ChunkDeserializer {
-		realDeserializer := originalChunkDeserializerFactory(assignments, verifier)
-		return &instrumentedChunkDeserializer{
-			ChunkDeserializer: realDeserializer,
+	config.UnsafeChunkDeserializerFactory =
+		func(assignments map[core.OperatorID]v2.Assignment, verifier *verifier.Verifier) internal.ChunkDeserializer {
+			realDeserializer := originalChunkDeserializerFactory(assignments, verifier)
+			return &instrumentedChunkDeserializer{
+				ChunkDeserializer: realDeserializer,
+			}
 		}
-	}
 
 	originalBlobDecoderFactory := config.UnsafeBlobDecoderFactory
-	config.UnsafeBlobDecoderFactory = func(verifier encoding.Verifier) internal.BlobDecoder {
+	config.UnsafeBlobDecoderFactory = func(verifier *verifier.Verifier) internal.BlobDecoder {
 		realDecoder := originalBlobDecoderFactory(verifier)
 		return &instrumentedBlobDecoder{
 			t:                         t,
@@ -162,7 +164,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create a worker with all the real components
 	worker, err := newRetrievalWorker(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		connectionPool,
@@ -205,7 +207,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 }
 
 // makeTestEncodingComponents makes a prover and verifier for KZG
-func makeTestEncodingComponents() (encoding.Prover, encoding.Verifier, error) {
+func makeTestEncodingComponents() (*prover.Prover, *verifier.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../../../resources/srs/g1.point",
 		G2Path:          "../../../../resources/srs/g2.point",
@@ -230,7 +232,9 @@ func makeTestEncodingComponents() (encoding.Prover, encoding.Verifier, error) {
 }
 
 // makeTestBlob creates a test blob with valid commitments
-func makeTestBlob(t *testing.T, p encoding.Prover, version v2.BlobVersion, length int, quorums []core.QuorumID) (*v2.BlobHeaderWithHashedPayment, []byte) {
+func makeTestBlob(
+	t *testing.T, p *prover.Prover, version v2.BlobVersion, length int, quorums []core.QuorumID,
+) (*v2.BlobHeaderWithHashedPayment, []byte) {
 	data := make([]byte, length*31)
 	_, err := rand.Read(data)
 	if err != nil {

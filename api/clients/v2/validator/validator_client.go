@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
@@ -32,7 +33,7 @@ type validatorClient struct {
 	logger           logging.Logger
 	blobParamsReader BlobParamsReader
 	chainState       core.ChainState
-	verifier         encoding.Verifier
+	verifier         *verifier.Verifier
 	config           *ValidatorClientConfig
 	connectionPool   *workerpool.WorkerPool
 	computePool      *workerpool.WorkerPool
@@ -46,7 +47,7 @@ func NewValidatorClient(
 	logger logging.Logger,
 	blobParamsReader BlobParamsReader,
 	chainState core.ChainState,
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 	config *ValidatorClientConfig,
 	metrics *ValidatorClientMetrics,
 ) ValidatorClient {

@@ -22,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -30,8 +29,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -61,7 +62,7 @@ var (
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
 	metadataTableNameV2             = "test-BlobMetadata-v2"
-	logger                          = testutils.GetLogger()
+	logger                          = test.GetLogger()
 	ethClient                       common.EthClient
 	rpcClient                       common.RPCEthClient
 	certBuilder                     *clientsv2.CertBuilder
@@ -167,6 +168,10 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		Expect(err).To(BeNil())
+
+		// Force foundry to mine a block since it isn't auto-mining
+		err = rpcClient.CallContext(context.Background(), nil, "evm_mine")
 		Expect(err).To(BeNil())
 
 		logger.Info("Starting binaries")
@@ -376,8 +381,13 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		return err
 	}
 
+	kzgVerifierV2, err := verifierv2.NewVerifier(kzgConfig, nil)
+	if err != nil {
+		return fmt.Errorf("new verifier v2: %w", err)
+	}
+
 	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),

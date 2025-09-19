@@ -29,7 +29,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -39,7 +38,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
 )
@@ -191,25 +189,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 	} else {
-		logger.Info("Using built-in indexer")
-		rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
-		if err != nil {
-			return err
-		}
-		idx, err := indexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			gethClient,
-			rpcClient,
-			serviceManagerAddress.Hex(),
-			logger,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create indexer: %w", err)
-		}
-		ics, err = indexer.NewIndexedChainState(chainState, idx)
-		if err != nil {
-			return fmt.Errorf("failed to create indexed chain state: %w", err)
-		}
+		return fmt.Errorf("built-in indexer is deprecated and will be removed soon, please use UseGraph=true")
 	}
 
 	var requestSigner clients.DispersalRequestSigner
@@ -289,12 +269,12 @@ func RunController(ctx *cli.Context) error {
 		if config.ServerConfig.EnablePaymentAuthentication {
 			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
 				c,
+				logger,
 				config.OnDemandConfig,
 				config.ReservationConfig,
 				contractDirectory,
 				gethClient,
 				dynamoClient.GetAwsClient(),
-				logger,
 				metricsRegistry,
 			)
 			if err != nil {
@@ -356,12 +336,12 @@ func RunController(ctx *cli.Context) error {
 
 func buildPaymentAuthorizationHandler(
 	ctx context.Context,
+	logger logging.Logger,
 	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
 	reservationConfig reservation.ReservationLedgerCacheConfig,
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
-	logger logging.Logger,
 	metricsRegistry *prometheus.Registry,
 ) (*controllerpayments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)

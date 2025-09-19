@@ -10,18 +10,19 @@ import (
 	"time"
 
 	cache2 "github.com/Layr-Labs/eigenda/common/cache"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRandomOperationsSingleThread(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	dataSize := 1024
 
 	baseData := make(map[int]string)
 	for i := 0; i < dataSize; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	accessor := func(key int) (*string, error) {
@@ -40,7 +41,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < dataSize; i++ {
-		value, err := ca.Get(context.Background(), i)
+		value, err := ca.Get(ctx, i)
 
 		if i%17 == 0 {
 			require.Error(t, err)
@@ -52,7 +53,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 
 	for k, v := range baseData {
-		value, err := ca.Get(context.Background(), k)
+		value, err := ca.Get(ctx, k)
 
 		if k%17 == 0 {
 			require.Error(t, err)
@@ -65,14 +66,15 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 }
 
 func TestCacheMisses(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	cacheSize := rand.Intn(10) + 10
 	keyCount := cacheSize + 1
 
 	baseData := make(map[int]string)
 	for i := 0; i < keyCount; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	cacheMissCount := atomic.Uint64{}
@@ -91,7 +93,7 @@ func TestCacheMisses(t *testing.T) {
 	expectedCacheMissCount := uint64(0)
 	for i := 0; i < cacheSize; i++ {
 		expectedCacheMissCount++
-		value, err := ca.Get(context.Background(), i)
+		value, err := ca.Get(ctx, i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -99,7 +101,7 @@ func TestCacheMisses(t *testing.T) {
 
 	// Get the first cacheSize keys again. This should not increase the cache miss count.
 	for i := 0; i < cacheSize; i++ {
-		value, err := ca.Get(context.Background(), i)
+		value, err := ca.Get(ctx, i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -107,14 +109,14 @@ func TestCacheMisses(t *testing.T) {
 
 	// Read the last key. This should cause the first key to be evicted.
 	expectedCacheMissCount++
-	value, err := ca.Get(context.Background(), cacheSize)
+	value, err := ca.Get(ctx, cacheSize)
 	require.NoError(t, err)
 	require.Equal(t, baseData[cacheSize], *value)
 
 	// Read the keys in order. Due to the order of evictions, each read should result in a cache miss.
 	for i := 0; i < cacheSize; i++ {
 		expectedCacheMissCount++
-		value, err := ca.Get(context.Background(), i)
+		value, err := ca.Get(ctx, i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -122,13 +124,14 @@ func TestCacheMisses(t *testing.T) {
 }
 
 func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	dataSize := 1024
 
 	baseData := make(map[int]string)
 	for i := 0; i < dataSize; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	accessorLock := sync.RWMutex{}
@@ -160,7 +163,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(context.Background(), 0)
+			value, err := ca.Get(ctx, 0)
 			require.NoError(t, err)
 			require.Equal(t, baseData[0], *value)
 		}()
@@ -183,7 +186,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// Fetching the key again should not result in a cache miss.
-	value, err := ca.Get(context.Background(), 0)
+	value, err := ca.Get(ctx, 0)
 	require.NoError(t, err)
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())
@@ -201,7 +204,8 @@ func TestParallelAccess(t *testing.T) {
 }
 
 func TestParallelAccessWithError(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	accessorLock := sync.RWMutex{}
 	cacheMissCount := atomic.Uint64{}
@@ -230,7 +234,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(context.Background(), 0)
+			value, err := ca.Get(ctx, 0)
 			require.Nil(t, value)
 			require.Equal(t, errors.New("intentional error"), err)
 		}()
@@ -253,7 +257,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	require.True(t, count >= 1)
 
 	// Fetching the key again should result in another cache miss since the previous fetch failed.
-	value, err := ca.Get(context.Background(), 0)
+	value, err := ca.Get(ctx, 0)
 	require.Nil(t, value)
 	require.Equal(t, errors.New("intentional error"), err)
 	require.Equal(t, count+1, cacheMissCount.Load())
@@ -263,13 +267,14 @@ func TestParallelAccessWithError(t *testing.T) {
 }
 
 func TestConcurrencyLimiter(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	dataSize := 1024
 
 	baseData := make(map[int]string)
 	for i := 0; i < dataSize; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	maxConcurrency := 10 + rand.Intn(10)
@@ -300,7 +305,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 	for i := 0; i < dataSize; i++ {
 		boundI := i
 		go func() {
-			value, err := ca.Get(context.Background(), boundI)
+			value, err := ca.Get(ctx, boundI)
 			require.NoError(t, err)
 			require.Equal(t, baseData[boundI], *value)
 			wg.Done()
@@ -321,13 +326,14 @@ func TestConcurrencyLimiter(t *testing.T) {
 }
 
 func TestOriginalRequesterTimesOut(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	dataSize := 1024
 
 	baseData := make(map[int]string)
 	for i := 0; i < dataSize; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	accessorLock := sync.RWMutex{}
@@ -359,18 +365,16 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	errCount := atomic.Uint64{}
 	for i := 0; i < 10; i++ {
 
-		var ctx context.Context
+		localCtx := ctx
 		if i == 0 {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			localCtx, cancel = context.WithTimeout(ctx, 1*time.Millisecond)
 			defer cancel()
-		} else {
-			ctx = context.Background()
 		}
 
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(ctx, 0)
+			value, err := ca.Get(localCtx, 0)
 
 			if err != nil {
 				errCount.Add(1)
@@ -400,7 +404,7 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	require.True(t, errCount.Load() <= 1)
 
 	// Fetching the key again should not result in a cache miss.
-	value, err := ca.Get(context.Background(), 0)
+	value, err := ca.Get(ctx, 0)
 	require.NoError(t, err)
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())
@@ -410,13 +414,14 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 }
 
 func TestSecondaryRequesterTimesOut(t *testing.T) {
-	tu.InitializeRandom()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	dataSize := 1024
 
 	baseData := make(map[int]string)
 	for i := 0; i < dataSize; i++ {
-		baseData[i] = tu.RandomString(10)
+		baseData[i] = random.RandomString(10)
 	}
 
 	accessorLock := sync.RWMutex{}
@@ -447,19 +452,16 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	wg.Add(10)
 	errCount := atomic.Uint64{}
 	for i := 0; i < 10; i++ {
-
-		var ctx context.Context
+		localCtx := ctx
 		if i == 1 {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			localCtx, cancel = context.WithTimeout(ctx, 1*time.Millisecond)
 			defer cancel()
-		} else {
-			ctx = context.Background()
 		}
 
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(ctx, 0)
+			value, err := ca.Get(localCtx, 0)
 
 			if err != nil {
 				errCount.Add(1)
@@ -493,7 +495,7 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	require.True(t, errCount.Load() <= 1)
 
 	// Fetching the key again should not result in a cache miss.
-	value, err := ca.Get(context.Background(), 0)
+	value, err := ca.Get(ctx, 0)
 	require.NoError(t, err)
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())

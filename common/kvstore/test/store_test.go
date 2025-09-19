@@ -8,7 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +34,7 @@ func verifyDBIsDeleted(t *testing.T) {
 }
 
 func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
 	expectedData := make(map[string][]byte)
@@ -44,8 +45,8 @@ func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 		if len(expectedData) == 0 || choice < 0.50 {
 			// Write a random value.
 
-			key := tu.RandomBytes(32)
-			value := tu.RandomBytes(32)
+			key := random.RandomBytes(32)
+			value := random.RandomBytes(32)
 
 			err := store.Put(key, value)
 			assert.NoError(t, err)
@@ -59,7 +60,7 @@ func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 				key = k
 				break
 			}
-			value := tu.RandomBytes(32)
+			value := random.RandomBytes(32)
 			err := store.Put([]byte(key), value)
 			assert.NoError(t, err)
 			expectedData[key] = value
@@ -77,7 +78,7 @@ func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 		} else {
 			// Drop a non-existent value.
 
-			key := tu.RandomBytes(32)
+			key := random.RandomBytes(32)
 			err := store.Delete(key)
 			assert.Nil(t, err)
 		}
@@ -91,7 +92,7 @@ func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 			}
 
 			// Try and get a value that isn't in the store.
-			key := tu.RandomBytes(32)
+			key := random.RandomBytes(32)
 			value, err := store.Get(key)
 			assert.Equal(t, kvstore.ErrNotFound, err)
 			assert.Nil(t, value)
@@ -106,8 +107,7 @@ func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 }
 
 func TestRandomOperations(t *testing.T) {
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(t, err)
+	logger := test.GetLogger()
 
 	for _, builder := range storeBuilders {
 		store, err := builder(logger, dbPath)
@@ -117,7 +117,7 @@ func TestRandomOperations(t *testing.T) {
 }
 
 func writeBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
 	var err error
@@ -127,14 +127,14 @@ func writeBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 
 	for i := 0; i < 1000; i++ {
 		// Write a random value.
-		key := tu.RandomBytes(32)
+		key := random.RandomBytes(32)
 
 		var value []byte
 		if i%50 == 0 {
 			// nil values are interpreted as empty slices.
 			value = nil
 		} else {
-			value = tu.RandomBytes(32)
+			value = random.RandomBytes(32)
 		}
 
 		batch.Put(key, value)
@@ -158,7 +158,7 @@ func writeBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 			}
 
 			// Try and get a value that isn't in the store.
-			key = tu.RandomBytes(32)
+			key = random.RandomBytes(32)
 			value, err = store.Get(key)
 			assert.Equal(t, kvstore.ErrNotFound, err)
 			assert.Nil(t, value)
@@ -184,7 +184,7 @@ func TestWriteBatch(t *testing.T) {
 }
 
 func deleteBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
 	expectedData := make(map[string][]byte)
@@ -193,8 +193,8 @@ func deleteBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 
 	// Add some data to the store.
 	for i := 0; i < 1000; i++ {
-		key := tu.RandomBytes(32)
-		value := tu.RandomBytes(32)
+		key := random.RandomBytes(32)
+		value := random.RandomBytes(32)
 
 		err := store.Put(key, value)
 		assert.NoError(t, err)
@@ -210,7 +210,7 @@ func deleteBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 			delete(expectedData, key)
 		} else if choice < 0.75 {
 			// Delete a non-existent key.
-			batch.Delete(tu.RandomBytes(32))
+			batch.Delete(random.RandomBytes(32))
 		}
 	}
 
@@ -225,7 +225,7 @@ func deleteBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 	}
 
 	// Try and get a value that isn't in the store.
-	key := tu.RandomBytes(32)
+	key := random.RandomBytes(32)
 	value, err := store.Get(key)
 	assert.Equal(t, kvstore.ErrNotFound, err)
 	assert.Nil(t, value)
@@ -250,15 +250,15 @@ func TestDeleteBatch(t *testing.T) {
 }
 
 func iterationTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
 	expectedData := make(map[string][]byte)
 
 	// Insert some data into the store.
 	for i := 0; i < 1000; i++ {
-		key := tu.RandomBytes(32)
-		value := tu.RandomBytes(32)
+		key := random.RandomBytes(32)
+		value := random.RandomBytes(32)
 
 		err := store.Put(key, value)
 		assert.NoError(t, err)
@@ -302,11 +302,11 @@ func TestIteration(t *testing.T) {
 }
 
 func iterationWithPrefixTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
-	prefixA := tu.RandomBytes(8)
-	prefixB := tu.RandomBytes(8)
+	prefixA := random.RandomBytes(8)
+	prefixB := random.RandomBytes(8)
 
 	expectedDataA := make(map[string][]byte)
 	expectedDataB := make(map[string][]byte)
@@ -316,13 +316,13 @@ func iterationWithPrefixTest(t *testing.T, store kvstore.Store[[]byte]) {
 		choice := rand.Float64()
 
 		var key []byte
-		value := tu.RandomBytes(32)
+		value := random.RandomBytes(32)
 
 		if choice < 0.5 {
-			key = append(prefixA, tu.RandomBytes(24)...)
+			key = append(prefixA, random.RandomBytes(24)...)
 			expectedDataA[string(key)] = value
 		} else {
-			key = append(prefixB, tu.RandomBytes(24)...)
+			key = append(prefixB, random.RandomBytes(24)...)
 			expectedDataB[string(key)] = value
 		}
 
@@ -388,10 +388,10 @@ func TestIterationWithPrefix(t *testing.T) {
 }
 
 func putNilTest(t *testing.T, store kvstore.Store[[]byte]) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	deleteDBDirectory(t)
 
-	key := tu.RandomBytes(32)
+	key := random.RandomBytes(32)
 
 	err := store.Put(key, nil)
 	assert.NoError(t, err)

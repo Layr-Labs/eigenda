@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // TestMutexPreventsSimultaneousRequests tests that the mutex in disperserClient
 // prevents multiple goroutines from executing critical sections concurrently.
 func TestMutexPreventsSimultaneousRequests(t *testing.T) {

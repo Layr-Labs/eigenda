@@ -7,15 +7,16 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestTrafficGenerator(t *testing.T) {
+	ctx := t.Context()
 	disperserClient := clientsmock.NewMockDisperserClient()
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	trafficGenerator := &traffic.TrafficGenerator{
 		Logger: logger,
 		Config: &traffic.Config{
@@ -31,7 +32,7 @@ func TestTrafficGenerator(t *testing.T) {
 	processing := disperser.Processing
 	disperserClient.On("DisperseBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(&processing, []byte{1}, nil)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		_ = trafficGenerator.StartTraffic(ctx)
 	}()
@@ -41,8 +42,9 @@ func TestTrafficGenerator(t *testing.T) {
 }
 
 func TestTrafficGeneratorAuthenticated(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	disperserClient := clientsmock.NewMockDisperserClient()
-	logger := testutils.GetLogger()
 
 	trafficGenerator := &traffic.TrafficGenerator{
 		Logger: logger,
@@ -60,7 +62,7 @@ func TestTrafficGeneratorAuthenticated(t *testing.T) {
 	processing := disperser.Processing
 	disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(&processing, []byte{1}, nil)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		_ = trafficGenerator.StartTraffic(ctx)
 	}()
