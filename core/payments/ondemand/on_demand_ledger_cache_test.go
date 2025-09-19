@@ -6,37 +6,49 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
+	ctx := t.Context()
+
 	t.Run("nil payment vault", func(t *testing.T) {
-		cache, err := ondemand.NewOnDemandLedgerCache(
-			context.Background(),
-			testutils.GetLogger(),
+		config, err := ondemand.NewOnDemandLedgerCacheConfig(
 			10,
-			nil, // nil payment vault
-			time.Second,
-			dynamoClient,
 			"tableName",
+			time.Second,
+		)
+		require.NoError(t, err)
+
+		cache, err := ondemand.NewOnDemandLedgerCache(
+			ctx,
+			test.GetLogger(),
+			config,
+			nil, // nil payment vault
+			dynamoClient,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
 	})
 
 	t.Run("nil dynamo client", func(t *testing.T) {
-		cache, err := ondemand.NewOnDemandLedgerCache(
-			context.Background(),
-			testutils.GetLogger(),
+		config, err := ondemand.NewOnDemandLedgerCacheConfig(
 			10,
-			vault.NewTestPaymentVault(),
-			time.Second,
-			nil, // nil dynamo client
 			"tableName",
+			time.Second,
+		)
+		require.NoError(t, err)
+
+		cache, err := ondemand.NewOnDemandLedgerCache(
+			ctx,
+			test.GetLogger(),
+			config,
+			vault.NewTestPaymentVault(),
+			nil, // nil dynamo client
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -44,7 +56,7 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 }
 
 func TestLRUCacheEvictionAndReload(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	tableName := createPaymentTable(t, "TestLRUCacheEvictionAndReload")
 	defer deleteTable(t, tableName)
@@ -60,14 +72,19 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	testVault.SetTotalDeposit(accountB, big.NewInt(5000))
 	testVault.SetTotalDeposit(accountC, big.NewInt(3000))
 
+	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		2, // Small cache size to force eviction
+		tableName,
+		time.Millisecond, // update frequently
+	)
+	require.NoError(t, err)
+
 	ledgerCache, err := ondemand.NewOnDemandLedgerCache(
 		ctx,
-		testutils.GetLogger(),
-		2, // Small cache size to force eviction
+		test.GetLogger(),
+		config,
 		testVault,
-		time.Millisecond, // update frequently
 		dynamoClient,
-		tableName,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
@@ -105,10 +122,9 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	// simulate a new deposit by account A
 	testVault.SetTotalDeposit(accountA, big.NewInt(10000))
 
-	// sleep for long enough for the update to be picked up by the monitor
-	time.Sleep(time.Millisecond * 10)
-
-	// try the same debit again
-	_, err = ledgerAReloaded.Debit(ctx, uint32(3), []uint8{0})
-	require.NoError(t, err)
+	// wait for the monitor to pick up the deposit update
+	test.AssertEventuallyTrue(t, func() bool {
+		_, err := ledgerAReloaded.Debit(ctx, uint32(3), []uint8{0})
+		return err == nil
+	}, time.Second)
 }

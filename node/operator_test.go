@@ -1,16 +1,15 @@
 package node_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
+	"github.com/Layr-Labs/eigenda/test"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -19,7 +18,8 @@ import (
 )
 
 func TestRegisterOperator(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -55,17 +55,18 @@ func TestRegisterOperator(t *testing.T) {
 	tx1 := createMockTx([]uint8{2})
 	churnerClient := &nodemock.ChurnerClient{}
 	churnerClient.On("Churn").Return(nil, nil)
-	err = node.RegisterOperator(context.Background(), operator, tx1, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx1, churnerClient, logger)
 	assert.NoError(t, err)
 	// Try to register with a quorum that's already registered
 	tx2 := createMockTx([]uint8{0})
-	err = node.RegisterOperator(context.Background(), operator, tx2, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx2, churnerClient, logger)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "quorums to register must be not registered yet"))
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
-	logger := testutils.GetLogger()
+	ctx := t.Context()
+	logger := test.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -95,7 +96,7 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	churnerClient := &nodemock.ChurnerClient{}
 	churnerClient.On("Churn").Return(nil, nil)
-	err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger)
+	err = node.RegisterOperator(ctx, operator, tx, churnerClient, logger)
 	assert.NoError(t, err)
 	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

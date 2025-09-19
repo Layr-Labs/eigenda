@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/urfave/cli/v2"
 )
 
@@ -30,7 +30,7 @@ var (
 	generateEnvCmdName = "env"
 	allCmdName         = "all"
 
-	logger = testutils.GetLogger()
+	logger = test.GetLogger()
 )
 
 func main() {

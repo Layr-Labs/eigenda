@@ -4,15 +4,14 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"io"
 	"math/big"
 	"math/rand"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // charset is the set of characters that can be used to generate random strings
@@ -245,4 +244,9 @@ func (r *TestRandom) Float32Range(min, max float32) float32 {
 // Float64Range generates a random float64 between min (inclusive) and max (exclusive).
 func (r *TestRandom) Float64Range(min, max float64) float64 {
 	return r.Float64()*(max-min) + min
+}
+
+// DurationRange generates a random time.Duration between min (inclusive) and max (exclusive).
+func (r *TestRandom) DurationRange(min time.Duration, max time.Duration) time.Duration {
+	return time.Duration(r.Int63n(int64(max-min))) + min
 }
