@@ -217,3 +217,19 @@ func readBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, error) {
 	}
 	return buf, nil
 }
+
+func NumberOfPointsInSRSFile(filePath string, pointsSize int64) (uint64, error) {
+	fileStat, errStat := os.Stat(filePath)
+	if errStat != nil {
+		return 0, fmt.Errorf("cannot stat the file %v: %w", filePath, errStat)
+	}
+	fileSizeByte := fileStat.Size()
+	if fileSizeByte%pointsSize != 0 {
+		return 0, fmt.Errorf("corrupted g2 point from the file %v. "+
+			"The size of the file on the provided path has size that is not multiple of %v, which is %v. "+
+			"It indicates there is an incomplete g2 point", filePath, pointsSize, fileSizeByte)
+	}
+	// get the size
+	numG2point := uint64(fileSizeByte / pointsSize)
+	return numG2point, nil
+}

@@ -240,5 +240,5 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 		return fmt.Errorf("generate rhsG1: %w", err)
 	}
 
-	return PairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
+	return pairingsVerify(&lhsG1, lhsG2, rhsG1, rhsG2)
 }

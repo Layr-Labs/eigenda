@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -45,11 +44,10 @@ type testComponents struct {
 
 func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig := &prover.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
 		CacheDir:        "../../resources/srs/SRSTables",
-		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		LoadG2Points:    false,

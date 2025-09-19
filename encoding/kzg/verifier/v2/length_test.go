@@ -12,30 +12,34 @@ import (
 )
 
 func TestLengthProof(t *testing.T) {
-	group, err := prover.NewProver(kzgConfig, nil)
+	harness := getTestHarness()
+
+	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, nil)
+	v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.Nil(t, err)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
 	numBlob := 5
 	for z := 0; z < numBlob; z++ {
 		extra := make([]byte, z*32*2)
-		inputBytes := append(gettysburgAddressBytes, extra...)
+		inputBytes := append(harness.paddedGettysburgAddressBytes, extra...)
 		inputFr, err := rs.ToFrArray(inputBytes)
 		require.Nil(t, err)
 
 		_, lengthCommitment, lengthProof, _, _, err := enc.Encode(inputFr)
 		require.Nil(t, err)
 
-		length := len(inputFr)
-		assert.NoError(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
+		blobLen := encoding.NextPowerOf2(len(inputFr))
+		assert.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(blobLen)),
+			"low degree verification failed\n")
 
-		length = len(inputFr) - 10
-		assert.Error(t, v.VerifyCommit(lengthCommitment, lengthProof, uint64(length)), "low degree verification failed\n")
+		blobLen = len(inputFr) - 10
+		assert.Error(t, v.VerifyLengthProof(lengthCommitment, lengthProof, uint64(blobLen)),
+			"low degree verification failed\n")
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -15,7 +14,6 @@ import (
 )
 
 type KzgMultiProofGnarkBackend struct {
-	*kzg.KzgConfig
 	Fs         *fft.FFTSettings
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 	SFs        *fft.FFTSettings

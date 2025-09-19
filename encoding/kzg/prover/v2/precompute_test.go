@@ -13,16 +13,18 @@ import (
 )
 
 func TestNewSRSTable_PreComputeWorks(t *testing.T) {
+	harness := getTestHarness()
 
+	kzgConfig := harness.proverV2KzgConfig
 	kzgConfig.CacheDir = "./data/SRSTable"
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 	require.NotNil(t, params)
 
-	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
+	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 	require.Nil(t, err)
 	require.NotNil(t, s1)
 
-	_, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSOrder, kzgConfig.NumWorker)
+	_, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
 	require.Nil(t, err)
 
 	subTable1, err := prover.NewSRSTable(kzgConfig.CacheDir, s1, kzgConfig.NumWorker)

@@ -5,7 +5,7 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
-	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli/v2"
 )
@@ -118,7 +118,7 @@ func ReadKzgConfig(ctx *cli.Context, maxBlobSizeBytes uint64) kzg.KzgConfig {
 		G2Path:          ctx.String(G2PathFlagName),
 		G2TrailingPath:  ctx.String(G2TrailingPathFlagName),
 		CacheDir:        ctx.String(CachePathFlagName),
-		SRSOrder:        eigendaflags.SrsOrder,
+		SRSOrder:        encoding.SRSOrder,
 		SRSNumberToLoad: maxBlobSizeBytes / 32,         // # of fr.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 		// we are intentionally not setting the `LoadG2Points` field here. `LoadG2Points` has different requirements

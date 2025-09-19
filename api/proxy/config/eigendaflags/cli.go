@@ -9,14 +9,14 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/consts"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/urfave/cli/v2"
 )
 
 const (
 	BytesPerSymbol     = 31
 	MaxCodingRatio     = 8
-	SrsOrder           = 1 << 28 // 2^28
-	MaxAllowedBlobSize = uint64(SrsOrder * BytesPerSymbol / MaxCodingRatio)
+	MaxAllowedBlobSize = uint64(encoding.SRSOrder * BytesPerSymbol / MaxCodingRatio)
 )
 
 var (
