@@ -227,7 +227,8 @@ func getOperatorId(t *testing.T, operator deploy.OperatorVars) [32]byte {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	contractDirectory, err := directory.NewContractDirectory(t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	contractDirectory, err := directory.NewContractDirectory(
+		t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
 	require.NoError(t, err)
 	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
 	require.NoError(t, err)
@@ -267,7 +268,8 @@ func getTransactor(t *testing.T, operator deploy.OperatorVars) *eth.Writer {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	contractDirectory, err := directory.NewContractDirectory(t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
+	contractDirectory, err := directory.NewContractDirectory(
+		t.Context(), logger, client, gethcommon.HexToAddress(operator.NODE_EIGENDA_DIRECTORY))
 	require.NoError(t, err)
 	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(t.Context(), directory.OperatorStateRetriever)
 	require.NoError(t, err)

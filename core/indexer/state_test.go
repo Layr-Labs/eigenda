@@ -84,9 +84,11 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
-	contractDirectory, err := directory.NewContractDirectory(context.TODO(), logger, client, gethcommon.HexToAddress(op.NODE_EIGENDA_DIRECTORY))
+	contractDirectory, err := directory.NewContractDirectory(
+		context.TODO(), logger, client, gethcommon.HexToAddress(op.NODE_EIGENDA_DIRECTORY))
 	Expect(err).To(BeNil())
-	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.OperatorStateRetriever)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.TODO(), directory.OperatorStateRetriever)
 	Expect(err).To(BeNil())
 	serviceManagerAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.ServiceManager)
 	Expect(err).To(BeNil())
