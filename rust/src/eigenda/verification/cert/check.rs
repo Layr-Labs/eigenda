@@ -7,15 +7,14 @@ use alloy_sol_types::SolValue;
 use hashbrown::HashMap;
 use tracing::{Level, instrument};
 
-use crate::eigenda::verification::cert::{
-    bitmap::{Bitmap, bit_indices_to_bitmap},
-    convert,
-    error::CertVerificationError::{self, *},
-    hash::TruncHash,
-    types::{
-        BlockNumber, NonSigner, Quorum, QuorumNumber, Version,
-        history::History,
-        solidity::{SecurityThresholds, VersionedBlobParams},
+use crate::eigenda::{
+    cert::solidity::{SecurityThresholds, VersionedBlobParams},
+    verification::cert::{
+        bitmap::{Bitmap, bit_indices_to_bitmap},
+        convert,
+        error::CertVerificationError::{self, *},
+        hash::TruncHash,
+        types::{BlockNumber, NonSigner, Quorum, QuorumNumber, Version, history::History},
     },
 };
 
@@ -892,13 +891,9 @@ mod test_cert_apks_equal_storage_apks {
 mod test_security_assumptions_are_met {
     use hashbrown::HashMap;
 
-    use crate::eigenda::verification::cert::{
-        check,
-        error::CertVerificationError::*,
-        types::{
-            Version,
-            solidity::{SecurityThresholds, VersionedBlobParams},
-        },
+    use crate::eigenda::{
+        cert::solidity::{SecurityThresholds, VersionedBlobParams},
+        verification::cert::{check, error::CertVerificationError::*, types::Version},
     };
 
     #[test]

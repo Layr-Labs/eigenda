@@ -17,7 +17,7 @@
 //!
 //! - Due to sovereign-sdk compatibility constraints these types could not be imported from [rust-eigenda-v2-common](https://crates.io/crates/rust-eigenda-v2-common)
 
-mod solidity;
+pub(crate) mod solidity;
 
 use alloy_primitives::{B256, Bytes, FixedBytes, U256};
 use alloy_rlp::{Decodable, RlpDecodable, RlpEncodable};
@@ -304,7 +304,7 @@ pub enum EigenDAVersionedCert {
 ///
 /// This structure represents a version 2 certificate containing all necessary
 /// information for verifying blob inclusion in the EigenDA network.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct EigenDACertV2 {
     /// Information about blob inclusion in the batch
     pub blob_inclusion_info: BlobInclusionInfo,
@@ -320,7 +320,7 @@ pub struct EigenDACertV2 {
 ///
 /// This structure represents a version 3 certificate with the same core components
 /// as V2 but potentially different field ordering or processing logic.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct EigenDACertV3 {
     /// Batch header containing batch metadata
     pub batch_header_v2: BatchHeaderV2,
@@ -339,7 +339,7 @@ pub struct EigenDACertV3 {
 /// matches the corresponding Solidity struct name.
 ///
 /// Reference: [EigenDATypesV2.sol](https://github.com/Layr-Labs/eigenda/blob/510291b9be38cacbed8bc62125f6f9a14bd604e4/contracts/src/core/libraries/v2/EigenDATypesV2.sol#L47)
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct BatchHeaderV2 {
     /// 32-byte root hash of the batch merkle tree
     pub batch_root: [u8; 32],
@@ -383,7 +383,7 @@ impl BatchHeaderV2 {
 ///
 /// This structure contains all the data needed to verify that a specific blob
 /// is included in the batch at the specified index.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct BlobInclusionInfo {
     /// Certificate containing blob metadata and commitments
     pub blob_certificate: BlobCertificate,
@@ -397,7 +397,7 @@ pub struct BlobInclusionInfo {
 ///
 /// This structure includes the blob header with commitments, signatures,
 /// and relay keys used for blob retrieval.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct BlobCertificate {
     /// Header containing blob metadata and commitments
     pub blob_header: BlobHeaderV2,
@@ -411,7 +411,7 @@ pub struct BlobCertificate {
 ///
 /// This version is separate from the certificate version. For example, Certificate V3
 /// can use BlobHeaderV2 since V2 is a tag for the EigenDA protocol.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct BlobHeaderV2 {
     /// Version number of the blob header format
     pub version: u16,
@@ -513,7 +513,7 @@ impl From<&G2Point> for solidity::G2Point {
 ///
 /// This structure contains all data needed to verify the aggregate signature
 /// while accounting for validators that did not participate in signing.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, PartialEq, Serialize, Deserialize, Default)]
 pub struct NonSignerStakesAndSignature {
     /// Indices of non-signers in the quorum bitmap
     pub non_signer_quorum_bitmap_indices: Vec<u32>,
@@ -549,7 +549,8 @@ pub enum StandardCommitmentParseError {
 
 #[cfg(test)]
 mod tests {
-    use super::{StandardCommitment, StandardCommitmentParseError};
+    use super::*;
+    use alloy_primitives::{Bytes, U256};
 
     #[test]
     fn v2_serialization_round_trip() {
@@ -593,5 +594,97 @@ mod tests {
             &commitment,
             Err(StandardCommitmentParseError::InvalidRlpCert(_)),
         ));
+    }
+
+    #[test]
+    fn v3_certificate_parsing() {
+        let cert_v3 = EigenDACertV3 {
+            batch_header_v2: BatchHeaderV2 {
+                batch_root: [1u8; 32],
+                reference_block_number: 12345,
+            },
+            blob_inclusion_info: BlobInclusionInfo {
+                blob_certificate: BlobCertificate {
+                    blob_header: BlobHeaderV2 {
+                        version: 1,
+                        ..Default::default()
+                    },
+                    signature: Bytes::from(vec![1u8, 2u8]),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commitment = StandardCommitment(EigenDAVersionedCert::V3(cert_v3));
+        let bytes = commitment.to_rlp_bytes();
+        let parsed = StandardCommitment::from_rlp_bytes(&bytes).unwrap();
+
+        assert_eq!(commitment, parsed);
+    }
+
+    #[test]
+    fn batch_header_v2_to_sol() {
+        let header = BatchHeaderV2 {
+            batch_root: [42u8; 32],
+            reference_block_number: 12345,
+        };
+
+        let sol_header = header.to_sol();
+        assert_eq!(sol_header.batchRoot.0, [42u8; 32]);
+        assert_eq!(sol_header.referenceBlockNumber, 12345);
+    }
+
+    #[test]
+    fn blob_commitment_to_sol() {
+        let commitment = BlobCommitment {
+            commitment: G1Point {
+                x: U256::from(1),
+                y: U256::from(2),
+            },
+            length_commitment: G2Point {
+                x: vec![U256::from(3), U256::from(4)],
+                y: vec![U256::from(5), U256::from(6)],
+            },
+            length_proof: G2Point {
+                x: vec![U256::from(7), U256::from(8)],
+                y: vec![U256::from(9), U256::from(10)],
+            },
+            length: 1024,
+        };
+
+        let sol_commitment = commitment.to_sol();
+        assert_eq!(sol_commitment.commitment.X, U256::from(1));
+        assert_eq!(sol_commitment.commitment.Y, U256::from(2));
+        assert_eq!(sol_commitment.lengthCommitment.X[0], U256::from(3));
+        assert_eq!(sol_commitment.lengthCommitment.X[1], U256::from(4));
+        assert_eq!(sol_commitment.length, 1024);
+    }
+
+    #[test]
+    fn g1_point_to_solidity() {
+        let point = G1Point {
+            x: U256::from(123),
+            y: U256::from(456),
+        };
+        let sol_point: solidity::G1Point = (&point).into();
+
+        assert_eq!(sol_point.X, U256::from(123));
+        assert_eq!(sol_point.Y, U256::from(456));
+    }
+
+    #[test]
+    fn g2_point_to_solidity() {
+        let point = G2Point {
+            x: vec![U256::from(111), U256::from(222)],
+            y: vec![U256::from(333), U256::from(444)],
+        };
+        let sol_point: solidity::G2Point = (&point).into();
+
+        assert_eq!(sol_point.X[0], U256::from(111));
+        assert_eq!(sol_point.X[1], U256::from(222));
+        assert_eq!(sol_point.Y[0], U256::from(333));
+        assert_eq!(sol_point.Y[1], U256::from(444));
     }
 }

@@ -110,6 +110,7 @@ reltester = { version = "2.0.0" }
 risc0-zkvm = { version = "2.1", default-features = false, features = ["std"] }
 test-strategy = { version = "0.4.3" }
 testcontainers = "0.25.0"
+wiremock = "0.6.0"
 
 [features]
 arbitrary = ["dep:arbitrary", "dep:proptest"]

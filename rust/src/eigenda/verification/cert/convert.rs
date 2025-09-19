@@ -106,10 +106,16 @@ pub(crate) fn fq_to_uint(fq: Fq) -> Uint<256, 4> {
 
 #[cfg(test)]
 mod tests {
-    use crate::eigenda::{cert::G1Point, verification::cert::convert};
-    use alloy_primitives::Uint;
-    use ark_bn254::G1Affine;
+    use alloy_primitives::{Uint, hex};
+    use ark_bn254::{Fq, G1Affine};
     use ark_ec::AffineRepr;
+
+    use crate::eigenda::{
+        cert::G1Point,
+        verification::cert::convert::{
+            self, fq_to_bytes_be, fq_to_uint, hash_to_big_int, hash_to_point,
+        },
+    };
 
     #[test]
     fn convert_point_to_hash() {
@@ -130,6 +136,38 @@ mod tests {
             y: Uint::from_be_bytes([0u8; 32]),
         };
         let expected = convert::point_to_hash(&point);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn hash_to_point_test() {
+        let hash = hex!("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+        let point = hash_to_point(hash.into());
+        assert!(point.is_on_curve());
+        assert!(!point.is_zero());
+    }
+
+    #[test]
+    fn hash_to_big_int_test() {
+        let hash = hex!("0000000000000000000000000000000000000000000000000000000000000001");
+        let actual = hash_to_big_int(hash.into()).0;
+        let expected = [1, 0, 0, 0];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn fq_to_bytes_be_test() {
+        let fq = Fq::from(42u64);
+        let actual = fq_to_bytes_be(fq);
+        let expected = hex!("000000000000000000000000000000000000000000000000000000000000002a");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn fq_to_uint_test() {
+        let fq = Fq::from(123u64);
+        let actual = fq_to_uint(fq);
+        let expected = Uint::from(123u64);
         assert_eq!(actual, expected);
     }
 }

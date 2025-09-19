@@ -6,16 +6,14 @@
 
 pub mod conversions;
 pub mod history;
-pub mod solidity;
 
 use alloy_primitives::{B256, aliases::U96};
 use ark_bn254::G1Affine;
 use hashbrown::HashMap;
 
-use crate::eigenda::verification::cert::{
-    bitmap::Bitmap,
-    hash::TruncHash,
-    types::{history::History, solidity::VersionedBlobParams},
+use crate::eigenda::{
+    cert::solidity::VersionedBlobParams,
+    verification::cert::{bitmap::Bitmap, hash::TruncHash, types::history::History},
 };
 
 /// Identifier for a quorum (0-255)

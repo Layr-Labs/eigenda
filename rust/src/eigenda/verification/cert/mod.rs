@@ -57,10 +57,13 @@ use ark_bn254::{G1Affine, G2Affine};
 use hashbrown::HashMap;
 use tracing::instrument;
 
-use crate::eigenda::verification::cert::{
-    error::CertVerificationError::{self, *},
-    hash::HashExt,
-    types::{NonSigner, Quorum, Storage, solidity::SecurityThresholds},
+use crate::eigenda::{
+    cert::solidity::SecurityThresholds,
+    verification::cert::{
+        error::CertVerificationError::{self, *},
+        hash::HashExt,
+        types::{NonSigner, Quorum, Storage},
+    },
 };
 
 /// Input parameters for certificate verification
@@ -433,13 +436,6 @@ fn process_quorums(
 
 #[cfg(test)]
 mod tests {
-    use crate::eigenda::{
-        cert::{
-            BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
-            G1Point, NonSignerStakesAndSignature,
-        },
-        verification::cert::hash::streaming_keccak256,
-    };
     use alloy_primitives::{B256, Bytes, aliases::U96, keccak256};
     use alloy_sol_types::SolValue;
     use ark_bn254::{Fr, G1Affine, G1Projective, G2Projective};
@@ -449,18 +445,24 @@ mod tests {
     #[cfg(feature = "stale-stakes-forbidden")]
     use crate::eigenda::verification::cert::types::Staleness;
 
-    use crate::eigenda::verification::cert::{
-        CertVerificationInputs,
-        bitmap::{Bitmap, BitmapError::*},
-        convert,
-        error::CertVerificationError::*,
-        hash::{HashExt, TruncHash},
-        types::{
-            Storage,
-            history::{History, HistoryError::*, Update},
+    use crate::eigenda::{
+        cert::{
+            BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
+            G1Point, NonSignerStakesAndSignature,
             solidity::{SecurityThresholds, VersionedBlobParams},
         },
-        verify,
+        verification::cert::{
+            CertVerificationInputs,
+            bitmap::{Bitmap, BitmapError::*},
+            convert,
+            error::CertVerificationError::*,
+            hash::{HashExt, TruncHash, streaming_keccak256},
+            types::{
+                Storage,
+                history::{History, HistoryError::*, Update},
+            },
+            verify,
+        },
     };
 
     #[test]

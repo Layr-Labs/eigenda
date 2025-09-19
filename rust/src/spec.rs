@@ -367,7 +367,7 @@ pub struct TransactionWithBlob {
 
 /// Contains data needed to validate the certificate. It also contains proofs
 /// used to verify the data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct CertificateStateData {
     pub threshold_registry: AccountProof,
     pub registry_coordinator: AccountProof,

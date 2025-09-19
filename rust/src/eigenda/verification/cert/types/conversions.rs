@@ -156,13 +156,13 @@ impl From<G2Point> for G2Affine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::uint;
 
     #[test]
     fn test_point_to_affine() {
+        // Use readable hex string instead of uint! macro
         let point = G1Point {
-            x: uint!(123456789_U256),
-            y: uint!(987654321_U256),
+            x: "0x00000000000000000000000000000000000000000000000000000000075bcd15".parse().unwrap(),
+            y: "0x000000000000000000000000000000000000000000000000000000003ade68b1".parse().unwrap(),
         };
 
         let affine: G1Affine = point.into();
@@ -171,16 +171,20 @@ mod tests {
 
     #[test]
     fn test_affine_to_point() {
-        let x = Fq::from_be_bytes_mod_order(&[
-            0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11,
-            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-            0x20,
-        ]);
-        let y = Fq::from_be_bytes_mod_order(&[
-            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
-            0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c,
-            0x3d, 0x3e, 0x3f, 0x40,
-        ]);
+        // Use hex string for better readability
+        let x_hex = "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+        let y_hex = "0x2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
+        
+        let x_bytes = hex::decode(&x_hex[2..]).unwrap();
+        let y_bytes = hex::decode(&y_hex[2..]).unwrap();
+        
+        let mut x_array = [0u8; 32];
+        let mut y_array = [0u8; 32];
+        x_array.copy_from_slice(&x_bytes);
+        y_array.copy_from_slice(&y_bytes);
+        
+        let x = Fq::from_be_bytes_mod_order(&x_array);
+        let y = Fq::from_be_bytes_mod_order(&y_array);
         let point = G1Affine::new_unchecked(x, y);
 
         let converted: G1Point = point.into();
@@ -211,9 +215,16 @@ mod tests {
 
     #[test]
     fn test_point_to_affine_g2() {
+        // Use readable hex strings for G2 coordinates
         let point = G2Point {
-            x: vec![uint!(123456789_U256), uint!(111222333_U256)],
-            y: vec![uint!(987654321_U256), uint!(444555666_U256)],
+            x: vec![
+                "0x00000000000000000000000000000000000000000000000000000000075bcd15".parse().unwrap(),
+                "0x000000000000000000000000000000000000000000000000000000006a24222".parse().unwrap(),
+            ],
+            y: vec![
+                "0x000000000000000000000000000000000000000000000000000000003ade68b1".parse().unwrap(),
+                "0x000000000000000000000000000000000000000000000000000000001a7dd93a".parse().unwrap(),
+            ],
         };
 
         let affine: G2Affine = point.into();
@@ -222,26 +233,32 @@ mod tests {
 
     #[test]
     fn test_affine_to_point_g2() {
-        let x_c0 = Fq::from_be_bytes_mod_order(&[
-            0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11,
-            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-            0x20,
-        ]);
-        let x_c1 = Fq::from_be_bytes_mod_order(&[
-            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
-            0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c,
-            0x3d, 0x3e, 0x3f, 0x40,
-        ]);
-        let y_c0 = Fq::from_be_bytes_mod_order(&[
-            0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e,
-            0x4f, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c,
-            0x5d, 0x5e, 0x5f, 0x60,
-        ]);
-        let y_c1 = Fq::from_be_bytes_mod_order(&[
-            0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e,
-            0x6f, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c,
-            0x7d, 0x7e, 0x7f, 0x80,
-        ]);
+        // Use hex strings for better readability
+        let x_c0_hex = "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+        let x_c1_hex = "0x2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
+        let y_c0_hex = "0x4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60";
+        let y_c1_hex = "0x6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80";
+        
+        let x_c0_bytes = hex::decode(&x_c0_hex[2..]).unwrap();
+        let x_c1_bytes = hex::decode(&x_c1_hex[2..]).unwrap();
+        let y_c0_bytes = hex::decode(&y_c0_hex[2..]).unwrap();
+        let y_c1_bytes = hex::decode(&y_c1_hex[2..]).unwrap();
+        
+        let mut x_c0_array = [0u8; 32];
+        let mut x_c1_array = [0u8; 32];
+        let mut y_c0_array = [0u8; 32];
+        let mut y_c1_array = [0u8; 32];
+        
+        x_c0_array.copy_from_slice(&x_c0_bytes);
+        x_c1_array.copy_from_slice(&x_c1_bytes);
+        y_c0_array.copy_from_slice(&y_c0_bytes);
+        y_c1_array.copy_from_slice(&y_c1_bytes);
+        
+        let x_c0 = Fq::from_be_bytes_mod_order(&x_c0_array);
+        let x_c1 = Fq::from_be_bytes_mod_order(&x_c1_array);
+        let y_c0 = Fq::from_be_bytes_mod_order(&y_c0_array);
+        let y_c1 = Fq::from_be_bytes_mod_order(&y_c1_array);
+        
         let x = Fq2::new(x_c0, x_c1);
         let y = Fq2::new(y_c0, y_c1);
         let affine = G2Affine::new_unchecked(x, y);

@@ -78,3 +78,93 @@ pub fn create_update<T: Copy + std::fmt::Debug>(
 ) -> Result<Update<T>, HistoryError> {
     Update::new(update_block, next_update_block, value)
 }
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::{B256, StorageKey, U256};
+    use reth_trie_common::StorageProof;
+
+    use crate::eigenda::{
+        extraction::CertExtractionError, verification::cert::types::history::HistoryError,
+    };
+
+    use super::{create_update, find_required_proof};
+
+    fn create_test_storage_proof(key: StorageKey, value: U256) -> StorageProof {
+        StorageProof {
+            key,
+            value,
+            ..Default::default()
+        }
+    }
+
+    fn create_test_key(value: u8) -> StorageKey {
+        StorageKey::from(B256::repeat_byte(value))
+    }
+
+    #[test]
+    fn find_required_proof_success() {
+        let key1 = create_test_key(1);
+        let key2 = create_test_key(2);
+        let key3 = create_test_key(3);
+
+        let proof1 = create_test_storage_proof(key1, U256::from(100));
+        let proof2 = create_test_storage_proof(key2, U256::from(200));
+        let proof3 = create_test_storage_proof(key3, U256::from(300));
+
+        let proofs = vec![proof1, proof2, proof3];
+
+        let found_proof = find_required_proof(&proofs, &key2, "test_variable").unwrap();
+
+        assert_eq!(found_proof.key, key2);
+        assert_eq!(found_proof.value, U256::from(200));
+    }
+
+    #[test]
+    fn find_required_proof_missing_key() {
+        let key1 = create_test_key(1);
+        let key2 = create_test_key(2);
+        let missing_key = create_test_key(99);
+
+        let proof1 = create_test_storage_proof(key1, U256::from(100));
+        let proof2 = create_test_storage_proof(key2, U256::from(200));
+
+        let proofs = vec![proof1, proof2];
+
+        let err = find_required_proof(&proofs, &missing_key, "missing_variable").unwrap_err();
+        assert!(
+            matches!(err, CertExtractionError::MissingStorageProof(ref var_name) if var_name == "missing_variable")
+        );
+    }
+
+    #[test]
+    fn find_required_proof_empty_proofs() {
+        let key = create_test_key(1);
+        let proofs: Vec<StorageProof> = vec![];
+
+        let err = find_required_proof(&proofs, &key, "empty_proofs").unwrap_err();
+        assert!(
+            matches!(err, CertExtractionError::MissingStorageProof(ref var_name) if var_name == "empty_proofs")
+        );
+    }
+
+    #[test]
+    fn create_update_success() {
+        let update = create_update(100, 200, "test_value").unwrap();
+        assert_eq!(update.update_block_number(), 100);
+        assert_eq!(update.next_update_block_number(), 200);
+        assert_eq!(*update.value(), "test_value");
+    }
+
+    #[test]
+    fn create_update_same_block_numbers() {
+        let err = create_update(100, 100, 42u32).unwrap_err();
+        assert!(matches!(err, HistoryError::InvalidBlockOrder { .. }));
+    }
+
+    #[test]
+    fn create_update_invalid_order() {
+        let err = create_update(200, 100, 42u32).unwrap_err();
+        assert!(matches!(err, HistoryError::InvalidBlockOrder { .. }));
+    }
+}

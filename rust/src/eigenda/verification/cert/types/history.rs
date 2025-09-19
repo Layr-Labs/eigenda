@@ -23,6 +23,15 @@ pub enum HistoryError {
     /// No historical entry exists at the requested index
     #[error("Missing history entry {0}")]
     MissingHistoryEntry(u32),
+
+    /// Invalid block order (update_block >= next_update_block when next_update_block != 0)
+    #[error(
+        "Invalid block order: update block {update_block} >= next update block {next_update_block}"
+    )]
+    InvalidBlockOrder {
+        update_block: u32,
+        next_update_block: u32,
+    },
 }
 
 /// Historical data structure that tracks values over block ranges.
@@ -81,16 +90,35 @@ impl<T: Copy + std::fmt::Debug> Update<T> {
     /// A new `Update` instance if the block range is valid
     ///
     /// # Errors
-    /// Returns `HistoryError::DegenerateInterval` if `update_block >= next_update_block`
+    /// Returns `HistoryError::InvalidBlockOrder` if `update_block >= next_update_block`
     /// (unless next_update_block is 0, which indicates the update is still current)
     pub fn new(
         update_block: BlockNumber,
         next_update_block: BlockNumber,
         value: T,
     ) -> Result<Self, HistoryError> {
+        if next_update_block != 0 && update_block >= next_update_block {
+            return Err(HistoryError::InvalidBlockOrder {
+                update_block,
+                next_update_block,
+            });
+        }
+
         let interval = Interval::new(update_block, next_update_block)?;
         let update = Self { interval, value };
         Ok(update)
+    }
+
+    pub fn update_block_number(&self) -> BlockNumber {
+        self.interval.left_inclusive
+    }
+
+    pub fn next_update_block_number(&self) -> BlockNumber {
+        self.interval.right_exclusive
+    }
+
+    pub fn value(&self) -> &T {
+        &self.value
     }
 
     /// Retrieve the value from this update if it was valid at the given block number.

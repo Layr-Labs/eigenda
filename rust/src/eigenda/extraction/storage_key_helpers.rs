@@ -97,3 +97,41 @@ pub fn nested_dynamic_array_key(
     let data_base: U256 = keccak256(b2).into();
     (data_base + U256::from(index)).into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::hex;
+
+    #[test]
+    fn simple_slot_key_test() {
+        let result = simple_slot_key(150);
+        let value = hex!("0000000000000000000000000000000000000000000000000000000000000096");
+        let expected = StorageKey::from(value);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn mapping_key_test() {
+        let result = mapping_key(U256::from(42), 5);
+        let value = hex!("d3e7a847b0e4be9f2ff1f88564b0a771bb9789c2c82f98679296a6042483791d");
+        let expected = StorageKey::from(value);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn dynamic_array_key_test() {
+        let result = dynamic_array_key(U256::from(0x123), 10, 5);
+        let value = hex!("7fe76a52931b48d767fa7e54a1d7007662ab2827fd4b83ca6b158f06dbdbed88");
+        let expected = StorageKey::from(value);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn nested_dynamic_array_key_test() {
+        let result = nested_dynamic_array_key(U256::from(0x456), 15, U256::from(0x789), 3);
+        let value = hex!("7b559e449c242de80687a166a5b9feebff23ad66e81b26e687aa932f8ef0afca");
+        let expected = StorageKey::from(value);
+        assert_eq!(result, expected);
+    }
+}
