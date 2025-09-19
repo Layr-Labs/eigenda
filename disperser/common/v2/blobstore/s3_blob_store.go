@@ -34,7 +34,7 @@ func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []by
 
 	err = b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
 	if err != nil {
-		b.logger.Errorf("failed to upload blob in bucket %s: %v", b.bucketName, err)
+		b.logger.Errorf("failed to upload blob in bucket %s: %w", b.bucketName, err)
 		return err
 	}
 	return nil
@@ -49,7 +49,7 @@ func (b *BlobStore) GetBlob(ctx context.Context, key corev2.BlobKey) ([]byte, er
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %v", ErrBlobNotFound, b.bucketName, err)
+		return nil, fmt.Errorf("%s %s: %w", ErrBlobNotFound, b.bucketName, err)
 	}
 	return data, nil
 }
