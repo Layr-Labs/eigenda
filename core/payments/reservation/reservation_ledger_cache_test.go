@@ -219,11 +219,9 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// sleep for long enough for the update to be picked up by the monitor
-	time.Sleep(time.Millisecond * 10)
-
-	// try adding more symbols again - should work due to increased capacity
-	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
-	require.NoError(t, err)
-	require.True(t, success)
+	// wait for the monitor to pick up the reservation update
+	test.AssertEventuallyTrue(t, func() bool {
+		success, _, err := ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
+		return err == nil && success
+	}, time.Second)
 }

@@ -162,10 +162,6 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
 		fmt.Println("Operator: ", idStr)
 
-		fmt.Println("Starting node")
-		err = op.Node.Start(ctx)
-		require.NoError(t, err)
-
 		fmt.Println("Starting server")
 		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
 		require.NoError(t, err)
