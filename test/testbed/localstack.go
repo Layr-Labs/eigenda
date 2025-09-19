@@ -19,13 +19,15 @@ const (
 )
 
 // LocalStackOptions configures the LocalStack AWS simulation container
+//
+//nolint:lll // struct field documentation
 type LocalStackOptions struct {
-	ExposeHostPort bool                           // If true, binds container port 4566 to host port (default: 4570)
-	HostPort       string                         // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
-	Services       []string                       // AWS services to enable (defaults to s3, dynamodb, kms)
-	Region         string                         // AWS region (defaults to us-east-1)
-	Debug          bool                           // Enable debug logging
-	Logger         logging.Logger                 // Logger for container operations (required)
+	ExposeHostPort bool                          // If true, binds container port 4566 to host port (default: 4570)
+	HostPort       string                        // Custom host port to bind to (defaults to "4570" if empty and ExposeHostPort is true)
+	Services       []string                      // AWS services to enable (defaults to s3, dynamodb, kms)
+	Region         string                        // AWS region (defaults to us-east-1)
+	Debug          bool                          // Enable debug logging
+	Logger         logging.Logger                // Logger for container operations (required)
 	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
 }
 

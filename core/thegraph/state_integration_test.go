@@ -116,10 +116,6 @@ func setupTest(t *testing.T) (
 	})
 	require.NoError(t, err, "failed to start graph node")
 
-	// Wait for Graph Node to be ready for subgraph deployment
-	logger.Info("Waiting for Graph Node to be ready", "adminURL", graphNodeContainer.AdminURL())
-	time.Sleep(10 * time.Second)
-
 	// Update the graph URL to use the new container
 	graphUrl = graphNodeContainer.HTTPURL() + "/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
