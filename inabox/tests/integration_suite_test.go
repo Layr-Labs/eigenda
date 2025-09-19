@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,8 +38,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 /*
@@ -91,26 +90,61 @@ func init() {
 	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
 
-func TestInaboxIntegration(t *testing.T) {
-	RegisterFailHandler(Fail)
+func TestMain(m *testing.M) {
+	flag.Parse()
 
 	if testing.Short() {
-		t.Skip()
+		logger.Info("Skipping inabox integration tests in short mode")
+		os.Exit(0)
 	}
 
-	RunSpecs(t, "Integration Suite")
+	// Run suite setup
+	setupSuite()
+
+	// Run all tests
+	code := m.Run()
+
+	// Run suite teardown
+	teardownSuite()
+
+	// Exit with test result code
+	os.Exit(code)
 }
 
-var _ = BeforeSuite(func() {
-	By("bootstrapping test environment")
+func setupSuite() {
+	logger.Info("bootstrapping test environment")
 
+	// Create a context with 1 minute timeout for setup
+	ctx, cancelSetup := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancelSetup()
+
+	// Channel to track setup completion
+	setupDone := make(chan error, 1)
+
+	// Run setup in goroutine to respect timeout
+	go func() {
+		setupDone <- runSetup(ctx)
+	}()
+
+	// Wait for setup to complete or timeout
+	select {
+	case err := <-setupDone:
+		if err != nil {
+			logger.Fatal("Setup failed:", err)
+		}
+	case <-ctx.Done():
+		logger.Fatal("Setup timed out after 1 minute")
+	}
+}
+
+func runSetup(ctx context.Context) error {
 	rootPath := "../../"
 
 	var err error
 	if testName == "" {
 		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
-			Expect(err).To(BeNil())
+			return fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
@@ -120,12 +154,14 @@ var _ = BeforeSuite(func() {
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
 			})
-			Expect(err).To(BeNil())
+			if err != nil {
+				return fmt.Errorf("failed to start localstack: %w", err)
+			}
 
 			deployConfig := testbed.DeployResourcesConfig{
 				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
@@ -134,19 +170,23 @@ var _ = BeforeSuite(func() {
 				V2MetadataTableName: metadataTableNameV2,
 				Logger:              logger,
 			}
-			err = testbed.DeployResources(context.Background(), deployConfig)
-			Expect(err).To(BeNil())
+			err = testbed.DeployResources(ctx, deployConfig)
+			if err != nil {
+				return fmt.Errorf("failed to deploy resources: %w", err)
+			}
 		} else {
 			logger.Info("Using in-memory Blob Store")
 		}
 
 		logger.Info("Starting anvil")
-		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
 		})
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to start anvil: %w", err)
+		}
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
@@ -165,22 +205,32 @@ var _ = BeforeSuite(func() {
 			NumConfirmations: numConfirmations,
 			NumRetries:       numRetries,
 		}, gethcommon.Address{}, logger)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create eth client: %w", err)
+		}
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create rpc client: %w", err)
+		}
 
 		// Force foundry to mine a block since it isn't auto-mining
-		err = rpcClient.CallContext(context.Background(), nil, "evm_mine")
-		Expect(err).To(BeNil())
+		err = rpcClient.CallContext(ctx, nil, "evm_mine")
+		if err != nil {
+			return fmt.Errorf("failed to mine block: %w", err)
+		}
 
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
+		}
 		err = setupRetrievalClients(testConfig)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to setup retrieval clients: %w", err)
+		}
 
 		logger.Info("Building client verification and interaction components")
 
@@ -191,50 +241,67 @@ var _ = BeforeSuite(func() {
 			ethClient,
 		)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create cert builder: %w", err)
+		}
 
 		routerAddressProvider, err := verification.BuildRouterAddressProvider(
 			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
 			ethClient,
 			logger)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to build router address provider: %w", err)
+		}
 
 		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
 			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
 
-		Expect(err).To(BeNil())
+		// No error to check for NewStaticCertVerifierAddressProvider
 
 		staticCertVerifier, err = verification.NewCertVerifier(
 			logger,
 			ethClient,
 			staticAddressProvider)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create static cert verifier: %w", err)
+		}
 
 		routerCertVerifier, err = verification.NewCertVerifier(
 			logger,
 			ethClient,
 			routerAddressProvider)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router cert verifier: %w", err)
+		}
 
 		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router transactor: %w", err)
+		}
 
 		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router caller: %w", err)
+		}
 
-		chainID, err := ethClient.ChainID(context.Background())
-		Expect(err).To(BeNil())
+		chainID, err := ethClient.ChainID(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
 
 		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
 		err = setupPayloadDisperserWithRouter()
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to setup payload disperser: %w", err)
+		}
 
 	}
-})
+	return nil
+}
 
 func setupPayloadDisperserWithRouter() error {
 	// Set up the block monitor
@@ -435,24 +502,57 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	return err
 }
 
-var _ = AfterSuite(func() {
-	if testConfig.Environment.IsLocal() {
-		if cancel != nil {
-			cancel()
-		}
+func teardownSuite() {
+	logger.Info("Tearing down test environment")
 
-		logger.Info("Stopping binaries")
-		testConfig.StopBinaries()
+	// Create a context with 1 minute timeout for teardown
+	ctx, cancelTeardown := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancelTeardown()
 
-		logger.Info("Stopping anvil")
-		_ = anvilContainer.Terminate(context.Background())
+	// Channel to track teardown completion
+	teardownDone := make(chan struct{})
 
-		logger.Info("Stopping graph node")
-		testConfig.StopGraphNode()
+	// Run teardown in goroutine to respect timeout
+	go func() {
+		defer close(teardownDone)
+		runTeardown(ctx)
+	}()
 
-		if localstackContainer != nil {
-			logger.Info("Stopping localstack container")
-			_ = localstackContainer.Terminate(context.Background())
+	// Wait for teardown to complete or timeout
+	select {
+	case <-teardownDone:
+		logger.Info("Teardown completed successfully")
+	case <-ctx.Done():
+		logger.Warn("Teardown timed out after 1 minute - some resources may not have been cleaned up")
+	}
+}
+
+func runTeardown(ctx context.Context) {
+	if testConfig == nil || !testConfig.Environment.IsLocal() {
+		return
+	}
+
+	if cancel != nil {
+		cancel()
+	}
+
+	logger.Info("Stopping binaries")
+	testConfig.StopBinaries()
+
+	logger.Info("Stopping anvil")
+	if anvilContainer != nil {
+		if err := anvilContainer.Terminate(ctx); err != nil {
+			logger.Warn("Failed to terminate anvil container", "error", err)
 		}
 	}
-})
+
+	logger.Info("Stopping graph node")
+	testConfig.StopGraphNode()
+
+	if localstackContainer != nil {
+		logger.Info("Stopping localstack container")
+		if err := localstackContainer.Terminate(ctx); err != nil {
+			logger.Warn("Failed to terminate localstack container", "error", err)
+		}
+	}
+}
