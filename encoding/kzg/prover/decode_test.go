@@ -29,11 +29,11 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
-	b, err := frames[0].Encode()
+	b, err := frames[0].Serialize()
 	require.Nil(t, err)
 	require.NotNil(t, b)
 
-	frame, err := encoding.Decode(b)
+	frame, err := new(encoding.Frame).Deserialize(b)
 	require.Nil(t, err)
 	require.NotNil(t, frame)
 

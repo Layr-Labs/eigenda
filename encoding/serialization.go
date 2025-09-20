@@ -10,19 +10,35 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
+// Serialize serializes the Frame into a byte slice using gob encoding.
+// TODO(samlaf): when do we use gob vs gnark serialization ([Frame.SerializeGnark])?
 func (c *Frame) Serialize() ([]byte, error) {
-	return encode(c)
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(c)
+	if err != nil {
+		return nil, fmt.Errorf("gob encode: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
+// Deserialize deserializes the byte slice into a Frame using gob decoding.
 func (c *Frame) Deserialize(data []byte) (*Frame, error) {
-	err := decode(data, c)
+	buf := bytes.NewBuffer(data)
+	err := gob.NewDecoder(buf).Decode(c)
+	if err != nil {
+		return nil, fmt.Errorf("gob decode: %w", err)
+	}
+
+	// TODO(samlaf): why do we check this here?
 	if !c.Proof.IsInSubGroup() {
 		return nil, fmt.Errorf("proof is in not the subgroup")
 	}
 
-	return c, err
+	return c, nil
 }
 
+// SerializeGnark serializes the Frame into a byte slice using gnark encoding.
 func (c *Frame) SerializeGnark() ([]byte, error) {
 	coded := make([]byte, 0, bn254.SizeOfG1AffineCompressed+BYTES_PER_SYMBOL*len(c.Coeffs))
 	// This is compressed format with just 32 bytes.
@@ -34,6 +50,7 @@ func (c *Frame) SerializeGnark() ([]byte, error) {
 	return coded, nil
 }
 
+// DeserializeGnark deserializes the byte slice into a Frame using gnark decoding.
 func (c *Frame) DeserializeGnark(data []byte) (*Frame, error) {
 	if len(data) <= bn254.SizeOfG1AffineCompressed {
 		return nil, fmt.Errorf("chunk length must be at least %d: %d given", bn254.SizeOfG1AffineCompressed, len(data))
@@ -59,27 +76,6 @@ func (c *Frame) DeserializeGnark(data []byte) (*Frame, error) {
 		buf = buf[BYTES_PER_SYMBOL:]
 	}
 	return &f, nil
-}
-
-func (f *Frame) Encode() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(f)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func Decode(b []byte) (Frame, error) {
-	var f Frame
-	buf := bytes.NewBuffer(b)
-	dec := gob.NewDecoder(buf)
-	err := dec.Decode(&f)
-	if err != nil {
-		return Frame{}, err
-	}
-	return f, nil
 }
 
 func (c *G1Commitment) Serialize() ([]byte, error) {
@@ -136,26 +132,6 @@ func (c *G2Commitment) UnmarshalJSON(data []byte) error {
 
 	if !(*bn254.G2Affine)(c).IsInSubGroup() {
 		return fmt.Errorf("G2Commitment not in the subgroup")
-	}
-	return nil
-}
-
-func encode(obj any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(obj)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func decode(data []byte, obj any) error {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-	err := dec.Decode(obj)
-	if err != nil {
-		return err
 	}
 	return nil
 }
