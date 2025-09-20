@@ -125,10 +125,10 @@ func (c client) GetChunks(
 		case grpcnode.ChunkEncodingFormat_GNARK:
 			chunk, err = new(encoding.Frame).DeserializeGnark(data)
 		case grpcnode.ChunkEncodingFormat_GOB:
-			chunk, err = new(encoding.Frame).Deserialize(data)
+			chunk, err = new(encoding.Frame).DeserializeGob(data)
 		case grpcnode.ChunkEncodingFormat_UNKNOWN:
 			// For backward compatibility, we fallback the UNKNOWN to GOB
-			chunk, err = new(encoding.Frame).Deserialize(data)
+			chunk, err = new(encoding.Frame).DeserializeGob(data)
 			if err != nil {
 				chunksChan <- RetrievedChunks{
 					OperatorID: opID,

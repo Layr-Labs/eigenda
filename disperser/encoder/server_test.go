@@ -136,7 +136,7 @@ func TestEncodeBlobV1(t *testing.T) {
 	var chunksData []*encoding.Frame
 
 	for i := range reply.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
@@ -281,7 +281,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 	var chunksData []*encoding.Frame
 
 	for i := range reply1.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply1.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply1.GetChunks()[i])
 		// perform an operation
 		chunksData = append(chunksData, chunkSerialized)
 	}
@@ -310,7 +310,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 	assert.NotNil(t, reply2.GetChunks())
 
 	for i := range reply2.GetChunks() {
-		chunkSerialized, _ := new(encoding.Frame).Deserialize(reply2.GetChunks()[i])
+		chunkSerialized, _ := new(encoding.Frame).DeserializeGob(reply2.GetChunks()[i])
 		// perform an operation
 		assert.Equal(t, len(chunkSerialized.Coeffs), len(chunksData[i].Coeffs))
 		assert.Equal(t, chunkSerialized.Coeffs, chunksData[i].Coeffs)

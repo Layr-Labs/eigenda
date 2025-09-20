@@ -81,7 +81,7 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 		Proof:  commitment,
 		Coeffs: []encoding.Symbol{encoding.ONE},
 	}
-	chunk1bytes, err := chunk1.Serialize()
+	chunk1bytes, err := chunk1.SerializeGob()
 	assert.Nil(t, err)
 	bundle1 := core.Bundle{
 		chunk1,
@@ -364,7 +364,7 @@ func decodeChunks(t *testing.T, s *node.Store, batchHeaderHash [32]byte, blobIdx
 	var f *encoding.Frame
 	switch chunkEncoding {
 	case pb.ChunkEncodingFormat_GOB:
-		f, err = new(encoding.Frame).Deserialize(chunks[0])
+		f, err = new(encoding.Frame).DeserializeGob(chunks[0])
 		assert.Nil(t, err)
 	case pb.ChunkEncodingFormat_GNARK:
 		f, err = new(encoding.Frame).DeserializeGnark(chunks[0])

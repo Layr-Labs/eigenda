@@ -159,7 +159,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 			bytes := make([][]byte, 0, len(chunks))
 			for _, c := range chunks {
-				serialized, err := c.Serialize()
+				serialized, err := c.SerializeGob()
 				if err != nil {
 					t.Fatal(err)
 				}

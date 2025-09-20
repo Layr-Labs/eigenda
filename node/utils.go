@@ -54,7 +54,7 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 				case core.GobBundleEncodingFormat:
 					bundles[uint8(quorumID)] = make([]*encoding.Frame, len(bundle.GetChunks()))
 					for k, data := range bundle.GetChunks() {
-						chunk, err := new(encoding.Frame).Deserialize(data)
+						chunk, err := new(encoding.Frame).DeserializeGob(data)
 						if err != nil {
 							resultChan <- err
 							return

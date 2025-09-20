@@ -336,7 +336,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assignment, ok := assignments[op.Node.Config.ID]
 		require.True(t, ok)
 		for _, data := range chunksReply.GetChunks() {
-			chunk, err := new(encoding.Frame).Deserialize(data)
+			chunk, err := new(encoding.Frame).DeserializeGob(data)
 			require.NoError(t, err)
 			chunks = append(chunks, chunk)
 		}

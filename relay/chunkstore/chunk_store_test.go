@@ -120,7 +120,7 @@ func runRandomProofsTest(t *testing.T, client s3.Client) {
 	for key, expectedProofs := range expectedValues {
 		binaryProofs, err := reader.GetBinaryChunkProofs(ctx, key)
 		require.NoError(t, err, "failed to get binary chunk proofs for blob key %x", key)
-		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
+		proofs := encoding.DeserializeSplitFrameProofs(binaryProofs)
 		require.Equal(t, expectedProofs, proofs, "proof mismatch for blob key %x", key)
 	}
 }

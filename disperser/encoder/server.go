@@ -227,7 +227,7 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 		if s.config.EnableGnarkChunkEncoding {
 			chunkSerialized, err = chunk.SerializeGnark()
 		} else {
-			chunkSerialized, err = chunk.Serialize()
+			chunkSerialized, err = chunk.SerializeGob()
 		}
 		if err != nil {
 			return nil, err

@@ -69,7 +69,7 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		chunkBytes := make([][]byte, len(chunks))
 		for _, c := range chunks {
-			serialized, err := c.Serialize()
+			serialized, err := c.SerializeGob()
 			assert.NotNil(t, err)
 			chunkBytes = append(chunkBytes, serialized)
 		}
