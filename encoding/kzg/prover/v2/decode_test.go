@@ -37,5 +37,5 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, frame)
 
-	assert.Equal(t, frame, frames[0])
+	assert.Equal(t, *frame, frames[0])
 }
