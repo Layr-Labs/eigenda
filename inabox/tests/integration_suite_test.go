@@ -99,7 +99,11 @@ func TestMain(m *testing.M) {
 	}
 
 	// Run suite setup
-	setupSuite()
+	if err := setupSuite(); err != nil {
+		logger.Error("Setup failed:", err)
+		teardownSuite()
+		os.Exit(1)
+	}
 
 	// Run all tests
 	code := m.Run()
@@ -111,33 +115,11 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setupSuite() {
+func setupSuite() error {
 	logger.Info("bootstrapping test environment")
 
-	// Create a context with 1 minute timeout for setup
-	ctx, cancelSetup := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancelSetup()
-
-	// Channel to track setup completion
-	setupDone := make(chan error, 1)
-
-	// Run setup in goroutine to respect timeout
-	go func() {
-		setupDone <- runSetup(ctx)
-	}()
-
-	// Wait for setup to complete or timeout
-	select {
-	case err := <-setupDone:
-		if err != nil {
-			logger.Fatal("Setup failed:", err)
-		}
-	case <-ctx.Done():
-		logger.Fatal("Setup timed out after 1 minute")
-	}
-}
-
-func runSetup(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	rootPath := "../../"
 
 	var err error
@@ -154,6 +136,7 @@ func runSetup(ctx context.Context) error {
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
+			// Use the timeout context for container creation
 			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
@@ -505,32 +488,12 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 func teardownSuite() {
 	logger.Info("Tearing down test environment")
 
-	// Create a context with 1 minute timeout for teardown
-	ctx, cancelTeardown := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancelTeardown()
-
-	// Channel to track teardown completion
-	teardownDone := make(chan struct{})
-
-	// Run teardown in goroutine to respect timeout
-	go func() {
-		defer close(teardownDone)
-		runTeardown(ctx)
-	}()
-
-	// Wait for teardown to complete or timeout
-	select {
-	case <-teardownDone:
-		logger.Info("Teardown completed successfully")
-	case <-ctx.Done():
-		logger.Warn("Teardown timed out after 1 minute - some resources may not have been cleaned up")
-	}
-}
-
-func runTeardown(ctx context.Context) {
 	if testConfig == nil || !testConfig.Environment.IsLocal() {
 		return
 	}
+
+	ctx, teardownCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer teardownCancel()
 
 	if cancel != nil {
 		cancel()
@@ -555,4 +518,6 @@ func runTeardown(ctx context.Context) {
 			logger.Warn("Failed to terminate localstack container", "error", err)
 		}
 	}
+
+	logger.Info("Teardown completed")
 }
