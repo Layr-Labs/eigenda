@@ -72,3 +72,8 @@ func (pv *ReservationPaymentValidator) Debit(
 
 	return success, nil
 }
+
+// Returns the current number of entries in the ledger cache.
+func (pv *ReservationPaymentValidator) GetCacheSize() int {
+	return pv.ledgerCache.Size()
+}
