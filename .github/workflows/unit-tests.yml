@@ -61,6 +61,16 @@ jobs:
           COVERAGE=$(go tool cover -func="unit-tests-coverage.out" | tail -1 | grep -Eo '[0-9]+\.[0-9]')
           echo "coverage: $COVERAGE% of statements"
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: main-unit-tests-coverage
+          files: unit-tests-coverage.out
+          flags: unit-tests
+          fail_ci_if_error: true
+          verbose: true
+
   litt-unit-tests:
     name: LittDB Tests
     runs-on: ubuntu-latest
@@ -112,52 +122,28 @@ jobs:
           COVERAGE=$(go tool cover -func="litt-unit-tests-coverage.out" | tail -1 | grep -Eo '[0-9]+\.[0-9]')
           echo "coverage: $COVERAGE% of statements"
 
-  # This job finalizes the unit test panel after all prerequisite jobs are done.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: litt-unit-tests-coverage
+          files: litt-unit-tests-coverage.out
+          flags: litt-tests
+          fail_ci_if_error: true
+          verbose: true
+
+  # Final job to satisfy branch protection rules
   unit-tests:
     name: Unit Tests
-    needs: [ main-unit-tests, litt-unit-tests ]
     runs-on: ubuntu-latest
+    needs: [main-unit-tests, litt-unit-tests]
+    if: always()
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
-
-      - uses: jdx/mise-action@v2
-        with:
-          version: ${{ env.MISE_VERSION }}
-          experimental: true
-
-      - name: Download main unit tests coverage
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: main-unit-tests-coverage
-          path: ./coverage-artifacts
-
-      - name: Download litt unit tests coverage
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: litt-unit-tests-coverage
-          path: ./coverage-artifacts
-
-      - name: Merge coverage files
-        shell: bash
+      - name: Check test results
         run: |
-          cd coverage-artifacts
-          if [ -f litt-unit-tests-coverage.out ] && [ -f unit-tests-coverage.out ]; then
-            echo "mode: set" > ../coverage.out
-            # Skip the first line (mode declaration) from each file and append
-            tail -n +2 unit-tests-coverage.out >> ../coverage.out
-            tail -n +2 litt-unit-tests-coverage.out >> ../coverage.out
-            echo "Merged coverage from both main-unit-tests and litt-unit-tests"
-          elif [ -f unit-tests-coverage.out ]; then
-            cp unit-tests-coverage.out ../coverage.out
-            echo "Using main-unit-tests coverage only"
-          else
-            echo "No coverage files found"
+          if [[ "${{ needs.main-unit-tests.result }}" != "success" || "${{ needs.litt-unit-tests.result }}" != "success" ]]; then
+            echo "One or more test jobs failed"
             exit 1
           fi
+          echo "All test jobs passed successfully"
 
-      - name: Update coverage badge
-        if: github.ref == 'refs/heads/master'
-        uses: ./.github/actions/test-coverage
-        with:
-          chart: true
-          amend: true
