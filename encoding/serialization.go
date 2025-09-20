@@ -10,9 +10,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
-// Serialize serializes the Frame into a byte slice using gob encoding.
+// SerializeGob serializes the Frame into a byte slice using gob encoding.
 // TODO(samlaf): when do we use gob vs gnark serialization ([Frame.SerializeGnark])?
-func (c *Frame) Serialize() ([]byte, error) {
+func (c *Frame) SerializeGob() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(c)
@@ -22,8 +22,8 @@ func (c *Frame) Serialize() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Deserialize deserializes the byte slice into a Frame using gob decoding.
-func (c *Frame) Deserialize(data []byte) (*Frame, error) {
+// DeserializeGob deserializes the byte slice into a Frame using gob decoding.
+func (c *Frame) DeserializeGob(data []byte) (*Frame, error) {
 	buf := bytes.NewBuffer(data)
 	err := gob.NewDecoder(buf).Decode(c)
 	if err != nil {

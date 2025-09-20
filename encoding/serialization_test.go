@@ -32,7 +32,7 @@ func TestSerDeserGnark(t *testing.T) {
 	// The gnark encoding via f.Serialize() will generate less bytes
 	// than gob.
 	assert.Equal(t, 32*(1+numCoeffs), len(gnark))
-	gob, err := f.Serialize()
+	gob, err := f.SerializeGob()
 	assert.Nil(t, err)
 	// 2080 with gnark v.s. 2574 with gob
 	assert.Equal(t, 2574, len(gob))
@@ -78,7 +78,7 @@ func BenchmarkFrameGobSerialization(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = frames[i%numSamples].Serialize()
+		_, _ = frames[i%numSamples].SerializeGob()
 	}
 }
 
@@ -97,13 +97,13 @@ func BenchmarkFrameGobDeserialization(b *testing.B) {
 	frames := createFrames(b, numSamples)
 	bytes := make([][]byte, numSamples)
 	for n := 0; n < numSamples; n++ {
-		gob, _ := frames[n].Serialize()
+		gob, _ := frames[n].SerializeGob()
 		bytes[n] = gob
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = new(encoding.Frame).Deserialize(bytes[i%numSamples])
+		_, _ = new(encoding.Frame).DeserializeGob(bytes[i%numSamples])
 	}
 }
 
