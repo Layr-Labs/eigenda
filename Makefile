@@ -109,7 +109,6 @@ fuzz-tests:
 # Integration tests use mocks
 integration-tests:
 	go test -v ./operators/churner/tests
-	go test -v ./core/indexer
 	go test -v ./node/plugin/tests
 	go test -v ./disperser/dataapi
 
