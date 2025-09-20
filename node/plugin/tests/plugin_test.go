@@ -96,13 +96,40 @@ func cleanup() {
 	}
 }
 
+// runNodePlugin is a helper function for running the node plugin
+func runNodePlugin(t *testing.T, operation string, operator deploy.OperatorVars) {
+	t.Helper()
+
+	// Convert deploy.OperatorVars to testbed.OperatorConfig
+	cfg := testbed.OperatorConfig{
+		NODE_HOSTNAME:                    operator.NODE_HOSTNAME,
+		NODE_DISPERSAL_PORT:              operator.NODE_DISPERSAL_PORT,
+		NODE_RETRIEVAL_PORT:              operator.NODE_RETRIEVAL_PORT,
+		NODE_V2_DISPERSAL_PORT:           operator.NODE_V2_DISPERSAL_PORT,
+		NODE_V2_RETRIEVAL_PORT:           operator.NODE_V2_RETRIEVAL_PORT,
+		NODE_ECDSA_KEY_FILE:              operator.NODE_ECDSA_KEY_FILE,
+		NODE_BLS_KEY_FILE:                operator.NODE_BLS_KEY_FILE,
+		NODE_ECDSA_KEY_PASSWORD:          operator.NODE_ECDSA_KEY_PASSWORD,
+		NODE_BLS_KEY_PASSWORD:            operator.NODE_BLS_KEY_PASSWORD,
+		NODE_QUORUM_ID_LIST:              operator.NODE_QUORUM_ID_LIST,
+		NODE_CHAIN_RPC:                   operator.NODE_CHAIN_RPC,
+		NODE_EIGENDA_DIRECTORY:           operator.NODE_EIGENDA_DIRECTORY,
+		NODE_BLS_OPERATOR_STATE_RETRIVER: operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
+		NODE_EIGENDA_SERVICE_MANAGER:     operator.NODE_EIGENDA_SERVICE_MANAGER,
+		NODE_CHURNER_URL:                 operator.NODE_CHURNER_URL,
+	}
+
+	err := testbed.RunNodePlugin(t.Context(), operation, cfg, logger)
+	require.NoError(t, err, "failed to run node plugin")
+}
+
 func TestPluginOptIn(t *testing.T) {
 	ctx := t.Context()
 
 	operator := testConfig.Operators[0]
 	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
@@ -115,7 +142,7 @@ func TestPluginOptIn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), ids)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", operator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -132,12 +159,12 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 	operator := testConfig.Operators[0]
 	require.NotEmpty(t, operator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", operator)
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(registeredQuorumIds))
@@ -145,7 +172,7 @@ func TestPluginOptInAndOptOut(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), ids)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", operator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -162,12 +189,12 @@ func TestPluginOptInAndQuorumUpdate(t *testing.T) {
 	operator := testConfig.Operators[0]
 	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
 
-	testConfig.RunNodePluginBinary("opt-in", operator)
+	runNodePlugin(t, "opt-in", operator)
 
 	registeredQuorumIds, err := tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
@@ -185,7 +212,7 @@ func TestPluginInvalidOperation(t *testing.T) {
 	operator := testConfig.Operators[0]
 	require.Equal(t, "0,1", operator.NODE_QUORUM_ID_LIST)
 
-	testConfig.RunNodePluginBinary("opt-out", operator)
+	runNodePlugin(t, "opt-out", operator)
 
 	tx := getTransactor(t, operator)
 	operatorID := getOperatorId(t, operator)
@@ -198,7 +225,7 @@ func TestPluginInvalidOperation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), ids)
 
-	testConfig.RunNodePluginBinary("invalid", operator)
+	runNodePlugin(t, "invalid", operator)
 
 	registeredQuorumIds, err = tx.GetRegisteredQuorumIdsForOperator(ctx, operatorID)
 	require.NoError(t, err)
