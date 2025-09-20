@@ -161,6 +161,66 @@ contract EigenDARegistryCoordinator is
         }
     }
 
+    function registerOperatorWithChurn(
+        bytes calldata quorumNumbers,
+        string calldata socket,
+        IBLSApkRegistry.PubkeyRegistrationParams calldata params,
+        SignatureWithSaltAndExpiry memory operatorSignature
+    ) external {
+        /**
+         * If the operator has NEVER registered a pubkey before, use `params` to register
+         * their pubkey in blsApkRegistry
+         *
+         * If the operator HAS registered a pubkey, `params` is ignored and the pubkey hash
+         * (operatorId) is fetched instead
+         */
+        bytes32 operatorId = _getOrCreateOperatorId(msg.sender, params);
+
+        // Register the operator in each of the registry contracts and update the operator's
+        // quorum bitmap and registration status
+        uint32[] memory numOperatorsPerQuorum = _registerOperator({
+            operator: msg.sender,
+            operatorId: operatorId,
+            quorumNumbers: quorumNumbers,
+            socket: socket,
+            operatorSignature: operatorSignature
+        }).numOperatorsPerQuorum;
+
+        // For each quorum, validate that the new operator count does not exceed the maximum
+        // If it does, churns an operator via an exhaustive search through the operator set.
+        for (uint256 i; i < quorumNumbers.length; i++) {
+            uint8 quorumNumber = uint8(quorumNumbers[i]);
+
+            if (numOperatorsPerQuorum[i] > _quorumParams[quorumNumber].maxOperatorCount) {
+                _churnOperator(quorumNumber);
+            }
+        }
+    }
+
+    function _churnOperator(uint8 quorumNumber) internal {
+        bytes32[] memory operatorList = indexRegistry.getOperatorListAtBlockNumber(quorumNumber, uint32(block.number));
+        require(operatorList.length > 0, "RegCoord._churnOperator: no operators to churn");
+
+        // Find the operator with the lowest stake
+        bytes32 operatorToChurn;
+        uint96 lowestStake = type(uint96).max;
+        for (uint256 i; i < operatorList.length; i++) {
+            uint96 operatorStake = stakeRegistry.getCurrentStake(operatorList[i], quorumNumber);
+            if (operatorStake < lowestStake) {
+                lowestStake = operatorStake;
+                operatorToChurn = operatorList[i];
+            }
+        }
+
+        // Deregister the operator with the lowest stake
+        bytes memory quorumNumbers = new bytes(1);
+        quorumNumbers[0] = bytes1(uint8(quorumNumber));
+        _deregisterOperator({
+            operator: blsApkRegistry.pubkeyHashToOperator(operatorToChurn),
+            quorumNumbers: quorumNumbers
+        });
+    }
+
     /**
      * @notice Registers msg.sender as an operator for one or more quorums. If any quorum reaches its maximum operator
      * capacity, `operatorKickParams` is used to replace an old operator with the new one.
@@ -172,6 +232,7 @@ contract EigenDARegistryCoordinator is
      * @param operatorSignature is the signature of the operator used by the AVS to register the operator in the delegation manager
      * @dev `params` is ignored if the caller has previously registered a public key
      * @dev `operatorSignature` is ignored if the operator's status is already REGISTERED
+     * @dev DEPRECATED: this method will be removed in a future version of the contract. Instead, use `registerOperator`
      */
     function registerOperatorWithChurn(
         bytes calldata quorumNumbers,
@@ -420,6 +481,7 @@ contract EigenDARegistryCoordinator is
      * (see `registerOperatorWithChurn`)
      * @param _churnApprover the new churn approver
      * @dev only callable by the owner
+     * @dev DEPRECATED
      */
     function setChurnApprover(address _churnApprover) external onlyOwner {
         _setChurnApprover(_churnApprover);
@@ -946,6 +1008,7 @@ contract EigenDARegistryCoordinator is
      * @param operatorKickParams The parameters needed to kick the operator from the quorums that have reached their caps
      * @param salt The salt to use for the churnApprover's signature
      * @param expiry The desired expiry time of the churnApprover's signature
+     * @dev DEPRECATED
      */
     function calculateOperatorChurnApprovalDigestHash(
         address registeringOperator,
