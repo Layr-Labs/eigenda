@@ -59,7 +59,7 @@ func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.B
 		return nil, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
 	}
 
-	proofs, err := rs.SplitSerializedFrameProofs(bytes)
+	proofs, err := encoding.SplitSerializedFrameProofs(bytes)
 	if err != nil {
 		r.logger.Error("failed to split proofs", "blob", blobKey.Hex(), "error", err)
 		return nil, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
