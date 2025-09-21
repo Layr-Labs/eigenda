@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -34,7 +35,7 @@ type EncoderServerV2 struct {
 	blobStore   *blobstore.BlobStore
 	chunkWriter chunkstore.ChunkWriter
 	logger      logging.Logger
-	prover      encoding.Prover
+	prover      *prover.Prover
 	metrics     *Metrics
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
@@ -57,7 +58,7 @@ func NewEncoderServerV2(
 	blobStore *blobstore.BlobStore,
 	chunkWriter chunkstore.ChunkWriter,
 	logger logging.Logger,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	metrics *Metrics,
 	grpcMetrics *grpcprom.ServerMetrics,
 ) *EncoderServerV2 {

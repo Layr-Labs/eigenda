@@ -13,6 +13,7 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -197,6 +198,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "eigenDALegacyCertVerifier", address(legacyEigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
+        vm.serializeAddress(output, "eigenDAEjectionManager", address(eigenDAEjectionManager));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

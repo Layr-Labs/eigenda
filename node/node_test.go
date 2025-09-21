@@ -96,6 +96,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		}
 	})
 	n := &node.Node{
+		CTX:            t.Context(),
 		Config:         config,
 		Logger:         logger,
 		KeyPair:        keyPair,

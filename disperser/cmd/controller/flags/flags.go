@@ -280,6 +280,42 @@ var (
 		Value:    3 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_AUTHORIZATION_REQUEST_MAX_FUTURE_AGE"),
 	}
+	OnDemandPaymentsTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "on-demand-payments-table-name"),
+		Usage:    "Name of the DynamoDB table for storing on-demand payment state",
+		Required: false,
+		Value:    "on_demand",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_PAYMENTS_TABLE_NAME"),
+	}
+	OnDemandPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ondemand-payments-ledger-cache-size"),
+		Usage:    "Maximum number of on-demand ledgers to keep in the LRU cache",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONDEMAND_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	ReservationPaymentsLedgerCacheSizeFlag = cli.IntFlag{
+		Name: common.PrefixFlag(FlagPrefix, "reservation-payments-ledger-cache-size"),
+		Usage: "Initial number of reservation ledgers to keep in the LRU cache. May increase " +
+			"dynamically if premature evictions are detected, up to 65,536.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_PAYMENTS_LEDGER_CACHE_SIZE"),
+	}
+	ReservationBucketCapacityPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
+		Usage:    "Duration used to calculate bucket capacity for reservations",
+		Required: false,
+		Value:    60 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
+	}
+	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
+		Usage:    "Interval for checking payment vault updates",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -325,6 +361,11 @@ var optionalFlags = []cli.Flag{
 	GrpcMaxIdleConnectionAgeFlag,
 	GrpcAuthorizationRequestMaxPastAgeFlag,
 	GrpcAuthorizationRequestMaxFutureAgeFlag,
+	OnDemandPaymentsTableNameFlag,
+	OnDemandPaymentsLedgerCacheSizeFlag,
+	ReservationPaymentsLedgerCacheSizeFlag,
+	ReservationBucketCapacityPeriodFlag,
+	PaymentVaultUpdateIntervalFlag,
 }
 
 var Flags []cli.Flag
