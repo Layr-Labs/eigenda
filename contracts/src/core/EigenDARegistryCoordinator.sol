@@ -67,7 +67,6 @@ contract EigenDARegistryCoordinator is
 
     /**
      * @param _initialOwner will hold the owner role
-     * @param _churnApprover will hold the churnApprover role, which authorizes registering with churn
      * @param _ejector will hold the ejector role, which can force-eject operators from quorums
      * @param _pauserRegistry a registry of addresses that can pause the contract
      * @param _initialPausedStatus pause status after calling initialize
@@ -78,7 +77,6 @@ contract EigenDARegistryCoordinator is
      */
     function initialize(
         address _initialOwner,
-        address _churnApprover,
         address _ejector,
         IPauserRegistry _pauserRegistry,
         uint256 _initialPausedStatus,
@@ -94,7 +92,6 @@ contract EigenDARegistryCoordinator is
         // Initialize roles
         _transferOwnership(_initialOwner);
         _initializePauser(_pauserRegistry, _initialPausedStatus);
-        _setChurnApprover(_churnApprover);
         _setEjector(_ejector);
 
         // Add registry contracts to the registries array
@@ -219,83 +216,6 @@ contract EigenDARegistryCoordinator is
             operator: blsApkRegistry.pubkeyHashToOperator(operatorToChurn),
             quorumNumbers: quorumNumbers
         });
-    }
-
-    /**
-     * @notice Registers msg.sender as an operator for one or more quorums. If any quorum reaches its maximum operator
-     * capacity, `operatorKickParams` is used to replace an old operator with the new one.
-     * @param quorumNumbers is an ordered byte array containing the quorum numbers being registered for
-     * @param params contains the G1 & G2 public keys of the operator, and a signature proving their ownership
-     * @param operatorKickParams used to determine which operator is removed to maintain quorum capacity as the
-     * operator registers for quorums
-     * @param churnApproverSignature is the signature of the churnApprover over the `operatorKickParams`
-     * @param operatorSignature is the signature of the operator used by the AVS to register the operator in the delegation manager
-     * @dev `params` is ignored if the caller has previously registered a public key
-     * @dev `operatorSignature` is ignored if the operator's status is already REGISTERED
-     * @dev DEPRECATED: this method will be removed in a future version of the contract. Instead, use `registerOperator`
-     */
-    function registerOperatorWithChurn(
-        bytes calldata quorumNumbers,
-        string calldata socket,
-        IBLSApkRegistry.PubkeyRegistrationParams calldata params,
-        OperatorKickParam[] calldata operatorKickParams,
-        SignatureWithSaltAndExpiry memory churnApproverSignature,
-        SignatureWithSaltAndExpiry memory operatorSignature
-    ) external onlyWhenNotPaused(PAUSED_REGISTER_OPERATOR) {
-        require(
-            operatorKickParams.length == quorumNumbers.length,
-            "RegCoord.registerOperatorWithChurn: input length mismatch"
-        );
-
-        /**
-         * If the operator has NEVER registered a pubkey before, use `params` to register
-         * their pubkey in blsApkRegistry
-         *
-         * If the operator HAS registered a pubkey, `params` is ignored and the pubkey hash
-         * (operatorId) is fetched instead
-         */
-        bytes32 operatorId = _getOrCreateOperatorId(msg.sender, params);
-
-        // Verify the churn approver's signature for the registering operator and kick params
-        _verifyChurnApproverSignature({
-            registeringOperator: msg.sender,
-            registeringOperatorId: operatorId,
-            operatorKickParams: operatorKickParams,
-            churnApproverSignature: churnApproverSignature
-        });
-
-        // Register the operator in each of the registry contracts and update the operator's
-        // quorum bitmap and registration status
-        RegisterResults memory results = _registerOperator({
-            operator: msg.sender,
-            operatorId: operatorId,
-            quorumNumbers: quorumNumbers,
-            socket: socket,
-            operatorSignature: operatorSignature
-        });
-
-        // Check that each quorum's operator count is below the configured maximum. If the max
-        // is exceeded, use `operatorKickParams` to deregister an existing operator to make space
-        for (uint256 i = 0; i < quorumNumbers.length; i++) {
-            OperatorSetParam memory operatorSetParams = _quorumParams[uint8(quorumNumbers[i])];
-
-            /**
-             * If the new operator count for any quorum exceeds the maximum, validate
-             * that churn can be performed, then deregister the specified operator
-             */
-            if (results.numOperatorsPerQuorum[i] > operatorSetParams.maxOperatorCount) {
-                _validateChurn({
-                    quorumNumber: uint8(quorumNumbers[i]),
-                    totalQuorumStake: results.totalStakes[i],
-                    newOperator: msg.sender,
-                    newOperatorStake: results.operatorStakes[i],
-                    kickParams: operatorKickParams[i],
-                    setParams: operatorSetParams
-                });
-
-                _deregisterOperator(operatorKickParams[i].operator, quorumNumbers[i:i + 1]);
-            }
-        }
     }
 
     /**
@@ -477,17 +397,6 @@ contract EigenDARegistryCoordinator is
     }
 
     /**
-     * @notice Sets the churnApprover, which approves operator registration with churn
-     * (see `registerOperatorWithChurn`)
-     * @param _churnApprover the new churn approver
-     * @dev only callable by the owner
-     * @dev DEPRECATED
-     */
-    function setChurnApprover(address _churnApprover) external onlyOwner {
-        _setChurnApprover(_churnApprover);
-    }
-
-    /**
      * @notice Sets the ejector, which can force-deregister operators from quorums
      * @param _ejector the new ejector
      * @dev only callable by the owner
@@ -615,49 +524,6 @@ contract EigenDARegistryCoordinator is
     }
 
     /**
-     * @notice Validates that an incoming operator is eligible to replace an existing
-     * operator based on the stake of both
-     * @dev In order to churn, the incoming operator needs to have more stake than the
-     * existing operator by a proportion given by `kickBIPsOfOperatorStake`
-     * @dev In order to be churned out, the existing operator needs to have a proportion
-     * of the total quorum stake less than `kickBIPsOfTotalStake`
-     * @param quorumNumber `newOperator` is trying to replace an operator in this quorum
-     * @param totalQuorumStake the total stake of all operators in the quorum, after the
-     * `newOperator` registers
-     * @param newOperator the incoming operator
-     * @param newOperatorStake the incoming operator's stake
-     * @param kickParams the quorum number and existing operator to replace
-     * @dev the existing operator's registration to this quorum isn't checked here, but
-     * if we attempt to deregister them, this will be checked in `_deregisterOperator`
-     * @param setParams config for this quorum containing `kickBIPsX` stake proportions
-     * mentioned above
-     */
-    function _validateChurn(
-        uint8 quorumNumber,
-        uint96 totalQuorumStake,
-        address newOperator,
-        uint96 newOperatorStake,
-        OperatorKickParam memory kickParams,
-        OperatorSetParam memory setParams
-    ) internal view {
-        address operatorToKick = kickParams.operator;
-        bytes32 idToKick = _operatorInfo[operatorToKick].operatorId;
-        require(newOperator != operatorToKick, "RegCoord._validateChurn: cannot churn self");
-        require(kickParams.quorumNumber == quorumNumber, "RegCoord._validateChurn: quorumNumber not the same as signed");
-
-        // Get the target operator's stake and check that it is below the kick thresholds
-        uint96 operatorToKickStake = stakeRegistry.getCurrentStake(idToKick, quorumNumber);
-        require(
-            newOperatorStake > _individualKickThreshold(operatorToKickStake, setParams),
-            "RegCoord._validateChurn: incoming operator has insufficient stake for churn"
-        );
-        require(
-            operatorToKickStake < _totalKickThreshold(totalQuorumStake, setParams),
-            "RegCoord._validateChurn: cannot kick operator with more than kickBIPsOfTotalStake"
-        );
-    }
-
-    /**
      * @dev Deregister the operator from one or more quorums
      * This method updates the operator's quorum bitmap and status, then deregisters
      * the operator with the BLSApkRegistry, IndexRegistry, and StakeRegistry
@@ -741,40 +607,6 @@ contract EigenDARegistryCoordinator is
      */
     function _totalKickThreshold(uint96 totalStake, OperatorSetParam memory setParams) internal pure returns (uint96) {
         return totalStake * setParams.kickBIPsOfTotalStake / BIPS_DENOMINATOR;
-    }
-
-    /// @notice verifies churnApprover's signature on operator churn approval and increments the churnApprover nonce
-    function _verifyChurnApproverSignature(
-        address registeringOperator,
-        bytes32 registeringOperatorId,
-        OperatorKickParam[] memory operatorKickParams,
-        SignatureWithSaltAndExpiry memory churnApproverSignature
-    ) internal {
-        // make sure the salt hasn't been used already
-        require(
-            !isChurnApproverSaltUsed[churnApproverSignature.salt],
-            "RegCoord._verifyChurnApproverSignature: churnApprover salt already used"
-        );
-        require(
-            churnApproverSignature.expiry >= block.timestamp,
-            "RegCoord._verifyChurnApproverSignature: churnApprover signature expired"
-        );
-
-        // set salt used to true
-        isChurnApproverSaltUsed[churnApproverSignature.salt] = true;
-
-        // check the churnApprover's signature
-        EIP1271SignatureUtils.checkSignature_EIP1271(
-            churnApprover,
-            calculateOperatorChurnApprovalDigestHash(
-                registeringOperator,
-                registeringOperatorId,
-                operatorKickParams,
-                churnApproverSignature.salt,
-                churnApproverSignature.expiry
-            ),
-            churnApproverSignature.signature
-        );
     }
 
     /**
@@ -883,11 +715,6 @@ contract EigenDARegistryCoordinator is
     function _setOperatorSetParams(uint8 quorumNumber, OperatorSetParam memory operatorSetParams) internal {
         _quorumParams[quorumNumber] = operatorSetParams;
         emit OperatorSetParamsUpdated(quorumNumber, operatorSetParams);
-    }
-
-    function _setChurnApprover(address newChurnApprover) internal {
-        emit ChurnApproverUpdated(churnApprover, newChurnApprover);
-        churnApprover = newChurnApprover;
     }
 
     function _setEjector(address newEjector) internal {
@@ -1000,36 +827,6 @@ contract EigenDARegistryCoordinator is
     /// @notice Returns the number of registries
     function numRegistries() external view returns (uint256) {
         return registries.length;
-    }
-
-    /**
-     * @notice Public function for the the churnApprover signature hash calculation when operators are being kicked from quorums
-     * @param registeringOperatorId The id of the registering operator
-     * @param operatorKickParams The parameters needed to kick the operator from the quorums that have reached their caps
-     * @param salt The salt to use for the churnApprover's signature
-     * @param expiry The desired expiry time of the churnApprover's signature
-     * @dev DEPRECATED
-     */
-    function calculateOperatorChurnApprovalDigestHash(
-        address registeringOperator,
-        bytes32 registeringOperatorId,
-        OperatorKickParam[] memory operatorKickParams,
-        bytes32 salt,
-        uint256 expiry
-    ) public view returns (bytes32) {
-        // calculate the digest hash
-        return _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    OPERATOR_CHURN_APPROVAL_TYPEHASH,
-                    registeringOperator,
-                    registeringOperatorId,
-                    operatorKickParams,
-                    salt,
-                    expiry
-                )
-            )
-        );
     }
 
     /**
