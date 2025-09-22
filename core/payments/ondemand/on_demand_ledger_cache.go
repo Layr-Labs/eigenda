@@ -191,3 +191,8 @@ func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, n
 	}
 	return nil
 }
+
+// Returns the current number of entries in the cache.
+func (c *OnDemandLedgerCache) Size() int {
+	return c.cache.Len()
+}

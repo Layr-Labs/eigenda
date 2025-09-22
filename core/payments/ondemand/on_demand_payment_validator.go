@@ -56,3 +56,8 @@ func (pv *OnDemandPaymentValidator) Debit(
 
 	return nil
 }
+
+// Returns the current number of entries in the ledger cache.
+func (pv *OnDemandPaymentValidator) GetCacheSize() int {
+	return pv.ledgerCache.Size()
+}
