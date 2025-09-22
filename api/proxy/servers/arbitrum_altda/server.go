@@ -76,6 +76,8 @@ func NewServer(ctx context.Context, cfg *Config, h *Handlers) (*Server, error) {
 
 }
 
+// Port returns the port that the server is listening on.
+// Useful in case Config.Port was set to 0 to let the OS assign a random port.
 func (svr *Server) Port() int {
 	// read from listener
 	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())

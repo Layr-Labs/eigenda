@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	ArbDANamespacedPrefix         = "daprovider"
-	MethodIsValidHeaderByte       = ArbDANamespacedPrefix + "_" + "isValidHeaderByte"
-	MethodStore                   = ArbDANamespacedPrefix + "_" + "store"
-	MethodRecoverBatchFromPayload = ArbDANamespacedPrefix + "_" + "recoverPayloadFromBatch"
+	MethodIsValidHeaderByte       = "daprovider_isValidHeaderByte"
+	MethodStore                   = "daprovider_store"
+	MethodRecoverBatchFromPayload = "daprovider_recoverPayloadFromBatch"
 )
 
 /*
