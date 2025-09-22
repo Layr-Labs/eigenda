@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -498,6 +499,47 @@ func TestV2ValidatorRetrieverOnly(t *testing.T) {
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1000))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+}
+
+func TestReservationPayments(t *testing.T) {
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeReservationOnly
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	// Test basic dispersal and retrieval with reservation payments
+	blob := testutils.RandBytes(1000)
+	requireStandardClientSetGet(t, ts, blob)
+
+	// Verify that dispersal and retrieval succeeded
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+
+	t.Log("Successfully dispersed and retrieved blob using reservation-only payments")
+}
+
+func TestOnDemandPayments(t *testing.T) {
+	t.Skip("Manual only for now, since we don't have a way of topping up on demand funds automatically")
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeOnDemandOnly
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	// Test basic dispersal and retrieval with on-demand payments
+	blob := testutils.RandBytes(1000)
+	requireStandardClientSetGet(t, ts, blob)
+
+	// Verify that dispersal and retrieval succeeded
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+
+	t.Log("Successfully dispersed and retrieved blob using on-demand-only payments")
 }
 
 // requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
