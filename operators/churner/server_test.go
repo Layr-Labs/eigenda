@@ -1,7 +1,6 @@
 package churner_test
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math/big"
@@ -10,10 +9,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ import (
 var (
 	keyPair                        *dacore.KeyPair
 	quorumIds                      = []uint32{0, 1}
-	logger                         = testutils.GetLogger()
+	logger                         = test.GetLogger()
 	transactorMock                 = &coremock.MockWriter{}
 	mockIndexer                    = &coremock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
@@ -36,8 +35,8 @@ var (
 )
 
 func TestChurn(t *testing.T) {
+	ctx := t.Context()
 	s := newTestServer(t)
-	ctx := context.Background()
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
@@ -96,7 +95,7 @@ func TestChurn(t *testing.T) {
 
 func TestChurnWithInvalidQuorum(t *testing.T) {
 	s := newTestServer(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{

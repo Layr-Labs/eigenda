@@ -3,18 +3,43 @@ package pubip
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+var _ Provider = (*testProvider)(nil)
+
+type testProvider struct {
+	// if true then this PublicIPAddress will return an error
+	returnErr bool
+
+	// number of times PublicIPAddress was called
+	count int
+
+	// ip address to return when PublicIPAddress is called
+	ip string
+}
+
+func (t *testProvider) Name() string {
+	return "test"
+}
+
+func (t *testProvider) PublicIPAddress(ctx context.Context) (string, error) {
+	t.count++
+	if t.returnErr {
+		return "", fmt.Errorf("intentional error")
+	}
+	return t.ip, nil
+}
+
 func TestProviderOrDefault(t *testing.T) {
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 
 	provider := ProviderOrDefault(logger, SeepIPProvider)
 	require.Equal(t, SeepIPProvider, provider.Name())
@@ -70,35 +95,10 @@ func TestProviderOrDefault(t *testing.T) {
 	require.Equal(t, IpifyProvider, multi.providers[1].Name())
 }
 
-var _ Provider = (*testProvider)(nil)
-
-type testProvider struct {
-	// if true then this PublicIPAddress will return an error
-	returnErr bool
-
-	// number of times PublicIPAddress was called
-	count int
-
-	// ip address to return when PublicIPAddress is called
-	ip string
-}
-
-func (t *testProvider) Name() string {
-	return "test"
-}
-
-func (t *testProvider) PublicIPAddress(ctx context.Context) (string, error) {
-	t.count++
-	if t.returnErr {
-		return "", fmt.Errorf("intentional error")
-	}
-	return t.ip, nil
-}
-
 func TestMultiProvider(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 
 	provider1 := &testProvider{
 		ip: rand.String(10),
@@ -111,7 +111,7 @@ func TestMultiProvider(t *testing.T) {
 	}
 	provider := NewMultiProvider(logger, provider1, provider2, provider3)
 
-	ip, err := provider.PublicIPAddress(context.Background())
+	ip, err := provider.PublicIPAddress(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, provider1.count)
 	require.Equal(t, 0, provider2.count)
@@ -119,7 +119,7 @@ func TestMultiProvider(t *testing.T) {
 	require.Equal(t, provider1.ip, ip)
 
 	provider1.returnErr = true
-	ip, err = provider.PublicIPAddress(context.Background())
+	ip, err = provider.PublicIPAddress(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 2, provider1.count)
 	require.Equal(t, 1, provider2.count)
@@ -127,7 +127,7 @@ func TestMultiProvider(t *testing.T) {
 	require.Equal(t, provider2.ip, ip)
 
 	provider2.returnErr = true
-	ip, err = provider.PublicIPAddress(context.Background())
+	ip, err = provider.PublicIPAddress(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 3, provider1.count)
 	require.Equal(t, 2, provider2.count)
@@ -135,7 +135,7 @@ func TestMultiProvider(t *testing.T) {
 	require.Equal(t, provider3.ip, ip)
 
 	provider3.returnErr = true
-	ip, err = provider.PublicIPAddress(context.Background())
+	ip, err = provider.PublicIPAddress(ctx)
 	require.Error(t, err)
 	require.Equal(t, 4, provider1.count)
 	require.Equal(t, 3, provider2.count)
@@ -144,6 +144,8 @@ func TestMultiProvider(t *testing.T) {
 }
 
 func TestSimpleProvider_PublicIPAddress(t *testing.T) {
+	ctx := t.Context()
+
 	tests := []struct {
 		name        string
 		requestDoer RequestDoerFunc
@@ -179,7 +181,7 @@ func TestSimpleProvider_PublicIPAddress(t *testing.T) {
 				"test",
 				"https://api.seeip.org")
 
-			ip, err := p.PublicIPAddress(context.Background())
+			ip, err := p.PublicIPAddress(ctx)
 			assert.Equal(t, tt.expected, ip)
 
 			if tt.expectErr {

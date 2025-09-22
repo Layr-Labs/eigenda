@@ -1,11 +1,12 @@
 package limiter
 
 import (
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/rand"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 func defaultConfig() *Config {
@@ -29,7 +30,7 @@ func defaultConfig() *Config {
 }
 
 func TestConcurrentBlobOperations(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
@@ -62,7 +63,7 @@ func TestConcurrentBlobOperations(t *testing.T) {
 }
 
 func TestGetBlobOpRateLimit(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetBlobOpsPerSecond = float64(2 + rand.Intn(10))
@@ -123,7 +124,7 @@ func TestGetBlobOpRateLimit(t *testing.T) {
 }
 
 func TestGetBlobBandwidthLimit(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	config := defaultConfig()
 	config.MaxGetBlobBytesPerSecond = float64(1024 + rand.Intn(1024*1024))

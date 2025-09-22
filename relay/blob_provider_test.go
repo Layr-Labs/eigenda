@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadWrite(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -61,7 +61,7 @@ func TestReadWrite(t *testing.T) {
 
 func TestNonExistentBlob(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -79,7 +79,7 @@ func TestNonExistentBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		blob, err := server.GetBlob(ctx, v2.BlobKey(tu.RandomBytes(32)))
+		blob, err := server.GetBlob(ctx, v2.BlobKey(random.RandomBytes(32)))
 		require.Error(t, err)
 		require.Nil(t, blob)
 	}

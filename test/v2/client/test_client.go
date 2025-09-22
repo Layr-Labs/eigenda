@@ -17,31 +17,31 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	proxycommon "github.com/Layr-Labs/eigenda/api/proxy/common"
+	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxyserver "github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
-	"github.com/Layr-Labs/eigenda/core/eth/directory"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/litt/util"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	proxyconfig "github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -381,6 +381,16 @@ func NewTestClient(
 				SignerPaymentKey: privateKey,
 				EthRPCURL:        ethRPCUrls[0],
 			},
+			EnabledServersConfig: &enablement.EnabledServersConfig{
+				Metric:      false,
+				ArbCustomDA: false,
+				RestAPIConfig: enablement.RestApisEnabled{
+					Admin:               false,
+					OpGenericCommitment: true,
+					OpKeccakCommitment:  true,
+					StandardCommitment:  true,
+				},
+			},
 			RestSvrCfg: proxyserver.Config{
 				Host: "localhost",
 				Port: config.ProxyPort,
@@ -415,6 +425,8 @@ func NewTestClient(
 						PayloadClientConfig: *payloadClientConfig,
 						RelayTimeout:        5 * time.Second,
 					},
+					ClientLedgerMode:                   clientledger.ParseClientLedgerMode(config.ClientLedgerPaymentMode),
+					VaultMonitorInterval:               time.Second * 30,
 					PutTries:                           3,
 					MaxBlobSizeBytes:                   16 * units.MiB,
 					EigenDACertVerifierOrRouterAddress: config.EigenDACertVerifierAddressQuorums0_1,

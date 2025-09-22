@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 		require.NoError(t, err)
 		cache, err := reservation.NewReservationLedgerCache(
 			t.Context(),
-			testutils.GetLogger(),
+			test.GetLogger(),
 			config,
 			nil, // nil payment vault
 			func() time.Time { return testTime },
@@ -45,7 +45,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 		require.NoError(t, err)
 		cache, err := reservation.NewReservationLedgerCache(
 			t.Context(),
-			testutils.GetLogger(),
+			test.GetLogger(),
 			config,
 			vault.NewTestPaymentVault(),
 			nil, // nil time source
@@ -97,7 +97,7 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 	require.NoError(t, err)
 	ledgerCache, err := reservation.NewReservationLedgerCache(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		config,
 		testVault,
 		timeSource,
@@ -172,7 +172,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 	require.NoError(t, err)
 	ledgerCache, err := reservation.NewReservationLedgerCache(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		config,
 		testVault,
 		timeSource,
@@ -219,11 +219,9 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// sleep for long enough for the update to be picked up by the monitor
-	time.Sleep(time.Millisecond * 10)
-
-	// try adding more symbols again - should work due to increased capacity
-	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
-	require.NoError(t, err)
-	require.True(t, success)
+	// wait for the monitor to pick up the reservation update
+	test.AssertEventuallyTrue(t, func() bool {
+		success, _, err := ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
+		return err == nil && success
+	}, time.Second)
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 
 	"github.com/emirpasic/gods/lists/doublylinkedlist"
@@ -28,10 +28,10 @@ func TestRandomDequeOperations(t *testing.T) {
 	deque := common.NewRandomAccessDeque[int](initialSize)
 
 	// Iterating an empty deque should work as expected
-	for _, _ = range deque.Iterator() {
+	for range deque.Iterator() {
 		t.Fail()
 	}
-	for _, _ = range deque.ReverseIterator() {
+	for range deque.ReverseIterator() {
 		t.Fail()
 	}
 

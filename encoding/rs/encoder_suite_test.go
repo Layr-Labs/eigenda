@@ -18,6 +18,8 @@ var (
 )
 
 func setupSuite(t *testing.T) func(t *testing.T) {
+	t.Helper()
+
 	log.Println("Setting up suite")
 
 	numNode = uint64(4)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 )
 
 var (
@@ -21,13 +22,15 @@ type ShardValidator interface {
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type shardValidator struct {
-	verifier   encoding.Verifier
+	verifier   *verifier.Verifier
 	assignment AssignmentCoordinator
 	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewShardValidator(v encoding.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID) ShardValidator {
+func NewShardValidator(
+	v *verifier.Verifier, asgn AssignmentCoordinator, cst ChainState, operatorID OperatorID,
+) ShardValidator {
 	return &shardValidator{
 		verifier:   v,
 		assignment: asgn,

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
+	"github.com/Layr-Labs/eigenda/test"
 	sdkmock "github.com/Layr-Labs/eigensdk-go/chainio/clients/mocks"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,13 +19,14 @@ import (
 )
 
 func TestProcessTransaction(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txID := "1234"
@@ -69,13 +70,14 @@ func TestProcessTransaction(t *testing.T) {
 }
 
 func TestReplaceGasFee(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 100*time.Millisecond, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})
@@ -105,13 +107,14 @@ func TestReplaceGasFee(t *testing.T) {
 }
 
 func TestTransactionReplacementFailure(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})
@@ -138,13 +141,14 @@ func TestTransactionReplacementFailure(t *testing.T) {
 }
 
 func TestSendTransactionReceiptRetry(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})
@@ -176,13 +180,14 @@ func TestSendTransactionReceiptRetry(t *testing.T) {
 }
 
 func TestSendTransactionRetrySuccess(t *testing.T) {
+	ctx := t.Context()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
+	logger := test.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})
@@ -218,13 +223,14 @@ func TestSendTransactionRetrySuccess(t *testing.T) {
 }
 
 func TestSendTransactionRetryFailure(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, time.Second, 48*time.Second, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})
@@ -256,13 +262,14 @@ func TestSendTransactionRetryFailure(t *testing.T) {
 }
 
 func TestTransactionNotBroadcasted(t *testing.T) {
+	ctx := t.Context()
+	logger := test.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	ctrl := gomock.NewController(t)
 	w := sdkmock.NewMockWallet(ctrl)
-	logger := testutils.GetLogger()
 	metrics := batcher.NewMetrics("9100", logger)
 	txnManager := batcher.NewTxnManager(ethClient, w, 0, 5, 100*time.Millisecond, 48*time.Second, logger, metrics.TxnManagerMetrics)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
 	defer cancel()
 	txnManager.Start(ctx)
 	txn := types.NewTransaction(0, common.HexToAddress("0x1"), big.NewInt(1e18), 100000, big.NewInt(1e9), []byte{})

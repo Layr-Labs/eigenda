@@ -3,20 +3,19 @@ package relay
 import (
 	"math/rand"
 	"testing"
-
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetNonExistentBlob(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -36,18 +35,16 @@ func TestGetNonExistentBlob(t *testing.T) {
 
 	// Try to fetch a non-existent blobs
 	for i := 0; i < 10; i++ {
-		_, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{v2.BlobKey(tu.RandomBytes(32))})
+		_, err := server.GetMetadataForBlobs(ctx, []v2.BlobKey{v2.BlobKey(random.RandomBytes(32))})
 		require.Error(t, err)
 	}
 }
 
 func TestFetchingIndividualMetadata(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
+	logger := test.GetLogger()
 	setup(t)
 	defer teardown(t)
 	metadataStore := buildMetadataStore(t)
@@ -128,10 +125,8 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 
 func TestBatchedFetch(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -220,10 +215,8 @@ func TestBatchedFetch(t *testing.T) {
 
 func TestIndividualFetchWithSharding(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
@@ -354,7 +347,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 
 func TestBatchedFetchWithSharding(t *testing.T) {
 	ctx := t.Context()
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	setup(t)
 	defer teardown(t)
