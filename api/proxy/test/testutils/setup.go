@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -148,6 +149,9 @@ type TestConfig struct {
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
 	UseS3Fallback      bool
+
+	ClientLedgerMode     clientledger.ClientLedgerMode
+	VaultMonitorInterval time.Duration
 }
 
 // NewTestConfig returns a new TestConfig
@@ -172,16 +176,18 @@ func NewTestConfig(
 			OpKeccakCommitment:  true,
 			StandardCommitment:  true,
 		},
-		BackendsToEnable:   backendsToEnable,
-		DispersalBackend:   dispersalBackend,
-		Backend:            backend,
-		Retrievers:         []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-		Expiration:         14 * 24 * time.Hour,
-		UseKeccak256ModeS3: false,
-		UseS3Caching:       false,
-		UseS3Fallback:      false,
-		WriteThreadCount:   0,
-		WriteOnCacheMiss:   false,
+		BackendsToEnable:     backendsToEnable,
+		DispersalBackend:     dispersalBackend,
+		Backend:              backend,
+		Retrievers:           []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		Expiration:           14 * 24 * time.Hour,
+		UseKeccak256ModeS3:   false,
+		UseS3Caching:         false,
+		UseS3Fallback:        false,
+		WriteThreadCount:     0,
+		WriteOnCacheMiss:     false,
+		ClientLedgerMode:     clientledger.ClientLedgerModeLegacy,
+		VaultMonitorInterval: 30 * time.Second,
 	}
 }
 
@@ -364,6 +370,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			Host:        host,
 			Port:        0,
 			APIsEnabled: testCfg.EnabledRestAPIs,
+		},
+		ArbCustomDASvrCfg: arbitrum_altda.Config{
+			Host: host,
+			Port: 0,
 		},
 	}
 }
