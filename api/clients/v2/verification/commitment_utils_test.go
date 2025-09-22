@@ -5,13 +5,15 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
-const g1Path = "../../../../resources/srs/g1.point"
+const (
+	g1Path = "../../../../resources/srs/g1.point"
+)
 
 // computeSrsNumber computes the number of SRS elements that need to be loaded for a message of given byte count
 func computeSrsNumber(byteCount int) uint64 {

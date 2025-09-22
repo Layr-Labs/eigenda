@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 )
 
 // A ChunkDeserializer is responsible for deserializing binary chunks. Will only return chunks if they are valid.
@@ -25,7 +26,7 @@ type ChunkDeserializer interface {
 // ChunkDeserializerFactory is a function that creates a new ChunkDeserializer instance.
 type ChunkDeserializerFactory func(
 	assignments map[core.OperatorID]v2.Assignment,
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 ) ChunkDeserializer
 
 var _ ChunkDeserializer = &chunkDeserializer{}
@@ -33,7 +34,7 @@ var _ ChunkDeserializer = &chunkDeserializer{}
 // chunkDeserializer is a standard implementation of the ChunkDeserializer interface.
 type chunkDeserializer struct {
 	assignments map[core.OperatorID]v2.Assignment
-	verifier    encoding.Verifier
+	verifier    *verifier.Verifier
 }
 
 var _ ChunkDeserializerFactory = NewChunkDeserializer
@@ -41,7 +42,7 @@ var _ ChunkDeserializerFactory = NewChunkDeserializer
 // NewChunkDeserializer creates a new ChunkDeserializer instance.
 func NewChunkDeserializer(
 	assignments map[core.OperatorID]v2.Assignment,
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 ) ChunkDeserializer {
 	return &chunkDeserializer{
 		assignments: assignments,

@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
+	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
@@ -23,6 +24,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
@@ -133,6 +135,7 @@ func GetBackend() Backend {
 }
 
 type TestConfig struct {
+	EnabledRestAPIs  *enablement.RestApisEnabled
 	BackendsToEnable []common.EigenDABackend
 	DispersalBackend common.EigenDABackend
 	Backend          Backend
@@ -163,6 +166,12 @@ func NewTestConfig(
 	}
 
 	return TestConfig{
+		EnabledRestAPIs: &enablement.RestApisEnabled{
+			Admin:               false,
+			OpGenericCommitment: true,
+			OpKeccakCommitment:  true,
+			StandardCommitment:  true,
+		},
 		BackendsToEnable:   backendsToEnable,
 		DispersalBackend:   dispersalBackend,
 		Backend:            backend,
@@ -316,6 +325,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
+			ClientLedgerMode:                   clientledger.ClientLedgerModeLegacy,
 		},
 	}
 	if useMemory {
@@ -335,17 +345,25 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
 		builderConfig.S3Config = createS3Config()
 	}
+
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: pk,
 		EthRPCURL:        ethRPC,
 	}
+
 	return config.AppConfig{
 		StoreBuilderConfig: builderConfig,
 		SecretConfig:       secretConfig,
-		MetricsSvrConfig:   proxy_metrics.Config{},
+		EnabledServersConfig: &enablement.EnabledServersConfig{
+			Metric:        false,
+			ArbCustomDA:   false,
+			RestAPIConfig: *testCfg.EnabledRestAPIs,
+		},
+		MetricsSvrConfig: proxy_metrics.Config{},
 		RestSvrCfg: rest.Config{
-			Host: host,
-			Port: 0,
+			Host:        host,
+			Port:        0,
+			APIsEnabled: testCfg.EnabledRestAPIs,
 		},
 	}
 }

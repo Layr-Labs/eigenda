@@ -4,21 +4,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRandomInsertions(t *testing.T) {
 
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDir := t.TempDir()
 
 	iterations := 10
-
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
 
 	config := &Config{
 		GetChunksHotCacheReadLimitMB:  units.GiB,
@@ -70,8 +68,7 @@ func TestRestart(t *testing.T) {
 
 	iterations := 10
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 
 	config := &Config{
 		GetChunksHotCacheReadLimitMB:  units.GiB,
@@ -136,8 +133,7 @@ func TestDoubleInsertionLittDB(t *testing.T) {
 
 	iterations := 10
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 
 	config := &Config{
 		LittDBDoubleWriteProtection:   true, // causes littDB to throw if data is written twice

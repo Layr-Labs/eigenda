@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -17,45 +17,38 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
 	t.Run("nil payment vault", func(t *testing.T) {
+		config, err := reservation.NewReservationLedgerCacheConfig(
+			10,
+			10*time.Second,
+			reservation.OverfillOncePermitted,
+			time.Second,
+		)
+		require.NoError(t, err)
 		cache, err := reservation.NewReservationLedgerCache(
 			t.Context(),
-			testutils.GetLogger(),
-			10,
+			test.GetLogger(),
+			config,
 			nil, // nil payment vault
 			func() time.Time { return testTime },
-			reservation.OverfillOncePermitted,
-			10*time.Second,
-			time.Second,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
 	})
 
 	t.Run("nil time source", func(t *testing.T) {
-		cache, err := reservation.NewReservationLedgerCache(
-			t.Context(),
-			testutils.GetLogger(),
+		config, err := reservation.NewReservationLedgerCacheConfig(
 			10,
-			vault.NewTestPaymentVault(),
-			nil, // nil time source
-			reservation.OverfillOncePermitted,
 			10*time.Second,
+			reservation.OverfillOncePermitted,
 			time.Second,
 		)
-		require.Error(t, err)
-		require.Nil(t, cache)
-	})
-
-	t.Run("invalid capacity duration", func(t *testing.T) {
+		require.NoError(t, err)
 		cache, err := reservation.NewReservationLedgerCache(
 			t.Context(),
-			testutils.GetLogger(),
-			10,
+			test.GetLogger(),
+			config,
 			vault.NewTestPaymentVault(),
-			func() time.Time { return testTime },
-			reservation.OverfillOncePermitted,
-			0, // invalid capacity duration (zero)
-			time.Second,
+			nil, // nil time source
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -95,15 +88,19 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
+	config, err := reservation.NewReservationLedgerCacheConfig(
+		2, // Small cache size to force eviction
+		time.Second,
+		reservation.OverfillOncePermitted,
+		time.Millisecond,
+	)
+	require.NoError(t, err)
 	ledgerCache, err := reservation.NewReservationLedgerCache(
 		ctx,
-		testutils.GetLogger(),
-		2, // Small cache size to force eviction
+		test.GetLogger(),
+		config,
 		testVault,
 		timeSource,
-		reservation.OverfillOncePermitted,
-		time.Second,
-		time.Millisecond,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
@@ -166,15 +163,19 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
+	config, err := reservation.NewReservationLedgerCacheConfig(
+		2, // Small cache size to force eviction
+		time.Second,
+		reservation.OverfillOncePermitted,
+		time.Millisecond,
+	)
+	require.NoError(t, err)
 	ledgerCache, err := reservation.NewReservationLedgerCache(
 		ctx,
-		testutils.GetLogger(),
-		2, // Small cache size to force eviction
+		test.GetLogger(),
+		config,
 		testVault,
 		timeSource,
-		reservation.OverfillOncePermitted,
-		time.Second,
-		time.Millisecond,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
@@ -218,11 +219,9 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// sleep for long enough for the update to be picked up by the monitor
-	time.Sleep(time.Millisecond * 10)
-
-	// try adding more symbols again - should work due to increased capacity
-	success, _, err = ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
-	require.NoError(t, err)
-	require.True(t, success)
+	// wait for the monitor to pick up the reservation update
+	test.AssertEventuallyTrue(t, func() bool {
+		success, _, err := ledgerAReloaded.Debit(testTime, testTime, uint32(4), []uint8{0})
+		return err == nil && success
+	}, time.Second)
 }

@@ -5,18 +5,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
 		monitor, err := NewReservationVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
 			1024,
@@ -29,8 +30,8 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 
 	t.Run("negative interval", func(t *testing.T) {
 		monitor, err := NewReservationVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
 			1024,
@@ -45,7 +46,7 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 func TestReservationVaultMonitor(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -76,7 +77,7 @@ func TestReservationVaultMonitor(t *testing.T) {
 
 	monitor, err := NewReservationVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		2, // Small batch size to force multiple batches
@@ -86,9 +87,9 @@ func TestReservationVaultMonitor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 
-	time.Sleep(updateInterval * 10)
-
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
@@ -110,10 +111,9 @@ func TestReservationVaultMonitor(t *testing.T) {
 	capturedUpdates = make(map[gethcommon.Address]*Reservation)
 
 	// Wait for the monitor to fetch the updated reservation
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated again
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
 	// Check that the specific account was updated correctly
 	updatedReservation, ok := capturedUpdates[testAccount]
@@ -135,7 +135,7 @@ func TestReservationVaultMonitor(t *testing.T) {
 func TestReservationVaultMonitorNoBatching(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -164,7 +164,7 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 
 	monitor, err := NewReservationVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		0, // Batch size 0 means no batching - all accounts in one call
@@ -175,10 +175,9 @@ func TestReservationVaultMonitorNoBatching(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	// Wait for updates
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated correctly with no batching
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 	for i, addr := range accounts {
 		reservation, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())

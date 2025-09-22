@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -9,25 +8,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPrune(t *testing.T) {
 	t.Parallel()
-
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 
 	rootPathCount := rand.Uint64Range(2, 5)
 	rootPaths := make([]string, rootPathCount)
@@ -178,13 +175,12 @@ func TestPrune(t *testing.T) {
 func TestPruneSubset(t *testing.T) {
 	t.Parallel()
 
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 
 	rootPathCount := rand.Uint64Range(2, 5)
 	rootPaths := make([]string, rootPathCount)

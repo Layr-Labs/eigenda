@@ -10,18 +10,19 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger = tu.GetLogger()
+	logger = test.GetLogger()
 )
 
 const (
@@ -106,7 +107,7 @@ func runRandomProofsTest(t *testing.T, client s3.Client) {
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		key := corev2.BlobKey(tu.RandomBytes(32))
+		key := corev2.BlobKey(random.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
 		expectedValues[key] = proofs
@@ -125,7 +126,7 @@ func runRandomProofsTest(t *testing.T, client s3.Client) {
 }
 
 func TestRandomProofs(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
 		client := mock.NewS3Client()
@@ -144,7 +145,7 @@ func generateRandomFrameCoeffs(
 	size int,
 	params encoding.EncodingParams) []rs.FrameCoeffs {
 
-	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)), params)
+	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(random.RandomBytes(size)), params)
 	require.NoError(t, err, "failed to encode bytes into frame coefficients")
 	return frames
 }
@@ -169,7 +170,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		key := corev2.BlobKey(tu.RandomBytes(32))
+		key := corev2.BlobKey(random.RandomBytes(32))
 
 		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		expectedValues[key] = coefficients
@@ -195,7 +196,7 @@ func runRandomCoefficientsTest(t *testing.T, client s3.Client) {
 }
 
 func TestRandomCoefficients(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 
 	t.Run("mock_client", func(t *testing.T) {
 		client := mock.NewS3Client()
@@ -209,7 +210,7 @@ func TestRandomCoefficients(t *testing.T) {
 }
 
 func TestCheckProofCoefficientsExist(t *testing.T) {
-	tu.InitializeRandom()
+	random.InitializeRandom()
 	client := mock.NewS3Client()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
@@ -224,7 +225,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	ctx := t.Context()
 	for i := 0; i < 100; i++ {
-		key := corev2.BlobKey(tu.RandomBytes(32))
+		key := corev2.BlobKey(random.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
 		err := writer.PutFrameProofs(ctx, key, proofs)

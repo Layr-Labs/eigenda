@@ -9,10 +9,10 @@ import (
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/node/auth"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
@@ -21,16 +21,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	logger = testutils.GetLogger()
-)
-
 const (
 	localstackPort = "4579"
 	localstackHost = "http://0.0.0.0:4579"
 	region         = "us-east-1"
 )
 
+var (
+	logger = test.GetLogger()
+)
+
+// TODO: Good candidate to be extracted into test package as a utility
 func setupLocalStack(t *testing.T) *testbed.LocalStackContainer {
 	t.Helper()
 

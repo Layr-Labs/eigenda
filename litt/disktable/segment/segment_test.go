@@ -2,16 +2,15 @@ package segment
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,9 +23,10 @@ func countFilesInDirectory(t *testing.T, directory string) int {
 
 func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	t.Parallel()
+
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -54,7 +54,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -143,7 +143,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -175,9 +175,10 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	t.Parallel()
+
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -204,7 +205,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -298,7 +299,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -334,9 +335,10 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 // Tests writing and reading, but allocates more shards than values written to force some shards to be empty.
 func TestWriteAndReadColdShard(t *testing.T) {
 	t.Parallel()
+
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -363,7 +365,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -423,7 +425,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewErrorMonitor(context.Background(), logger, nil),
+		util.NewErrorMonitor(ctx, logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
 		false,
@@ -457,10 +459,10 @@ func TestWriteAndReadColdShard(t *testing.T) {
 }
 
 func TestGetFilePaths(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+	logger := test.GetLogger()
+	errorMonitor := util.NewErrorMonitor(ctx, logger, nil)
 
 	index := rand.Uint32()
 	shardingFactor := rand.Uint32Range(1, 10)

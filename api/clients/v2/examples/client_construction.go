@@ -20,8 +20,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -85,6 +85,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		blockNumMonitor,
 		certBuilder,
 		certVerifier,
+		nil,
 		nil,
 	)
 }
@@ -204,7 +205,7 @@ func createDisperserClient(
 	logger logging.Logger,
 	privateKey string,
 	kzgProver *prover.Prover,
-) (clients.DisperserClient, error) {
+) (*clients.DisperserClient, error) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create blob request signer: %w", err)

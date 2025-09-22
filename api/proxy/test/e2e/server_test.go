@@ -10,16 +10,57 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
 	"github.com/Layr-Labs/eigenda/api/proxy/common/types/commitments"
+	enabled_apis "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/random"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestProxyAPIsEnabledRestALTDA tests to ensure that the enabled APIs expression is
+// is getting respected by the REST ALTDA Server when wiring up a proxy application instance
+// with just `op-generic` mode enabled.
+func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip(`test only runs with memstore, since code paths being asserted upon aren't 
+				network specific. running this in multiple envs would be unnecessary and provide
+				no further guarantees.`)
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	testCfg.EnabledRestAPIs = &enabled_apis.RestApisEnabled{
+		OpGenericCommitment: true,
+	}
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+	testBlob := []byte("hello world")
+
+	cfg := &standard_client.Config{
+		URL: ts.Address(),
+	}
+	daClient := standard_client.New(cfg) // standard commitment mode (should fail given disabled)
+
+	t.Log("Setting input data on proxy server...")
+	_, err := daClient.SetData(ts.Ctx, testBlob)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "403")
+
+	opGenericClient := altda.NewDAClient(ts.Address(), false, false) // now op-generic mode (should work e2e given enabled)
+
+	daCommit, err := opGenericClient.SetInput(ts.Ctx, testBlob)
+	require.NoError(t, err)
+
+	preimage, err := opGenericClient.GetInput(ts.Ctx, daCommit, 0)
+	require.NoError(t, err)
+	require.Equal(t, testBlob, preimage)
+}
 
 func TestProxyClientWriteReadV1(t *testing.T) {
 	testProxyClientWriteRead(t, common.V1EigenDABackend)
