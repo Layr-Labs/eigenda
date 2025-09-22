@@ -108,17 +108,20 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 func (v *Verifier) VerifyLengthProof(
 	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
 ) error {
+	// This also prevents commitmentLength=0.
 	if !encoding.IsPowerOfTwo(commitmentLength) {
 		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
-
+	// Because commitmentLength is power of 2, we know its represented as 100..0 in binary,
+	// so couting the number of trailing zeros gives us log2(commitmentLength).
+	// We need commitmentLengthLog <= 27 because we have hardcoded SRS points only for that range.
 	commitmentLengthLog := bits.TrailingZeros64(commitmentLength)
-	if commitmentLengthLog > 28 {
+	if commitmentLengthLog > 27 {
 		return fmt.Errorf("commitment length %d is > max possible 2^28", commitmentLength)
 	}
-	// g1Challenge = [x^(SRSOrder - commitmentLength)]_1
-	// G1PowerOf2SRS contains the 28 hardcoded points that we need.
-	g1Challenge := srs.G1PowerOf2SRS[commitmentLengthLog]
+	// g1Challenge = [tau^(2^28 - commitmentLength)]_1
+	// G1ReversePowerOf2SRS contains the 28 hardcoded points that we need.
+	g1Challenge := srs.G1ReversePowerOf2SRS[commitmentLengthLog]
 
 	err := verifyLengthProof(lengthCommit, lengthProof, &g1Challenge)
 	if err != nil {

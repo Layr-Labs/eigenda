@@ -12,19 +12,17 @@ import (
 //go:embed g2.point.powerOf2
 var serializedG2PowerOf2Data []byte
 
-// G2PowerOf2SRS contains 28 G2 points: [1] [tau^1] [tau^2]..[tau^{2^27}]
+// G2PowerOf2SRS contains 28 G2 points: [tau^{2^i}] for i in [0,27],
+// namely: [tau] [tau^2] [tau^4]..[tau^{2^27}]
 //
-// the powerOf2 file, only [tau^exp] are stored.
-// exponent    0,    1,       2,    , ..
-// actual pow [tau],[tau^2],[tau^4],.. (stored in the file)
-// In our convention SRSOrder contains the total number of series of g1, g2 starting with generator
-// i.e. [1] [tau] [tau^2]..
-// So the actual power of tau is SRSOrder - 1
-// The mainnet SRS, the max power is 2^28-1, so the last power in powerOf2 file is [tau^(2^27)]
+// The actual g2.point SRS file contains 2^28 points: [1], [tau], [tau^2],..,[tau^(2^28-1)]
 var G2PowerOf2SRS []bn254.G2Affine
 
-// Contains 28 points represented by G1SRSFile[2^28 - 2^i] for i in 0..28
-var G1PowerOf2SRS []bn254.G1Affine
+// G1ReversePowerOf2SRS contains 28 G1 points: [tau^(2^28 - 2^i)] for i in [0,27],
+// namely: [tau^(2^28 - 1)], [tau^(2^28 - 2)],..,[tau^(2^28 - 2^27)]
+//
+// Note that the G1 SRS file contains 2^28 points: [1], [tau], [tau^2],..,[tau^(2^28-1)]
+var G1ReversePowerOf2SRS []bn254.G1Affine
 
 func init() {
 	// Note that we can't use bn254.NewDecoder(bytes.NewReader(serializedG2PowerOf2Data)).Decode(&G2PowerOf2Data)
@@ -40,9 +38,9 @@ func init() {
 		G2PowerOf2SRS = append(G2PowerOf2SRS, p)
 	}
 	G1PowerOf2HexStrings := []string{
-		"d902537c5ac68b39468f8cfcc46b00da353024b618b0454e6847d2aee530e850",
-		"c672cec11e3d0c0096d550635d28c4b51dd3c2deb407a5985f458f5a8610fe94",
-		"c2ee739ae261af377f3c65362049fef9402013bd898351eb60e0d7429a56f880",
+		"d902537c5ac68b39468f8cfcc46b00da353024b618b0454e6847d2aee530e850", // G1SRSFile[2^28 - 2^0] = [tau^(2^28 - 1)]
+		"c672cec11e3d0c0096d550635d28c4b51dd3c2deb407a5985f458f5a8610fe94", // G1SRSFile[2^28 - 2^1] = [tau^(2^28 - 2)]
+		"c2ee739ae261af377f3c65362049fef9402013bd898351eb60e0d7429a56f880", // ...
 		"d9d7adde8d4e55e87312fcb7713fdd1e8713358347d7c8bc1ac21fa1ef1db34a",
 		"8f89ac9e77846d29af1c58af31cfc3fe61c45ca14cf0a10f7aa71605b868c0e7",
 		"e3adc6dbd3cb5c694b17bdb974860d07222f9ffd75655d8800702f455ddffc97",
@@ -68,10 +66,12 @@ func init() {
 		"d20165a1b364337df11a35fb687aa62382236938f8f740cb7059b656e1f4dd1c",
 		"a9d669092e951729fcc2eaf05ff706cf372e04cbde166f48833337fa37b69537",
 		"eb34e5696bcd208899dbd9d1e7604ec39cc594eeedae3eaf40ff8695ab25ca72",
-		"8000000000000000000000000000000000000000000000000000000000000001",
 	}
-	for i := 0; i < 28; i++ {
-		G1PowerOf2SRS = append(G1PowerOf2SRS, toG1Affine(G1PowerOf2HexStrings[i]))
+	if len(G1PowerOf2HexStrings) != 28 {
+		panic("expected 28 G1PowerOf2HexStrings points")
+	}
+	for _, pt := range G1PowerOf2HexStrings {
+		G1ReversePowerOf2SRS = append(G1ReversePowerOf2SRS, toG1Affine(pt))
 	}
 }
 
