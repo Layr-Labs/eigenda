@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -26,7 +26,7 @@ var _ QuorumScanner = (*quorumScanner)(nil)
 
 type quorumScanner struct {
 	// A handle for communicating with the registry coordinator contract.
-	registryCoordinator *regcoordinator.ContractEigenDARegistryCoordinator
+	registryCoordinator *regcoordinator.ContractRegistryCoordinator
 }
 
 // Create a new QuorumScanner instance.
@@ -35,7 +35,7 @@ func NewQuorumScanner(
 	registryCoordinatorAddress gethcommon.Address,
 ) (QuorumScanner, error) {
 
-	registryCoordinator, err := regcoordinator.NewContractEigenDARegistryCoordinator(
+	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(
 		registryCoordinatorAddress,
 		contractBackend)
 	if err != nil {

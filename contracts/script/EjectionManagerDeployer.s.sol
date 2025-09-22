@@ -4,7 +4,7 @@ pragma solidity =0.8.12;
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {EjectionManager} from "../lib/eigenlayer-middleware/src/EjectionManager.sol";
 import {IEjectionManager} from "../lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
-import {EigenDARegistryCoordinator, IRegistryCoordinator} from "src/core/EigenDARegistryCoordinator.sol";
+import {RegistryCoordinator, IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IStakeRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -25,7 +25,7 @@ contract Deployer_EjectionManager is Script, Test {
     EjectionManager public ejectionManager;
     EjectionManager public ejectionManagerImplementation;
 
-    EigenDARegistryCoordinator public registryCoordinator;
+    RegistryCoordinator public registryCoordinator;
     StakeRegistry public stakeRegistry;
     ProxyAdmin public eigenDAProxyAdmin;
     EmptyContract public emptyContract;
@@ -35,7 +35,7 @@ contract Deployer_EjectionManager is Script, Test {
 
         eigenDAProxyAdmin = ProxyAdmin(stdJson.readAddress(existingDeploymentData, ".addresses.eigenDAProxyAdmin"));
         registryCoordinator =
-            EigenDARegistryCoordinator(stdJson.readAddress(existingDeploymentData, ".addresses.registryCoordinator"));
+            RegistryCoordinator(stdJson.readAddress(existingDeploymentData, ".addresses.registryCoordinator"));
         stakeRegistry = StakeRegistry(stdJson.readAddress(existingDeploymentData, ".addresses.stakeRegistry"));
 
         string memory config_data = vm.readFile(deployConfigPath);
