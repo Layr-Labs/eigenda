@@ -32,6 +32,7 @@ type result struct {
 }
 
 func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
+	t.Helper()
 
 	blobStatus, key, err := client.DisperseBlob(ctx, data, []uint8{param.QuorumID})
 	if err != nil {
@@ -75,6 +76,7 @@ func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient,
 }
 
 func retrieve(t *testing.T, ctx context.Context, client retriever.RetrieverClient, result result) error {
+	t.Helper()
 
 	reply, err := client.RetrieveBlob(ctx, &retriever.BlobRequest{
 		BatchHeaderHash:      result.BlobVerificationProof.GetBatchMetadata().GetBatchHeaderHash(),
@@ -103,8 +105,9 @@ type ratelimitTestCase struct {
 }
 
 func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase) (int, int) {
+	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 
 	disp, err := clients.NewDisperserClient(&clients.Config{
@@ -168,7 +171,6 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	}
 
 	return dispersalErrors, retrievalErrors
-
 }
 
 func TestRatelimit(t *testing.T) {
