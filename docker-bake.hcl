@@ -42,6 +42,7 @@ group "all" {
     "batcher",
     "disperser",
     "encoder",
+    "encoder-icicle"
     "retriever",
     "churner",
     "dataapi",
