@@ -123,6 +123,7 @@ target "encoder" {
 target "encoder-icicle" {
   context    = "."
   dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  platforms  = ["linux/amd64"]
   tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
 }
 
