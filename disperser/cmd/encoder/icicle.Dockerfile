@@ -25,14 +25,7 @@ COPY api/proxy/clients ./api/proxy/clients
 RUN go mod download
 
 # Copy the rest of the source code
-COPY ./disperser /app/disperser
-COPY common /app/common
-COPY contracts /app/contracts
-COPY core /app/core
-COPY api /app/api
-COPY indexer /app/indexer
-COPY encoding /app/encoding
-COPY relay /app/relay
+COPY . .
 
 # Define Icicle versions and checksums
 ENV ICICLE_VERSION=3.4
