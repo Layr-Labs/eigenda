@@ -368,6 +368,11 @@ func buildPaymentAuthorizationHandler(
 		globalSymbolsPerSecond,
 		globalRatePeriodInterval,
 		time.Now,
+		meterer.NewOnDemandMetererMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 
 	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
@@ -376,6 +381,16 @@ func buildPaymentAuthorizationHandler(
 		onDemandConfig,
 		paymentVault,
 		awsDynamoClient,
+		ondemand.NewOnDemandValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		ondemand.NewOnDemandCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
@@ -387,17 +402,24 @@ func buildPaymentAuthorizationHandler(
 		reservationConfig,
 		paymentVault,
 		time.Now,
+		reservation.NewReservationValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		reservation.NewReservationCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create reservation payment validator: %w", err)
 	}
 
-	paymentAuthMetrics := metrics.NewPaymentAuthorizationMetrics(metricsRegistry)
-
 	return controllerpayments.NewPaymentAuthorizationHandler(
 		onDemandMeterer,
 		onDemandValidator,
 		reservationValidator,
-		paymentAuthMetrics,
 	), nil
 }

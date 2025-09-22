@@ -39,6 +39,8 @@ func TestDebitMultipleAccounts(t *testing.T) {
 		config,
 		testVault,
 		dynamoClient,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -81,6 +83,8 @@ func TestDebitInsufficientFunds(t *testing.T) {
 		config,
 		testVault,
 		dynamoClient,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 

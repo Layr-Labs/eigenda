@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	namespace                  = "eigenda_controller"
-	authorizePaymentsSubsystem = "authorize_payments"
+	Namespace                  = "eigenda_controller"
+	AuthorizePaymentsSubsystem = "authorize_payments"
 )
 
 // Encapsulates metrics for the controller GRPC server
@@ -37,23 +37,23 @@ func NewServerMetrics(registry *prometheus.Registry, logger logging.Logger) *Ser
 
 	paymentAuthorizationFailures := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: Namespace,
 			Name:      "payment_authorization_failure_count",
-			Subsystem: authorizePaymentsSubsystem,
+			Subsystem: AuthorizePaymentsSubsystem,
 			Help:      "Number of AuthorizePayment RPC failures",
 		},
 	)
 
 	paymentAuthorizationReplays := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: Namespace,
 			Name:      "payment_authorization_replay_count",
-			Subsystem: authorizePaymentsSubsystem,
+			Subsystem: AuthorizePaymentsSubsystem,
 			Help:      "Number of payment authorization requests rejected due to replay detection",
 		},
 	)
 
-	paymentAuthorizationStageTimer := common.NewStageTimer(registry, namespace, "payment_authorization", false)
+	paymentAuthorizationStageTimer := common.NewStageTimer(registry, Namespace, "payment_authorization", false)
 
 	return &ServerMetrics{
 		logger:                         logger,
