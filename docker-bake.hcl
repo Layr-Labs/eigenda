@@ -42,6 +42,7 @@ group "all" {
     "batcher",
     "disperser",
     "encoder",
+    "encoder-icicle",
     "retriever",
     "churner",
     "dataapi",
@@ -122,6 +123,9 @@ target "encoder" {
 target "encoder-icicle" {
   context    = "."
   dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  // Currently needed because Dockerfile has amd64 hardcoded in a few places.
+  // TODO: make Dockerfile also work for arm.
+  platforms  = ["linux/amd64"]
   tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
 }
 
