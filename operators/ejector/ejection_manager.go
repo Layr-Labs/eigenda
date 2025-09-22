@@ -2,19 +2,30 @@ package ejector
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	geth "github.com/ethereum/go-ethereum/common"
 )
 
-// TODO future cody: split this into a threaded version and a non-threaded version to make testing easier.
+// TODO add metrics
+
+// EjectionManager manages and executes validator ejections.
+type EjectionManager interface {
+
+	// Begin ejection proceedings against a validator. May not take action if it is not appropriate to do so.
+	BeginEjection(validatorAddress geth.Address)
+
+	// For all eligible ejections that have been started, check their status and finalize if appropriate.
+	FinalizeEjections()
+}
+
+var _ EjectionManager = (*ejectionManager)(nil)
 
 // A utility that manages ejections and the ejection lifecycle. An ejection manager is responsible for executing
 // ejections, not deciding when it is appropriate to eject. That is to say, this utility does not monitor validator
 // signing rates.
-type EjectionManager struct {
+type ejectionManager struct {
 	ctx        context.Context
 	logger     logging.Logger
 	timeSource func() time.Time
@@ -49,33 +60,27 @@ type EjectionManager struct {
 	// The minimum time between two consecutive ejection attempts for the same validator.
 	retryDelay time.Duration
 
-	// Channel for receiving ejection requests.
-	ejectionRequestChan chan geth.Address
-
 	// The maximum number of consecutive failed ejection attempts before a validator is blacklisted.
 	maxConsecutiveFailedEjectionAttempts uint32
-
-	// The period between the background checks for ejection progress.
-	period time.Duration
 }
 
-// Create a new EjectionManager.
+// Create a new ejectionManager.
 func NewEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
 	timeSource func() time.Time,
 	transactor EjectionTransactor,
-// the minimum time between starting an ejection and completing it
+	// the minimum time between starting an ejection and completing it
 	ejectionDelay time.Duration,
-// the minimum time between two consecutive ejection attempts for the same validator
+	// the minimum time between two consecutive ejection attempts for the same validator
 	retryDelay time.Duration,
-// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
+	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
-// the period between the background checks for ejection progress
+	// the period between the background checks for ejection progress
 	period time.Duration,
-) (*EjectionManager, error) {
+) EjectionManager {
 
-	em := &EjectionManager{
+	return &ejectionManager{
 		ctx:                                  ctx,
 		logger:                               logger,
 		timeSource:                           timeSource,
@@ -86,52 +91,12 @@ func NewEjectionManager(
 		transactor:                           transactor,
 		ejectionDelay:                        ejectionDelay,
 		retryDelay:                           retryDelay,
-		ejectionRequestChan:                  make(chan geth.Address, 64),
 		maxConsecutiveFailedEjectionAttempts: maxConsecutiveFailedEjectionAttempts,
-		period:                               period,
-	}
-
-	go em.mainLoop()
-
-	return em, nil
-}
-
-// EjectValidator begins ejection proceedings for a validator if it is appropriate to do so.
-//
-// There are several conditions where calling this method will not result in a new ejection being attempted:
-//   - There is already an ongoing ejection for the validator.
-//   - The validator is in the ejection blacklist (i.e. validators we will never attempt to eject).
-//   - A previous attempt at ejecting the validator was made too recently.
-func (em *EjectionManager) EjectValidator(validatorAddress geth.Address) error {
-	select {
-	case <-em.ctx.Done():
-		return fmt.Errorf("context closed: %w", em.ctx.Err())
-	case em.ejectionRequestChan <- validatorAddress:
-		return nil
 	}
 }
 
-// All modifications to struct state are done in this main loop goroutine.
-func (em *EjectionManager) mainLoop() {
-	ticker := time.NewTicker(em.period)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-em.ctx.Done():
-			em.logger.Info("Ejection manager shutting down")
-			return
-		case request := <-em.ejectionRequestChan:
-			em.processEjectionRequest(request)
-		case <-ticker.C:
-			em.cleanRecentEjections()
-			em.finalizeEjections()
-		}
-	}
-}
-
-// processEjectionRequest processes a single ejection request.
-func (em *EjectionManager) processEjectionRequest(validatorAddress geth.Address) {
+// BeginEjection starts the ejection process for a validator if it is appropriate to do so.
+func (em *ejectionManager) BeginEjection(validatorAddress geth.Address) {
 	// Check to see if the validator is blacklisted.
 	if _, blacklisted := em.ejectionBlacklist[validatorAddress]; blacklisted {
 		em.logger.Infof("validator %s is blacklisted from ejection, skipping", validatorAddress.Hex())
@@ -175,7 +140,7 @@ func (em *EjectionManager) processEjectionRequest(validatorAddress geth.Address)
 
 // cleanRecentEjections removes entries from recentEjections that are older than the retry delay. We only need
 // to remember prior ejections when those ejections prevent us from attempting a new ejection.
-func (em *EjectionManager) cleanRecentEjections() {
+func (em *ejectionManager) cleanRecentEjections() {
 
 	// Note: iterating this entire map is not as efficient as a priority queue. However, there are two mitigating
 	// factors that make this less than optimal approach acceptable.
@@ -199,7 +164,9 @@ func (em *EjectionManager) cleanRecentEjections() {
 
 // For each ejection that that was started long enough ago to be eligible for finalization, check the status
 // and finalize if appropriate.
-func (em *EjectionManager) finalizeEjections() {
+func (em *ejectionManager) FinalizeEjections() {
+
+	em.cleanRecentEjections()
 
 	// Note: similar to cleanRecentEjections(), we are iterating a map here. At a certain scale a
 	// priority queue would be more efficient, but that optimization is premature at this time.
@@ -216,7 +183,7 @@ func (em *EjectionManager) finalizeEjections() {
 }
 
 // Finalize the ejection for a specific validator.
-func (em *EjectionManager) finalizeEjection(address geth.Address) {
+func (em *ejectionManager) finalizeEjection(address geth.Address) {
 	// Check to see if the ejection is still in progress.
 	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, address)
 	if err != nil {
@@ -244,7 +211,7 @@ func (em *EjectionManager) finalizeEjection(address geth.Address) {
 }
 
 // Handle the case where a previously started ejection is no longer in progress.
-func (em *EjectionManager) handleAbortedEjection(address geth.Address) {
+func (em *ejectionManager) handleAbortedEjection(address geth.Address) {
 	isPresent, err := em.transactor.IsValidatorPresentInAnyQuorum(em.ctx, address)
 	if err != nil {
 		em.logger.Errorf("failed to check quorum presence for validator %s: %v", address.Hex(), err)
