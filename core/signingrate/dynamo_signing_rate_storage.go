@@ -83,7 +83,7 @@ func (d *dynamoSigningRateStorage) storeBucket(ctx context.Context, bucket *vali
 		return fmt.Errorf("proto marshal failed: %w", err)
 	}
 
-	// Note: the "BucketType" attribute is due a quirk in dynamo. It won't let us do certain queries unless we have
+	// Note: the "PayloadType" attribute is due to a quirk in dynamo. It won't let us do certain queries unless we have
 	// a partition key. So we create a dummy partition key that is always the same value.
 
 	_, err = d.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{

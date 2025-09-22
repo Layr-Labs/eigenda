@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func setupDynamoClient(t *testing.T) (client *dynamodb.Client, cleanup func()) {
 		// localstack is already deployed
 		portString := os.Getenv("LOCALSTACK_PORT")
 		require.NoError(t, err)
-		localstackPort, err = fmt.Sscanf(portString, "%d", &localstackPort)
+		localstackPort, err = strconv.Atoi(portString)
 		require.NoError(t, err)
 	}
 
@@ -176,7 +177,7 @@ func TestSigningRateStorage(t *testing.T) {
 		validatorIDs[i] = core.OperatorID(rand.Bytes(32))
 	}
 
-	quroumCount := core.QuorumID(rand.Intn(5) + 3)
+	quorumCount := core.QuorumID(rand.Intn(5) + 3)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -199,7 +200,7 @@ func TestSigningRateStorage(t *testing.T) {
 	require.Len(t, buckets, 0)
 
 	// Add a single bucket and check it can be retrieved.
-	simulateRandomSigningRateActivity(rand, tracker, quroumCount, validatorIDs, 100)
+	simulateRandomSigningRateActivity(rand, tracker, quorumCount, validatorIDs, 100)
 
 	unflushedBuckets, err := tracker.GetUnflushedBuckets()
 	require.NoError(t, err)
@@ -218,7 +219,7 @@ func TestSigningRateStorage(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		now = now.Add(time.Minute * 10)
 		timePointer.Store(&now)
-		simulateRandomSigningRateActivity(rand, tracker, quroumCount, validatorIDs, 100)
+		simulateRandomSigningRateActivity(rand, tracker, quorumCount, validatorIDs, 100)
 	}
 
 	unflushedBuckets, err = tracker.GetUnflushedBuckets()
@@ -251,7 +252,7 @@ func TestSigningRateStorage(t *testing.T) {
 
 	// Modify the last bucket and ensure it gets overwritten correctly.
 	// Note that we are not advancing time, so this activity goes into the last bucket.
-	simulateRandomSigningRateActivity(rand, tracker, quroumCount, validatorIDs, 100)
+	simulateRandomSigningRateActivity(rand, tracker, quorumCount, validatorIDs, 100)
 
 	unflushedBuckets, err = tracker.GetUnflushedBuckets()
 	require.NoError(t, err)
