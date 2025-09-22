@@ -105,8 +105,8 @@ func setupAndRun(m *testing.M) {
 		logger.Fatal("Failed to deploy contracts:", err)
 	}
 
-	logger.Info("Setting up test operators")
-	setupTestOperators()
+	logger.Info("Setting up test operator")
+	setupTestOperator()
 
 	// Run tests
 	code := m.Run()
@@ -126,7 +126,7 @@ func cleanup() {
 	}
 }
 
-func setupTestOperators() {
+func setupTestOperator() {
 	// Create operator configurations using testbed keys
 	opName := "opr0"
 	operator := OperatorConfig{
