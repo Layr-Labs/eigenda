@@ -22,7 +22,7 @@ import (
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	prover2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test"
 	testrandom "github.com/Layr-Labs/eigenda/test/random"
@@ -120,7 +120,7 @@ func buildCertFromBlobBytes(
 		LoadG2Points:    true,
 	}
 
-	prover, err := prover2.NewProver(kzgConfig, nil)
+	prover, err := proverv2.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
 	commitments, err := prover.GetCommitmentsForPaddedLength(blobBytes)

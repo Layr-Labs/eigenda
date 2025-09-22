@@ -43,7 +43,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	kzgproverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	kzgverifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -225,7 +225,7 @@ func buildEigenDAV2Backend(
 	kzgConfig := config.KzgConfig
 	kzgConfig.LoadG2Points = true
 
-	kzgProver, err := prover.NewProver(&kzgConfig, nil)
+	kzgProver, err := kzgproverv2.NewProver(&kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new KZG prover: %w", err)
 	}
@@ -591,7 +591,7 @@ func buildPayloadDisperser(
 	clientConfigV2 common.ClientConfigV2,
 	secrets common.SecretConfigV2,
 	ethClient common_eigenda.EthClient,
-	kzgProver *prover.Prover,
+	kzgProver *kzgproverv2.Prover,
 	contractDirectory *directory.ContractDirectory,
 	certVerifier *verification.CertVerifier,
 	operatorStateRetrieverAddr geth_common.Address,
