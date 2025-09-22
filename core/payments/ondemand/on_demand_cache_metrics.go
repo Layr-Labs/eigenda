@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [OnDemandLedgerCache]
@@ -19,7 +20,7 @@ func NewOnDemandCacheMetrics(registry *prometheus.Registry, namespace string, su
 		return nil
 	}
 
-	evictions := prometheus.NewCounter(
+	evictions := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_ledger_cache_evictions",
@@ -28,7 +29,7 @@ func NewOnDemandCacheMetrics(registry *prometheus.Registry, namespace string, su
 		},
 	)
 
-	cacheMisses := prometheus.NewCounter(
+	cacheMisses := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_ledger_cache_misses",
@@ -36,8 +37,6 @@ func NewOnDemandCacheMetrics(registry *prometheus.Registry, namespace string, su
 			Help:      "Total number of cache misses in the on-demand ledger cache",
 		},
 	)
-
-	registry.MustRegister(evictions, cacheMisses)
 
 	return &OnDemandCacheMetrics{
 		registry:    registry,
@@ -56,7 +55,7 @@ func (m *OnDemandCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
 		return
 	}
 
-	m.cacheSize = prometheus.NewGaugeFunc(
+	m.cacheSize = promauto.With(m.registry).NewGaugeFunc(
 		prometheus.GaugeOpts{
 			Namespace: m.namespace,
 			Name:      "on_demand_ledger_cache_size",
@@ -67,8 +66,6 @@ func (m *OnDemandCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
 			return float64(sizeGetter())
 		},
 	)
-
-	m.registry.MustRegister(m.cacheSize)
 }
 
 // Increments the evictions counter

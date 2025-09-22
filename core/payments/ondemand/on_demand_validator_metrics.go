@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [OnDemandPaymentValidator]
@@ -21,7 +22,7 @@ func NewOnDemandValidatorMetrics(
 		return nil
 	}
 
-	symbolCount := prometheus.NewHistogram(
+	symbolCount := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "on_demand_symbol_count",
@@ -32,7 +33,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	insufficientFunds := prometheus.NewCounter(
+	insufficientFunds := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_insufficient_funds_count",
@@ -41,7 +42,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	quorumNotSupported := prometheus.NewCounter(
+	quorumNotSupported := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_quorum_not_supported_count",
@@ -50,20 +51,13 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	unexpectedErrors := prometheus.NewCounter(
+	unexpectedErrors := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_unexpected_errors_count",
 			Subsystem: subsystem,
 			Help:      "Total number of unexpected errors during on-demand payment authorization",
 		},
-	)
-
-	registry.MustRegister(
-		symbolCount,
-		insufficientFunds,
-		quorumNotSupported,
-		unexpectedErrors,
 	)
 
 	return &OnDemandValidatorMetrics{

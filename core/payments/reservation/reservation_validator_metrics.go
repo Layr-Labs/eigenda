@@ -2,6 +2,7 @@ package reservation
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [ReservationPaymentValidator]
@@ -23,7 +24,7 @@ func NewReservationValidatorMetrics(
 		return nil
 	}
 
-	symbolCount := prometheus.NewHistogram(
+	symbolCount := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "reservation_symbol_count",
@@ -34,7 +35,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	insufficientBandwidth := prometheus.NewCounter(
+	insufficientBandwidth := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_insufficient_bandwidth_count",
@@ -43,7 +44,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	quorumNotPermitted := prometheus.NewCounter(
+	quorumNotPermitted := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_quorum_not_permitted_count",
@@ -52,7 +53,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	timeOutOfRange := prometheus.NewCounter(
+	timeOutOfRange := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_time_out_of_range_count",
@@ -61,7 +62,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	timeMovedBackward := prometheus.NewCounter(
+	timeMovedBackward := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_time_moved_backward_count",
@@ -70,22 +71,13 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	unexpectedErrors := prometheus.NewCounter(
+	unexpectedErrors := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_unexpected_errors_count",
 			Subsystem: subsystem,
 			Help:      "Total number of unexpected errors during reservation payment authorization",
 		},
-	)
-
-	registry.MustRegister(
-		symbolCount,
-		insufficientBandwidth,
-		quorumNotPermitted,
-		timeOutOfRange,
-		timeMovedBackward,
-		unexpectedErrors,
 	)
 
 	return &ReservationValidatorMetrics{
