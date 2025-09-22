@@ -27,8 +27,6 @@ type Verifier struct {
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
-var _ encoding.Verifier = &Verifier{}
-
 func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")

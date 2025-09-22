@@ -3,6 +3,7 @@ package internal
 import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 )
 
 // BlobDecoder is responsible for decoding blobs from chunk data.
@@ -20,20 +21,20 @@ type BlobDecoder interface {
 
 // BlobDecoderFactory is a function that creates a new BlobDecoder instance.
 type BlobDecoderFactory func(
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 ) BlobDecoder
 
 var _ BlobDecoder = &blobDecoder{}
 
 // blobDecoder is a standard implementation of the BlobDecoder interface.
 type blobDecoder struct {
-	verifier encoding.Verifier
+	verifier *verifier.Verifier
 }
 
 var _ BlobDecoderFactory = NewBlobDecoder
 
 // NewBlobDecoder creates a new BlobDecoder instance.
-func NewBlobDecoder(verifier encoding.Verifier) BlobDecoder {
+func NewBlobDecoder(verifier *verifier.Verifier) BlobDecoder {
 	return &blobDecoder{
 		verifier: verifier,
 	}

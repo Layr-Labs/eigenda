@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 }
 
 // makeTestVerifier makes a verifier currently using the only supported backend.
-func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
