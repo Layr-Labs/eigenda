@@ -44,7 +44,7 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	testBlob := []byte("hello world")
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg) // standard commitment mode (should fail given disabled)
 
@@ -53,7 +53,8 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "403")
 
-	opGenericClient := altda.NewDAClient(ts.Address(), false, false) // now op-generic mode (should work e2e given enabled)
+	opGenericClient := altda.NewDAClient(ts.RestAddress(),
+		false, false) // now op-generic mode (should work e2e given enabled)
 
 	daCommit, err := opGenericClient.SetInput(ts.Ctx, testBlob)
 	require.NoError(t, err)
@@ -153,7 +154,7 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 	t.Cleanup(kill)
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 
@@ -273,7 +274,7 @@ func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend)
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 	expectedBlob := testutils.RandBytes(1_000_000)
@@ -312,7 +313,7 @@ func testProxyWriteCacheOnMiss(t *testing.T, dispersalBackend common.EigenDABack
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 	expectedBlob := testutils.RandBytes(1_000_000)
@@ -369,7 +370,7 @@ func testProxyMemConfigClientCanGetAndPatch(t *testing.T, dispersalBackend commo
 
 	memClient := memconfig_client.New(
 		&memconfig_client.Config{
-			URL: "http://" + ts.Server.Endpoint(),
+			URL: "http://" + ts.RestServer.Endpoint(),
 		})
 
 	// 1 - ensure cfg can be read from memconfig handlers
@@ -407,7 +408,7 @@ func TestInterleavedVersions(t *testing.T) {
 
 	client := standard_client.New(
 		&standard_client.Config{
-			URL: testSuite.Address(),
+			URL: testSuite.RestAddress(),
 		})
 
 	// disperse a payload to v1
@@ -416,19 +417,19 @@ func TestInterleavedVersions(t *testing.T) {
 	require.NoError(t, err)
 
 	// disperse a payload to v2
-	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
 	payload2a := testRandom.Bytes(1000)
 	cert2a, err := client.SetData(testSuite.Ctx, payload2a)
 	require.NoError(t, err)
 
 	// disperse another payload to v1
-	testSuite.Server.SetDispersalBackend(common.V1EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V1EigenDABackend)
 	payload1b := testRandom.Bytes(1000)
 	cert1b, err := client.SetData(testSuite.Ctx, payload1b)
 	require.NoError(t, err)
 
 	// disperse another payload to v2
-	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
 	payload2b := testRandom.Bytes(1000)
 	cert2b, err := client.SetData(testSuite.Ctx, payload2b)
 	require.NoError(t, err)
@@ -567,7 +568,7 @@ func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.Bac
 // requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
 func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte) {
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 
@@ -584,7 +585,7 @@ func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []by
 
 // requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
 func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, precompute bool) {
-	daClient := altda.NewDAClient(ts.Address(), false, precompute)
+	daClient := altda.NewDAClient(ts.RestAddress(), false, precompute)
 
 	commit, err := daClient.SetInput(ts.Ctx, blob)
 	require.NoError(t, err)
