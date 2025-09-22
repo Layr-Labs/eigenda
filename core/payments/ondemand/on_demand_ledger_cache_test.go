@@ -30,6 +30,7 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 			config,
 			nil, // nil payment vault
 			dynamoClient,
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -49,6 +50,7 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 			config,
 			vault.NewTestPaymentVault(),
 			nil, // nil dynamo client
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -85,6 +87,7 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 		config,
 		testVault,
 		dynamoClient,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
