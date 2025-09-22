@@ -113,7 +113,7 @@ func (v *Verifier) VerifyLengthProof(
 		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
 	// Because commitmentLength is power of 2, we know its represented as 100..0 in binary,
-	// so couting the number of trailing zeros gives us log2(commitmentLength).
+	// so counting the number of trailing zeros gives us log2(commitmentLength).
 	// We need commitmentLengthLog <= 27 because we have hardcoded SRS points only for that range.
 	commitmentLengthLog := bits.TrailingZeros64(commitmentLength)
 	if commitmentLengthLog > 27 {
