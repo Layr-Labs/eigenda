@@ -69,7 +69,7 @@ func setupAndRun(m *testing.M) {
 
 	var err error
 	anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true,
+		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
 		Logger:         logger,
 	})
 	if err != nil {
