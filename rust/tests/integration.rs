@@ -1,3 +1,5 @@
+//! Integration tests for EigenDA adapter functionality.
+
 #![cfg(feature = "native")]
 
 mod common;

@@ -68,6 +68,7 @@ impl DaSpec for EigenDaSpec {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+/// Configuration parameters for rollup operation with EigenDA.
 pub struct RollupParams {
     /// The account to which we are storing the certificates of the batch blobs
     pub rollup_batch_namespace: NamespaceId,
@@ -87,6 +88,7 @@ pub struct RollupParams {
 pub struct NamespaceId(Address);
 
 impl NamespaceId {
+    /// Create namespace from 20-byte array.
     pub const fn from_bytes(bytes: [u8; 20]) -> Self {
         Self(Address(FixedBytes(bytes)))
     }
@@ -182,6 +184,7 @@ impl BlockHeaderTrait for EthereumBlockHeader {
     Ord,
     UniversalWallet,
 )]
+/// Ethereum address wrapper for Sovereign SDK integration.
 pub struct EthereumAddress(#[sov_wallet(as_ty = "[u8; 20]", display = "hex")] Address);
 
 impl BasicAddress for EthereumAddress {}
@@ -279,7 +282,10 @@ mod arbitrary_impl {
     }
 }
 
-wrap_fixed_bytes!(pub struct EthereumHash<32>;);
+wrap_fixed_bytes!(
+    /// Ethereum hash wrapper for Sovereign SDK integration.
+    pub struct EthereumHash<32>;
+);
 
 impl BlockHashTrait for EthereumHash {}
 
@@ -308,6 +314,7 @@ pub struct BlobWithSender {
 }
 
 impl BlobWithSender {
+    /// Create new blob with sender and transaction data.
     pub fn new(sender: Address, tx_hash: TxHash, blob: Bytes) -> Self {
         Self {
             sender,
@@ -353,6 +360,7 @@ impl BlobReaderTrait for BlobWithSender {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionWithBlob {
     /// The transaction that holds a certificate.
+    /// serde_as is required due to risc0 serialization.
     #[serde_as(as = "serde_bincode_compat::EthereumTxEnvelope<'_>")]
     pub tx: EthereumTxEnvelope<TxEip4844>,
     /// Data used to verify the certificate.
@@ -365,19 +373,27 @@ pub struct TransactionWithBlob {
 /// used to verify the data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct CertificateStateData {
+    /// Proof for threshold registry contract state.
     pub threshold_registry: AccountProof,
+    /// Proof for registry coordinator contract state.
     pub registry_coordinator: AccountProof,
     #[cfg(feature = "stale-stakes-forbidden")]
+    /// Proof for service manager contract state.
     pub service_manager: AccountProof,
+    /// Proof for BLS aggregate public key registry contract state.
     pub bls_apk_registry: AccountProof,
+    /// Proof for stake registry contract state.
     pub stake_registry: AccountProof,
+    /// Proof for certificate verifier contract state.
     pub cert_verifier: AccountProof,
     #[cfg(feature = "stale-stakes-forbidden")]
+    /// Proof for delegation manager contract state.
     pub delegation_manager: AccountProof,
 }
 
 impl CertificateStateData {
     #![allow(clippy::result_large_err)]
+    /// Verify all contract state proofs against the given state root.
     pub fn verify(&self, state_root: B256) -> Result<(), ProofVerificationError> {
         self.threshold_registry.verify(state_root)?;
         self.registry_coordinator.verify(state_root)?;

@@ -1,3 +1,9 @@
+//! Build script for sov-eigenda-adapter.
+//!
+//! This script generates a serialized SRS (Structured Reference String) at compile time
+//! by reading the g1.point file and creating a binary representation that can be embedded
+//! in the final binary for efficient runtime access.
+
 #[path = "src/eigenda/verification/blob/srs.rs"]
 mod srs;
 

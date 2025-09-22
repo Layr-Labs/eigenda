@@ -917,7 +917,7 @@ mod tests {
         ];
 
         let quorum_bitmap_history = {
-            let quorum_bitmap_historys = vec![
+            let quorum_bitmap_histories = vec![
                 Bitmap::new([5, 0, 0, 0]), // 1 0 1
                 Bitmap::new([6, 0, 0, 0]), // 1 1 0
                 Bitmap::new([7, 0, 0, 0]), // 1 1 1
@@ -928,7 +928,7 @@ mod tests {
 
             pk_hashes
                 .into_iter()
-                .zip(quorum_bitmap_historys)
+                .zip(quorum_bitmap_histories)
                 .map(|(pk_hash, quorum_bitmap_history)| {
                     let update = Update::new(41, 43, quorum_bitmap_history).unwrap();
                     let history = HashMap::from([(0, update)]);

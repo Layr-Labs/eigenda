@@ -1,3 +1,4 @@
+/// Configuration types for EigenDA service.
 pub mod config;
 
 use std::ops::Not;
@@ -47,12 +48,15 @@ use crate::verifier::{EigenDaCompletenessProof, EigenDaInclusionProof, EigenDaVe
 #[derive(Debug, Error)]
 pub enum EigenDaServiceError {
     #[error("Configuration error: {0}")]
+    /// Configuration validation error.
     Configuration(String),
 
     #[error("Error received from the EigenDA proxy: {0}")]
+    /// Error from EigenDA proxy client.
     ProxyError(#[from] ProxyError),
 
     #[error(transparent)]
+    /// Ethereum RPC communication error.
     EthereumRpcError(#[from] RpcError<TransportErrorKind>),
 }
 
@@ -607,9 +611,11 @@ impl EthereumBlock {
             .cloned()
             .collect();
 
+        let tx_refs = self.transactions.iter().map(|tx| tx.tx.clone()).collect();
+
         DaProof {
             inclusion_proof: EigenDaInclusionProof::new(maybe_relevant_txs),
-            completeness_proof: EigenDaCompletenessProof::new(self.transactions.clone()),
+            completeness_proof: EigenDaCompletenessProof::new(tx_refs),
         }
     }
 }

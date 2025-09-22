@@ -82,6 +82,10 @@ pub enum CertExtractionError {
     /// Error from Alloy Solidity types decoding
     #[error(transparent)]
     WrapAlloySolTypesError(#[from] alloy_sol_types::Error),
+
+    /// Error for when Ethereum Bytes are expected to be encoded in short form but long form is found instead
+    #[error("Unexpected ethereum bytes long form")]
+    UnexpectedEthereumBytesLongForm,
 }
 
 /// Trait for types that can provide storage keys for data extraction
@@ -704,7 +708,7 @@ impl StorageKeyProvider for QuorumNumbersRequiredV2Extractor {
 }
 
 /// Extracts required quorum numbers from EigenDaCertVerifier::quorumNumbersRequiredV2.
-/// Example on Holesky: 0x0001 (indicating quorum 0 and 1 are required).
+/// Example on Holesky: 0x0001 (indicating quorum 0 is required).
 impl DataDecoder for QuorumNumbersRequiredV2Extractor {
     type Output = Bytes;
 
@@ -713,6 +717,8 @@ impl DataDecoder for QuorumNumbersRequiredV2Extractor {
         &self,
         storage_proofs: &[StorageProof],
     ) -> Result<Self::Output, CertExtractionError> {
+        use CertExtractionError::*;
+
         let storage_key = &self.storage_keys()[0];
         let proof = decode_helpers::find_required_proof(
             storage_proofs,
@@ -720,9 +726,23 @@ impl DataDecoder for QuorumNumbersRequiredV2Extractor {
             "quorumNumbersRequiredV2",
         )?;
 
-        // there can be at most 256 quorums
+        // By design there can be at most 256 quorums (meaning this value occupies only 8 bytes)
+        // Quorum numbers are stored as the Ethereum "bytes" type
+        // Ethereum encodes bytes (like strings) of length < 32 (called "short form", our case) as follows:
+        //   The actual bytes are stored left-aligned (i.e., starting at the most significant byte).
+        //   The LSB either stores length * 2 (short form) or length * 2 + 1 (long form)
+        //     So the LSB serves a dual purpose:
+        //       - its parity indicates whether we're dealing with short or long form
+        //       - it also stores the length of the payload
         let be = proof.value.to_be_bytes::<32>();
-        let len = (be[31] / 2) as usize;
+
+        let is_long_form = (be[31] & 1) == 1;
+        if is_long_form {
+            return Err(UnexpectedEthereumBytesLongForm);
+        }
+
+        // Since the LSB stores (len << 1) we can recover the length with just LSB >> 1
+        let len = (be[31] >> 1) as usize;
         Ok(be[..len].to_vec().into())
     }
 }
@@ -861,7 +881,7 @@ mod tests {
         let mut value_bytes = [0u8; 32];
         value_bytes[0] = 0u8; // quorum 0
         value_bytes[1] = 1u8; // quorum 1  
-        value_bytes[31] = 4u8; // length = 4 (2 quorums * 2 bytes each)
+        value_bytes[31] = 4u8; // length = 2, encoded as (length * 2)
         let value = U256::from_be_bytes(value_bytes);
 
         let proof = create_storage_proof(storage_key, value);

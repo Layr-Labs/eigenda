@@ -439,7 +439,7 @@ fn leaf_node_belongs_to_merkle_tree(
     sibling_path: u32,
 ) -> Result<(), CertVerificationError> {
     let proof_len = proof.len();
-    if proof_len % 32 != 0 {
+    if !proof_len.is_multiple_of(32) {
         return Err(MerkleProofLengthNotMultipleOf32Bytes(proof_len));
     }
 

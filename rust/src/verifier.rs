@@ -1,9 +1,12 @@
-use alloy_consensus::proofs::calculate_transaction_root;
-use alloy_consensus::transaction::SignerRecoverable;
+use alloy_consensus::{
+    EthereumTxEnvelope, TxEip4844, proofs::calculate_transaction_root,
+    transaction::SignerRecoverable,
+};
 use alloy_primitives::B256;
 use bytes::Bytes;
 use reth_trie_common::proof::ProofVerificationError;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use sov_rollup_interface::da::{
     BlobReaderTrait, BlockHeaderTrait, DaSpec, DaVerifier, RelevantBlobs, RelevantProofs,
 };
@@ -24,9 +27,11 @@ use crate::spec::{
 #[allow(clippy::large_enum_variant)]
 pub enum VerifierError {
     #[error(transparent)]
+    /// Error verifying completeness proof.
     CompletenessError(#[from] CompletenessProofError),
 
     #[error(transparent)]
+    /// Error verifying inclusion proof.
     InclusionError(#[from] InclusionProofError),
 }
 
@@ -43,6 +48,7 @@ pub struct EigenDaVerifier {
 impl EigenDaVerifier {
     #![allow(clippy::result_large_err)]
     #[instrument(skip_all, fields(block_height = block_header.height()))]
+    /// Verify that provided blobs are correctly included in the block.
     pub fn verify_transactions(
         &self,
         block_header: &EthereumBlockHeader,
@@ -117,28 +123,29 @@ impl DaVerifier for EigenDaVerifier {
 #[derive(Debug, Error)]
 pub enum CompletenessProofError {
     #[error("Recomputed merkle root ({0}) doesn't match the one in header ({1})")]
+    /// Merkle root mismatch between computed and header values.
     MerkleRootMismatch(B256, B256),
-
-    #[error("Error occurred while verifying the Ethereum account proof: {0}")]
-    ProofVerificationError(#[from] ProofVerificationError),
 }
 
 /// A proof of completeness of the transactions in the block.
 ///
 /// This proof holds all the transactions from the block, in order.
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EigenDaCompletenessProof {
-    transactions: Vec<TransactionWithBlob>,
+    /// serde_as is required due to risc0 serialization.
+    #[serde_as(as = "Vec<alloy_consensus::serde_bincode_compat::EthereumTxEnvelope<'_>>")]
+    transactions: Vec<EthereumTxEnvelope<TxEip4844>>,
 }
 
 impl EigenDaCompletenessProof {
     /// Create a new completeness proof.
-    pub fn new(transactions: Vec<TransactionWithBlob>) -> Self {
+    pub fn new(transactions: Vec<EthereumTxEnvelope<TxEip4844>>) -> Self {
         Self { transactions }
     }
 
     /// Verify that the proof holds the complete list of transactions for the
-    /// block. Also verify that the certificate states are correct.
+    /// block.
     ///
     /// Upon success, the proof returns a vector of transactions that were
     /// proven to represent a whole transaction set of a specific block.
@@ -146,23 +153,14 @@ impl EigenDaCompletenessProof {
     /// # Errors
     ///
     /// This function will return an error if:
-    ///   - Certificate state data is incorrect
-    ///   - recomputed transaction_root is different from the root in the header
+    ///   - Recomputed transaction_root is different from the root in the header
     #[allow(clippy::result_large_err)]
     pub fn verify(
         self,
         header: &EthereumBlockHeader,
-    ) -> Result<Vec<TransactionWithBlob>, CompletenessProofError> {
-        // Validate the certificate states against the state_root in the header
-        for tx in &self.transactions {
-            if let Some(cert_state) = &tx.cert_state {
-                cert_state.verify(header.as_ref().state_root)?;
-            }
-        }
-
+    ) -> Result<Vec<EthereumTxEnvelope<TxEip4844>>, CompletenessProofError> {
         // Verify that the proof holds the complete list of transactions for the block
-        let transactions = self.transactions.iter().map(|t| &t.tx).collect::<Vec<_>>();
-        let calculated_transactions_root = calculate_transaction_root(&transactions);
+        let calculated_transactions_root = calculate_transaction_root(&self.transactions);
         if calculated_transactions_root != header.as_ref().transactions_root {
             return Err(CompletenessProofError::MerkleRootMismatch(
                 calculated_transactions_root,
@@ -178,34 +176,48 @@ impl EigenDaCompletenessProof {
 #[derive(Debug, Error)]
 pub enum InclusionProofError {
     #[error("Transaction ({0}) in proof wasn't part of the completeness proof")]
+    /// Transaction in proof wasn't part of completeness proof.
     NotProvenTransaction(B256),
 
     #[error("Certificate state is missing for transaction ({0})")]
+    /// Certificate state missing for transaction.
     CertStateMissing(B256),
 
     #[error("Proof incomplete, some relevant transactions are missing")]
+    /// Proof incomplete, some relevant transactions missing.
     ProofIncomplete,
 
     #[error("Blob missing for transaction ({0})")]
+    /// Blob missing for transaction.
     MissingBlob(B256),
 
     #[error("Additional blob ({0}) provided, irrelevant for the rollup")]
+    /// Additional blob provided that's irrelevant for rollup.
     IrrelevantBlob(B256),
 
     #[error("Transaction has incorrect sender ({1}), expected ({0})")]
+    /// Transaction has incorrect sender address.
     IncorrectSender(EthereumAddress, EthereumAddress),
 
     #[error("Transaction has incorrect hash ({1}), expected ({0})")]
+    /// Transaction has incorrect blob hash.
     IncorrectBlobHash(EthereumHash, EthereumHash),
 
     #[error("Malformed data for transaction ({0})")]
+    /// Malformed blob data for transaction.
     IncorrectBlobData(EthereumHash),
 
     #[error("Error occurred while verifying EigenDA blob: {0}")]
+    /// Error verifying EigenDA blob.
     BlobVerificationError(#[from] BlobVerificationError),
 
     #[error("Error occurred while tried to recover a transaction sender")]
+    /// Error recovering transaction sender.
     RecoverSenderError,
+
+    #[error("Error occurred while verifying the Ethereum account proof: {0}")]
+    /// Error verifying Ethereum account proof.
+    ProofVerificationError(#[from] ProofVerificationError),
 }
 
 /// A proof of inclusion of the rollup transactions from the block.
@@ -230,12 +242,28 @@ impl EigenDaInclusionProof {
 
     /// Verify that the proof holds transactions extracted from all transactions
     /// within given namespace, no more, no less.
+    /// Also verify that the certificate states are correct./
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    ///   - Certificate state data is incorrect
+    ///   - Transaction in proof wasn't part of the completeness proof
+    ///   - Proof is incomplete, some relevant transactions are missing
     #[instrument(skip_all)]
     fn verify_transactions(
         &self,
         namespace: NamespaceId,
-        proven_transactions: &[TransactionWithBlob],
+        header: &EthereumBlockHeader,
+        proven_transactions: &[EthereumTxEnvelope<TxEip4844>],
     ) -> Result<(), InclusionProofError> {
+        // Validate the certificate states against the state_root in the header
+        for tx in &self.transactions {
+            if let Some(cert_state) = &tx.cert_state {
+                cert_state.verify(header.as_ref().state_root)?;
+            }
+        }
+
         // Transaction hashes related to the transactions in the proof
         let mut transaction_hashes = self
             .transactions
@@ -246,8 +274,8 @@ impl EigenDaInclusionProof {
         // already proven to be a complete set.
         let mut namespace_transaction_hashes = proven_transactions
             .iter()
-            .filter(|TransactionWithBlob { tx, .. }| namespace.contains(tx))
-            .map(|TransactionWithBlob { tx, .. }| tx.hash());
+            .filter(|tx| namespace.contains(*tx))
+            .map(|tx| tx.hash());
 
         loop {
             match (
@@ -362,12 +390,12 @@ impl EigenDaInclusionProof {
         &self,
         header: &EthereumBlockHeader,
         namespace: NamespaceId,
-        proven_transactions: &[TransactionWithBlob],
+        proven_transactions: &[EthereumTxEnvelope<TxEip4844>],
         blobs_with_senders: &[BlobWithSender],
         cert_recency_window: u64,
     ) -> Result<(), InclusionProofError> {
         // Verify transactions contained by the proof
-        self.verify_transactions(namespace, proven_transactions)?;
+        self.verify_transactions(namespace, header, proven_transactions)?;
         // Verify certificates and blobs
         let mut valid_proven_blobs = self.verify_certs_and_blobs(header, cert_recency_window);
 
@@ -481,7 +509,8 @@ mod tests {
 
     #[test]
     fn test_completeness_proof_new() {
-        let transactions = vec![create_test_transaction_with_blob()];
+        let transaction_with_blob = create_test_transaction_with_blob();
+        let transactions = vec![transaction_with_blob.tx.clone()];
 
         let proof = EigenDaCompletenessProof::new(transactions.clone());
 
@@ -507,7 +536,7 @@ mod tests {
     fn test_completeness_proof_verify_merkle_root_mismatch() {
         let header = create_test_header(1, B256::default(), B256::from_slice(&[1; 32]));
         let transaction = create_test_transaction_with_blob();
-        let proof = EigenDaCompletenessProof::new(vec![transaction]);
+        let proof = EigenDaCompletenessProof::new(vec![transaction.tx]);
 
         let result = proof.verify(&header);
         assert!(matches!(
@@ -529,8 +558,9 @@ mod tests {
         let proof = EigenDaInclusionProof::new(vec![]);
         let namespace =
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let header = create_test_header(1, B256::default(), B256::default());
 
-        let result = proof.verify_transactions(namespace, &[]);
+        let result = proof.verify_transactions(namespace, &header, &[]);
         assert!(result.is_ok());
     }
 
@@ -540,8 +570,9 @@ mod tests {
         let proof = EigenDaInclusionProof::new(vec![transaction]);
         let namespace =
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let header = create_test_header(1, B256::default(), B256::default());
 
-        let result = proof.verify_transactions(namespace, &[]);
+        let result = proof.verify_transactions(namespace, &header, &[]);
         assert!(matches!(
             result,
             Err(InclusionProofError::NotProvenTransaction(_))
@@ -554,8 +585,9 @@ mod tests {
         let proof = EigenDaInclusionProof::new(vec![]);
         let namespace =
             NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let header = create_test_header(1, B256::default(), B256::default());
 
-        let result = proof.verify_transactions(namespace, &[proven_tx]);
+        let result = proof.verify_transactions(namespace, &header, &[proven_tx.tx]);
         assert!(matches!(result, Err(InclusionProofError::ProofIncomplete)));
     }
 
@@ -572,18 +604,17 @@ mod tests {
 
     #[test]
     fn test_completeness_proof_verify_with_valid_transactions() {
-        let transaction = create_test_transaction_with_blob();
-        let transactions = vec![transaction.clone()];
-        let tx_refs = vec![transaction.tx.clone()];
+        let tx = create_test_transaction_with_blob();
+        let tx_refs = vec![tx.tx.clone()];
         let tx_root = calculate_transaction_root(&tx_refs);
 
         let header = create_test_header(1, B256::default(), tx_root);
-        let proof = EigenDaCompletenessProof::new(transactions.clone());
+        let proof = EigenDaCompletenessProof::new(tx_refs.clone());
 
         let result = proof.verify(&header);
         assert!(result.is_ok());
         let verified_transactions = result.unwrap();
-        assert_eq!(verified_transactions, transactions);
+        assert_eq!(verified_transactions, tx_refs);
     }
 
     #[test]

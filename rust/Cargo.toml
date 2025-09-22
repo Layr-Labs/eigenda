@@ -58,11 +58,11 @@ serde = { version = "1.0.219", default-features = false, features = [
 ] }
 serde_json = { version = "1.0.141" }
 serde_with = { version = "3.14.0" }
-sov-rollup-interface = { git = "ssh://git@github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
+sov-rollup-interface = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "b486610bbad3e39d5785b6009c5d9ca9ab9dec9e" }
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.47.1", features = ["sync"], optional = true }
 tracing = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.19", features = [
+tracing-subscriber = { version = "0.3.20", features = [
   "env-filter",
   "local-time",
 ] }

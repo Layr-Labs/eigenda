@@ -70,8 +70,11 @@ impl Debug for EigenDaConfig {
 /// Network the adapter is running against.
 #[derive(Debug, Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub enum Network {
+    /// Ethereum mainnet.
     Mainnet,
+    /// Holesky testnet.
     Holesky,
+    /// Sepolia testnet.
     Sepolia,
 }
 
