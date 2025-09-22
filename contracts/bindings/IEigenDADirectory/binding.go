@@ -31,7 +31,7 @@ var (
 
 // ContractIEigenDADirectoryMetaData contains all meta data concerning the ContractIEigenDADirectory contract.
 var ContractIEigenDADirectoryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBytes\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraInfo\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addConfigBytes32\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"extraInfo\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllNames\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string[]\",\"internalType\":\"string[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes32\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes32\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes32ExtraInfo\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytes32ExtraInfo\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytesExtraInfo\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getConfigBytesExtraInfo\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getName\",\"inputs\":[{\"name\":\"key\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"removeAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeConfigBytes\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeConfigBytes32\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceAddress\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceConfigBytes\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"extraInfo\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"replaceConfigBytes32\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"},{\"name\":\"value\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"extraInfo\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AddressAdded\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"value\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressRemoved\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AddressReplaced\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"},{\"name\":\"key\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newValue\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressAlreadyExists\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"AddressDoesNotExist\",\"inputs\":[{\"name\":\"name\",\"type\":\"string\",\"internalType\":\"string\"}]},{\"type\":\"error\",\"name\":\"NewValueIsOldValue\",\"inputs\":[{\"name\":\"value\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ZeroAddress\",\"inputs\":[]}]",
 }
 
 // ContractIEigenDADirectoryABI is the input ABI used to generate the binding from.
@@ -273,6 +273,254 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetAll
 	return _ContractIEigenDADirectory.Contract.GetAllNames(&_ContractIEigenDADirectory.CallOpts)
 }
 
+// GetConfigBytes is a free data retrieval call binding the contract method 0x4f93c9bf.
+//
+// Solidity: function getConfigBytes(string name) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes(opts *bind.CallOpts, name string) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes", name)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes is a free data retrieval call binding the contract method 0x4f93c9bf.
+//
+// Solidity: function getConfigBytes(string name) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes(name string) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes is a free data retrieval call binding the contract method 0x4f93c9bf.
+//
+// Solidity: function getConfigBytes(string name) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes(name string) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes0 is a free data retrieval call binding the contract method 0x62c7855b.
+//
+// Solidity: function getConfigBytes(bytes32 key) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes0(opts *bind.CallOpts, key [32]byte) ([]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes0", key)
+
+	if err != nil {
+		return *new([]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes0 is a free data retrieval call binding the contract method 0x62c7855b.
+//
+// Solidity: function getConfigBytes(bytes32 key) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes0(key [32]byte) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes0(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytes0 is a free data retrieval call binding the contract method 0x62c7855b.
+//
+// Solidity: function getConfigBytes(bytes32 key) view returns(bytes)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes0(key [32]byte) ([]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes0(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0x6f8210b4.
+//
+// Solidity: function getConfigBytes32(bytes32 key) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes32(opts *bind.CallOpts, key [32]byte) ([32]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes32", key)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0x6f8210b4.
+//
+// Solidity: function getConfigBytes32(bytes32 key) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes32(key [32]byte) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytes32 is a free data retrieval call binding the contract method 0x6f8210b4.
+//
+// Solidity: function getConfigBytes32(bytes32 key) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes32(key [32]byte) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytes320 is a free data retrieval call binding the contract method 0x99c2c9d3.
+//
+// Solidity: function getConfigBytes32(string name) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes320(opts *bind.CallOpts, name string) ([32]byte, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes320", name)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// GetConfigBytes320 is a free data retrieval call binding the contract method 0x99c2c9d3.
+//
+// Solidity: function getConfigBytes32(string name) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes320(name string) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes320(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes320 is a free data retrieval call binding the contract method 0x99c2c9d3.
+//
+// Solidity: function getConfigBytes32(string name) view returns(bytes32)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes320(name string) ([32]byte, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes320(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes32ExtraInfo is a free data retrieval call binding the contract method 0x2572b2ef.
+//
+// Solidity: function getConfigBytes32ExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes32ExtraInfo(opts *bind.CallOpts, name string) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes32ExtraInfo", name)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigBytes32ExtraInfo is a free data retrieval call binding the contract method 0x2572b2ef.
+//
+// Solidity: function getConfigBytes32ExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes32ExtraInfo(name string) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32ExtraInfo(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes32ExtraInfo is a free data retrieval call binding the contract method 0x2572b2ef.
+//
+// Solidity: function getConfigBytes32ExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes32ExtraInfo(name string) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32ExtraInfo(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytes32ExtraInfo0 is a free data retrieval call binding the contract method 0x5dc72cdb.
+//
+// Solidity: function getConfigBytes32ExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytes32ExtraInfo0(opts *bind.CallOpts, key [32]byte) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytes32ExtraInfo0", key)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigBytes32ExtraInfo0 is a free data retrieval call binding the contract method 0x5dc72cdb.
+//
+// Solidity: function getConfigBytes32ExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytes32ExtraInfo0(key [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32ExtraInfo0(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytes32ExtraInfo0 is a free data retrieval call binding the contract method 0x5dc72cdb.
+//
+// Solidity: function getConfigBytes32ExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytes32ExtraInfo0(key [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytes32ExtraInfo0(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytesExtraInfo is a free data retrieval call binding the contract method 0x3344b34a.
+//
+// Solidity: function getConfigBytesExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytesExtraInfo(opts *bind.CallOpts, key [32]byte) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytesExtraInfo", key)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigBytesExtraInfo is a free data retrieval call binding the contract method 0x3344b34a.
+//
+// Solidity: function getConfigBytesExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytesExtraInfo(key [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytesExtraInfo(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytesExtraInfo is a free data retrieval call binding the contract method 0x3344b34a.
+//
+// Solidity: function getConfigBytesExtraInfo(bytes32 key) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytesExtraInfo(key [32]byte) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytesExtraInfo(&_ContractIEigenDADirectory.CallOpts, key)
+}
+
+// GetConfigBytesExtraInfo0 is a free data retrieval call binding the contract method 0x5cef4101.
+//
+// Solidity: function getConfigBytesExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCaller) GetConfigBytesExtraInfo0(opts *bind.CallOpts, name string) (string, error) {
+	var out []interface{}
+	err := _ContractIEigenDADirectory.contract.Call(opts, &out, "getConfigBytesExtraInfo0", name)
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+// GetConfigBytesExtraInfo0 is a free data retrieval call binding the contract method 0x5cef4101.
+//
+// Solidity: function getConfigBytesExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) GetConfigBytesExtraInfo0(name string) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytesExtraInfo0(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
+// GetConfigBytesExtraInfo0 is a free data retrieval call binding the contract method 0x5cef4101.
+//
+// Solidity: function getConfigBytesExtraInfo(string name) view returns(string)
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryCallerSession) GetConfigBytesExtraInfo0(name string) (string, error) {
+	return _ContractIEigenDADirectory.Contract.GetConfigBytesExtraInfo0(&_ContractIEigenDADirectory.CallOpts, name)
+}
+
 // GetName is a free data retrieval call binding the contract method 0x54b8d5e3.
 //
 // Solidity: function getName(bytes32 key) view returns(string)
@@ -325,6 +573,48 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) Ad
 	return _ContractIEigenDADirectory.Contract.AddAddress(&_ContractIEigenDADirectory.TransactOpts, name, value)
 }
 
+// AddConfigBytes is a paid mutator transaction binding the contract method 0xbc33a6de.
+//
+// Solidity: function addConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBytes(opts *bind.TransactOpts, name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBytes", name, value, extraInfo)
+}
+
+// AddConfigBytes is a paid mutator transaction binding the contract method 0xbc33a6de.
+//
+// Solidity: function addConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBytes(name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// AddConfigBytes is a paid mutator transaction binding the contract method 0xbc33a6de.
+//
+// Solidity: function addConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBytes(name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x456afa28.
+//
+// Solidity: function addConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) AddConfigBytes32(opts *bind.TransactOpts, name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "addConfigBytes32", name, value, extraInfo)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x456afa28.
+//
+// Solidity: function addConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) AddConfigBytes32(name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// AddConfigBytes32 is a paid mutator transaction binding the contract method 0x456afa28.
+//
+// Solidity: function addConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) AddConfigBytes32(name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.AddConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
 // RemoveAddress is a paid mutator transaction binding the contract method 0xf94d1312.
 //
 // Solidity: function removeAddress(string name) returns()
@@ -346,6 +636,48 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) Re
 	return _ContractIEigenDADirectory.Contract.RemoveAddress(&_ContractIEigenDADirectory.TransactOpts, name)
 }
 
+// RemoveConfigBytes is a paid mutator transaction binding the contract method 0xc266b2b6.
+//
+// Solidity: function removeConfigBytes(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) RemoveConfigBytes(opts *bind.TransactOpts, name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "removeConfigBytes", name)
+}
+
+// RemoveConfigBytes is a paid mutator transaction binding the contract method 0xc266b2b6.
+//
+// Solidity: function removeConfigBytes(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) RemoveConfigBytes(name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.RemoveConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name)
+}
+
+// RemoveConfigBytes is a paid mutator transaction binding the contract method 0xc266b2b6.
+//
+// Solidity: function removeConfigBytes(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) RemoveConfigBytes(name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.RemoveConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name)
+}
+
+// RemoveConfigBytes32 is a paid mutator transaction binding the contract method 0x92579b17.
+//
+// Solidity: function removeConfigBytes32(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) RemoveConfigBytes32(opts *bind.TransactOpts, name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "removeConfigBytes32", name)
+}
+
+// RemoveConfigBytes32 is a paid mutator transaction binding the contract method 0x92579b17.
+//
+// Solidity: function removeConfigBytes32(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) RemoveConfigBytes32(name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.RemoveConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name)
+}
+
+// RemoveConfigBytes32 is a paid mutator transaction binding the contract method 0x92579b17.
+//
+// Solidity: function removeConfigBytes32(string name) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) RemoveConfigBytes32(name string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.RemoveConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name)
+}
+
 // ReplaceAddress is a paid mutator transaction binding the contract method 0x1d7762e7.
 //
 // Solidity: function replaceAddress(string name, address value) returns()
@@ -365,6 +697,48 @@ func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) ReplaceAddre
 // Solidity: function replaceAddress(string name, address value) returns()
 func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) ReplaceAddress(name string, value common.Address) (*types.Transaction, error) {
 	return _ContractIEigenDADirectory.Contract.ReplaceAddress(&_ContractIEigenDADirectory.TransactOpts, name, value)
+}
+
+// ReplaceConfigBytes is a paid mutator transaction binding the contract method 0xc506298c.
+//
+// Solidity: function replaceConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) ReplaceConfigBytes(opts *bind.TransactOpts, name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "replaceConfigBytes", name, value, extraInfo)
+}
+
+// ReplaceConfigBytes is a paid mutator transaction binding the contract method 0xc506298c.
+//
+// Solidity: function replaceConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) ReplaceConfigBytes(name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.ReplaceConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// ReplaceConfigBytes is a paid mutator transaction binding the contract method 0xc506298c.
+//
+// Solidity: function replaceConfigBytes(string name, bytes value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) ReplaceConfigBytes(name string, value []byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.ReplaceConfigBytes(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// ReplaceConfigBytes32 is a paid mutator transaction binding the contract method 0xdfe07f69.
+//
+// Solidity: function replaceConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactor) ReplaceConfigBytes32(opts *bind.TransactOpts, name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.contract.Transact(opts, "replaceConfigBytes32", name, value, extraInfo)
+}
+
+// ReplaceConfigBytes32 is a paid mutator transaction binding the contract method 0xdfe07f69.
+//
+// Solidity: function replaceConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectorySession) ReplaceConfigBytes32(name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.ReplaceConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
+}
+
+// ReplaceConfigBytes32 is a paid mutator transaction binding the contract method 0xdfe07f69.
+//
+// Solidity: function replaceConfigBytes32(string name, bytes32 value, string extraInfo) returns()
+func (_ContractIEigenDADirectory *ContractIEigenDADirectoryTransactorSession) ReplaceConfigBytes32(name string, value [32]byte, extraInfo string) (*types.Transaction, error) {
+	return _ContractIEigenDADirectory.Contract.ReplaceConfigBytes32(&_ContractIEigenDADirectory.TransactOpts, name, value, extraInfo)
 }
 
 // ContractIEigenDADirectoryAddressAddedIterator is returned from FilterAddressAdded and is used to iterate over the raw logs and unpacked data for AddressAdded events raised by the ContractIEigenDADirectory contract.
