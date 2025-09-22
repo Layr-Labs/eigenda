@@ -128,8 +128,7 @@ func (s *Server) AuthorizePayment(
 
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf(
-			"failed to hash request: %v, request=%s", err, request.String()))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v, request=%s", err, request.String()))
 	}
 
 	probe.SetStage("replay_protection")

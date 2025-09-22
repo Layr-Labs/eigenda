@@ -6,7 +6,6 @@ import (
 
 // Tracks metrics for the [ReservationPaymentValidator]
 type ReservationValidatorMetrics struct {
-	reservationPaymentsCount         prometheus.Counter
 	reservationSymbolCount           prometheus.Histogram
 	reservationInsufficientBandwidth prometheus.Counter
 	reservationQuorumNotPermitted    prometheus.Counter
@@ -24,15 +23,6 @@ func NewReservationValidatorMetrics(
 		return nil
 	}
 
-	paymentsCount := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "reservation_payments_count",
-			Subsystem: subsystem,
-			Help:      "Total number of successful reservation payments processed",
-		},
-	)
-
 	symbolCount := prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -44,7 +34,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	insufficientFunds := prometheus.NewCounter(
+	insufficientBandwidth := prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_insufficient_bandwidth_count",
@@ -90,9 +80,8 @@ func NewReservationValidatorMetrics(
 	)
 
 	registry.MustRegister(
-		paymentsCount,
 		symbolCount,
-		insufficientFunds,
+		insufficientBandwidth,
 		quorumNotPermitted,
 		timeOutOfRange,
 		timeMovedBackward,
@@ -100,9 +89,8 @@ func NewReservationValidatorMetrics(
 	)
 
 	return &ReservationValidatorMetrics{
-		reservationPaymentsCount:         paymentsCount,
 		reservationSymbolCount:           symbolCount,
-		reservationInsufficientBandwidth: insufficientFunds,
+		reservationInsufficientBandwidth: insufficientBandwidth,
 		reservationQuorumNotPermitted:    quorumNotPermitted,
 		reservationTimeOutOfRange:        timeOutOfRange,
 		reservationTimeMovedBackward:     timeMovedBackward,
@@ -116,7 +104,6 @@ func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
 		return
 	}
 	m.reservationSymbolCount.Observe(float64(symbolCount))
-	m.reservationPaymentsCount.Inc()
 }
 
 // Increments the counter for insufficient funds errors

@@ -85,21 +85,21 @@ func (pv *ReservationPaymentValidator) Debit(
 	var quorumNotPermittedErr *QuorumNotPermittedError
 	if errors.As(err, &quorumNotPermittedErr) {
 		pv.metrics.IncrementQuorumNotPermitted()
-		return false, nil
+		return false, err
 	}
 
 	var timeOutOfRangeErr *TimeOutOfRangeError
 	if errors.As(err, &timeOutOfRangeErr) {
 		pv.metrics.IncrementTimeOutOfRange()
-		return false, nil
+		return false, err
 	}
 
 	var timeMovedBackwardErr *TimeMovedBackwardError
 	if errors.As(err, &timeMovedBackwardErr) {
 		pv.metrics.IncrementTimeMovedBackward()
-		return false, nil
+		return false, err
 	}
 
 	pv.metrics.IncrementUnexpectedErrors()
-	return false, nil
+	return false, err
 }

@@ -43,13 +43,11 @@ func NewPaymentAuthorizationHandler(
 		panic("reservationValidator cannot be nil")
 	}
 
-	handler := &PaymentAuthorizationHandler{
+	return &PaymentAuthorizationHandler{
 		onDemandMeterer:      onDemandMeterer,
 		onDemandValidator:    onDemandValidator,
 		reservationValidator: reservationValidator,
 	}
-
-	return handler
 }
 
 // Checks whether the payment is valid.
@@ -67,7 +65,7 @@ func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	probe.SetStage("request_validation")
 
 	if len(clientSignature) != 65 {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("signature length is unexpected: %d, signature: %s",
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("signature length %d is unexpected, signature: %s",
 			len(clientSignature), hex.EncodeToString(clientSignature)))
 	}
 

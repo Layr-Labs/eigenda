@@ -6,7 +6,6 @@ import (
 
 // Tracks metrics for the [OnDemandPaymentValidator]
 type OnDemandValidatorMetrics struct {
-	onDemandPaymentsCount      prometheus.Counter
 	onDemandSymbolCount        prometheus.Histogram
 	onDemandInsufficientFunds  prometheus.Counter
 	onDemandQuorumNotSupported prometheus.Counter
@@ -21,15 +20,6 @@ func NewOnDemandValidatorMetrics(
 	if registry == nil {
 		return nil
 	}
-
-	paymentsCount := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "on_demand_payments_count",
-			Subsystem: subsystem,
-			Help:      "Total number of successful on-demand payments processed",
-		},
-	)
 
 	symbolCount := prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -70,7 +60,6 @@ func NewOnDemandValidatorMetrics(
 	)
 
 	registry.MustRegister(
-		paymentsCount,
 		symbolCount,
 		insufficientFunds,
 		quorumNotSupported,
@@ -78,7 +67,6 @@ func NewOnDemandValidatorMetrics(
 	)
 
 	return &OnDemandValidatorMetrics{
-		onDemandPaymentsCount:      paymentsCount,
 		onDemandSymbolCount:        symbolCount,
 		onDemandInsufficientFunds:  insufficientFunds,
 		onDemandQuorumNotSupported: quorumNotSupported,
@@ -92,7 +80,6 @@ func (m *OnDemandValidatorMetrics) RecordSuccess(symbolCount uint32) {
 		return
 	}
 	m.onDemandSymbolCount.Observe(float64(symbolCount))
-	m.onDemandPaymentsCount.Inc()
 }
 
 // Increments the counter for insufficient funds errors

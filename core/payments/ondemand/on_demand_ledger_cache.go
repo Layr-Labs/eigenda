@@ -43,8 +43,9 @@ type OnDemandLedgerCache struct {
 	// Otherwise, it would be possible for two separate callers to get a cache miss for the same account, create the
 	// new object for the same account key, and try to add them to the cache.
 	ledgerCreationLock *common.IndexLock
-	vaultMonitor       *OnDemandVaultMonitor
-	metrics            *OnDemandCacheMetrics
+	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
+	vaultMonitor *OnDemandVaultMonitor
+	metrics      *OnDemandCacheMetrics
 }
 
 func NewOnDemandLedgerCache(
