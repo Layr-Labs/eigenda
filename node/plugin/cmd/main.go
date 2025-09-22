@@ -132,19 +132,19 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	contractDirectory, err := directory.NewContractDirectory(context.TODO(), logger, client,
+	contractDirectory, err := directory.NewContractDirectory(context.Background(), logger, client,
 		gethcommon.HexToAddress(config.EigenDADirectory))
 	if err != nil {
 		log.Printf("Error: failed to create contract directory: %v", err)
 		return
 	}
-	eigenDAServiceManagerAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.ServiceManager)
+	eigenDAServiceManagerAddr, err := contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
 	if err != nil {
 		log.Printf("Error: failed to get EigenDAServiceManager address from directory: %v", err)
 		return
 	}
 	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
-		context.TODO(), directory.OperatorStateRetriever)
+		context.Background(), directory.OperatorStateRetriever)
 	if err != nil {
 		log.Printf("Error: failed to get OperatorStateRetriever address from directory: %v", err)
 		return
