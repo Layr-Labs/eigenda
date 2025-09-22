@@ -106,8 +106,8 @@ func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
 	m.reservationSymbolCount.Observe(float64(symbolCount))
 }
 
-// Increments the counter for insufficient funds errors
-func (m *ReservationValidatorMetrics) IncrementInsufficientFunds() {
+// Increments the counter for when the holder of a reservation lacks bandwidth to perform the dispersal
+func (m *ReservationValidatorMetrics) IncrementInsufficientBandwidth() {
 	if m == nil {
 		return
 	}
