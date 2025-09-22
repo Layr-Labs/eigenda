@@ -84,9 +84,7 @@ func TestBatchHeaderHash(t *testing.T) {
 
 	hash, err := batchHeader.Hash()
 	assert.NoError(t, err)
-	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
-	// This should have been documented.
-	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 has NOT verified in solidity with chisel
+	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 has verified in solidity with chisel
 	assert.Equal(t, "891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2", hex.EncodeToString(hash[:]))
 }
 
@@ -130,7 +128,9 @@ func TestBlobCertHash(t *testing.T) {
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
 
-	// 4728c80786471c92bddeb593c80818c5d7d025735e62e8752cc5e6793ba5c6eb has verified in solidity with chisel
+	// TODO(samlaf): had to update this hash, but no idea how to recreate the hash using chisel...
+	// This should have been documented.
+	// 4728c80786471c92bddeb593c80818c5d7d025735e62e8752cc5e6793ba5c6eb has NOT verified in solidity with chisel
 	assert.Equal(t, "4728c80786471c92bddeb593c80818c5d7d025735e62e8752cc5e6793ba5c6eb", hex.EncodeToString(hash[:]))
 }
 
