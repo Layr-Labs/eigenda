@@ -365,8 +365,6 @@ func runNodePlugin(t *testing.T, operation string, operator OperatorConfig) {
 		"--quorum-id-list", operator.NODE_QUORUM_ID_LIST,
 		"--chain-rpc", operator.NODE_CHAIN_RPC,
 		"--eigenda-directory", operator.NODE_EIGENDA_DIRECTORY,
-		"--bls-operator-state-retriever", operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
-		"--eigenda-service-manager", operator.NODE_EIGENDA_SERVICE_MANAGER,
 		"--churner-url", operator.NODE_CHURNER_URL,
 		"--num-confirmations", "0",
 	)
