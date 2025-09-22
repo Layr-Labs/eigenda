@@ -78,7 +78,7 @@ func NewReservationCacheMetrics(
 //
 // This should be called after the cache is initialized
 func (m *ReservationCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
-	if m == nil || m.registry == nil {
+	if m == nil || m.registry == nil || m.cacheSize != nil {
 		return
 	}
 

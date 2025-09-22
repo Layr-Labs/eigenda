@@ -52,7 +52,7 @@ func NewOnDemandCacheMetrics(registry *prometheus.Registry, namespace string, su
 //
 // This should be called after the cache is initialized
 func (m *OnDemandCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
-	if m == nil || m.registry == nil {
+	if m == nil || m.registry == nil || m.cacheSize != nil {
 		return
 	}
 
