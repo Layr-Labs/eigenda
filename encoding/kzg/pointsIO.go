@@ -229,7 +229,6 @@ func NumberOfPointsInSRSFile(filePath string, pointsSize int64) (uint64, error) 
 			"The size of the file on the provided path has size that is not multiple of %v, which is %v. "+
 			"It indicates there is an incomplete g2 point", filePath, pointsSize, fileSizeByte)
 	}
-	// get the size
 	numG2point := uint64(fileSizeByte / pointsSize)
 	return numG2point, nil
 }
