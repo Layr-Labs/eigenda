@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
+	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
 	controllerpayments "github.com/Layr-Labs/eigenda/disperser/controller/payments"
 	"github.com/Layr-Labs/eigenda/disperser/controller/server"
 	"github.com/prometheus/client_golang/prometheus"
@@ -274,6 +275,7 @@ func RunController(ctx *cli.Context) error {
 				contractDirectory,
 				gethClient,
 				dynamoClient.GetAwsClient(),
+				metricsRegistry,
 			)
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
@@ -340,6 +342,7 @@ func buildPaymentAuthorizationHandler(
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
+	metricsRegistry *prometheus.Registry,
 ) (*controllerpayments.PaymentAuthorizationHandler, error) {
 	paymentVaultAddress, err := contractDirectory.GetContractAddress(ctx, directory.PaymentVault)
 	if err != nil {
@@ -365,6 +368,11 @@ func buildPaymentAuthorizationHandler(
 		globalSymbolsPerSecond,
 		globalRatePeriodInterval,
 		time.Now,
+		meterer.NewOnDemandMetererMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 
 	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
@@ -373,6 +381,16 @@ func buildPaymentAuthorizationHandler(
 		onDemandConfig,
 		paymentVault,
 		awsDynamoClient,
+		ondemand.NewOnDemandValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		ondemand.NewOnDemandCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
@@ -384,6 +402,16 @@ func buildPaymentAuthorizationHandler(
 		reservationConfig,
 		paymentVault,
 		time.Now,
+		reservation.NewReservationValidatorMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
+		reservation.NewReservationCacheMetrics(
+			metricsRegistry,
+			metrics.Namespace,
+			metrics.AuthorizePaymentsSubsystem,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create reservation payment validator: %w", err)

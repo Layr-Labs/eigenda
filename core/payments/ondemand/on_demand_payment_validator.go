@@ -2,6 +2,7 @@ package ondemand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
@@ -15,6 +16,7 @@ type OnDemandPaymentValidator struct {
 	logger logging.Logger
 	// A cache of the ledgers being tracked
 	ledgerCache *OnDemandLedgerCache
+	metrics     *OnDemandValidatorMetrics
 }
 
 func NewOnDemandPaymentValidator(
@@ -24,8 +26,10 @@ func NewOnDemandPaymentValidator(
 	// provides access to payment vault contract
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
+	validatorMetrics *OnDemandValidatorMetrics,
+	cacheMetrics *OnDemandCacheMetrics,
 ) (*OnDemandPaymentValidator, error) {
-	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, config, paymentVault, dynamoClient)
+	ledgerCache, err := NewOnDemandLedgerCache(ctx, logger, config, paymentVault, dynamoClient, cacheMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger cache: %w", err)
 	}
@@ -33,6 +37,7 @@ func NewOnDemandPaymentValidator(
 	return &OnDemandPaymentValidator{
 		logger:      logger,
 		ledgerCache: ledgerCache,
+		metrics:     validatorMetrics,
 	}, nil
 }
 
@@ -50,9 +55,23 @@ func (pv *OnDemandPaymentValidator) Debit(
 	}
 
 	_, err = ledger.Debit(ctx, symbolCount, quorumNumbers)
-	if err != nil {
-		return fmt.Errorf("debit on-demand payment: %w", err)
+	if err == nil {
+		pv.metrics.RecordSuccess(symbolCount)
+		return nil
 	}
 
-	return nil
+	var insufficientFundsErr *InsufficientFundsError
+	if errors.As(err, &insufficientFundsErr) {
+		pv.metrics.IncrementInsufficientFunds()
+		return err
+	}
+
+	var quorumNotSupportedErr *QuorumNotSupportedError
+	if errors.As(err, &quorumNotSupportedErr) {
+		pv.metrics.IncrementQuorumNotSupported()
+		return err
+	}
+
+	pv.metrics.IncrementUnexpectedErrors()
+	return err
 }
