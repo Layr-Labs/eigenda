@@ -35,36 +35,38 @@ func TestEncoder(t *testing.T) {
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
-	commitments, chunks, err := p.EncodeAndProve(harness.paddedGettysburgAddressBytes, params)
-	assert.NoError(t, err)
+	commitments, err := p.GetCommitmentsForPaddedLength(harness.paddedGettysburgAddressBytes)
+	require.NoError(t, err)
+	frames, err := p.GetFrames(harness.paddedGettysburgAddressBytes, params)
+	require.NoError(t, err)
 
 	indices := []encoding.ChunkNumber{
 		0, 1, 2, 3, 4, 5, 6, 7,
 	}
-	err = v.VerifyFrames(chunks, indices, commitments, params)
+	err = v.VerifyFrames(frames, indices, commitments, params)
 	assert.NoError(t, err)
-	err = v.VerifyFrames(chunks, []encoding.ChunkNumber{
+	err = v.VerifyFrames(frames, []encoding.ChunkNumber{
 		7, 6, 5, 4, 3, 2, 1, 0,
 	}, commitments, params)
 	assert.Error(t, err)
 
 	maxInputSize := uint64(len(harness.paddedGettysburgAddressBytes))
-	decoded, err := p.Decode(chunks, indices, params, maxInputSize)
+	decoded, err := p.Decode(frames, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 
-	// shuffle chunks
-	tmp := chunks[2]
-	chunks[2] = chunks[5]
-	chunks[5] = tmp
+	// shuffle frames
+	tmp := frames[2]
+	frames[2] = frames[5]
+	frames[5] = tmp
 	indices = []encoding.ChunkNumber{
 		0, 1, 5, 3, 4, 2, 6, 7,
 	}
 
-	err = v.VerifyFrames(chunks, indices, commitments, params)
+	err = v.VerifyFrames(frames, indices, commitments, params)
 	assert.NoError(t, err)
 
-	decoded, err = p.Decode(chunks, indices, params, maxInputSize)
+	decoded, err = p.Decode(frames, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
@@ -94,11 +96,13 @@ func BenchmarkEncode(b *testing.B) {
 	}
 
 	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
-	_, _, _ = p.EncodeAndProve(blobs[0], params)
+	_, err = p.GetFrames(blobs[0], params)
+	require.NoError(b, err)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _, _ = p.EncodeAndProve(blobs[i%numSamples], params)
+		_, err = p.GetFrames(blobs[i%numSamples], params)
+		require.NoError(b, err)
 	}
 }
 

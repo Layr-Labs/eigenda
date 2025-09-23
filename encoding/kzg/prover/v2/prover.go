@@ -139,44 +139,6 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 	return encoderGroup, nil
 }
 
-func (e *Prover) EncodeAndProve(
-	data []byte, params encoding.EncodingParams,
-) (encoding.BlobCommitments, []*encoding.Frame, error) {
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, err
-	}
-
-	commit, lengthCommit, lengthProof, kzgFrames, _, err := enc.EncodeBytes(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, err
-	}
-
-	chunks := make([]*encoding.Frame, len(kzgFrames))
-	for ind, frame := range kzgFrames {
-
-		chunks[ind] = &encoding.Frame{
-			Coeffs: frame.Coeffs,
-			Proof:  frame.Proof,
-		}
-	}
-
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return encoding.BlobCommitments{}, nil, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	length := uint(len(symbols))
-	commitments := encoding.BlobCommitments{
-		Commitment:       (*encoding.G1Commitment)(commit),
-		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
-		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
-	}
-
-	return commitments, chunks, nil
-}
-
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
