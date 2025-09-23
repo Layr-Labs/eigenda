@@ -14,6 +14,7 @@ import (
 type OnDemandMeterer struct {
 	limiter *rate.Limiter
 	getNow  func() time.Time
+	metrics *OnDemandMetererMetrics
 }
 
 // Creates a new OnDemandMeterer with the specified rate limiting parameters.
@@ -21,6 +22,7 @@ func NewOnDemandMeterer(
 	globalSymbolsPerSecond uint64,
 	globalRatePeriodInterval uint64,
 	getNow func() time.Time,
+	metrics *OnDemandMetererMetrics,
 ) *OnDemandMeterer {
 	burstSize := int(globalSymbolsPerSecond * globalRatePeriodInterval)
 	limiter := rate.NewLimiter(rate.Limit(globalSymbolsPerSecond), burstSize)
@@ -28,6 +30,7 @@ func NewOnDemandMeterer(
 	return &OnDemandMeterer{
 		limiter: limiter,
 		getNow:  getNow,
+		metrics: metrics,
 	}
 }
 
@@ -43,6 +46,7 @@ func (m *OnDemandMeterer) MeterDispersal(symbolCount uint32) (*rate.Reservation,
 
 	if !reservation.OK() || reservation.Delay() > 0 {
 		reservation.Cancel()
+		m.metrics.RecordGlobalMeterExhaustion(symbolCount)
 		return nil, fmt.Errorf("global rate limit exceeded: cannot reserve %d symbols", symbolCount)
 	}
 

@@ -38,6 +38,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 /*
@@ -48,7 +50,9 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
-	anvilContainer *testbed.AnvilContainer
+	anvilContainer     *testbed.AnvilContainer
+	graphNodeContainer *testbed.GraphNodeContainer
+	dockerNetwork      *testcontainers.DockerNetwork
 
 	templateName      string
 	testName          string
@@ -133,6 +137,15 @@ func setupSuite() error {
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
+		// Create a shared Docker network for all containers
+		dockerNetwork, err = network.New(context.Background(),
+			network.WithDriver("bridge"),
+			network.WithAttachable())
+		if err != nil {
+			return fmt.Errorf("failed to create docker network: %w", err)
+		}
+		logger.Info("Created Docker network", "name", dockerNetwork.Name)
+
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
@@ -141,6 +154,7 @@ func setupSuite() error {
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
+				Network:        dockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start localstack: %w", err)
@@ -166,15 +180,33 @@ func setupSuite() error {
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
+			Network:        dockerNetwork,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start anvil: %w", err)
 		}
+		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
+		logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
 			logger.Info("Starting graph node")
-			testConfig.StartGraphNode()
+			graphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+				PostgresDB:     "graph-node",
+				PostgresUser:   "graph-node",
+				PostgresPass:   "let-me-in",
+				EthereumRPC:    anvilInternalEndpoint,
+				ExposeHostPort: true,
+				HostHTTPPort:   "8000",
+				HostWSPort:     "8001",
+				HostAdminPort:  "8020",
+				HostIPFSPort:   "5001",
+				Logger:         logger,
+				Network:        dockerNetwork,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to start graph node: %w", err)
+			}
 		}
 
 		logger.Info("Deploying experiment")
@@ -507,10 +539,17 @@ func teardownSuite() {
 		if err := anvilContainer.Terminate(ctx); err != nil {
 			logger.Warn("Failed to terminate anvil container", "error", err)
 		}
+
+		if dockerNetwork != nil {
+			logger.Info("Removing Docker network")
+			_ = dockerNetwork.Remove(context.Background())
+		}
 	}
 
-	logger.Info("Stopping graph node")
-	testConfig.StopGraphNode()
+	if graphNodeContainer != nil {
+		logger.Info("Stopping graph node")
+		_ = graphNodeContainer.Terminate(context.Background())
+	}
 
 	if localstackContainer != nil {
 		logger.Info("Stopping localstack container")

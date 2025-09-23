@@ -1,7 +1,6 @@
 package reservation
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -46,8 +45,7 @@ func TestNewReservationVaultMonitorInvalidInterval(t *testing.T) {
 func TestReservationVaultMonitor(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	accounts := []gethcommon.Address{
@@ -135,8 +133,7 @@ func TestReservationVaultMonitor(t *testing.T) {
 func TestReservationVaultMonitorNoBatching(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	// Create multiple accounts to verify they're all fetched in a single batch

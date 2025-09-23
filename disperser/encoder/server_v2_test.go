@@ -160,7 +160,7 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
 		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
 		require.NoError(t, err, "Failed to get chunk proofs")
-		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
+		proofs := encoding.DeserializeSplitFrameProofs(binaryProofs)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
