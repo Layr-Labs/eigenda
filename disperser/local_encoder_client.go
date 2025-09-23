@@ -34,7 +34,7 @@ func (m *LocalEncoderClient) EncodeBlob(ctx context.Context, data []byte, encodi
 
 	bytes := make([][]byte, 0, len(chunks))
 	for _, c := range chunks {
-		serialized, err := c.Serialize()
+		serialized, err := c.SerializeGob()
 		if err != nil {
 			return nil, nil, fmt.Errorf("serialize chunk: %w", err)
 		}

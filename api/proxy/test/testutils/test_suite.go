@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/generated_key/memstore/memconfig"
@@ -16,10 +17,12 @@ import (
 
 // TestSuite contains necessary objects, to be able to execute a proxy test
 type TestSuite struct {
-	Ctx     context.Context
-	Log     logging.Logger
-	Metrics *proxy_metrics.EmulatedMetricer
-	Server  *rest.Server
+	Ctx context.Context
+	Log logging.Logger
+
+	Metrics    *proxy_metrics.EmulatedMetricer
+	RestServer *rest.Server
+	ArbServer  *arbitrum_altda.Server
 }
 
 // TestSuiteWithLogger returns a function which overrides the logger for a TestSuite
@@ -66,6 +69,9 @@ func CreateTestSuite(
 	// 	configString,
 	// )
 
+	var restServer *rest.Server
+	var arbServer *arbitrum_altda.Server
+
 	certMgr, keccakMgr, err := builder.BuildManagers(
 		ctx,
 		logger,
@@ -78,35 +84,73 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("build storage managers: %v", err.Error()))
 	}
 
-	proxyServer := rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
-	router := mux.NewRouter()
-	proxyServer.RegisterRoutes(router)
-	if appConfig.StoreBuilderConfig.MemstoreEnabled {
-		memconfig.NewHandlerHTTP(logger, appConfig.StoreBuilderConfig.MemstoreConfig).
-			RegisterMemstoreConfigHandlers(router)
+	if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+		restServer = rest.NewServer(appConfig.RestSvrCfg, certMgr, keccakMgr, logger, metrics)
+		router := mux.NewRouter()
+		restServer.RegisterRoutes(router)
+		if appConfig.StoreBuilderConfig.MemstoreEnabled {
+			memconfig.NewHandlerHTTP(logger, appConfig.StoreBuilderConfig.MemstoreConfig).
+				RegisterMemstoreConfigHandlers(router)
+		}
+
+		if err := restServer.Start(router); err != nil {
+			panic(fmt.Sprintf("start proxy server: %v", err.Error()))
+		}
 	}
 
-	if err := proxyServer.Start(router); err != nil {
-		panic(fmt.Sprintf("start proxy server: %v", err.Error()))
+	if appConfig.EnabledServersConfig.ArbCustomDA {
+		arbHandlers := arbitrum_altda.NewHandlers(certMgr)
+		arbServer, err = arbitrum_altda.NewServer(ctx, &appConfig.ArbCustomDASvrCfg, arbHandlers)
+		if err != nil {
+			panic(fmt.Sprintf("create arbitrum server: %v", err.Error()))
+		}
+
+		if err := arbServer.Start(); err != nil {
+			panic(fmt.Sprintf("start arbitrum server: %v", err.Error()))
+		}
 	}
 
 	kill := func() {
-		if err := proxyServer.Stop(); err != nil {
-			logger.Error("failed to stop proxy server", "err", err)
+		if appConfig.EnabledServersConfig.RestAPIConfig.Enabled() {
+			if err := restServer.Stop(); err != nil {
+				logger.Error("failed to stop proxy server", "err", err)
+			}
+		}
+
+		if appConfig.EnabledServersConfig.ArbCustomDA {
+			if err := arbServer.Stop(); err != nil {
+				logger.Error("failed to stop arb server", "err", err)
+			}
 		}
 	}
 
 	return TestSuite{
-		Ctx:     ctx,
-		Log:     logger,
-		Metrics: metrics,
-		Server:  proxyServer,
+		Ctx:        ctx,
+		Log:        logger,
+		Metrics:    metrics,
+		RestServer: restServer,
+		ArbServer:  arbServer,
 	}, kill
 }
 
-func (ts *TestSuite) Address() string {
+func (ts *TestSuite) RestAddress() string {
+	if ts.RestServer == nil {
+		panic("rest server is being referenced for test execution but was never configured")
+	}
+
 	// read port from listener
-	port := ts.Server.Port()
+	port := ts.RestServer.Port()
+
+	return fmt.Sprintf("%s://%s:%d", transport, host, port)
+}
+
+func (ts *TestSuite) ArbAddress() string {
+	if ts.ArbServer == nil {
+		panic("arb server is being referenced for test execution but was never configured")
+	}
+
+	// read port from listener
+	port := ts.ArbServer.Port()
 
 	return fmt.Sprintf("%s://%s:%d", transport, host, port)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/testutils"
+	"github.com/Layr-Labs/eigenda/core/payments/clientledger"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -43,7 +44,7 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	testBlob := []byte("hello world")
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg) // standard commitment mode (should fail given disabled)
 
@@ -52,7 +53,8 @@ func TestProxyAPIsEnabledRestALTDA(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "403")
 
-	opGenericClient := altda.NewDAClient(ts.Address(), false, false) // now op-generic mode (should work e2e given enabled)
+	opGenericClient := altda.NewDAClient(ts.RestAddress(),
+		false, false) // now op-generic mode (should work e2e given enabled)
 
 	daCommit, err := opGenericClient.SetInput(ts.Ctx, testBlob)
 	require.NoError(t, err)
@@ -152,7 +154,7 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 	t.Cleanup(kill)
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 
@@ -272,7 +274,7 @@ func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend)
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 	expectedBlob := testutils.RandBytes(1_000_000)
@@ -311,7 +313,7 @@ func testProxyWriteCacheOnMiss(t *testing.T, dispersalBackend common.EigenDABack
 	defer kill()
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 	expectedBlob := testutils.RandBytes(1_000_000)
@@ -368,7 +370,7 @@ func testProxyMemConfigClientCanGetAndPatch(t *testing.T, dispersalBackend commo
 
 	memClient := memconfig_client.New(
 		&memconfig_client.Config{
-			URL: "http://" + ts.Server.Endpoint(),
+			URL: "http://" + ts.RestServer.Endpoint(),
 		})
 
 	// 1 - ensure cfg can be read from memconfig handlers
@@ -406,7 +408,7 @@ func TestInterleavedVersions(t *testing.T) {
 
 	client := standard_client.New(
 		&standard_client.Config{
-			URL: testSuite.Address(),
+			URL: testSuite.RestAddress(),
 		})
 
 	// disperse a payload to v1
@@ -415,19 +417,19 @@ func TestInterleavedVersions(t *testing.T) {
 	require.NoError(t, err)
 
 	// disperse a payload to v2
-	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
 	payload2a := testRandom.Bytes(1000)
 	cert2a, err := client.SetData(testSuite.Ctx, payload2a)
 	require.NoError(t, err)
 
 	// disperse another payload to v1
-	testSuite.Server.SetDispersalBackend(common.V1EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V1EigenDABackend)
 	payload1b := testRandom.Bytes(1000)
 	cert1b, err := client.SetData(testSuite.Ctx, payload1b)
 	require.NoError(t, err)
 
 	// disperse another payload to v2
-	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
+	testSuite.RestServer.SetDispersalBackend(common.V2EigenDABackend)
 	payload2b := testRandom.Bytes(1000)
 	cert2b, err := client.SetData(testSuite.Ctx, payload2b)
 	require.NoError(t, err)
@@ -500,6 +502,47 @@ func TestV2ValidatorRetrieverOnly(t *testing.T) {
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
+func TestReservationPayments(t *testing.T) {
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeReservationOnly
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	// Test basic dispersal and retrieval with reservation payments
+	blob := testutils.RandBytes(1000)
+	requireStandardClientSetGet(t, ts, blob)
+
+	// Verify that dispersal and retrieval succeeded
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+
+	t.Log("Successfully dispersed and retrieved blob using reservation-only payments")
+}
+
+func TestOnDemandPayments(t *testing.T) {
+	t.Skip("Manual only for now, since we don't have a way of topping up on demand funds automatically")
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeOnDemandOnly
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	// Test basic dispersal and retrieval with on-demand payments
+	blob := testutils.RandBytes(1000)
+	requireStandardClientSetGet(t, ts, blob)
+
+	// Verify that dispersal and retrieval succeeded
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+
+	t.Log("Successfully dispersed and retrieved blob using on-demand-only payments")
+}
+
 // requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
 func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode commitments.CommitmentMode) {
 	writeCount, err := cm.Get(string(mode), http.MethodPost)
@@ -525,7 +568,7 @@ func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.Bac
 // requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
 func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte) {
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 	daClient := standard_client.New(cfg)
 
@@ -542,7 +585,7 @@ func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []by
 
 // requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
 func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, precompute bool) {
-	daClient := altda.NewDAClient(ts.Address(), false, precompute)
+	daClient := altda.NewDAClient(ts.RestAddress(), false, precompute)
 
 	commit, err := daClient.SetInput(ts.Ctx, blob)
 	require.NoError(t, err)

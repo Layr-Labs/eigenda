@@ -110,33 +110,39 @@ func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *controller.AuthorizePaymentRequest,
 ) (*controller.AuthorizePaymentResponse, error) {
-	start := time.Now()
+	if s.paymentAuthorizationHandler == nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"payment authorization handler not configured, request=%s", request.String()))
+	}
+
+	probe := s.metrics.NewPaymentAuthorizationProbe()
 	success := false
 	defer func() {
-		if success {
-			s.metrics.ReportAuthorizePaymentLatency(time.Since(start))
-		} else {
-			s.metrics.ReportAuthorizePaymentAuthFailure()
+		probe.End()
+		if !success {
+			s.metrics.ReportAuthorizePaymentFailure()
 		}
 	}()
 
-	if s.paymentAuthorizationHandler == nil {
-		return nil, api.NewErrorInternal("payment authorization handler not configured")
-	}
+	probe.SetStage("hash_authorize_payment_request")
 
 	requestHash, err := hashing.HashAuthorizePaymentRequest(request)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to hash request: %v, request=%s", err, request.String()))
 	}
+
+	probe.SetStage("replay_protection")
 
 	timestamp := time.Unix(0, request.GetBlobHeader().GetPaymentHeader().GetTimestamp())
 	err = s.replayGuardian.VerifyRequest(requestHash, timestamp)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("replay protection check failed: %v", err))
+		s.metrics.ReportPaymentAuthReplayProtectionFailure()
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"replay protection check failed: %v, request=%s", err, request.String()))
 	}
 
 	response, err := s.paymentAuthorizationHandler.AuthorizePayment(
-		ctx, request.GetBlobHeader(), request.GetClientSignature())
+		ctx, request.GetBlobHeader(), request.GetClientSignature(), probe)
 	if err != nil {
 		return nil, err
 	}
