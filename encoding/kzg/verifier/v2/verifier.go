@@ -3,10 +3,11 @@ package verifier
 import (
 	"errors"
 	"fmt"
-	"math"
+	gomath "math"
 	"math/bits"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/resources/srs"
 
@@ -84,7 +85,7 @@ func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 	}
 
 	// Create FFT settings based on params
-	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
 
 	return &ParametrizedVerifier{
@@ -109,7 +110,7 @@ func (v *Verifier) VerifyLengthProof(
 	lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, commitmentLength uint64,
 ) error {
 	// This also prevents commitmentLength=0.
-	if !encoding.IsPowerOfTwo(commitmentLength) {
+	if !math.IsPowerOfTwo(commitmentLength) {
 		return fmt.Errorf("commitment length %d is not a power of 2", commitmentLength)
 	}
 	// Because commitmentLength is power of 2, we know its represented as 100..0 in binary,
