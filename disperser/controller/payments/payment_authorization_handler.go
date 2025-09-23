@@ -43,13 +43,11 @@ func NewPaymentAuthorizationHandler(
 		panic("reservationValidator cannot be nil")
 	}
 
-	handler := &PaymentAuthorizationHandler{
+	return &PaymentAuthorizationHandler{
 		onDemandMeterer:      onDemandMeterer,
 		onDemandValidator:    onDemandValidator,
 		reservationValidator: reservationValidator,
 	}
-
-	return handler
 }
 
 // Checks whether the payment is valid.
