@@ -38,8 +38,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 )
@@ -143,7 +141,9 @@ func setupSuite() error {
 		dockerNetwork, err = network.New(context.Background(),
 			network.WithDriver("bridge"),
 			network.WithAttachable())
-		Expect(err).To(BeNil(), "failed to create Docker network")
+		if err != nil {
+			return fmt.Errorf("failed to create docker network: %w", err)
+		}
 		logger.Info("Created Docker network", "name", dockerNetwork.Name)
 
 		if !inMemoryBlobStore {
@@ -182,7 +182,9 @@ func setupSuite() error {
 			Logger:         logger,
 			Network:        dockerNetwork,
 		})
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to start anvil: %w", err)
+		}
 		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
 		logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
@@ -202,7 +204,9 @@ func setupSuite() error {
 				Logger:         logger,
 				Network:        dockerNetwork,
 			})
-			Expect(err).To(BeNil())
+			if err != nil {
+				return fmt.Errorf("failed to start graph node: %w", err)
+			}
 		}
 
 		logger.Info("Deploying experiment")
