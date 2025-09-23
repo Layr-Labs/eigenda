@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -627,7 +628,7 @@ func TestInvalidLength(t *testing.T) {
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Changing the number of commitments should cause an error before a validity check of the commitments
 	commitments.Length += 1
@@ -678,7 +679,7 @@ func TestTooShortCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Length we are commiting to should be a power of 2.
-	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+	require.Equal(t, uint64(commitments.Length), math.NextPowOf2u64(uint64(commitments.Length)))
 
 	// Choose a smaller commitment length than is legal. Make sure it's a power of 2 so that it doesn't
 	// fail prior to the commitment length check.
