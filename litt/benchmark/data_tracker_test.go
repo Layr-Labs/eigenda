@@ -1,19 +1,19 @@
 package benchmark
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	config2 "github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTrackerDeterminism(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -28,9 +28,9 @@ func TestTrackerDeterminism(t *testing.T) {
 	// Generate enough data to fill 10ish cohorts.
 	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
 
-	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, config.LittConfig.Logger, nil)
 
-	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err := NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	// map from indices to keys
@@ -57,8 +57,7 @@ func TestTrackerDeterminism(t *testing.T) {
 	require.NoError(t, err)
 	err = os.MkdirAll(directory, os.ModePerm)
 	require.NoError(t, err)
-
-	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err = NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	for i := uint64(0); i < keyCount; i++ {
@@ -79,6 +78,7 @@ func TestTrackerDeterminism(t *testing.T) {
 }
 
 func TestTrackerRestart(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -92,9 +92,9 @@ func TestTrackerRestart(t *testing.T) {
 	// Generate enough data to fill 10ish cohorts.
 	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
 
-	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, config.LittConfig.Logger, nil)
 
-	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err := NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	indexSet := make(map[uint64]struct{})
@@ -114,7 +114,7 @@ func TestTrackerRestart(t *testing.T) {
 
 	// Restart.
 	dataTracker.Close()
-	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err = NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	// Generate more values.
@@ -136,6 +136,7 @@ func TestTrackerRestart(t *testing.T) {
 }
 
 func TestTrackReads(t *testing.T) {
+	ctx := t.Context()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -149,9 +150,9 @@ func TestTrackReads(t *testing.T) {
 	// Generate enough data to fill exactly 10 cohorts.
 	keyCount := 10 * config.CohortSize
 
-	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+	errorMonitor := util.NewErrorMonitor(ctx, config.LittConfig.Logger, nil)
 
-	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err := NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	keyToIndexMap := make(map[string]uint64)
@@ -224,7 +225,7 @@ func TestTrackReads(t *testing.T) {
 
 	// Restart the tracker without marking any of the new data as having been written.
 	dataTracker.Close()
-	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
+	dataTracker, err = NewDataTracker(ctx, config, errorMonitor)
 	require.NoError(t, err)
 
 	// Read a bunch of data.

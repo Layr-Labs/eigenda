@@ -107,15 +107,9 @@ func NodeMain(ctx *cli.Context) error {
 		return fmt.Errorf("failed to get ServiceManager address: %w", err)
 	}
 
-	// Create the node.
+	// Create and start the node.
 	node, err := node.NewNode(context.Background(), reg, config, contractDirectory, pubIPProvider, client, logger)
 	if err != nil {
-		return err
-	}
-
-	err = node.Start(context.Background())
-	if err != nil {
-		node.Logger.Error("could not start node", "error", err)
 		return err
 	}
 

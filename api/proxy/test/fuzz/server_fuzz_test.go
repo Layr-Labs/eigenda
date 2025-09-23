@@ -39,7 +39,7 @@ func fuzzProxyClientServer(f *testing.F, dispersalBackend common.EigenDABackend)
 	f.Add(b)
 
 	cfg := &standard_client.Config{
-		URL: ts.Address(),
+		URL: ts.RestAddress(),
 	}
 
 	daClient := standard_client.New(cfg)

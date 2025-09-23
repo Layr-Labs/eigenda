@@ -70,12 +70,9 @@ type ReservationLedgerCache struct {
 func NewReservationLedgerCache(
 	ctx context.Context,
 	logger logging.Logger,
-	maxLedgers int,
+	config ReservationLedgerCacheConfig,
 	paymentVault payments.PaymentVault,
 	timeSource func() time.Time,
-	overfillBehavior OverfillBehavior,
-	bucketCapacityPeriod time.Duration,
-	updateInterval time.Duration,
 ) (*ReservationLedgerCache, error) {
 	if paymentVault == nil {
 		return nil, errors.New("payment vault must be non-nil")
@@ -85,10 +82,6 @@ func NewReservationLedgerCache(
 		return nil, errors.New("time source must be non-nil")
 	}
 
-	if bucketCapacityPeriod <= 0 {
-		return nil, errors.New("bucket capacity period must be > 0")
-	}
-
 	minNumSymbols, err := paymentVault.GetMinNumSymbols(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get min num symbols: %w", err)
@@ -96,16 +89,16 @@ func NewReservationLedgerCache(
 
 	ledgerCache := &ReservationLedgerCache{
 		logger:               logger,
-		maxLedgers:           maxLedgers,
+		maxLedgers:           config.MaxLedgers,
 		paymentVault:         paymentVault,
 		timeSource:           timeSource,
-		overfillBehavior:     overfillBehavior,
-		bucketCapacityPeriod: bucketCapacityPeriod,
+		overfillBehavior:     config.OverfillBehavior,
+		bucketCapacityPeriod: config.BucketCapacityPeriod,
 		minNumSymbols:        minNumSymbols,
 		ledgerCreationLock:   common.NewIndexLock(256),
 	}
 
-	ledgerCache.cache, err = lru.NewWithEvict(maxLedgers, ledgerCache.handleEviction)
+	ledgerCache.cache, err = lru.NewWithEvict(config.MaxLedgers, ledgerCache.handleEviction)
 	if err != nil {
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
@@ -114,7 +107,7 @@ func NewReservationLedgerCache(
 		ctx,
 		logger,
 		paymentVault,
-		updateInterval,
+		config.UpdateInterval,
 		// relatively arbitrary value. much higher than account number in practice, but much lower than what the RPC
 		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
 		// in a config value

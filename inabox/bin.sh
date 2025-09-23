@@ -262,39 +262,14 @@ function force_stop {
     echo "All processes force killed"
 }
 
-function start_graph {
-
-    echo "Starting graph node ....."
-    pushd ./thegraph
-        docker compose up -d
-    popd
-     ./wait-for http://0.0.0.0:8000 -- echo "GraphQL up"
-
-     if [ $? -ne 0 ]; then
-        echo "Failed to start graph node"
-        exit 1
-     fi
-
-    echo "Graph node started ....."
-}
-
-function stop_graph {
-
-    pushd ./thegraph
-        docker compose down -v
-    popd
-}
-
 help() {
-    echo "Usage: $0 {start|start-detached|stop-detached|force-stop|start-graph|stop-graph}"
+    echo "Usage: $0 {start|start-detached|stop-detached|force-stop}"
     echo ""
     echo "Commands:"
-    echo "  start               Start all services in the foreground with trap on SIGINT"
+    echo "  start              Start all services in the foreground with trap on SIGINT"
     echo "  start-detached     Start all services in the background and log output to files"
     echo "  stop-detached      Stop all background services started with start-detached"
     echo "  force-stop         Force kill all EigenDA related processes"
-    echo "  start-graph        Start The Graph node using Docker Compose"
-    echo "  stop-graph         Stop The Graph node and remove associated volumes"
     echo ""
     echo "Logs are stored in $testpath/logs/"
     echo "PIDs of detached processes are stored in $testpath/pids"
@@ -309,10 +284,6 @@ case "$1" in
         stop_detached ${@:2} ;;
     force-stop)
         force_stop ${@:2} ;;
-    start-graph)
-        start_graph ${@:2} ;;
-    stop-graph)
-        stop_graph ${@:2} ;;
     help)
         help;;
     *)

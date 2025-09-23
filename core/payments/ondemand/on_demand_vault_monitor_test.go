@@ -6,17 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
 		monitor, err := NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
 			1024,
@@ -29,8 +30,8 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 
 	t.Run("negative interval", func(t *testing.T) {
 		monitor, err := NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
 			1024,
@@ -43,7 +44,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -68,7 +69,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 
 	monitor, err := NewOnDemandVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		2, // Small batch size to force multiple batches
@@ -78,9 +79,10 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 
-	time.Sleep(updateInterval * 10)
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
-	require.Equal(t, len(accounts), len(capturedUpdates))
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
@@ -96,10 +98,9 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	capturedUpdates = make(map[gethcommon.Address]*big.Int)
 
 	// Wait for the monitor to fetch the updated deposits
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated again
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
 	// Check that the specific account was updated correctly
 	updatedDeposit, ok := capturedUpdates[testAccount]
@@ -119,7 +120,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	updateInterval := time.Millisecond
 
@@ -142,7 +143,7 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 
 	monitor, err := NewOnDemandVaultMonitor(
 		ctx,
-		testutils.GetLogger(),
+		test.GetLogger(),
 		testVault,
 		updateInterval,
 		0, // Batch size 0 means no batching - all accounts in one call
@@ -153,10 +154,9 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	// Wait for updates
-	time.Sleep(updateInterval * 10)
-
-	// Verify all accounts were updated correctly with no batching
-	require.Equal(t, len(accounts), len(capturedUpdates))
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())

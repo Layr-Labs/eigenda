@@ -4,16 +4,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWriteThenReadValues(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -99,8 +98,7 @@ func TestWriteThenReadValues(t *testing.T) {
 func TestReadingTruncatedValueFile(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()

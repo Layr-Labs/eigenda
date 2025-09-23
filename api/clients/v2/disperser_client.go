@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
@@ -35,7 +36,7 @@ type DisperserClient struct {
 	config                  *DisperserClientConfig
 	signer                  corev2.BlobRequestSigner
 	clientPool              *common.GRPCClientPool[disperser_rpc.DisperserClient]
-	prover                  encoding.Prover
+	prover                  *prover.Prover
 	accountant              *Accountant
 	accountantLock          sync.Mutex
 	initOnceAccountant      sync.Once
@@ -67,7 +68,7 @@ func NewDisperserClient(
 	logger logging.Logger,
 	config *DisperserClientConfig,
 	signer corev2.BlobRequestSigner,
-	prover encoding.Prover,
+	prover *prover.Prover,
 	accountant *Accountant,
 	metrics metrics.DispersalMetricer,
 ) (*DisperserClient, error) {
