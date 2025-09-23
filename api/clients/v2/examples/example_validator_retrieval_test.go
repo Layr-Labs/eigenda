@@ -39,10 +39,19 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create contract directory: %v", err))
 	}
 
-	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
-		context.Background(), directory.CertVerifierRouter)
+	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(ctx, directory.CertVerifierRouter)
 	if err != nil {
 		panic(fmt.Sprintf("get cert verifier router address: %v", err))
+	}
+
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		panic(fmt.Sprintf("get OperatorStateRetriever address: %v", err))
+	}
+
+	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		panic(fmt.Sprintf("get RegistryCoordinator address: %v", err))
 	}
 
 	// Create a payload disperser and disperse a sample payload to EigenDA
@@ -66,7 +75,8 @@ func Example_validatorPayloadRetrieval() {
 	fmt.Printf("Successfully dispersed payload\n")
 
 	// Create a validator payload retriever to retrieve directly from validator nodes
-	validatorPayloadRetriever, err := createValidatorPayloadRetriever(logger, ethClient, contractDirectory)
+	validatorPayloadRetriever, err := createValidatorPayloadRetriever(
+		logger, ethClient, operatorStateRetrieverAddr, registryCoordinatorAddr)
 	if err != nil {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}

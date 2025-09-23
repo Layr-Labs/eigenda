@@ -82,9 +82,26 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
 
-	certBuilder, err := createCertBuilder(contractDirectory)
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.OperatorStateRetriever)
 	if err != nil {
-		return nil, fmt.Errorf("create cert builder: %w", err)
+		return nil, fmt.Errorf("get OperatorStateRetriever address: %w", err)
+	}
+
+	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.RegistryCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("get RegistryCoordinator address: %w", err)
+	}
+
+	certBuilder, err := clients.NewCertBuilder(
+		logger,
+		operatorStateRetrieverAddr,
+		registryCoordinatorAddr,
+		ethClient,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new cert builder: %w", err)
 	}
 
 	blockNumMonitor, err := createBlockNumberMonitor()
@@ -135,12 +152,18 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 func createRelayPayloadRetriever(
 	logger logging.Logger,
 	ethClient *geth.EthClient,
-	contractDirectory *directory.ContractDirectory,
+	operatorStateRetrieverAddr gethcommon.Address,
+	serviceManagerAddr gethcommon.Address,
 ) (*payloadretrieval.RelayPayloadRetriever, error) {
 
-	reader, err := createEthReader(logger, ethClient, contractDirectory)
+	reader, err := eth.NewReader(
+		logger,
+		ethClient,
+		operatorStateRetrieverAddr.Hex(),
+		serviceManagerAddr.Hex(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create eth reader: %w", err)
+		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
 	relayClient, err := createRelayClient(logger, ethClient, reader.GetRelayRegistryAddress())
@@ -170,12 +193,17 @@ func createRelayPayloadRetriever(
 func createValidatorPayloadRetriever(
 	logger logging.Logger,
 	ethClient *geth.EthClient,
-	contractDirectory *directory.ContractDirectory,
+	operatorStateRetrieverAddr gethcommon.Address,
+	serviceManagerAddr gethcommon.Address,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
-	// Create the eth reader
-	ethReader, err := createEthReader(logger, ethClient, contractDirectory)
+	ethReader, err := eth.NewReader(
+		logger,
+		ethClient,
+		operatorStateRetrieverAddr.Hex(),
+		serviceManagerAddr.Hex(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("create eth reader: %w", err)
+		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
 	chainState := eth.NewChainState(ethReader, ethClient)
@@ -291,37 +319,6 @@ func createCertVerifier(
 	return verification.NewCertVerifier(logger, ethClient, routerAddressProvider)
 }
 
-func createCertBuilder(contractDirectory *directory.ContractDirectory) (*clients.CertBuilder, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %v", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
-		context.Background(), directory.OperatorStateRetriever)
-	if err != nil {
-		return nil, fmt.Errorf("get OperatorStateRetriever address: %w", err)
-	}
-
-	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(
-		context.Background(), directory.RegistryCoordinator)
-	if err != nil {
-		return nil, fmt.Errorf("get RegistryCoordinator address: %w", err)
-	}
-
-	return clients.NewCertBuilder(
-		logger,
-		operatorStateRetrieverAddr,
-		registryCoordinatorAddr,
-		ethClient,
-	)
-}
-
 func createBlockNumberMonitor() (*verification.BlockNumberMonitor, error) {
 	logger, err := createLogger()
 	if err != nil {
@@ -366,35 +363,6 @@ func createKzgConfig() kzg.KzgConfig {
 		SRSNumberToLoad: uint64(1<<13) / encoding.BYTES_PER_SYMBOL,
 		NumWorker:       4,
 	}
-}
-
-func createEthReader(
-	logger logging.Logger,
-	ethClient common.EthClient,
-	contractDirectory *directory.ContractDirectory,
-) (*eth.Reader, error) {
-	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
-		context.Background(), directory.OperatorStateRetriever)
-	if err != nil {
-		return nil, fmt.Errorf("get OperatorStateRetriever address: %w", err)
-	}
-
-	serviceManagerAddr, err := contractDirectory.GetContractAddress(context.Background(), directory.ServiceManager)
-	if err != nil {
-		return nil, fmt.Errorf("get ServiceManager address: %w", err)
-	}
-
-	ethReader, err := eth.NewReader(
-		logger,
-		ethClient,
-		operatorStateRetrieverAddr.Hex(),
-		serviceManagerAddr.Hex(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	return ethReader, nil
 }
 
 func createLogger() (logging.Logger, error) {

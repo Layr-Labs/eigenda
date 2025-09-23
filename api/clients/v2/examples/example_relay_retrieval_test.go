@@ -37,6 +37,16 @@ func Example_relayPayloadRetrieval() {
 		panic(fmt.Sprintf("create contract directory: %v", err))
 	}
 
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		panic(fmt.Sprintf("get OperatorStateRetriever address: %v", err))
+	}
+
+	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		panic(fmt.Sprintf("get RegistryCoordinator address: %v", err))
+	}
+
 	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
 		context.Background(), directory.CertVerifierRouter)
 	if err != nil {
@@ -64,7 +74,8 @@ func Example_relayPayloadRetrieval() {
 	fmt.Printf("Successfully dispersed payload\n")
 
 	// Create a payload retriever to retrieve from EigenDA relays
-	payloadRetriever, err := createRelayPayloadRetriever(logger, ethClient, contractDirectory)
+	payloadRetriever, err := createRelayPayloadRetriever(
+		logger, ethClient, operatorStateRetrieverAddr, registryCoordinatorAddr)
 	if err != nil {
 		panic(fmt.Sprintf("create relay payload retriever: %v", err))
 	}
