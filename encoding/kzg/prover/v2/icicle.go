@@ -49,16 +49,15 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		Srs:            p.Srs,
 		NttCfg:         icicleDevice.NttCfg,
 		MsmCfg:         icicleDevice.MsmCfg,
-		KzgConfig:      p.KzgConfig,
 		Device:         icicleDevice.Device,
 		GpuLock:        sync.Mutex{},
+		NumWorker:      p.KzgConfig.NumWorker,
 	}
 
 	// Set up gnark commitments backend
 	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
-		KzgConfig:  p.KzgConfig,
 	}
 
 	return &ParametrizedProver{

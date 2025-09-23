@@ -20,7 +20,6 @@ import (
 )
 
 type KzgMultiProofIcicleBackend struct {
-	*kzg.KzgConfig
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []iciclebn254.Affine
 	SRSIcicle      []iciclebn254.Affine
@@ -30,6 +29,7 @@ type KzgMultiProofIcicleBackend struct {
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
 	GpuLock        sync.Mutex
+	NumWorker      uint64
 }
 
 type WorkerResult struct {
