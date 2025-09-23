@@ -11,9 +11,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigenda/test/random"
@@ -84,7 +84,7 @@ func NewLoadGenerator(
 	// The size of the blob we want to send.
 	targetBlobSize := uint64(config.BlobSizeMB * units.MiB)
 	// The target blob size must be a power of 2.
-	targetBlobSize = encoding.NextPowerOf2(targetBlobSize)
+	targetBlobSize = math.NextPowOf2u64(targetBlobSize)
 
 	// The size of the payload necessary to create a blob of the target size.
 	payloadSize, err := codec.BlobSizeToMaxPayloadSize(uint32(targetBlobSize))
