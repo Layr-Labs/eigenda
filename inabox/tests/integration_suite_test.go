@@ -52,6 +52,7 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 var (
 	anvilContainer     *testbed.AnvilContainer
 	graphNodeContainer *testbed.GraphNodeContainer
+	churnerContainer   *testbed.ChurnerContainer
 	// chainDockerNetwork is only used by anvil and graphNode
 	chainDockerNetwork *testcontainers.DockerNetwork
 
@@ -235,6 +236,14 @@ func setupSuite() error {
 		if err != nil {
 			return fmt.Errorf("failed to mine block: %w", err)
 		}
+
+		logger.Info("Starting churner container")
+		churnerConfig := setupChurnerConfig(testConfig)
+		churnerContainer, err = testbed.NewChurnerContainerWithNetwork(ctx, churnerConfig, dockerNetwork)
+		if err != nil {
+			return fmt.Errorf("failed to start churner container: %w", err)
+		}
+		logger.Info("Churner container started", "url", churnerContainer.URL())
 
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
@@ -518,6 +527,35 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	return err
 }
 
+func setupChurnerConfig(testConfig *deploy.Config) testbed.ChurnerConfig {
+	config := testbed.DefaultChurnerConfig()
+
+	// Set contract addresses
+	config.ServiceManager = testConfig.EigenDA.ServiceManager
+	config.OperatorStateRetriever = testConfig.EigenDA.OperatorStateRetriever
+	config.EigenDADirectory = testConfig.EigenDA.EigenDADirectory
+
+	// Use internal network address for Anvil when running in container
+	config.ChainRPC = "http://anvil:8545"
+
+	// Get deployer's private key
+	deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+	if ok && deployer.Name != "" {
+		config.PrivateKey = strings.TrimPrefix(testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey, "0x")
+	}
+
+	// Set graph URL if graph node is enabled
+	if deployer.DeploySubgraphs && graphNodeContainer != nil {
+		// Use internal network address for Graph node when running in container
+		config.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+	}
+
+	config.ExposeHostPort = true
+	config.GRPCPort = "32002"
+
+	return config
+}
+
 func teardownSuite() {
 	logger.Info("Tearing down test environment")
 
@@ -534,6 +572,13 @@ func teardownSuite() {
 
 	logger.Info("Stopping binaries")
 	testConfig.StopBinaries()
+
+	if churnerContainer != nil {
+		logger.Info("Stopping churner container")
+		if err := churnerContainer.Stop(ctx); err != nil {
+			logger.Warn("Failed to stop churner container", "error", err)
+		}
+	}
 
 	logger.Info("Stopping anvil")
 	if anvilContainer != nil {

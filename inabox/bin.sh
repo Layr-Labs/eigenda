@@ -19,13 +19,8 @@ function kill_processes {
 function start_trap {
     trap kill_processes SIGINT
 
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    ../operators/churner/bin/server &
-
-    pid="$!"
-    pids="$pids $pid"
+    # Churner is now started as a Docker container in the integration test
+    # Skipping churner binary start
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -115,16 +110,8 @@ function start_detached {
 
     mkdir -p $testpath/logs
 
-    set -a
-    source $testpath/envs/churner.env
-    set +a
-    ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
-
-    pid="$!"
-    pids="$pids $pid"
-
-    ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -- echo "Churner up" &
-    waiters="$waiters $!"
+    # Churner is now started as a Docker container in the integration test
+    # Skipping churner binary start
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -250,7 +237,6 @@ function stop_detached {
 
 function force_stop {
     echo "Force stopping all EigenDA processes..."
-    pkill -9 -f "churner/bin/server" || true
     pkill -9 -f "disperser/bin/server" || true
     pkill -9 -f "disperser/bin/encoder" || true
     pkill -9 -f "disperser/bin/batcher" || true

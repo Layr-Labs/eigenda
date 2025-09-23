@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -52,6 +53,8 @@ type ChurnerConfig struct {
 	// Container configuration (not exposed as env vars)
 	Image          string        `env:"-"`
 	StartupTimeout time.Duration `env:"-"`
+	ExposeHostPort bool          `env:"-"` // If true, binds container port to host port
+	HostPort       string        `env:"-"` // Custom host port to bind to (defaults to GRPCPort if empty and ExposeHostPort is true)
 
 	// Additional env vars that don't have direct struct fields
 	LogPath string `env:"CHURNER_LOG_PATH"`
@@ -76,7 +79,7 @@ func DefaultChurnerConfig() ChurnerConfig {
 		LogFormat:              "text",
 		LogLevel:               "debug",
 		Hostname:               "0.0.0.0",
-		GRPCPort:               "32001",
+		GRPCPort:               "32002",
 		EigenDADirectory:       "", // Will be populated from contract deployment
 		OperatorStateRetriever: "", // Will be populated from contract deployment
 		ServiceManager:         "", // Will be populated from contract deployment
@@ -89,6 +92,8 @@ func DefaultChurnerConfig() ChurnerConfig {
 		ChurnApprovalInterval:  900 * time.Second,
 		Image:                  "ghcr.io/layr-labs/eigenda/churner:dev",
 		StartupTimeout:         30 * time.Second,
+		ExposeHostPort:         false,
+		HostPort:               "",
 	}
 }
 
@@ -169,6 +174,34 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 	// Add metrics port if enabled
 	if config.EnableMetrics {
 		req.ExposedPorts = append(req.ExposedPorts, config.MetricsHTTPPort+"/tcp")
+	}
+
+	// Add host port binding if requested
+	if config.ExposeHostPort {
+		hostPort := config.HostPort
+		if hostPort == "" {
+			hostPort = config.GRPCPort
+		}
+		req.HostConfigModifier = func(hc *container.HostConfig) {
+			hc.PortBindings = nat.PortMap{
+				nat.Port(config.GRPCPort + "/tcp"): []nat.PortBinding{
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: hostPort,
+					},
+				},
+			}
+			// Also bind metrics port if enabled
+			if config.EnableMetrics {
+				metricsHostPort := config.MetricsHTTPPort
+				hc.PortBindings[nat.Port(config.MetricsHTTPPort+"/tcp")] = []nat.PortBinding{
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: metricsHostPort,
+					},
+				}
+			}
+		}
 	}
 
 	// Create and start container
