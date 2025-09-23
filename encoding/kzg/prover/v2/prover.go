@@ -175,6 +175,8 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, fmt.Errorf("ToFrArray: %w", err)
 	}
 
+	// TODO(samlaf): why do we hardcode these params here?
+	// Would we ever need/want to change them?
 	params := encoding.EncodingParams{
 		NumChunks:   2,
 		ChunkLength: 2,

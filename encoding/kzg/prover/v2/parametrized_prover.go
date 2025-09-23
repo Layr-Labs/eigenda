@@ -56,58 +56,6 @@ type proofsResult struct {
 	Err      error
 }
 
-type commitmentsResult struct {
-	commitment       *bn254.G1Affine
-	lengthCommitment *bn254.G2Affine
-	lengthProof      *bn254.G2Affine
-	Error            error
-}
-
-func (g *ParametrizedProver) Encode(
-	inputFr []fr.Element,
-) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-	if err := g.validateInput(inputFr); err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-
-	encodeStart := time.Now()
-
-	commitmentsChan := make(chan commitmentsResult, 1)
-
-	// inputFr is untouched
-	// compute chunks
-	go func() {
-		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr)
-
-		commitmentsChan <- commitmentsResult{
-			commitment:       commitment,
-			lengthCommitment: lengthCommitment,
-			lengthProof:      lengthProof,
-			Error:            err,
-		}
-	}()
-
-	frames, indices, err := g.GetFrames(inputFr)
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-
-	commitmentResult := <-commitmentsChan
-	if commitmentResult.Error != nil {
-		return nil, nil, nil, nil, nil, commitmentResult.Error
-	}
-
-	slog.Info("Encoding process details",
-		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Num_chunks", g.encodingParams.NumChunks,
-		"Chunk_length", g.encodingParams.ChunkLength,
-		"Total_duration", time.Since(encodeStart),
-	)
-
-	return commitmentResult.commitment, commitmentResult.lengthCommitment,
-		commitmentResult.lengthProof, frames, indices, nil
-}
-
 func (g *ParametrizedProver) GetCommitments(
 	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
