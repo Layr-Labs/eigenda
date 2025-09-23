@@ -69,7 +69,7 @@ func (tem *ThreadedEjectionManager) mainLoop() {
 			tem.logger.Info("Ejection manager shutting down")
 			return
 		case request := <-tem.ejectionRequestChan:
-			tem.ejectionManager.BeginEjection(request)
+			tem.ejectionManager.BeginEjection(request, nil) // TODO
 		case <-ticker.C:
 			tem.ejectionManager.FinalizeEjections()
 		}

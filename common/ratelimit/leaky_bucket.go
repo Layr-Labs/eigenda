@@ -95,8 +95,8 @@ func NewLeakyBucket(
 //
 // If the bucket doesn't have enough capacity to accommodate the fill, "water" IS NOT added to the bucket, i.e. a
 // failed fill doesn't count against the meter.
-func (lb *LeakyBucket) Fill(now time.Time, quantity uint32) (bool, error) {
-	if quantity == 0 {
+func (lb *LeakyBucket) Fill(now time.Time, quantity float64) (bool, error) {
+	if quantity <= 0 {
 		return false, errors.New("quantity must be > 0")
 	}
 
@@ -106,7 +106,7 @@ func (lb *LeakyBucket) Fill(now time.Time, quantity uint32) (bool, error) {
 	}
 
 	// this is how full the bucket would be, if the fill were to be accepted
-	newFillLevel := lb.currentFillLevel + float64(quantity)
+	newFillLevel := lb.currentFillLevel + quantity
 
 	// if newFillLevel is <= the total bucket capacity, no further checks are required
 	if newFillLevel <= lb.bucketCapacity {
@@ -168,8 +168,8 @@ func (lb *LeakyBucket) SetFillLevel(now time.Time, fillLevel float64) error {
 // - Returns a generic error for all other modes of failure.
 //
 // The input time should be the most up-to-date time, NOT the time of the original fill.
-func (lb *LeakyBucket) RevertFill(now time.Time, quantity uint32) error {
-	if quantity == 0 {
+func (lb *LeakyBucket) RevertFill(now time.Time, quantity float64) error {
+	if quantity <= 0 {
 		return errors.New("quantity must be > 0")
 	}
 
@@ -178,7 +178,7 @@ func (lb *LeakyBucket) RevertFill(now time.Time, quantity uint32) error {
 		return fmt.Errorf("leak: %w", err)
 	}
 
-	lb.currentFillLevel = lb.currentFillLevel - float64(quantity)
+	lb.currentFillLevel = lb.currentFillLevel - quantity
 
 	// Ensure fill level doesn't go negative
 	if lb.currentFillLevel < 0 {

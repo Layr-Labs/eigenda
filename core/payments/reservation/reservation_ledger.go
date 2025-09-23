@@ -88,7 +88,7 @@ func (rl *ReservationLedger) Debit(
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	success, err := rl.leakyBucket.Fill(now, billableSymbols)
+	success, err := rl.leakyBucket.Fill(now, float64(billableSymbols))
 	if err != nil {
 		return false, 0, fmt.Errorf("fill: %w", err)
 	}
@@ -112,7 +112,7 @@ func (rl *ReservationLedger) RevertDebit(now time.Time, symbolCount uint32) (flo
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	err := rl.leakyBucket.RevertFill(now, billableSymbols)
+	err := rl.leakyBucket.RevertFill(now, float64(billableSymbols))
 	if err != nil {
 		return 0, fmt.Errorf("revert fill: %w", err)
 	}

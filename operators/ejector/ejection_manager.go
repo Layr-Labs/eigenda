@@ -4,6 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	geth "github.com/ethereum/go-ethereum/common"
 )
@@ -14,13 +17,25 @@ import (
 type EjectionManager interface {
 
 	// Begin ejection proceedings against a validator. May not take action if it is not appropriate to do so.
-	BeginEjection(validatorAddress geth.Address)
+	BeginEjection(
+		validatorAddress geth.Address,
+	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
+		stakes map[core.QuorumID]float64,
+	)
 
 	// For all eligible ejections that have been started, check their status and finalize if appropriate.
 	FinalizeEjections()
 }
 
 var _ EjectionManager = (*ejectionManager)(nil)
+
+// Information tracked for each in-progress ejection.
+type inProgressEjection struct {
+	// The time the ejection was started.
+	ejectionStartTime time.Time
+	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
+	stake map[core.QuorumID]float64
+}
 
 // A utility that manages ejections and the ejection lifecycle. An ejection manager is responsible for executing
 // ejections, not deciding when it is appropriate to eject. That is to say, this utility does not monitor validator
@@ -39,11 +54,11 @@ type ejectionManager struct {
 	ejectionBlacklist map[geth.Address]struct{}
 
 	// The timestamps of recent ejection attempts, keyed by validator address.
-	recentEjections map[geth.Address]time.Time
+	recentEjectionTimes map[geth.Address]time.Time
 
 	// Ejections that have been started but not completed, keyed by validator address. The value is the
 	// time the ejection was started.
-	startedEjections map[geth.Address]time.Time
+	ejectionsInProgress map[geth.Address]*inProgressEjection
 
 	// The number of consecutive failed ejection attempts, keyed by validator address. If this exceeds a
 	// threshold, the validator is added to the ejection blacklist. For the purposes of this counter,
@@ -62,6 +77,10 @@ type ejectionManager struct {
 
 	// The maximum number of consecutive failed ejection attempts before a validator is blacklisted.
 	maxConsecutiveFailedEjectionAttempts uint32
+
+	// The rate limiter for ejection transactions, keyed by quorum ID. Limits the fraction of the stake (out of 1.0)
+	// that can be ejected per time period.
+	quorumRateLimits map[core.QuorumID]*ratelimit.LeakyBucket
 }
 
 // Create a new ejectionManager.
@@ -70,23 +89,25 @@ func NewEjectionManager(
 	logger logging.Logger,
 	timeSource func() time.Time,
 	transactor EjectionTransactor,
-	// the minimum time between starting an ejection and completing it
+// the minimum time between starting an ejection and completing it
 	ejectionDelay time.Duration,
-	// the minimum time between two consecutive ejection attempts for the same validator
+// the minimum time between two consecutive ejection attempts for the same validator
 	retryDelay time.Duration,
-	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
+// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
-	// the period between the background checks for ejection progress
+// the period between the background checks for ejection progress
 	period time.Duration,
 ) EjectionManager {
+
+	// TODO set up rate limits
 
 	return &ejectionManager{
 		ctx:                                  ctx,
 		logger:                               logger,
 		timeSource:                           timeSource,
 		ejectionBlacklist:                    make(map[geth.Address]struct{}),
-		recentEjections:                      make(map[geth.Address]time.Time),
-		startedEjections:                     make(map[geth.Address]time.Time),
+		recentEjectionTimes:                  make(map[geth.Address]time.Time),
+		ejectionsInProgress:                  make(map[geth.Address]*inProgressEjection),
 		failedEjectionAttempts:               make(map[geth.Address]uint32),
 		transactor:                           transactor,
 		ejectionDelay:                        ejectionDelay,
@@ -95,8 +116,11 @@ func NewEjectionManager(
 	}
 }
 
-// BeginEjection starts the ejection process for a validator if it is appropriate to do so.
-func (em *ejectionManager) BeginEjection(validatorAddress geth.Address) {
+func (em *ejectionManager) BeginEjection(
+	validatorAddress geth.Address,
+	stakes map[core.QuorumID]float64,
+) {
+
 	// Check to see if the validator is blacklisted.
 	if _, blacklisted := em.ejectionBlacklist[validatorAddress]; blacklisted {
 		em.logger.Infof("validator %s is blacklisted from ejection, skipping", validatorAddress.Hex())
@@ -104,13 +128,13 @@ func (em *ejectionManager) BeginEjection(validatorAddress geth.Address) {
 	}
 
 	// Check to see if we are already in the process of ejecting this validator.
-	if _, inProgress := em.startedEjections[validatorAddress]; inProgress {
+	if _, inProgress := em.ejectionsInProgress[validatorAddress]; inProgress {
 		em.logger.Infof("ejection already in progress for validator %s, skipping", validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if we have recently attempted to eject this validator.
-	if _, recentlyEjected := em.recentEjections[validatorAddress]; recentlyEjected {
+	if _, recentlyEjected := em.recentEjectionTimes[validatorAddress]; recentlyEjected {
 		em.logger.Infof("recent ejection attempt for validator %s, skipping", validatorAddress.Hex())
 		return
 	}
@@ -121,6 +145,17 @@ func (em *ejectionManager) BeginEjection(validatorAddress geth.Address) {
 		em.logger.Errorf("failed to check ejection status for validator %s: %v", validatorAddress.Hex(), err)
 		return
 	}
+
+	// Check if we are prevented from starting an ejection by rate limiting.
+	// TODO
+	//now := em.timeSource()
+	//permittedQuorums := make([]core.QuorumID, 0, len(stakes))
+	//for qid, stake := range stakes {
+	//	leakyBucket := em.getLeakyBucketForQuorum(qid)
+	//
+	//	err := leakyBucket.Fill(now, )
+	//
+	//}
 
 	if inProgress {
 		// An ejection is already in progress. Record it, and we can try to finalize it later.
@@ -134,11 +169,52 @@ func (em *ejectionManager) BeginEjection(validatorAddress geth.Address) {
 		}
 	}
 
-	em.recentEjections[validatorAddress] = em.timeSource()
-	em.startedEjections[validatorAddress] = em.timeSource()
+	em.recentEjectionTimes[validatorAddress] = em.timeSource()
+	em.ejectionsInProgress[validatorAddress] = &inProgressEjection{
+		ejectionStartTime: em.timeSource(),
+		stake:             stakes,
+	}
 }
 
-// cleanRecentEjections removes entries from recentEjections that are older than the retry delay. We only need
+func (em *ejectionManager) FinalizeEjections() {
+
+	em.cleanRecentEjections()
+
+	// Note: similar to cleanRecentEjections(), we are iterating a map here. At a certain scale a
+	// priority queue would be more efficient, but that optimization is premature at this time.
+
+	cutoff := em.timeSource().Add(-em.ejectionDelay)
+
+	for address, ejection := range em.ejectionsInProgress {
+		if ejection.ejectionStartTime.After(cutoff) {
+			// Not ready to finalize yet.
+			continue
+		}
+		em.finalizeEjection(address)
+	}
+}
+
+// Get the leaky bucket for a specific quorum, creating it if it doesn't already exist.
+func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit.LeakyBucket {
+	leakyBucket, ok := em.quorumRateLimits[qid]
+
+	if !ok {
+		var err error
+		leakyBucket, err = ratelimit.NewLeakyBucket(
+			100,
+			time.Minute,
+			false,
+			ratelimit.OverfillNotPermitted, em.timeSource()) // TODO proper config
+		em.quorumRateLimits[qid] = leakyBucket
+
+		// TODO check params in constructor
+		enforce.NilError(err, "should be impossible, leaky bucket parameters are pre-validated")
+	}
+
+	return leakyBucket
+}
+
+// cleanRecentEjections removes entries from recentEjectionTimes that are older than the retry delay. We only need
 // to remember prior ejections when those ejections prevent us from attempting a new ejection.
 func (em *ejectionManager) cleanRecentEjections() {
 
@@ -155,30 +231,10 @@ func (em *ejectionManager) cleanRecentEjections() {
 	// background goroutines, so that this loop is not blocked on network calls. Premature at current scale.
 
 	cutoff := em.timeSource().Add(-em.retryDelay)
-	for addr, ts := range em.recentEjections {
+	for addr, ts := range em.recentEjectionTimes {
 		if ts.Before(cutoff) {
-			delete(em.recentEjections, addr)
+			delete(em.recentEjectionTimes, addr)
 		}
-	}
-}
-
-// For each ejection that that was started long enough ago to be eligible for finalization, check the status
-// and finalize if appropriate.
-func (em *ejectionManager) FinalizeEjections() {
-
-	em.cleanRecentEjections()
-
-	// Note: similar to cleanRecentEjections(), we are iterating a map here. At a certain scale a
-	// priority queue would be more efficient, but that optimization is premature at this time.
-
-	cutoff := em.timeSource().Add(-em.ejectionDelay)
-
-	for address, ejectionStartedTimestamp := range em.startedEjections {
-		if ejectionStartedTimestamp.After(cutoff) {
-			// Not ready to finalize yet.
-			continue
-		}
-		em.finalizeEjection(address)
 	}
 }
 
@@ -206,7 +262,7 @@ func (em *ejectionManager) finalizeEjection(address geth.Address) {
 	}
 
 	em.logger.Infof("successfully completed ejection for validator %s", address.Hex())
-	delete(em.startedEjections, address)
+	delete(em.ejectionsInProgress, address)
 	delete(em.failedEjectionAttempts, address)
 }
 
@@ -238,6 +294,6 @@ func (em *ejectionManager) handleAbortedEjection(address geth.Address) {
 		em.logger.Infof("validator %s no longer present in any quorum, ejection complete", address.Hex())
 	}
 
-	delete(em.startedEjections, address)
+	delete(em.ejectionsInProgress, address)
 	return
 }
