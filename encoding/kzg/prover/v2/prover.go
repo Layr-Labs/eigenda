@@ -19,6 +19,10 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
+// Prover is the main struct that is able to generate KZG commitments and proofs.
+// TODO(samlaf): we should split the kzg commitment functionality into its own struct/service.
+// In EigenDA V2, commitments are generated client side (or on the API server) and proofs are generated on the encoder.
+// It would make it a lot cleaner, as well as more explicit which exact SRS points are needed for which functionality.
 type Prover struct {
 	Config     *encoding.Config
 	KzgConfig  *KzgConfig

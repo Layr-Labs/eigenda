@@ -14,6 +14,10 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// ParametrizedProver is a prover that is configured for a specific encoding configuration.
+// It contains a specific FFT setup and pre-transformed SRS points for that specific encoding config.
+// Note that commitments are not dependent on the FFT setup.
+// TODO(samlaf): move the commitment functionality back to the prover, not parametrizedProver.
 type ParametrizedProver struct {
 	srsNumberToLoad uint64
 
