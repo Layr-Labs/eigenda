@@ -15,13 +15,12 @@ import (
 )
 
 type ParametrizedProver struct {
-	encoding.EncodingParams
-	*rs.Encoder
+	encodingParams encoding.EncodingParams
+	encoder        *rs.Encoder
 
-	KzgConfig *KzgConfig
-
-	KzgMultiProofBackend  KzgMultiProofsBackendV2
-	KzgCommitmentsBackend KzgCommitmentsBackendV2
+	kzgConfig             *KzgConfig
+	kzgMultiProofBackend  KzgMultiProofsBackendV2
+	kzgCommitmentsBackend KzgCommitmentsBackendV2
 }
 
 type rsEncodeResult struct {
@@ -110,8 +109,8 @@ func (g *ParametrizedProver) Encode(
 
 	slog.Info("Encoding process details",
 		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Num_chunks", g.NumChunks,
-		"Chunk_length", g.ChunkLength,
+		"Num_chunks", g.encodingParams.NumChunks,
+		"Chunk_length", g.encodingParams.ChunkLength,
 		"Total_duration", time.Since(encodeStart),
 	)
 
@@ -125,7 +124,7 @@ func (g *ParametrizedProver) Decode(frames []encoding.Frame, indices []uint64, m
 		rsFrames[ind] = frame.Coeffs
 	}
 
-	b, err := g.Encoder.Decode(rsFrames, indices, maxInputSize, g.EncodingParams)
+	b, err := g.encoder.Decode(rsFrames, indices, maxInputSize, g.encodingParams)
 	if err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
@@ -148,7 +147,7 @@ func (g *ParametrizedProver) GetCommitments(
 	// compute commit for the full poly
 	go func() {
 		start := time.Now()
-		commit, err := g.KzgCommitmentsBackend.ComputeCommitmentV2(inputFr)
+		commit, err := g.kzgCommitmentsBackend.ComputeCommitmentV2(inputFr)
 		commitmentChan <- commitmentResult{
 			Commitment: commit,
 			Err:        err,
@@ -158,7 +157,7 @@ func (g *ParametrizedProver) GetCommitments(
 
 	go func() {
 		start := time.Now()
-		lengthCommitment, err := g.KzgCommitmentsBackend.ComputeLengthCommitmentV2(inputFr)
+		lengthCommitment, err := g.kzgCommitmentsBackend.ComputeLengthCommitmentV2(inputFr)
 		lengthCommitmentChan <- lengthCommitmentResult{
 			LengthCommitment: lengthCommitment,
 			Err:              err,
@@ -172,7 +171,7 @@ func (g *ParametrizedProver) GetCommitments(
 		// inputFr is not modified because padding with 0s doesn't change the commitment,
 		// but we need to pretend like it was actually padded with 0s to get the correct length proof.
 		blobLen := math.NextPowOf2u64(uint64(len(inputFr)))
-		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
+		lengthProof, err := g.kzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
 		lengthProofChan <- lengthProofResult{
 			LengthProof: lengthProof,
 			Err:         err,
@@ -219,7 +218,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	go func() {
 		start := time.Now()
 
-		frames, indices, err := g.Encoder.Encode(inputFr, g.EncodingParams)
+		frames, indices, err := g.encoder.Encode(inputFr, g.encodingParams)
 		rsChan <- rsEncodeResult{
 			Frames:   frames,
 			Indices:  indices,
@@ -231,7 +230,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	go func() {
 		start := time.Now()
 		// compute proofs
-		paddedCoeffs := make([]fr.Element, g.NumEvaluations())
+		paddedCoeffs := make([]fr.Element, g.encodingParams.NumEvaluations())
 		// polyCoeffs has less points than paddedCoeffs in general due to erasure redundancy
 		copy(paddedCoeffs, inputFr)
 
@@ -241,8 +240,8 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
 		}
 
-		proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProofV2(
-			flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.KzgConfig.NumWorker)
+		proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
+			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.kzgConfig.NumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
@@ -260,8 +259,8 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	totalProcessingTime := time.Since(encodeStart)
 	slog.Info("Frame process details",
 		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Num_chunks", g.NumChunks,
-		"Chunk_length", g.ChunkLength,
+		"Num_chunks", g.encodingParams.NumChunks,
+		"Chunk_length", g.encodingParams.ChunkLength,
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
@@ -283,9 +282,9 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 }
 
 func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
-	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
+	if len(inputFr) > int(g.kzgConfig.SRSNumberToLoad) {
 		return fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v",
-			len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+			len(inputFr), int(g.kzgConfig.SRSNumberToLoad))
 	}
 
 	return nil

@@ -337,11 +337,11 @@ func (p *Prover) createGnarkBackendProver(
 	}
 
 	return &ParametrizedProver{
-		Encoder:               p.encoder,
-		EncodingParams:        params,
-		KzgConfig:             p.KzgConfig,
-		KzgMultiProofBackend:  multiproofBackend,
-		KzgCommitmentsBackend: commitmentsBackend,
+		encoder:               p.encoder,
+		encodingParams:        params,
+		kzgConfig:             p.KzgConfig,
+		kzgMultiProofBackend:  multiproofBackend,
+		kzgCommitmentsBackend: commitmentsBackend,
 	}, nil
 }
 
