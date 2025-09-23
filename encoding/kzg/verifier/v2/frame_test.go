@@ -11,19 +11,21 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	harness := getTestHarness()
 
-	proverGroup, err := prover.NewProver(kzgConfig, nil)
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
+
+	proverGroup, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.Nil(t, err)
 	encoder, err := proverGroup.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	verifierGroup, err := verifier.NewVerifier(kzgConfig, nil)
+	verifierGroup, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
 	require.Nil(t, err)
 	verifier, err := verifierGroup.GetKzgVerifier(params)
 	require.Nil(t, err)
 
-	commit, _, _, frames, _, err := encoder.EncodeBytes(gettysburgAddressBytes)
+	commit, _, _, frames, _, err := encoder.EncodeBytes(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
 	require.NotNil(t, commit)
 

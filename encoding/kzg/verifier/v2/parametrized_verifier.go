@@ -16,7 +16,7 @@ import (
 )
 
 type ParametrizedVerifier struct {
-	*kzg.KzgConfig
+	*KzgConfig
 	g1SRS kzg.G1SRS
 	Fs    *fft.FFTSettings
 }
@@ -82,5 +82,5 @@ func verifyFrame(
 	// e([commitment - interpolation_polynomial]^(-1), [1]) * e([proof],  [s^n - x^n]) = 1_T
 	//
 
-	return PairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
+	return pairingsVerify(&commitMinusInterpolation, &kzg.GenG2, &frame.Proof, &xnMinusYn)
 }

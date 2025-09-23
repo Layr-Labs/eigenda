@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/indexer"
@@ -76,11 +77,21 @@ func mustMakeOperatorTransactor(
 		NumRetries:       0,
 	}
 
-	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
+	client, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	require.NoError(t, err, "failed to create geth client")
 
-	tx, err := eth.NewWriter(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
+	contractDirectory, err := directory.NewContractDirectory(
+		context.TODO(), logger, client, gethcommon.HexToAddress(op.NODE_EIGENDA_DIRECTORY))
+	require.NoError(t, err, "failed to create contract directory")
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(
+		context.TODO(), directory.OperatorStateRetriever)
+	require.NoError(t, err, "failed to get operator state retriever address")
+	serviceManagerAddr, err := contractDirectory.GetContractAddress(context.TODO(), directory.ServiceManager)
+	require.NoError(t, err, "failed to get service manager address")
+
+	tx, err := eth.NewWriter(logger, client, operatorStateRetrieverAddr.Hex(), serviceManagerAddr.Hex())
 	require.NoError(t, err, "failed to create writer")
+
 	return tx
 }
 

@@ -6,7 +6,11 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-const BYTES_PER_SYMBOL = 32
+// These consts are related to our choice of curve BN254.
+const (
+	BYTES_PER_SYMBOL = 32
+	SRSOrder         = 1 << 28 // 2^28
+)
 
 func init() {
 	initGlobals()

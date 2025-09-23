@@ -19,7 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	proverv2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -136,8 +136,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		config.EncodingConfig.LoadG2Points = true
-		prover, err := prover.NewProver(&config.EncodingConfig, nil)
+		// load G2 points because v2 apiserver exposes an rpc endpoint to compute kzg commitments
+		config.ProverKzgConfig.LoadG2Points = true
+		prover, err := proverv2.NewProver(&config.ProverKzgConfig, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}

@@ -21,7 +21,7 @@ import (
 
 type Prover struct {
 	Config     *encoding.Config
-	KzgConfig  *kzg.KzgConfig
+	KzgConfig  *KzgConfig
 	encoder    *rs.Encoder
 	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
@@ -31,12 +31,12 @@ type Prover struct {
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
-func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
+func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
 	if encoderConfig == nil {
 		encoderConfig = encoding.DefaultConfig()
 	}
 
-	if kzgConfig.SRSNumberToLoad > kzgConfig.SRSOrder {
+	if kzgConfig.SRSNumberToLoad > encoding.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
@@ -62,19 +62,15 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
-			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
-			if errStat != nil {
-				return nil, fmt.Errorf("cannot stat the G2TrailingPath: %w", errStat)
+			// TODO(samlaf): this function/check should probably be done in ReadG2PointSection
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2TrailingPath, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file %v: %w", kzgConfig.G2TrailingPath, err)
 			}
-			fileSizeByte := fileStat.Size()
-			if fileSizeByte%64 != 0 {
-				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point", fileSizeByte)
-			}
-			// get the size
-			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
 			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("insufficient number of g2 points from G2TrailingPath. "+
-					"Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
+				return nil, fmt.Errorf("kzgConfig.G2TrailingPath=%v contains %v G2 Points, "+
+					"which is < kzgConfig.SRSNumberToLoad=%v",
+					kzgConfig.G2TrailingPath, numG2point, kzgConfig.SRSNumberToLoad)
 			}
 
 			// use g2 trailing file
@@ -90,15 +86,22 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			}
 		} else {
 			// require entire g2 srs be available on disk
+			numG2point, err := kzg.NumberOfPointsInSRSFile(kzgConfig.G2Path, kzg.G2PointBytes)
+			if err != nil {
+				return nil, fmt.Errorf("number of points in srs file: %w", err)
+			}
+			if numG2point < encoding.SRSOrder {
+				return nil, fmt.Errorf("no kzgConfig.G2TrailingPath was passed, yet the G2 SRS file %v is incomplete: contains %v < 2^28 G2 Points", kzgConfig.G2Path, numG2point)
+			}
 			g2Trailing, err = kzg.ReadG2PointSection(
 				kzgConfig.G2Path,
-				kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-				kzgConfig.SRSOrder, // last exclusive
+				encoding.SRSOrder-kzgConfig.SRSNumberToLoad,
+				encoding.SRSOrder, // last exclusive
 				kzgConfig.NumWorker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read G2 points (%v to %v) from file %v: %w",
-					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
+					encoding.SRSOrder-kzgConfig.SRSNumberToLoad, encoding.SRSOrder, kzgConfig.G2Path, err)
 			}
 		}
 	}
@@ -245,9 +248,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
-	length := math.NextPowOf2u32(uint32(len(symbols)))
-
-	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
+	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols)
 	if err != nil {
 		return encoding.BlobCommitments{}, fmt.Errorf("get commitments: %w", err)
 	}
@@ -256,7 +257,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
+		Length:           math.NextPowOf2u32(uint32(len(symbols))),
 	}
 
 	return commitments, nil
@@ -296,10 +297,6 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 
 	g.ParametrizedProvers[params] = enc
 	return enc, nil
-}
-
-func (g *Prover) GetSRSOrder() uint64 {
-	return g.KzgConfig.SRSOrder
 }
 
 // Detect the precomputed table from the specified directory
@@ -370,7 +367,7 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 }
 
 func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
-	if err := encoding.ValidateEncodingParams(params, p.KzgConfig.SRSOrder); err != nil {
+	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
 	}
 
@@ -413,14 +410,12 @@ func (p *Prover) createGnarkBackendProver(
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
-		KzgConfig:  p.KzgConfig,
 	}
 
 	// Set KZG Commitments gnark backend
 	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
-		KzgConfig:  p.KzgConfig,
 	}
 
 	return &ParametrizedProver{

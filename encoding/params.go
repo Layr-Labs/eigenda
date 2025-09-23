@@ -39,6 +39,8 @@ func ParamsFromMins[T constraints.Integer](minChunkLength, minNumChunks T) Encod
 	}
 }
 
+// ParamsFromSysPar takes in the number of systematic and parity chunks, as well as the data size in bytes,
+// and returns the corresponding encoding parameters.
 func ParamsFromSysPar(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
