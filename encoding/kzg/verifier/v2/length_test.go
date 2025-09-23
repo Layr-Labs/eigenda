@@ -30,7 +30,6 @@ func TestLengthProof(t *testing.T) {
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
 
-	// for numSymbols := uint64(1); numSymbols <= 1; numSymbols *= 2 {
 	for numSymbols := uint64(1); numSymbols < maxNumSymbols; numSymbols *= 2 {
 		t.Run("numSymbols="+strconv.Itoa(int(numSymbols)), func(t *testing.T) {
 			inputBytes := testRand.Bytes(int(numSymbols) * encoding.BYTES_PER_SYMBOL)
