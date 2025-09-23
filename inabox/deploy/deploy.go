@@ -140,6 +140,10 @@ func (env *Config) DeployExperiment() error {
 		return fmt.Errorf("could not load private keys: %w", err)
 	}
 
+	logger.Info("Why does it not go inside:")
+	logger.Info("EigenDA.Deployer:", env.EigenDA.Deployer)
+	logger.Info("IsEigenDADeployed:", env.IsEigenDADeployed())
+
 	if env.EigenDA.Deployer != "" && !env.IsEigenDADeployed() {
 		logger.Info("Deploying EigenDA")
 		err = env.deployEigenDAContracts()
