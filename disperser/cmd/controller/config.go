@@ -6,6 +6,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -41,6 +43,9 @@ type Config struct {
 	ControllerReadinessProbePath string
 	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
+
+	OnDemandConfig    ondemand.OnDemandLedgerCacheConfig
+	ReservationConfig reservation.ReservationLedgerCacheConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -85,6 +90,28 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("invalid controller service config: %w", err)
 	}
 
+	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
+
+	onDemandConfig, err := ondemand.NewOnDemandLedgerCacheConfig(
+		ctx.GlobalInt(flags.OnDemandPaymentsLedgerCacheSizeFlag.Name),
+		ctx.GlobalString(flags.OnDemandPaymentsTableNameFlag.Name),
+		paymentVaultUpdateInterval,
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("create on-demand config: %w", err)
+	}
+
+	reservationConfig, err := reservation.NewReservationLedgerCacheConfig(
+		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
+		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+		// this doesn't need to be configurable. there are no plans to ever use a different value
+		reservation.OverfillOncePermitted,
+		paymentVaultUpdateInterval,
+	)
+	if err != nil {
+		return Config{}, fmt.Errorf("create reservation config: %w", err)
+	}
+
 	config := Config{
 		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		EthClientConfig:                     ethClientConfig,
@@ -126,6 +153,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ControllerReadinessProbePath:    ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:       ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 		ServerConfig:                    serverConfig,
+		OnDemandConfig:                  onDemandConfig,
+		ReservationConfig:               reservationConfig,
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

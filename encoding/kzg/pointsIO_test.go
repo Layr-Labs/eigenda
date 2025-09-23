@@ -1,4 +1,4 @@
-package kzg
+package kzg_test
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/require"
 )
@@ -21,17 +22,17 @@ func TestDeserializePoints(t *testing.T) {
 	const testNumPoints = 10000
 
 	// Read G1 points
-	g1Points, err := ReadG1Points(G1PointsFilePath, testNumPoints, 1)
+	g1Points, err := kzg.ReadG1Points(G1PointsFilePath, testNumPoints, 1)
 	require.NoError(t, err)
 	require.Len(t, g1Points, int(testNumPoints))
 
 	// Read G2 points
-	g2Points, err := ReadG2Points(G2PointsFilePath, testNumPoints, 1)
+	g2Points, err := kzg.ReadG2Points(G2PointsFilePath, testNumPoints, 1)
 	require.NoError(t, err)
 	require.Len(t, g2Points, testNumPoints)
 
 	// Read G2 trailing points
-	g2TrailingPoints, err := ReadG2Points(G2TrailingPointsFilePath, testNumPoints, 1)
+	g2TrailingPoints, err := kzg.ReadG2Points(G2TrailingPointsFilePath, testNumPoints, 1)
 	require.NoError(t, err)
 	require.Len(t, g2TrailingPoints, testNumPoints)
 }
@@ -44,7 +45,7 @@ func BenchmarkNumWorkers(b *testing.B) {
 	for _, numWorkers := range workerCounts {
 		b.Run(fmt.Sprintf("%d-Workers-G1", numWorkers), func(b *testing.B) {
 			for b.Loop() {
-				g1Points, err := ReadG1Points(G1PointsFilePath, benchNumPoints, uint64(numWorkers))
+				g1Points, err := kzg.ReadG1Points(G1PointsFilePath, benchNumPoints, uint64(numWorkers))
 				require.NoError(b, err)
 				require.Len(b, g1Points, benchNumPoints)
 			}
@@ -54,7 +55,7 @@ func BenchmarkNumWorkers(b *testing.B) {
 	for _, numWorkers := range workerCounts {
 		b.Run(fmt.Sprintf("%d-Workers-G2", numWorkers), func(b *testing.B) {
 			for b.Loop() {
-				g2Points, err := ReadG2Points(G2PointsFilePath, benchNumPoints, uint64(numWorkers))
+				g2Points, err := kzg.ReadG2Points(G2PointsFilePath, benchNumPoints, uint64(numWorkers))
 				require.NoError(b, err)
 				require.Len(b, g2Points, benchNumPoints)
 			}
@@ -82,18 +83,18 @@ func BenchmarkReadG2PointsCompressedVsUncompressed(b *testing.B) {
 	b.Skip("Meant to be run manually, run TestGenerateUncompressedPointFiles first to create uncompressed files")
 
 	numWorkers := uint64(runtime.GOMAXPROCS(0))
-	testNumPoints := uint64(16 << 20 / G1PointBytes)
+	testNumPoints := uint64(16 << 20 / kzg.G1PointBytes)
 
 	b.Run("Compressed", func(b *testing.B) {
 		for b.Loop() {
-			_, err := ReadG2Points(G2PointsFilePath, testNumPoints, numWorkers)
+			_, err := kzg.ReadG2Points(G2PointsFilePath, testNumPoints, numWorkers)
 			require.NoError(b, err)
 		}
 	})
 
 	b.Run("Uncompressed", func(b *testing.B) {
 		for b.Loop() {
-			_, err := ReadG2PointsUncompressed(G2PointsUncompressedFilePath, testNumPoints, numWorkers)
+			_, err := kzg.ReadG2PointsUncompressed(G2PointsUncompressedFilePath, testNumPoints, numWorkers)
 			require.NoError(b, err)
 		}
 	})
@@ -105,20 +106,20 @@ func TestGenerateUncompressedPointFiles(t *testing.T) {
 	numWorkers := uint64(runtime.GOMAXPROCS(0))
 
 	// 16MiB of compressed G1 points means 16 * 1024 * 1024 / G1PointBytes points
-	numPoints := uint64(16 << 20 / G1PointBytes)
+	numPoints := uint64(16 << 20 / kzg.G1PointBytes)
 
-	g2Points, err := ReadG2Points(G2PointsFilePath, numPoints, numWorkers)
+	g2Points, err := kzg.ReadG2Points(G2PointsFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
 
 	err = createUncompressedFile(g2Points, G2PointsUncompressedFilePath)
 	require.NoError(t, err)
 
-	g2TrailingPoints, err := ReadG2Points(G2TrailingPointsFilePath, numPoints, numWorkers)
+	g2TrailingPoints, err := kzg.ReadG2Points(G2TrailingPointsFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
 	err = createUncompressedFile(g2TrailingPoints, G2TrailingPointsUncompressedFilePath)
 	require.NoError(t, err)
 
-	g1Points, err := ReadG1Points(G1PointsFilePath, numPoints, numWorkers)
+	g1Points, err := kzg.ReadG1Points(G1PointsFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
 	err = createUncompressedFile(g1Points, G1PointsUncompressedFilePath)
 	require.NoError(t, err)
@@ -128,21 +129,21 @@ func TestGenerateUncompressedPointFiles(t *testing.T) {
 func TestUncompressedPointsFilesEquivalence(t *testing.T) {
 	t.Skip("run manually to verify uncompressed points files match original points")
 	numWorkers := uint64(runtime.GOMAXPROCS(0))
-	numPoints := uint64(16 << 20 / G1PointBytes)
+	numPoints := uint64(16 << 20 / kzg.G1PointBytes)
 
-	g2Points, err := ReadG2Points(G2PointsFilePath, numPoints, numWorkers)
+	g2Points, err := kzg.ReadG2Points(G2PointsFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
-	g2PointsUncompressed, err := ReadG2PointsUncompressed(G2PointsUncompressedFilePath, numPoints, numWorkers)
-	require.NoError(t, err)
-
-	g2PointsTrailing, err := ReadG2Points(G2TrailingPointsFilePath, numPoints, numWorkers)
-	require.NoError(t, err)
-	g2PointsTrailingUncompressed, err := ReadG2PointsUncompressed(G2TrailingPointsUncompressedFilePath, numPoints, numWorkers)
+	g2PointsUncompressed, err := kzg.ReadG2PointsUncompressed(G2PointsUncompressedFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
 
-	g1Points, err := ReadG1Points(G1PointsFilePath, numPoints, numWorkers)
+	g2PointsTrailing, err := kzg.ReadG2Points(G2TrailingPointsFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
-	g1PointsUncompressed, err := ReadG1PointsUncompressed(G1PointsUncompressedFilePath, numPoints, numWorkers)
+	g2PointsTrailingUncompressed, err := kzg.ReadG2PointsUncompressed(G2TrailingPointsUncompressedFilePath, numPoints, numWorkers) //nolint:lll
+	require.NoError(t, err)
+
+	g1Points, err := kzg.ReadG1Points(G1PointsFilePath, numPoints, numWorkers)
+	require.NoError(t, err)
+	g1PointsUncompressed, err := kzg.ReadG1PointsUncompressed(G1PointsUncompressedFilePath, numPoints, numWorkers)
 	require.NoError(t, err)
 
 	// Verify points are equal

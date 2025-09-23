@@ -147,7 +147,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.node.Config.EnableV2 = true
 	c.node.RelayClient.Store(c.relayClient)
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
-	ctx := context.Background()
 	bp, ok := c.node.BlobVersionParams.Load().Get(0)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams)
@@ -158,7 +157,8 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.NotNil(t, relayClient)
 
 	// Both updates fail
-	newCtx, cancel := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	var cancel context.CancelFunc
+	c.node.CTX, cancel = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
 	defer cancel()
 
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
@@ -168,7 +168,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
 	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
 
-	err := c.node.RefreshOnchainState(newCtx)
+	err := c.node.RefreshOnchainState()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	bp, ok = c.node.BlobVersionParams.Load().Get(0)
 	require.True(t, ok)
@@ -181,7 +181,8 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Equal(t, quorumCount, uint32(2))
 
 	// Same relay URLs shouldn't trigger update
-	newCtx1, cancel1 := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	var cancel1 context.CancelFunc
+	c.node.CTX, cancel1 = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
 	defer cancel1()
 
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
@@ -193,7 +194,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(3), nil)
 
-	err = c.node.RefreshOnchainState(newCtx1)
+	err = c.node.RefreshOnchainState()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	newRelayClient = c.node.RelayClient.Load().(relay.RelayClient)
 	require.Same(t, relayClient, newRelayClient)
@@ -223,7 +224,6 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	require.NoError(t, err)
 	// set up non-mock client
 	c.node.RelayClient.Store(relayClient)
-	ctx := context.Background()
 	bp, ok := c.node.BlobVersionParams.Load().Get(0)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams)
@@ -231,7 +231,8 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	require.False(t, ok)
 
 	// Blob params updated successfully
-	newCtx, cancel := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	var cancel context.CancelFunc
+	c.node.CTX, cancel = context.WithTimeout(t.Context(), c.node.Config.OnchainStateRefreshInterval*2)
 	defer cancel()
 
 	blobParams2 := &core.BlobVersionParameters{
@@ -247,7 +248,7 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
 	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
 
-	err = c.node.RefreshOnchainState(newCtx)
+	err = c.node.RefreshOnchainState()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	bp, ok = c.node.BlobVersionParams.Load().Get(0)
 	require.True(t, ok)

@@ -19,7 +19,6 @@ import (
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	dmock "github.com/Layr-Labs/eigenda/disperser/mock"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -47,7 +46,7 @@ type batcherComponents struct {
 }
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
-func makeTestProver() (encoding.Prover, error) {
+func makeTestProver() (*prover.Prover, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",

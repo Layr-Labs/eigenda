@@ -34,6 +34,7 @@ import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {IEigenDADirectory, EigenDADirectory} from "src/core/EigenDADirectory.sol";
 import {EigenDAAccessControl} from "src/core/EigenDAAccessControl.sol";
+import {EigenDAEjectionManager} from "src/periphery/ejection/EigenDAEjectionManager.sol";
 import {
     DeployOpenEigenLayer,
     ProxyAdmin,
@@ -72,6 +73,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
     EigenDAAccessControl public eigenDAAccessControl;
+    EigenDAEjectionManager public eigenDAEjectionManager;
 
     EigenDADirectory public eigenDADirectoryImplementation;
 
@@ -408,6 +410,26 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
             address(eigenDARelayRegistryImplementation),
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
+        );
+
+        // Deploy EigenDAEjectionManager
+        // Using the first deployed strategy token as deposit token
+        address depositToken = address(deployedStrategyArray[0].underlyingToken());
+        uint256 depositBaseFeeMultiplier = 100; // 100x base fee multiplier
+        uint256 estimatedGasUsedWithoutSig = 100000; // 100k gas estimate
+        uint256 estimatedGasUsedWithSig = 200000; // 200k gas estimate with signature verification
+
+        eigenDAEjectionManager = new EigenDAEjectionManager(
+            depositToken,
+            depositBaseFeeMultiplier,
+            address(eigenDADirectory),
+            estimatedGasUsedWithoutSig,
+            estimatedGasUsedWithSig
+        );
+        eigenDAEjectionManager.setCooldown(60);
+        eigenDAEjectionManager.setDelay(60);
+        eigenDADirectory.addAddress(
+            AddressDirectoryConstants.EIGEN_DA_EJECTION_MANAGER_NAME, address(eigenDAEjectionManager)
         );
     }
 }

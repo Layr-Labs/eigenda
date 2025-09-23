@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -180,10 +179,37 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 		return nil, proofsErr
 	}
 
-	frames, err := rs.BuildChunksData(proofs, int(elementCount), coefficients)
+	frames, err := buildChunksData(proofs, int(elementCount), coefficients)
 	if err != nil {
 		return nil, err
 	}
 
 	return frames, nil
+}
+
+// BuildChunksData creates a binary core.ChunksData object from the given proofs and coefficients.
+func buildChunksData(
+	proofs [][]byte,
+	chunkLen int,
+	coefficients [][]byte) (*core.ChunksData, error) {
+
+	if len(proofs) != len(coefficients) {
+		return nil, fmt.Errorf("proofs and coefficients have different lengths (%d vs %d)",
+			len(proofs), len(coefficients))
+	}
+
+	binaryChunks := make([][]byte, len(proofs))
+
+	for i := 0; i < len(proofs); i++ {
+		binaryFrame := make([]byte, len(proofs[i])+len(coefficients[i]))
+		copy(binaryFrame, proofs[i])
+		copy(binaryFrame[len(proofs[i]):], coefficients[i])
+		binaryChunks[i] = binaryFrame
+	}
+
+	return &core.ChunksData{
+		Chunks:   binaryChunks,
+		Format:   core.GnarkChunkEncodingFormat,
+		ChunkLen: chunkLen,
+	}, nil
 }

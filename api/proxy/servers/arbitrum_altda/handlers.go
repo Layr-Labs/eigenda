@@ -12,16 +12,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
+const (
+	MethodIsValidHeaderByte       = "daprovider_isValidHeaderByte"
+	MethodStore                   = "daprovider_store"
+	MethodRecoverBatchFromPayload = "daprovider_recoverPayloadFromBatch"
+)
+
 /*
 	This is a (hopefully) comprehensive handlers blue print for introducing a new ALT DA server type
 	that's compatible with Arbitrum's upcoming Custom DA spec.
-
-	TODO: Understand the best way to incorporate the ALT DA server into the
-	 	  existing eigenda-proxy E2E testing framework. Vendoring is rather challenging given
-		  the amount of arbitrum specific dependencies in their DA Client type. The DA Client is a wrapper
-		  on-top of the go-ethereum rpc client. It could be sufficient for E2E testing intra-monorepo to
-		  to utilize the generic rpc client while maintaining a more comprehensive framework in our layr-labs/nitro
-		  fork.
 
 	TODO: Understand what fork management for our Arbitrum forks will look like; at a high level we need to:
 			1. test E2E correctness of the nitro stack with EigenDA
