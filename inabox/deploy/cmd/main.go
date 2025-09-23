@@ -165,9 +165,6 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to start graph node: %w", err)
 		}
-		// Wait for Graph Node to be ready
-		fmt.Println("Waiting for Graph Node to be ready...")
-		time.Sleep(10 * time.Second)
 	}
 
 	return nil
