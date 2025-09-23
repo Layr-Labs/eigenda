@@ -88,9 +88,9 @@ docker-build-push:
 # We keep the node-group and proxy targets separate since we might want to release them separately in the future.
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake node-group-release ${PUSH_FLAG}
+	docker buildx bake node-group-release ${PUSH_FLAG} ${PLATFORM_FLAG}
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
-	docker buildx bake proxy-release ${PUSH_FLAG}
+	docker buildx bake proxy-release ${PUSH_FLAG} ${PLATFORM_FLAG}
 
 # Run all tests that don't have their own panel.
 unit-tests:

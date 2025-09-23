@@ -20,11 +20,12 @@ env:
   CACHE-TO: /tmp/.buildx-cache-new
 
 jobs:
-  build-and-push:
+  # Calculate version once for all jobs
+  semver:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      semver: ${{ steps.gitversion.outputs.fullSemVer }}
+      should-push: ${{ steps.check-push.outputs.should-push }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
@@ -37,16 +38,45 @@ jobs:
         versionSpec: '5.x'
 
     - name: Determine SemVer
+      id: gitversion
       uses: gittools/actions/gitversion/execute@v1.1.1
       with:
         useConfigFile: true
 
-    - run: |
-        echo "SemVer ${{ env.fullSemVer }} Forced ${{ github.event.inputs.force }}"
-      name: Display SemVer
+    - name: Display SemVer
+      run: echo "SemVer ${{ steps.gitversion.outputs.fullSemVer }} Forced ${{ github.event.inputs.force }}"
 
-    - name: Setup Buildx
-      uses: docker/setup-buildx-action@v1
+    - name: Check if should push
+      id: check-push
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/v* ]] || [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+          echo "should-push=true" >> $GITHUB_OUTPUT
+        else
+          echo "should-push=false" >> $GITHUB_OUTPUT
+        fi
+
+  # Build on platform-specific runners
+  build-platform:
+    needs: semver
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: linux2xl-2-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
       with:
         install: true
         driver-opts: image=moby/buildkit:master
@@ -55,25 +85,66 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        key: ${{ runner.os }}-${{ matrix.platform }}-buildx-${{ github.sha }}
         restore-keys: |
-          ${{ runner.os }}-buildx-
-      if: ${{ success() }}
+          ${{ runner.os }}-${{ matrix.platform }}-buildx-
 
     - name: Log into registry ${{ env.REGISTRY }}
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ success() }}
 
-    # We only push on `v*` tags or if the force input is true.
-    # We still run the build on every push to master just to ensure the images build correctly.
-    - name: Set release PUSH_FLAG
+    - name: Set PUSH_FLAG
       run: echo "PUSH_FLAG=--push" >> $GITHUB_ENV
-      if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.force == 'true'
+      if: needs.semver.outputs.should-push == 'true'
 
-    - name: Build (and potentially push) docker image release
-      # The PUSH_FLAG is ingested by the Makefile and passed to docker buildx bake command.
-      run: PUSH_FLAG=$PUSH_FLAG make docker-release-build
+    - name: Build and push platform-specific images
+      run: |
+        # Use architecture suffix in SEMVER for platform-specific tags
+        SEMVER="${{ needs.semver.outputs.semver }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}" \
+        PUSH_FLAG="${PUSH_FLAG}" \
+        PLATFORM_FLAG="--set *.platform=${{ matrix.platform }}" \
+        make docker-release-build
+
+  # Combine platform images into multi-arch manifests
+  combine-manifests:
+    needs: [semver, build-platform]
+    if: needs.semver.outputs.should-push == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Log into registry ${{ env.REGISTRY }}
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create and push multi-arch manifests
+      run: |
+        REGISTRY="${{ env.REGISTRY }}"
+        BASE_TAG="${{ needs.semver.outputs.semver }}"
+
+        # Create manifests for node-group-release images
+        for IMAGE in "opr-node" "opr-nodeplugin"; do
+          docker manifest create \
+            "${REGISTRY}/layr-labs/eigenda/${IMAGE}:${BASE_TAG}" \
+            "${REGISTRY}/layr-labs/eigenda/${IMAGE}:${BASE_TAG}-amd64" \
+            "${REGISTRY}/layr-labs/eigenda/${IMAGE}:${BASE_TAG}-arm64"
+
+          docker manifest push "${REGISTRY}/layr-labs/eigenda/${IMAGE}:${BASE_TAG}"
+          echo "Created multi-arch manifest for layr-labs/eigenda/${IMAGE}:${BASE_TAG}"
+        done
+
+        # Create manifest for proxy-release (different repo path)
+        docker manifest create \
+          "${REGISTRY}/layr-labs/eigenda-proxy:${BASE_TAG}" \
+          "${REGISTRY}/layr-labs/eigenda-proxy:${BASE_TAG}-amd64" \
+          "${REGISTRY}/layr-labs/eigenda-proxy:${BASE_TAG}-arm64"
+
+        docker manifest push "${REGISTRY}/layr-labs/eigenda-proxy:${BASE_TAG}"
+        echo "Created multi-arch manifest for layr-labs/eigenda-proxy:${BASE_TAG}"
