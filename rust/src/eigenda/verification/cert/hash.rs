@@ -175,7 +175,7 @@ mod tests {
         let hash = TruncHash([
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
         ]);
-        let actual = format!("{}", hash);
+        let actual = format!("{hash}");
         let expected = "0102030405060708090a0102030405060708090a0b0c0d0e";
         assert_eq!(actual, expected);
     }

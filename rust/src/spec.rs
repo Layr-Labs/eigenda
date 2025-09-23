@@ -133,6 +133,18 @@ impl FromStr for NamespaceId {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthereumBlockHeader(Header);
 
+impl EthereumBlockHeader {
+    /// The function checks if **this** [`EthereumBlockHeader`] is a direct
+    /// parent to the [`EthereumBlockHeader`] passed as an argument.
+    ///
+    /// Note: The relationship is checked by hashing this header and checking it
+    /// against the parent_hash of `maybe_child`.
+    pub fn is_parent(&self, maybe_child: &EthereumBlockHeader) -> bool {
+        let our_hash = self.0.hash_slow();
+        maybe_child.0.parent_hash == our_hash
+    }
+}
+
 impl From<Header> for EthereumBlockHeader {
     fn from(header: Header) -> Self {
         Self(header)

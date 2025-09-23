@@ -206,7 +206,7 @@ mod tests {
         let hex_cert = hex::encode(certificate.to_rlp_bytes());
 
         Mock::given(method("GET"))
-            .and(path(format!("/get/0x{}", hex_cert)))
+            .and(path(format!("/get/0x{hex_cert}")))
             .and(query_param("commitment_mode", "standard"))
             .and(query_param("return_encoded_payload", "true"))
             .respond_with(ResponseTemplate::new(200).set_body_bytes(test_data))
@@ -230,7 +230,7 @@ mod tests {
         let hex_cert = hex::encode(certificate.to_rlp_bytes());
 
         Mock::given(method("GET"))
-            .and(path(format!("/get/0x{}", hex_cert)))
+            .and(path(format!("/get/0x{hex_cert}")))
             .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
             .mount(&mock_server)
             .await;

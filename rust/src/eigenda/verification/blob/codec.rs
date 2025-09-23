@@ -342,8 +342,7 @@ pub(crate) mod tests {
 
             assert_eq!(
                 raw_payload, recovered_payload,
-                "Failed roundtrip for size {}",
-                size
+                "Failed roundtrip for size {size}",
             );
         }
     }

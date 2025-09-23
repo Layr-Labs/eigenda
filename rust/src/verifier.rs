@@ -1,7 +1,6 @@
-use alloy_consensus::{
-    EthereumTxEnvelope, TxEip4844, proofs::calculate_transaction_root,
-    transaction::SignerRecoverable,
-};
+use alloy_consensus::proofs::calculate_transaction_root;
+use alloy_consensus::transaction::SignerRecoverable;
+use alloy_consensus::{EthereumTxEnvelope, TxEip4844};
 use alloy_primitives::B256;
 use bytes::Bytes;
 use reth_trie_common::proof::ProofVerificationError;
@@ -18,8 +17,8 @@ use crate::eigenda::verification::blob::error::BlobVerificationError;
 use crate::eigenda::verification::{verify_blob, verify_cert, verify_cert_recency};
 use crate::ethereum::extract_certificate;
 use crate::spec::{
-    BlobWithSender, EigenDaSpec, EthereumAddress, EthereumBlockHeader, EthereumHash, NamespaceId,
-    TransactionWithBlob,
+    BlobWithSender, CertificateStateData, EigenDaSpec, EthereumAddress, EthereumBlockHeader,
+    EthereumHash, NamespaceId, TransactionWithBlob,
 };
 
 /// Errors that may occur when verifying with the [`EigenDaVerifier`].
@@ -179,6 +178,10 @@ pub enum InclusionProofError {
     /// Transaction in proof wasn't part of completeness proof.
     NotProvenTransaction(B256),
 
+    /// The ancestry chain is incorrect
+    #[error("Incorrect ancestry chain")]
+    IncorrectAncestry,
+
     #[error("Certificate state is missing for transaction ({0})")]
     /// Certificate state missing for transaction.
     CertStateMissing(B256),
@@ -228,16 +231,117 @@ pub enum InclusionProofError {
 /// extracted from the block.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EigenDaInclusionProof {
+    #[cfg(feature = "use-rbn-state")]
+    ancestors: Vec<EthereumBlockHeader>,
     transactions: Vec<TransactionWithBlob>,
 }
 
 impl EigenDaInclusionProof {
     /// Create a new inclusion proof from a complete and ordered list of
     /// transactions that can be relevant for the rollup.
-    pub fn new(maybe_relevant_txs: Vec<TransactionWithBlob>) -> Self {
+    pub fn new(
+        #[cfg(feature = "use-rbn-state")] ancestors: Vec<EthereumBlockHeader>,
+        maybe_relevant_txs: Vec<TransactionWithBlob>,
+    ) -> Self {
         Self {
+            #[cfg(feature = "use-rbn-state")]
+            ancestors,
             transactions: maybe_relevant_txs,
         }
+    }
+
+    /// Get the [`EthereumBlockHeader`] for the specific referenced block. The
+    /// `ancestors` are expected to be a contiguous chain of ancestors preceding the
+    /// `current_height`.
+    #[cfg(feature = "use-rbn-state")]
+    #[instrument(skip_all, fields(block_height = current_height))]
+    pub fn get_ancestor(
+        &self,
+        current_height: u64,
+        referenced_height: u64,
+    ) -> Option<&EthereumBlockHeader> {
+        // Check that the referenced height is always smaller from the current_height
+        if current_height <= referenced_height {
+            return None;
+        }
+
+        // Safety: We know that the referenced_height is always smaller from current_height.
+        let diff = current_height - referenced_height;
+        let ancestors_len = self.ancestors.len() as u64;
+
+        // Check that the referenced height is in the vector
+        if ancestors_len < diff {
+            return None;
+        }
+
+        // Safety: We know that the `diff` <= `ancestors_len`
+        let index = (ancestors_len - diff) as usize;
+        Some(&self.ancestors[index])
+    }
+
+    /// Verify that the ancestors in the proof represent the correct ancestry
+    /// chain and the block header is a direct descendant.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    ///   - Ancestry chain is not continuous
+    ///   - The header is not a direct descendant of the ancestry chain
+    #[cfg(feature = "use-rbn-state")]
+    fn verify_ancestors(&self, header: &EthereumBlockHeader) -> Result<(), InclusionProofError> {
+        // Iterate through the ancestors and check their parent/child
+        // relationships. If the direct ancestry is not valid, the error is
+        // returned. In case when we have no ancestors the `last_ancestor` is None.
+        let last_ancestor = self.ancestors.iter().try_fold(
+            None,
+            |parent: Option<&EthereumBlockHeader>, maybe_child| {
+                // If there is no parent to check against, we set the ancestry as valid
+                let valid_ancestry = parent
+                    .map(|parent| parent.is_parent(maybe_child))
+                    .unwrap_or(true);
+
+                if valid_ancestry {
+                    Ok(Some(maybe_child))
+                } else {
+                    Err(InclusionProofError::IncorrectAncestry)
+                }
+            },
+        )?;
+
+        // Check if last ancestor is our actual parent
+        if let Some(ancestor) = last_ancestor
+            && !ancestor.is_parent(header)
+        {
+            return Err(InclusionProofError::IncorrectAncestry);
+        }
+
+        Ok(())
+    }
+
+    fn verify_cert_state(
+        &self,
+        header: &EthereumBlockHeader,
+        #[cfg(feature = "use-rbn-state")] referenced_height: u64,
+        state: &CertificateStateData,
+    ) -> Result<(), InclusionProofError> {
+        // Verify the certificate state against the referenced block header state root
+        #[cfg(feature = "use-rbn-state")]
+        {
+            let current_height = header.height();
+            let rbn_header = self
+                .get_ancestor(current_height, referenced_height)
+                .ok_or(InclusionProofError::IncorrectAncestry)?;
+
+            state.verify(rbn_header.as_ref().state_root)?;
+        }
+
+        // Verify the certificate state against the current block header state root
+        #[cfg(not(feature = "use-rbn-state"))]
+        {
+            state.verify(header.as_ref().state_root)?;
+        }
+
+        Ok(())
     }
 
     /// Verify that the proof holds transactions extracted from all transactions
@@ -254,16 +358,8 @@ impl EigenDaInclusionProof {
     fn verify_transactions(
         &self,
         namespace: NamespaceId,
-        header: &EthereumBlockHeader,
         proven_transactions: &[EthereumTxEnvelope<TxEip4844>],
     ) -> Result<(), InclusionProofError> {
-        // Validate the certificate states against the state_root in the header
-        for tx in &self.transactions {
-            if let Some(cert_state) = &tx.cert_state {
-                cert_state.verify(header.as_ref().state_root)?;
-            }
-        }
-
         // Transaction hashes related to the transactions in the proof
         let mut transaction_hashes = self
             .transactions
@@ -335,6 +431,16 @@ impl EigenDaInclusionProof {
                     return Some(Err(InclusionProofError::CertStateMissing(*tx.hash())));
                 };
 
+                // Verify the cert state. The state should always be valid
+                if let Err(err) = self.verify_cert_state(
+                    header,
+                    #[cfg(feature = "use-rbn-state")]
+                    referenced_height,
+                    state,
+                ) {
+                    return Some(Err(err));
+                };
+
                 // Verify the cert. We are skipping it if it's invalid.
                 verify_cert(header, state, &cert).ok()?;
 
@@ -380,11 +486,12 @@ impl EigenDaInclusionProof {
     /// # Errors
     ///
     /// This function will return an error if:
-    ///   - there is an extra `BlobWithSender` provided which wasn't found in the block
-    ///   - the list of provided `BlobWithSender`s is not complete, there are more in the block
-    ///   - provided sender is different from the one in the proven transaction
-    ///   - provided hash is different from the hash of the proven transaction
-    ///   - provided blob data is different from the blob retrieved and proven to be part of the transaction
+    ///   - Ancestry chain contained by the proof is incorrect.
+    ///   - There is an extra `BlobWithSender` provided which wasn't found in the block.
+    ///   - The list of provided `BlobWithSender`s is not complete, there are more in the block.
+    ///   - Provided sender is different from the one in the proven transaction.
+    ///   - Provided hash is different from the hash of the proven transaction.
+    ///   - Provided blob data is different from the blob retrieved and proven to be part of the transaction.
     #[instrument(skip_all, fields(block_height = header.height()))]
     pub fn verify(
         &self,
@@ -394,8 +501,11 @@ impl EigenDaInclusionProof {
         blobs_with_senders: &[BlobWithSender],
         cert_recency_window: u64,
     ) -> Result<(), InclusionProofError> {
+        // Verify ancestry chain contained by the proof
+        #[cfg(feature = "use-rbn-state")]
+        self.verify_ancestors(header)?;
         // Verify transactions contained by the proof
-        self.verify_transactions(namespace, header, proven_transactions)?;
+        self.verify_transactions(namespace, proven_transactions)?;
         // Verify certificates and blobs
         let mut valid_proven_blobs = self.verify_certs_and_blobs(header, cert_recency_window);
 
@@ -467,14 +577,14 @@ mod tests {
     use std::str::FromStr;
 
     use alloy_consensus::{EthereumTxEnvelope, Header, SignableTransaction, TxEip1559, TxEnvelope};
-    use alloy_primitives::{Address, TxKind, address};
+    use alloy_primitives::{TxKind, address};
     use alloy_signer::Signature;
     use bytes::Bytes;
 
     use super::*;
     use crate::spec::EthereumBlockHeader;
 
-    fn create_test_header(
+    pub fn create_test_header(
         number: u64,
         parent_hash: B256,
         transactions_root: B256,
@@ -489,7 +599,7 @@ mod tests {
         EthereumBlockHeader::from(header)
     }
 
-    fn create_test_transaction_with_blob() -> TransactionWithBlob {
+    pub fn create_test_transaction_with_blob() -> TransactionWithBlob {
         let tx_data = TxEip1559 {
             to: TxKind::Call(address!("0x1234567890123456789012345678901234567890")),
             ..Default::default()
@@ -546,63 +656,6 @@ mod tests {
     }
 
     #[test]
-    fn test_inclusion_proof_new() {
-        let transactions = vec![create_test_transaction_with_blob()];
-        let proof = EigenDaInclusionProof::new(transactions.clone());
-
-        assert_eq!(proof.transactions, transactions);
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_transactions_empty() {
-        let proof = EigenDaInclusionProof::new(vec![]);
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let header = create_test_header(1, B256::default(), B256::default());
-
-        let result = proof.verify_transactions(namespace, &header, &[]);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_transactions_not_proven() {
-        let transaction = create_test_transaction_with_blob();
-        let proof = EigenDaInclusionProof::new(vec![transaction]);
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let header = create_test_header(1, B256::default(), B256::default());
-
-        let result = proof.verify_transactions(namespace, &header, &[]);
-        assert!(matches!(
-            result,
-            Err(InclusionProofError::NotProvenTransaction(_))
-        ));
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_transactions_proof_incomplete() {
-        let proven_tx = create_test_transaction_with_blob();
-        let proof = EigenDaInclusionProof::new(vec![]);
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let header = create_test_header(1, B256::default(), B256::default());
-
-        let result = proof.verify_transactions(namespace, &header, &[proven_tx.tx]);
-        assert!(matches!(result, Err(InclusionProofError::ProofIncomplete)));
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_empty_proof_and_transactions() {
-        let header = create_test_header(1, B256::default(), B256::default());
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let proof = EigenDaInclusionProof::new(vec![]);
-
-        let result = proof.verify(&header, namespace, &[], &[], 100);
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_completeness_proof_verify_with_valid_transactions() {
         let tx = create_test_transaction_with_blob();
         let tx_refs = vec![tx.tx.clone()];
@@ -615,83 +668,6 @@ mod tests {
         assert!(result.is_ok());
         let verified_transactions = result.unwrap();
         assert_eq!(verified_transactions, tx_refs);
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_missing_blob_error() {
-        let header = create_test_header(1, B256::default(), B256::default());
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-
-        let tx_hash = B256::from_slice(&[1; 32]);
-        let blob_sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let blob_with_sender = BlobWithSender::new(blob_sender, tx_hash, Bytes::new());
-
-        let proof = EigenDaInclusionProof::new(vec![]);
-
-        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
-        assert!(matches!(
-            result,
-            Err(InclusionProofError::IrrelevantBlob(_))
-        ));
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_incorrect_sender() {
-        let header = create_test_header(1, B256::default(), B256::default());
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-
-        let tx_hash = B256::from_slice(&[1; 32]);
-        let wrong_sender = Address::from_str("0x9876543210987654321098765432109876543210").unwrap();
-        let blob_with_sender = BlobWithSender::new(wrong_sender, tx_hash, Bytes::new());
-
-        let proof = EigenDaInclusionProof::new(vec![]);
-
-        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
-        assert!(matches!(
-            result,
-            Err(InclusionProofError::IrrelevantBlob(_))
-        ));
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_incorrect_hash() {
-        let header = create_test_header(1, B256::default(), B256::default());
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-
-        let wrong_hash = B256::from_slice(&[99; 32]);
-        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let blob_with_sender = BlobWithSender::new(sender, wrong_hash, Bytes::new());
-
-        let proof = EigenDaInclusionProof::new(vec![]);
-
-        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
-        assert!(matches!(
-            result,
-            Err(InclusionProofError::IrrelevantBlob(_))
-        ));
-    }
-
-    #[test]
-    fn test_inclusion_proof_verify_data_length_mismatch() {
-        let header = create_test_header(1, B256::default(), B256::default());
-        let namespace =
-            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
-
-        let tx_hash = B256::from_slice(&[1; 32]);
-        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
-        let long_data = Bytes::from(vec![1u8; 1000]);
-        let blob_with_sender = BlobWithSender::new(sender, tx_hash, long_data);
-
-        let proof = EigenDaInclusionProof::new(vec![]);
-
-        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
-        assert!(matches!(
-            result,
-            Err(InclusionProofError::IrrelevantBlob(_))
-        ));
     }
 
     #[test]
@@ -736,5 +712,150 @@ mod tests {
         let incomplete_error = InclusionProofError::ProofIncomplete;
         let incomplete_string = format!("{incomplete_error}");
         assert!(incomplete_string.contains("some relevant transactions are missing"));
+    }
+}
+
+#[cfg(feature = "use-rbn-state")]
+#[cfg(test)]
+mod use_rbn_state_tests {
+    use std::str::FromStr;
+
+    use alloy_primitives::{Address, B256};
+    use bytes::Bytes;
+
+    use crate::{
+        spec::{BlobWithSender, NamespaceId},
+        verifier::{EigenDaInclusionProof, InclusionProofError, tests},
+    };
+
+    #[test]
+    fn test_inclusion_proof_new() {
+        let transactions = vec![tests::create_test_transaction_with_blob()];
+        let proof = EigenDaInclusionProof::new(vec![], transactions.clone());
+
+        assert_eq!(proof.transactions, transactions);
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_empty() {
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_not_proven() {
+        let transaction = tests::create_test_transaction_with_blob();
+        let proof = EigenDaInclusionProof::new(vec![], vec![transaction]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[]);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::NotProvenTransaction(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_transactions_proof_incomplete() {
+        let proven_tx = tests::create_test_transaction_with_blob();
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let result = proof.verify_transactions(namespace, &[proven_tx.tx]);
+        assert!(matches!(result, Err(InclusionProofError::ProofIncomplete)));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_empty_proof_and_transactions() {
+        let header = tests::create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[], 100);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_missing_blob_error() {
+        let header = tests::create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let blob_sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender = BlobWithSender::new(blob_sender, tx_hash, Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_incorrect_sender() {
+        let header = tests::create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let wrong_sender = Address::from_str("0x9876543210987654321098765432109876543210").unwrap();
+        let blob_with_sender = BlobWithSender::new(wrong_sender, tx_hash, Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_incorrect_hash() {
+        let header = tests::create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let wrong_hash = B256::from_slice(&[99; 32]);
+        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let blob_with_sender = BlobWithSender::new(sender, wrong_hash, Bytes::new());
+
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
+    }
+
+    #[test]
+    fn test_inclusion_proof_verify_data_length_mismatch() {
+        let header = tests::create_test_header(1, B256::default(), B256::default());
+        let namespace =
+            NamespaceId::from_str("0x1234567890123456789012345678901234567890").unwrap();
+
+        let tx_hash = B256::from_slice(&[1; 32]);
+        let sender = Address::from_str("0x1234567890123456789012345678901234567890").unwrap();
+        let long_data = Bytes::from(vec![1u8; 1000]);
+        let blob_with_sender = BlobWithSender::new(sender, tx_hash, long_data);
+
+        let proof = EigenDaInclusionProof::new(vec![], vec![]);
+
+        let result = proof.verify(&header, namespace, &[], &[blob_with_sender], 100);
+        assert!(matches!(
+            result,
+            Err(InclusionProofError::IrrelevantBlob(_))
+        ));
     }
 }

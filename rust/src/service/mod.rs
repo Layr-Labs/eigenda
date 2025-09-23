@@ -58,6 +58,10 @@ pub enum EigenDaServiceError {
     #[error(transparent)]
     /// Ethereum RPC communication error.
     EthereumRpcError(#[from] RpcError<TransportErrorKind>),
+
+    /// Ancestor is missing.
+    #[error("Ancestor at height ({0}) is missing")]
+    AncestorMissing(u64),
 }
 
 /// EigenDaService is responsible for interacting with the EigenDA data availability layer.
@@ -186,7 +190,7 @@ impl EigenDaService {
         &self,
         header: &EthereumBlockHeader,
         transactions: Vec<Transaction>,
-    ) -> Result<Vec<TransactionWithBlob>, EigenDaServiceError> {
+    ) -> Result<Vec<(TransactionWithBlob, Option<EthereumBlockHeader>)>, EigenDaServiceError> {
         let mut block_transactions = Vec::with_capacity(transactions.len());
 
         for transaction in transactions {
@@ -197,21 +201,27 @@ impl EigenDaService {
             if self.rollup_batch_namespace.contains(&tx).not()
                 && self.rollup_proof_namespace.contains(&tx).not()
             {
-                block_transactions.push(TransactionWithBlob {
-                    tx,
-                    encoded_payload: None,
-                    cert_state: None,
-                });
+                block_transactions.push((
+                    TransactionWithBlob {
+                        tx,
+                        encoded_payload: None,
+                        cert_state: None,
+                    },
+                    None,
+                ));
                 continue;
             }
 
             // Certificate is malformed
             let Some(cert) = extract_certificate(&tx) else {
-                block_transactions.push(TransactionWithBlob {
-                    tx,
-                    encoded_payload: None,
-                    cert_state: None,
-                });
+                block_transactions.push((
+                    TransactionWithBlob {
+                        tx,
+                        encoded_payload: None,
+                        cert_state: None,
+                    },
+                    None,
+                ));
                 continue;
             };
 
@@ -225,7 +235,7 @@ impl EigenDaService {
                     ?err,
                     "Certificate recency verification failed. Ignoring."
                 );
-                block_transactions.push(
+                block_transactions.push((
                     // We don't need to store a cert_state to prove that the
                     // certificate recency is invalid.
                     TransactionWithBlob {
@@ -233,12 +243,28 @@ impl EigenDaService {
                         encoded_payload: None,
                         cert_state: None,
                     },
-                );
+                    None,
+                ));
                 continue;
             };
 
+            // Fetch state used to verify the certificate with the corresponding
+            // block header to verify the state against. We are fetching state
+            // from the block referenced by the certificate.
+            #[cfg(feature = "use-rbn-state")]
+            let (cert_state_header, cert_state) = self.fetch_referenced_ancestor(&cert).await?;
+
+            // Fetch state used to verify the certificate with the corresponding
+            // block header to verify the state against. Fetch the state from
+            // the current block.
+            #[cfg(not(feature = "use-rbn-state"))]
+            let (cert_state_header, cert_state) = {
+                let state_height = header.height();
+                let state = self.fetch_cert_state(state_height, &cert).await?;
+                (header.clone(), state)
+            };
+
             // Verify the certificate against the state
-            let cert_state = self.fetch_cert_state(header.height(), &cert).await?;
             if let Err(err) = verify_cert(header, &cert_state, &cert) {
                 debug!(
                     ?header,
@@ -246,7 +272,7 @@ impl EigenDaService {
                     ?err,
                     "Certificate verification failed. Ignoring."
                 );
-                block_transactions.push(
+                block_transactions.push((
                     // We need the state for the invalid certificate so that we
                     // can prove that the certificate is really invalid and that
                     // was the reason we skipped it.
@@ -255,18 +281,22 @@ impl EigenDaService {
                         encoded_payload: None,
                         cert_state: Some(cert_state),
                     },
-                );
+                    Some(cert_state_header),
+                ));
                 continue;
             };
 
             // Fetch the encoded payload for the valid certificate
             let encoded_payload = self.proxy.get_encoded_payload(&cert).await?;
 
-            block_transactions.push(TransactionWithBlob {
-                tx,
-                encoded_payload: Some(encoded_payload),
-                cert_state: Some(cert_state),
-            });
+            block_transactions.push((
+                TransactionWithBlob {
+                    tx,
+                    encoded_payload: Some(encoded_payload),
+                    cert_state: Some(cert_state),
+                },
+                Some(cert_state_header),
+            ));
         }
 
         Ok(block_transactions)
@@ -427,12 +457,30 @@ impl DaService for EigenDaService {
         let header = EthereumBlockHeader::from(block.header.clone().into_consensus());
 
         // Iterate over transactions in the block and fetch sequencer relevant data
-        let transactions = self
+        let transactions_with_ancestors = self
             .process_transactions_with_metadata(&header, block.into_transactions_vec())
             .await?;
 
+        #[cfg(feature = "use-rbn-state")]
+        let (transactions, ancestors) = {
+            let (transactions, ancestors): (_, Vec<_>) =
+                transactions_with_ancestors.into_iter().unzip();
+
+            let ancestors = ancestors.into_iter().flatten().collect();
+            let ancestors = self.prepare_ancestor_chain(height, ancestors).await?;
+            (transactions, ancestors)
+        };
+
+        #[cfg(not(feature = "use-rbn-state"))]
+        let transactions = {
+            let (transactions, _): (_, Vec<_>) = transactions_with_ancestors.into_iter().unzip();
+            transactions
+        };
+
         Ok(EthereumBlock {
             header,
+            #[cfg(feature = "use-rbn-state")]
+            ancestors,
             transactions,
         })
     }
@@ -550,9 +598,107 @@ impl DaService for EigenDaService {
     }
 }
 
+#[cfg(feature = "use-rbn-state")]
+mod rbn {
+    use std::future::ready;
+
+    use alloy_provider::Provider;
+    use futures::future::Either;
+    use futures::{StreamExt, TryStreamExt, stream, try_join};
+    use sov_rollup_interface::da::BlockHeaderTrait;
+    use tracing::warn;
+
+    use crate::eigenda::cert::StandardCommitment;
+    use crate::service::{EigenDaService, EigenDaServiceError};
+    use crate::spec::{CertificateStateData, EthereumBlockHeader};
+
+    impl EigenDaService {
+        /// Fetch [`EthereumBlockHeader`] with state data needed to verify the certificate.
+        pub(crate) async fn fetch_referenced_ancestor(
+            &self,
+            certificate: &StandardCommitment,
+        ) -> Result<(EthereumBlockHeader, CertificateStateData), EigenDaServiceError> {
+            let block_height = certificate.reference_block();
+
+            let (ancestor, state) = try_join!(
+                self.fetch_ancestor(block_height),
+                self.fetch_cert_state(block_height, certificate)
+            )?;
+
+            Ok((ancestor, state))
+        }
+
+        /// Fetch [`EthereumBlockHeader`] for the specific block height
+        async fn fetch_ancestor(
+            &self,
+            block_height: u64,
+        ) -> Result<EthereumBlockHeader, EigenDaServiceError> {
+            let block = self
+                .ethereum
+                .get_block_by_number(block_height.into())
+                .await?
+                .ok_or_else(|| EigenDaServiceError::AncestorMissing(block_height))?;
+
+            let header = block.header.into_consensus();
+            Ok(EthereumBlockHeader::from(header))
+        }
+
+        /// Prepare a valid ancestor chain. Based on the `referenced_ancestors` we
+        /// fetch the remaining ancestors needed to have a contiguous chain. The
+        /// first ancestor is the earliest referenced ancestor, the last ancestor is
+        /// the parent of the block on the `current_height`.
+        pub(crate) async fn prepare_ancestor_chain(
+            &self,
+            current_height: u64,
+            referenced_ancestors: Vec<EthereumBlockHeader>,
+        ) -> Result<Vec<EthereumBlockHeader>, EigenDaServiceError> {
+            // If no ancestors, we return an empty chain
+            let Some(oldest_ancestor_height) = referenced_ancestors
+                .iter()
+                .map(|ancestor| ancestor.height())
+                .min()
+            else {
+                return Ok(vec![]);
+            };
+
+            if oldest_ancestor_height >= current_height {
+                warn!(
+                    ?oldest_ancestor_height,
+                    %current_height,
+                    "oldest_ancestor_height is >= current_height"
+                );
+                return Ok(vec![]);
+            }
+
+            let ancestors_fut = (oldest_ancestor_height..current_height).map(|height| {
+                if let Some(referenced) = referenced_ancestors
+                    .iter()
+                    .find(|ancestor| ancestor.height() == height)
+                {
+                    Either::Left(ready(Ok(referenced.clone())))
+                } else {
+                    Either::Right(self.fetch_ancestor(height))
+                }
+            });
+
+            let ancestors = stream::iter(ancestors_fut)
+                .buffered(10)
+                .try_collect()
+                .await?;
+
+            Ok(ancestors)
+        }
+    }
+}
+
 /// An Ethereum block containing relevant information.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EthereumBlock {
+    /// List of ancestor blocks. The first ancestor in a list is the earliest
+    /// referenced block (RBN) from which the values for certificate creation
+    /// were sourced. The last header in the list is a parent of this block.
+    #[cfg(feature = "use-rbn-state")]
+    pub ancestors: Vec<EthereumBlockHeader>,
     /// The current block header.
     pub header: EthereumBlockHeader,
     /// Transactions included in this block.
@@ -614,7 +760,11 @@ impl EthereumBlock {
         let tx_refs = self.transactions.iter().map(|tx| tx.tx.clone()).collect();
 
         DaProof {
-            inclusion_proof: EigenDaInclusionProof::new(maybe_relevant_txs),
+            inclusion_proof: EigenDaInclusionProof::new(
+                #[cfg(feature = "use-rbn-state")]
+                self.ancestors.clone(),
+                maybe_relevant_txs,
+            ),
             completeness_proof: EigenDaCompletenessProof::new(tx_refs),
         }
     }
