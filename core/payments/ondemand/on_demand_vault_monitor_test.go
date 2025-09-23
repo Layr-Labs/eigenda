@@ -1,7 +1,6 @@
 package ondemand
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -44,8 +43,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	accounts := []gethcommon.Address{
@@ -120,8 +118,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	// Create multiple accounts to verify they're all fetched in a single batch
