@@ -93,4 +93,20 @@ library ConfigRegistryLib {
     function isKeyRegisteredBytes(bytes32 key) internal view returns (bool) {
         return isKeyRegistered(S.layout().bytesConfig.nameSet, key);
     }
+
+    function getNumRegisteredKeysBytes32() internal view returns (uint256) {
+        return S.layout().bytes32Config.nameSet.nameList.length;
+    }
+
+    function getNumRegisteredKeysBytes() internal view returns (uint256) {
+        return S.layout().bytesConfig.nameSet.nameList.length;
+    }
+
+    function getRegisteredKeyBytes32(uint256 index) internal view returns (string memory) {
+        return S.layout().bytes32Config.nameSet.nameList[index];
+    }
+
+    function getRegisteredKeyBytes(uint256 index) internal view returns (string memory) {
+        return S.layout().bytesConfig.nameSet.nameList[index];
+    }
 }

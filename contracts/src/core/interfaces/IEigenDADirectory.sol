@@ -45,6 +45,16 @@ interface IEigenDAAddressDirectory {
 ///         Supports both bytes32 and bytes types for configuration values, along with optional extra information.
 /// @dev    Contracts should use the bytes32 functions for gas efficiency.
 interface IEigenDAConfigRegistry {
+    error ConfigAlreadyExists(string name);
+    error ConfigDoesNotExist(string name);
+
+    event ConfigBytes32Added(string name, bytes32 indexed key, bytes32 value, string extraInfo);
+    event ConfigBytesAdded(string name, bytes32 indexed key, bytes value, string extraInfo);
+    event ConfigBytes32Replaced(string name, bytes32 indexed key, bytes32 oldValue, bytes32 newValue, string extraInfo);
+    event ConfigBytesReplaced(string name, bytes32 indexed key, bytes oldValue, bytes newValue, string extraInfo);
+    event ConfigBytes32Removed(string name, bytes32 indexed key);
+    event ConfigBytesRemoved(string name, bytes32 indexed key);
+
     /// @notice Adds a new bytes32 configuration entry to the registry by name, along with optional extra info.
     /// @dev Reverts if the entry already exists.
     function addConfigBytes32(string memory name, bytes32 value, string memory extraInfo) external;
@@ -92,6 +102,18 @@ interface IEigenDAConfigRegistry {
 
     /// @notice Gets the extra info associated with a bytes configuration entry by keccak256 hash of the name.
     function getConfigBytesExtraInfo(bytes32 key) external view returns (string memory);
+
+    /// @notice Gets the number of registered keys for bytes32 configuration entries.
+    function getNumRegisteredKeysBytes32() external view returns (uint256);
+
+    /// @notice Gets the number of registered keys for bytes configuration entries.
+    function getNumRegisteredKeysBytes() external view returns (uint256);
+
+    /// @notice Gets the registered key for bytes32 configuration entries at a specific index.
+    function getRegisteredKeyBytes32(uint256 index) external view returns (string memory);
+
+    /// @notice Gets the registered key for bytes configuration entries at a specific index.
+    function getRegisteredKeyBytes(uint256 index) external view returns (string memory);
 }
 
 /// @notice Interface for the EigenDA Directory
