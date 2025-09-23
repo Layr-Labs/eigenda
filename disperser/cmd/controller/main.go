@@ -12,8 +12,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metadata"
 	"github.com/Layr-Labs/eigenda/disperser/controller/metrics"
@@ -337,8 +337,8 @@ func RunController(ctx *cli.Context) error {
 func buildPaymentAuthorizationHandler(
 	ctx context.Context,
 	logger logging.Logger,
-	onDemandConfig ondemand.OnDemandLedgerCacheConfig,
-	reservationConfig reservation.ReservationLedgerCacheConfig,
+	onDemandConfig ondemandvalidation.OnDemandLedgerCacheConfig,
+	reservationConfig reservationvalidation.ReservationLedgerCacheConfig,
 	contractDirectory *directory.ContractDirectory,
 	ethClient common.EthClient,
 	awsDynamoClient *awsdynamodb.Client,
@@ -375,18 +375,18 @@ func buildPaymentAuthorizationHandler(
 		),
 	)
 
-	onDemandValidator, err := ondemand.NewOnDemandPaymentValidator(
+	onDemandValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		logger,
 		onDemandConfig,
 		paymentVault,
 		awsDynamoClient,
-		ondemand.NewOnDemandValidatorMetrics(
+		ondemandvalidation.NewOnDemandValidatorMetrics(
 			metricsRegistry,
 			metrics.Namespace,
 			metrics.AuthorizePaymentsSubsystem,
 		),
-		ondemand.NewOnDemandCacheMetrics(
+		ondemandvalidation.NewOnDemandCacheMetrics(
 			metricsRegistry,
 			metrics.Namespace,
 			metrics.AuthorizePaymentsSubsystem,
@@ -396,18 +396,18 @@ func buildPaymentAuthorizationHandler(
 		return nil, fmt.Errorf("create on-demand payment validator: %w", err)
 	}
 
-	reservationValidator, err := reservation.NewReservationPaymentValidator(
+	reservationValidator, err := reservationvalidation.NewReservationPaymentValidator(
 		ctx,
 		logger,
 		reservationConfig,
 		paymentVault,
 		time.Now,
-		reservation.NewReservationValidatorMetrics(
+		reservationvalidation.NewReservationValidatorMetrics(
 			metricsRegistry,
 			metrics.Namespace,
 			metrics.AuthorizePaymentsSubsystem,
 		),
-		reservation.NewReservationCacheMetrics(
+		reservationvalidation.NewReservationCacheMetrics(
 			metricsRegistry,
 			metrics.Namespace,
 			metrics.AuthorizePaymentsSubsystem,

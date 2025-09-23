@@ -14,7 +14,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -23,15 +25,15 @@ import (
 // Handles payment authorization requests received from API servers.
 type PaymentAuthorizationHandler struct {
 	onDemandMeterer      *meterer.OnDemandMeterer
-	onDemandValidator    *ondemand.OnDemandPaymentValidator
-	reservationValidator *reservation.ReservationPaymentValidator
+	onDemandValidator    *ondemandvalidation.OnDemandPaymentValidator
+	reservationValidator *reservationvalidation.ReservationPaymentValidator
 }
 
 // Panics if construction fails: we cannot operate if we cannot handle payments
 func NewPaymentAuthorizationHandler(
 	onDemandMeterer *meterer.OnDemandMeterer,
-	onDemandValidator *ondemand.OnDemandPaymentValidator,
-	reservationValidator *reservation.ReservationPaymentValidator,
+	onDemandValidator *ondemandvalidation.OnDemandPaymentValidator,
+	reservationValidator *reservationvalidation.ReservationPaymentValidator,
 ) *PaymentAuthorizationHandler {
 	if onDemandMeterer == nil {
 		panic("onDemandMeterer cannot be nil")

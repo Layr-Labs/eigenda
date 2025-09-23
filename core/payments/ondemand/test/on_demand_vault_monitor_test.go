@@ -1,4 +1,4 @@
-package ondemand
+package ondemand_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -15,7 +16,7 @@ import (
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -29,7 +30,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	})
 
 	t.Run("negative interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -67,7 +68,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,
@@ -141,7 +142,7 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,
