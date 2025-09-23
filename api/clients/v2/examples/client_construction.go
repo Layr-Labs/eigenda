@@ -41,8 +41,8 @@ import (
 const (
 	ethRPCURL         = "https://ethereum-sepolia-rpc.publicnode.com"
 	disperserHostname = "disperser-testnet-sepolia.eigenda.xyz"
-	// Contract registry address for Sepolia - this allows fetching all other contract addresses
-	contractRegistryAddress = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
+	// EigenDA Directory Address for Sepolia - this allows fetching all other contract addresses
+	eigenDADirectoryAddress = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
 	// CertVerifierRouter is not available from the contract registry and must be specified directly
 	certVerifierRouterAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 )
@@ -73,7 +73,7 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
-	contractDirectory, err := createContractDirectory(context.Background(), logger, ethClient)
+	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("create contract directory: %w", err)
 	}
@@ -139,7 +139,7 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
-	contractDirectory, err := createContractDirectory(context.Background(), logger, ethClient)
+	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("create contract directory: %w", err)
 	}
@@ -185,7 +185,7 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
-	contractDirectory, err := createContractDirectory(context.Background(), logger, ethClient)
+	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("create contract directory: %w", err)
 	}
@@ -439,12 +439,12 @@ func createLogger() (logging.Logger, error) {
 	return logger, nil
 }
 
-func createContractDirectory(
+func createEigenDADirectory(
 	ctx context.Context,
 	logger logging.Logger,
 	ethClient common.EthClient,
 ) (*directory.ContractDirectory, error) {
-	directoryAddress := gethcommon.HexToAddress(contractRegistryAddress)
+	directoryAddress := gethcommon.HexToAddress(eigenDADirectoryAddress)
 	contractDirectory, err := directory.NewContractDirectory(ctx, logger, ethClient, directoryAddress)
 	if err != nil {
 		return nil, fmt.Errorf("new contract directory: %w", err)
