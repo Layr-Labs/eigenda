@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
@@ -168,7 +169,7 @@ func (h *PaymentAuthorizationHandler) authorizeReservationPayment(
 	if errors.As(err, &timeOutOfRangeErr) {
 		return api.NewErrorInvalidArg(err.Error())
 	}
-	var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+	var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 	if errors.As(err, &timeMovedBackwardErr) {
 		return api.NewErrorInternal(err.Error())
 	}

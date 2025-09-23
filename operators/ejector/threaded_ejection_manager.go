@@ -39,7 +39,7 @@ func NewThreadedEjectionManager(
 		ejectionRequestChan: make(chan geth.Address),
 		period:              period,
 	}
-	//go tem.run()
+	go tem.mainLoop()
 	return tem
 }
 

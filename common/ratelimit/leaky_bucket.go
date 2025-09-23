@@ -47,22 +47,22 @@ type LeakyBucket struct {
 
 // Creates a new instance of the LeakyBucket algorithm
 func NewLeakyBucket(
-	// how fast "water" leaks out of the bucket
-	leakRate uint64,
-	// bucketCapacityDuration * leakRate becomes the bucket capacity
+// how fast "water" leaks out of the bucket per second
+	leakRate float64,
+// bucketCapacityDuration * leakRate becomes the bucket capacity
 	bucketCapacityDuration time.Duration,
-	// whether the bucket should start full or empty
+// whether the bucket should start full or empty
 	startFull bool,
-	// how to handle overfilling the bucket
+// how to handle overfilling the bucket
 	overfillBehavior OverfillBehavior,
-	// the current time, when this is being constructed
+// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
 	if leakRate == 0 {
 		return nil, errors.New("leakRate must be > 0")
 	}
 
-	bucketCapacity := float64(leakRate) * bucketCapacityDuration.Seconds()
+	bucketCapacity := leakRate * bucketCapacityDuration.Seconds()
 	if bucketCapacity <= 0 {
 		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %d * duration %s)",
 			leakRate, bucketCapacityDuration)
@@ -77,7 +77,7 @@ func NewLeakyBucket(
 	return &LeakyBucket{
 		overfillBehavior: overfillBehavior,
 		bucketCapacity:   bucketCapacity,
-		leakRate:         float64(leakRate),
+		leakRate:         leakRate,
 		currentFillLevel: currentFillLevel,
 		previousLeakTime: now,
 	}, nil

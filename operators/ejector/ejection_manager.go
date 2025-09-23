@@ -2,6 +2,7 @@ package ejector
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/enforce"
@@ -79,15 +80,29 @@ type ejectionManager struct {
 	maxConsecutiveFailedEjectionAttempts uint32
 
 	// The rate limiter for ejection transactions, keyed by quorum ID. Limits the fraction of the stake (out of 1.0)
-	// that can be ejected per time period.
+	// that can be ejected per time period. Since a quorum ID is an 8-bit integer (in smart contracts, no less!),
+	// it's safe to assume that the map will not grow too large.
 	quorumRateLimits map[core.QuorumID]*ratelimit.LeakyBucket
+
+	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
+	maxEjectionRate float64
+
+	// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
+	// in this interval.
+	throttleBucketInterval time.Duration
+
+	// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
+	// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
+	startThrottleFull bool
 }
 
 // Create a new ejectionManager.
 func NewEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
+// A source of time.
 	timeSource func() time.Time,
+// Submits ejection transactions.
 	transactor EjectionTransactor,
 // the minimum time between starting an ejection and completing it
 	ejectionDelay time.Duration,
@@ -95,13 +110,17 @@ func NewEjectionManager(
 	retryDelay time.Duration,
 // the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
-// the period between the background checks for ejection progress
-	period time.Duration,
-) EjectionManager {
+// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
+	maxEjectionRate float64,
+// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
+// in this interval.
+	throttleBucketInterval time.Duration,
+// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
+// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
+	startThrottleFull bool,
+) (EjectionManager, error) {
 
-	// TODO set up rate limits
-
-	return &ejectionManager{
+	em := &ejectionManager{
 		ctx:                                  ctx,
 		logger:                               logger,
 		timeSource:                           timeSource,
@@ -113,7 +132,26 @@ func NewEjectionManager(
 		ejectionDelay:                        ejectionDelay,
 		retryDelay:                           retryDelay,
 		maxConsecutiveFailedEjectionAttempts: maxConsecutiveFailedEjectionAttempts,
+		quorumRateLimits:                     make(map[core.QuorumID]*ratelimit.LeakyBucket),
+		maxEjectionRate:                      maxEjectionRate,
+		throttleBucketInterval:               throttleBucketInterval,
+		startThrottleFull:                    startThrottleFull,
 	}
+
+	// Set up a throttle for quorum 0. We will always have a quorum 0, and this allows us to check to see
+	// if the throttle config is valid. Checking here lets us assume it is valid later on.
+	var err error
+	em.quorumRateLimits[0], err = ratelimit.NewLeakyBucket(
+		maxEjectionRate,
+		throttleBucketInterval,
+		startThrottleFull,
+		ratelimit.OverfillOncePermitted,
+		timeSource())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create leaky bucket: %w", err)
+	}
+
+	return em, nil
 }
 
 func (em *ejectionManager) BeginEjection(
@@ -147,15 +185,12 @@ func (em *ejectionManager) BeginEjection(
 	}
 
 	// Check if we are prevented from starting an ejection by rate limiting.
-	// TODO
-	//now := em.timeSource()
-	//permittedQuorums := make([]core.QuorumID, 0, len(stakes))
-	//for qid, stake := range stakes {
-	//	leakyBucket := em.getLeakyBucketForQuorum(qid)
-	//
-	//	err := leakyBucket.Fill(now, )
-	//
-	//}
+	allowedByRateLimits := em.checkRateLimits(validatorAddress, stakes)
+	if !allowedByRateLimits {
+		// Rate limiting prevents us from starting an ejection at this time.
+		// checkRateLimits() will have logged the reason, since it has more context.
+		return
+	}
 
 	if inProgress {
 		// An ejection is already in progress. Record it, and we can try to finalize it later.
@@ -177,7 +212,6 @@ func (em *ejectionManager) BeginEjection(
 }
 
 func (em *ejectionManager) FinalizeEjections() {
-
 	em.cleanRecentEjections()
 
 	// Note: similar to cleanRecentEjections(), we are iterating a map here. At a certain scale a
@@ -190,8 +224,80 @@ func (em *ejectionManager) FinalizeEjections() {
 			// Not ready to finalize yet.
 			continue
 		}
-		em.finalizeEjection(address)
+
+		ejected := em.finalizeEjection(address)
+
+		if !ejected {
+			em.cleanUpFailedEjection(address, ejection.stake)
+		}
 	}
+}
+
+// Check if we are prevented from starting an ejection by rate limiting. If we are prevented from starting
+// an ejection in any quorum, we revert all fills and return false. If we are permitted to start an ejection
+// in all quorums, we return true and debit the leaky buckets for each quorum.
+func (em *ejectionManager) checkRateLimits(
+	validatorAddress geth.Address,
+	stakes map[core.QuorumID]float64,
+) bool {
+
+	now := em.timeSource()
+	permittedQuorums := make([]core.QuorumID, 0, len(stakes))
+	for qid, stake := range stakes {
+		if stake <= 0.0 {
+			em.logger.Errorf(
+				"validator %s has non-positive stake %.4f in quorum %d, skipping rate limit check",
+				validatorAddress.Hex(), stake, qid)
+			continue
+		}
+
+		leakyBucket := em.getLeakyBucketForQuorum(qid)
+
+		allowed, err := leakyBucket.Fill(now, stake)
+
+		// The only way we can get an error here is if time moves backwards, or if stake <= 0
+		enforce.NilError(err, "should be impossible")
+
+		if !allowed {
+			// We are prevented by rate limiting from starting an ejection in this quorum.
+			// We will need to undo all previous fills before bailing out.
+			for _, quorumID := range permittedQuorums {
+				stakeToUndo := stakes[quorumID]
+				leakyBucketToUndo := em.getLeakyBucketForQuorum(quorumID)
+				err = leakyBucketToUndo.RevertFill(now, stakeToUndo)
+				enforce.NilError(err, "should be impossible")
+			}
+
+			em.logger.Warnf("rate limit prevents ejection of validator %s in quorum %d, skipping",
+				validatorAddress.Hex(), qid)
+			return false
+		}
+	}
+
+	return true
+}
+
+// Refund the rate limit fills for each quorum. This should be called if we fail to finalize an ejection.
+// Also removes the ejection from ejectionsInProgress.
+func (em *ejectionManager) cleanUpFailedEjection(
+	validatorAddress geth.Address,
+	stakes map[core.QuorumID]float64,
+) {
+	now := em.timeSource()
+	for qid, stake := range stakes {
+		if stake <= 0.0 {
+			em.logger.Errorf(
+				"validator %s has non-positive stake %.4f in quorum %d, skipping rate limit refund",
+				validatorAddress.Hex(), stake, qid)
+			continue
+		}
+
+		leakyBucket := em.getLeakyBucketForQuorum(qid)
+		err := leakyBucket.RevertFill(now, stake)
+		enforce.NilError(err, "should be impossible")
+	}
+
+	delete(em.ejectionsInProgress, validatorAddress)
 }
 
 // Get the leaky bucket for a specific quorum, creating it if it doesn't already exist.
@@ -201,13 +307,13 @@ func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit
 	if !ok {
 		var err error
 		leakyBucket, err = ratelimit.NewLeakyBucket(
-			100,
+			em.maxEjectionRate,
 			time.Minute,
-			false,
-			ratelimit.OverfillNotPermitted, em.timeSource()) // TODO proper config
+			em.startThrottleFull,
+			ratelimit.OverfillOncePermitted,
+			em.timeSource())
 		em.quorumRateLimits[qid] = leakyBucket
 
-		// TODO check params in constructor
 		enforce.NilError(err, "should be impossible, leaky bucket parameters are pre-validated")
 	}
 
@@ -238,19 +344,19 @@ func (em *ejectionManager) cleanRecentEjections() {
 	}
 }
 
-// Finalize the ejection for a specific validator.
-func (em *ejectionManager) finalizeEjection(address geth.Address) {
+// Finalize the ejection for a specific validator. Returns true if the ejection was finalized, false otherwise.
+func (em *ejectionManager) finalizeEjection(address geth.Address) bool {
 	// Check to see if the ejection is still in progress.
 	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, address)
 	if err != nil {
 		em.logger.Errorf("failed to check ejection status for validator %s: %v", address.Hex(), err)
-		return
+		return false
 	}
 
 	if !inProgress {
 		// Either the validator cancelled the ejection or another ejector finalized it for us.
 		em.handleAbortedEjection(address)
-		return
+		return false
 	}
 
 	// Complete the ejection.
@@ -258,12 +364,16 @@ func (em *ejectionManager) finalizeEjection(address geth.Address) {
 	if err != nil {
 		// We failed to eject. Leave the ejection in progress so we can try again later.
 		em.logger.Errorf("failed to complete ejection for validator %s: %v", address.Hex(), err)
-		return
+		return false
 	}
 
 	em.logger.Infof("successfully completed ejection for validator %s", address.Hex())
+	// If we return before we get here, it's the responsibility of the caller to refund the rate limits
+	// and remove the in-progress ejection.
 	delete(em.ejectionsInProgress, address)
 	delete(em.failedEjectionAttempts, address)
+
+	return true
 }
 
 // Handle the case where a previously started ejection is no longer in progress.
@@ -295,5 +405,4 @@ func (em *ejectionManager) handleAbortedEjection(address geth.Address) {
 	}
 
 	delete(em.ejectionsInProgress, address)
-	return
 }

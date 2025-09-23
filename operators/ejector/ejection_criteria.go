@@ -17,11 +17,11 @@ func IsEjectable(
 
 	eject := false
 
-	validatorID := core.OperatorID(signingRate.ValidatorId)
+	validatorID := core.OperatorID(signingRate.GetValidatorId())
 
-	totalBatches := signingRate.SignedBatches + signingRate.UnsignedBatches
+	totalBatches := signingRate.GetSignedBatches() + signingRate.GetUnsignedBatches()
 	if totalBatches > 0 {
-		signedFraction := float64(signingRate.SignedBatches) / float64(totalBatches)
+		signedFraction := float64(signingRate.GetSignedBatches()) / float64(totalBatches)
 		if signedFraction < threshold {
 			logger.Infof(
 				"Validator %s is eligible for ejeciton: signed batch fraction %.4f is below threshold %.4f",
@@ -30,9 +30,9 @@ func IsEjectable(
 		}
 	}
 
-	totalBytes := signingRate.SignedBytes + signingRate.UnsignedBytes
+	totalBytes := signingRate.GetSignedBytes() + signingRate.GetUnsignedBytes()
 	if totalBytes > 0 {
-		signedFraction := float64(signingRate.SignedBytes) / float64(totalBytes)
+		signedFraction := float64(signingRate.GetSignedBytes()) / float64(totalBytes)
 		if signedFraction < threshold {
 			logger.Infof(
 				"Validator %s is eligible for ejeciton: signed byte fraction %.4f is below threshold %.4f",
