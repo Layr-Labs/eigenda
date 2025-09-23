@@ -22,6 +22,11 @@ allow = [
 ignore = true
 
 [[licenses.clarify]]
+crate = "eigenda"
+expression = "LicenseRef-Private"
+license-files = []
+
+[[licenses.clarify]]
 crate = "sov-eigenda-adapter"
 expression = "LicenseRef-Private"
 license-files = []

@@ -1,0 +1,48 @@
+[package]
+edition = "2024"
+name = "eigenda"
+version = "0.1.0"
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-sol-types = { workspace = true }
+ark-bn254 = { workspace = true, features = ["curve"] }
+ark-ec = { version = "0.5.0", default-features = false }
+ark-ff = { version = "0.5.0", default-features = false }
+ark-serialize = { workspace = true, features = ["derive"] }
+bitvec = { version = "1.0.1", default-features = false }
+bytes = { workspace = true }
+derive_more = { workspace = true }
+hashbrown = { workspace = true, features = ["default-hasher"] }
+hex = { workspace = true }
+proptest = { workspace = true, features = ["alloc", "std"], optional = true }
+rust-kzg-bn254-primitives = { version = "0.1.2", default-features = false }
+rust-kzg-bn254-prover = { workspace = true }
+serde = { workspace = true, features = ["alloc", "derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[build-dependencies]
+ark-bn254 = { workspace = true }
+ark-serialize = { workspace = true, features = ["derive"] }
+bincode = { workspace = true, features = ["derive"] }
+rust-kzg-bn254-prover = { workspace = true }
+
+[dev-dependencies]
+arbitrary = { workspace = true }
+bincode = { workspace = true, features = ["derive", "serde", "std"] }
+hex = { workspace = true }
+jsonschema = { workspace = true }
+rand = { workspace = true }
+reltester = { workspace = true }
+# Pinned so that it's same as in https://github.com/Sovereign-Labs/sovereign-sdk/blob/b486610bbad3e39d5785b6009c5d9ca9ab9dec9e/Cargo.toml
+risc0-zkvm = { workspace = true, features = ["std"] }
+test-strategy = { workspace = true }
+testcontainers = { workspace = true }
+wiremock = { workspace = true }
+
+[features]
+arbitrary = ["dep:proptest"]
+default = []
+stale-stakes-forbidden = []

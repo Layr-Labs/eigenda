@@ -2129,6 +2129,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "eigenda"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-sol-types",
+ "arbitrary",
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "bincode",
+ "bitvec",
+ "bytes",
+ "derive_more 2.0.1",
+ "hashbrown 0.15.5",
+ "hex",
+ "jsonschema",
+ "proptest",
+ "rand 0.8.5",
+ "reltester",
+ "risc0-zkvm",
+ "rust-kzg-bn254-primitives",
+ "rust-kzg-bn254-prover",
+ "serde",
+ "test-strategy",
+ "testcontainers",
+ "thiserror 2.0.16",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5371,7 +5404,6 @@ dependencies = [
  "alloy-network",
  "alloy-primitives",
  "alloy-provider",
- "alloy-rlp",
  "alloy-rpc-client",
  "alloy-rpc-types",
  "alloy-rpc-types-eth",
@@ -5382,16 +5414,14 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "ark-bn254",
- "ark-ec",
- "ark-ff 0.5.0",
  "ark-serialize 0.5.0",
  "async-trait",
  "backon",
  "bincode",
- "bitvec",
  "borsh",
  "bytes",
  "derive_more 2.0.1",
+ "eigenda",
  "futures",
  "hashbrown 0.15.5",
  "hex",
@@ -5402,7 +5432,6 @@ dependencies = [
  "reqwest",
  "reth-trie-common",
  "risc0-zkvm",
- "rust-kzg-bn254-primitives",
  "rust-kzg-bn254-prover",
  "rustls",
  "schemars 0.8.22",
