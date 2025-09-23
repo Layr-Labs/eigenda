@@ -108,19 +108,6 @@ func (g *ParametrizedProver) Encode(
 		commitmentResult.lengthProof, frames, indices, nil
 }
 
-func (g *ParametrizedProver) Decode(frames []*encoding.Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
-	rsFrames := make([]rs.FrameCoeffs, len(frames))
-	for ind, frame := range frames {
-		rsFrames[ind] = frame.Coeffs
-	}
-
-	b, err := g.encoder.Decode(rsFrames, indices, maxInputSize, g.encodingParams)
-	if err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
-	}
-	return b, nil
-}
-
 func (g *ParametrizedProver) GetCommitments(
 	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {

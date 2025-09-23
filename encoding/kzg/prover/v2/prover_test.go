@@ -13,15 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func sampleFrames(frames []*encoding.Frame, num uint64) ([]*encoding.Frame, []uint64) {
+func sampleFrames(frames []*encoding.Frame, num uint64) ([]*encoding.Frame, []encoding.ChunkNumber) {
 	samples := make([]*encoding.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 
-	frameIndices := make([]uint64, num)
+	frameIndices := make([]encoding.ChunkNumber, num)
 	for i, j := range indices {
 		samples[i] = frames[j]
-		frameIndices[i] = uint64(j)
+		frameIndices[i] = encoding.ChunkNumber(j)
 	}
 	return samples, frameIndices
 }
@@ -51,7 +51,7 @@ func TestEncoder(t *testing.T) {
 	assert.Error(t, err)
 
 	maxInputSize := uint64(len(harness.paddedGettysburgAddressBytes))
-	decoded, err := p.Decode(frames, indices, params, maxInputSize)
+	decoded, err := v.Decode(frames, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 
@@ -66,7 +66,7 @@ func TestEncoder(t *testing.T) {
 	err = v.VerifyFrames(frames, indices, commitments, params)
 	assert.NoError(t, err)
 
-	decoded, err = p.Decode(frames, indices, params, maxInputSize)
+	decoded, err = v.Decode(frames, indices, params, maxInputSize)
 	assert.NoError(t, err)
 	assert.Equal(t, harness.paddedGettysburgAddressBytes, decoded)
 }
@@ -115,10 +115,6 @@ func FuzzOnlySystematic(f *testing.F) {
 		require.NoError(t, err)
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
-		enc, err := group.GetKzgEncoder(params)
-		if err != nil {
-			t.Errorf("Error making rs: %q", err)
-		}
 
 		//encode the data
 		frames, err := group.GetFrames(input, params)
@@ -135,7 +131,9 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		data, err := enc.Decode(samples, indices, uint64(len(input)))
+		v, err := verifier.NewVerifier(harness.verifierV2KzgConfig, nil)
+		require.NoError(t, err)
+		data, err := v.Decode(samples, indices, params, uint64(len(input)))
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}

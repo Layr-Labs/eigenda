@@ -217,35 +217,6 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	return enc, nil
 }
 
-// Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
-// The result is trimmed to the given maxInputSize.
-func (p *Prover) Decode(
-	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
-) ([]byte, error) {
-	frames := make([]*encoding.Frame, len(chunks))
-	for i := range chunks {
-		frames[i] = &encoding.Frame{
-			Proof:  chunks[i].Proof,
-			Coeffs: chunks[i].Coeffs,
-		}
-	}
-
-	encoder, err := p.GetKzgEncoder(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
-}
-
-func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
-	res := make([]uint64, len(chunkIndices))
-	for i, d := range chunkIndices {
-		res[i] = uint64(d)
-	}
-	return res
-}
-
 func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	if err := encoding.ValidateEncodingParams(params, encoding.SRSOrder); err != nil {
 		return nil, fmt.Errorf("validate encoding params: %w", err)
