@@ -154,7 +154,15 @@ func (env *Config) DeployExperiment() error {
 			return fmt.Errorf("error getting latest block number: %w", err)
 		}
 
-		err = env.deploySubgraphs(startBlock)
+		config := testbed.SubgraphDeploymentConfig{
+			RootPath:            env.rootPath,
+			RegistryCoordinator: env.EigenDA.RegistryCoordinator,
+			BlsApkRegistry:      env.EigenDA.BlsApkRegistry,
+			ServiceManager:      env.EigenDA.ServiceManager,
+			Logger:              logger,
+		}
+
+		err = testbed.DeploySubgraphs(config, startBlock)
 		if err != nil {
 			return fmt.Errorf("error deploying subgraphs: %w", err)
 		}
