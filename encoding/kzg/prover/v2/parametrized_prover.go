@@ -269,38 +269,6 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	return kzgFrames, rsResult.Indices, nil
 }
 
-func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
-	if err := g.validateInput(inputFr); err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-
-	// Pad the input polynomial to the number of evaluations
-	paddingStart := time.Now()
-	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
-	copy(paddedCoeffs, inputFr)
-	paddingEnd := time.Since(paddingStart)
-
-	proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProofV2(paddedCoeffs, g.NumChunks, g.ChunkLength, g.KzgConfig.NumWorker) //nolint: lll
-	if err != nil {
-		return nil, fmt.Errorf("compute multi frame proofs: %w", err)
-	}
-
-	slog.Info("ComputeMultiFrameProofs process details",
-		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
-		"Num_chunks", g.NumChunks,
-		"Chunk_length", g.ChunkLength,
-		"Total_duration", time.Since(start),
-		"Padding_duration", paddingEnd,
-		"SRSOrder", encoding.SRSOrder,
-		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
-		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
-	)
-
-	return proofs, nil
-}
-
 func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
 	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
 		return fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v",

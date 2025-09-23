@@ -130,39 +130,13 @@ func NewProver(kzgConfig *KzgConfig, encoderConfig *encoding.Config) (*Prover, e
 			return nil, fmt.Errorf("make cache dir: %w", err)
 		}
 
-		err = encoderGroup.PreloadAllEncoders()
+		err = encoderGroup.preloadAllEncoders()
 		if err != nil {
 			return nil, fmt.Errorf("preload all encoders: %w", err)
 		}
 	}
 
 	return encoderGroup, nil
-}
-
-func (g *Prover) PreloadAllEncoders() error {
-	paramsAll, err := GetAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("detect %v srs maps\n", len(paramsAll))
-	for i := 0; i < len(paramsAll); i++ {
-		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
-	}
-
-	if len(paramsAll) == 0 {
-		return nil
-	}
-
-	for _, params := range paramsAll {
-		// get those encoders and store them
-		enc, err := g.GetKzgEncoder(params)
-		if err != nil {
-			return err
-		}
-		g.ParametrizedProvers[params] = enc
-	}
-
-	return nil
 }
 
 func (e *Prover) EncodeAndProve(
@@ -264,25 +238,6 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 	return commitments, nil
 }
 
-func (e *Prover) GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error) {
-	symbols, err := rs.ToFrArray(data)
-	if err != nil {
-		return nil, fmt.Errorf("ToFrArray: %w", err)
-	}
-
-	enc, err := e.GetKzgEncoder(params)
-	if err != nil {
-		return nil, fmt.Errorf("get kzg encoder: %w", err)
-	}
-
-	proofs, err := enc.GetMultiFrameProofs(symbols)
-	if err != nil {
-		return nil, fmt.Errorf("get multi frame proofs: %w", err)
-	}
-
-	return proofs, nil
-}
-
 func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -298,44 +253,6 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 
 	g.ParametrizedProvers[params] = enc
 	return enc, nil
-}
-
-// Detect the precomputed table from the specified directory
-// the file name follow the name convention of
-//
-//	dimE*.coset&
-//
-// where the first * specifies the dimension of the matrix which
-// equals to the number of chunks
-// where the second & specifies the length of each chunk
-func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
-	files, err := os.ReadDir(tableDir)
-	if err != nil {
-		return nil, fmt.Errorf("read srs table dir: %w", err)
-	}
-
-	tables := make([]encoding.EncodingParams, 0)
-	for _, file := range files {
-		filename := file.Name()
-
-		tokens := strings.Split(filename, ".")
-
-		dimEValue, err := strconv.Atoi(tokens[0][4:])
-		if err != nil {
-			return nil, fmt.Errorf("parse dimension part of the table: %w", err)
-		}
-		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
-		if err != nil {
-			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
-		}
-
-		params := encoding.EncodingParams{
-			NumChunks:   uint64(cosetSizeValue),
-			ChunkLength: uint64(dimEValue),
-		}
-		tables = append(tables, params)
-	}
-	return tables, nil
 }
 
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
@@ -397,7 +314,7 @@ func (p *Prover) createGnarkBackendProver(
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
 
-	_, fftPointsT, err := p.SetupFFTPoints(params)
+	_, fftPointsT, err := p.setupFFTPoints(params)
 	if err != nil {
 		return nil, err
 	}
@@ -434,8 +351,72 @@ func (p *Prover) createIcicleBackendProver(
 	return CreateIcicleBackendProver(p, params, fs)
 }
 
+func (g *Prover) preloadAllEncoders() error {
+	paramsAll, err := getAllPrecomputedSrsMap(g.KzgConfig.CacheDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("detect %v srs maps\n", len(paramsAll))
+	for i := 0; i < len(paramsAll); i++ {
+		fmt.Printf(" %v. NumChunks: %v   ChunkLength: %v\n", i, paramsAll[i].NumChunks, paramsAll[i].ChunkLength)
+	}
+
+	if len(paramsAll) == 0 {
+		return nil
+	}
+
+	for _, params := range paramsAll {
+		// get those encoders and store them
+		enc, err := g.GetKzgEncoder(params)
+		if err != nil {
+			return err
+		}
+		g.ParametrizedProvers[params] = enc
+	}
+
+	return nil
+}
+
+// Detect the precomputed table from the specified directory
+// the file name follow the name convention of
+//
+//	dimE*.coset&
+//
+// where the first * specifies the dimension of the matrix which
+// equals to the number of chunks
+// where the second & specifies the length of each chunk
+func getAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error) {
+	files, err := os.ReadDir(tableDir)
+	if err != nil {
+		return nil, fmt.Errorf("read srs table dir: %w", err)
+	}
+
+	tables := make([]encoding.EncodingParams, 0)
+	for _, file := range files {
+		filename := file.Name()
+
+		tokens := strings.Split(filename, ".")
+
+		dimEValue, err := strconv.Atoi(tokens[0][4:])
+		if err != nil {
+			return nil, fmt.Errorf("parse dimension part of the table: %w", err)
+		}
+		cosetSizeValue, err := strconv.Atoi(tokens[1][5:])
+		if err != nil {
+			return nil, fmt.Errorf("parse coset size part of the table: %w", err)
+		}
+
+		params := encoding.EncodingParams{
+			NumChunks:   uint64(cosetSizeValue),
+			ChunkLength: uint64(dimEValue),
+		}
+		tables = append(tables, params)
+	}
+	return tables, nil
+}
+
 // Helper methods for setup
-func (p *Prover) SetupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
+func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
 	subTable, err := NewSRSTable(p.KzgConfig.CacheDir, p.Srs.G1, p.KzgConfig.NumWorker)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
