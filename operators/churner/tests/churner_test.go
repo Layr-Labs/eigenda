@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"math/big"
 	"testing"
@@ -16,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
@@ -29,15 +27,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
-	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
+// Simple operator info struct that only contains what the test needs
+type operatorInfo struct {
+	ECDSAPrivateKey string
+	ECDSAKeyFile    string
+	ECDSAPassword   string
+	BLSKeyPath      string
+	BLSPassword     string
 }
 
 var (
-	templateName string
-	testName     string
-
 	localstackPort                 = "4570"
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
@@ -50,26 +49,26 @@ var (
 	logger = test.GetLogger()
 )
 
-func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+// TestSetup contains all the test infrastructure needed for churner tests
+type TestSetup struct {
+	AnvilContainer      *testbed.AnvilContainer
+	LocalstackContainer *testbed.LocalStackContainer
+	Contracts           *testbed.DeploymentResult
+	Operators           []operatorInfo
+	PrivateKeys         *testbed.PrivateKeyMaps
+}
+
+func setupTest(t *testing.T) *TestSetup {
 	t.Helper()
 
 	if testing.Short() {
 		t.Skip("Skipping churner test in short mode")
 	}
 
-	flag.Parse()
 	ctx := t.Context()
-	rootPath := "../../../"
+	numOperators := 4
 
-	if testName == "" {
-		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		require.NoError(t, err, "failed to create test directory")
-	}
-
-	testConfig := deploy.NewTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = false
-
+	// Start localstack container
 	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
@@ -78,15 +77,52 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 	})
 	require.NoError(t, err, "failed to start localstack container")
 
+	// Start anvil container
 	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		ExposeHostPort: true,
 		Logger:         logger,
 	})
 	require.NoError(t, err, "failed to start anvil container")
 
-	logger.Info("Deploying experiment")
-	err = testConfig.DeployExperiment()
-	require.NoError(t, err, "failed to deploy experiment")
+	// Load private keys using testbed
+	privateKeys, err := testbed.LoadPrivateKeys(testbed.LoadPrivateKeysInput{
+		NumOperators: numOperators,
+		NumRelays:    0,
+	})
+	require.NoError(t, err, "failed to load private keys")
+
+	// Get deployer key from Anvil's default accounts
+	deployerKey, _ := testbed.GetAnvilDefaultKeys()
+
+	// Deploy contracts
+	logger.Info("Deploying contracts")
+	deploymentResult, err := testbed.DeployEigenDAContracts(testbed.DeploymentConfig{
+		AnvilRPCURL:      "http://localhost:8545",
+		DeployerKey:      deployerKey,
+		NumOperators:     numOperators,
+		NumRelays:        0,
+		MaxOperatorCount: 3, // Set max to 3 so the 4th operator can churn
+		Stakes: []testbed.Stakes{
+			{Total: 100e18, Distribution: []float32{1, 4, 6, 10}},
+			{Total: 100e18, Distribution: []float32{1, 3, 8, 9}},
+		},
+		PrivateKeys: privateKeys,
+		Logger:      logger,
+	})
+	require.NoError(t, err, "failed to deploy contracts")
+
+	// Create operator info using pre-existing encrypted key files
+	operators := make([]operatorInfo, numOperators)
+	for i := 0; i < numOperators; i++ {
+		operatorKey := fmt.Sprintf("opr%d", i)
+		operators[i] = operatorInfo{
+			ECDSAPrivateKey: privateKeys.EcdsaMap[operatorKey].PrivateKey,
+			ECDSAKeyFile:    privateKeys.EcdsaMap[operatorKey].KeyFile,
+			ECDSAPassword:   privateKeys.EcdsaMap[operatorKey].Password,
+			BLSKeyPath:      privateKeys.BlsMap[operatorKey].KeyFile,
+			BLSPassword:     privateKeys.BlsMap[operatorKey].Password,
+		}
+	}
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers")
@@ -96,14 +132,20 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	return anvilContainer, localstackContainer, testConfig
+	return &TestSetup{
+		AnvilContainer:      anvilContainer,
+		LocalstackContainer: localstackContainer,
+		Contracts:           deploymentResult,
+		Operators:           operators,
+		PrivateKeys:         privateKeys,
+	}
 }
 
 func TestChurner(t *testing.T) {
 	ctx := t.Context()
-	_, _, testConfig := setupTest(t)
+	testSetup := setupTest(t)
 
-	server := newTestServer(t, testConfig)
+	server := newTestServer(t, testSetup)
 	quorumIDsUint8 := make([]uint8, len(quorumIds))
 	for i, id := range quorumIds {
 		quorumIDsUint8[i] = uint8(id)
@@ -115,11 +157,14 @@ func TestChurner(t *testing.T) {
 	var signer blssigner.Signer
 	var g1PointBytes []byte
 	var g2PointBytes []byte
-	for i, op := range testConfig.Operators {
-		socket := fmt.Sprintf("%s:%s:%s", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT, op.NODE_RETRIEVAL_PORT)
+
+	for i, op := range testSetup.Operators {
+		socket := fmt.Sprintf("localhost:%d:%d", 32000+i, 32100+i) // Simple port assignment
+
+		// Create BLS signer from key file
 		opSigner, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
-			Path:       op.NODE_BLS_KEY_FILE,
-			Password:   op.NODE_BLS_KEY_PASSWORD,
+			Path:       op.BLSKeyPath,
+			Password:   op.BLSPassword,
 			SignerType: blssignerTypes.Local,
 		})
 		require.NoError(t, err)
@@ -136,8 +181,9 @@ func TestChurner(t *testing.T) {
 		opG2Point := new(core.G2Point)
 		opG2Point, err = opG2Point.Deserialize(opG2PointBytes)
 		require.NoError(t, err)
-		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
+		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.ECDSAKeyFile, op.ECDSAPassword)
 		require.NoError(t, err)
+
 		if i == 0 {
 			// This is the lowest stake operator that will be eventually churned
 			lowestStakeOperatorAddr = sk.Address
@@ -146,9 +192,13 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+		// Use the hex private key from plugin.GetECDSAPrivateKey for the transactor
 		tx = mustCreateTransactorFromScratch(
-			t, *privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
-		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
+			t, *privateKey,
+			testSetup.Contracts.EigenDA.OperatorStateRetriever,
+			testSetup.Contracts.EigenDA.ServiceManager,
+			logger)
+		if i >= 3 { // MaxOperatorCount is 3, so the 4th operator (index 3) will churn
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
 			signer = opSigner
@@ -237,7 +287,7 @@ func mustCreateTransactorFromScratch(
 	return writer
 }
 
-func newTestServer(t *testing.T, testConfig *deploy.Config) *churner.Server {
+func newTestServer(t *testing.T, testSetup *TestSetup) *churner.Server {
 	t.Helper()
 
 	config := &churner.Config{
@@ -247,17 +297,17 @@ func newTestServer(t *testing.T, testConfig *deploy.Config) *churner.Server {
 			NumRetries:       numRetries,
 		},
 		LoggerConfig:               *common.DefaultLoggerConfig(),
-		OperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
-		EigenDAServiceManagerAddr:  testConfig.EigenDA.ServiceManager,
-		EigenDADirectory:           testConfig.EigenDA.EigenDADirectory,
+		OperatorStateRetrieverAddr: testSetup.Contracts.EigenDA.OperatorStateRetriever,
+		EigenDAServiceManagerAddr:  testSetup.Contracts.EigenDA.ServiceManager,
+		EigenDADirectory:           testSetup.Contracts.EigenDA.EigenDADirectory,
 		ChurnApprovalInterval:      15 * time.Minute,
 	}
 
 	operatorTransactorChurner := mustCreateTransactorFromScratch(
 		t,
 		churnerPrivateKeyHex,
-		testConfig.EigenDA.OperatorStateRetriever,
-		testConfig.EigenDA.ServiceManager,
+		testSetup.Contracts.EigenDA.OperatorStateRetriever,
+		testSetup.Contracts.EigenDA.ServiceManager,
 		logger,
 	)
 
