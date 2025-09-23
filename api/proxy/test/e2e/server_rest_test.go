@@ -525,6 +525,10 @@ func TestReservationPayments(t *testing.T) {
 func TestOnDemandPayments(t *testing.T) {
 	t.Parallel()
 
+	if testutils.GetBackend() != testutils.SepoliaBackend {
+		t.Skip("The CI key only has on-demand funds deposited on sepolia")
+	}
+
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
 	testCfg.ClientLedgerMode = clientledger.ClientLedgerModeOnDemandOnly
 
