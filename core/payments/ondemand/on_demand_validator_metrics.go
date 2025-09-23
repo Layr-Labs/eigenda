@@ -2,11 +2,11 @@ package ondemand
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [OnDemandPaymentValidator]
 type OnDemandValidatorMetrics struct {
-	onDemandPaymentsCount      prometheus.Counter
 	onDemandSymbolCount        prometheus.Histogram
 	onDemandInsufficientFunds  prometheus.Counter
 	onDemandQuorumNotSupported prometheus.Counter
@@ -22,16 +22,7 @@ func NewOnDemandValidatorMetrics(
 		return nil
 	}
 
-	paymentsCount := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "on_demand_payments_count",
-			Subsystem: subsystem,
-			Help:      "Total number of successful on-demand payments processed",
-		},
-	)
-
-	symbolCount := prometheus.NewHistogram(
+	symbolCount := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "on_demand_symbol_count",
@@ -42,7 +33,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	insufficientFunds := prometheus.NewCounter(
+	insufficientFunds := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_insufficient_funds_count",
@@ -51,7 +42,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	quorumNotSupported := prometheus.NewCounter(
+	quorumNotSupported := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_quorum_not_supported_count",
@@ -60,7 +51,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	unexpectedErrors := prometheus.NewCounter(
+	unexpectedErrors := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_unexpected_errors_count",
@@ -69,16 +60,7 @@ func NewOnDemandValidatorMetrics(
 		},
 	)
 
-	registry.MustRegister(
-		paymentsCount,
-		symbolCount,
-		insufficientFunds,
-		quorumNotSupported,
-		unexpectedErrors,
-	)
-
 	return &OnDemandValidatorMetrics{
-		onDemandPaymentsCount:      paymentsCount,
 		onDemandSymbolCount:        symbolCount,
 		onDemandInsufficientFunds:  insufficientFunds,
 		onDemandQuorumNotSupported: quorumNotSupported,
@@ -92,7 +74,6 @@ func (m *OnDemandValidatorMetrics) RecordSuccess(symbolCount uint32) {
 		return
 	}
 	m.onDemandSymbolCount.Observe(float64(symbolCount))
-	m.onDemandPaymentsCount.Inc()
 }
 
 // Increments the counter for insufficient funds errors

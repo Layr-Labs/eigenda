@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [OnDemandMeterer]
@@ -19,7 +20,7 @@ func NewOnDemandMetererMetrics(
 		return nil
 	}
 
-	onDemandGlobalMeterExhaustedRequests := prometheus.NewCounter(
+	onDemandGlobalMeterExhaustedRequests := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_global_meter_exhausted_requests_count",
@@ -28,7 +29,7 @@ func NewOnDemandMetererMetrics(
 		},
 	)
 
-	onDemandGlobalMeterExhaustedSymbols := prometheus.NewCounter(
+	onDemandGlobalMeterExhaustedSymbols := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "on_demand_global_meter_exhausted_symbols_count",
@@ -36,8 +37,6 @@ func NewOnDemandMetererMetrics(
 			Help:      "Total number of symbols rejected due to global rate limit",
 		},
 	)
-
-	registry.MustRegister(onDemandGlobalMeterExhaustedRequests, onDemandGlobalMeterExhaustedSymbols)
 
 	return &OnDemandMetererMetrics{
 		onDemandGlobalMeterExhaustedRequests: onDemandGlobalMeterExhaustedRequests,

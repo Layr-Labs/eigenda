@@ -2,11 +2,11 @@ package reservation
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [ReservationPaymentValidator]
 type ReservationValidatorMetrics struct {
-	reservationPaymentsCount         prometheus.Counter
 	reservationSymbolCount           prometheus.Histogram
 	reservationInsufficientBandwidth prometheus.Counter
 	reservationQuorumNotPermitted    prometheus.Counter
@@ -24,16 +24,7 @@ func NewReservationValidatorMetrics(
 		return nil
 	}
 
-	paymentsCount := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "reservation_payments_count",
-			Subsystem: subsystem,
-			Help:      "Total number of successful reservation payments processed",
-		},
-	)
-
-	symbolCount := prometheus.NewHistogram(
+	symbolCount := promauto.With(registry).NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "reservation_symbol_count",
@@ -44,7 +35,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	insufficientFunds := prometheus.NewCounter(
+	insufficientBandwidth := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_insufficient_bandwidth_count",
@@ -53,7 +44,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	quorumNotPermitted := prometheus.NewCounter(
+	quorumNotPermitted := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_quorum_not_permitted_count",
@@ -62,7 +53,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	timeOutOfRange := prometheus.NewCounter(
+	timeOutOfRange := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_time_out_of_range_count",
@@ -71,7 +62,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	timeMovedBackward := prometheus.NewCounter(
+	timeMovedBackward := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_time_moved_backward_count",
@@ -80,7 +71,7 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	unexpectedErrors := prometheus.NewCounter(
+	unexpectedErrors := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_unexpected_errors_count",
@@ -89,20 +80,9 @@ func NewReservationValidatorMetrics(
 		},
 	)
 
-	registry.MustRegister(
-		paymentsCount,
-		symbolCount,
-		insufficientFunds,
-		quorumNotPermitted,
-		timeOutOfRange,
-		timeMovedBackward,
-		unexpectedErrors,
-	)
-
 	return &ReservationValidatorMetrics{
-		reservationPaymentsCount:         paymentsCount,
 		reservationSymbolCount:           symbolCount,
-		reservationInsufficientBandwidth: insufficientFunds,
+		reservationInsufficientBandwidth: insufficientBandwidth,
 		reservationQuorumNotPermitted:    quorumNotPermitted,
 		reservationTimeOutOfRange:        timeOutOfRange,
 		reservationTimeMovedBackward:     timeMovedBackward,
@@ -116,11 +96,10 @@ func (m *ReservationValidatorMetrics) RecordSuccess(symbolCount uint32) {
 		return
 	}
 	m.reservationSymbolCount.Observe(float64(symbolCount))
-	m.reservationPaymentsCount.Inc()
 }
 
-// Increments the counter for insufficient funds errors
-func (m *ReservationValidatorMetrics) IncrementInsufficientFunds() {
+// Increments the counter for when the holder of a reservation lacks bandwidth to perform the dispersal
+func (m *ReservationValidatorMetrics) IncrementInsufficientBandwidth() {
 	if m == nil {
 		return
 	}

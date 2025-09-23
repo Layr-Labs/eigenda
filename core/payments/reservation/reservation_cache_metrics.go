@@ -2,6 +2,7 @@ package reservation
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // Tracks metrics for the [ReservationLedgerCache]
@@ -25,7 +26,7 @@ func NewReservationCacheMetrics(
 		return nil
 	}
 
-	evictions := prometheus.NewCounter(
+	evictions := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_ledger_cache_evictions",
@@ -34,7 +35,7 @@ func NewReservationCacheMetrics(
 		},
 	)
 
-	prematureEvictions := prometheus.NewCounter(
+	prematureEvictions := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_ledger_cache_premature_evictions",
@@ -43,7 +44,7 @@ func NewReservationCacheMetrics(
 		},
 	)
 
-	resizes := prometheus.NewCounter(
+	resizes := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_ledger_cache_resizes",
@@ -52,7 +53,7 @@ func NewReservationCacheMetrics(
 		},
 	)
 
-	cacheMisses := prometheus.NewCounter(
+	cacheMisses := promauto.With(registry).NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "reservation_ledger_cache_misses",
@@ -60,8 +61,6 @@ func NewReservationCacheMetrics(
 			Help:      "Total number of cache misses in the reservation ledger cache",
 		},
 	)
-
-	registry.MustRegister(evictions, prematureEvictions, resizes, cacheMisses)
 
 	return &ReservationCacheMetrics{
 		registry:           registry,
@@ -78,11 +77,11 @@ func NewReservationCacheMetrics(
 //
 // This should be called after the cache is initialized
 func (m *ReservationCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
-	if m == nil || m.registry == nil {
+	if m == nil || m.registry == nil || m.cacheSize != nil {
 		return
 	}
 
-	m.cacheSize = prometheus.NewGaugeFunc(
+	m.cacheSize = promauto.With(m.registry).NewGaugeFunc(
 		prometheus.GaugeOpts{
 			Namespace: m.namespace,
 			Name:      "reservation_ledger_cache_size",
@@ -93,8 +92,6 @@ func (m *ReservationCacheMetrics) RegisterSizeGauge(sizeGetter func() int) {
 			return float64(sizeGetter())
 		},
 	)
-
-	m.registry.MustRegister(m.cacheSize)
 }
 
 // Increments the evictions counter
