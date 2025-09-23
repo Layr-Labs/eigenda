@@ -43,8 +43,6 @@ const (
 	disperserHostname = "disperser-testnet-sepolia.eigenda.xyz"
 	// EigenDA Directory Address for Sepolia - this allows fetching all other contract addresses
 	eigenDADirectoryAddress = "0x9620dC4B3564198554e4D2b06dEFB7A369D90257"
-	// CertVerifierRouter is not available from the contract registry and must be specified directly
-	certVerifierRouterAddress = "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429"
 )
 
 func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisperser, error) {
@@ -63,11 +61,6 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	certVerifier, err := createCertVerifier()
-	if err != nil {
-		return nil, fmt.Errorf("create cert verifier: %w", err)
-	}
-
 	ethClient, err := createEthClient(logger)
 	if err != nil {
 		return nil, fmt.Errorf("create eth client: %w", err)
@@ -76,6 +69,17 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("create contract directory: %w", err)
+	}
+
+	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.CertVerifierRouter)
+	if err != nil {
+		return nil, fmt.Errorf("get cert verifier router address: %w", err)
+	}
+
+	certVerifier, err := createCertVerifier(certVerifierRouterAddress, ethClient, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
 
 	certBuilder, err := createCertBuilder(contractDirectory)
@@ -295,31 +299,18 @@ func createKzgProver() (*prover.Prover, error) {
 	return kzgProver, nil
 }
 
-func createCertVerifier() (*verification.CertVerifier, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %v", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	routerAddressProvider, err := verification.BuildRouterAddressProvider(
-		gethcommon.HexToAddress(certVerifierRouterAddress),
-		ethClient,
-		logger,
-	)
+func createCertVerifier(
+	certVerifierRouterAddress gethcommon.Address,
+	ethClient common.EthClient,
+	logger logging.Logger,
+) (*verification.CertVerifier, error) {
+	routerAddressProvider, err := verification.BuildRouterAddressProvider(certVerifierRouterAddress, ethClient, logger)
 	if err != nil {
 		return nil, fmt.Errorf("create router address provider: %w", err)
 	}
 
-	return verification.NewCertVerifier(
-		logger,
-		ethClient,
-		routerAddressProvider,
-	)
+	//nolint:wrapcheck
+	return verification.NewCertVerifier(logger, ethClient, routerAddressProvider)
 }
 
 func createCertBuilder(contractDirectory *directory.ContractDirectory) (*clients.CertBuilder, error) {
