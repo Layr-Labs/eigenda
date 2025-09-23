@@ -11,7 +11,7 @@ var startTime = time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
 func TestMeterDispersal(t *testing.T) {
 	timeSource := func() time.Time { return startTime }
-	meterer := NewOnDemandMeterer(100, 10, timeSource)
+	meterer := NewOnDemandMeterer(100, 10, timeSource, nil)
 
 	reservation, err := meterer.MeterDispersal(500)
 	require.NoError(t, err)
@@ -21,7 +21,7 @@ func TestMeterDispersal(t *testing.T) {
 
 func TestCancelDispersal(t *testing.T) {
 	timeSource := func() time.Time { return startTime }
-	meterer := NewOnDemandMeterer(100, 10, timeSource)
+	meterer := NewOnDemandMeterer(100, 10, timeSource, nil)
 
 	reservation, err := meterer.MeterDispersal(500)
 	require.NoError(t, err)

@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
@@ -229,7 +230,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, errors.New("blob header must contain a commitment")
 	}
 	commitedBlobLength := blobHeaderProto.GetCommitment().GetLength()
-	if commitedBlobLength == 0 || commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+	if commitedBlobLength == 0 || commitedBlobLength != math.NextPowOf2u32(commitedBlobLength) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))

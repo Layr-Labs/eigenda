@@ -2,6 +2,7 @@ package reservation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ type ReservationPaymentValidator struct {
 	// A cache of the ledgers being tracked
 	ledgerCache *ReservationLedgerCache
 	timeSource  func() time.Time
+	metrics     *ReservationValidatorMetrics
 }
 
 func NewReservationPaymentValidator(
@@ -26,6 +28,8 @@ func NewReservationPaymentValidator(
 	paymentVault payments.PaymentVault,
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time,
+	validatorMetrics *ReservationValidatorMetrics,
+	cacheMetrics *ReservationCacheMetrics,
 ) (*ReservationPaymentValidator, error) {
 
 	ledgerCache, err := NewReservationLedgerCache(
@@ -34,6 +38,7 @@ func NewReservationPaymentValidator(
 		config,
 		paymentVault,
 		timeSource,
+		cacheMetrics,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger cache: %w", err)
@@ -43,6 +48,7 @@ func NewReservationPaymentValidator(
 		logger:      logger,
 		ledgerCache: ledgerCache,
 		timeSource:  timeSource,
+		metrics:     validatorMetrics,
 	}, nil
 }
 
@@ -66,9 +72,34 @@ func (pv *ReservationPaymentValidator) Debit(
 
 	now := pv.timeSource()
 	success, _, err := ledger.Debit(now, dispersalTime, symbolCount, quorumNumbers)
-	if err != nil {
-		return false, fmt.Errorf("debit reservation payment: %w", err)
+
+	if err == nil {
+		if success {
+			pv.metrics.RecordSuccess(symbolCount)
+		} else {
+			pv.metrics.IncrementInsufficientBandwidth()
+		}
+		return success, nil
 	}
 
-	return success, nil
+	var quorumNotPermittedErr *QuorumNotPermittedError
+	if errors.As(err, &quorumNotPermittedErr) {
+		pv.metrics.IncrementQuorumNotPermitted()
+		return false, err
+	}
+
+	var timeOutOfRangeErr *TimeOutOfRangeError
+	if errors.As(err, &timeOutOfRangeErr) {
+		pv.metrics.IncrementTimeOutOfRange()
+		return false, err
+	}
+
+	var timeMovedBackwardErr *TimeMovedBackwardError
+	if errors.As(err, &timeMovedBackwardErr) {
+		pv.metrics.IncrementTimeMovedBackward()
+		return false, err
+	}
+
+	pv.metrics.IncrementUnexpectedErrors()
+	return false, err
 }

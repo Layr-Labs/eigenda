@@ -30,6 +30,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 			config,
 			nil, // nil payment vault
 			func() time.Time { return testTime },
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -49,6 +50,7 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 			config,
 			vault.NewTestPaymentVault(),
 			nil, // nil time source
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -101,6 +103,7 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 		config,
 		testVault,
 		timeSource,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
@@ -176,6 +179,7 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		config,
 		testVault,
 		timeSource,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)

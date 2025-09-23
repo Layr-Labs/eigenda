@@ -3,12 +3,13 @@ package prover
 import (
 	"errors"
 	"fmt"
-	"math"
+	gomath "math"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -245,7 +246,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
-	length := encoding.NextPowerOf2(uint64(len(symbols)))
+	length := math.NextPowOf2u64(uint64(len(symbols)))
 
 	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
 	if err != nil {
@@ -375,9 +376,9 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	// Create FFT settings based on params
-	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
 	if params.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * params.NumChunks)))
+		n = uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	}
 	fs := fft.NewFFTSettings(n)
 
@@ -405,7 +406,7 @@ func (p *Prover) createGnarkBackendProver(
 	}
 
 	// Create subgroup FFT settings
-	t := uint8(math.Log2(float64(2 * params.NumChunks)))
+	t := uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
 	// Set KZG Prover gnark backend

@@ -45,6 +45,7 @@ type OnDemandLedgerCache struct {
 	ledgerCreationLock *common.IndexLock
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
 	vaultMonitor *OnDemandVaultMonitor
+	metrics      *OnDemandCacheMetrics
 }
 
 func NewOnDemandLedgerCache(
@@ -53,17 +54,8 @@ func NewOnDemandLedgerCache(
 	config OnDemandLedgerCacheConfig,
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
+	metrics *OnDemandCacheMetrics,
 ) (*OnDemandLedgerCache, error) {
-	cache, err := lru.NewWithEvict(
-		config.MaxLedgers,
-		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
-			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
-	}
-
 	if paymentVault == nil {
 		return nil, errors.New("payment vault must be non-nil")
 	}
@@ -83,16 +75,30 @@ func NewOnDemandLedgerCache(
 	}
 
 	ledgerCache := &OnDemandLedgerCache{
-		cache:              cache,
 		paymentVault:       paymentVault,
 		dynamoClient:       dynamoClient,
 		onDemandTableName:  config.OnDemandTableName,
 		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols:      minNumSymbols,
 		ledgerCreationLock: common.NewIndexLock(256),
+		metrics:            metrics,
 	}
 
-	// Create the vault monitor with callback functions
+	ledgerCache.cache, err = lru.NewWithEvict(
+		config.MaxLedgers,
+		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
+			ledgerCache.metrics.IncrementEvictions()
+			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
+	}
+
+	ledgerCache.metrics.RegisterSizeGauge(func() int {
+		return ledgerCache.cache.Len()
+	})
+
 	ledgerCache.vaultMonitor, err = NewOnDemandVaultMonitor(
 		ctx,
 		logger,
@@ -102,8 +108,8 @@ func NewOnDemandLedgerCache(
 		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
 		// in a config value
 		1024,
-		ledgerCache.GetAccountsToUpdate,
-		ledgerCache.UpdateTotalDeposit,
+		ledgerCache.getAccountsToUpdate,
+		ledgerCache.updateTotalDeposit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand vault monitor: %w", err)
@@ -136,6 +142,7 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 	}
 
 	// Slow path: acquire per-account lock and check again
+	c.metrics.IncrementCacheMisses()
 	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
 	c.ledgerCreationLock.Lock(accountIndex)
 	defer c.ledgerCreationLock.Unlock(accountIndex)
@@ -173,12 +180,12 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 //
 // This method is used to determine which values need to be fetched from the PaymentVault, when periodically
 // checking for updates.
-func (c *OnDemandLedgerCache) GetAccountsToUpdate() []gethcommon.Address {
+func (c *OnDemandLedgerCache) getAccountsToUpdate() []gethcommon.Address {
 	return c.cache.Keys()
 }
 
 // Updates the total deposit for an account
-func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+func (c *OnDemandLedgerCache) updateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
 		// Account was evicted from cache, nothing to update

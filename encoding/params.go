@@ -3,8 +3,9 @@ package encoding
 import (
 	"errors"
 	"fmt"
-	"math"
+	gomath "math"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"golang.org/x/exp/constraints"
 )
 
@@ -22,10 +23,10 @@ func (p EncodingParams) NumEvaluations() uint64 {
 }
 
 func (p EncodingParams) Validate() error {
-	if !IsPowerOfTwo(p.NumChunks) {
+	if !math.IsPowerOfTwo(p.NumChunks) {
 		return fmt.Errorf("number of chunks must be a power of 2, got %d", p.NumChunks)
 	}
-	if !IsPowerOfTwo(p.ChunkLength) {
+	if !math.IsPowerOfTwo(p.ChunkLength) {
 		return fmt.Errorf("chunk length must be a power of 2, got %d", p.ChunkLength)
 	}
 	return nil
@@ -33,22 +34,22 @@ func (p EncodingParams) Validate() error {
 
 func ParamsFromMins[T constraints.Integer](minChunkLength, minNumChunks T) EncodingParams {
 	return EncodingParams{
-		NumChunks:   NextPowerOf2(uint64(minNumChunks)),
-		ChunkLength: NextPowerOf2(uint64(minChunkLength)),
+		NumChunks:   math.NextPowOf2u64(uint64(minNumChunks)),
+		ChunkLength: math.NextPowOf2u64(uint64(minChunkLength)),
 	}
 }
 
 func ParamsFromSysPar(numSys, numPar, dataSize uint64) EncodingParams {
 
 	numNodes := numSys + numPar
-	dataLen := RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
-	chunkLen := RoundUpDivide(dataLen, numSys)
+	dataLen := math.RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
+	chunkLen := math.RoundUpDivide(dataLen, numSys)
 	return ParamsFromMins(chunkLen, numNodes)
 
 }
 
 func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
-	dataLen := RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
+	dataLen := math.RoundUpDivide(dataSize, BYTES_PER_SYMBOL)
 	numSys := dataLen / chunkLen
 	return numSys
 }
@@ -62,7 +63,7 @@ func ValidateEncodingParams(params EncodingParams, SRSOrder uint64) error {
 		return errors.New("chunk length must be greater than 0")
 	}
 
-	if params.NumChunks > math.MaxUint64/params.ChunkLength {
+	if params.NumChunks > gomath.MaxUint64/params.ChunkLength {
 		return fmt.Errorf("multiplication overflow: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
 	}
 
