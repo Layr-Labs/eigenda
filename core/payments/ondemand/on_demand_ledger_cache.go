@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
@@ -51,14 +50,12 @@ type OnDemandLedgerCache struct {
 func NewOnDemandLedgerCache(
 	ctx context.Context,
 	logger logging.Logger,
-	maxLedgers int,
+	config OnDemandLedgerCacheConfig,
 	paymentVault payments.PaymentVault,
-	updateInterval time.Duration,
 	dynamoClient *dynamodb.Client,
-	onDemandTableName string,
 ) (*OnDemandLedgerCache, error) {
 	cache, err := lru.NewWithEvict(
-		maxLedgers,
+		config.MaxLedgers,
 		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
 			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
 		},
@@ -89,7 +86,7 @@ func NewOnDemandLedgerCache(
 		cache:              cache,
 		paymentVault:       paymentVault,
 		dynamoClient:       dynamoClient,
-		onDemandTableName:  onDemandTableName,
+		onDemandTableName:  config.OnDemandTableName,
 		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols:      minNumSymbols,
 		ledgerCreationLock: common.NewIndexLock(256),
@@ -100,7 +97,11 @@ func NewOnDemandLedgerCache(
 		ctx,
 		logger,
 		paymentVault,
-		updateInterval,
+		config.UpdateInterval,
+		// relatively arbitrary value. much higher than account number in practice, but much lower than what the RPC
+		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
+		// in a config value
+		1024,
 		ledgerCache.GetAccountsToUpdate,
 		ledgerCache.UpdateTotalDeposit,
 	)

@@ -1,0 +1,73 @@
+# Codecov configuration
+# https://docs.codecov.io/docs/codecovyml-reference
+
+coverage:
+  # Coverage precision (number of decimal places)
+  precision: 2
+  round: down
+
+  # Coverage range for color coding (red to green)
+  range: "30...80"
+
+  status:
+    project:
+      default:
+        # Only fail the status if coverage drops by more than 1%
+        threshold: 1%
+        target: auto
+
+    patch:
+      default:
+        # Require at least 50% coverage on new/modified code
+        target: 50%
+        threshold: 5%
+
+# Files and paths to ignore in coverage calculations
+ignore:
+  # Auto-generated contract bindings
+  - "contracts/bindings/**"
+  - "**/bindings/**"
+
+  # Generated protobuf/grpc files
+  - "**/*.pb.go"
+  - "**/*.pb.gw.go"
+  - "**/grpc/**"
+
+  # Mock files
+  - "**/mock/**"
+  - "**/mocks/**"
+  - "**/*_mock.go"
+  - "**/*_mocks.go"
+
+  # Test files and test utilities
+  - "**/*_test.go"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/testutils/**"
+  - "**/testdata/**"
+
+  # Command-line entry points (main packages)
+  - "**/cmd/**"
+  - "**/main.go"
+
+  # Documentation and examples
+  - "**/docs/**"
+  - "**/examples/**"
+  - "**/example/**"
+
+  # Generated files
+  - "**/generated/**"
+  - "**/*.generated.go"
+  - "**/codegen/**"
+
+  # Third-party and vendor
+  - "vendor/**"
+  - "third_party/**"
+
+  # Build and deployment
+  - "**/build/**"
+  - "**/deploy/**"
+  - "**/scripts/**"
+
+  # Resource files
+  - "resources/**"

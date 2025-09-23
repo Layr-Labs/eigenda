@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/proxy/common"
+	"github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	"github.com/Layr-Labs/eigenda/api/proxy/metrics"
 	"github.com/Layr-Labs/eigenda/api/proxy/test/mocks"
 	"github.com/gorilla/mux"
@@ -24,10 +25,16 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints disabled - they should not be accessible
 	t.Run("Admin Endpoints Disabled", func(t *testing.T) {
 		// Create server config with admin endpoints disabled
+
 		adminDisabledCfg := Config{
-			Host:        "localhost",
-			Port:        0,
-			EnabledAPIs: []string{}, // Empty list means no APIs are enabled
+			Host: "localhost",
+			Port: 0,
+			APIsEnabled: &enablement.RestApisEnabled{
+				Admin:               false,
+				OpGenericCommitment: true,
+				OpKeccakCommitment:  true,
+				StandardCommitment:  true,
+			},
 		}
 
 		// Test GET endpoint with admin disabled

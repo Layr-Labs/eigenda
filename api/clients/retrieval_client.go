@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/wealdtech/go-merkletree/v2"
 
@@ -56,7 +57,7 @@ type retrievalClient struct {
 	chainState            core.ChainState
 	assignmentCoordinator core.AssignmentCoordinator
 	nodeClient            NodeClient
-	verifier              encoding.Verifier
+	verifier              *verifier.Verifier
 	numConnections        int
 }
 
@@ -66,7 +67,7 @@ func NewRetrievalClient(
 	chainState core.ChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
-	verifier encoding.Verifier,
+	verifier *verifier.Verifier,
 	numConnections int) (RetrievalClient, error) {
 
 	return &retrievalClient{

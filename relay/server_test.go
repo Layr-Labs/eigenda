@@ -6,16 +6,15 @@ import (
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/replay"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -120,10 +119,8 @@ func getChunks(
 
 func TestReadWriteBlobs(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)
@@ -252,7 +249,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		request := &pb.GetBlobRequest{
-			BlobKey: tu.RandomBytes(32),
+			BlobKey: random.RandomBytes(32),
 		}
 
 		response, err := getBlob(t, request)
@@ -263,10 +260,8 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)
@@ -765,10 +760,8 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
 	ctx := t.Context()
+	logger = test.GetLogger()
 	rand := random.NewTestRandom()
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
 
 	setup(t)
 	defer teardown(t)

@@ -4,6 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 )
 
 var _ internal.BlobDecoder = &MockBlobDecoder{}
@@ -35,7 +36,7 @@ func (m MockBlobDecoder) DecodeBlob(
 
 // NewMockBlobDecoderFactory creates a new BlobDecoderFactory that returns the provided decoder.
 func NewMockBlobDecoderFactory(decoder internal.BlobDecoder) internal.BlobDecoderFactory {
-	return func(verifier encoding.Verifier) internal.BlobDecoder {
+	return func(verifier *verifier.Verifier) internal.BlobDecoder {
 		return decoder
 	}
 }

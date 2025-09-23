@@ -51,6 +51,7 @@ CLAUDE.md file *in the relevant subdirectory*.
 
 | Subdirectory | Description                                         |
 |--------------|-----------------------------------------------------|
+| ./core       | Core business logic and components of EigenDA       |
 | ./docs       | Documentation files describing the EigenDA system.  |
 
 ---
@@ -151,3 +152,5 @@ maintainability:
 3. Use line numbers and file paths so that the user can easily find elements being referred to.
 4. When asked to review something, don't focus on praising what's good about it. Instead, focus on concrete feedback
    for improvement. If nothing can be improved, it's ok to just say so.
+5. **TODO Handling**: Only work on TODOs that specifically mention "Claude" or explicitly request AI assistance.
+   Ignore other TODOs unless explicitly asked to work on them.

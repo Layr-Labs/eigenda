@@ -4,7 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/random"
 )
 
 func RandomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest {

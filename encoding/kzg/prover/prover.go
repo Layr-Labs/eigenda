@@ -33,8 +33,6 @@ type Prover struct {
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
 
-var _ encoding.Prover = &Prover{}
-
 func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
 	if encoderConfig == nil {
 		encoderConfig = encoding.DefaultConfig()
