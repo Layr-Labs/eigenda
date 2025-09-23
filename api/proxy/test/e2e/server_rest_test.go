@@ -523,7 +523,6 @@ func TestReservationPayments(t *testing.T) {
 }
 
 func TestOnDemandPayments(t *testing.T) {
-	t.Skip("Manual only for now, since we don't have a way of topping up on demand funds automatically")
 	t.Parallel()
 
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
