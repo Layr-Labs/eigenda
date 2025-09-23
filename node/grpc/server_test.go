@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 }
 
 // makeTestVerifier makes a verifier currently using the only supported backend.
-func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
@@ -273,7 +273,7 @@ func makeStoreChunksRequestExtended(t *testing.T, quorumThreshold, adversaryThre
 
 	var blob1Bundles, blob2Bundles []*pb.Bundle
 	if useGnarkBundleEncoding {
-		decoded, err := new(encoding.Frame).Deserialize(encodedChunk)
+		decoded, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 		assert.NoError(t, err)
 		bundle := core.Bundle{
 			decoded,
@@ -425,9 +425,9 @@ func TestRetrieveChunks(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
-	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
+	recovered, err := new(encoding.Frame).DeserializeGob(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
-	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
+	chunk, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
 
@@ -497,9 +497,9 @@ func TestMixedBundleEncoding(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.ChunkEncodingFormat_GOB, retrievalReply.GetChunkEncodingFormat())
-	recovered, err := new(encoding.Frame).Deserialize(retrievalReply.GetChunks()[0])
+	recovered, err := new(encoding.Frame).DeserializeGob(retrievalReply.GetChunks()[0])
 	assert.NoError(t, err)
-	chunk, err := new(encoding.Frame).Deserialize(encodedChunk)
+	chunk, err := new(encoding.Frame).DeserializeGob(encodedChunk)
 	assert.NoError(t, err)
 	assert.Equal(t, recovered, chunk)
 

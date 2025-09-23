@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,8 +14,7 @@ import (
 func TestReadWriteKeys(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -89,8 +88,7 @@ func TestReadWriteKeys(t *testing.T) {
 func TestReadingTruncatedKeyFile(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()
@@ -172,8 +170,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 func TestSwappingKeyFile(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
+	logger := test.GetLogger()
 	directory := t.TempDir()
 
 	index := rand.Uint32()

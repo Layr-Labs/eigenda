@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	logger = test.GetLogger()
+)
+
 func TestWaitForBlockNumber(t *testing.T) {
+	ctx := t.Context()
+
 	mockEthClient := &commonmock.MockEthClient{}
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
 	pollRate := time.Millisecond * 50
 
 	blockNumberMonitor, err := NewBlockNumberMonitor(logger, mockEthClient, pollRate)
@@ -34,7 +36,7 @@ func TestWaitForBlockNumber(t *testing.T) {
 	mockEthClient.On("BlockNumber").Return(uint64(callCount - 1))
 
 	// give plenty of time on the timeout, to get the necessary number of polls in
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), pollRate*time.Duration(callCount*2))
+	timeoutCtx, cancel := context.WithTimeout(ctx, pollRate*time.Duration(callCount*2))
 	defer cancel()
 
 	waitGroup := sync.WaitGroup{}

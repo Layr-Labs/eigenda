@@ -29,7 +29,9 @@ type BlobCommitments struct {
 	Commitment       *G1Commitment `json:"commitment"`
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
-	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
+	// This is the length in SYMBOLS (32 byte field elements) of the blob.
+	// When using EigenDA V2, it must be a power of 2.
+	// TODO(samlaf): we should make this uint32 or uint64, uint is ambiguous.
 	Length uint `json:"length"`
 }
 
@@ -134,7 +136,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk
 	Proof Proof
-	// Coeffs contains the coefficients of the interpolating polynomial of the chunk
+	// Coeffs contains the [EncodingParams.ChunkLength] coefficients of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 

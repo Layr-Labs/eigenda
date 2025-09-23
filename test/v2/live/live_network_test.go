@@ -12,15 +12,14 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
-
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,7 +71,7 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, clients.ErrZeroSymbols.Error())
 }
@@ -150,7 +149,7 @@ func zeroBlobDispersalTest(t *testing.T, environment string) {
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of a blob containing all 0s
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
 	require.NoError(t, err)
 }
 
@@ -480,9 +479,10 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 }
 
 func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
-	quorums := []core.QuorumID{0, 1}
-
+	ctx := t.Context()
+	logger := test.GetLogger()
 	rand := random.NewTestRandom()
+	quorums := []core.QuorumID{0, 1}
 
 	c := client.GetTestClient(t, environment)
 
@@ -492,10 +492,7 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 
 	accountId, err := signer.GetAccountID()
 	require.NoError(t, err)
-	fmt.Printf("Account ID: %s\n", accountId.Hex())
-
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
+	logger.Infof("Account ID: %s", accountId.Hex())
 
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          c.GetConfig().DisperserHostname,
@@ -523,10 +520,10 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	blob, err := payload.ToBlob(codecs.PolynomialFormCoeff)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

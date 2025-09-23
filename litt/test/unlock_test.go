@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	testrandom "github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +50,9 @@ func TestUnlock(t *testing.T) {
 	lockFileCount := 0
 	err = filepath.Walk(testDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// Log but do not fail. LittDB may be shuffling files around concurrently.
+			t.Logf("Error walking path %s (not necessarily fatal): %v", path, err)
+			return nil
 		}
 		if info.IsDir() {
 			return nil
@@ -71,7 +73,9 @@ func TestUnlock(t *testing.T) {
 	lockFileCount = 0
 	err = filepath.Walk(testDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// Log but do not fail. LittDB may be shuffling files around concurrently.
+			t.Logf("Error walking path %s (not necessarily fatal): %v", path, err)
+			return nil
 		}
 		if info.IsDir() {
 			return nil

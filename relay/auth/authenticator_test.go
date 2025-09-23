@@ -1,22 +1,20 @@
 package auth
 
 import (
-	"context"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/stretchr/testify/require"
 )
 
 // TestMockSigning is a meta-test to verify that
 // the test framework's BLS keys are functioning correctly.
 func TestMockSigning(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx := context.Background()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
@@ -33,7 +31,7 @@ func TestMockSigning(t *testing.T) {
 	operator, ok := operators[operatorID]
 	require.True(t, ok)
 
-	bytesToSign := tu.RandomBytes(32)
+	bytesToSign := random.RandomBytes(32)
 	signature := ics.KeyPairs[operatorID].SignMessage([32]byte(bytesToSign))
 
 	isValid := signature.Verify(operator.PubkeyG2, [32]byte(bytesToSign))
@@ -47,9 +45,8 @@ func TestMockSigning(t *testing.T) {
 }
 
 func TestValidRequest(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx := context.Background()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
@@ -78,9 +75,8 @@ func TestValidRequest(t *testing.T) {
 }
 
 func TestNonExistingClient(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx := context.Background()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
@@ -95,7 +91,7 @@ func TestNonExistingClient(t *testing.T) {
 	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024)
 	require.NoError(t, err)
 
-	invalidOperatorID := tu.RandomBytes(32)
+	invalidOperatorID := random.RandomBytes(32)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = invalidOperatorID
@@ -105,9 +101,8 @@ func TestNonExistingClient(t *testing.T) {
 }
 
 func TestBadSignature(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx := context.Background()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
@@ -141,9 +136,8 @@ func TestBadSignature(t *testing.T) {
 }
 
 func TestMissingOperatorID(t *testing.T) {
-	tu.InitializeRandom()
-
-	ctx := context.Background()
+	ctx := t.Context()
+	random.InitializeRandom()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{

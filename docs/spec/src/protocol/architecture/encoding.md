@@ -24,6 +24,7 @@ Basic RS encoding is used to achieve the first requirement of *Adversarial toler
 
 Notice that given any number of chunks $M$ such that $M \times$`ChunkLength` >= `BlobLength`, via [polynomial interpolation](https://en.wikipedia.org/wiki/Polynomial_interpolation) it is possible to reconstruct the original polynomial, and therefore its coefficients which represent the original blob. 
 
+
 ### Validation via KZG
 
 To address the requirement *Adversarial tolerance for disperser* using RS encoding alone requires fraud proofs: a challenger must download all of the encoded chunks and check that they lie on a polynomial corresponding to the blob commitment. 

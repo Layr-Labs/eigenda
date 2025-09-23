@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -18,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -129,7 +129,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
 	}
 
-	if !encoding.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
+	if !math.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
 		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
 	}
 
@@ -163,6 +163,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			config.ReservedOnly,
+			config.UseControllerMediatedPayments,
+			config.ControllerAddress,
 		)
 		if err != nil {
 			return err

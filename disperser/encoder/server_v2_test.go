@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -43,12 +43,11 @@ type testComponents struct {
 	dynamoDBClient   *mock.MockDynamoDBClient
 }
 
-func makeTestProver(numPoint uint64) (encoding.Prover, error) {
+func makeTestProver(numPoint uint64) (*prover.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
-		G2PowerOf2Path:  "../../resources/srs/g2.point.powerOf2",
 		CacheDir:        "../../resources/srs/SRSTables",
 		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
@@ -163,7 +162,7 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
 		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
 		require.NoError(t, err, "Failed to get chunk proofs")
-		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
+		proofs := encoding.DeserializeSplitFrameProofs(binaryProofs)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 

@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	p   encoding.Prover
-	v   encoding.Verifier
+	p   *prover.Prover
+	v   *verifier.Verifier
 	asn core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 )
 
@@ -43,7 +43,7 @@ func setup(m *testing.M) {
 }
 
 // makeTestComponents makes a prover and verifier currently using the only supported backend.
-func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
+func makeTestComponents() (*prover.Prover, *verifier.Verifier, error) {
 	config := &kzg.KzgConfig{
 		G1Path:          "../../resources/srs/g1.point",
 		G2Path:          "../../resources/srs/g2.point",
@@ -159,7 +159,7 @@ func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) 
 			}
 			bytes := make([][]byte, 0, len(chunks))
 			for _, c := range chunks {
-				serialized, err := c.Serialize()
+				serialized, err := c.SerializeGob()
 				if err != nil {
 					t.Fatal(err)
 				}

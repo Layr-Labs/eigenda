@@ -9,12 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"gopkg.in/yaml.v3"
 )
 
-var logger = testutils.GetLogger()
+var logger = test.GetLogger()
 
 func (env *Config) GetDeployer(name string) (*ContractDeployer, bool) {
 	for _, deployer := range env.Deployers {
@@ -469,7 +469,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 
 		RETRIEVER_G1_PATH:             "",
 		RETRIEVER_G2_PATH:             "",
-		RETRIEVER_G2_POWER_OF_2_PATH:  "",
 		RETRIEVER_CACHE_PATH:          "",
 		RETRIEVER_SRS_ORDER:           "",
 		RETRIEVER_SRS_LOAD:            "",

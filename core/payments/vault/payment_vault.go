@@ -114,6 +114,29 @@ func (pv *paymentVault) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, 
 	return globalSymbolsPerSecond, nil
 }
 
+// Retrieves the global rate period interval parameter
+func (pv *paymentVault) GetGlobalRatePeriodInterval(ctx context.Context) (uint64, error) {
+	callData, err := pv.paymentVaultBinding.TryPackGlobalRatePeriodInterval()
+	if err != nil {
+		return 0, fmt.Errorf("pack GlobalRatePeriodInterval call: %w", err)
+	}
+
+	returnData, err := pv.ethClient.CallContract(ctx, ethereum.CallMsg{
+		To:   &pv.paymentVaultAddress,
+		Data: callData,
+	}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("global rate period interval eth call: %w", err)
+	}
+
+	globalRatePeriodInterval, err := pv.paymentVaultBinding.UnpackGlobalRatePeriodInterval(returnData)
+	if err != nil {
+		return 0, fmt.Errorf("unpack GlobalRatePeriodInterval return data: %w", err)
+	}
+
+	return globalRatePeriodInterval, nil
+}
+
 // Retrieves the minimum number of symbols parameter
 func (pv *paymentVault) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	callData, err := pv.paymentVaultBinding.TryPackMinNumSymbols()

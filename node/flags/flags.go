@@ -461,6 +461,12 @@ var (
 		Value:    100 * time.Millisecond,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_MINIMUM_FLUSH_INTERVAL"),
 	}
+	LittSnapshotDirectoryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-snapshot-directory"),
+		Usage:    "The directory where LittDB snapshots are stored. If not provided, no snapshots are taken.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_SNAPSHOT_DIRECTORY"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool.",
@@ -541,6 +547,27 @@ var (
 		Required: false,
 		Value:    64,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OPERATOR_STATE_CACHE_SIZE"),
+	}
+	EjectionSentinelPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-sentinel-period"),
+		Usage:    "The period at which the ejection sentinel runs to check for ejection conditions.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_SENTINEL_PERIOD"),
+	}
+	// TODO(cody.littley): this needs to be enabled by default prior to allowing third parties to eject.
+	//  In the immediate term, leave it disabled by default to give operators time to adjust to the idea.
+	EjectionDefenseEnabledFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ejection-defense-enabled"),
+		Usage:    "Whether to enable the ejection defense mechanism.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EJECTION_DEFENSE_ENABLED"),
+	}
+	IgnoreVersionForEjectionDefenseFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ignore-version-for-ejection-defense"),
+		Usage:    "Whether to ignore the version check for ejection defense.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -684,6 +711,10 @@ var optionalFlags = []cli.Flag{
 	StoreChunksBufferSizeGBFlag,
 	StoreChunksBufferSizeFractionFlag,
 	OperatorStateCacheSizeFlag,
+	LittSnapshotDirectoryFlag,
+	EjectionSentinelPeriodFlag,
+	EjectionDefenseEnabledFlag,
+	IgnoreVersionForEjectionDefenseFlag,
 }
 
 func init() {

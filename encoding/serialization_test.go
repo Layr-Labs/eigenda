@@ -1,13 +1,17 @@
 package encoding_test
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/test/random"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSerDeserGnark(t *testing.T) {
@@ -32,7 +36,7 @@ func TestSerDeserGnark(t *testing.T) {
 	// The gnark encoding via f.Serialize() will generate less bytes
 	// than gob.
 	assert.Equal(t, 32*(1+numCoeffs), len(gnark))
-	gob, err := f.Serialize()
+	gob, err := f.SerializeGob()
 	assert.Nil(t, err)
 	// 2080 with gnark v.s. 2574 with gob
 	assert.Equal(t, 2574, len(gob))
@@ -72,13 +76,88 @@ func createFrames(b *testing.B, numFrames int) []encoding.Frame {
 	return frames
 }
 
+// randomG1 generates a random G1 point. There is no direct way to generate a random G1 point in the bn254 library,
+// but we can generate a random BLS key and steal the public key.
+func randomG1() (*bn254.G1Point, error) {
+	key, err := bn254.GenRandomBlsKeys()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random BLS keys: %w", err)
+	}
+	return key.PubKey, nil
+}
+
+func TestSerializeFrameProof(t *testing.T) {
+	g1, err := randomG1()
+	require.NoError(t, err)
+
+	proof := g1.G1Affine
+
+	bytes := make([]byte, encoding.SerializedProofLength)
+	err = encoding.SerializeFrameProof(proof, bytes)
+	require.NoError(t, err)
+
+	proof2, err := encoding.DeserializeFrameProof(bytes)
+	require.NoError(t, err)
+
+	require.True(t, proof.Equal(proof2))
+}
+
+func TestSerializeFrameProofs(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	count := 10 + rand.Intn(10)
+	proofs := make([]*encoding.Proof, count)
+
+	for i := 0; i < count; i++ {
+		g1, err := randomG1()
+		require.NoError(t, err)
+		proofs[i] = g1.G1Affine
+	}
+
+	bytes, err := encoding.SerializeFrameProofs(proofs)
+	require.NoError(t, err)
+	proofs2, err := encoding.DeserializeFrameProofs(bytes)
+	require.NoError(t, err)
+
+	require.Equal(t, len(proofs), len(proofs2))
+	for i := 0; i < len(proofs); i++ {
+		require.True(t, proofs[i].Equal(proofs2[i]))
+	}
+}
+
+func TestSplitSerializedFrameProofs(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	count := 10 + rand.Intn(10)
+	proofs := make([]*encoding.Proof, count)
+
+	for i := 0; i < count; i++ {
+		g1, err := randomG1()
+		require.NoError(t, err)
+		proofs[i] = g1.G1Affine
+	}
+
+	bytes, err := encoding.SerializeFrameProofs(proofs)
+	require.NoError(t, err)
+	splitBytes, err := encoding.SplitSerializedFrameProofs(bytes)
+	require.NoError(t, err)
+
+	require.Equal(t, len(proofs), len(splitBytes))
+	for i := 0; i < len(proofs); i++ {
+		proof := &encoding.Proof{}
+		err := proof.Unmarshal(splitBytes[i])
+		require.NoError(t, err)
+		require.True(t, proofs[i].Equal(proof))
+	}
+}
+
 func BenchmarkFrameGobSerialization(b *testing.B) {
 	numSamples := 64
 	frames := createFrames(b, numSamples)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = frames[i%numSamples].Serialize()
+		_, _ = frames[i%numSamples].SerializeGob()
 	}
 }
 
@@ -97,13 +176,13 @@ func BenchmarkFrameGobDeserialization(b *testing.B) {
 	frames := createFrames(b, numSamples)
 	bytes := make([][]byte, numSamples)
 	for n := 0; n < numSamples; n++ {
-		gob, _ := frames[n].Serialize()
+		gob, _ := frames[n].SerializeGob()
 		bytes[n] = gob
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = new(encoding.Frame).Deserialize(bytes[i%numSamples])
+		_, _ = new(encoding.Frame).DeserializeGob(bytes[i%numSamples])
 	}
 }
 

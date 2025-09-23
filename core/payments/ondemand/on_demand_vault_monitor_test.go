@@ -1,25 +1,25 @@
-package ondemand_test
+package ondemand
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
+	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
+	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
-		monitor, err := ondemand.NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+		monitor, err := NewOnDemandVaultMonitor(
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			0, // zero interval
+			1024,
 			func() []gethcommon.Address { return nil },
 			func(gethcommon.Address, *big.Int) error { return nil },
 		)
@@ -28,11 +28,12 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	})
 
 	t.Run("negative interval", func(t *testing.T) {
-		monitor, err := ondemand.NewOnDemandVaultMonitor(
-			context.Background(),
-			testutils.GetLogger(),
+		monitor, err := NewOnDemandVaultMonitor(
+			ctx,
+			test.GetLogger(),
 			vault.NewTestPaymentVault(),
 			-time.Second, // negative interval
+			1024,
 			func() []gethcommon.Address { return nil },
 			func(gethcommon.Address, *big.Int) error { return nil },
 		)
@@ -41,41 +42,122 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	})
 }
 
-// tests basic vault monitor behavior
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	logger := testutils.GetLogger()
-	updateInterval := 1 * time.Millisecond
-	address := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	ctx := t.Context()
+	updateInterval := time.Millisecond
+
+	accounts := []gethcommon.Address{
+		gethcommon.HexToAddress("0x1111111111111111111111111111111111111111"),
+		gethcommon.HexToAddress("0x2222222222222222222222222222222222222222"),
+		gethcommon.HexToAddress("0x3333333333333333333333333333333333333333"),
+		gethcommon.HexToAddress("0x4444444444444444444444444444444444444444"),
+		gethcommon.HexToAddress("0x5555555555555555555555555555555555555555"),
+	}
 
 	testVault := vault.NewTestPaymentVault()
-	testVault.SetTotalDeposit(address, big.NewInt(5000))
+	for i, addr := range accounts {
+		testVault.SetTotalDeposit(addr, big.NewInt(int64(1000+i*100)))
+	}
 
-	var capturedAccountID gethcommon.Address
-	var capturedDeposit *big.Int
+	capturedUpdates := make(map[gethcommon.Address]*big.Int)
 	updateTotalDeposit := func(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
-		capturedAccountID = accountID
-		capturedDeposit = newTotalDeposit
+		capturedUpdates[accountID] = newTotalDeposit
 		return nil
 	}
 
-	monitor, err := ondemand.NewOnDemandVaultMonitor(
+	monitor, err := NewOnDemandVaultMonitor(
 		ctx,
-		logger,
+		test.GetLogger(),
 		testVault,
 		updateInterval,
-		func() []gethcommon.Address { return []gethcommon.Address{address} },
+		2, // Small batch size to force multiple batches
+		func() []gethcommon.Address { return accounts },
 		updateTotalDeposit,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 
-	time.Sleep(updateInterval * 10)
-	require.Equal(t, address, capturedAccountID)
-	require.Equal(t, big.NewInt(5000), capturedDeposit)
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
 
-	testVault.SetTotalDeposit(address, big.NewInt(5001))
-	time.Sleep(updateInterval * 10)
-	require.Equal(t, big.NewInt(5001), capturedDeposit, "update should have been observed")
+	for i, addr := range accounts {
+		deposit, ok := capturedUpdates[addr]
+		require.True(t, ok, "account %s should have been updated", addr.Hex())
+		require.NotNil(t, deposit)
+		require.Equal(t, big.NewInt(int64(1000+i*100)), deposit)
+	}
+
+	// update one of the deposits
+	testAccount := accounts[2]
+	testVault.SetTotalDeposit(testAccount, big.NewInt(9999)) // Changed
+
+	// Clear captured updates to verify new updates
+	capturedUpdates = make(map[gethcommon.Address]*big.Int)
+
+	// Wait for the monitor to fetch the updated deposits
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
+
+	// Check that the specific account was updated correctly
+	updatedDeposit, ok := capturedUpdates[testAccount]
+	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
+	require.NotNil(t, updatedDeposit)
+	require.Equal(t, big.NewInt(9999), updatedDeposit)
+
+	// Other accounts should remain unchanged
+	for i, addr := range accounts {
+		if addr != testAccount {
+			deposit, ok := capturedUpdates[addr]
+			require.True(t, ok, "account %s should have been updated", addr.Hex())
+			require.NotNil(t, deposit)
+			require.Equal(t, big.NewInt(int64(1000+i*100)), deposit)
+		}
+	}
+}
+
+func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
+	ctx := t.Context()
+	updateInterval := time.Millisecond
+
+	// Create multiple accounts to verify they're all fetched in a single batch
+	accounts := []gethcommon.Address{
+		gethcommon.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		gethcommon.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+	}
+
+	testVault := vault.NewTestPaymentVault()
+	for i, addr := range accounts {
+		testVault.SetTotalDeposit(addr, big.NewInt(int64(2000+i*200)))
+	}
+
+	capturedUpdates := make(map[gethcommon.Address]*big.Int)
+	updateTotalDeposit := func(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+		capturedUpdates[accountID] = newTotalDeposit
+		return nil
+	}
+
+	monitor, err := NewOnDemandVaultMonitor(
+		ctx,
+		test.GetLogger(),
+		testVault,
+		updateInterval,
+		0, // Batch size 0 means no batching - all accounts in one call
+		func() []gethcommon.Address { return accounts },
+		updateTotalDeposit,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, monitor)
+
+	// Wait for updates
+	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		return len(capturedUpdates)
+	}, time.Second)
+	for i, addr := range accounts {
+		deposit, ok := capturedUpdates[addr]
+		require.True(t, ok, "account %s should have been updated", addr.Hex())
+		require.NotNil(t, deposit)
+		require.Equal(t, big.NewInt(int64(2000+i*200)), deposit)
+	}
 }

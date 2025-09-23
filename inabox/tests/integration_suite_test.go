@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core"
@@ -30,14 +30,16 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	verifierv2 "github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/testbed"
+	"github.com/Layr-Labs/eigenda/test"
+	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 )
 
 /*
@@ -48,7 +50,9 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
-	anvilContainer *testbed.AnvilContainer
+	anvilContainer     *testbed.AnvilContainer
+	graphNodeContainer *testbed.GraphNodeContainer
+	dockerNetwork      *testcontainers.DockerNetwork
 
 	templateName      string
 	testName          string
@@ -61,7 +65,7 @@ var (
 	metadataTableName               = "test-BlobMetadata"
 	bucketTableName                 = "test-BucketStore"
 	metadataTableNameV2             = "test-BlobMetadata-v2"
-	logger                          = testutils.GetLogger()
+	logger                          = test.GetLogger()
 	ethClient                       common.EthClient
 	rpcClient                       common.RPCEthClient
 	certBuilder                     *clientsv2.CertBuilder
@@ -90,41 +94,71 @@ func init() {
 	flag.BoolVar(&inMemoryBlobStore, "inMemoryBlobStore", false, "whether to use in-memory blob store")
 }
 
-func TestInaboxIntegration(t *testing.T) {
-	RegisterFailHandler(Fail)
+func TestMain(m *testing.M) {
+	flag.Parse()
 
 	if testing.Short() {
-		t.Skip()
+		logger.Info("Skipping inabox integration tests in short mode")
+		os.Exit(0)
 	}
 
-	RunSpecs(t, "Integration Suite")
+	// Run suite setup
+	if err := setupSuite(); err != nil {
+		logger.Error("Setup failed:", err)
+		teardownSuite()
+		os.Exit(1)
+	}
+
+	// Run all tests
+	code := m.Run()
+
+	// Run suite teardown
+	teardownSuite()
+
+	// Exit with test result code
+	os.Exit(code)
 }
 
-var _ = BeforeSuite(func() {
-	By("bootstrapping test environment")
+func setupSuite() error {
+	logger.Info("bootstrapping test environment")
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	rootPath := "../../"
 
 	var err error
 	if testName == "" {
 		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
-			Expect(err).To(BeNil())
+			return fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
+		// Create a shared Docker network for all containers
+		dockerNetwork, err = network.New(context.Background(),
+			network.WithDriver("bridge"),
+			network.WithAttachable())
+		if err != nil {
+			return fmt.Errorf("failed to create docker network: %w", err)
+		}
+		logger.Info("Created Docker network", "name", dockerNetwork.Name)
+
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
 			localStackPort = "4570"
-			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(context.Background(), testbed.LocalStackOptions{
+			// Use the timeout context for container creation
+			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
+				Network:        dockerNetwork,
 			})
-			Expect(err).To(BeNil())
+			if err != nil {
+				return fmt.Errorf("failed to start localstack: %w", err)
+			}
 
 			deployConfig := testbed.DeployResourcesConfig{
 				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
@@ -133,24 +167,46 @@ var _ = BeforeSuite(func() {
 				V2MetadataTableName: metadataTableNameV2,
 				Logger:              logger,
 			}
-			err = testbed.DeployResources(context.Background(), deployConfig)
-			Expect(err).To(BeNil())
+			err = testbed.DeployResources(ctx, deployConfig)
+			if err != nil {
+				return fmt.Errorf("failed to deploy resources: %w", err)
+			}
 		} else {
 			logger.Info("Using in-memory Blob Store")
 		}
 
 		logger.Info("Starting anvil")
-		anvilContainer, err = testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+		anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
+			Network:        dockerNetwork,
 		})
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to start anvil: %w", err)
+		}
+		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
+		logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
 		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
 			logger.Info("Starting graph node")
-			testConfig.StartGraphNode()
+			graphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+				PostgresDB:     "graph-node",
+				PostgresUser:   "graph-node",
+				PostgresPass:   "let-me-in",
+				EthereumRPC:    anvilInternalEndpoint,
+				ExposeHostPort: true,
+				HostHTTPPort:   "8000",
+				HostWSPort:     "8001",
+				HostAdminPort:  "8020",
+				HostIPFSPort:   "5001",
+				Logger:         logger,
+				Network:        dockerNetwork,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to start graph node: %w", err)
+			}
 		}
 
 		logger.Info("Deploying experiment")
@@ -164,18 +220,32 @@ var _ = BeforeSuite(func() {
 			NumConfirmations: numConfirmations,
 			NumRetries:       numRetries,
 		}, gethcommon.Address{}, logger)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create eth client: %w", err)
+		}
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create rpc client: %w", err)
+		}
+
+		// Force foundry to mine a block since it isn't auto-mining
+		err = rpcClient.CallContext(ctx, nil, "evm_mine")
+		if err != nil {
+			return fmt.Errorf("failed to mine block: %w", err)
+		}
 
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
+		}
 		err = setupRetrievalClients(testConfig)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to setup retrieval clients: %w", err)
+		}
 
 		logger.Info("Building client verification and interaction components")
 
@@ -186,50 +256,67 @@ var _ = BeforeSuite(func() {
 			ethClient,
 		)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create cert builder: %w", err)
+		}
 
 		routerAddressProvider, err := verification.BuildRouterAddressProvider(
 			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
 			ethClient,
 			logger)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to build router address provider: %w", err)
+		}
 
 		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
 			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
 
-		Expect(err).To(BeNil())
+		// No error to check for NewStaticCertVerifierAddressProvider
 
 		staticCertVerifier, err = verification.NewCertVerifier(
 			logger,
 			ethClient,
 			staticAddressProvider)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create static cert verifier: %w", err)
+		}
 
 		routerCertVerifier, err = verification.NewCertVerifier(
 			logger,
 			ethClient,
 			routerAddressProvider)
 
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router cert verifier: %w", err)
+		}
 
 		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router transactor: %w", err)
+		}
 
 		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to create router caller: %w", err)
+		}
 
-		chainID, err := ethClient.ChainID(context.Background())
-		Expect(err).To(BeNil())
+		chainID, err := ethClient.ChainID(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get chain ID: %w", err)
+		}
 
 		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
 		err = setupPayloadDisperserWithRouter()
-		Expect(err).To(BeNil())
+		if err != nil {
+			return fmt.Errorf("failed to setup payload disperser: %w", err)
+		}
 
 	}
-})
+	return nil
+}
 
 func setupPayloadDisperserWithRouter() error {
 	// Set up the block monitor
@@ -293,6 +380,7 @@ func setupPayloadDisperserWithRouter() error {
 		certBuilder,
 		routerCertVerifier,
 		nil,
+		nil,
 	)
 
 	return err
@@ -348,7 +436,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
-		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
@@ -376,8 +463,13 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		return err
 	}
 
+	kzgVerifierV2, err := verifierv2.NewVerifier(kzgConfig, nil)
+	if err != nil {
+		return fmt.Errorf("new verifier v2: %w", err)
+	}
+
 	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
@@ -388,7 +480,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClientV2,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 
 	if err != nil {
@@ -419,30 +511,52 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		kzgVerifier.Srs.G1,
+		kzgVerifier.G1SRS,
 		metrics.NoopRetrievalMetrics)
 
 	return err
 }
 
-var _ = AfterSuite(func() {
-	if testConfig.Environment.IsLocal() {
-		if cancel != nil {
-			cancel()
+func teardownSuite() {
+	logger.Info("Tearing down test environment")
+
+	if testConfig == nil || !testConfig.Environment.IsLocal() {
+		return
+	}
+
+	ctx, teardownCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer teardownCancel()
+
+	if cancel != nil {
+		cancel()
+	}
+
+	logger.Info("Stopping binaries")
+	testConfig.StopBinaries()
+
+	logger.Info("Stopping anvil")
+	if anvilContainer != nil {
+		if err := anvilContainer.Terminate(ctx); err != nil {
+			logger.Warn("Failed to terminate anvil container", "error", err)
 		}
 
-		logger.Info("Stopping binaries")
-		testConfig.StopBinaries()
-
-		logger.Info("Stopping anvil")
-		_ = anvilContainer.Terminate(context.Background())
-
-		logger.Info("Stopping graph node")
-		testConfig.StopGraphNode()
-
-		if localstackContainer != nil {
-			logger.Info("Stopping localstack container")
-			_ = localstackContainer.Terminate(context.Background())
+		if dockerNetwork != nil {
+			logger.Info("Removing Docker network")
+			_ = dockerNetwork.Remove(context.Background())
 		}
 	}
-})
+
+	if graphNodeContainer != nil {
+		logger.Info("Stopping graph node")
+		_ = graphNodeContainer.Terminate(context.Background())
+	}
+
+	if localstackContainer != nil {
+		logger.Info("Stopping localstack container")
+		if err := localstackContainer.Terminate(ctx); err != nil {
+			logger.Warn("Failed to terminate localstack container", "error", err)
+		}
+	}
+
+	logger.Info("Teardown completed")
+}

@@ -10,6 +10,7 @@
   "EigenDACertVerifierAddressQuorums0_1": "0x58D2B844a894f00b7E6F9F492b9F43aD54Cd4429",
   "EigenDACertVerifierAddressQuorums0_1_2": "",
   "EigenDACertVerifierAddressQuorums2": "",
+  "ClientLedgerPaymentMode": "reservation-and-on-demand",
   "SubgraphURL": "https://subgraph.satsuma-prod.com/b0b35e5616aa/eigenlabs/eigenda-operator-state-sepolia/version/v0.7.0/api",
   "DisableMetrics": true
 }

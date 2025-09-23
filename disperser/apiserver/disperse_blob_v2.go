@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda/api/grpc/controller"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
@@ -16,9 +18,27 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServerV2) DisperseBlob(
+	ctx context.Context,
+	req *pb.DisperseBlobRequest,
+) (*pb.DisperseBlobReply, error) {
+	reply, st := s.disperseBlob(ctx, req)
+	api.LogResponseStatus(s.logger, st)
+	if st != nil {
+		// nolint:wrapcheck
+		return reply, st.Err()
+	}
+	return reply, nil
+}
+
+func (s *DispersalServerV2) disperseBlob(
+	ctx context.Context,
+	req *pb.DisperseBlobRequest,
+) (*pb.DisperseBlobReply, *status.Status) {
 	start := time.Now()
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
@@ -27,20 +47,33 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	// Validate the request
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
-		return nil, api.NewErrorInternal("onchain state is nil")
+		return nil, status.New(codes.Internal, "onchain state is not available")
 	}
 	blobHeader, err := s.validateDispersalRequest(req, onchainState)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
+		return nil, status.Newf(codes.InvalidArgument, "failed to validate request: %s", err.Error())
 	}
 
-	if err := s.checkBlobExistence(ctx, blobHeader); err != nil {
-		return nil, err
+	if st := s.checkBlobExistence(ctx, blobHeader); st != nil && st.Code() != codes.OK {
+		return nil, st
 	}
 
-	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
-		return nil, err
+	if s.useControllerMediatedPayments {
+		// Use the new controller-based payment system
+		authorizePaymentRequest := &controller.AuthorizePaymentRequest{
+			BlobHeader:      req.GetBlobHeader(),
+			ClientSignature: req.GetSignature(),
+		}
+		_, err := s.controllerClient.AuthorizePayment(ctx, authorizePaymentRequest)
+		if err != nil {
+			return nil, status.Convert(err)
+		}
+	} else {
+		// Use the legacy payment metering system
+		// Check against payment meter to make sure there is quota remaining
+		if st := s.checkPaymentMeter(ctx, req, start); st != nil && st.Code() != codes.OK {
+			return nil, st
+		}
 	}
 
 	finishedValidation := time.Now()
@@ -48,11 +81,17 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 
 	blob := req.GetBlob()
 	s.metrics.reportDisperseBlobSize(len(blob))
-	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
+	s.logger.Debug(
+		"received a new blob dispersal request",
+		"blobSizeBytes",
+		len(blob),
+		"quorums",
+		req.GetBlobHeader().GetQuorumNumbers(),
+	)
 
-	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
-	if err != nil {
-		return nil, err
+	blobKey, st := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
+	if st != nil && st.Code() != codes.OK {
+		return nil, st
 	}
 	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
 
@@ -75,22 +114,29 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	return &pb.DisperseBlobReply{
 		Result:  dispv2.Queued.ToProfobuf(),
 		BlobKey: blobKey[:],
-	}, nil
+	}, status.New(codes.OK, "blob dispersal request accepted")
 }
 
-func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, signature []byte, requestedAt time.Time, ttl time.Duration) (corev2.BlobKey, error) {
+func (s *DispersalServerV2) StoreBlob(
+	ctx context.Context,
+	data []byte,
+	blobHeader *corev2.BlobHeader,
+	signature []byte,
+	requestedAt time.Time,
+	ttl time.Duration,
+) (corev2.BlobKey, *status.Status) {
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
-		return corev2.BlobKey{}, api.NewErrorInvalidArg(fmt.Sprintf("failed to get blob key: %v", err))
+		return corev2.BlobKey{}, status.Newf(codes.InvalidArgument, "failed to get blob key: %v", err)
 	}
 
 	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
 		s.logger.Warn("failed to store blob", "err", err, "blobKey", blobKey.Hex())
 		if errors.Is(err, common.ErrAlreadyExists) {
-			return corev2.BlobKey{}, api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
+			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob already exists: %s", blobKey.Hex())
 		}
 
-		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob: %v", err))
+		return corev2.BlobKey{}, status.Newf(codes.Internal, "failed to store blob: %v", err)
 	}
 
 	s.logger.Debug("storing blob metadata", "blobHeader", blobHeader)
@@ -108,19 +154,23 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 	if err != nil {
 		s.logger.Warn("failed to store blob metadata", "err", err, "blobKey", blobKey.Hex())
 		if errors.Is(err, common.ErrAlreadyExists) {
-			return corev2.BlobKey{}, api.NewErrorAlreadyExists(fmt.Sprintf("blob metadata already exists: %s", blobKey.Hex()))
+			return corev2.BlobKey{}, status.Newf(codes.AlreadyExists, "blob metadata already exists: %s", blobKey.Hex())
 		}
 
-		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob metadata: %v", err))
+		return corev2.BlobKey{}, status.Newf(codes.Internal, "failed to store blob metadata: %v", err)
 	}
-	return blobKey, err
+	return blobKey, status.New(codes.OK, "blob stored successfully")
 }
 
-func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest, receivedAt time.Time) error {
+func (s *DispersalServerV2) checkPaymentMeter(
+	ctx context.Context,
+	req *pb.DisperseBlobRequest,
+	receivedAt time.Time,
+) *status.Status {
 	blobHeaderProto := req.GetBlobHeader()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
+		return status.Newf(codes.InvalidArgument, "invalid blob header: %s", err.Error())
 	}
 	blobLength := encoding.GetBlobLengthPowerOf2(uint(len(req.GetBlob())))
 
@@ -129,7 +179,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 	if !gethcommon.IsHexAddress(accountID) {
-		return api.NewErrorInvalidArg(fmt.Sprintf("invalid account ID: %s", accountID))
+		return status.Newf(codes.InvalidArgument, "invalid account ID: %s", accountID)
 	}
 
 	paymentHeader := core.PaymentMetadata{
@@ -138,13 +188,19 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
+	symbolsCharged, err := s.meterer.MeterRequest(
+		ctx,
+		paymentHeader,
+		uint64(blobLength),
+		blobHeader.QuorumNumbers,
+		receivedAt,
+	)
 	if err != nil {
-		return api.NewErrorResourceExhausted(err.Error())
+		return status.New(codes.ResourceExhausted, err.Error())
 	}
 	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
 
-	return nil
+	return status.New(codes.OK, "payment meter check passed")
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
@@ -174,7 +230,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, errors.New("blob header must contain a commitment")
 	}
 	commitedBlobLength := blobHeaderProto.GetCommitment().GetLength()
-	if commitedBlobLength == 0 || commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+	if commitedBlobLength == 0 || commitedBlobLength != math.NextPowOf2u32(commitedBlobLength) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
@@ -197,7 +253,8 @@ func (s *DispersalServerV2) validateDispersalRequest(
 
 	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
 	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
-	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
+	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 &&
+		blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
 	if timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
 		return nil, errors.New("invalid payment metadata")
 	}
@@ -220,11 +277,17 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	_, err = rs.ToFrArray(blob)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
-		return nil, errors.New("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+		return nil, errors.New(
+			"encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617",
+		)
 	}
 
 	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeaderProto.GetVersion())); !ok {
-		return nil, fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys())
+		return nil, fmt.Errorf(
+			"invalid blob version %d; valid blob versions are: %v",
+			blobHeaderProto.GetVersion(),
+			onchainState.BlobVersionParameters.Keys(),
+		)
 	}
 
 	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
@@ -243,21 +306,21 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	return blobHeader, nil
 }
 
-func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *corev2.BlobHeader) error {
+func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *corev2.BlobHeader) *status.Status {
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header: %v", err))
+		return status.Newf(codes.InvalidArgument, "failed to parse blob key: %v", err.Error())
 	}
 
 	// check if blob already exists
 	exists, err := s.blobMetadataStore.CheckBlobExists(ctx, blobKey)
 	if err != nil {
-		return api.NewErrorInternal(fmt.Sprintf("failed to check blob existence: %v", err))
+		return status.Newf(codes.Internal, "failed to check blob existence: %s", err.Error())
 	}
 
 	if exists {
-		return api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
+		return status.Newf(codes.AlreadyExists, "blob already exists: %s", blobKey.Hex())
 	}
 
-	return nil
+	return status.New(codes.OK, "")
 }

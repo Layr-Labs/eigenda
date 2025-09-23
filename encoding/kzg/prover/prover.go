@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"math"
+	gomath "math"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -21,18 +22,16 @@ import (
 )
 
 type Prover struct {
-	Config    *encoding.Config
-	KzgConfig *kzg.KzgConfig
-	encoder   *rs.Encoder
-	encoding.BackendType
-	Srs        *kzg.SRS
+	Config     *encoding.Config
+	KzgConfig  *kzg.KzgConfig
+	encoder    *rs.Encoder
+	Srs        kzg.SRS
 	G2Trailing []bn254.G2Affine
-	mu         sync.Mutex
 
+	// mu protects access to ParametrizedProvers
+	mu                  sync.Mutex
 	ParametrizedProvers map[encoding.EncodingParams]*ParametrizedProver
 }
-
-var _ encoding.Prover = &Prover{}
 
 func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prover, error) {
 	if encoderConfig == nil {
@@ -103,18 +102,9 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 					kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad, kzgConfig.SRSOrder, kzgConfig.G2Path, err)
 			}
 		}
-	} else {
-		// todo, there are better ways to handle it
-		if len(kzgConfig.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
-		}
 	}
 
-	srs, err := kzg.NewSrs(s1, s2)
-	if err != nil {
-		log.Println("Could not create srs", err)
-		return nil, err
-	}
+	srs := kzg.NewSrs(s1, s2)
 
 	// Create RS encoder
 	rsEncoder, err := rs.NewEncoder(encoderConfig)
@@ -257,7 +247,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, err
 	}
 
-	length := encoding.NextPowerOf2(uint64(len(symbols)))
+	length := math.NextPowOf2u64(uint64(len(symbols)))
 
 	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
 	if err != nil {
@@ -302,11 +292,12 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	}
 
 	enc, err := g.newProver(params)
-	if err == nil {
-		g.ParametrizedProvers[params] = enc
+	if err != nil {
+		return nil, fmt.Errorf("new prover: %w", err)
 	}
 
-	return enc, err
+	g.ParametrizedProvers[params] = enc
+	return enc, nil
 }
 
 func (g *Prover) GetSRSOrder() uint64 {
@@ -387,30 +378,26 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	// Create FFT settings based on params
-	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	n := uint8(gomath.Log2(float64(params.NumEvaluations())))
 	if params.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * params.NumChunks)))
+		n = uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	}
 	fs := fft.NewFFTSettings(n)
 
-	// Create base KZG settings
-	ks, err := kzg.NewKZGSettings(fs, p.Srs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
-	}
-
 	switch p.Config.BackendType {
 	case encoding.GnarkBackend:
-		return p.createGnarkBackendProver(params, fs, ks)
+		return p.createGnarkBackendProver(params, fs)
 	case encoding.IcicleBackend:
-		return p.createIcicleBackendProver(params, fs, ks)
+		return p.createIcicleBackendProver(params, fs)
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)
 	}
 
 }
 
-func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+func (p *Prover) createGnarkBackendProver(
+	params encoding.EncodingParams, fs *fft.FFTSettings,
+) (*ParametrizedProver, error) {
 	if p.Config.GPUEnable {
 		return nil, errors.New("GPU is not supported in gnark backend")
 	}
@@ -421,7 +408,7 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 	}
 
 	// Create subgroup FFT settings
-	t := uint8(math.Log2(float64(2 * params.NumChunks)))
+	t := uint8(gomath.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
 	// Set KZG Prover gnark backend
@@ -443,14 +430,15 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 		Encoder:               p.encoder,
 		EncodingParams:        params,
 		KzgConfig:             p.KzgConfig,
-		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
 		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil
 }
 
-func (p *Prover) createIcicleBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
-	return CreateIcicleBackendProver(p, params, fs, ks)
+func (p *Prover) createIcicleBackendProver(
+	params encoding.EncodingParams, fs *fft.FFTSettings,
+) (*ParametrizedProver, error) {
+	return CreateIcicleBackendProver(p, params, fs)
 }
 
 // Helper methods for setup
