@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -34,14 +35,11 @@ type ChurnerConfig struct {
 	ServiceManager         string `env:"CHURNER_EIGENDA_SERVICE_MANAGER"`
 
 	// Chain configuration
-	ChainRPC         string `env:"CHURNER_CHAIN_RPC"`
-	PrivateKey       string `env:"CHURNER_PRIVATE_KEY"`
-	NumConfirmations int    `env:"CHURNER_NUM_CONFIRMATIONS"`
+	ChainRPC   string `env:"CHURNER_CHAIN_RPC"`
+	PrivateKey string `env:"CHURNER_PRIVATE_KEY"`
 
 	// Graph configuration
-	GraphURL            string        `env:"CHURNER_GRAPH_URL"`
-	IndexerPullInterval time.Duration `env:"CHURNER_INDEXER_PULL_INTERVAL"`
-	MaxRetries          int           `env:"CHURNER_GRAPH_MAX_RETRIES"`
+	GraphURL string `env:"CHURNER_GRAPH_URL"`
 
 	// Metrics configuration
 	EnableMetrics   bool   `env:"CHURNER_ENABLE_METRICS"`
@@ -85,13 +83,10 @@ func DefaultChurnerConfig() ChurnerConfig {
 		ChainRPC:               "", // Will be populated from Anvil
 		PrivateKey:             "", // Will be populated from deployer key
 		GraphURL:               "", // Will be populated from GraphNode if enabled
-		IndexerPullInterval:    1 * time.Second,
-		MaxRetries:             5,
 		EnableMetrics:          true,
 		MetricsHTTPPort:        "9095",
 		PerPublicKeyRateLimit:  1 * time.Second, // Fast for testing
-		ChurnApprovalInterval:  5 * time.Second, // Fast for testing
-		NumConfirmations:       0,               // No confirmations for testing
+		ChurnApprovalInterval:  900 * time.Second,
 		Image:                  "ghcr.io/layr-labs/eigenda/churner:dev",
 		StartupTimeout:         30 * time.Second,
 	}
@@ -251,6 +246,22 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 		_, _ = io.Copy(logFile, logReader)
 	}()
 
+	churner := &ChurnerContainer{
+		Container:  container,
+		config:     config,
+		url:        churnerURL,
+		logPath:    hostLogPath,
+		logDir:     logDir,
+		network:    network,
+		internalIP: internalIP,
+		cancelLog:  cancelLog,
+	}
+
+	// Dump config to .env file for debugging
+	if err := churner.DumpConfigToEnv(); err != nil {
+		fmt.Printf("Warning: failed to dump config to .env: %v\n", err)
+	}
+
 	fmt.Printf("Churner started successfully\n")
 	fmt.Printf("  - External URL: %s\n", churnerURL)
 	fmt.Printf("  - Internal URL: churner:%s\n", config.GRPCPort)
@@ -261,16 +272,7 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 		fmt.Printf("  - Metrics: http://%s:%s/metrics\n", host, metricsPort.Port())
 	}
 
-	return &ChurnerContainer{
-		Container:  container,
-		config:     config,
-		url:        churnerURL,
-		logPath:    hostLogPath,
-		logDir:     logDir,
-		network:    network,
-		internalIP: internalIP,
-		cancelLog:  cancelLog,
-	}, nil
+	return churner, nil
 }
 
 // URL returns the churner service URL accessible from the host
@@ -301,6 +303,85 @@ func (c *ChurnerContainer) LogPath() string {
 // Network returns the Docker network this container is connected to
 func (c *ChurnerContainer) Network() *testcontainers.DockerNetwork {
 	return c.network
+}
+
+// DumpConfigToEnv writes the churner configuration to a .env file in the logs directory
+func (c *ChurnerContainer) DumpConfigToEnv() error {
+	if c.logDir == "" {
+		return fmt.Errorf("log directory not set")
+	}
+
+	envPath := filepath.Join(c.logDir, "churner-config.env")
+
+	// Get env map from config
+	envMap, err := c.config.ToEnvMap()
+	if err != nil {
+		return fmt.Errorf("failed to convert config to env map: %w", err)
+	}
+
+	// Create the env file
+	file, err := os.Create(envPath)
+	if err != nil {
+		return fmt.Errorf("failed to create env file: %w", err)
+	}
+	defer file.Close()
+
+	// Write header
+	_, err = fmt.Fprintf(file, "# Churner Configuration Dump\n")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Generated at: %s\n", time.Now().Format(time.RFC3339))
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Container URL: %s\n", c.url)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Internal IP: %s\n", c.internalIP)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "\n")
+	if err != nil {
+		return err
+	}
+
+	// Write env vars in sorted order for consistency
+	keys := make([]string, 0, len(envMap))
+	for key := range envMap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		_, err = fmt.Fprintf(file, "%s=%s\n", key, envMap[key])
+		if err != nil {
+			return err
+		}
+	}
+
+	// Add additional runtime information as comments
+	_, err = fmt.Fprintf(file, "\n# Runtime Information (not env vars)\n")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Image: %s\n", c.config.Image)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Startup Timeout: %s\n", c.config.StartupTimeout)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "# Log Path: %s\n", c.logPath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("  - Config dump: %s\n", envPath)
+	return nil
 }
 
 // Stop gracefully stops the churner container
