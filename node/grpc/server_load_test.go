@@ -37,11 +37,12 @@ func makeBatch(
 		operatorState, err := chainState.GetOperatorState(context.Background(), 0, []core.QuorumID{0})
 		assert.NoError(t, err)
 
-		chunkLength, err := asn.CalculateChunkLength(operatorState, uint(encoding.GetBlobLength(blobSize)), 0, &core.SecurityParam{
-			QuorumID:              0,
-			AdversaryThreshold:    uint8(advThreshold),
-			ConfirmationThreshold: uint8(quorumThreshold),
-		})
+		chunkLength, err := asn.CalculateChunkLength(operatorState, uint(encoding.GetBlobLength(blobSize)), 0,
+			&core.SecurityParam{
+				QuorumID:              0,
+				AdversaryThreshold:    uint8(advThreshold),
+				ConfirmationThreshold: uint8(quorumThreshold),
+			})
 		assert.NoError(t, err)
 
 		blobQuorumInfo := &core.BlobQuorumInfo{
