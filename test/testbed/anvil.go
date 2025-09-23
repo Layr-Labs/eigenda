@@ -25,10 +25,13 @@ type AnvilContainer struct {
 }
 
 // AnvilOptions configures the Anvil container
+//
+//nolint:lll // struct field documentation
 type AnvilOptions struct {
-	ExposeHostPort bool           // If true, binds container port 8545 to host port 8545
-	HostPort       string         // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
-	Logger         logging.Logger // Logger for container operations (required)
+	ExposeHostPort bool                          // If true, binds container port 8545 to host port 8545
+	HostPort       string                        // Custom host port to bind to (defaults to "8545" if empty and ExposeHostPort is true)
+	Logger         logging.Logger                // Logger for container operations (required)
+	Network        *testcontainers.DockerNetwork // Docker network to use (optional)
 }
 
 // NewAnvilContainerWithOptions creates and starts a new Anvil container with custom options
@@ -52,6 +55,14 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 			wait.ForListeningPort("8545/tcp"),
 			wait.ForLog("Listening on 0.0.0.0:8545").WithStartupTimeout(30*time.Second),
 		),
+	}
+
+	// Add network configuration (if provided)
+	if opts.Network != nil {
+		req.Networks = []string{opts.Network.Name}
+		req.NetworkAliases = map[string][]string{
+			opts.Network.Name: {uniqueName, "anvil"},
+		}
 	}
 
 	// Add host port binding if requested
@@ -112,6 +123,11 @@ func NewAnvilContainerWithOptions(ctx context.Context, opts AnvilOptions) (*Anvi
 // RpcURL returns the RPC URL for connecting to the Anvil instance
 func (ac *AnvilContainer) RpcURL() string {
 	return ac.rpcURL
+}
+
+// InternalEndpoint returns the Anvil endpoint URL for internal Docker network communication
+func (ac *AnvilContainer) InternalEndpoint() string {
+	return "http://anvil:8545"
 }
 
 // Terminate stops and removes the container

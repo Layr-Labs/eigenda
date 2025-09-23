@@ -123,7 +123,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			commitmentData, err := altda.DecodeCommitmentData(altdaCommitment)
 			require.NoError(t, err)
 
-			daClient := altda.NewDAClient(ts.Address(), false, false)
+			daClient := altda.NewDAClient(ts.RestAddress(), false, false)
 			_, err = daClient.GetInput(ts.Ctx, commitmentData, tt.certL1IBN)
 			tt.requireErrorFn(t, err)
 		})
@@ -211,7 +211,7 @@ func TestOPContractTestValidAndInvalidCertErrors(t *testing.T) {
 			commitmentData, err := altda.DecodeCommitmentData(altdaCommitment)
 			require.NoError(t, err)
 
-			daClient := altda.NewDAClient(ts.Address(), false, false)
+			daClient := altda.NewDAClient(ts.RestAddress(), false, false)
 			_, err = daClient.GetInput(ts.Ctx, commitmentData, 0)
 
 			tt.requireErrorFn(t, err)

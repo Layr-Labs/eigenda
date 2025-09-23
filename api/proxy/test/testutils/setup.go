@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/config/eigendaflags"
 	enablement "github.com/Layr-Labs/eigenda/api/proxy/config/enablement"
 	proxy_metrics "github.com/Layr-Labs/eigenda/api/proxy/metrics"
+	"github.com/Layr-Labs/eigenda/api/proxy/servers/arbitrum_altda"
 	"github.com/Layr-Labs/eigenda/api/proxy/servers/rest"
 	"github.com/Layr-Labs/eigenda/api/proxy/store"
 	"github.com/Layr-Labs/eigenda/api/proxy/store/builder"
@@ -369,6 +370,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			Host:        host,
 			Port:        0,
 			APIsEnabled: testCfg.EnabledRestAPIs,
+		},
+		ArbCustomDASvrCfg: arbitrum_altda.Config{
+			Host: host,
+			Port: 0,
 		},
 	}
 }
