@@ -222,9 +222,9 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 func (p *Prover) Decode(
 	chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64,
 ) ([]byte, error) {
-	frames := make([]encoding.Frame, len(chunks))
+	frames := make([]*encoding.Frame, len(chunks))
 	for i := range chunks {
-		frames[i] = encoding.Frame{
+		frames[i] = &encoding.Frame{
 			Proof:  chunks[i].Proof,
 			Coeffs: chunks[i].Coeffs,
 		}

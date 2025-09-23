@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint64) {
-	samples := make([]encoding.Frame, num)
+func sampleFrames(frames []*encoding.Frame, num uint64) ([]*encoding.Frame, []uint64) {
+	samples := make([]*encoding.Frame, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 
@@ -121,7 +121,8 @@ func FuzzOnlySystematic(f *testing.F) {
 		}
 
 		//encode the data
-		_, _, _, frames, _, err := enc.EncodeBytes(input)
+		frames, err := group.GetFrames(input, params)
+		require.NoError(t, err)
 
 		for _, frame := range frames {
 			assert.NotEqual(t, len(frame.Coeffs), 0)

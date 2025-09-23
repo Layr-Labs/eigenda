@@ -63,18 +63,6 @@ type commitmentsResult struct {
 	Error            error
 }
 
-// just a wrapper to take bytes not Fr Element
-func (g *ParametrizedProver) EncodeBytes(
-	inputBytes []byte,
-) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-	inputFr, err := rs.ToFrArray(inputBytes)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
-	}
-
-	return g.Encode(inputFr)
-}
-
 func (g *ParametrizedProver) Encode(
 	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
@@ -120,7 +108,7 @@ func (g *ParametrizedProver) Encode(
 		commitmentResult.lengthProof, frames, indices, nil
 }
 
-func (g *ParametrizedProver) Decode(frames []encoding.Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
+func (g *ParametrizedProver) Decode(frames []*encoding.Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
 	rsFrames := make([]rs.FrameCoeffs, len(frames))
 	for ind, frame := range frames {
 		rsFrames[ind] = frame.Coeffs
