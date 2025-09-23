@@ -132,21 +132,11 @@ func createPayloadDisperser(privateKeyHex string) (*payloaddispersal.PayloadDisp
 	)
 }
 
-func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %w", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("create contract directory: %w", err)
-	}
+func createRelayPayloadRetriever(
+	logger logging.Logger,
+	ethClient *geth.EthClient,
+	contractDirectory *directory.ContractDirectory,
+) (*payloadretrieval.RelayPayloadRetriever, error) {
 
 	reader, err := createEthReader(logger, ethClient, contractDirectory)
 	if err != nil {
@@ -177,23 +167,11 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		metrics.NoopRetrievalMetrics)
 }
 
-func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetriever, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %w", err)
-	}
-
-	// Create an EthClient for blockchain interaction
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	contractDirectory, err := createEigenDADirectory(context.Background(), logger, ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("create contract directory: %w", err)
-	}
-
+func createValidatorPayloadRetriever(
+	logger logging.Logger,
+	ethClient *geth.EthClient,
+	contractDirectory *directory.ContractDirectory,
+) (*payloadretrieval.ValidatorPayloadRetriever, error) {
 	// Create the eth reader
 	ethReader, err := createEthReader(logger, ethClient, contractDirectory)
 	if err != nil {

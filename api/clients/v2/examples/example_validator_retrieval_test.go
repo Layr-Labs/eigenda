@@ -29,6 +29,22 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create logger: %v", err))
 	}
 
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		panic(fmt.Sprintf("create eth client: %v", err))
+	}
+
+	contractDirectory, err := createEigenDADirectory(ctx, logger, ethClient)
+	if err != nil {
+		panic(fmt.Sprintf("create contract directory: %v", err))
+	}
+
+	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.CertVerifierRouter)
+	if err != nil {
+		panic(fmt.Sprintf("get cert verifier router address: %v", err))
+	}
+
 	// Create a payload disperser and disperse a sample payload to EigenDA
 	// This will be the payload we will later retrieve
 	payloadDisperser, err := createPayloadDisperser(privateKey)
@@ -50,7 +66,7 @@ func Example_validatorPayloadRetrieval() {
 	fmt.Printf("Successfully dispersed payload\n")
 
 	// Create a validator payload retriever to retrieve directly from validator nodes
-	validatorPayloadRetriever, err := createValidatorPayloadRetriever()
+	validatorPayloadRetriever, err := createValidatorPayloadRetriever(logger, ethClient, contractDirectory)
 	if err != nil {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}
@@ -67,22 +83,6 @@ func Example_validatorPayloadRetrieval() {
 	}
 
 	fmt.Printf("Successfully retrieved payload\n")
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		panic(fmt.Sprintf("create eth client: %v", err))
-	}
-
-	contractDirectory, err := createEigenDADirectory(ctx, logger, ethClient)
-	if err != nil {
-		panic(fmt.Sprintf("create contract directory: %v", err))
-	}
-
-	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
-		context.Background(), directory.CertVerifierRouter)
-	if err != nil {
-		panic(fmt.Sprintf("get cert verifier router address: %v", err))
-	}
 
 	// Create a cert verifier, to verify the certificate on chain
 	certVerifier, err := createCertVerifier(certVerifierRouterAddress, ethClient, logger)
