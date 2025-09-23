@@ -10,6 +10,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
+const SerializedProofLength = bn254.SizeOfG1AffineCompressed
+
 // SerializeGob serializes the Frame into a byte slice using gob encoding.
 // TODO(samlaf): when do we use gob vs gnark serialization ([Frame.SerializeGnark])?
 func (c *Frame) SerializeGob() ([]byte, error) {
@@ -78,9 +80,7 @@ func (c *Frame) DeserializeGnark(data []byte) (*Frame, error) {
 	return &f, nil
 }
 
-const SerializedProofLength = bn254.SizeOfG1AffineCompressed
-
-// SerializeFrameProof serializes an [Proof] to the target byte array.
+// SerializeFrameProof serializes a [Proof] to the target byte array.
 // Only the first SerializedProofLength bytes of the target array are written to.
 func SerializeFrameProof(proof *Proof, target []byte) error {
 	if len(target) < SerializedProofLength {
@@ -99,13 +99,13 @@ func SerializeFrameProofs(proofs []*Proof) ([]byte, error) {
 	for index, proof := range proofs {
 		err := SerializeFrameProof(proof, bytes[index*SerializedProofLength:])
 		if err != nil {
-			return nil, fmt.Errorf("failed to serialize proof: %w", err)
+			return nil, fmt.Errorf("serialize proof: %w", err)
 		}
 	}
 	return bytes, nil
 }
 
-// DeserializeFrameProof deserializes an [Proof]. Only the first proof is deserialized
+// DeserializeFrameProof deserializes a [Proof]. Only the first proof is deserialized
 // from the first SerializedProofLength bytes of the input array.
 func DeserializeFrameProof(bytes []byte) (*Proof, error) {
 	if len(bytes) != SerializedProofLength {
@@ -114,7 +114,7 @@ func DeserializeFrameProof(bytes []byte) (*Proof, error) {
 	proof := Proof{}
 	err := proof.Unmarshal(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal proof: %w", err)
+		return nil, fmt.Errorf("unmarshal proof: %w", err)
 	}
 	return &proof, nil
 }
@@ -128,7 +128,7 @@ func DeserializeFrameProofs(bytes []byte) ([]*Proof, error) {
 
 	splitProofs, err := SplitSerializedFrameProofs(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to split proofs: %w", err)
+		return nil, fmt.Errorf("split serialized frame proofs: %w", err)
 	}
 
 	return DeserializeSplitFrameProofs(splitProofs), nil
