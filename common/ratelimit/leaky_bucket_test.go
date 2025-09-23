@@ -1,4 +1,4 @@
-package reservation
+package ratelimit
 
 import (
 	"testing"

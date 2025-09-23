@@ -31,6 +31,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/proxy/store/secondary/s3"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -744,7 +745,7 @@ func buildReservationLedger(
 		// start full since reservation usage isn't persisted: assume the worst case (heavy usage before startup)
 		true,
 		// this is a parameter for flexibility, but there aren't plans to operate with anything other than this value
-		reservation.OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		// TODO(litt3): is there a different place we should define this? hardcoding makes sense... it's just a
 		// question of *where*
 		time.Minute,

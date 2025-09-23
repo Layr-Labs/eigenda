@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/metrics"
 	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
@@ -172,7 +173,7 @@ func (cl *ClientLedger) debitReservationOnly(
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
 			return nil, fmt.Errorf("debit reservation: %w", err)
@@ -229,7 +230,7 @@ func (cl *ClientLedger) debitReservationOrOnDemand(
 	// dispersal time when constructing the payment header, and it does so with its conception of "now"
 	success, remainingCapacity, err := cl.reservationLedger.Debit(now, now, blobLengthSymbols, quorums)
 	if err != nil {
-		var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+		var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 		if errors.As(err, &timeMovedBackwardErr) {
 			// this is the only class of error that can be returned from Debit where trying again might help
 			return nil, fmt.Errorf("debit reservation: %w", err)

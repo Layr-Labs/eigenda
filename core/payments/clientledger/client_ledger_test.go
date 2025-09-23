@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
@@ -542,7 +543,7 @@ func buildReservationLedger(t *testing.T) *reservation.ReservationLedger {
 	require.NoError(t, err)
 
 	reservationLedgerConfig, err := reservation.NewReservationLedgerConfig(
-		*res, 1, false, reservation.OverfillOncePermitted, time.Minute)
+		*res, 1, false, ratelimit.OverfillOncePermitted, time.Minute)
 	require.NotNil(t, reservationLedgerConfig)
 	require.NoError(t, err)
 

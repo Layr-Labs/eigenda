@@ -3,6 +3,8 @@ package reservation
 import (
 	"errors"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 )
 
 // Contains configuration for the reservation ledger cache
@@ -13,7 +15,7 @@ type ReservationLedgerCacheConfig struct {
 	// Duration used to calculate bucket capacity when creating new reservation ledgers
 	BucketCapacityPeriod time.Duration
 	// How to handle requests that would overfill the bucket
-	OverfillBehavior OverfillBehavior
+	OverfillBehavior ratelimit.OverfillBehavior
 	// Interval for checking for payment updates
 	UpdateInterval time.Duration
 }
@@ -22,7 +24,7 @@ type ReservationLedgerCacheConfig struct {
 func NewReservationLedgerCacheConfig(
 	maxLedgers int,
 	bucketCapacityPeriod time.Duration,
-	overfillBehavior OverfillBehavior,
+	overfillBehavior ratelimit.OverfillBehavior,
 	updateInterval time.Duration,
 ) (ReservationLedgerCacheConfig, error) {
 	if maxLedgers <= 0 {
@@ -41,7 +43,7 @@ func NewReservationLedgerCacheConfig(
 		return ReservationLedgerCacheConfig{}, errors.New("update interval must be > 0")
 	}
 
-	if overfillBehavior != OverfillNotPermitted && overfillBehavior != OverfillOncePermitted {
+	if overfillBehavior != ratelimit.OverfillNotPermitted && overfillBehavior != ratelimit.OverfillOncePermitted {
 		return ReservationLedgerCacheConfig{}, errors.New("invalid overfill behavior")
 	}
 

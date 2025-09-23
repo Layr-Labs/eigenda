@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/payments"
 )
@@ -19,7 +20,7 @@ type ReservationLedger struct {
 	lock sync.Mutex
 
 	// an instance of the algorithm which tracks reservation usage
-	leakyBucket *LeakyBucket
+	leakyBucket *ratelimit.LeakyBucket
 }
 
 // Creates a new reservation ledger, which represents the reservation of a single user with a [LeakyBucket]
@@ -28,7 +29,7 @@ func NewReservationLedger(
 	// now should be from a source that includes monotonic timestamp for best results
 	now time.Time,
 ) (*ReservationLedger, error) {
-	leakyBucket, err := NewLeakyBucket(
+	leakyBucket, err := ratelimit.NewLeakyBucket(
 		config.reservation.symbolsPerSecond,
 		config.bucketCapacityDuration,
 		config.startFull,
@@ -166,7 +167,7 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 
 	previousFillLevel := rl.leakyBucket.CheckFillLevel(now)
 
-	newLeakyBucket, err := NewLeakyBucket(
+	newLeakyBucket, err := ratelimit.NewLeakyBucket(
 		newConfig.reservation.symbolsPerSecond,
 		newConfig.bucketCapacityDuration,
 		false, // fill level is explicitly set below
@@ -177,7 +178,10 @@ func (rl *ReservationLedger) UpdateReservation(newReservation *Reservation, now 
 		return fmt.Errorf("new leaky bucket: %w", err)
 	}
 
-	newLeakyBucket.currentFillLevel = previousFillLevel
+	err = newLeakyBucket.SetFillLevel(now, previousFillLevel)
+	if err != nil {
+		return fmt.Errorf("set fill level: %w", err)
+	}
 
 	rl.config = newConfig
 	rl.leakyBucket = newLeakyBucket
@@ -190,5 +194,5 @@ func (rl *ReservationLedger) GetBucketCapacity() float64 {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
-	return rl.leakyBucket.bucketCapacity
+	return rl.leakyBucket.GetBucketCapacity()
 }

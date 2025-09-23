@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -48,7 +49,7 @@ type ReservationLedgerCache struct {
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time
 	// how to handle requests that would overfill the bucket
-	overfillBehavior OverfillBehavior
+	overfillBehavior ratelimit.OverfillBehavior
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration
 	// minimum number of symbols to bill for a given dispersal, from the PaymentVault
