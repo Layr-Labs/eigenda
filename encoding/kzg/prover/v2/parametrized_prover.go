@@ -15,12 +15,14 @@ import (
 )
 
 type ParametrizedProver struct {
+	srsNumberToLoad uint64
+
 	encodingParams encoding.EncodingParams
 	encoder        *rs.Encoder
 
-	kzgConfig             *KzgConfig
-	kzgMultiProofBackend  KzgMultiProofsBackendV2
-	kzgCommitmentsBackend KzgCommitmentsBackendV2
+	computeMultiprooNumWorker uint64
+	kzgMultiProofBackend      KzgMultiProofsBackendV2
+	kzgCommitmentsBackend     KzgCommitmentsBackendV2
 }
 
 type rsEncodeResult struct {
@@ -241,7 +243,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		}
 
 		proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
-			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.kzgConfig.NumWorker)
+			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiprooNumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
@@ -282,9 +284,9 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 }
 
 func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
-	if len(inputFr) > int(g.kzgConfig.SRSNumberToLoad) {
+	if len(inputFr) > int(g.srsNumberToLoad) {
 		return fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v",
-			len(inputFr), int(g.kzgConfig.SRSNumberToLoad))
+			len(inputFr), int(g.srsNumberToLoad))
 	}
 
 	return nil
