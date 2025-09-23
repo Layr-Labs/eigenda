@@ -16,7 +16,7 @@ message EncodeBlobRequest {
   bytes blob_key = 1;
   EncodingParams encoding_params = 2;
   // TODO(samlaf): we should change this to uint32, since blobLengths are uint32 everywhere.
-	// However this is a minor breaking change and would require some coordination for our
+  // However this is a minor breaking change and would require some coordination for our
   // deployments (encoder client/server), so leaving as is for now.
   uint64 blob_size = 3;
 }
