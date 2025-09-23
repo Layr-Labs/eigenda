@@ -145,8 +145,9 @@ contract EigenDADirectory is IEigenDADirectory {
         if (!ConfigRegistryLib.isKeyRegisteredBytes32(key)) {
             revert ConfigDoesNotExist(name);
         }
+        bytes32 oldValue = ConfigRegistryLib.getConfigBytes32(key);
         ConfigRegistryLib.setConfigBytes32(key, value, extraInfo);
-        emit ConfigBytes32Replaced(name, key, ConfigRegistryLib.getConfigBytes32(key), value, extraInfo);
+        emit ConfigBytes32Replaced(name, key, oldValue, value, extraInfo);
     }
 
     /// @inheritdoc IEigenDAConfigRegistry
