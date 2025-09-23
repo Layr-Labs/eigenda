@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,14 +18,14 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("nil payment vault", func(t *testing.T) {
-		config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		config, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 			10,
 			"tableName",
 			time.Second,
 		)
 		require.NoError(t, err)
 
-		cache, err := ondemand.NewOnDemandLedgerCache(
+		cache, err := ondemandvalidation.NewOnDemandLedgerCache(
 			ctx,
 			test.GetLogger(),
 			config,
@@ -37,14 +38,14 @@ func TestNewOnDemandLedgerCacheInvalidParams(t *testing.T) {
 	})
 
 	t.Run("nil dynamo client", func(t *testing.T) {
-		config, err := ondemand.NewOnDemandLedgerCacheConfig(
+		config, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 			10,
 			"tableName",
 			time.Second,
 		)
 		require.NoError(t, err)
 
-		cache, err := ondemand.NewOnDemandLedgerCache(
+		cache, err := ondemandvalidation.NewOnDemandLedgerCache(
 			ctx,
 			test.GetLogger(),
 			config,
@@ -74,14 +75,14 @@ func TestLRUCacheEvictionAndReload(t *testing.T) {
 	testVault.SetTotalDeposit(accountB, big.NewInt(5000))
 	testVault.SetTotalDeposit(accountC, big.NewInt(3000))
 
-	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+	config, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		tableName,
 		time.Millisecond, // update frequently
 	)
 	require.NoError(t, err)
 
-	ledgerCache, err := ondemand.NewOnDemandLedgerCache(
+	ledgerCache, err := ondemandvalidation.NewOnDemandLedgerCache(
 		ctx,
 		test.GetLogger(),
 		config,

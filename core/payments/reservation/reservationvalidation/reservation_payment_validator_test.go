@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -46,7 +47,7 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	config, err := NewReservationLedgerCacheConfig(
 		10,
 		10*time.Second,
-		OverfillOncePermitted,
+		reservation.OverfillOncePermitted,
 		time.Second,
 	)
 	require.NoError(t, err)
@@ -101,7 +102,7 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 	config, err := NewReservationLedgerCacheConfig(
 		10,
 		1*time.Second,
-		OverfillOncePermitted,
+		reservation.OverfillOncePermitted,
 		time.Second,
 	)
 	require.NoError(t, err)

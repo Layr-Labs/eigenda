@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -26,14 +27,14 @@ func TestDebitMultipleAccounts(t *testing.T) {
 	testVault.SetTotalDeposit(accountA, big.NewInt(10000))
 	testVault.SetTotalDeposit(accountB, big.NewInt(20000))
 
-	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+	config, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 		10,
 		tableName,
 		time.Second,
 	)
 	require.NoError(t, err)
 
-	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
+	paymentValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		test.GetLogger(),
 		config,
@@ -70,14 +71,14 @@ func TestDebitInsufficientFunds(t *testing.T) {
 	testVault.SetPricePerSymbol(1000)
 	testVault.SetTotalDeposit(accountID, big.NewInt(5000))
 
-	config, err := ondemand.NewOnDemandLedgerCacheConfig(
+	config, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 		10,
 		tableName,
 		time.Second,
 	)
 	require.NoError(t, err)
 
-	paymentValidator, err := ondemand.NewOnDemandPaymentValidator(
+	paymentValidator, err := ondemandvalidation.NewOnDemandPaymentValidator(
 		ctx,
 		test.GetLogger(),
 		config,

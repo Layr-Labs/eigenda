@@ -1,4 +1,4 @@
-package reservation_test
+package reservationvalidation
 
 import (
 	"context"
@@ -17,14 +17,14 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
 	t.Run("nil payment vault", func(t *testing.T) {
-		config, err := reservation.NewReservationLedgerCacheConfig(
+		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
 			reservation.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
-		cache, err := reservation.NewReservationLedgerCache(
+		cache, err := NewReservationLedgerCache(
 			t.Context(),
 			test.GetLogger(),
 			config,
@@ -37,14 +37,14 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 	})
 
 	t.Run("nil time source", func(t *testing.T) {
-		config, err := reservation.NewReservationLedgerCacheConfig(
+		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
 			reservation.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
-		cache, err := reservation.NewReservationLedgerCache(
+		cache, err := NewReservationLedgerCache(
 			t.Context(),
 			test.GetLogger(),
 			config,
@@ -90,14 +90,14 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	config, err := reservation.NewReservationLedgerCacheConfig(
+	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
 		reservation.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
-	ledgerCache, err := reservation.NewReservationLedgerCache(
+	ledgerCache, err := NewReservationLedgerCache(
 		ctx,
 		test.GetLogger(),
 		config,
@@ -166,14 +166,14 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	config, err := reservation.NewReservationLedgerCacheConfig(
+	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
 		reservation.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
-	ledgerCache, err := reservation.NewReservationLedgerCache(
+	ledgerCache, err := NewReservationLedgerCache(
 		ctx,
 		test.GetLogger(),
 		config,
