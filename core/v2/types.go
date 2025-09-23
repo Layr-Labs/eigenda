@@ -143,7 +143,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 			Commitment:       commitment,
 			LengthCommitment: lengthCommitment,
 			LengthProof:      lengthProof,
-			Length:           uint(proto.GetCommitment().GetLength()),
+			Length:           proto.GetCommitment().GetLength(),
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
@@ -169,8 +169,8 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 	}, nil
 }
 
-func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := blobParams.GetChunkLength(uint32(blobLength))
+func GetEncodingParams(blobLength uint32, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := blobParams.GetChunkLength(blobLength)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}

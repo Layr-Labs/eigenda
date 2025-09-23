@@ -189,12 +189,11 @@ func (e *Prover) EncodeAndProve(
 		return encoding.BlobCommitments{}, nil, fmt.Errorf("ToFrArray: %w", err)
 	}
 
-	length := uint(len(symbols))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
+		Length:           uint32(len(symbols)),
 	}
 
 	return commitments, chunks, nil
@@ -246,7 +245,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		return encoding.BlobCommitments{}, fmt.Errorf("get kzg encoder: %w", err)
 	}
 
-	length := math.NextPowOf2u64(uint64(len(symbols)))
+	length := math.NextPowOf2u32(uint32(len(symbols)))
 
 	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
 	if err != nil {
@@ -257,7 +256,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           uint(length),
+		Length:           length,
 	}
 
 	return commitments, nil

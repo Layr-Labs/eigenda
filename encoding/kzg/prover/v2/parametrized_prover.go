@@ -88,7 +88,7 @@ func (g *ParametrizedProver) Encode(
 	// inputFr is untouched
 	// compute chunks
 	go func() {
-		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr, uint64(len(inputFr)))
+		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr, uint32(len(inputFr)))
 
 		commitmentsChan <- commitmentsResult{
 			commitment:       commitment,
@@ -120,7 +120,7 @@ func (g *ParametrizedProver) Encode(
 }
 
 func (g *ParametrizedProver) GetCommitments(
-	inputFr []fr.Element, length uint64,
+	inputFr []fr.Element, length uint32,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
 	if err := g.validateInput(inputFr); err != nil {
 		return nil, nil, nil, err

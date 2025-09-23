@@ -368,7 +368,6 @@ func getConfirmedMetadata(t *testing.T, metadata *disperser.BlobMetadata, blobIn
 		X: commitX,
 		Y: commitY,
 	}
-	dataLength := 32
 	batchID := uint32(99)
 	batchRoot := []byte("hello")
 	referenceBlockNumber := uint32(132)
@@ -385,7 +384,7 @@ func getConfirmedMetadata(t *testing.T, metadata *disperser.BlobMetadata, blobIn
 		BlobInclusionProof:   inclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(dataLength),
+			Length:     32,
 		},
 		BatchID:                 batchID,
 		ConfirmationTxnHash:     common.HexToHash("0x123"),
