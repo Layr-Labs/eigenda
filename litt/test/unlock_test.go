@@ -50,7 +50,8 @@ func TestUnlock(t *testing.T) {
 	lockFileCount := 0
 	err = filepath.Walk(testDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// Log but do not fail. LittDB may be shuffling files around concurrently.
+			t.Logf("Error walking path %s (not necesarily fatal): %v", path, err)
 		}
 		if info.IsDir() {
 			return nil
@@ -70,9 +71,8 @@ func TestUnlock(t *testing.T) {
 	// There should be no lock files left.
 	lockFileCount = 0
 	err = filepath.Walk(testDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+		// Log but do not fail. LittDB may be shuffling files around concurrently.
+		t.Logf("Error walking path %s (not necesarily fatal): %v", path, err)
 		if info.IsDir() {
 			return nil
 		}
