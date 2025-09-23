@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/test/random"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,16 +42,10 @@ func TestLengthProof(t *testing.T) {
 			_, lengthCommitment, lengthProof, err := enc.GetCommitments(inputFr)
 			require.Nil(t, err)
 
-			require.NoError(t, v.VerifyLengthProof(
-				(*bn254.G2Affine)(lengthCommitment),
-				(*bn254.G2Affine)(lengthProof),
-				numSymbols),
+			require.NoError(t, v.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols),
 				"low degree verification failed\n")
 
-			require.Error(t, v.VerifyLengthProof(
-				(*bn254.G2Affine)(lengthCommitment),
-				(*bn254.G2Affine)(lengthProof),
-				numSymbols*2),
+			require.Error(t, v.VerifyLengthProof(lengthCommitment, lengthProof, numSymbols*2),
 				"low degree verification failed\n")
 		})
 	}
