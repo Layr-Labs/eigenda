@@ -386,7 +386,7 @@ func (s *ServerV2) validateDispersalRequest(
 	if commitedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
 	}
-	if commitedBlobLength != uint(math.NextPowOf2u64(uint64(commitedBlobLength))) {
+	if uint64(commitedBlobLength) != math.NextPowOf2u64(uint64(commitedBlobLength)) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 
