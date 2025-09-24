@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	defaultTablesBaseURL  = "https://srs-mainnet.s3.amazonaws.com/kzg/SRSTables"
+	defaultTablesBaseURL   = "https://srs-mainnet.s3.amazonaws.com/kzg/SRSTables"
 	defaultTablesOutputDir = "resources/srs/SRSTables"
-	defaultDimension      = "dimE8192"
+	defaultDimension       = "dimE8192"
 )
 
 // TablesDownloaderConfig holds configuration for SRS table files download
