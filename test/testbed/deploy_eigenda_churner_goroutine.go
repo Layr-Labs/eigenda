@@ -23,6 +23,56 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// ChurnerConfig defines configuration for the churner container
+//
+//nolint:lll // struct field documentation
+type ChurnerConfig struct {
+	// Enable churner service
+	Enabled bool `env:"-"` // Skip in env mapping
+
+	// Log configuration
+	LogFormat string `env:"CHURNER_LOG_FORMAT"`
+	LogLevel  string `env:"CHURNER_LOG_LEVEL"`
+
+	// Network configuration
+	Hostname string `env:"CHURNER_HOSTNAME"`
+	GRPCPort string `env:"CHURNER_GRPC_PORT"`
+
+	// EigenDA contract addresses
+	EigenDADirectory       string `env:"CHURNER_EIGENDA_DIRECTORY"`
+	OperatorStateRetriever string `env:"CHURNER_BLS_OPERATOR_STATE_RETRIVER"` // Note: typo in original
+	ServiceManager         string `env:"CHURNER_EIGENDA_SERVICE_MANAGER"`
+
+	// Chain configuration
+	ChainRPC   string `env:"CHURNER_CHAIN_RPC"`
+	PrivateKey string `env:"CHURNER_PRIVATE_KEY"`
+
+	// Graph configuration
+	GraphURL string `env:"CHURNER_GRAPH_URL"`
+
+	// Metrics configuration
+	EnableMetrics   bool   `env:"CHURNER_ENABLE_METRICS"`
+	MetricsHTTPPort string `env:"CHURNER_METRICS_HTTP_PORT"`
+
+	// Churner specific configuration
+	PerPublicKeyRateLimit time.Duration `env:"CHURNER_PER_PUBLIC_KEY_RATE_LIMIT"`
+	ChurnApprovalInterval time.Duration `env:"CHURNER_CHURN_APPROVAL_INTERVAL"`
+
+	// Container configuration (not exposed as env vars)
+	Image          string        `env:"-"`
+	StartupTimeout time.Duration `env:"-"`
+	ExposeHostPort bool          `env:"-"` // If true, binds container port to host port
+	HostPort       string        `env:"-"` // Custom host port to bind to (defaults to GRPCPort if empty and ExposeHostPort is true)
+
+	LogPath string `env:"CHURNER_LOG_PATH"` // Additional env vars that don't have direct struct fields
+
+	// Test data directory path for logs and env files (not exposed as env var)
+	TestDataPath string `env:"-"` // Path to inabox/testdata/<timestamp> directory
+
+	// MockIndexer for testing - if provided, will be used instead of creating a real graph indexer
+	MockIndexer interface{} `env:"-"` // Will be cast to thegraph.IndexedChainState
+}
+
 type ChurnerGoroutine struct {
 	server   *grpc.Server
 	listener net.Listener
@@ -107,7 +157,20 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 		}
 
 		cs := coreeth.NewChainState(tx, gethClient)
-		indexer := thegraph.MakeIndexedChainState(churnerConfig.ChainStateConfig, cs, logger)
+
+		// Use mock indexer if provided, otherwise create real graph indexer
+		var indexer thegraph.IndexedChainState
+		if config.MockIndexer != nil {
+			var ok bool
+			indexer, ok = config.MockIndexer.(thegraph.IndexedChainState)
+			if !ok {
+				logger.Error("Failed to cast MockIndexer to IndexedChainState")
+				errChan <- fmt.Errorf("failed to cast MockIndexer to IndexedChainState")
+				return
+			}
+		} else {
+			indexer = thegraph.MakeIndexedChainState(churnerConfig.ChainStateConfig, cs, logger)
+		}
 
 		churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, logger)
 		cn, err := churner.NewChurner(churnerConfig, indexer, tx, logger, churnerMetrics)
@@ -160,6 +223,31 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 		cancel:   cancel,
 		config:   config,
 	}, nil
+}
+
+// DefaultChurnerConfig returns a default churner configuration suitable for testing
+func DefaultChurnerConfig() ChurnerConfig {
+	return ChurnerConfig{
+		Enabled:                true,
+		LogFormat:              "text",
+		LogLevel:               "debug",
+		Hostname:               "0.0.0.0",
+		GRPCPort:               "32002",
+		EigenDADirectory:       "", // Will be populated from contract deployment
+		OperatorStateRetriever: "", // Will be populated from contract deployment
+		ServiceManager:         "", // Will be populated from contract deployment
+		ChainRPC:               "", // Will be populated from Anvil
+		PrivateKey:             "", // Will be populated from deployer key
+		GraphURL:               "", // Will be populated from GraphNode if enabled
+		EnableMetrics:          true,
+		MetricsHTTPPort:        "9095",
+		PerPublicKeyRateLimit:  1 * time.Second, // Fast for testing
+		ChurnApprovalInterval:  900 * time.Second,
+		Image:                  "ghcr.io/layr-labs/eigenda/churner:dev",
+		StartupTimeout:         30 * time.Second,
+		ExposeHostPort:         false,
+		HostPort:               "",
+	}
 }
 
 // buildChurnerArgs builds the command line arguments from the ChurnerConfig

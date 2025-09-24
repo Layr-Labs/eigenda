@@ -10,13 +10,11 @@ import (
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node/plugin"
-	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -25,6 +23,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Simple operator info struct that only contains what the test needs
@@ -38,7 +38,6 @@ type operatorInfo struct {
 
 var (
 	localstackPort                 = "4570"
-	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
 	operatorAddr                   = ""
@@ -145,7 +144,40 @@ func TestChurner(t *testing.T) {
 	ctx := t.Context()
 	testSetup := setupTest(t)
 
-	server := newTestServer(t, testSetup)
+	// Create mock indexer
+	mockIndexer := &indexermock.MockIndexedChainState{}
+
+	// Configure and start churner using testbed pattern with mock indexer
+	churnerConfig := testbed.ChurnerConfig{
+		Enabled:                true,
+		LogLevel:               "debug",
+		LogFormat:              "text",
+		Hostname:               "0.0.0.0",
+		GRPCPort:               "32002",
+		ChainRPC:               "http://localhost:8545",
+		PrivateKey:             churnerPrivateKeyHex,
+		OperatorStateRetriever: testSetup.Contracts.EigenDA.OperatorStateRetriever,
+		ServiceManager:         testSetup.Contracts.EigenDA.ServiceManager,
+		EigenDADirectory:       testSetup.Contracts.EigenDA.EigenDADirectory,
+		EnableMetrics:          true,
+		MetricsHTTPPort:        "9095",
+		ChurnApprovalInterval:  15 * time.Minute,
+		PerPublicKeyRateLimit:  1 * time.Second,
+		MockIndexer:            mockIndexer,
+	}
+
+	// Start churner as a goroutine using testbed pattern
+	churnerGoroutine, err := testbed.StartChurnerGoroutine(churnerConfig, logger)
+	require.NoError(t, err, "failed to start churner goroutine")
+	defer churnerGoroutine.Stop(ctx)
+
+	// Create gRPC client to connect to the churner
+	conn, err := grpc.Dial(churnerGoroutine.URL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err, "failed to dial churner")
+	defer conn.Close()
+
+	churnerClient := pb.NewChurnerClient(conn)
+
 	quorumIDsUint8 := make([]uint8, len(quorumIds))
 	for i, id := range quorumIds {
 		quorumIDsUint8[i] = uint8(id)
@@ -235,11 +267,13 @@ func TestChurner(t *testing.T) {
 	require.NoError(t, err)
 	request.OperatorRequestSignature = signature
 
+	// Set up mock expectation for the lowest stake operator
 	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
 		PubkeyG1: lowestStakeOperatorPubKey,
 	}, nil)
 
-	reply, err := server.Churn(ctx, request)
+	// Call churner via gRPC instead of direct server call
+	reply, err := churnerClient.Churn(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, reply)
 	require.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
@@ -285,35 +319,4 @@ func mustCreateTransactorFromScratch(
 	require.NoError(t, err, "failed to create eth writer")
 
 	return writer
-}
-
-func newTestServer(t *testing.T, testSetup *TestSetup) *churner.Server {
-	t.Helper()
-
-	config := &churner.Config{
-		EthClientConfig: geth.EthClientConfig{
-			RPCURLs:          []string{rpcURL},
-			PrivateKeyString: churnerPrivateKeyHex,
-			NumRetries:       numRetries,
-		},
-		LoggerConfig:               *common.DefaultLoggerConfig(),
-		OperatorStateRetrieverAddr: testSetup.Contracts.EigenDA.OperatorStateRetriever,
-		EigenDAServiceManagerAddr:  testSetup.Contracts.EigenDA.ServiceManager,
-		EigenDADirectory:           testSetup.Contracts.EigenDA.EigenDADirectory,
-		ChurnApprovalInterval:      15 * time.Minute,
-	}
-
-	operatorTransactorChurner := mustCreateTransactorFromScratch(
-		t,
-		churnerPrivateKeyHex,
-		testSetup.Contracts.EigenDA.OperatorStateRetriever,
-		testSetup.Contracts.EigenDA.ServiceManager,
-		logger,
-	)
-
-	metrics := churner.NewMetrics("9001", logger)
-	cn, err := churner.NewChurner(config, mockIndexer, operatorTransactorChurner, logger, metrics)
-	require.NoError(t, err)
-
-	return churner.NewServer(config, cn, logger, metrics)
 }
