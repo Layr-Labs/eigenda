@@ -569,6 +569,33 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "IGNORE_VERSION_FOR_EJECTION_DEFENSE"),
 	}
+	EnablePaymentValidationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-payment-validation"),
+		Usage:    "Whether the validator should perform payment validation. Temporary flag that will be removed once the new payments system is fully in place.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PAYMENT_VALIDATION"),
+	}
+	ReservationMaxLedgersFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-max-ledgers"),
+		Usage:    "Initial size for the reservation ledger LRU cache. This increases dynamically if premature evictions are detected.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_MAX_LEDGERS"),
+	}
+	ReservationBucketCapacityPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
+		Usage:    "Duration used to calculate bucket capacity when creating new reservation ledgers.",
+		Required: false,
+		Value:    180 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
+	}
+	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
+		Usage:    "Interval for checking for payment vault updates.",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PAYMENT_VAULT_UPDATE_INTERVAL"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -715,6 +742,10 @@ var optionalFlags = []cli.Flag{
 	EjectionSentinelPeriodFlag,
 	EjectionDefenseEnabledFlag,
 	IgnoreVersionForEjectionDefenseFlag,
+	EnablePaymentValidationFlag,
+	ReservationMaxLedgersFlag,
+	ReservationBucketCapacityPeriodFlag,
+	PaymentVaultUpdateIntervalFlag,
 }
 
 func init() {

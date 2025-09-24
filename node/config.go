@@ -203,6 +203,19 @@ type Config struct {
 	// setting the minimum version number goes rogue, honest validators may want to contest ejection regardless of the
 	// claimed minimum version number.
 	IgnoreVersionForEjectionDefense bool
+
+	// Whether the validator should perform payment validation.
+	//
+	// TODO(litt3): This is a temporary field, which will be removed once the new payments system is fully in place.
+	// Payment validation is currently optional to make implementation and testing possible before actually shipping
+	// the new payments system.
+	EnablePaymentValidation bool
+	// Initial size for the reservation ledger LRU cache. This increase dynamically if premature evictions are detected.
+	ReservationMaxLedgers int
+	// Duration used to calculate bucket capacity when creating new reservation ledgers
+	ReservationBucketCapacityPeriod time.Duration
+	// Interval for checking for payment vault updates
+	PaymentVaultUpdateInterval time.Duration
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -457,5 +470,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EjectionSentinelPeriod:          ctx.GlobalDuration(flags.EjectionSentinelPeriodFlag.Name),
 		EjectionDefenseEnabled:          ctx.GlobalBool(flags.EjectionDefenseEnabledFlag.Name),
 		IgnoreVersionForEjectionDefense: ctx.GlobalBool(flags.IgnoreVersionForEjectionDefenseFlag.Name),
+		EnablePaymentValidation:         ctx.GlobalBool(flags.EnablePaymentValidationFlag.Name),
+		ReservationMaxLedgers:           ctx.GlobalInt(flags.ReservationMaxLedgersFlag.Name),
+		ReservationBucketCapacityPeriod: ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
+		PaymentVaultUpdateInterval:      ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name),
 	}, nil
 }

@@ -146,6 +146,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 		}
 	}
+	// TODO(litt3): why would we permit the blob authenticator to be nil?
 	if s.blobAuthenticator != nil {
 		// TODO: check the latency of request validation later; could be parallelized to avoid significant
 		// impact to the request latency
@@ -156,6 +157,13 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			}
 		}
 	}
+
+	// Validate reservation payments (on-demand payments are validated on the controller)
+	err = s.node.ValidateReservationPayment(ctx, batch, probe)
+	if err != nil {
+		return nil, fmt.Errorf("validate reservation payment: %w", err)
+	}
+
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
