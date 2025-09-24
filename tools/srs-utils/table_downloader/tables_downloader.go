@@ -1,9 +1,11 @@
-package downloader
+package table_downloader
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/internal/download"
 )
 
 const (
@@ -39,7 +41,7 @@ func NewTablesDownloaderConfig(
 		baseURL = defaultTablesBaseURL
 	}
 	if len(cosetSizes) == 0 {
-		cosetSizes = []int{4, 8, 16, 32, 64, 128, 256, 512, 1024}
+		cosetSizes = []int{4, 8, 16, 32, 64, 128, 256, 512}
 	}
 
 	return TablesDownloaderConfig{
@@ -65,13 +67,13 @@ func DownloadSRSTables(config TablesDownloaderConfig) error {
 
 	for _, cosetSize := range config.cosetSizes {
 		fileName := fmt.Sprintf("%s.coset%d", config.dimension, cosetSize)
-		fileURL, err := constructURLPath(config.baseURL, fileName)
+		fileURL, err := download.ConstructURLPath(config.baseURL, fileName)
 		if err != nil {
 			return fmt.Errorf("construct URL for %s: %w", fileName, err)
 		}
 
 		// Get file size
-		fileSize, err := getRemoteFileSize(fileURL)
+		fileSize, err := download.GetRemoteFileSize(fileURL)
 		if err != nil {
 			fmt.Printf("Warning: Could not get size for %s: %v (skipping)\n", fileName, err)
 			continue
@@ -80,7 +82,7 @@ func DownloadSRSTables(config TablesDownloaderConfig) error {
 		fmt.Printf("Downloading %s (%d MB)...\n", fileName, fileSize/(1024*1024))
 
 		outputPath := filepath.Join(config.outputDir, fileName)
-		if err := downloadFile(fileURL, outputPath, 0, fileSize-1); err != nil {
+		if err := download.DownloadFile(fileURL, outputPath, 0, fileSize-1); err != nil {
 			return fmt.Errorf("download %s: %w", fileName, err)
 		}
 
@@ -94,21 +96,7 @@ func DownloadSRSTables(config TablesDownloaderConfig) error {
 	}
 
 	fmt.Printf("\nSuccessfully downloaded %d files (%s) to %s\n",
-		downloadedFiles, formatBytes(totalBytes), config.outputDir)
+		downloadedFiles, download.FormatBytes(totalBytes), config.outputDir)
 
 	return nil
-}
-
-// formatBytes converts bytes to a human-readable string
-func formatBytes(bytes uint64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := uint64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

@@ -36,7 +36,8 @@ the complete G2 SRS. This file is optional and primarily used by operator nodes 
 ### SRS Tables for EigenDA V2
 
 EigenDA V2 uses precomputed SRS tables for efficient polynomial operations with specific chunk counts. These tables
-contain coset evaluations that accelerate encoding and decoding operations.
+contain coset evaluations that accelerate encoding and decoding operations. This is only used for generating the
+KZG multiproofs.
 
 In EigenDA V2, **blob version 0** specifically sets `numChunks=8192`, which is why the dimE8192 tables are the
 primary SRS tables used in production.

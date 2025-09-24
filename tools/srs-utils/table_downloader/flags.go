@@ -1,4 +1,4 @@
-package downloader
+package table_downloader
 
 import (
 	"fmt"
@@ -14,8 +14,8 @@ const (
 	flagCosetSizes      = "coset-sizes"
 )
 
-// TablesFlags defines command line flags for the download-tables command
-var TablesFlags = []cli.Flag{
+// Flags defines command line flags for the download-tables command
+var Flags = []cli.Flag{
 	cli.StringFlag{
 		Name:  flagDimension,
 		Usage: "Dimension name (e.g., dimE8192)",
@@ -38,8 +38,8 @@ var TablesFlags = []cli.Flag{
 	},
 }
 
-// ReadTablesConfig reads command line flags into a config struct
-func ReadTablesConfig(cCtx *cli.Context) (TablesDownloaderConfig, error) {
+// ReadConfig reads command line flags into a config struct
+func ReadCLIConfig(cCtx *cli.Context) (TablesDownloaderConfig, error) {
 	cosetSizesStr := cCtx.String(flagCosetSizes)
 	var cosetSizes []int
 	if cosetSizesStr != "" {
