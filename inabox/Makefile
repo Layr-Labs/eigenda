@@ -1,25 +1,15 @@
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
-.PHONY: new-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil deploy-all stop-infra run-e2e clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
 	cp ./templates/testconfig-anvil.yaml "testdata/$(dt)/config.yaml"
 
-new-anvil-nochurner:
-	mkdir -p "testdata/$(dt)"
-	cp ./templates/testconfig-anvil-nochurner.yaml "testdata/$(dt)/config.yaml"
-
-chain:
-	go run ./deploy/cmd -localstack-port 4570 chain
-
-localstack:
-	go run ./deploy/cmd -localstack-port 4570 localstack
-
-exp: 
-	go run ./deploy/cmd exp
-
-deploy-all:
-	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
+# Start infra will start anvil, a graph node, and aws localstack services (s3 and dynamodb).
+# It will also deploy the contracts and the subgraphs onto the graph node.
+# After this you can run `make start-services`.
+start-infra:
+	go run ./deploy/cmd -localstack-port 4570
 
 stop-infra:
 # Stop anvil
@@ -30,6 +20,14 @@ stop-infra:
 	docker ps -q --filter "ancestor=graphprotocol/graph-node:v0.35.0" | xargs -r docker stop 2>/dev/null || true
 	docker ps -q --filter "ancestor=ipfs/kubo:v0.24.0" | xargs -r docker stop 2>/dev/null || true
 	docker ps -q --filter "ancestor=postgres:13" | xargs -r docker stop 2>/dev/null || true
+
+# Starts all the services: disperser, validators, churner, etc.
+start-services:
+	./bin.sh start-detached
+
+stop-services:
+	./bin.sh stop-detached
+
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 

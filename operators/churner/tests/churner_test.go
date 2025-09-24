@@ -67,7 +67,7 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 		require.NoError(t, err, "failed to create test directory")
 	}
 
-	testConfig := deploy.NewTestConfig(testName, rootPath)
+	testConfig := deploy.ReadTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
 	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{

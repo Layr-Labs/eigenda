@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
 	if testConfig.Environment.IsLocal() {

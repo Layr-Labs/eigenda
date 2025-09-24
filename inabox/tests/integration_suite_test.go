@@ -134,7 +134,7 @@ func setupSuite() error {
 		}
 	}
 
-	testConfig = deploy.NewTestConfig(testName, rootPath)
+	testConfig = deploy.ReadTestConfig(testName, rootPath)
 
 	if testConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
