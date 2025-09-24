@@ -18,7 +18,7 @@ An `encodedPayload` is the bn254 encoding of the `payload`, prefixed with an enc
 
 #### Encoded Payload Header
 
-The header carries metadata needed to decode back to the original payload. Because it is included in the encoded payload, it too must be representable as valid field elements. The header currently takes 32 bytes: the first byte is 0x00 (to ensure it forms a valid field element), followed by an encoding version_byte and 4 bytes representing the size of the original payload. The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12). The remaining bytes of the encoded payload header are zero-filled.
+The header carries metadata needed to decode back to the original payload. Because it is included in the encoded payload, it too must be representable as valid field elements. The header currently takes 32 bytes: the first byte is 0x00 (to ensure it forms a valid field element), followed by an encoding version_byte and 4 bytes representing the size of the original payload. The golang payload clients provided in the eigenda repo currently only support [encoding version 0x0](https://github.com/Layr-Labs/eigenda/blob/f591a1fe44bced0f17edef9df43aaf13929e8508/api/clients/codecs/blob_codec.go#L12). The remaining bytes can be anything, as they are not read by the integration. However, the recommended default is to zero-fill the remaining bytes, which is also the current behavior of the eigenda proxy.
 
 #### Encoding Payload Version 0x0
 
