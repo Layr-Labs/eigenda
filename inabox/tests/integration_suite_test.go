@@ -53,7 +53,7 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 var (
 	anvilContainer     *testbed.AnvilContainer
 	graphNodeContainer *testbed.GraphNodeContainer
-	churnerContainer   *testbed.ChurnerContainer
+	churnerGoroutine   *testbed.ChurnerGoroutine
 	// chainDockerNetwork is only used by anvil and graphNode
 	chainDockerNetwork *testcontainers.DockerNetwork
 
