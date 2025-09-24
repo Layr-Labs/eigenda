@@ -101,26 +101,15 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	testAccount := accounts[2]
 	testVault.SetTotalDeposit(testAccount, big.NewInt(9999)) // Changed
 
-	// Clear captured updates to verify new updates
-	mu.Lock()
-	capturedUpdates = make(map[gethcommon.Address]*big.Int)
-	mu.Unlock()
-
-	// Wait for the monitor to fetch the updated deposits
-	test.AssertEventuallyEquals(t, len(accounts), func() int {
+	// Wait for the monitor to fetch the updated deposit
+	test.AssertEventuallyEquals(t, big.NewInt(9999), func() *big.Int {
 		mu.Lock()
 		defer mu.Unlock()
-		return len(capturedUpdates)
+		return capturedUpdates[testAccount]
 	}, time.Second)
 
-	// Check that the specific account was updated correctly
-	mu.Lock()
-	updatedDeposit, ok := capturedUpdates[testAccount]
-	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
-	require.NotNil(t, updatedDeposit)
-	require.Equal(t, big.NewInt(9999), updatedDeposit)
-
 	// Other accounts should remain unchanged
+	mu.Lock()
 	for i, addr := range accounts {
 		if addr != testAccount {
 			deposit, ok := capturedUpdates[addr]
