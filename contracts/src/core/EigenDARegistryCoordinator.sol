@@ -19,7 +19,7 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
 import {Pausable} from "eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
-import {RegistryCoordinatorStorage} from "lib/eigenlayer-middleware/src/RegistryCoordinatorStorage.sol";
+import {EigenDARegistryCoordinatorStorage} from "src/core/EigenDARegistryCoordinatorStorage.sol";
 
 /**
  * @title A `RegistryCoordinator` that has three registries:
@@ -29,12 +29,12 @@ import {RegistryCoordinatorStorage} from "lib/eigenlayer-middleware/src/Registry
  *
  * @author Layr Labs, Inc.
  */
-contract RegistryCoordinator is
+contract EigenDARegistryCoordinator is
     EIP712,
     Initializable,
     Pausable,
     OwnableUpgradeable,
-    RegistryCoordinatorStorage,
+    EigenDARegistryCoordinatorStorage,
     ISignatureUtils
 {
     using BitmapUtils for *;
@@ -59,7 +59,7 @@ contract RegistryCoordinator is
         IIndexRegistry _indexRegistry,
         ISocketRegistry _socketRegistry
     )
-        RegistryCoordinatorStorage(_serviceManager, _stakeRegistry, _blsApkRegistry, _indexRegistry, _socketRegistry)
+        EigenDARegistryCoordinatorStorage(_serviceManager, _stakeRegistry, _blsApkRegistry, _indexRegistry, _socketRegistry)
         EIP712("AVSRegistryCoordinator", "v0.0.1")
     {
         _disableInitializers();

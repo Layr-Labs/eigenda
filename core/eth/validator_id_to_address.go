@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	geth "github.com/ethereum/go-ethereum/common"
@@ -18,7 +18,7 @@ func ValidatorIDToAddress(
 	validatorID core.OperatorID,
 ) (geth.Address, error) {
 
-	registryCoordinator, err := regcoordinator.NewContractRegistryCoordinator(
+	registryCoordinator, err := regcoordinator.NewContractEigenDARegistryCoordinator(
 		registryCoordinatorAddress,
 		contractBackend)
 	if err != nil {
