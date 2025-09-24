@@ -200,7 +200,7 @@ func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommit
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           uint(math.NextPowOf2u32(uint32(len(symbols)))),
+		Length:           math.NextPowOf2u32(uint32(len(symbols))),
 	}
 
 	return commitments, nil

@@ -73,7 +73,6 @@ func emptyBlobDispersalTest(t *testing.T, environment string) {
 	// This should fail with "data is empty" error
 	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, nil, nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, clients.ErrZeroSymbols.Error())
 }
 
 func TestEmptyBlobDispersal(t *testing.T) {

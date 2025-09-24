@@ -1,4 +1,4 @@
-package ondemand
+package ondemandvalidation
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
