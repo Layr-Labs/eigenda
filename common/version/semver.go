@@ -9,7 +9,7 @@ import (
 
 var _ fmt.Stringer = (*Semver)(nil)
 
-// Semver represents a semantic version.
+// Semver represents a semantic defaultVersion.
 type Semver struct {
 	major  uint64
 	minor  uint64
@@ -27,7 +27,7 @@ func NewSemver(major uint64, minor uint64, patch uint64, errata string) *Semver 
 	}
 }
 
-// Parses a semantic version string and returns a Semver instance.
+// Parses a semantic defaultVersion string and returns a Semver instance.
 //
 // Requires the string to have the following format: X.Y.Z[-errata], where X, Y, and Z are
 // non-negative integers, and errata is an optional arbitrary string. Note that if
@@ -42,10 +42,10 @@ func SemverFromString(versionStr string) (*Semver, error) {
 		// Try with errata
 		n, err := fmt.Sscanf(versionStr, "%d.%d.%d-%s", &major, &minor, &patch, &errata)
 		if err != nil {
-			return nil, fmt.Errorf("invalid version format: %w", err)
+			return nil, fmt.Errorf("invalid defaultVersion format: %w", err)
 		}
 		if n != 4 {
-			return nil, fmt.Errorf("invalid version format")
+			return nil, fmt.Errorf("invalid defaultVersion format")
 		}
 	} else {
 
@@ -56,10 +56,10 @@ func SemverFromString(versionStr string) (*Semver, error) {
 
 		n, err := fmt.Sscanf(versionStr, "%d.%d.%d%s", &major, &minor, &patch, &extra)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return nil, fmt.Errorf("invalid version format: %w", err)
+			return nil, fmt.Errorf("invalid defaultVersion format: %w", err)
 		}
 		if n != 3 || extra != "" {
-			return nil, fmt.Errorf("invalid version format")
+			return nil, fmt.Errorf("invalid defaultVersion format")
 		}
 	}
 
@@ -75,17 +75,17 @@ func (s *Semver) String() string {
 	return fmt.Sprintf("%d.%d.%d%s", s.major, s.minor, s.patch, errataStr)
 }
 
-// Get the major version number.
+// Get the major defaultVersion number.
 func (s *Semver) Major() uint64 {
 	return s.major
 }
 
-// Get the minor version number.
+// Get the minor defaultVersion number.
 func (s *Semver) Minor() uint64 {
 	return s.minor
 }
 
-// Get the patch version number.
+// Get the patch defaultVersion number.
 func (s *Semver) Patch() uint64 {
 	return s.patch
 }

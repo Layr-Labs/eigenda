@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -41,31 +40,33 @@ type Server struct {
 
 	mu *sync.Mutex
 
-	// A string representation of the current version.
-	version string
+	// Version of the software.
+	softwareVersion *version.Semver
 }
 
 // NewServer creates a new Server instance with the provided parameters.
 //
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
-func NewServer(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *Server {
-
-	semver, err := version.CurrentVersion()
-	enforce.NilError(err, "invalid current version")
+func NewServer(
+	config *node.Config,
+	node *node.Node,
+	logger logging.Logger,
+	ratelimiter common.RateLimiter,
+	softwareVersion *version.Semver) *Server {
 
 	return &Server{
-		config:      config,
-		logger:      logger,
-		node:        node,
-		ratelimiter: ratelimiter,
-		mu:          &sync.Mutex{},
-		version:     semver.String(),
+		config:          config,
+		logger:          logger,
+		node:            node,
+		ratelimiter:     ratelimiter,
+		mu:              &sync.Mutex{},
+		softwareVersion: softwareVersion,
 	}
 }
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: s.version}, nil
+		return &pb.NodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
 	memBytes := uint64(0)
@@ -75,7 +76,7 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 	}
 
 	return &pb.NodeInfoReply{
-		Semver:   s.version,
+		Semver:   s.softwareVersion.String(),
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),

@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/common/version"
@@ -41,7 +40,7 @@ type ServerV2 struct {
 	replayGuardian     replay.ReplayGuardian
 
 	// The current software version.
-	version string
+	softwareVersion *version.Semver
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -52,7 +51,8 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+	softwareVersion *version.Semver) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -81,9 +81,6 @@ func NewServerV2(
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
-	semver, err := version.CurrentVersion()
-	enforce.NilError(err, "invalid current version")
-
 	return &ServerV2{
 		config:             config,
 		node:               node,
@@ -93,13 +90,13 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
-		version:            semver.String(),
+		softwareVersion:    softwareVersion,
 	}, nil
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.GetNodeInfoReply{Semver: s.version}, nil
+		return &pb.GetNodeInfoReply{Semver: s.softwareVersion.String()}, nil
 	}
 
 	memBytes := uint64(0)
@@ -109,7 +106,7 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 	}
 
 	return &pb.GetNodeInfoReply{
-		Semver:   s.version,
+		Semver:   s.softwareVersion.String(),
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),

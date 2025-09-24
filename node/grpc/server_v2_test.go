@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/gammazero/workerpool"
@@ -126,7 +127,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		reader)
+		reader,
+		version.DefaultVersion())
 
 	require.NoError(t, err)
 	return &testComponents{

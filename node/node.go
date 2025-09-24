@@ -20,7 +20,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
@@ -128,6 +127,7 @@ func NewNode(
 	pubIPProvider pubip.Provider,
 	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
+	softwareVersion *version.Semver,
 ) (*Node, error) {
 	nodeLogger := logger.With("component", "Node")
 
@@ -189,11 +189,8 @@ func NewNode(
 	}
 
 	// Setup Node Api
-	semver, err := version.CurrentVersion()
-	enforce.NilError(err, "invalid current version")
-
 	nodeApi := nodeapi.NewNodeApi(
-		AppName, semver.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+		AppName, softwareVersion.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 

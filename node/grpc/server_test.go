@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/docker/go-units"
 	"github.com/gammazero/workerpool"
 
@@ -182,7 +183,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 		Validator:      val,
 		ValidationPool: workerpool.New(1),
 	}
-	return grpc.NewServer(config, node, logger, ratelimiter)
+	return grpc.NewServer(config, node, logger, ratelimiter, version.DefaultVersion())
 }
 
 func makeStoreChunksRequest(t *testing.T, quorumThreshold, adversaryThreshold uint8) (*pb.StoreChunksRequest, [32]byte, [32]byte, []*core.BlobHeader, []*pb.BlobHeader) {
