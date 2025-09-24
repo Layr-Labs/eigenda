@@ -19,8 +19,17 @@ function kill_processes {
 function start_trap {
     trap kill_processes SIGINT
 
-    # Churner is now started as a Docker container in the integration test
-    # Skipping churner binary start
+    if [ "$SKIP_CHURNER" != "true" ]; then
+        set -a
+        source $testpath/envs/churner.env
+        set +a
+        ../operators/churner/bin/server &
+
+        pid="$!"
+        pids="$pids $pid"
+    else
+        echo "Skipping churner startup (SKIP_CHURNER=true)"
+    fi
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -110,8 +119,20 @@ function start_detached {
 
     mkdir -p $testpath/logs
 
-    # Churner is now started as a Docker container in the integration test
-    # Skipping churner binary start
+    if [ "$SKIP_CHURNER" != "true" ]; then
+        set -a
+        source $testpath/envs/churner.env
+        set +a
+        ../operators/churner/bin/server > $testpath/logs/churner.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${CHURNER_GRPC_PORT} -- echo "Churner up" &
+        waiters="$waiters $!"
+    else
+        echo "Skipping churner startup (SKIP_CHURNER=true)"
+    fi
 
     for FILE in $(ls $testpath/envs/dis*.env); do
         set -a
@@ -237,6 +258,9 @@ function stop_detached {
 
 function force_stop {
     echo "Force stopping all EigenDA processes..."
+    if [ "$SKIP_CHURNER" != "true" ]; then
+        pkill -9 -f "churner/bin/server" || true
+    fi
     pkill -9 -f "disperser/bin/server" || true
     pkill -9 -f "disperser/bin/encoder" || true
     pkill -9 -f "disperser/bin/batcher" || true
@@ -256,6 +280,9 @@ help() {
     echo "  start-detached     Start all services in the background and log output to files"
     echo "  stop-detached      Stop all background services started with start-detached"
     echo "  force-stop         Force kill all EigenDA related processes"
+    echo ""
+    echo "Environment variables:"
+    echo "  SKIP_CHURNER=true  Skip starting the churner service (used when tests run churner as a goroutine)"
     echo ""
     echo "Logs are stored in $testpath/logs/"
     echo "PIDs of detached processes are stored in $testpath/pids"

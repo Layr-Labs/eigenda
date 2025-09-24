@@ -371,7 +371,8 @@ func (env *Config) StartBinaries() {
 	}
 
 	logger.Info("Starting binaries")
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
+	// Skip churner since tests will start it as a goroutine using testbed
+	err := execCmd("./bin.sh", []string{"start-detached"}, []string{"SKIP_CHURNER=true"}, true)
 	if err != nil {
 		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
 	}
@@ -390,7 +391,8 @@ func (env *Config) StopBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
+	// Also skip churner during stop since it wasn't started
+	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{"SKIP_CHURNER=true"}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
 	}
