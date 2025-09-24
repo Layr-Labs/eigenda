@@ -1,6 +1,8 @@
-specVersion: 0.0.5
+specVersion: 1.2.0
 schema:
   file: ./schema.graphql
+indexerHints:
+  prune: auto
 dataSources:
   - kind: ethereum
     name: RegistryCoordinator
@@ -11,7 +13,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - ChurnApproverUpdated
@@ -44,7 +46,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - OperatorAddedToQuorums
@@ -59,6 +61,8 @@ dataSources:
           handler: handleOperatorRemovedFromQuorums
         - event: NewPubkeyRegistration(indexed address,(uint256,uint256),(uint256[2],uint256[2]))
           handler: handleNewPubkeyRegistration
+          calls:
+            OperatorToPubkeyHash: BLSApkRegistry[event.address].operatorToPubkeyHash(event.params.operator)
       file: ./src/bls-apk-registry.ts
   - kind: ethereum
     name: BLSApkRegistry_Operator
@@ -69,7 +73,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - Operator
@@ -89,7 +93,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - OperatorDeregistered
@@ -112,7 +116,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - OperatorAddedToQuorums
@@ -135,7 +139,7 @@ dataSources:
       startBlock: 0
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - EjectorUpdated
