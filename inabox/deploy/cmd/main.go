@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/urfave/cli/v2"
 )
 
@@ -85,9 +86,7 @@ func DeployAll(ctx *cli.Context) error {
 	}
 
 	logger.Info("Deployment complete. You can now run `make run-e2e` to run the e2e tests.")
-
 	return nil
-
 }
 
 func readTestConfig(ctx *cli.Context) (*deploy.Config, error) {
@@ -108,11 +107,25 @@ func readTestConfig(ctx *cli.Context) (*deploy.Config, error) {
 
 // Spins up an anvil chain and a graph node (if DeploySubgraphs=true)
 func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
+	// Create a shared Docker network for all containers
+	// TODO(samlaf): seems like there's no way with testcontainers-go@v0.38 to give this network a name...
+	// https://pkg.go.dev/github.com/testcontainers/testcontainers-go@v0.38.0/network#WithNetworkName
+	// only returns an option to be passed to container requests... so we would have to use it on the first container
+	// we create, which would require changing our testbed package.
+	dockerNetwork, err := network.New(ctx.Context,
+		network.WithDriver("bridge"),
+		network.WithAttachable(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create docker network: %w", err)
+	}
+	logger.Info("Created Docker network", "name", dockerNetwork.Name)
 
-	_, err := testbed.NewAnvilContainerWithOptions(ctx.Context, testbed.AnvilOptions{
+	anvilC, err := testbed.NewAnvilContainerWithOptions(ctx.Context, testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
 		Logger:         logger,
+		Network:        dockerNetwork,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start anvil container: %w", err)
@@ -124,13 +137,15 @@ func startChainInfra(ctx *cli.Context, config *deploy.Config) error {
 			PostgresDB:     "graph-node",
 			PostgresUser:   "graph-node",
 			PostgresPass:   "let-me-in",
-			EthereumRPC:    "http://localhost:8545",
 			ExposeHostPort: true,
 			HostHTTPPort:   "8000",
 			HostWSPort:     "8001",
 			HostAdminPort:  "8020",
 			HostIPFSPort:   "5001",
 			Logger:         logger,
+			Network:        dockerNetwork,
+			// internal endpoint will work because they are in the same dockerNetwork
+			EthereumRPC: anvilC.InternalEndpoint(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start graph node: %w", err)
