@@ -115,7 +115,7 @@ integration-tests:
 
 # Tests that require a build because they start local inabox infra:
 # either chain, subgraph, or localstack.
-integration-tests-inabox: build
+integration-tests-inabox: build docker-build
 	go test -v ./core/thegraph
 	cd inabox && make run-e2e
 
