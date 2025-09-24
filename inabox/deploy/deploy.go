@@ -359,8 +359,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	}
 }
 
-// TODO: Supply the test path to the runner utility
-func (env *Config) StartBinaries() {
+// StartBinaries starts the EigenDA binaries
+// forTests: if true, skips churner (which runs as goroutine in tests)
+func (env *Config) StartBinaries(forTests bool) {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
 	}
@@ -370,9 +371,16 @@ func (env *Config) StartBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	logger.Info("Starting binaries")
-	// Skip churner since tests will start it as a goroutine using testbed
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{"SKIP_CHURNER=true"}, true)
+	var command string
+	if forTests {
+		logger.Info("Starting binaries for tests (without churner)")
+		command = "start-detached-for-tests"
+	} else {
+		logger.Info("Starting binaries for devnet")
+		command = "start-detached"
+	}
+
+	err := execCmd("./bin.sh", []string{command}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to start binaries, check testdata directory for more information", "error", err)
 	}
@@ -380,7 +388,7 @@ func (env *Config) StartBinaries() {
 	logger.Info("Binaries started successfully!")
 }
 
-// TODO: Supply the test path to the runner utility
+// StopBinaries stops all running binaries
 func (env *Config) StopBinaries() {
 	if err := changeDirectory(filepath.Join(env.rootPath, "inabox")); err != nil {
 		logger.Fatal("Error changing directories", "error", err)
@@ -391,8 +399,7 @@ func (env *Config) StopBinaries() {
 		logger.Info("Successfully changed to absolute path", "path", cwd)
 	}
 
-	// Also skip churner during stop since it wasn't started
-	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{"SKIP_CHURNER=true"}, true)
+	err := execCmd("./bin.sh", []string{"stop-detached"}, []string{}, true)
 	if err != nil {
 		logger.Fatal("Failed to stop binaries", "error", err)
 	}

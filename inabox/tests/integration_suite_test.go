@@ -247,7 +247,7 @@ func setupSuite() error {
 		logger.Info("Churner goroutine started", "url", churnerGoroutine.URL())
 
 		logger.Info("Starting binaries")
-		testConfig.StartBinaries()
+		testConfig.StartBinaries(true) // true = for tests, will skip churner
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		if err != nil {

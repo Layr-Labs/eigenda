@@ -124,7 +124,7 @@ func setupTest(t *testing.T) (
 	require.NoError(t, err, "failed to deploy experiment")
 
 	logger.Info("Starting binaries")
-	testConfig.StartBinaries()
+	testConfig.StartBinaries(true)
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers and services")
