@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// ChurnerGoroutine represents a churner running in a goroutine instead of a container
 type ChurnerGoroutine struct {
 	server   *grpc.Server
 	listener net.Listener
@@ -32,7 +31,6 @@ type ChurnerGoroutine struct {
 	config   ChurnerConfig
 }
 
-// StartChurnerGoroutine starts a churner service in a goroutine
 func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*ChurnerGoroutine, error) {
 	// Start listener on the specified port
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", config.GRPCPort))
@@ -83,9 +81,7 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 		}
 
 		// Create logger from churner config (which respects the log path)
-		// Override format to text to match test logger format
 		churnerConfig.LoggerConfig.Format = common.TextLogFormat
-		// Disable color when writing to file
 		churnerConfig.LoggerConfig.HandlerOpts.NoColor = true
 		churnerLogger, err := common.NewLogger(&churnerConfig.LoggerConfig)
 		if err != nil {
@@ -93,7 +89,6 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 			errChan <- fmt.Errorf("failed to create churner logger: %w", err)
 			return
 		}
-		// Use churnerLogger from this point forward instead of the test logger
 		logger = churnerLogger
 
 		// Create clients
