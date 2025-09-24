@@ -153,3 +153,114 @@ func TestStandardEjection(t *testing.T) {
 	require.Len(t, ejectionTransactor.completedEjections, 3)
 
 }
+
+func TestConstructorBlacklist(t *testing.T) {
+	rand := random.NewTestRandom()
+
+	logger := common.TestLogger(t)
+
+	start := rand.Time()
+	currentTime := start
+	previousTime := currentTime
+
+	timeSource := func() time.Time {
+		return currentTime
+	}
+
+	validatorA := rand.Address()
+	validatorB := rand.Address()
+	validatorC := rand.Address()
+
+	ejectionTransactor := newMockEjectionTransactor()
+	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorA] = true
+	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorB] = true
+	ejectionTransactor.isValidatorPresentInAnyQuorumResponses[validatorC] = true
+
+	ejectionDelay := time.Minute + rand.DurationRange(0, time.Minute)
+	retryDelay := 10*time.Minute + rand.DurationRange(0, time.Minute)
+	retryAttempts := rand.Uint32Range(1, 3)
+	maxEjectionRate := 1.00
+	bucketDuration := time.Hour
+	startBucketFull := true
+
+	// Blacklist B and C, so only A should be ejected.
+	blacklist := []geth.Address{
+		validatorB,
+		validatorC,
+	}
+
+	manager, err := NewEjectionManager(
+		t.Context(),
+		logger,
+		timeSource,
+		ejectionTransactor,
+		ejectionDelay,
+		retryDelay,
+		retryAttempts,
+		maxEjectionRate,
+		bucketDuration,
+		startBucketFull,
+		blacklist)
+	require.NoError(t, err)
+
+	// Eject A and B at the same time. Eject C a bit later.
+	ejectionTimeA := currentTime.Add(time.Minute)
+	ejectionTimeB := currentTime.Add(time.Minute)
+	ejectionTimeC := currentTime.Add(2 * time.Minute)
+
+	var expectedFinalizeTimeA time.Time
+
+	// Step forward in time in ~5 second increments, checking the state of ejections along the way.
+	endTime := start.Add(30 * time.Minute)
+	for currentTime.Before(endTime) {
+
+		// Start ejections when ready.
+		if isTriggerTime(currentTime, previousTime, ejectionTimeA) {
+			_, started := ejectionTransactor.inProgressEjections[validatorA]
+			require.False(t, started)
+			manager.BeginEjection(validatorA, nil)
+			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
+			_, started = ejectionTransactor.inProgressEjections[validatorA]
+			require.True(t, started)
+		}
+		if isTriggerTime(currentTime, previousTime, ejectionTimeB) {
+			manager.BeginEjection(validatorB, nil)
+		}
+		if isTriggerTime(currentTime, previousTime, ejectionTimeC) {
+			manager.BeginEjection(validatorC, nil)
+		}
+		// If right before the expected finalize time, ejection should not yet be finalized.
+		if isTriggerTime(currentTime, previousTime, expectedFinalizeTimeA) {
+			_, finalized := ejectionTransactor.completedEjections[validatorA]
+			require.False(t, finalized)
+		}
+
+		// Call this each iteration. Most of the time it won't do anything, but when the time is right it will finalize
+		// ejections that are ready.
+		manager.FinalizeEjections()
+
+		// Once finalize is called, verify that the ejection has been completed if it is the expected time.
+		if isTriggerTime(currentTime, previousTime, expectedFinalizeTimeA) {
+			_, finalized := ejectionTransactor.completedEjections[validatorA]
+			require.True(t, finalized)
+		}
+
+		// Neither B nor C should ever have their ejections started or finalized, since they are blacklisted.
+		_, started := ejectionTransactor.inProgressEjections[validatorB]
+		require.False(t, started)
+		_, finalized := ejectionTransactor.completedEjections[validatorB]
+		require.False(t, finalized)
+		_, started = ejectionTransactor.inProgressEjections[validatorC]
+		require.False(t, started)
+		_, finalized = ejectionTransactor.completedEjections[validatorC]
+		require.False(t, finalized)
+
+		previousTime = currentTime
+		currentTime = currentTime.Add(rand.DurationRange(time.Second, 5*time.Second))
+	}
+
+	// Sanity check: we should see all three ejections completed. This is more a verification that the unit
+	// test itself worked as expected, rather than a test of the ejection manager.
+	require.Len(t, ejectionTransactor.completedEjections, 1)
+
+}
