@@ -5,16 +5,21 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node/plugin"
+	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -147,32 +152,76 @@ func TestChurner(t *testing.T) {
 	// Create mock indexer
 	mockIndexer := &indexermock.MockIndexedChainState{}
 
-	// Configure and start churner using testbed pattern with mock indexer
-	churnerConfig := testbed.ChurnerConfig{
-		Enabled:                true,
-		LogLevel:               "debug",
-		LogFormat:              "text",
-		Hostname:               "0.0.0.0",
-		GRPCPort:               "32002",
-		ChainRPC:               "http://localhost:8545",
-		PrivateKey:             churnerPrivateKeyHex,
-		OperatorStateRetriever: testSetup.Contracts.EigenDA.OperatorStateRetriever,
-		ServiceManager:         testSetup.Contracts.EigenDA.ServiceManager,
-		EigenDADirectory:       testSetup.Contracts.EigenDA.EigenDADirectory,
-		EnableMetrics:          true,
-		MetricsHTTPPort:        "9095",
-		ChurnApprovalInterval:  15 * time.Minute,
-		PerPublicKeyRateLimit:  1 * time.Second,
-		MockIndexer:            mockIndexer,
+	// Start churner server directly using the churner package
+	grpcPort := "32002"
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
+	require.NoError(t, err, "failed to listen on port")
+	defer listener.Close()
+
+	// Create churner config directly (no CLI parsing needed)
+	churnerConfig := &churner.Config{
+		EthClientConfig: geth.EthClientConfig{
+			RPCURLs:          []string{"http://localhost:8545"},
+			PrivateKeyString: churnerPrivateKeyHex,
+		},
+		LoggerConfig: common.LoggerConfig{
+			Format: common.TextLogFormat,
+			HandlerOpts: logging.SLoggerOptions{
+				Level:   slog.LevelDebug,
+				NoColor: true,
+			},
+		},
+		MetricsConfig: churner.MetricsConfig{
+			HTTPPort:      "9095",
+			EnableMetrics: true,
+		},
+		OperatorStateRetrieverAddr: testSetup.Contracts.EigenDA.OperatorStateRetriever,
+		EigenDAServiceManagerAddr:  testSetup.Contracts.EigenDA.ServiceManager,
+		EigenDADirectory:           testSetup.Contracts.EigenDA.EigenDADirectory,
+		ChurnApprovalInterval:      15 * time.Minute,
+		PerPublicKeyRateLimit:      1 * time.Second,
 	}
 
-	// Start churner as a goroutine using testbed pattern
-	churnerGoroutine, err := testbed.StartChurnerGoroutine(churnerConfig, logger)
-	require.NoError(t, err, "failed to start churner goroutine")
-	defer churnerGoroutine.Stop(ctx)
+	// Create geth client
+	gethClient, err := geth.NewMultiHomingClient(churnerConfig.EthClientConfig, gethcommon.Address{}, logger)
+	require.NoError(t, err, "failed to create geth client")
+
+	// Create writer
+	churnerTx, err := coreeth.NewWriter(
+		logger,
+		gethClient,
+		churnerConfig.OperatorStateRetrieverAddr,
+		churnerConfig.EigenDAServiceManagerAddr)
+	require.NoError(t, err, "failed to create writer")
+
+	// Create churner with mock indexer
+	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, logger)
+	cn, err := churner.NewChurner(churnerConfig, mockIndexer, churnerTx, logger, churnerMetrics)
+	require.NoError(t, err, "failed to create churner")
+
+	// Create churner server
+	churnerServer := churner.NewServer(churnerConfig, cn, logger, churnerMetrics)
+	err = churnerServer.Start(churnerConfig.MetricsConfig)
+	require.NoError(t, err, "failed to start churner server metrics")
+
+	// Create and start gRPC server
+	gs := grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
+	pb.RegisterChurnerServer(gs, churnerServer)
+	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, gs)
+
+	// Start serving in goroutine
+	go func() {
+		if err := gs.Serve(listener); err != nil {
+			t.Logf("gRPC server stopped: %v", err)
+		}
+	}()
+	defer gs.Stop()
+
+	// Give server time to start
+	time.Sleep(100 * time.Millisecond)
 
 	// Create gRPC client to connect to the churner
-	conn, err := grpc.NewClient(churnerGoroutine.URL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%s", grpcPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial churner")
 	defer func() {
 		if err := conn.Close(); err != nil {
@@ -188,7 +237,7 @@ func TestChurner(t *testing.T) {
 	}
 	var lowestStakeOperatorAddr gethcommon.Address
 	var lowestStakeOperatorPubKey *core.G1Point
-	var tx *eth.Writer
+	var tx *coreeth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
 	var signer blssigner.Signer
 	var g1PointBytes []byte
@@ -306,7 +355,7 @@ func mustCreateTransactorFromScratch(
 	operatorStateRetriever string,
 	serviceManager string,
 	logger logging.Logger,
-) *eth.Writer {
+) *coreeth.Writer {
 	t.Helper()
 
 	ethClientCfg := geth.EthClientConfig{
@@ -319,7 +368,7 @@ func mustCreateTransactorFromScratch(
 	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
 	require.NoError(t, err, "failed to create eth client")
 
-	writer, err := eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	writer, err := coreeth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
 	require.NoError(t, err, "failed to create eth writer")
 
 	return writer
