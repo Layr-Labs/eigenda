@@ -33,14 +33,20 @@ var (
 	bucketDuration           = 450 * time.Second
 )
 
-// Set via go build -ldflags="-X main.version=${SEMVER}...
-var version string
-
 func main() {
 
-	err := commonversion.SetVersion(version)
-	if err != nil {
-		log.Printf("Version string \"%s\" is invalid, valling back to hard coded version", version)
+	if node.SemVer != "" {
+		semver := node.SemVer
+		if node.GitCommit != "" {
+			semver = fmt.Sprintf("%s-%s", semver, node.GitCommit)
+		}
+		if node.GitDate != "" {
+			semver = fmt.Sprintf("%s-%s", semver, node.GitDate)
+		}
+		err := commonversion.SetVersion(semver)
+		if err != nil {
+			log.Printf("Version string \"%s\" is invalid, falling back to hard coded version", node.SemVer)
+		}
 	}
 
 	semver, err := commonversion.CurrentVersion()
