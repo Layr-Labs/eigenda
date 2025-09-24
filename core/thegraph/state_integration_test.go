@@ -36,7 +36,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
