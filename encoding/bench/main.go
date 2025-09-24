@@ -43,7 +43,7 @@ func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
 	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 1024, "Minimum blob length (power of 2)")
-	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 524288, "Maximum blob length (power of 2)")
+	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 1048576, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
@@ -61,20 +61,20 @@ func main() {
 
 	// Setup phase
 	kzgConfig = &kzg.KzgConfig{
-		G1Path:          "/home/ubuntu/eigenda/resources/srs/g1.point",
-		G2Path:          "/home/ubuntu/eigenda/resources/srs/g2.point",
-		CacheDir:        "/home/ubuntu/eigenda/resources/srs/SRSTables",
+		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
+		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
+		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
 		SRSOrder:        268435456,
-		SRSNumberToLoad: 524288,
+		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    false,
+		LoadG2Points:    true,
 	}
 
 	fmt.Printf("* Task Starts\n")
 
 	cfg := &encoding.Config{
-		BackendType: encoding.GnarkBackend,
-		GPUEnable:   false,
+		BackendType: encoding.IcicleBackend,
+		GPUEnable:   true,
 		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 	}
 	p, err := prover.NewProver(kzgConfig, cfg)
