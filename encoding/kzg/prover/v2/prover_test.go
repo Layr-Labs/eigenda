@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier/v2"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,7 +111,11 @@ func FuzzOnlySystematic(f *testing.F) {
 	harness := getTestHarness()
 
 	f.Add(harness.paddedGettysburgAddressBytes)
+	f.Add([]byte("Hello, World!"))
+	f.Add([]byte{0})
+
 	f.Fuzz(func(t *testing.T, input []byte) {
+		input = codec.ConvertByPaddingEmptyByte(input)
 		group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 		require.NoError(t, err)
 
