@@ -36,19 +36,18 @@ the complete G2 SRS. This file is optional and primarily used by operator nodes 
 ### SRS Tables for EigenDA V2
 
 EigenDA V2 uses precomputed SRS tables for efficient polynomial operations with specific chunk counts. These tables
-contain coset evaluations that accelerate encoding and decoding operations. This is only used for generating the
-KZG multiproofs.
+contain coset evaluations that accelerate KZG multiproofs. 
 
 In EigenDA V2, **blob version 0** specifically sets `numChunks=8192`, which is why the dimE8192 tables are the
 primary SRS tables used in production.
 
 #### Available Table Files
 
-The SRS tables are organized by dimension (numChunks) and coset size:
+The SRS tables are organized by dimension (numChunks) and coset size (chunk length):
 
 | Dimension | Coset Sizes | Total Size | Description |
 |-----------|-------------|------------|-------------|
-| dimE8192  | 4, 8, 16, 32, 64, 128, 256, 512, 1024 | ~1 GB | Tables for numChunks=8192 (blob version 0) |
+| dimE8192  | 4, 8, 16, 32, 64, 128, 256, 512 | ~512 MB | Tables for numChunks=8192 (blob version 0) |
 
 Each table file is named following the pattern: `<dimension>.coset<size>` (e.g., `dimE8192.coset256`)
 
@@ -64,7 +63,7 @@ Where:
 - `numChunks` = 8192 (for blob version 0)
 - `cosetSize` = chunk length (varies based on blob size)
 - `32 bytes` = size of each BN254 field element
-- `codingRatio` = 8 (fixed erasure coding expansion factor)
+- `codingRatio` = 8 (fixed erasure coding expansion factor for blob version 0)
 
 Supported blob sizes for dimE8192:
 - cosetSize=4: blob size = 128 KB (minimum)
@@ -75,7 +74,6 @@ Supported blob sizes for dimE8192:
 - cosetSize=128: blob size = 4 MB
 - cosetSize=256: blob size = 8 MB
 - cosetSize=512: blob size = 16 MB (current production limit)
-- cosetSize=1024: blob size = 32 MB (future support)
 
 ## Installation
 
