@@ -7,10 +7,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
@@ -34,13 +36,17 @@ var (
 func main() {
 	app := cli.NewApp()
 	app.Flags = flags.Flags
-	app.Version = fmt.Sprintf("%s-%s-%s", node.SemVer, node.GitCommit, node.GitDate)
+
+	semver, err := version.CurrentVersion()
+	enforce.NilError(err, "invalid current version")
+
+	app.Version = semver.String()
 	app.Name = node.AppName
 	app.Usage = "EigenDA Node"
 	app.Description = "Service for receiving and storing encoded blobs from disperser"
 
 	app.Action = NodeMain
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}

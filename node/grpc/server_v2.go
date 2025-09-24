@@ -12,8 +12,10 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -37,6 +39,9 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+
+	// The current software version.
+	version string
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -76,6 +81,9 @@ func NewServerV2(
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
+	semver, err := version.CurrentVersion()
+	enforce.NilError(err, "invalid current version")
+
 	return &ServerV2{
 		config:             config,
 		node:               node,
@@ -85,12 +93,13 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		version:            semver.String(),
 	}, nil
 }
 
 func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.GetNodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.GetNodeInfoReply{Semver: s.version}, nil
 	}
 
 	memBytes := uint64(0)
@@ -100,7 +109,7 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 	}
 
 	return &pb.GetNodeInfoReply{
-		Semver:   node.SemVer,
+		Semver:   s.version,
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),

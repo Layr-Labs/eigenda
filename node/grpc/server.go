@@ -13,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -38,6 +40,9 @@ type Server struct {
 	ratelimiter common.RateLimiter
 
 	mu *sync.Mutex
+
+	// A string representation of the current version.
+	version string
 }
 
 // NewServer creates a new Server instance with the provided parameters.
@@ -45,18 +50,22 @@ type Server struct {
 // Note: The Server's chunks store will be created at config.DbPath+"/chunk".
 func NewServer(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *Server {
 
+	semver, err := version.CurrentVersion()
+	enforce.NilError(err, "invalid current version")
+
 	return &Server{
 		config:      config,
 		logger:      logger,
 		node:        node,
 		ratelimiter: ratelimiter,
 		mu:          &sync.Mutex{},
+		version:     semver.String(),
 	}
 }
 
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.NodeInfoReply{Semver: s.version}, nil
 	}
 
 	memBytes := uint64(0)
@@ -65,7 +74,13 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 		memBytes = v.Total
 	}
 
-	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
+	return &pb.NodeInfoReply{
+		Semver:   s.version,
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
+		MemBytes: memBytes,
+	}, nil
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {

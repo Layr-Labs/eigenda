@@ -20,9 +20,11 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/enforce"
 	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/version"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	"github.com/Layr-Labs/eigenda/core/eth/operatorstate"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -187,7 +189,11 @@ func NewNode(
 	}
 
 	// Setup Node Api
-	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
+	semver, err := version.CurrentVersion()
+	enforce.NilError(err, "invalid current version")
+
+	nodeApi := nodeapi.NewNodeApi(
+		AppName, semver.String(), ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
 	metrics := NewMetrics(eigenMetrics, reg, logger, socketAddr, config.ID, config.OnchainMetricsInterval, tx, cst)
 
