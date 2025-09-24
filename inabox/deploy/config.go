@@ -351,6 +351,8 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AWS_ENDPOINT_URL:                   "",
 		CONTROLLER_ENCODER_ADDRESS:                    "0.0.0.0:34001",
 		CONTROLLER_BATCH_METADATA_UPDATE_PERIOD:       "100ms",
+		CONTROLLER_GRPC_SERVER_ENABLE:                 "true",  // Enable GRPC server for payment processing
+		CONTROLLER_GRPC_PORT:                          "30000", // GRPC port for controller service
 		// set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
 		// disperser chooses rbn = latest_block_number - finalization_block_delay
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "5",
