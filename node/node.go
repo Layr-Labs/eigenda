@@ -444,6 +444,8 @@ func NewNode(
 // poison pill" problem: if a single payment fails within a batch, then the entire batch is invalid. Therefore, payment
 // validation shouldn't be enabled until the single-blob-batch effort has been completed. Then, poisoning a batch will
 // only affect the malicious user.
+//
+// This method is goroutine safe
 func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Batch, probe *common.SequenceProbe) error {
 	// TODO(litt3): remove this case once payment validation is no longer optional
 	if n.reservationPaymentValidator == nil {
