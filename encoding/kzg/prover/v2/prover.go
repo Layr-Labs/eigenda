@@ -276,12 +276,12 @@ func (p *Prover) createGnarkBackendProver(
 	}
 
 	return &ParametrizedProver{
-		srsNumberToLoad:           p.KzgConfig.SRSNumberToLoad,
-		encoder:                   p.encoder,
-		encodingParams:            params,
-		computeMultiprooNumWorker: p.KzgConfig.NumWorker,
-		kzgMultiProofBackend:      multiproofBackend,
-		kzgCommitmentsBackend:     commitmentsBackend,
+		srsNumberToLoad:            p.KzgConfig.SRSNumberToLoad,
+		encoder:                    p.encoder,
+		encodingParams:             params,
+		computeMultiproofNumWorker: p.KzgConfig.NumWorker,
+		kzgMultiProofBackend:       multiproofBackend,
+		kzgCommitmentsBackend:      commitmentsBackend,
 	}, nil
 }
 

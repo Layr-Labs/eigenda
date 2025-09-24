@@ -24,9 +24,9 @@ type ParametrizedProver struct {
 	encodingParams encoding.EncodingParams
 	encoder        *rs.Encoder
 
-	computeMultiprooNumWorker uint64
-	kzgMultiProofBackend      KzgMultiProofsBackendV2
-	kzgCommitmentsBackend     KzgCommitmentsBackendV2
+	computeMultiproofNumWorker uint64
+	kzgMultiProofBackend       KzgMultiProofsBackendV2
+	kzgCommitmentsBackend      KzgCommitmentsBackendV2
 }
 
 type rsEncodeResult struct {
@@ -170,7 +170,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		}
 
 		proofs, err := g.kzgMultiProofBackend.ComputeMultiFrameProofV2(
-			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiprooNumWorker)
+			flatpaddedCoeffs, g.encodingParams.NumChunks, g.encodingParams.ChunkLength, g.computeMultiproofNumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
