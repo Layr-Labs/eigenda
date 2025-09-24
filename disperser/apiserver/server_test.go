@@ -954,7 +954,6 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		X: commitX,
 		Y: commitY,
 	}
-	dataLength := 32
 	batchID := uint32(99)
 	batchRoot := []byte("hello")
 	referenceBlockNumber := uint32(132)
@@ -984,7 +983,7 @@ func simulateBlobConfirmation(t *testing.T, requestID []byte, blobSize uint, sec
 		BlobInclusionProof:   inclusionProof,
 		BlobCommitment: &encoding.BlobCommitments{
 			Commitment: commitment,
-			Length:     uint(dataLength),
+			Length:     32,
 		},
 		BatchID:                 batchID,
 		ConfirmationTxnHash:     gethcommon.HexToHash("0x123"),

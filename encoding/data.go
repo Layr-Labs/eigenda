@@ -24,15 +24,18 @@ type Proof = bn254.G1Affine
 // Symbol is a symbol in the field used for polynomial commitments
 type Symbol = fr.Element
 
-// BlobCommitments contains the blob's commitment, degree proof, and the actual degree.
+// BlobCommitments contains the blob's commitment, as well as the length of the blob,
+// and a proof (consisting of a LengthCommitment + LengthProof) of that length.
 type BlobCommitments struct {
-	Commitment       *G1Commitment `json:"commitment"`
+	// Commitment is the KZG commitment of the blob, taken by evaluating the
+	// polynomial represented by the blob (blob elements are coefficients) at the SRS points.
+	Commitment *G1Commitment `json:"commitment"`
+	// The LengthCommitment and LengthProof are combined to prove that the blob polynomial is of a certain degree.
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
 	// This is the length in SYMBOLS (32 byte field elements) of the blob.
 	// When using EigenDA V2, it must be a power of 2.
-	// TODO(samlaf): we should make this uint32 or uint64, uint is ambiguous.
-	Length uint `json:"length"`
+	Length uint32 `json:"length"`
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format
@@ -128,7 +131,7 @@ func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, 
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
-		Length:           uint(c.GetLength()),
+		Length:           c.GetLength(),
 	}, nil
 }
 

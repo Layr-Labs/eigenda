@@ -307,7 +307,8 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(RoundUpDivide(b.Length*PercentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*PercentMultiplier*encoding.BYTES_PER_SYMBOL,
+			uint32(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }

@@ -15,19 +15,19 @@ type KzgCommitmentsGnarkBackend struct {
 }
 
 func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofV2(coeffs []fr.Element) (*bn254.G2Affine, error) {
-	inputLength := uint64(len(coeffs))
+	inputLength := uint32(len(coeffs))
 	return p.ComputeLengthProofForLengthV2(coeffs, inputLength)
 }
 
 func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLengthV2(
-	coeffs []fr.Element, length uint64,
+	coeffs []fr.Element, length uint32,
 ) (*bn254.G2Affine, error) {
-	if length < uint64(len(coeffs)) {
+	if length < uint32(len(coeffs)) {
 		return nil, fmt.Errorf("length is less than the number of coefficients")
 	}
 
-	start := uint64(len(p.G2Trailing)) - length
-	shiftedSecret := p.G2Trailing[start : start+uint64(len(coeffs))]
+	start := uint32(len(p.G2Trailing)) - length
+	shiftedSecret := p.G2Trailing[start : start+uint32(len(coeffs))]
 	config := ecc.MultiExpConfig{}
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree

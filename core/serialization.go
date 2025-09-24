@@ -477,7 +477,7 @@ func BlobHeaderFromProtobuf(h *pb.BlobHeader) (*BlobHeader, error) {
 			Commitment:       commitment,
 			LengthCommitment: &lengthCommitment,
 			LengthProof:      &lengthProof,
-			Length:           uint(h.GetLength()),
+			Length:           h.GetLength(),
 		},
 		QuorumInfos: quorumHeaders,
 		AccountID:   h.GetAccountId(),

@@ -64,7 +64,7 @@ func (v *shardValidator) validateBlobQuorum(quorumHeader *BlobQuorumInfo, blob *
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	ok, err := v.assignment.ValidateChunkLength(operatorState, blob.BlobHeader.Length, quorumHeader)
+	ok, err := v.assignment.ValidateChunkLength(operatorState, uint(blob.BlobHeader.Length), quorumHeader)
 	if err != nil || !ok {
 		return nil, nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
