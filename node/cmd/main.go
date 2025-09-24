@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
-	"github.com/Layr-Labs/eigenda/common/version"
+	commonversion "github.com/Layr-Labs/eigenda/common/version"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/eth/directory"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
@@ -33,12 +33,23 @@ var (
 	bucketDuration           = 450 * time.Second
 )
 
+// Set via go build -ldflags="-X main.version=${SEMVER}...
+var version string
+
 func main() {
+
+	err := commonversion.SetVersion(version)
+	if err != nil {
+		log.Printf("Version string \"%s\" is invalid, valling back to hard coded version", version)
+	}
+
+	semver, err := commonversion.CurrentVersion()
+	enforce.NilError(err, "invalid current version")
+
+	log.Printf("Starting EigenDA Validator, version %s", semver)
+
 	app := cli.NewApp()
 	app.Flags = flags.Flags
-
-	semver, err := version.CurrentVersion()
-	enforce.NilError(err, "invalid current version")
 
 	app.Version = semver.String()
 	app.Name = node.AppName
