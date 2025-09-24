@@ -42,7 +42,7 @@ func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
 	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 4096, "Minimum blob length (power of 2)")
-	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 4096, "Maximum blob length (power of 2)")
+	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 524288, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
@@ -173,7 +173,7 @@ func benchmarkEncodeAndVerify(
 	}
 
 	start := time.Now()
-	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+	commit, _, _, frames, _, err := enc.Encode(inputFr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -187,18 +187,20 @@ func benchmarkEncodeAndVerify(
 		if err != nil {
 			log.Fatalf("Failed to create verifier: %v", err)
 		}
-		verifier, err := v.GetKzgVerifier(params)
-		if err != nil {
-			log.Fatalf("Failed to create verifier: %v", err)
+
+		samples := []encoding.Sample{}
+		for i, frame := range frames {
+			samples = append(samples, encoding.Sample{
+				Commitment:      (*encoding.G1Commitment)(commit),
+				Chunk:           &frame,
+				AssignmentIndex: uint(i),
+				BlobIndex:       0,
+			})
 		}
 
-		for i := 0; i < len(frames); i++ {
-			err = verifier.VerifyFrame(&frames[i], uint64(fIndices[i]), commit, params.NumChunks)
-			if err != nil {
-				log.Printf("Verification failed for frame %d (index %d): %v", i, fIndices[i], err)
-				verifyResult = false
-				break
-			}
+		err = v.UniversalVerifySubBatch(params, samples, 1)
+		if err != nil {
+			log.Fatal("Wtf", err)
 		}
 	}
 
