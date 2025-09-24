@@ -56,7 +56,7 @@ func TestEquals(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, a.Equals(a))
-	require.False(t, a.Equals(b))
+	require.True(t, a.Equals(b))
 	require.False(t, a.Equals(c))
 	require.False(t, a.Equals(d))
 	require.False(t, a.Equals(e))
@@ -81,7 +81,7 @@ func TestLessThan(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, a.LessThan(a))
-	require.True(t, a.LessThan(b))
+	require.False(t, a.LessThan(b))
 	require.True(t, a.LessThan(c))
 	require.True(t, a.LessThan(d))
 	require.True(t, a.LessThan(e))
@@ -165,7 +165,7 @@ func TestGreaterThanOrEqual(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, a.GreaterThanOrEqual(a))
-	require.False(t, a.GreaterThanOrEqual(b))
+	require.True(t, a.GreaterThanOrEqual(b))
 	require.False(t, a.GreaterThanOrEqual(c))
 	require.False(t, a.GreaterThanOrEqual(d))
 	require.False(t, a.GreaterThanOrEqual(e))

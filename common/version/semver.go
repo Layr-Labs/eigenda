@@ -99,10 +99,10 @@ func (s *Semver) Equals(other *Semver) bool {
 	if s == nil || other == nil {
 		return false
 	}
-	return s.major == other.major && s.minor == other.minor && s.patch == other.patch && s.errata == other.errata
+	return s.major == other.major && s.minor == other.minor && s.patch == other.patch
 }
 
-// Compares two Semver instances to see if this one is less than the other.
+// Compares two Semver instances to see if this one is less than the other. Ignores errata.
 func (s *Semver) LessThan(other *Semver) bool {
 	if s == nil || other == nil {
 		return false
@@ -116,10 +116,10 @@ func (s *Semver) LessThan(other *Semver) bool {
 	if s.patch != other.patch {
 		return s.patch < other.patch
 	}
-	return s.errata < other.errata
+	return false
 }
 
-// Compares two Semver instances to see if this one is greater than the other.
+// Compares two Semver instances to see if this one is greater than the other. Ignores errata.
 func (s *Semver) GreaterThan(other *Semver) bool {
 	if s == nil || other == nil {
 		return false
@@ -133,15 +133,15 @@ func (s *Semver) GreaterThan(other *Semver) bool {
 	if s.patch != other.patch {
 		return s.patch > other.patch
 	}
-	return s.errata > other.errata
+	return false
 }
 
-// Compares two Semver instances to see if this one is greater than or equal to the other.
+// Compares two Semver instances to see if this one is greater than or equal to the other. Ignores errata.
 func (s *Semver) GreaterThanOrEqual(other *Semver) bool {
 	return s.GreaterThan(other) || s.Equals(other)
 }
 
-// Compares two Semver instances to see if this one is less than or equal to the other.
+// Compares two Semver instances to see if this one is less than or equal to the other. Ignores errata.
 func (s *Semver) LessThanOrEqual(other *Semver) bool {
 	return s.LessThan(other) || s.Equals(other)
 }
