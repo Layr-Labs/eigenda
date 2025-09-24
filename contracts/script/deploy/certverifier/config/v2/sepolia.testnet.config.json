@@ -1,0 +1,9 @@
+{
+    "eigenDADirectory": "0x9620dC4B3564198554e4D2b06dEFB7A369D90257",
+    "defaultSecurityThresholds": {
+        "0_confirmationThreshold": 55,
+        "1_adversaryThreshold": 33
+    },
+    
+    "quorumNumbersRequired": "0x0001"
+}
