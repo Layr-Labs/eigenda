@@ -18,6 +18,8 @@ import (
 )
 
 // ChurnerConfig defines configuration for the churner container
+//
+//nolint:lll // struct field documentation
 type ChurnerConfig struct {
 	// Enable churner service
 	Enabled bool `env:"-"` // Skip in env mapping
@@ -56,8 +58,10 @@ type ChurnerConfig struct {
 	ExposeHostPort bool          `env:"-"` // If true, binds container port to host port
 	HostPort       string        `env:"-"` // Custom host port to bind to (defaults to GRPCPort if empty and ExposeHostPort is true)
 
-	// Additional env vars that don't have direct struct fields
-	LogPath string `env:"CHURNER_LOG_PATH"`
+	LogPath string `env:"CHURNER_LOG_PATH"` // Additional env vars that don't have direct struct fields
+
+	// Test data directory path for logs and env files (not exposed as env var)
+	TestDataPath string `env:"-"` // Path to inabox/testdata/<timestamp> directory
 }
 
 // ChurnerContainer represents a running churner container
@@ -128,7 +132,13 @@ func (c ChurnerConfig) ToEnvMap() (map[string]string, error) {
 			} else {
 				strValue = strconv.FormatInt(value.Int(), 10)
 			}
-		default:
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+			strValue = strconv.FormatUint(value.Uint(), 10)
+		case reflect.Float32, reflect.Float64:
+			strValue = strconv.FormatFloat(value.Float(), 'f', -1, 64)
+		case reflect.Invalid, reflect.Complex64, reflect.Complex128, reflect.Array, reflect.Chan,
+			reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice,
+			reflect.Struct, reflect.UnsafePointer:
 			// Skip unsupported types
 			continue
 		}
@@ -144,7 +154,21 @@ func (c ChurnerConfig) ToEnvMap() (map[string]string, error) {
 }
 
 // NewChurnerContainerWithNetwork creates and starts a new churner container with a custom network
-func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, network *testcontainers.DockerNetwork) (*ChurnerContainer, error) {
+func NewChurnerContainerWithNetwork(
+	ctx context.Context,
+	config ChurnerConfig,
+	network *testcontainers.DockerNetwork,
+) (*ChurnerContainer, error) {
+	return NewChurnerContainerWithOptions(ctx, config, network, "")
+}
+
+// NewChurnerContainerWithOptions creates and starts a new churner container with additional options
+func NewChurnerContainerWithOptions(
+	ctx context.Context,
+	config ChurnerConfig,
+	network *testcontainers.DockerNetwork,
+	testDataPath string,
+) (*ChurnerContainer, error) {
 	if !config.Enabled {
 		return nil, nil
 	}
@@ -216,21 +240,21 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 	// Get the mapped port
 	mappedPort, err := container.MappedPort(ctx, nat.Port(config.GRPCPort))
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get mapped port: %w", err)
 	}
 
 	// Get the container host
 	host, err := container.Host(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get container host: %w", err)
 	}
 
 	// Get internal IP address
 	containerJSON, err := container.Inspect(ctx)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to inspect container: %w", err)
 	}
 
@@ -243,14 +267,20 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 
 	churnerURL := fmt.Sprintf("%s:%s", host, mappedPort.Port())
 
-	// Create a timestamped directory for logs
-	timestamp := time.Now().Format("2006-01-02-15-04-05")
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	var logDir string
+	if testDataPath != "" {
+		// Use the provided testdata directory
+		logDir = filepath.Join(testDataPath, "logs")
+	} else {
+		// Fallback to timestamped directory for logs
+		timestamp := time.Now().Format("2006-01-02-15-04-05")
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+		logDir = filepath.Join(cwd, "logs", fmt.Sprintf("churner-%s", timestamp))
 	}
 
-	logDir := filepath.Join(cwd, "logs", fmt.Sprintf("churner-%s", timestamp))
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
@@ -258,7 +288,7 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 
 	logFile, err := os.Create(hostLogPath)
 	if err != nil {
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
 
@@ -266,18 +296,21 @@ func NewChurnerContainerWithNetwork(ctx context.Context, config ChurnerConfig, n
 	logCtx, cancelLog := context.WithCancel(context.Background())
 	logReader, err := container.Logs(logCtx)
 	if err != nil {
-		logFile.Close()
+		_ = logFile.Close()
 		cancelLog()
-		container.Terminate(ctx)
+		_ = container.Terminate(ctx)
 		return nil, fmt.Errorf("failed to get log reader: %w", err)
 	}
 
 	// Stream logs in background
 	go func() {
-		defer logReader.Close()
-		defer logFile.Close()
+		defer func() { _ = logReader.Close() }()
+		defer func() { _ = logFile.Close() }()
 		_, _ = io.Copy(logFile, logReader)
 	}()
+
+	// Store the test data path in the config
+	config.TestDataPath = testDataPath
 
 	churner := &ChurnerContainer{
 		Container:  container,
@@ -344,7 +377,18 @@ func (c *ChurnerContainer) DumpConfigToEnv() error {
 		return fmt.Errorf("log directory not set")
 	}
 
-	envPath := filepath.Join(c.logDir, "churner-config.env")
+	// Determine where to write the env file
+	envDir := c.logDir
+	if c.config.TestDataPath != "" {
+		// Use the envs directory in testdata if available
+		envDir = filepath.Join(c.config.TestDataPath, "envs")
+		if err := os.MkdirAll(envDir, 0755); err != nil {
+			// Fallback to logs directory if can't create envs directory
+			envDir = c.logDir
+		}
+	}
+
+	envPath := filepath.Join(envDir, "churner.env")
 
 	// Get env map from config
 	envMap, err := c.config.ToEnvMap()
@@ -357,28 +401,28 @@ func (c *ChurnerContainer) DumpConfigToEnv() error {
 	if err != nil {
 		return fmt.Errorf("failed to create env file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write header
 	_, err = fmt.Fprintf(file, "# Churner Configuration Dump\n")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write header: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Generated at: %s\n", time.Now().Format(time.RFC3339))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write timestamp: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Container URL: %s\n", c.url)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write URL: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Internal IP: %s\n", c.internalIP)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write IP: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "\n")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write newline: %w", err)
 	}
 
 	// Write env vars in sorted order for consistency
@@ -391,26 +435,26 @@ func (c *ChurnerContainer) DumpConfigToEnv() error {
 	for _, key := range keys {
 		_, err = fmt.Fprintf(file, "%s=%s\n", key, envMap[key])
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to write env var %s: %w", key, err)
 		}
 	}
 
 	// Add additional runtime information as comments
 	_, err = fmt.Fprintf(file, "\n# Runtime Information (not env vars)\n")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write runtime header: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Image: %s\n", c.config.Image)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write image: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Startup Timeout: %s\n", c.config.StartupTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write startup timeout: %w", err)
 	}
 	_, err = fmt.Fprintf(file, "# Log Path: %s\n", c.logPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write log path: %w", err)
 	}
 
 	fmt.Printf("  - Config dump: %s\n", envPath)
@@ -426,7 +470,7 @@ func (c *ChurnerContainer) Stop(ctx context.Context) error {
 		c.cancelLog()
 	}
 
-	if err := c.Container.Terminate(ctx); err != nil {
+	if err := c.Terminate(ctx); err != nil {
 		return fmt.Errorf("failed to stop churner container: %w", err)
 	}
 

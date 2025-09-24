@@ -20,7 +20,7 @@ func TestChurnerContainerStartup(t *testing.T) {
 		network.WithAttachable(),
 	)
 	require.NoError(t, err, "Failed to create docker network")
-	defer dockerNetwork.Remove(ctx)
+	defer func() { _ = dockerNetwork.Remove(ctx) }()
 
 	// Start Anvil container first
 	anvil, err := NewAnvilContainerWithOptions(ctx, AnvilOptions{
@@ -67,7 +67,7 @@ func TestChurnerContainerStartup(t *testing.T) {
 	}()
 
 	// Verify the container is running
-	state, err := churner.Container.State(ctx)
+	state, err := churner.State(ctx)
 	require.NoError(t, err)
 	require.True(t, state.Running, "Container should be running")
 

@@ -239,7 +239,7 @@ func setupSuite() error {
 
 		logger.Info("Starting churner container")
 		churnerConfig := setupChurnerConfig(testConfig)
-		churnerContainer, err = testbed.NewChurnerContainerWithNetwork(ctx, churnerConfig, dockerNetwork)
+		churnerContainer, err = testbed.NewChurnerContainerWithOptions(ctx, churnerConfig, dockerNetwork, testConfig.Path)
 		if err != nil {
 			return fmt.Errorf("failed to start churner container: %w", err)
 		}
@@ -552,6 +552,7 @@ func setupChurnerConfig(testConfig *deploy.Config) testbed.ChurnerConfig {
 
 	config.ExposeHostPort = true
 	config.GRPCPort = "32002"
+	config.TestDataPath = testConfig.Path
 
 	return config
 }
