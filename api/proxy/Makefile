@@ -48,7 +48,6 @@ test-e2e-sepolia:
 test-fuzz:
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV2 -fuzztime=1m
-	go test ./encoding/kzg/prover/v2 -fuzz=FuzzOnlySystematic -fuzztime=1m
 
 benchmark:
 	go test -benchmem -run=^$ -bench . ./test/benchmark -test.parallel 4

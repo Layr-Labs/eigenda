@@ -105,6 +105,7 @@ litt-unit-tests:
 fuzz-tests:
 	go test --fuzz=FuzzParseSignatureKMS -fuzztime=1m ./common
 	go test --fuzz=FuzzBlobConversion -fuzztime=1m ./api/clients/v2/coretypes
+	go test --fuzz=FuzzOnlySystematic -fuzztime=1m ./encoding/kzg/prover/v2
 
 # Integration tests use mocks
 integration-tests:
