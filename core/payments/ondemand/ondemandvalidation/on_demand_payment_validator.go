@@ -1,4 +1,4 @@
-package ondemand
+package ondemandvalidation
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -60,13 +61,13 @@ func (pv *OnDemandPaymentValidator) Debit(
 		return nil
 	}
 
-	var insufficientFundsErr *InsufficientFundsError
+	var insufficientFundsErr *ondemand.InsufficientFundsError
 	if errors.As(err, &insufficientFundsErr) {
 		pv.metrics.IncrementInsufficientFunds()
 		return err
 	}
 
-	var quorumNotSupportedErr *QuorumNotSupportedError
+	var quorumNotSupportedErr *ondemand.QuorumNotSupportedError
 	if errors.As(err, &quorumNotSupportedErr) {
 		pv.metrics.IncrementQuorumNotSupported()
 		return err

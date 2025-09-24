@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -39,7 +40,7 @@ type ReservationLedgerCache struct {
 	// The solution to prevent this from happening is that we will detect when a ledger is evicted prematurely, and
 	// automatically resize the cache in response. This prevents the cache from getting into a thrashy state, where
 	// many ledgers are being evicted prematurely and then reinstantiated.
-	cache *lru.Cache[gethcommon.Address, *ReservationLedger]
+	cache *lru.Cache[gethcommon.Address, *reservation.ReservationLedger]
 	// current maximum number of ledgers the cache can hold (will be dynamically increased if premature evictions are
 	// observed)
 	maxLedgers int
@@ -48,7 +49,7 @@ type ReservationLedgerCache struct {
 	// source of current time for the leaky bucket algorithm
 	timeSource func() time.Time
 	// how to handle requests that would overfill the bucket
-	overfillBehavior OverfillBehavior
+	overfillBehavior reservation.OverfillBehavior
 	// duration used to calculate bucket capacity
 	bucketCapacityPeriod time.Duration
 	// minimum number of symbols to bill for a given dispersal, from the PaymentVault
@@ -64,7 +65,7 @@ type ReservationLedgerCache struct {
 	// race conditions during cache resizing
 	evictionLock sync.Mutex
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
-	vaultMonitor *ReservationVaultMonitor
+	vaultMonitor *reservation.ReservationVaultMonitor
 	metrics      *ReservationCacheMetrics
 }
 
@@ -110,7 +111,7 @@ func NewReservationLedgerCache(
 		return ledgerCache.cache.Len()
 	})
 
-	ledgerCache.vaultMonitor, err = NewReservationVaultMonitor(
+	ledgerCache.vaultMonitor, err = reservation.NewReservationVaultMonitor(
 		ctx,
 		logger,
 		paymentVault,
@@ -133,7 +134,7 @@ func NewReservationLedgerCache(
 func (c *ReservationLedgerCache) GetOrCreate(
 	ctx context.Context,
 	accountID gethcommon.Address,
-) (*ReservationLedger, error) {
+) (*reservation.ReservationLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
@@ -156,12 +157,12 @@ func (c *ReservationLedgerCache) GetOrCreate(
 		return nil, fmt.Errorf("no reservation found for account %v", accountID.Hex())
 	}
 
-	reservationObj, err := FromContractStruct(reservationData)
+	reservationObj, err := reservation.FromContractStruct(reservationData)
 	if err != nil {
 		return nil, fmt.Errorf("from contract struct: %w", err)
 	}
 
-	reservationLedgerConfig, err := NewReservationLedgerConfig(
+	reservationLedgerConfig, err := reservation.NewReservationLedgerConfig(
 		*reservationObj,
 		c.minNumSymbols,
 		// start empty, to err on the side of permitting more throughput instead of less
@@ -174,7 +175,7 @@ func (c *ReservationLedgerCache) GetOrCreate(
 	}
 
 	now := c.timeSource()
-	newLedger, err := NewReservationLedger(*reservationLedgerConfig, now)
+	newLedger, err := reservation.NewReservationLedger(*reservationLedgerConfig, now)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
@@ -190,7 +191,10 @@ func (c *ReservationLedgerCache) getAccountsToUpdate() []gethcommon.Address {
 
 // Updates the reservation for an account if different from current value
 // If newReservation is nil, the account is removed from the cache
-func (c *ReservationLedgerCache) updateReservation(accountID gethcommon.Address, newReservation *Reservation) error {
+func (c *ReservationLedgerCache) updateReservation(
+	accountID gethcommon.Address,
+	newReservation *reservation.Reservation,
+) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
 		// Account was evicted from cache or never existed, nothing to update
@@ -212,7 +216,7 @@ func (c *ReservationLedgerCache) updateReservation(accountID gethcommon.Address,
 // If the evicted ledger has a non-empty bucket, it resizes the cache and re-adds the ledger.
 func (c *ReservationLedgerCache) handleEviction(
 	accountID gethcommon.Address,
-	reservationLedger *ReservationLedger,
+	reservationLedger *reservation.ReservationLedger,
 ) {
 	c.evictionLock.Lock()
 	defer c.evictionLock.Unlock()

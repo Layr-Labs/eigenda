@@ -289,7 +289,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 		NumChunks:   req.GetEncodingParams().GetNumChunks(),
 	}
 
-	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
+	err = encoding.ValidateEncodingParams(params, encoding.SRSOrder)
 	if err != nil {
 		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}

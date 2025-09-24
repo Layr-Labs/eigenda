@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"github.com/prometheus/client_golang/prometheus"

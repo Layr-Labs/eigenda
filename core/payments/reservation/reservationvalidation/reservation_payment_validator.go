@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -82,19 +83,19 @@ func (pv *ReservationPaymentValidator) Debit(
 		return success, nil
 	}
 
-	var quorumNotPermittedErr *QuorumNotPermittedError
+	var quorumNotPermittedErr *reservation.QuorumNotPermittedError
 	if errors.As(err, &quorumNotPermittedErr) {
 		pv.metrics.IncrementQuorumNotPermitted()
 		return false, err
 	}
 
-	var timeOutOfRangeErr *TimeOutOfRangeError
+	var timeOutOfRangeErr *reservation.TimeOutOfRangeError
 	if errors.As(err, &timeOutOfRangeErr) {
 		pv.metrics.IncrementTimeOutOfRange()
 		return false, err
 	}
 
-	var timeMovedBackwardErr *TimeMovedBackwardError
+	var timeMovedBackwardErr *reservation.TimeMovedBackwardError
 	if errors.As(err, &timeMovedBackwardErr) {
 		pv.metrics.IncrementTimeMovedBackward()
 		return false, err

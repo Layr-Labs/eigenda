@@ -1,4 +1,4 @@
-package ondemand
+package ondemandvalidation
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -25,7 +26,7 @@ type OnDemandLedgerCache struct {
 	// Least recently used OnDemandLedger entries are removed if the cache gets above the configured size. Since
 	// on-demand payment data is stored in a persistent way, deleting an OnDemandLedger from memory doesn't result in
 	// data loss: it just means that a new OnDemandLedger object will need to be constructed if needed in the future.
-	cache *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	cache *lru.Cache[gethcommon.Address, *ondemand.OnDemandLedger]
 	// can access state of the PaymentVault contract
 	paymentVault payments.PaymentVault
 	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
@@ -44,7 +45,7 @@ type OnDemandLedgerCache struct {
 	// new object for the same account key, and try to add them to the cache.
 	ledgerCreationLock *common.IndexLock
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
-	vaultMonitor *OnDemandVaultMonitor
+	vaultMonitor *ondemand.OnDemandVaultMonitor
 	metrics      *OnDemandCacheMetrics
 }
 
@@ -86,7 +87,7 @@ func NewOnDemandLedgerCache(
 
 	ledgerCache.cache, err = lru.NewWithEvict(
 		config.MaxLedgers,
-		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
+		func(accountAddress gethcommon.Address, _ *ondemand.OnDemandLedger) {
 			ledgerCache.metrics.IncrementEvictions()
 			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
 		},
@@ -99,7 +100,7 @@ func NewOnDemandLedgerCache(
 		return ledgerCache.cache.Len()
 	})
 
-	ledgerCache.vaultMonitor, err = NewOnDemandVaultMonitor(
+	ledgerCache.vaultMonitor, err = ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		logger,
 		paymentVault,
@@ -135,7 +136,10 @@ func NewOnDemandLedgerCache(
 // It is very unlikely for this race condition to take place if the cache has been configured with a sane size. Given
 // the low probability of the occurrence, and the low severity of the race condition, we are not addressing it right
 // now to avoid the complexity of the potential workarounds.
-func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcommon.Address) (*OnDemandLedger, error) {
+func (c *OnDemandLedgerCache) GetOrCreate(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*ondemand.OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
@@ -156,12 +160,12 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 		return nil, fmt.Errorf("get total deposit for account %v: %w", accountID.Hex(), err)
 	}
 
-	cumulativePaymentStore, err := NewCumulativePaymentStore(c.dynamoClient, c.onDemandTableName, accountID)
+	cumulativePaymentStore, err := ondemand.NewCumulativePaymentStore(c.dynamoClient, c.onDemandTableName, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
 
-	newLedger, err := OnDemandLedgerFromStore(
+	newLedger, err := ondemand.OnDemandLedgerFromStore(
 		ctx,
 		totalDeposit,
 		c.pricePerSymbol,

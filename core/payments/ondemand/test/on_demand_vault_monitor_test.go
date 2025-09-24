@@ -1,11 +1,12 @@
-package ondemand
+package ondemand_test
 
 import (
-	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -15,7 +16,7 @@ import (
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -29,7 +30,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	})
 
 	t.Run("negative interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -44,8 +45,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	accounts := []gethcommon.Address{
@@ -61,13 +61,16 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 		testVault.SetTotalDeposit(addr, big.NewInt(int64(1000+i*100)))
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*big.Int)
 	updateTotalDeposit := func(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newTotalDeposit
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,
@@ -80,29 +83,38 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 	require.NotNil(t, monitor)
 
 	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedUpdates)
 	}, time.Second)
 
+	mu.Lock()
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, deposit)
 		require.Equal(t, big.NewInt(int64(1000+i*100)), deposit)
 	}
+	mu.Unlock()
 
 	// update one of the deposits
 	testAccount := accounts[2]
 	testVault.SetTotalDeposit(testAccount, big.NewInt(9999)) // Changed
 
 	// Clear captured updates to verify new updates
+	mu.Lock()
 	capturedUpdates = make(map[gethcommon.Address]*big.Int)
+	mu.Unlock()
 
 	// Wait for the monitor to fetch the updated deposits
 	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedUpdates)
 	}, time.Second)
 
 	// Check that the specific account was updated correctly
+	mu.Lock()
 	updatedDeposit, ok := capturedUpdates[testAccount]
 	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
 	require.NotNil(t, updatedDeposit)
@@ -117,11 +129,11 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 			require.Equal(t, big.NewInt(int64(1000+i*100)), deposit)
 		}
 	}
+	mu.Unlock()
 }
 
 func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	// Create multiple accounts to verify they're all fetched in a single batch
@@ -135,13 +147,16 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 		testVault.SetTotalDeposit(addr, big.NewInt(int64(2000+i*200)))
 	}
 
+	var mu sync.Mutex
 	capturedUpdates := make(map[gethcommon.Address]*big.Int)
 	updateTotalDeposit := func(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+		mu.Lock()
+		defer mu.Unlock()
 		capturedUpdates[accountID] = newTotalDeposit
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,
@@ -155,12 +170,16 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 
 	// Wait for updates
 	test.AssertEventuallyEquals(t, len(accounts), func() int {
+		mu.Lock()
+		defer mu.Unlock()
 		return len(capturedUpdates)
 	}, time.Second)
+	mu.Lock()
 	for i, addr := range accounts {
 		deposit, ok := capturedUpdates[addr]
 		require.True(t, ok, "account %s should have been updated", addr.Hex())
 		require.NotNil(t, deposit)
 		require.Equal(t, big.NewInt(int64(2000+i*200)), deposit)
 	}
+	mu.Unlock()
 }
