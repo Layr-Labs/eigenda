@@ -9,6 +9,7 @@ import (
 func verifySemver(t *testing.T, str string, major int, minor int, patch int, errata string) {
 	semver, err := SemverFromString(str)
 	require.NoError(t, err)
+
 	require.Equal(t, major, semver.Major())
 	require.Equal(t, minor, semver.Minor())
 	require.Equal(t, patch, semver.Patch())
@@ -44,16 +45,11 @@ func TestInvalidSyntax(t *testing.T) {
 }
 
 func TestEquals(t *testing.T) {
-	a, err := NewSemver(1, 2, 3, "")
-	require.NoError(t, err)
-	b, err := NewSemver(1, 2, 3, "alpha")
-	require.NoError(t, err)
-	c, err := NewSemver(1, 2, 100, "")
-	require.NoError(t, err)
-	d, err := NewSemver(1, 100, 3, "")
-	require.NoError(t, err)
-	e, err := NewSemver(100, 2, 3, "")
-	require.NoError(t, err)
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
 
 	require.True(t, a.Equals(a))
 	require.True(t, a.Equals(b))
@@ -62,23 +58,29 @@ func TestEquals(t *testing.T) {
 	require.False(t, a.Equals(e))
 }
 
+func TestStrictEquals(t *testing.T) {
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+
+	require.True(t, a.StrictEquals(a))
+	require.False(t, a.StrictEquals(b))
+	require.False(t, a.StrictEquals(c))
+	require.False(t, a.StrictEquals(d))
+	require.False(t, a.StrictEquals(e))
+}
+
 func TestLessThan(t *testing.T) {
-	a, err := NewSemver(1, 2, 3, "")
-	require.NoError(t, err)
-	b, err := NewSemver(1, 2, 3, "alpha")
-	require.NoError(t, err)
-	c, err := NewSemver(1, 2, 100, "")
-	require.NoError(t, err)
-	d, err := NewSemver(1, 100, 3, "")
-	require.NoError(t, err)
-	e, err := NewSemver(100, 2, 3, "")
-	require.NoError(t, err)
-	f, err := NewSemver(0, 2, 3, "")
-	require.NoError(t, err)
-	g, err := NewSemver(1, 1, 3, "")
-	require.NoError(t, err)
-	h, err := NewSemver(1, 2, 2, "")
-	require.NoError(t, err)
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+	f := NewSemver(0, 2, 3, "")
+	g := NewSemver(1, 1, 3, "")
+	h := NewSemver(1, 2, 2, "")
 
 	require.False(t, a.LessThan(a))
 	require.False(t, a.LessThan(b))
@@ -91,22 +93,14 @@ func TestLessThan(t *testing.T) {
 }
 
 func TestGreaterThan(t *testing.T) {
-	a, err := NewSemver(1, 2, 3, "")
-	require.NoError(t, err)
-	b, err := NewSemver(1, 2, 3, "alpha")
-	require.NoError(t, err)
-	c, err := NewSemver(1, 2, 100, "")
-	require.NoError(t, err)
-	d, err := NewSemver(1, 100, 3, "")
-	require.NoError(t, err)
-	e, err := NewSemver(100, 2, 3, "")
-	require.NoError(t, err)
-	f, err := NewSemver(0, 2, 3, "")
-	require.NoError(t, err)
-	g, err := NewSemver(1, 1, 3, "")
-	require.NoError(t, err)
-	h, err := NewSemver(1, 2, 2, "")
-	require.NoError(t, err)
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+	f := NewSemver(0, 2, 3, "")
+	g := NewSemver(1, 1, 3, "")
+	h := NewSemver(1, 2, 2, "")
 
 	require.False(t, a.GreaterThan(a))
 	require.False(t, a.GreaterThan(b))
@@ -119,22 +113,14 @@ func TestGreaterThan(t *testing.T) {
 }
 
 func TestLessThanOrEqual(t *testing.T) {
-	a, err := NewSemver(1, 2, 3, "")
-	require.NoError(t, err)
-	b, err := NewSemver(1, 2, 3, "alpha")
-	require.NoError(t, err)
-	c, err := NewSemver(1, 2, 100, "")
-	require.NoError(t, err)
-	d, err := NewSemver(1, 100, 3, "")
-	require.NoError(t, err)
-	e, err := NewSemver(100, 2, 3, "")
-	require.NoError(t, err)
-	f, err := NewSemver(0, 2, 3, "")
-	require.NoError(t, err)
-	g, err := NewSemver(1, 1, 3, "")
-	require.NoError(t, err)
-	h, err := NewSemver(1, 2, 2, "")
-	require.NoError(t, err)
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+	f := NewSemver(0, 2, 3, "")
+	g := NewSemver(1, 1, 3, "")
+	h := NewSemver(1, 2, 2, "")
 
 	require.True(t, a.LessThanOrEqual(a))
 	require.True(t, a.LessThanOrEqual(b))
@@ -147,22 +133,14 @@ func TestLessThanOrEqual(t *testing.T) {
 }
 
 func TestGreaterThanOrEqual(t *testing.T) {
-	a, err := NewSemver(1, 2, 3, "")
-	require.NoError(t, err)
-	b, err := NewSemver(1, 2, 3, "alpha")
-	require.NoError(t, err)
-	c, err := NewSemver(1, 2, 100, "")
-	require.NoError(t, err)
-	d, err := NewSemver(1, 100, 3, "")
-	require.NoError(t, err)
-	e, err := NewSemver(100, 2, 3, "")
-	require.NoError(t, err)
-	f, err := NewSemver(0, 2, 3, "")
-	require.NoError(t, err)
-	g, err := NewSemver(1, 1, 3, "")
-	require.NoError(t, err)
-	h, err := NewSemver(1, 2, 2, "")
-	require.NoError(t, err)
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+	f := NewSemver(0, 2, 3, "")
+	g := NewSemver(1, 1, 3, "")
+	h := NewSemver(1, 2, 2, "")
 
 	require.True(t, a.GreaterThanOrEqual(a))
 	require.True(t, a.GreaterThanOrEqual(b))
@@ -172,4 +150,24 @@ func TestGreaterThanOrEqual(t *testing.T) {
 	require.True(t, a.GreaterThanOrEqual(f))
 	require.True(t, a.GreaterThanOrEqual(g))
 	require.True(t, a.GreaterThanOrEqual(h))
+}
+
+func TestComparator(t *testing.T) {
+	a := NewSemver(1, 2, 3, "")
+	b := NewSemver(1, 2, 3, "alpha")
+	c := NewSemver(1, 2, 100, "")
+	d := NewSemver(1, 100, 3, "")
+	e := NewSemver(100, 2, 3, "")
+	f := NewSemver(0, 2, 3, "")
+	g := NewSemver(1, 1, 3, "")
+	h := NewSemver(1, 2, 2, "")
+
+	require.Equal(t, 0, SemverComparator(a, a))
+	require.Equal(t, 0, SemverComparator(a, b))
+	require.Equal(t, -1, SemverComparator(a, c))
+	require.Equal(t, -1, SemverComparator(a, d))
+	require.Equal(t, -1, SemverComparator(a, e))
+	require.Equal(t, 1, SemverComparator(a, f))
+	require.Equal(t, 1, SemverComparator(a, g))
+	require.Equal(t, 1, SemverComparator(a, h))
 }
