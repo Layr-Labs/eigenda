@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -237,13 +238,13 @@ func setupSuite() error {
 			return fmt.Errorf("failed to mine block: %w", err)
 		}
 
-		logger.Info("Starting churner container")
+		logger.Info("Starting churner goroutine")
 		churnerConfig := setupChurnerConfig(testConfig)
-		churnerContainer, err = testbed.NewChurnerContainerWithOptions(ctx, churnerConfig, dockerNetwork, testConfig.Path)
+		churnerGoroutine, err = testbed.StartChurnerGoroutine(churnerConfig, logger)
 		if err != nil {
-			return fmt.Errorf("failed to start churner container: %w", err)
+			return fmt.Errorf("failed to start churner goroutine: %w", err)
 		}
-		logger.Info("Churner container started", "url", churnerContainer.URL())
+		logger.Info("Churner goroutine started", "url", churnerGoroutine.URL())
 
 		logger.Info("Starting binaries")
 		testConfig.StartBinaries()
@@ -535,8 +536,8 @@ func setupChurnerConfig(testConfig *deploy.Config) testbed.ChurnerConfig {
 	config.OperatorStateRetriever = testConfig.EigenDA.OperatorStateRetriever
 	config.EigenDADirectory = testConfig.EigenDA.EigenDADirectory
 
-	// Use internal network address for Anvil when running in container
-	config.ChainRPC = "http://anvil:8545"
+	// Use localhost for Anvil when running as goroutine
+	config.ChainRPC = "http://localhost:8545"
 
 	// Get deployer's private key
 	deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
@@ -546,13 +547,23 @@ func setupChurnerConfig(testConfig *deploy.Config) testbed.ChurnerConfig {
 
 	// Set graph URL if graph node is enabled
 	if deployer.DeploySubgraphs && graphNodeContainer != nil {
-		// Use internal network address for Graph node when running in container
-		config.GraphURL = "http://graph-node:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
+		// Use localhost for Graph node when running as goroutine
+		config.GraphURL = "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 	}
 
 	config.ExposeHostPort = true
 	config.GRPCPort = "32002"
 	config.TestDataPath = testConfig.Path
+
+	// Set log path to write to testdata directory
+	if testConfig.Path != "" {
+		logsDir := filepath.Join(testConfig.Path, "logs")
+		// Create logs directory if it doesn't exist
+		if err := os.MkdirAll(logsDir, 0755); err != nil {
+			panic(fmt.Errorf("failed to create logs directory: %w", err))
+		}
+		config.LogPath = filepath.Join(logsDir, "churner.log")
+	}
 
 	return config
 }
@@ -574,11 +585,9 @@ func teardownSuite() {
 	logger.Info("Stopping binaries")
 	testConfig.StopBinaries()
 
-	if churnerContainer != nil {
-		logger.Info("Stopping churner container")
-		if err := churnerContainer.Stop(ctx); err != nil {
-			logger.Warn("Failed to stop churner container", "error", err)
-		}
+	if churnerGoroutine != nil {
+		logger.Info("Stopping churner goroutine")
+		churnerGoroutine.Stop(ctx)
 	}
 
 	logger.Info("Stopping anvil")
