@@ -336,8 +336,8 @@ func GetAllPrecomputedSrsMap(tableDir string) ([]encoding.EncodingParams, error)
 		}
 
 		params := encoding.EncodingParams{
-			NumChunks:   uint64(cosetSizeValue),
-			ChunkLength: uint64(dimEValue),
+			NumChunks:   uint64(dimEValue),
+			ChunkLength: uint64(cosetSizeValue),
 		}
 		tables = append(tables, params)
 	}
