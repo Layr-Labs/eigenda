@@ -52,7 +52,8 @@ TODO: Put these into a testSuite object which is initialized per inabox E2E test
 var (
 	anvilContainer     *testbed.AnvilContainer
 	graphNodeContainer *testbed.GraphNodeContainer
-	dockerNetwork      *testcontainers.DockerNetwork
+	// chainDockerNetwork is only used by anvil and graphNode
+	chainDockerNetwork *testcontainers.DockerNetwork
 
 	templateName      string
 	testName          string
@@ -138,13 +139,13 @@ func setupSuite() error {
 
 	if testConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
-		dockerNetwork, err = network.New(context.Background(),
+		chainDockerNetwork, err = network.New(context.Background(),
 			network.WithDriver("bridge"),
 			network.WithAttachable())
 		if err != nil {
 			return fmt.Errorf("failed to create docker network: %w", err)
 		}
-		logger.Info("Created Docker network", "name", dockerNetwork.Name)
+		logger.Info("Created Docker network", "name", chainDockerNetwork.Name)
 
 		if !inMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
@@ -154,7 +155,7 @@ func setupSuite() error {
 				ExposeHostPort: true,
 				HostPort:       localStackPort,
 				Logger:         logger,
-				Network:        dockerNetwork,
+				Network:        chainDockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start localstack: %w", err)
@@ -180,7 +181,7 @@ func setupSuite() error {
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
-			Network:        dockerNetwork,
+			Network:        chainDockerNetwork,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start anvil: %w", err)
@@ -202,7 +203,7 @@ func setupSuite() error {
 				HostAdminPort:  "8020",
 				HostIPFSPort:   "5001",
 				Logger:         logger,
-				Network:        dockerNetwork,
+				Network:        chainDockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start graph node: %w", err)
@@ -539,16 +540,16 @@ func teardownSuite() {
 		if err := anvilContainer.Terminate(ctx); err != nil {
 			logger.Warn("Failed to terminate anvil container", "error", err)
 		}
-
-		if dockerNetwork != nil {
-			logger.Info("Removing Docker network")
-			_ = dockerNetwork.Remove(context.Background())
-		}
 	}
 
 	if graphNodeContainer != nil {
 		logger.Info("Stopping graph node")
 		_ = graphNodeContainer.Terminate(context.Background())
+	}
+
+	if chainDockerNetwork != nil {
+		logger.Info("Removing Docker network")
+		_ = chainDockerNetwork.Remove(context.Background())
 	}
 
 	if localstackContainer != nil {
