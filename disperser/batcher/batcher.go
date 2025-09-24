@@ -368,6 +368,7 @@ func (b *Batcher) updateConfirmationInfo(
 					"other than confirmed or insufficient signatures: %s",
 				status.String())
 		}
+		b.EncodingStreamer.RemoveEncodedBlob(metadata)
 		if updateConfirmationInfoErr != nil {
 			b.logger.Error("HandleSingleBatch: error updating blob confirmed metadata",
 				"err", updateConfirmationInfoErr)
