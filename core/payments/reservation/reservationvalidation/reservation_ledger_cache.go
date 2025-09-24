@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -40,7 +41,7 @@ type ReservationLedgerCache struct {
 	// The solution to prevent this from happening is that we will detect when a ledger is evicted prematurely, and
 	// automatically resize the cache in response. This prevents the cache from getting into a thrashy state, where
 	// many ledgers are being evicted prematurely and then reinstantiated.
-	cache *lru.Cache[gethcommon.Address, *ReservationLedger]
+	cache *lru.Cache[gethcommon.Address, *reservation.ReservationLedger]
 	// current maximum number of ledgers the cache can hold (will be dynamically increased if premature evictions are
 	// observed)
 	maxLedgers int
@@ -65,7 +66,8 @@ type ReservationLedgerCache struct {
 	// race conditions during cache resizing
 	evictionLock sync.Mutex
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
-	vaultMonitor *ReservationVaultMonitor
+	vaultMonitor *reservation.ReservationVaultMonitor
+	metrics      *ReservationCacheMetrics
 }
 
 func NewReservationLedgerCache(
@@ -74,6 +76,7 @@ func NewReservationLedgerCache(
 	config ReservationLedgerCacheConfig,
 	paymentVault payments.PaymentVault,
 	timeSource func() time.Time,
+	metrics *ReservationCacheMetrics,
 ) (*ReservationLedgerCache, error) {
 	if paymentVault == nil {
 		return nil, errors.New("payment vault must be non-nil")
@@ -97,6 +100,7 @@ func NewReservationLedgerCache(
 		bucketCapacityPeriod: config.BucketCapacityPeriod,
 		minNumSymbols:        minNumSymbols,
 		ledgerCreationLock:   common.NewIndexLock(256),
+		metrics:              metrics,
 	}
 
 	ledgerCache.cache, err = lru.NewWithEvict(config.MaxLedgers, ledgerCache.handleEviction)
@@ -104,7 +108,11 @@ func NewReservationLedgerCache(
 		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
 	}
 
-	ledgerCache.vaultMonitor, err = NewReservationVaultMonitor(
+	ledgerCache.metrics.RegisterSizeGauge(func() int {
+		return ledgerCache.cache.Len()
+	})
+
+	ledgerCache.vaultMonitor, err = reservation.NewReservationVaultMonitor(
 		ctx,
 		logger,
 		paymentVault,
@@ -113,8 +121,8 @@ func NewReservationLedgerCache(
 		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
 		// in a config value
 		1024,
-		ledgerCache.GetAccountsToUpdate,
-		ledgerCache.UpdateReservation,
+		ledgerCache.getAccountsToUpdate,
+		ledgerCache.updateReservation,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation vault monitor: %w", err)
@@ -127,13 +135,14 @@ func NewReservationLedgerCache(
 func (c *ReservationLedgerCache) GetOrCreate(
 	ctx context.Context,
 	accountID gethcommon.Address,
-) (*ReservationLedger, error) {
+) (*reservation.ReservationLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
 	}
 
 	// Slow path: acquire per-account lock and check again
+	c.metrics.IncrementCacheMisses()
 	defer c.acquireLedgerLock(accountID)()
 
 	if ledger, exists := c.cache.Get(accountID); exists {
@@ -149,12 +158,12 @@ func (c *ReservationLedgerCache) GetOrCreate(
 		return nil, fmt.Errorf("no reservation found for account %v", accountID.Hex())
 	}
 
-	reservationObj, err := FromContractStruct(reservationData)
+	reservationObj, err := reservation.FromContractStruct(reservationData)
 	if err != nil {
 		return nil, fmt.Errorf("from contract struct: %w", err)
 	}
 
-	reservationLedgerConfig, err := NewReservationLedgerConfig(
+	reservationLedgerConfig, err := reservation.NewReservationLedgerConfig(
 		*reservationObj,
 		c.minNumSymbols,
 		// start empty, to err on the side of permitting more throughput instead of less
@@ -167,7 +176,7 @@ func (c *ReservationLedgerCache) GetOrCreate(
 	}
 
 	now := c.timeSource()
-	newLedger, err := NewReservationLedger(*reservationLedgerConfig, now)
+	newLedger, err := reservation.NewReservationLedger(*reservationLedgerConfig, now)
 	if err != nil {
 		return nil, fmt.Errorf("new reservation ledger: %w", err)
 	}
@@ -176,14 +185,17 @@ func (c *ReservationLedgerCache) GetOrCreate(
 	return newLedger, nil
 }
 
-// GetAccountsToUpdate returns all accounts currently being tracked in the cache
-func (c *ReservationLedgerCache) GetAccountsToUpdate() []gethcommon.Address {
+// Returns all accounts currently being tracked in the cache
+func (c *ReservationLedgerCache) getAccountsToUpdate() []gethcommon.Address {
 	return c.cache.Keys()
 }
 
-// UpdateReservation updates the reservation for an account if different from current value
+// Updates the reservation for an account if different from current value
 // If newReservation is nil, the account is removed from the cache
-func (c *ReservationLedgerCache) UpdateReservation(accountID gethcommon.Address, newReservation *Reservation) error {
+func (c *ReservationLedgerCache) updateReservation(
+	accountID gethcommon.Address,
+	newReservation *reservation.Reservation,
+) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
 		// Account was evicted from cache or never existed, nothing to update
@@ -205,17 +217,19 @@ func (c *ReservationLedgerCache) UpdateReservation(accountID gethcommon.Address,
 // If the evicted ledger has a non-empty bucket, it resizes the cache and re-adds the ledger.
 func (c *ReservationLedgerCache) handleEviction(
 	accountID gethcommon.Address,
-	reservationLedger *ReservationLedger,
+	reservationLedger *reservation.ReservationLedger,
 ) {
 	c.evictionLock.Lock()
 	defer c.evictionLock.Unlock()
+
+	c.metrics.IncrementEvictions()
 
 	if reservationLedger.IsBucketEmpty(c.timeSource()) {
 		c.logger.Debugf("evicted account %s from LRU reservation ledger cache", accountID.Hex())
 		return
 	}
 
-	// The bucket is not empty!!! This was a premature eviction: we must resize the cache
+	c.metrics.IncrementPrematureEvictions()
 
 	newSize := c.maxLedgers * 2
 	if newSize > maxReservationLRUCacheSize {
@@ -230,6 +244,7 @@ func (c *ReservationLedgerCache) handleEviction(
 
 	c.maxLedgers = newSize
 	c.cache.Resize(c.maxLedgers)
+	c.metrics.IncrementResizes()
 
 	// Don't bother checking if another routine already re-created this ledger. Even if another routine *did* create
 	// a new instance, it's reasonable to preference the old instance over the new. There may be some small discrepancy

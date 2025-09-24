@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/core/eth/directory"
 )
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -21,6 +22,36 @@ func Example_relayPayloadRetrieval() {
 	privateKey := ""
 
 	ctx := context.Background()
+	logger, err := createLogger()
+	if err != nil {
+		panic(fmt.Sprintf("create logger: %v", err))
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		panic(fmt.Sprintf("create eth client: %v", err))
+	}
+
+	contractDirectory, err := createEigenDADirectory(ctx, logger, ethClient)
+	if err != nil {
+		panic(fmt.Sprintf("create contract directory: %v", err))
+	}
+
+	operatorStateRetrieverAddr, err := contractDirectory.GetContractAddress(ctx, directory.OperatorStateRetriever)
+	if err != nil {
+		panic(fmt.Sprintf("get OperatorStateRetriever address: %v", err))
+	}
+
+	registryCoordinatorAddr, err := contractDirectory.GetContractAddress(ctx, directory.RegistryCoordinator)
+	if err != nil {
+		panic(fmt.Sprintf("get RegistryCoordinator address: %v", err))
+	}
+
+	certVerifierRouterAddress, err := contractDirectory.GetContractAddress(
+		context.Background(), directory.CertVerifierRouter)
+	if err != nil {
+		panic(fmt.Sprintf("get cert verifier router address: %v", err))
+	}
 
 	// Create a payload disperser and disperse a sample payload to EigenDA
 	// This will be the payload we will later retrieve
@@ -43,7 +74,8 @@ func Example_relayPayloadRetrieval() {
 	fmt.Printf("Successfully dispersed payload\n")
 
 	// Create a payload retriever to retrieve from EigenDA relays
-	payloadRetriever, err := createRelayPayloadRetriever()
+	payloadRetriever, err := createRelayPayloadRetriever(
+		logger, ethClient, operatorStateRetrieverAddr, registryCoordinatorAddr)
 	if err != nil {
 		panic(fmt.Sprintf("create relay payload retriever: %v", err))
 	}
@@ -63,7 +95,7 @@ func Example_relayPayloadRetrieval() {
 	fmt.Printf("Successfully retrieved payload\n")
 
 	// Create a cert verifier, to verify the certificate on chain
-	certVerifier, err := createCertVerifier()
+	certVerifier, err := createCertVerifier(certVerifierRouterAddress, ethClient, logger)
 	if err != nil {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}

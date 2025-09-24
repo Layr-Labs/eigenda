@@ -154,7 +154,7 @@ func TestRevertFill(t *testing.T) {
 }
 
 func TestLeak(t *testing.T) {
-	leakRate := uint64(5)
+	leakRate := float64(5)
 
 	// This test uses a large capacity, to make sure that none of the fills or leaks are bumping up against the
 	// limits of the bucket
@@ -181,7 +181,7 @@ func TestLeak(t *testing.T) {
 
 	// compute how much should have leaked throughout the test duration
 	timeDelta := workingTime.Sub(testStartTime)
-	expectedLeak := timeDelta.Seconds() * float64(leakRate)
+	expectedLeak := timeDelta.Seconds() * leakRate
 
 	// original fill, minus what we expected to leak, plus what we filled during iteration
 	expectedFill := halfFull - expectedLeak + float64(iterations)

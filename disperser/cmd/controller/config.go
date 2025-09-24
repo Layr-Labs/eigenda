@@ -7,8 +7,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
-	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
@@ -45,8 +45,8 @@ type Config struct {
 	ControllerHealthProbePath    string
 	ServerConfig                 server.Config
 
-	OnDemandConfig    ondemand.OnDemandLedgerCacheConfig
-	ReservationConfig reservation.ReservationLedgerCacheConfig
+	OnDemandConfig    ondemandvalidation.OnDemandLedgerCacheConfig
+	ReservationConfig reservationvalidation.ReservationLedgerCacheConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -93,7 +93,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 	paymentVaultUpdateInterval := ctx.GlobalDuration(flags.PaymentVaultUpdateIntervalFlag.Name)
 
-	onDemandConfig, err := ondemand.NewOnDemandLedgerCacheConfig(
+	onDemandConfig, err := ondemandvalidation.NewOnDemandLedgerCacheConfig(
 		ctx.GlobalInt(flags.OnDemandPaymentsLedgerCacheSizeFlag.Name),
 		ctx.GlobalString(flags.OnDemandPaymentsTableNameFlag.Name),
 		paymentVaultUpdateInterval,
@@ -102,7 +102,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, fmt.Errorf("create on-demand config: %w", err)
 	}
 
-	reservationConfig, err := reservation.NewReservationLedgerCacheConfig(
+	reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
 		ctx.GlobalInt(flags.ReservationPaymentsLedgerCacheSizeFlag.Name),
 		ctx.GlobalDuration(flags.ReservationBucketCapacityPeriodFlag.Name),
 		// this doesn't need to be configurable. there are no plans to ever use a different value

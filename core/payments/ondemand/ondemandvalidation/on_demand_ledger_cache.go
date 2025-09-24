@@ -1,4 +1,4 @@
-package ondemand
+package ondemandvalidation
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/payments"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -25,7 +26,7 @@ type OnDemandLedgerCache struct {
 	// Least recently used OnDemandLedger entries are removed if the cache gets above the configured size. Since
 	// on-demand payment data is stored in a persistent way, deleting an OnDemandLedger from memory doesn't result in
 	// data loss: it just means that a new OnDemandLedger object will need to be constructed if needed in the future.
-	cache *lru.Cache[gethcommon.Address, *OnDemandLedger]
+	cache *lru.Cache[gethcommon.Address, *ondemand.OnDemandLedger]
 	// can access state of the PaymentVault contract
 	paymentVault payments.PaymentVault
 	// the underlying dynamo client, which is used by all OnDemandLedger instances created by this struct
@@ -44,7 +45,8 @@ type OnDemandLedgerCache struct {
 	// new object for the same account key, and try to add them to the cache.
 	ledgerCreationLock *common.IndexLock
 	// monitors the PaymentVault for changes, and updates cached ledgers accordingly
-	vaultMonitor *OnDemandVaultMonitor
+	vaultMonitor *ondemand.OnDemandVaultMonitor
+	metrics      *OnDemandCacheMetrics
 }
 
 func NewOnDemandLedgerCache(
@@ -53,17 +55,8 @@ func NewOnDemandLedgerCache(
 	config OnDemandLedgerCacheConfig,
 	paymentVault payments.PaymentVault,
 	dynamoClient *dynamodb.Client,
+	metrics *OnDemandCacheMetrics,
 ) (*OnDemandLedgerCache, error) {
-	cache, err := lru.NewWithEvict(
-		config.MaxLedgers,
-		func(accountAddress gethcommon.Address, _ *OnDemandLedger) {
-			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
-	}
-
 	if paymentVault == nil {
 		return nil, errors.New("payment vault must be non-nil")
 	}
@@ -83,17 +76,31 @@ func NewOnDemandLedgerCache(
 	}
 
 	ledgerCache := &OnDemandLedgerCache{
-		cache:              cache,
 		paymentVault:       paymentVault,
 		dynamoClient:       dynamoClient,
 		onDemandTableName:  config.OnDemandTableName,
 		pricePerSymbol:     new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols:      minNumSymbols,
 		ledgerCreationLock: common.NewIndexLock(256),
+		metrics:            metrics,
 	}
 
-	// Create the vault monitor with callback functions
-	ledgerCache.vaultMonitor, err = NewOnDemandVaultMonitor(
+	ledgerCache.cache, err = lru.NewWithEvict(
+		config.MaxLedgers,
+		func(accountAddress gethcommon.Address, _ *ondemand.OnDemandLedger) {
+			ledgerCache.metrics.IncrementEvictions()
+			logger.Infof("evicted account %s from LRU on-demand ledger cache", accountAddress.Hex())
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new LRU cache with evict: %w", err)
+	}
+
+	ledgerCache.metrics.RegisterSizeGauge(func() int {
+		return ledgerCache.cache.Len()
+	})
+
+	ledgerCache.vaultMonitor, err = ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		logger,
 		paymentVault,
@@ -102,8 +109,8 @@ func NewOnDemandLedgerCache(
 		// could actually handle. Since the "sweet spot" is really wide, hardcode this instead of spending time wiring
 		// in a config value
 		1024,
-		ledgerCache.GetAccountsToUpdate,
-		ledgerCache.UpdateTotalDeposit,
+		ledgerCache.getAccountsToUpdate,
+		ledgerCache.updateTotalDeposit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand vault monitor: %w", err)
@@ -129,13 +136,17 @@ func NewOnDemandLedgerCache(
 // It is very unlikely for this race condition to take place if the cache has been configured with a sane size. Given
 // the low probability of the occurrence, and the low severity of the race condition, we are not addressing it right
 // now to avoid the complexity of the potential workarounds.
-func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcommon.Address) (*OnDemandLedger, error) {
+func (c *OnDemandLedgerCache) GetOrCreate(
+	ctx context.Context,
+	accountID gethcommon.Address,
+) (*ondemand.OnDemandLedger, error) {
 	// Fast path: check if ledger already exists in cache
 	if ledger, exists := c.cache.Get(accountID); exists {
 		return ledger, nil
 	}
 
 	// Slow path: acquire per-account lock and check again
+	c.metrics.IncrementCacheMisses()
 	accountIndex := binary.BigEndian.Uint64(accountID.Bytes()[:8])
 	c.ledgerCreationLock.Lock(accountIndex)
 	defer c.ledgerCreationLock.Unlock(accountIndex)
@@ -149,12 +160,12 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 		return nil, fmt.Errorf("get total deposit for account %v: %w", accountID.Hex(), err)
 	}
 
-	cumulativePaymentStore, err := NewCumulativePaymentStore(c.dynamoClient, c.onDemandTableName, accountID)
+	cumulativePaymentStore, err := ondemand.NewCumulativePaymentStore(c.dynamoClient, c.onDemandTableName, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("new cumulative payment store: %w", err)
 	}
 
-	newLedger, err := OnDemandLedgerFromStore(
+	newLedger, err := ondemand.OnDemandLedgerFromStore(
 		ctx,
 		totalDeposit,
 		c.pricePerSymbol,
@@ -173,12 +184,12 @@ func (c *OnDemandLedgerCache) GetOrCreate(ctx context.Context, accountID gethcom
 //
 // This method is used to determine which values need to be fetched from the PaymentVault, when periodically
 // checking for updates.
-func (c *OnDemandLedgerCache) GetAccountsToUpdate() []gethcommon.Address {
+func (c *OnDemandLedgerCache) getAccountsToUpdate() []gethcommon.Address {
 	return c.cache.Keys()
 }
 
 // Updates the total deposit for an account
-func (c *OnDemandLedgerCache) UpdateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
+func (c *OnDemandLedgerCache) updateTotalDeposit(accountID gethcommon.Address, newTotalDeposit *big.Int) error {
 	ledger, exists := c.cache.Get(accountID)
 	if !exists {
 		// Account was evicted from cache, nothing to update

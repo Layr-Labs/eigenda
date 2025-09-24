@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/math"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -18,7 +18,7 @@ type ParametrizedProver struct {
 	encoding.EncodingParams
 	*rs.Encoder
 
-	KzgConfig *kzg.KzgConfig
+	KzgConfig *KzgConfig
 
 	KzgMultiProofBackend  KzgMultiProofsBackendV2
 	KzgCommitmentsBackend KzgCommitmentsBackendV2
@@ -88,7 +88,7 @@ func (g *ParametrizedProver) Encode(
 	// inputFr is untouched
 	// compute chunks
 	go func() {
-		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr, uint64(len(inputFr)))
+		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr)
 
 		commitmentsChan <- commitmentsResult{
 			commitment:       commitment,
@@ -120,7 +120,7 @@ func (g *ParametrizedProver) Encode(
 }
 
 func (g *ParametrizedProver) GetCommitments(
-	inputFr []fr.Element, length uint64,
+	inputFr []fr.Element,
 ) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
 	if err := g.validateInput(inputFr); err != nil {
 		return nil, nil, nil, err
@@ -155,7 +155,11 @@ func (g *ParametrizedProver) GetCommitments(
 
 	go func() {
 		start := time.Now()
-		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, length)
+		// blobLen must always be a power of 2 in V2
+		// inputFr is not modified because padding with 0s doesn't change the commitment,
+		// but we need to pretend like it was actually padded with 0s to get the correct length proof.
+		blobLen := math.NextPowOf2u64(uint64(len(inputFr)))
+		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
 		lengthProofChan <- lengthProofResult{
 			LengthProof: lengthProof,
 			Err:         err,
@@ -179,8 +183,9 @@ func (g *ParametrizedProver) GetCommitments(
 		"Committing_duration", commitmentResult.Duration,
 		"LengthCommit_duration", lengthCommitmentResult.Duration,
 		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
@@ -247,8 +252,9 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames
@@ -287,8 +293,9 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 		"Chunk_length", g.ChunkLength,
 		"Total_duration", time.Since(start),
 		"Padding_duration", paddingEnd,
-		"SRSOrder", g.KzgConfig.SRSOrder,
-		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", encoding.SRSOrder,
+		// TODO(samlaf): should we take NextPowerOf2(len(inputFr)) instead?
+		"SRSOrder_shift", encoding.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return proofs, nil

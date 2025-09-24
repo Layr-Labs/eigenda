@@ -30,7 +30,7 @@ func NewReservationLedger(
 	now time.Time,
 ) (*ReservationLedger, error) {
 	leakyBucket, err := ratelimit.NewLeakyBucket(
-		config.reservation.symbolsPerSecond,
+		float64(config.reservation.symbolsPerSecond),
 		config.bucketCapacityDuration,
 		config.startFull,
 		config.overfillBehavior,

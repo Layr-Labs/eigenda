@@ -1,4 +1,4 @@
-package reservation
+package reservationvalidation
 
 import (
 	"context"
@@ -57,6 +57,8 @@ func TestDebitMultipleAccounts(t *testing.T) {
 		config,
 		testVault,
 		mockTimeSource,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, paymentValidator)
@@ -110,6 +112,8 @@ func TestDebitInsufficientCapacity(t *testing.T) {
 		config,
 		testVault,
 		mockTimeSource,
+		nil,
+		nil,
 	)
 	require.NoError(t, err)
 

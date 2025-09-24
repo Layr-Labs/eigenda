@@ -11,10 +11,12 @@ import (
 )
 
 func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
-	group, err := prover.NewProver(kzgConfig, nil)
+	harness := getTestHarness()
+
+	group, err := prover.NewProver(harness.proverV2KzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
+	params := encoding.ParamsFromSysPar(harness.numSys, harness.numPar, uint64(len(harness.paddedGettysburgAddressBytes)))
 
 	p, err := group.GetKzgEncoder(params)
 
@@ -22,20 +24,20 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	require.NotNil(t, p)
 
 	// Convert to inputFr
-	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
+	inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 	require.Nil(t, err)
 
 	frames, _, err := p.GetFrames(inputFr)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
-	b, err := frames[0].Encode()
+	b, err := frames[0].SerializeGob()
 	require.Nil(t, err)
 	require.NotNil(t, b)
 
-	frame, err := encoding.Decode(b)
+	frame, err := new(encoding.Frame).DeserializeGob(b)
 	require.Nil(t, err)
 	require.NotNil(t, frame)
 
-	assert.Equal(t, frame, frames[0])
+	assert.Equal(t, *frame, frames[0])
 }

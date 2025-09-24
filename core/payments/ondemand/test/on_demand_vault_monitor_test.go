@@ -1,11 +1,11 @@
-package ondemand
+package ondemand_test
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -15,7 +15,7 @@ import (
 func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	ctx := t.Context()
 	t.Run("zero interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -29,7 +29,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 	})
 
 	t.Run("negative interval", func(t *testing.T) {
-		monitor, err := NewOnDemandVaultMonitor(
+		monitor, err := ondemand.NewOnDemandVaultMonitor(
 			ctx,
 			test.GetLogger(),
 			vault.NewTestPaymentVault(),
@@ -44,8 +44,7 @@ func TestNewOnDemandVaultMonitorInvalidInterval(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitor(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	accounts := []gethcommon.Address{
@@ -67,7 +66,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,
@@ -120,8 +119,7 @@ func TestOnDemandVaultMonitor(t *testing.T) {
 }
 
 func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx := t.Context()
 	updateInterval := time.Millisecond
 
 	// Create multiple accounts to verify they're all fetched in a single batch
@@ -141,7 +139,7 @@ func TestOnDemandVaultMonitorNoBatching(t *testing.T) {
 		return nil
 	}
 
-	monitor, err := NewOnDemandVaultMonitor(
+	monitor, err := ondemand.NewOnDemandVaultMonitor(
 		ctx,
 		test.GetLogger(),
 		testVault,

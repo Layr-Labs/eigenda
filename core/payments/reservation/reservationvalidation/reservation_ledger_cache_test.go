@@ -1,4 +1,4 @@
-package reservation_test
+package reservationvalidation
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/v2/PaymentVault"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	"github.com/Layr-Labs/eigenda/test"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -18,38 +17,40 @@ func TestNewReservationLedgerCacheInvalidParams(t *testing.T) {
 	testTime := time.Date(1971, 8, 15, 0, 0, 0, 0, time.UTC)
 
 	t.Run("nil payment vault", func(t *testing.T) {
-		config, err := reservation.NewReservationLedgerCacheConfig(
+		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
 			ratelimit.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
-		cache, err := reservation.NewReservationLedgerCache(
+		cache, err := NewReservationLedgerCache(
 			t.Context(),
 			test.GetLogger(),
 			config,
 			nil, // nil payment vault
 			func() time.Time { return testTime },
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
 	})
 
 	t.Run("nil time source", func(t *testing.T) {
-		config, err := reservation.NewReservationLedgerCacheConfig(
+		config, err := NewReservationLedgerCacheConfig(
 			10,
 			10*time.Second,
 			ratelimit.OverfillOncePermitted,
 			time.Second,
 		)
 		require.NoError(t, err)
-		cache, err := reservation.NewReservationLedgerCache(
+		cache, err := NewReservationLedgerCache(
 			t.Context(),
 			test.GetLogger(),
 			config,
 			vault.NewTestPaymentVault(),
 			nil, // nil time source
+			nil,
 		)
 		require.Error(t, err)
 		require.Nil(t, cache)
@@ -89,19 +90,20 @@ func TestLRUCacheNormalEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	config, err := reservation.NewReservationLedgerCacheConfig(
+	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
 		ratelimit.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
-	ledgerCache, err := reservation.NewReservationLedgerCache(
+	ledgerCache, err := NewReservationLedgerCache(
 		ctx,
 		test.GetLogger(),
 		config,
 		testVault,
 		timeSource,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
@@ -164,19 +166,20 @@ func TestLRUCachePrematureEviction(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	config, err := reservation.NewReservationLedgerCacheConfig(
+	config, err := NewReservationLedgerCacheConfig(
 		2, // Small cache size to force eviction
 		time.Second,
 		ratelimit.OverfillOncePermitted,
 		time.Millisecond,
 	)
 	require.NoError(t, err)
-	ledgerCache, err := reservation.NewReservationLedgerCache(
+	ledgerCache, err := NewReservationLedgerCache(
 		ctx,
 		test.GetLogger(),
 		config,
 		testVault,
 		timeSource,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ledgerCache)
