@@ -156,7 +156,11 @@ func TestChurner(t *testing.T) {
 	grpcPort := "32002"
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
 	require.NoError(t, err, "failed to listen on port")
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			t.Logf("failed to close listener: %v", err)
+		}
+	}()
 
 	// Create churner config directly (no CLI parsing needed)
 	churnerConfig := &churner.Config{
@@ -221,7 +225,9 @@ func TestChurner(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create gRPC client to connect to the churner
-	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%s", grpcPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("localhost:%s", grpcPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial churner")
 	defer func() {
 		if err := conn.Close(); err != nil {
