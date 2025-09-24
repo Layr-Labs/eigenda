@@ -101,7 +101,7 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 	err = fs.Parse(args)
 	if err != nil {
 		cancel()
-		listener.Close()
+		_ = listener.Close()
 		return nil, fmt.Errorf("failed to parse flags: %w", err)
 	}
 
@@ -149,7 +149,11 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 			return
 		}
 
-		tx, err := coreeth.NewWriter(logger, gethClient, churnerConfig.OperatorStateRetrieverAddr, churnerConfig.EigenDAServiceManagerAddr)
+		tx, err := coreeth.NewWriter(
+			logger,
+			gethClient,
+			churnerConfig.OperatorStateRetrieverAddr,
+			churnerConfig.EigenDAServiceManagerAddr)
 		if err != nil {
 			logger.Error("Failed to create writer", "error", err)
 			errChan <- fmt.Errorf("failed to create writer: %w", err)
@@ -181,7 +185,9 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 		}
 
 		churnerServer := churner.NewServer(churnerConfig, cn, logger, churnerMetrics)
-		churnerServer.Start(churnerConfig.MetricsConfig)
+		if err := churnerServer.Start(churnerConfig.MetricsConfig); err != nil {
+			logger.Error("Failed to start churner server metrics", "error", err)
+		}
 
 		// Register services
 		reflection.Register(gs)
@@ -204,14 +210,14 @@ func StartChurnerGoroutine(config ChurnerConfig, logger logging.Logger) (*Churne
 	select {
 	case err := <-errChan:
 		cancel()
-		listener.Close()
+		_ = listener.Close()
 		return nil, err
 	case <-readyChan:
 		// Server started successfully
 		logger.Info("Churner server started successfully", "port", config.GRPCPort)
 	case <-time.After(5 * time.Second):
 		cancel()
-		listener.Close()
+		_ = listener.Close()
 		return nil, fmt.Errorf("churner server startup timeout")
 	}
 

@@ -172,9 +172,13 @@ func TestChurner(t *testing.T) {
 	defer churnerGoroutine.Stop(ctx)
 
 	// Create gRPC client to connect to the churner
-	conn, err := grpc.Dial(churnerGoroutine.URL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(churnerGoroutine.URL(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial churner")
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("failed to close connection: %v", err)
+		}
+	}()
 
 	churnerClient := pb.NewChurnerClient(conn)
 
