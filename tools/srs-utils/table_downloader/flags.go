@@ -33,8 +33,8 @@ var Flags = []cli.Flag{
 	},
 	cli.StringFlag{
 		Name:  flagCosetSizes,
-		Usage: "Comma-separated list of coset sizes to download (e.g., 4,8,16,32,64,128,256,512,1024)",
-		Value: "4,8,16,32,64,128,256,512,1024",
+		Usage: "Comma-separated list of coset sizes to download (e.g., 4,8,16,32,64,128,256,512)",
+		Value: "4,8,16,32,64,128,256,512",
 	},
 }
 
