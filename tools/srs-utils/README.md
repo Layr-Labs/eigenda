@@ -3,14 +3,15 @@
 This project provides tools for working with EigenDA's Structured Reference String (SRS). It includes tools to:
 
 1. Download pre-processed SRS files directly from the EigenDA S3 bucket
-2. Extract G1 and G2 points used by EigenDA from the ptau challenge file, created from the Perpetual Powers of Tau MPC ceremony run by the Ethereum Foundation
-3. Verify that the extracted points are correct based on approaches used in the Ethereum Foundation's KZG ceremony
+2. Download precomputed SRS tables for EigenDA V2 encoding operations
+3. Extract G1 and G2 points used by EigenDA from the ptau challenge file, created from the Perpetual Powers of Tau MPC ceremony run by the Ethereum Foundation
+4. Verify that the extracted points are correct based on approaches used in the Ethereum Foundation's KZG ceremony
 
 ## Structured Reference String (SRS) Files
 
 The SRS files are required for KZG commitments and proofs in EigenDA.
 
-### File Information
+### Core SRS Files
 
 | File Name          | Size   | Number of Points | Point Size | SHA256 Hash                                                      |
 |--------------------|--------|------------------|------------|------------------------------------------------------------------|
@@ -27,10 +28,53 @@ Note that the G2 point files (`g2.point` and `g2.trailing.point`) are twice the 
 points require twice as many bytes to represent as G1 points in the BN254 curve. Each G1 point requires 32 bytes 
 of storage, while each G2 point requires 64 bytes.
 
-The `g2.point.powerOf2` file contains only G2 points at power-of-2 indices (indices 1, 2, 4, 8, 16, ..., 2^27). This 
-optimized file contains just 28 G2 points instead of the full set, significantly reducing memory usage for operator 
-nodes. Since operators only perform multi-reveal proofs on blobs with power-of-2 polynomial degrees, they don't need 
+The `g2.point.powerOf2` file contains only G2 points at power-of-2 indices (indices 1, 2, 4, 8, 16, ..., 2^27). This
+optimized file contains just 28 G2 points instead of the full set, significantly reducing memory usage for operator
+nodes. Since operators only perform multi-reveal proofs on blobs with power-of-2 polynomial degrees, they don't need
 the complete G2 SRS. This file is optional and primarily used by operator nodes for memory efficiency.
+
+### SRS Tables for EigenDA V2
+
+EigenDA V2 uses precomputed SRS tables for efficient polynomial operations with specific chunk counts. These tables
+contain coset evaluations that accelerate encoding and decoding operations.
+
+In EigenDA V2, **blob version 0** specifically sets `numChunks=8192`, which is why the dimE8192 tables are the
+primary SRS tables used in production.
+
+#### Available Table Files
+
+The SRS tables are organized by dimension (numChunks) and coset size:
+
+| Dimension | Coset Sizes | Total Size | Description |
+|-----------|-------------|------------|-------------|
+| dimE8192  | 4, 8, 16, 32, 64, 128, 256, 512, 1024 | ~1 GB | Tables for numChunks=8192 (blob version 0) |
+
+Each table file is named following the pattern: `<dimension>.coset<size>` (e.g., `dimE8192.coset256`)
+
+#### Blob Size Calculation
+
+The supported blob size depends on the coset size (chunk length) used:
+
+```
+Blob Size = (numChunks × cosetSize × 32 bytes) / codingRatio
+```
+
+Where:
+- `numChunks` = 8192 (for blob version 0)
+- `cosetSize` = chunk length (varies based on blob size)
+- `32 bytes` = size of each BN254 field element
+- `codingRatio` = 8 (fixed erasure coding expansion factor)
+
+Supported blob sizes for dimE8192:
+- cosetSize=4: blob size = 128 KB (minimum)
+- cosetSize=8: blob size = 256 KB
+- cosetSize=16: blob size = 512 KB
+- cosetSize=32: blob size = 1 MB
+- cosetSize=64: blob size = 2 MB
+- cosetSize=128: blob size = 4 MB
+- cosetSize=256: blob size = 8 MB
+- cosetSize=512: blob size = 16 MB (current production limit)
+- cosetSize=1024: blob size = 32 MB (future support)
 
 ## Installation
 
@@ -69,6 +113,35 @@ To download with the power-of-2 points file:
 ```bash
 srs-utils download --blob-size-bytes 16777216 --include-g2-power-of-2
 ```
+
+### Downloading SRS Tables for EigenDA V2
+
+To download the precomputed SRS tables used by EigenDA V2 for encoding operations with numChunks=8192:
+
+```bash
+srs-utils download-tables
+```
+
+This will download all coset tables for the default dimension (dimE8192). The files will be saved to
+`resources/srs/SRSTables` directory by default.
+
+Options:
+- `--dimension`: The dimension to download (default: "dimE8192")
+- `--output-dir`: Directory where the tables will be saved (default: "resources/srs/SRSTables")
+- `--base-url`: Base URL for downloading (default: "https://srs-mainnet.s3.amazonaws.com/kzg/SRSTables")
+- `--coset-sizes`: Comma-separated list of coset sizes to download (default: "4,8,16,32,64,128,256,512,1024")
+
+Example with custom parameters:
+
+```bash
+# Download only specific coset sizes
+srs-utils download-tables --coset-sizes 256,512,1024
+
+# Download to a custom directory
+srs-utils download-tables --output-dir ./my-srs-tables
+```
+
+The download will show progress for each file and display the total size downloaded upon completion.
 
 ### Alternative: Generating SRS Files from the Original Challenge File
 

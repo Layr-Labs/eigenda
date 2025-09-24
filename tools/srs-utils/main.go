@@ -56,6 +56,25 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:    "download-tables",
+				Aliases: []string{"dt"},
+				Usage:   "download SRS table files for specified dimension",
+				Flags:   downloader.TablesFlags,
+				Action: func(cCtx *cli.Context) error {
+					config, err := downloader.ReadTablesConfig(cCtx)
+					if err != nil {
+						return fmt.Errorf("error in configuration: %w", err)
+					}
+
+					err = downloader.DownloadSRSTables(config)
+					if err != nil {
+						return fmt.Errorf("download SRS tables: %w", err)
+					}
+
+					return nil
+				},
+			},
 		},
 	}
 
