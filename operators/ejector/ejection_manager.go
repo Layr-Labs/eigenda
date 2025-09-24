@@ -20,7 +20,7 @@ type EjectionManager interface {
 	// Begin ejection proceedings against a validator. May not take action if it is not appropriate to do so.
 	BeginEjection(
 		validatorAddress geth.Address,
-		// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
+	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
 		stakes map[core.QuorumID]float64,
 	)
 
@@ -100,25 +100,25 @@ type ejectionManager struct {
 func NewEjectionManager(
 	ctx context.Context,
 	logger logging.Logger,
-	// A source of time.
+// A source of time.
 	timeSource func() time.Time,
-	// Submits ejection transactions.
+// Submits ejection transactions.
 	transactor EjectionTransactor,
-	// the minimum time between starting an ejection and completing it
+// the minimum time between starting an ejection and completing it
 	ejectionDelay time.Duration,
-	// the minimum time between two consecutive ejection attempts for the same validator
+// the minimum time between two consecutive ejection attempts for the same validator
 	retryDelay time.Duration,
-	// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
+// the maximum number of consecutive failed ejection attempts before a validator is blacklisted
 	maxConsecutiveFailedEjectionAttempts uint32,
-	// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
+// Configures throttle for maximum stake (as a fraction of 1.0) that can be ejected per second in each quorum.
 	maxEjectionRate float64,
-	// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
-	// in this interval.
+// Determines the bucket size for the rate limiter. The bucket is sized equal to the amount that can be drained
+// in this interval.
 	throttleBucketInterval time.Duration,
-	// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
-	// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
+// If true, when starting up the leaky bucket used by the throttle will be full, meaning that we will need to
+// wait for some time before being able to eject. If false, the bucket starts empty and we can eject immediately.
 	startThrottleFull bool,
-	// A set of validators that we will not attempt to eject. May be nil.
+// A set of validators that we will not attempt to eject. May be nil.
 	ejectionBlacklist []geth.Address,
 ) (EjectionManager, error) {
 
@@ -167,26 +167,30 @@ func (em *ejectionManager) BeginEjection(
 
 	// Check to see if the validator is blacklisted.
 	if _, blacklisted := em.ejectionBlacklist[validatorAddress]; blacklisted {
-		em.logger.Infof("validator %s is blacklisted from ejection, skipping", validatorAddress.Hex())
+		em.logger.Infof("validator %s is blacklisted from ejection, will not begin ejection",
+			validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if we are already in the process of ejecting this validator.
 	if _, inProgress := em.ejectionsInProgress[validatorAddress]; inProgress {
-		em.logger.Infof("ejection already in progress for validator %s, skipping", validatorAddress.Hex())
+		em.logger.Infof("ejection already in progress for validator %s, will not begin ejection",
+			validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if we have recently attempted to eject this validator.
 	if _, recentlyEjected := em.recentEjectionTimes[validatorAddress]; recentlyEjected {
-		em.logger.Infof("recent ejection attempt for validator %s, skipping", validatorAddress.Hex())
+		em.logger.Infof("recent ejection attempt for validator %s, will not begin ejection",
+			validatorAddress.Hex())
 		return
 	}
 
 	// Check to see if there is already an ejection in progress on-chain for this validator.
 	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, validatorAddress)
 	if err != nil {
-		em.logger.Errorf("failed to check ejection status for validator %s: %v", validatorAddress.Hex(), err)
+		em.logger.Errorf("failed to check ejection status for validator %s, will not begin ejection: %v",
+			validatorAddress.Hex(), err)
 		return
 	}
 
@@ -200,7 +204,9 @@ func (em *ejectionManager) BeginEjection(
 
 	if inProgress {
 		// An ejection is already in progress. Record it, and we can try to finalize it later.
-		em.logger.Infof("ejection already in progress on-chain for validator %s", validatorAddress.Hex())
+		em.logger.Infof("ejection already in progress on-chain for validator %s, "+
+			"will not begin ejection but will attempt to finalize",
+			validatorAddress.Hex())
 	} else {
 		// Start a new ejection.
 		err = em.transactor.StartEjection(em.ctx, validatorAddress)
@@ -208,6 +214,7 @@ func (em *ejectionManager) BeginEjection(
 			em.logger.Errorf("failed to start ejection for validator %s: %v", validatorAddress.Hex(), err)
 			return
 		}
+		em.logger.Infof("started ejection proceedings against %s", validatorAddress.Hex())
 	}
 
 	em.recentEjectionTimes[validatorAddress] = em.timeSource()
@@ -352,7 +359,8 @@ func (em *ejectionManager) finalizeEjection(address geth.Address) bool {
 	// Check to see if the ejection is still in progress.
 	inProgress, err := em.transactor.IsEjectionInProgress(em.ctx, address)
 	if err != nil {
-		em.logger.Errorf("failed to check ejection status for validator %s: %v", address.Hex(), err)
+		em.logger.Errorf("failed to check ejection status for validator %s, will not finalize ejection: %v",
+			address.Hex(), err)
 		return false
 	}
 
