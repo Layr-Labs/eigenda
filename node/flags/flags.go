@@ -586,8 +586,9 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "reservation-bucket-capacity-period"),
 		Usage:    "Duration used to calculate bucket capacity when creating new reservation ledgers.",
 		Required: false,
-		Value:    180 * time.Second,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
+		// TODO(litt3): we need to decide whether this is the default value we actually want to ship
+		Value:  180 * time.Second,
+		EnvVar: common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_BUCKET_CAPACITY_PERIOD"),
 	}
 	PaymentVaultUpdateIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "payment-vault-update-interval"),
