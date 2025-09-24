@@ -331,7 +331,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierOrRouterAddress: certVerifierAddress,
 			EigenDADirectory:                   eigenDADirectory,
 			RetrieversToEnable:                 testCfg.Retrievers,
-			ClientLedgerMode:                   clientledger.ClientLedgerModeLegacy,
+			ClientLedgerMode:                   testCfg.ClientLedgerMode,
+			VaultMonitorInterval:               testCfg.VaultMonitorInterval,
 		},
 	}
 	if useMemory {

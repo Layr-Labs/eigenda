@@ -324,7 +324,7 @@ func TestOnDemandOnly(t *testing.T) {
 		require.Equal(t, accountID, paymentMetadata.AccountID)
 	})
 
-	t.Run("insufficient funds panic", func(t *testing.T) {
+	t.Run("insufficient funds returns error", func(t *testing.T) {
 		clientLedger := NewClientLedger(
 			ctx,
 			test.GetLogger(),
@@ -339,9 +339,9 @@ func TestOnDemandOnly(t *testing.T) {
 		)
 		require.NotNil(t, clientLedger)
 
-		require.Panics(t, func() {
-			_, _ = clientLedger.Debit(ctx, 1001, []core.QuorumID{0, 1})
-		}, "insufficient funds should cause fatal panic in on-demand only mode")
+		_, err := clientLedger.Debit(ctx, 1001, []core.QuorumID{0, 1})
+		var insufficientFundsErr *ondemand.InsufficientFundsError
+		require.ErrorAs(t, err, &insufficientFundsErr)
 	})
 
 	t.Run("fatal errors cause panic", func(t *testing.T) {
