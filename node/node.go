@@ -38,7 +38,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/indexer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -82,7 +81,6 @@ type Node struct {
 	ValidatorV2             corev2.ShardValidator
 	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
-	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
 	// a worker pool used to download chunk data from the relays
 	DownloadPool *workerpool.WorkerPool
@@ -242,10 +240,8 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
-	socketsFilterer, err := indexer.NewOperatorSocketsFilterer(serviceManagerAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
-	}
+	// TODO: OperatorSocketsFilterer functionality was removed due to indexer deprecation.
+	// Socket monitoring should be reimplemented using thegraph or direct contract calls.
 
 	nodeLogger.Info("Creating node",
 		"chainID", chainID.String(),
@@ -302,7 +298,6 @@ func NewNode(
 		Validator:               validator,
 		ValidatorV2:             validatorV2,
 		PubIPProvider:           pubIPProvider,
-		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
@@ -955,31 +950,10 @@ func (n *Node) updateSocketAddress(ctx context.Context, newSocketAddr string) {
 }
 
 func (n *Node) checkRegisteredNodeIpOnChain(ctx context.Context) {
-	n.Logger.Info("Start checkRegisteredNodeIpOnChain goroutine in background to subscribe the " +
-		"operator socket change events onchain")
-
-	socketChan, err := n.OperatorSocketsFilterer.WatchOperatorSocketUpdate(ctx, n.Config.ID)
-	if err != nil {
-		return
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case socket := <-socketChan:
-			n.mu.Lock()
-			if socket != n.CurrentSocket {
-				n.Logger.Info(
-					"Detected socket registered onchain which is different than the socket kept at the DA Node",
-					"socket kept at DA Node", n.CurrentSocket,
-					"socket registered onchain", socket,
-					"the action taken", "update the socket kept at DA Node")
-				n.CurrentSocket = socket
-			}
-			n.mu.Unlock()
-		}
-	}
+	// TODO: This functionality was disabled due to indexer deprecation.
+	// Socket monitoring should be reimplemented using thegraph or direct contract calls.
+	n.Logger.Info("Socket monitoring is currently disabled due to indexer deprecation")
+	return
 }
 
 func (n *Node) checkCurrentNodeIp(ctx context.Context) {
