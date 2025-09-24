@@ -2,7 +2,6 @@ package examples
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -510,15 +509,18 @@ func createOnDemandLedger(
 		return nil, fmt.Errorf("get payment state from disperser: %w", err)
 	}
 
+	var cumulativePayment *big.Int
 	if paymentState.GetCumulativePayment() == nil {
-		return nil, errors.New("received nil cumulative payment from disperser")
+		cumulativePayment = big.NewInt(0)
+	} else {
+		cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
 	onDemandLedger, err := ondemand.OnDemandLedgerFromValue(
 		totalDeposits,
 		new(big.Int).SetUint64(pricePerSymbol),
 		minNumSymbols,
-		new(big.Int).SetBytes(paymentState.GetCumulativePayment()),
+		cumulativePayment,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new on-demand ledger: %w", err)

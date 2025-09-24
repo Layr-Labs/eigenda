@@ -158,7 +158,7 @@ func (g *ParametrizedProver) GetCommitments(
 		// blobLen must always be a power of 2 in V2
 		// inputFr is not modified because padding with 0s doesn't change the commitment,
 		// but we need to pretend like it was actually padded with 0s to get the correct length proof.
-		blobLen := math.NextPowOf2u64(uint64(len(inputFr)))
+		blobLen := math.NextPowOf2u32(uint32(len(inputFr)))
 		lengthProof, err := g.KzgCommitmentsBackend.ComputeLengthProofForLengthV2(inputFr, blobLen)
 		lengthProofChan <- lengthProofResult{
 			LengthProof: lengthProof,

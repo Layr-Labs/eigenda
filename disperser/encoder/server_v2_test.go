@@ -88,7 +88,7 @@ func TestEncodeBlob(t *testing.T) {
 
 	// Setup test data
 	data := createTestData(t, testDataSize)
-	blobSize := uint(len(data))
+	blobSize := uint32(len(data))
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0

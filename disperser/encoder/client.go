@@ -78,6 +78,6 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 		Commitment:       commitment,
 		LengthCommitment: lengthCommitment,
 		LengthProof:      lengthProof,
-		Length:           uint(reply.GetCommitment().GetLength()),
+		Length:           reply.GetCommitment().GetLength(),
 	}, chunksData, nil
 }
