@@ -35,6 +35,8 @@ var (
 
 func main() {
 
+	// These version flags are possibly set by the build system. If they are not they will be empty, and
+	// we default to the version defined in common/version.
 	if node.SemVer != "" {
 		semver := node.SemVer
 		if node.GitCommit != "" {
