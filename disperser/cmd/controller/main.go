@@ -230,6 +230,7 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	dispatcher, err := controller.NewDispatcher(
+		context.Background(),
 		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,

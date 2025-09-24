@@ -113,14 +113,6 @@ var (
 		Value:    1 * time.Hour,
 	}
 
-	// Dispatcher Flags
-	DispatcherPullIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "dispatcher-pull-interval"),
-		Usage:    "Interval at which to pull from the queue",
-		Required: false,
-		Value:    1 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPATCHER_PULL_INTERVAL"),
-	}
 	AttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "attestation-timeout"),
 		Usage:    "Timeout for node requests",
@@ -325,7 +317,6 @@ var requiredFlags = []cli.Flag{
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
 
-	DispatcherPullIntervalFlag,
 	AttestationTimeoutFlag,
 	BatchAttestationTimeoutFlag,
 }
