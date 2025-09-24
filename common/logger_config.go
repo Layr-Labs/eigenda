@@ -141,7 +141,7 @@ func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 
 // Test-only utility for getting a logger instance.
 func TestLogger(t *testing.T) logging.Logger {
-	logger, err := NewLogger(DefaultLoggerConfig())
+	logger, err := NewLogger(DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	return logger
 }

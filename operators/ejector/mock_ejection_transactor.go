@@ -19,9 +19,6 @@ type mockEjectionTransactor struct {
 	completedEjections map[gethcommon.Address]struct{}
 
 	// The values to return for IsValidatorPresentInAnyQuorum calls.
-	isEjectionInProgressResponses map[gethcommon.Address]bool
-
-	// The values to return for IsValidatorPresentInAnyQuorum calls.
 	isValidatorPresentInAnyQuorumResponses map[gethcommon.Address]bool
 }
 
@@ -29,7 +26,6 @@ func newMockEjectionTransactor() *mockEjectionTransactor {
 	return &mockEjectionTransactor{
 		inProgressEjections:                    make(map[gethcommon.Address]struct{}),
 		completedEjections:                     make(map[gethcommon.Address]struct{}),
-		isEjectionInProgressResponses:          make(map[gethcommon.Address]bool),
 		isValidatorPresentInAnyQuorumResponses: make(map[gethcommon.Address]bool),
 	}
 }
@@ -51,7 +47,9 @@ func (m mockEjectionTransactor) IsEjectionInProgress(
 	_ context.Context,
 	addressToCheck gethcommon.Address,
 ) (bool, error) {
-	return m.isEjectionInProgressResponses[addressToCheck], nil
+
+	_, inProgress := m.inProgressEjections[addressToCheck]
+	return inProgress, nil
 }
 
 func (m mockEjectionTransactor) IsValidatorPresentInAnyQuorum(

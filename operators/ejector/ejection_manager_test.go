@@ -1,7 +1,6 @@
 package ejector
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 )
 
 // TODO test cases:
-//  - regular ejection
 //  - blacklisted in constructor
 //  - ejection already in progress
 //  - too recent of an attempt
@@ -32,7 +30,7 @@ func isTriggerTime(now time.Time, previousTime time.Time, target time.Time) bool
 }
 
 func TestStandardEjection(t *testing.T) {
-	rand := random.NewTestRandom(0) // TODO
+	rand := random.NewTestRandom()
 
 	logger := common.TestLogger(t)
 
@@ -80,28 +78,20 @@ func TestStandardEjection(t *testing.T) {
 	ejectionTimeB := currentTime.Add(time.Minute)
 	ejectionTimeC := currentTime.Add(2 * time.Minute)
 
-	expectedFinalizeTimeA := ejectionTimeA.Add(ejectionDelay)
-	expectedFinalizeTimeB := ejectionTimeB.Add(ejectionDelay)
-	expectedFinalizeTimeC := ejectionTimeC.Add(ejectionDelay)
-
-	fmt.Printf("ejectionTimeA: %s\n", ejectionTimeA)                 // TODO
-	fmt.Printf("expectedFinalizeTimeA: %s\n", expectedFinalizeTimeA) // TODO
-	fmt.Printf("ejectionTimeB: %s\n", ejectionTimeB)                 // TODO
-	fmt.Printf("expectedFinalizeTimeB: %s\n", expectedFinalizeTimeB) // TODO
-	fmt.Printf("ejectionTimeC: %s\n", ejectionTimeC)                 // TODO
-	fmt.Printf("expectedFinalizeTimeC: %s\n", expectedFinalizeTimeC) // TODO
+	var expectedFinalizeTimeA time.Time
+	var expectedFinalizeTimeB time.Time
+	var expectedFinalizeTimeC time.Time
 
 	// Step forward in time in ~5 second increments, checking the state of ejections along the way.
 	endTime := start.Add(30 * time.Minute)
 	for currentTime.Before(endTime) {
-
-		fmt.Printf("current time: %s\n", currentTime) // TODO
 
 		// Start ejections when ready.
 		if isTriggerTime(currentTime, previousTime, ejectionTimeA) {
 			_, started := ejectionTransactor.inProgressEjections[validatorA]
 			require.False(t, started)
 			manager.BeginEjection(validatorA, nil)
+			expectedFinalizeTimeA = currentTime.Add(ejectionDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorA]
 			require.True(t, started)
 		}
@@ -109,6 +99,7 @@ func TestStandardEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorB]
 			require.False(t, started)
 			manager.BeginEjection(validatorB, nil)
+			expectedFinalizeTimeB = currentTime.Add(ejectionDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorB]
 			require.True(t, started)
 		}
@@ -116,6 +107,7 @@ func TestStandardEjection(t *testing.T) {
 			_, started := ejectionTransactor.inProgressEjections[validatorC]
 			require.False(t, started)
 			manager.BeginEjection(validatorC, nil)
+			expectedFinalizeTimeC = currentTime.Add(ejectionDelay)
 			_, started = ejectionTransactor.inProgressEjections[validatorC]
 			require.True(t, started)
 		}
@@ -132,10 +124,6 @@ func TestStandardEjection(t *testing.T) {
 		if isTriggerTime(currentTime, previousTime, expectedFinalizeTimeC) {
 			_, finalized := ejectionTransactor.completedEjections[validatorC]
 			require.False(t, finalized)
-		}
-
-		if isTriggerTime(currentTime, previousTime, expectedFinalizeTimeA) {
-			fmt.Printf("about to finalize A at %s\n", currentTime) // TODO
 		}
 
 		// Call this each iteration. Most of the time it won't do anything, but when the time is right it will finalize

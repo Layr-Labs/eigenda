@@ -32,8 +32,8 @@ var _ EjectionManager = (*ejectionManager)(nil)
 
 // Information tracked for each in-progress ejection.
 type inProgressEjection struct {
-	// The time the ejection was started.
-	ejectionStartTime time.Time
+	// The time when the ejection can be finalized.
+	ejectionFinalizationTime time.Time
 	// For each quorum the validator is a member of, the validator's stake in that quorum as a fraction of 1.0.
 	stake map[core.QuorumID]float64
 }
@@ -212,8 +212,8 @@ func (em *ejectionManager) BeginEjection(
 
 	em.recentEjectionTimes[validatorAddress] = em.timeSource()
 	em.ejectionsInProgress[validatorAddress] = &inProgressEjection{
-		ejectionStartTime: em.timeSource(),
-		stake:             stakes,
+		ejectionFinalizationTime: em.timeSource().Add(em.ejectionDelay),
+		stake:                    stakes,
 	}
 }
 
@@ -223,18 +223,15 @@ func (em *ejectionManager) FinalizeEjections() {
 	// Note: similar to cleanRecentEjections(), we are iterating a map here. At a certain scale a
 	// priority queue would be more efficient, but that optimization is premature at this time.
 
-	cutoff := em.timeSource().Add(-em.ejectionDelay)
+	now := em.timeSource()
 
 	for address, ejection := range em.ejectionsInProgress {
-		if ejection.ejectionStartTime.Before(cutoff) {
-			// Not ready to finalize yet.
-			continue
-		}
+		if now.After(ejection.ejectionFinalizationTime) {
+			ejected := em.finalizeEjection(address)
 
-		ejected := em.finalizeEjection(address)
-
-		if !ejected {
-			em.cleanUpFailedEjection(address, ejection.stake)
+			if !ejected {
+				em.cleanUpFailedEjection(address, ejection.stake)
+			}
 		}
 	}
 }
