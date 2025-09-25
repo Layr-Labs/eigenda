@@ -159,6 +159,19 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	// Validate reservation payments (on-demand payments are validated on the the disperser's controller service)
+	//
+	// Note: the payment processing that occurs within this method is NOT reverted, even if something fails further
+	// along. There are a couple reasons for this:
+	// 1. At this stage, the dispersal request has already been sent to other validators. Even if this individual
+	// validator were to revert the payment after some type of failure, there's no way to make sure that all other
+	// validators would experience the same failure and revert. It is important to keep validator payment state in
+	// sync, so the safest behavior is to just treat this as the point-of-no-return, from a payments perspective.
+	// 2. Even if there were a way for all validators to agree on what payments to revert, non-trivial amounts of work
+	// are being done shortly after this payment validation completes, for which the validators should be compensated.
+	//
+	// This accounting logic relies on each dispersal only arriving at this stage *once*. That is currently guaranteed
+	// based on the replay guardian above. If the replay guardian were ever to be removed (for example, to enable
+	// retried dispersals) then the accounting logic here would need to be revisited, and made retry tolerant.
 	err = s.node.ValidateReservationPayment(ctx, batch, probe)
 	if err != nil {
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
