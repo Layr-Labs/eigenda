@@ -19,7 +19,7 @@ exp:
 	go run ./deploy/cmd exp
 
 deploy-all: new-anvil
-	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true  all
+	go run ./deploy/cmd  -localstack-port 4570 -deploy-resources true all
 
 stop-infra:
 # Stop anvil

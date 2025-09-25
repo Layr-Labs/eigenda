@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	LocalStackImage = "localstack/localstack:latest"
+	LocalStackImage = "localstack/localstack:4.7.0"
 	LocalStackPort  = "4566/tcp"
 )
 
