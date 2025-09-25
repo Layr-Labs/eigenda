@@ -21,14 +21,20 @@
 //! The challenge `γ` is computed as `keccak256(H(m) || APK_G₁ || APK_G₂ || σ)`
 //! to prevent rogue public key attacks in the aggregate setting.
 
+use std::sync::LazyLock;
+
 use alloy_primitives::B256;
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
+use ark_ec::bn::G2Prepared;
 use ark_ec::pairing::{Pairing, PairingOutput};
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{AdditiveGroup, PrimeField};
 
 use crate::verification::cert::convert;
 use crate::verification::cert::hash::streaming_keccak256;
+
+static PRECOMPUTED_NEG_G2: LazyLock<G2Prepared<ark_bn254::Config>> =
+    LazyLock::new(|| G2Prepared::from(-G2Affine::generator()));
 
 /// Verify a BLS signature using bilinear pairings.
 ///
@@ -56,9 +62,9 @@ pub fn verify(msg_hash: B256, apk_g1: G1Affine, apk_g2: G2Affine, sigma: G1Affin
     let msg_point = convert::hash_to_point(msg_hash);
 
     let a1 = (sigma + apk_g1 * gamma).into_affine();
-    let a2 = -G2Affine::generator();
+    let a2 = PRECOMPUTED_NEG_G2.clone();
     let b1 = (msg_point + G1Affine::generator() * gamma).into_affine();
-    let b2 = apk_g2;
+    let b2 = G2Prepared::from(apk_g2);
 
     let miller_result = Bn254::multi_miller_loop([a1, b1], [a2, b2]);
     let pairing_result = Bn254::final_exponentiation(miller_result);

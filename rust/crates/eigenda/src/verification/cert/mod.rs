@@ -430,8 +430,14 @@ fn process_quorums(
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(any(test, feature = "test-utils"))]
+/// Test utilities for certificate verification operations
+///
+/// This module provides helper functions for creating test certificates, batch
+/// headers, and other data structures used in EigenDA certificate verification
+/// tests and benchmarks. These utilities are only available when the `test-utils`
+/// feature is enabled or during testing.
+pub mod test_utils {
     use alloy_primitives::aliases::U96;
     use alloy_primitives::{B256, Bytes, keccak256};
     use alloy_sol_types::SolValue;
@@ -441,19 +447,281 @@ mod tests {
 
     use crate::cert::solidity::{SecurityThresholds, VersionedBlobParams};
     use crate::cert::{
-        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo, G1Point,
+        BatchHeaderV2, BlobCertificate, BlobCommitment, BlobHeaderV2, BlobInclusionInfo,
         NonSignerStakesAndSignature,
     };
     use crate::verification::cert::bitmap::Bitmap;
+    use crate::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
+    use crate::verification::cert::types::Storage;
+    use crate::verification::cert::types::history::{History, Update};
+    use crate::verification::cert::{CertVerificationInputs, convert};
+
+    /// Generate valid test inputs for certificate verification
+    ///
+    /// This function creates a complete set of test data including batch headers,
+    /// blob inclusion info, signatures, and storage state for benchmarking and testing.
+    pub fn success_inputs() -> CertVerificationInputs {
+        let g1 = G1Projective::generator();
+        let g2 = G2Projective::generator();
+
+        let non_signer0_sk = Fr::from(40u64);
+        let non_signer0_g1_pk = (g1 * non_signer0_sk).into_affine();
+
+        let non_signer1_sk = Fr::from(41u64);
+        let non_signer1_g1_pk = (g1 * non_signer1_sk).into_affine();
+
+        let non_signer2_sk = Fr::from(42u64);
+        let non_signer2_g1_pk = (g1 * non_signer2_sk).into_affine();
+
+        let signer3_sk = Fr::from(43u64);
+        let signer3_g1_pk = (g1 * signer3_sk).into_affine();
+        let signer3_g2_pk = (g2 * signer3_sk).into_affine();
+
+        let signer4_sk = Fr::from(44u64);
+        let signer4_g1_pk = (g1 * signer4_sk).into_affine();
+        let signer4_g2_pk = (g2 * signer4_sk).into_affine();
+
+        let optional_non_signer5_sk = Fr::from(45u64);
+        let optional_non_signer5_g1_pk = (g1 * optional_non_signer5_sk).into_affine();
+
+        let _apk_g1 = (signer3_g1_pk + signer4_g1_pk).into_affine();
+        let apk_g2 = (signer3_g2_pk + signer4_g2_pk).into_affine();
+
+        let blob_inclusion_info = BlobInclusionInfo {
+            blob_certificate: BlobCertificate {
+                blob_header: BlobHeaderV2 {
+                    version: 42,
+                    quorum_numbers: [0, 2].into(),
+                    commitment: BlobCommitment::default(),
+                    payment_header_hash: [42; 32],
+                },
+                signature: [].into(),
+                relay_keys: vec![42],
+            },
+            blob_index: 0,
+            inclusion_proof: [42u8; 32].into(),
+        };
+
+        let (batch_header, sigma) =
+            compute_batch_header_and_sigma(&blob_inclusion_info, vec![signer3_sk, signer4_sk]);
+
+        let apk_for_each_quorum = [
+            (non_signer0_g1_pk + non_signer2_g1_pk + signer4_g1_pk).into_affine(),
+            (non_signer0_g1_pk + non_signer1_g1_pk + non_signer2_g1_pk + signer3_g1_pk)
+                .into_affine(),
+        ];
+
+        let non_signer_stakes_and_signature = NonSignerStakesAndSignature {
+            non_signer_quorum_bitmap_indices: vec![0, 0, 0],
+            non_signer_pubkeys: vec![
+                non_signer0_g1_pk.into(),
+                non_signer1_g1_pk.into(),
+                non_signer2_g1_pk.into(),
+            ],
+            quorum_apks: vec![apk_for_each_quorum[0].into(), apk_for_each_quorum[1].into()],
+            apk_g2: apk_g2.into(),
+            sigma: sigma.into(),
+            quorum_apk_indices: vec![0, 0],
+            total_stake_indices: vec![0, 0],
+            non_signer_stake_indices: vec![vec![0, 0, 0], vec![0, 0, 0]],
+        };
+        let signed_quorum_numbers: Bytes = [0, 2].into();
+
+        let security_thresholds = SecurityThresholds {
+            confirmationThreshold: 66,
+            adversaryThreshold: 0,
+        };
+
+        let non_signer0_pk_hash = convert::point_to_hash(&non_signer0_g1_pk.into());
+        let non_signer1_pk_hash = convert::point_to_hash(&non_signer1_g1_pk.into());
+        let non_signer2_pk_hash = convert::point_to_hash(&non_signer2_g1_pk.into());
+        let signer3_pk_hash = convert::point_to_hash(&signer3_g1_pk.into());
+        let signer4_pk_hash = convert::point_to_hash(&signer4_g1_pk.into());
+        let optional_non_signer5_pk_hash =
+            convert::point_to_hash(&optional_non_signer5_g1_pk.into());
+
+        let pk_hashes = [
+            non_signer0_pk_hash,
+            non_signer1_pk_hash,
+            non_signer2_pk_hash,
+            signer3_pk_hash,
+            signer4_pk_hash,
+            optional_non_signer5_pk_hash,
+        ];
+
+        let quorum_bitmap_history = {
+            let quorum_bitmap_histories = vec![
+                Bitmap::new([5, 0, 0, 0]),
+                Bitmap::new([6, 0, 0, 0]),
+                Bitmap::new([7, 0, 0, 0]),
+                Bitmap::new([4, 0, 0, 0]),
+                Bitmap::new([1, 0, 0, 0]),
+                Bitmap::new([0, 0, 0, 0]),
+            ];
+
+            pk_hashes
+                .into_iter()
+                .zip(quorum_bitmap_histories)
+                .map(|(pk_hash, quorum_bitmap_history)| {
+                    let update = Update::new(41, 43, quorum_bitmap_history).unwrap();
+                    let history = HashMap::from([(0, update)]);
+                    (pk_hash, History(history))
+                })
+                .collect()
+        };
+
+        let operator_stake_history = pk_hashes
+            .into_iter()
+            .map(|pk_hash| {
+                let stake_history_by_quorum = signed_quorum_numbers
+                    .clone()
+                    .into_iter()
+                    .map(|quorum| {
+                        let update = Update::new(41, 43, U96::from(10)).unwrap();
+                        let history = HashMap::from([(0, update)]);
+                        (quorum, History(history))
+                    })
+                    .collect();
+                (pk_hash, stake_history_by_quorum)
+            })
+            .collect::<HashMap<B256, _>>();
+
+        let total_stake_history = signed_quorum_numbers
+            .clone()
+            .into_iter()
+            .map(|quorum| {
+                let update = Update::new(41, 43, U96::from(100)).unwrap();
+                let history = HashMap::from([(0, update)]);
+                (quorum, History(history))
+            })
+            .collect();
+
+        let apk_history = signed_quorum_numbers
+            .clone()
+            .into_iter()
+            .zip(apk_for_each_quorum)
+            .map(|(quorum, apk)| {
+                let apk_hash = convert::point_to_hash(&apk.into());
+                let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
+                let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
+                let update = Update::new(41, 43, apk_trunc_hash).unwrap();
+                let history = HashMap::from([(0, update)]);
+                (quorum, History(history))
+            })
+            .collect();
+
+        let versioned_blob_params = HashMap::from([(
+            42,
+            VersionedBlobParams {
+                maxNumOperators: 42,
+                numChunks: 44,
+                codingRate: 42,
+            },
+        )]);
+
+        let next_blob_version = 43;
+
+        #[cfg(feature = "stale-stakes-forbidden")]
+        let staleness = {
+            use crate::verification::cert::types::Staleness;
+
+            let quorum_update_block_number = signed_quorum_numbers
+                .clone()
+                .into_iter()
+                .map(|quorum| (quorum, 42))
+                .collect();
+
+            Staleness {
+                stale_stakes_forbidden: true,
+                min_withdrawal_delay_blocks: 10,
+                quorum_update_block_number,
+            }
+        };
+
+        let storage = Storage {
+            quorum_count: u8::MAX,
+            current_block: 43,
+            quorum_bitmap_history,
+            operator_stake_history,
+            total_stake_history,
+            apk_history,
+            versioned_blob_params,
+            next_blob_version,
+            #[cfg(feature = "stale-stakes-forbidden")]
+            staleness,
+        };
+
+        let required_quorum_numbers: Bytes = [0, 2].into();
+
+        CertVerificationInputs {
+            batch_header,
+            blob_inclusion_info,
+            non_signer_stakes_and_signature,
+            security_thresholds,
+            required_quorum_numbers,
+            signed_quorum_numbers,
+            storage,
+        }
+    }
+
+    /// Computes batch header and signature for test certificate generation
+    ///
+    /// Creates a `BatchHeaderV2` from blob inclusion information and computes
+    /// the corresponding BLS signature using the provided secret keys. This is
+    /// used to generate valid test certificates for verification testing.
+    ///
+    /// # Arguments
+    /// * `blob_inclusion_info` - Information about blob inclusion in the batch
+    /// * `secret_keys` - Secret keys for signing the batch header
+    ///
+    /// # Returns
+    /// A tuple containing:
+    /// - `BatchHeaderV2`: The computed batch header
+    /// - `G1Affine`: The BLS signature for the batch header
+    pub fn compute_batch_header_and_sigma(
+        blob_inclusion_info: &BlobInclusionInfo,
+        secret_keys: Vec<Fr>,
+    ) -> (BatchHeaderV2, G1Affine) {
+        let encoded = blob_inclusion_info
+            .blob_certificate
+            .hash_ext()
+            .abi_encode_packed();
+        let left_child = keccak256(&encoded);
+
+        let right_sibling = [42u8; 32].into();
+        let batch_root = streaming_keccak256(&[left_child, right_sibling]);
+
+        let batch_header = BatchHeaderV2 {
+            batch_root: batch_root.into(),
+            reference_block_number: 42,
+        };
+
+        let msg_hash = batch_header.hash_ext();
+        let msg_point = convert::hash_to_point(msg_hash);
+
+        let sigma = secret_keys
+            .into_iter()
+            .map(|sk| (msg_point * sk).into_affine())
+            .fold(G1Affine::identity(), |acc, sig| {
+                (G1Projective::from(acc) + G1Projective::from(sig)).into_affine()
+            });
+
+        (batch_header, sigma)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::aliases::U96;
+    use ark_bn254::Fr;
+
+    use crate::cert::G1Point;
     use crate::verification::cert::bitmap::BitmapError::*;
     use crate::verification::cert::error::CertVerificationError::*;
-    use crate::verification::cert::hash::{HashExt, TruncHash, streaming_keccak256};
-    #[cfg(feature = "stale-stakes-forbidden")]
-    use crate::verification::cert::types::Staleness;
-    use crate::verification::cert::types::Storage;
+    use crate::verification::cert::test_utils::{compute_batch_header_and_sigma, success_inputs};
     use crate::verification::cert::types::history::HistoryError::*;
-    use crate::verification::cert::types::history::{History, Update};
-    use crate::verification::cert::{CertVerificationInputs, convert, verify};
+    use crate::verification::cert::types::history::Update;
+    use crate::verification::cert::verify;
 
     #[test]
     fn success() {
@@ -810,254 +1078,5 @@ mod tests {
         let err = verify(inputs).unwrap_err();
 
         assert_eq!(err, BlobQuorumsDoNotContainRequiredQuorums);
-    }
-
-    fn success_inputs() -> CertVerificationInputs {
-        let g1 = G1Projective::generator();
-        let g2 = G2Projective::generator();
-
-        let non_signer0_sk = Fr::from(40u64);
-        let non_signer0_g1_pk = (g1 * non_signer0_sk).into_affine();
-
-        let non_signer1_sk = Fr::from(41u64);
-        let non_signer1_g1_pk = (g1 * non_signer1_sk).into_affine();
-
-        let non_signer2_sk = Fr::from(42u64);
-        let non_signer2_g1_pk = (g1 * non_signer2_sk).into_affine();
-
-        let signer3_sk = Fr::from(43u64);
-        let signer3_g1_pk = (g1 * signer3_sk).into_affine();
-        let signer3_g2_pk = (g2 * signer3_sk).into_affine();
-
-        let signer4_sk = Fr::from(44u64);
-        let signer4_g1_pk = (g1 * signer4_sk).into_affine();
-        let signer4_g2_pk = (g2 * signer4_sk).into_affine();
-
-        let optional_non_signer5_sk = Fr::from(45u64);
-        let optional_non_signer5_g1_pk = (g1 * optional_non_signer5_sk).into_affine();
-
-        let _apk_g1 = (signer3_g1_pk + signer4_g1_pk).into_affine();
-        let apk_g2 = (signer3_g2_pk + signer4_g2_pk).into_affine();
-
-        let blob_inclusion_info = BlobInclusionInfo {
-            blob_certificate: BlobCertificate {
-                blob_header: BlobHeaderV2 {
-                    version: 42,
-                    quorum_numbers: [0, 2].into(),
-                    commitment: BlobCommitment::default(),
-                    payment_header_hash: [42; 32],
-                },
-                signature: [].into(),
-                relay_keys: vec![42],
-            },
-            blob_index: 0,
-            inclusion_proof: [42u8; 32].into(),
-        };
-
-        let (batch_header, sigma) =
-            compute_batch_header_and_sigma(&blob_inclusion_info, vec![signer3_sk, signer4_sk]);
-
-        // let sig_at_quorum_2_by_signer_3 = (msg_point * signer3_sk).into_affine();
-        // let sig_at_quorum_0_by_signer_4 = (msg_point * signer4_sk).into_affine();
-        // let sigma = (sig_at_quorum_2_by_signer_3 + sig_at_quorum_0_by_signer_4).into_affine();
-
-        let apk_for_each_quorum = [
-            (non_signer0_g1_pk + non_signer2_g1_pk + signer4_g1_pk).into_affine(),
-            (non_signer0_g1_pk + non_signer1_g1_pk + non_signer2_g1_pk + signer3_g1_pk)
-                .into_affine(),
-        ];
-
-        let non_signer_stakes_and_signature = NonSignerStakesAndSignature {
-            non_signer_quorum_bitmap_indices: vec![0, 0, 0],
-            non_signer_pubkeys: vec![
-                non_signer0_g1_pk.into(),
-                non_signer1_g1_pk.into(),
-                non_signer2_g1_pk.into(),
-            ],
-            quorum_apks: vec![apk_for_each_quorum[0].into(), apk_for_each_quorum[1].into()],
-            apk_g2: apk_g2.into(),
-            sigma: sigma.into(),
-            quorum_apk_indices: vec![0, 0],
-            total_stake_indices: vec![0, 0],
-            non_signer_stake_indices: vec![vec![0, 0, 0], vec![0, 0, 0]],
-        };
-        // quorum 1 had no signatures
-        // quorums 0 and 2 had at least one signature (exactly one in this example)
-        let signed_quorum_numbers: Bytes = [0, 2].into();
-
-        let security_thresholds = SecurityThresholds {
-            // further down I set codingRate = 42
-            // since (confirmation_threshold - adversary_threshold) * codingRate >= 100
-            // and confirmation_threshold > adversary_threshold
-            // I set the following:
-            // the above condition would be met with confirmation_threshold: 100
-            // but would result in n = 0 in `n < maxNumOperators` thus not meeting security assumptions
-            confirmationThreshold: 66,
-            adversaryThreshold: 0,
-        };
-
-        let non_signer0_pk_hash = convert::point_to_hash(&non_signer0_g1_pk.into());
-        let non_signer1_pk_hash = convert::point_to_hash(&non_signer1_g1_pk.into());
-        let non_signer2_pk_hash = convert::point_to_hash(&non_signer2_g1_pk.into());
-        let signer3_pk_hash = convert::point_to_hash(&signer3_g1_pk.into());
-        let signer4_pk_hash = convert::point_to_hash(&signer4_g1_pk.into());
-        let optional_non_signer5_pk_hash =
-            convert::point_to_hash(&optional_non_signer5_g1_pk.into());
-
-        // by sheer coincidence the first 3 hashes are already sorted
-        let pk_hashes = [
-            non_signer0_pk_hash,
-            non_signer1_pk_hash,
-            non_signer2_pk_hash,
-            signer3_pk_hash,
-            signer4_pk_hash,
-            optional_non_signer5_pk_hash,
-        ];
-
-        let quorum_bitmap_history = {
-            let quorum_bitmap_histories = vec![
-                Bitmap::new([5, 0, 0, 0]), // 1 0 1
-                Bitmap::new([6, 0, 0, 0]), // 1 1 0
-                Bitmap::new([7, 0, 0, 0]), // 1 1 1
-                Bitmap::new([4, 0, 0, 0]), // 1 0 0
-                Bitmap::new([1, 0, 0, 0]), // 0 0 1
-                Bitmap::new([0, 0, 0, 0]), // 0 0 0
-            ];
-
-            pk_hashes
-                .into_iter()
-                .zip(quorum_bitmap_histories)
-                .map(|(pk_hash, quorum_bitmap_history)| {
-                    let update = Update::new(41, 43, quorum_bitmap_history).unwrap();
-                    let history = HashMap::from([(0, update)]);
-                    (pk_hash, History(history))
-                })
-                .collect()
-        };
-
-        let operator_stake_history = pk_hashes
-            .into_iter()
-            .map(|pk_hash| {
-                let stake_history_by_quorum = signed_quorum_numbers
-                    .clone()
-                    .into_iter()
-                    .map(|quorum| {
-                        let update = Update::new(41, 43, U96::from(10)).unwrap();
-                        let history = HashMap::from([(0, update)]);
-                        (quorum, History(history))
-                    })
-                    .collect();
-                (pk_hash, stake_history_by_quorum)
-            })
-            .collect::<HashMap<B256, _>>();
-
-        let total_stake_history = signed_quorum_numbers
-            .clone()
-            .into_iter()
-            .map(|quorum| {
-                let update = Update::new(41, 43, U96::from(100)).unwrap();
-                let history = HashMap::from([(0, update)]);
-                (quorum, History(history))
-            })
-            .collect();
-
-        let apk_history = signed_quorum_numbers
-            .clone()
-            .into_iter()
-            .zip(apk_for_each_quorum)
-            .map(|(quorum, apk)| {
-                let apk_hash = convert::point_to_hash(&apk.into());
-                let apk_trunc_hash: [u8; 24] = apk_hash[..24].try_into().unwrap();
-                let apk_trunc_hash: TruncHash = apk_trunc_hash.into();
-                let update = Update::new(41, 43, apk_trunc_hash).unwrap();
-                let history = HashMap::from([(0, update)]);
-                (quorum, History(history))
-            })
-            .collect();
-
-        let versioned_blob_params = HashMap::from([(
-            42,
-            VersionedBlobParams {
-                maxNumOperators: 42,
-                numChunks: 44,
-                codingRate: 42,
-            },
-        )]);
-
-        let next_blob_version = 43;
-
-        #[cfg(feature = "stale-stakes-forbidden")]
-        let staleness = {
-            let quorum_update_block_number = signed_quorum_numbers
-                .clone()
-                .into_iter()
-                .map(|quorum| (quorum, 42))
-                .collect();
-
-            Staleness {
-                stale_stakes_forbidden: true,
-                min_withdrawal_delay_blocks: 10,
-                quorum_update_block_number,
-            }
-        };
-
-        let storage = Storage {
-            quorum_count: u8::MAX,
-            current_block: 43,
-            quorum_bitmap_history,
-            operator_stake_history,
-            total_stake_history,
-            apk_history,
-            versioned_blob_params,
-            next_blob_version,
-            #[cfg(feature = "stale-stakes-forbidden")]
-            staleness,
-        };
-
-        let required_quorum_numbers: Bytes = [0, 2].into();
-
-        CertVerificationInputs {
-            batch_header,
-            blob_inclusion_info,
-            non_signer_stakes_and_signature,
-            security_thresholds,
-            required_quorum_numbers,
-            signed_quorum_numbers,
-            storage,
-        }
-    }
-
-    fn compute_batch_header_and_sigma(
-        blob_inclusion_info: &BlobInclusionInfo,
-        secret_keys: Vec<Fr>,
-    ) -> (BatchHeaderV2, G1Affine) {
-        //   C || 42
-        //  /      \
-        // C        42
-
-        let encoded = blob_inclusion_info
-            .blob_certificate
-            .hash_ext()
-            .abi_encode_packed();
-        let left_child = keccak256(&encoded);
-
-        let right_sibling = [42u8; 32].into();
-        let batch_root = streaming_keccak256(&[left_child, right_sibling]);
-
-        let batch_header = BatchHeaderV2 {
-            batch_root: batch_root.into(),
-            reference_block_number: 42,
-        };
-
-        let msg_hash = batch_header.hash_ext();
-        let msg_point = convert::hash_to_point(msg_hash);
-
-        let sigma = secret_keys
-            .iter()
-            .map(|secret_key| msg_point * secret_key)
-            .sum::<G1Projective>()
-            .into_affine();
-
-        (batch_header, sigma)
     }
 }

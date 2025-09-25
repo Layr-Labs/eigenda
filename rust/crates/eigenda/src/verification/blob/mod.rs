@@ -186,6 +186,39 @@ fn verify_kzg_commitment(
         .ok_or(InvalidKzgCommitment)
 }
 
+/// Creates test data for blob verification benchmarks and tests
+///
+/// Returns a valid blob commitment and encoded payload pair that will pass
+/// blob verification. Uses a hardcoded payload
+/// and a pre-computed commitment that matches this data.
+///
+/// # Returns
+/// A tuple containing:
+/// - `BlobCommitment`: Pre-computed commitment for the test payload
+/// - `Vec<u8>`: Encoded payload that matches the commitment
+///
+/// # Note
+/// This function is only available when the `test-utils` feature is enabled
+/// or during testing.
+#[cfg(any(test, feature = "test-utils"))]
+pub fn success_inputs(raw_payload: &[u8]) -> (BlobCommitment, Vec<u8>) {
+    use ark_bn254::G2Affine;
+
+    use crate::cert::BlobCommitment;
+    use crate::verification::blob::codec::tests_utils::encode_raw_payload;
+
+    let encoded_payload = encode_raw_payload(raw_payload).unwrap();
+    let blob = Blob::new(&encoded_payload);
+
+    let commitment = BlobCommitment {
+        commitment: KZG::new().commit_blob(&blob, &SRS).unwrap().into(),
+        length_commitment: G2Affine::default().into(),
+        length_proof: G2Affine::default().into(),
+        length: (blob.len() / 32) as u32,
+    };
+    (commitment, encoded_payload)
+}
+
 #[cfg(test)]
 mod test {
     use crate::verification::blob::error::BlobVerificationError::*;
@@ -200,36 +233,9 @@ mod test {
     #[test]
     #[cfg(not(debug_assertions))]
     fn verify_succeeds_with_known_commitment() {
-        use std::str::FromStr;
+        use crate::verification::blob::{success_inputs, verify};
 
-        use ark_bn254::{Fq, G1Affine, G2Affine};
-
-        use crate::cert::BlobCommitment;
-        use crate::verification::blob::codec::tests::encode_raw_payload;
-        use crate::verification::blob::verify;
-
-        let raw_payload = [123; 512];
-        let encoded_payload = encode_raw_payload(&raw_payload).unwrap();
-
-        let known_commitment = G1Affine::new_unchecked(
-            Fq::from_str(
-                "14744258532267160547483505594354502788777214273862365248297251133183543768320",
-            )
-            .unwrap(),
-            Fq::from_str(
-                "14747463945321045950305747275042450369190644326153769248149140572576072465547",
-            )
-            .unwrap(),
-        )
-        .into();
-
-        let blob_commitment = BlobCommitment {
-            commitment: known_commitment,
-            length_commitment: G2Affine::default().into(),
-            length_proof: G2Affine::default().into(),
-            length: 32 + 32,
-        };
-
+        let (blob_commitment, encoded_payload) = success_inputs(&[123; 512]);
         assert_eq!(verify(&blob_commitment, &encoded_payload), Ok(()));
     }
 

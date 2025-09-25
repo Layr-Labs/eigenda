@@ -5,7 +5,9 @@ version = "0.1.0"
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
-alloy-rlp = { version = "0.3.12", default-features = false }
+alloy-rlp = { version = "0.3.12", default-features = false, features = [
+  "derive",
+] }
 alloy-sol-types = { workspace = true }
 ark-bn254 = { workspace = true, features = ["curve"] }
 ark-ec = { version = "0.5.0", default-features = false }
@@ -32,6 +34,7 @@ rust-kzg-bn254-prover = { workspace = true }
 [dev-dependencies]
 arbitrary = { workspace = true }
 bincode = { workspace = true, features = ["derive", "serde", "std"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 hex = { workspace = true }
 jsonschema = { workspace = true }
 rand = { workspace = true }
@@ -46,3 +49,14 @@ wiremock = { workspace = true }
 arbitrary = ["dep:proptest"]
 default = []
 stale-stakes-forbidden = []
+test-utils = []
+
+[[bench]]
+harness = false
+name = "cert_verification"
+required-features = ["test-utils"]
+
+[[bench]]
+harness = false
+name = "blob_verification"
+required-features = ["test-utils"]

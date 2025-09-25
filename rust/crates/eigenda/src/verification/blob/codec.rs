@@ -133,15 +133,15 @@ pub fn decode_encoded_payload(encoded_payload: &[u8]) -> Result<Vec<u8>, BlobVer
     Ok(raw_payload)
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "test-utils"))]
+/// Test utilities for blob codec operations
+///
+/// This module provides helper functions for encoding raw payloads into the
+/// EigenDA blob format for use in tests and benchmarks. These utilities are
+/// only available when the `test-utils` feature is enabled or during testing.
+pub mod tests_utils {
     use crate::verification::blob::BlobVerificationError::{self, *};
-    use crate::verification::blob::codec::{
-        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, decode_encoded_payload,
-    };
-    use crate::verification::blob::error::BlobVerificationError::{
-        BlobTooSmallForHeader, BlobTooSmallForHeaderAndPayload,
-    };
+    use crate::verification::blob::codec::{BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN};
 
     /// Guard byte value used to prefix field elements in the EigenDA encoding.
     ///
@@ -200,6 +200,7 @@ pub(crate) mod tests {
     /// by construction:
     /// - The payload length in the header provides an upper bound for payload size validation
     /// - All padding bytes are guaranteed to be zero
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn encode_raw_payload(raw_payload: &[u8]) -> Result<Vec<u8>, BlobVerificationError> {
         let header = construct_header(raw_payload)?;
 
@@ -256,7 +257,7 @@ pub(crate) mod tests {
     ///
     /// * `Ok([u8; 32])` - The constructed header bytes
     /// * `Err(BlobVerificationError::BlobTooLarge)` - If payload length exceeds `u32::MAX`
-    fn construct_header(
+    pub fn construct_header(
         raw_payload: &[u8],
     ) -> Result<[u8; HEADER_BYTES_LEN], BlobVerificationError> {
         let mut header = [0; HEADER_BYTES_LEN];
@@ -309,7 +310,7 @@ pub(crate) mod tests {
     /// The function uses a two-stage approach:
     /// 1. Expand payload to chunk-aligned size with zero padding
     /// 2. Transform chunks into symbols by interleaving guard bytes
-    fn pad_raw_payload(raw_payload: &[u8]) -> Result<Vec<u8>, BlobVerificationError> {
+    pub fn pad_raw_payload(raw_payload: &[u8]) -> Result<Vec<u8>, BlobVerificationError> {
         let chunks = raw_payload.len().div_ceil(BYTES_PER_CHUNK);
 
         let chunk_bytes_len = chunks.checked_mul(BYTES_PER_CHUNK).ok_or(Overflow)?;
@@ -330,6 +331,19 @@ pub(crate) mod tests {
 
         Ok(dst)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::verification::blob::codec::tests_utils::{
+        FIELD_ELEMENT_GUARD_BYTE, VERSION, construct_header, encode_raw_payload, pad_raw_payload,
+    };
+    use crate::verification::blob::codec::{
+        BYTES_PER_CHUNK, BYTES_PER_SYMBOL, HEADER_BYTES_LEN, decode_encoded_payload,
+    };
+    use crate::verification::blob::error::BlobVerificationError::{
+        BlobTooSmallForHeader, BlobTooSmallForHeaderAndPayload,
+    };
 
     #[test]
     fn roundtrip_boundary_cases() {
@@ -507,7 +521,7 @@ mod proptests {
     use proptest::prelude::*;
 
     use crate::verification::blob::codec::decode_encoded_payload;
-    use crate::verification::blob::codec::tests::encode_raw_payload;
+    use crate::verification::blob::codec::tests_utils::encode_raw_payload;
 
     proptest! {
         #[test]
