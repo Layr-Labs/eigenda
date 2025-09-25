@@ -537,14 +537,6 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 }
 
 func startChurnerServer(testConfig *deploy.Config) error {
-	// Start listener on the specified port
-	grpcPort := "32002"
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
-	if err != nil {
-		return fmt.Errorf("failed to listen on port %s: %w", grpcPort, err)
-	}
-	churnerListener = listener
-
 	// Get deployer's private key
 	var privateKey string
 	deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
@@ -585,6 +577,7 @@ func startChurnerServer(testConfig *deploy.Config) error {
 		OperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
 		EigenDAServiceManagerAddr:  testConfig.EigenDA.ServiceManager,
 		EigenDADirectory:           testConfig.EigenDA.EigenDADirectory,
+		GRPCPort:                   "32002",
 		ChurnApprovalInterval:      15 * time.Minute,
 		PerPublicKeyRateLimit:      1 * time.Second,
 	}
@@ -619,22 +612,29 @@ func startChurnerServer(testConfig *deploy.Config) error {
 	}
 
 	// Create indexer
-	cs := coreeth.NewChainState(churnerTx, gethClient)
-	indexer := thegraph.MakeIndexedChainState(churnerConfig.ChainStateConfig, cs, churnerLogger)
+	chainState := coreeth.NewChainState(churnerTx, gethClient)
+	indexer := thegraph.MakeIndexedChainState(churnerConfig.ChainStateConfig, chainState, churnerLogger)
 
 	// Create churner
 	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, churnerLogger)
-	cn, err := churner.NewChurner(churnerConfig, indexer, churnerTx, churnerLogger, churnerMetrics)
+	churnerInstance, err := churner.NewChurner(churnerConfig, indexer, churnerTx, churnerLogger, churnerMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create churner: %w", err)
 	}
 
 	// Create churner server
-	churnerSvr := churner.NewServer(churnerConfig, cn, churnerLogger, churnerMetrics)
+	churnerSvr := churner.NewServer(churnerConfig, churnerInstance, churnerLogger, churnerMetrics)
 	err = churnerSvr.Start(churnerConfig.MetricsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start churner server metrics: %w", err)
 	}
+
+	// Create listener only after churner is successfully created
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", churnerConfig.GRPCPort))
+	if err != nil {
+		return fmt.Errorf("failed to listen on port %s: %w", churnerConfig.GRPCPort, err)
+	}
+	churnerListener = listener
 
 	// Create and start gRPC server
 	churnerServer = grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
@@ -643,15 +643,15 @@ func startChurnerServer(testConfig *deploy.Config) error {
 
 	// Start serving in goroutine
 	go func() {
-		churnerLogger.Info("Starting churner gRPC server", "port", grpcPort)
+		churnerLogger.Info("Starting churner gRPC server", "port", churnerConfig.GRPCPort)
 		if err := churnerServer.Serve(churnerListener); err != nil {
 			churnerLogger.Info("Churner gRPC server stopped", "error", err)
 		}
 	}()
 
-	// Give server time to start
+	// TODO: Replace with proper health check endpoint instead of fixed sleep
 	time.Sleep(100 * time.Millisecond)
-	churnerLogger.Info("Churner server started successfully", "port", grpcPort, "logFile", logFilePath)
+	churnerLogger.Info("Churner server started successfully", "port", churnerConfig.GRPCPort, "logFile", logFilePath)
 
 	return nil
 }

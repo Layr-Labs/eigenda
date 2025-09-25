@@ -32,15 +32,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Simple operator info struct that only contains what the test needs
-type operatorInfo struct {
-	ECDSAPrivateKey string
-	ECDSAKeyFile    string
-	ECDSAPassword   string
-	BLSKeyPath      string
-	BLSPassword     string
-}
-
 var (
 	localstackPort                 = "4570"
 	rpcURL                         = "http://localhost:8545"
@@ -53,16 +44,16 @@ var (
 	logger = test.GetLogger()
 )
 
-// TestSetup contains all the test infrastructure needed for churner tests
-type TestSetup struct {
+// testHarness contains all the test infrastructure needed for churner tests
+type testHarness struct {
 	AnvilContainer      *testbed.AnvilContainer
 	LocalstackContainer *testbed.LocalStackContainer
 	Contracts           *testbed.DeploymentResult
-	Operators           []operatorInfo
+	Operators           []testbed.OperatorInfo
 	PrivateKeys         *testbed.PrivateKeyMaps
 }
 
-func setupTest(t *testing.T) *TestSetup {
+func setupTest(t *testing.T) *testHarness {
 	t.Helper()
 
 	if testing.Short() {
@@ -115,18 +106,8 @@ func setupTest(t *testing.T) *TestSetup {
 	})
 	require.NoError(t, err, "failed to deploy contracts")
 
-	// Create operator info using pre-existing encrypted key files
-	operators := make([]operatorInfo, numOperators)
-	for i := 0; i < numOperators; i++ {
-		operatorKey := fmt.Sprintf("opr%d", i)
-		operators[i] = operatorInfo{
-			ECDSAPrivateKey: privateKeys.EcdsaMap[operatorKey].PrivateKey,
-			ECDSAKeyFile:    privateKeys.EcdsaMap[operatorKey].KeyFile,
-			ECDSAPassword:   privateKeys.EcdsaMap[operatorKey].Password,
-			BLSKeyPath:      privateKeys.BlsMap[operatorKey].KeyFile,
-			BLSPassword:     privateKeys.BlsMap[operatorKey].Password,
-		}
-	}
+	// Generate operators using testbed helper function
+	operators := testbed.GenerateOperators(privateKeys)
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers")
@@ -136,7 +117,7 @@ func setupTest(t *testing.T) *TestSetup {
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	return &TestSetup{
+	return &testHarness{
 		AnvilContainer:      anvilContainer,
 		LocalstackContainer: localstackContainer,
 		Contracts:           deploymentResult,
@@ -151,16 +132,6 @@ func TestChurner(t *testing.T) {
 
 	// Create mock indexer
 	mockIndexer := &indexermock.MockIndexedChainState{}
-
-	// Start churner server directly using the churner package
-	grpcPort := "32002"
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
-	require.NoError(t, err, "failed to listen on port")
-	defer func() {
-		if err := listener.Close(); err != nil {
-			t.Logf("failed to close listener: %v", err)
-		}
-	}()
 
 	// Create churner config directly (no CLI parsing needed)
 	churnerConfig := &churner.Config{
@@ -184,6 +155,7 @@ func TestChurner(t *testing.T) {
 		EigenDADirectory:           testSetup.Contracts.EigenDA.EigenDADirectory,
 		ChurnApprovalInterval:      15 * time.Minute,
 		PerPublicKeyRateLimit:      1 * time.Second,
+		GRPCPort:                   "32000",
 	}
 
 	// Create geth client
@@ -200,33 +172,41 @@ func TestChurner(t *testing.T) {
 
 	// Create churner with mock indexer
 	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, logger)
-	cn, err := churner.NewChurner(churnerConfig, mockIndexer, churnerTx, logger, churnerMetrics)
+	churnerInstance, err := churner.NewChurner(churnerConfig, mockIndexer, churnerTx, logger, churnerMetrics)
 	require.NoError(t, err, "failed to create churner")
 
 	// Create churner server
-	churnerServer := churner.NewServer(churnerConfig, cn, logger, churnerMetrics)
+	churnerServer := churner.NewServer(churnerConfig, churnerInstance, logger, churnerMetrics)
 	err = churnerServer.Start(churnerConfig.MetricsConfig)
 	require.NoError(t, err, "failed to start churner server metrics")
 
 	// Create and start gRPC server
-	gs := grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
-	pb.RegisterChurnerServer(gs, churnerServer)
-	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, gs)
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
+	pb.RegisterChurnerServer(grpcServer, churnerServer)
+	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, grpcServer)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", churnerConfig.GRPCPort))
+	require.NoError(t, err, "failed to listen on port")
+	defer func() {
+		if err := listener.Close(); err != nil {
+			t.Logf("failed to close listener: %v", err)
+		}
+	}()
 
 	// Start serving in goroutine
 	go func() {
-		if err := gs.Serve(listener); err != nil {
+		if err := grpcServer.Serve(listener); err != nil {
 			t.Logf("gRPC server stopped: %v", err)
 		}
 	}()
-	defer gs.Stop()
+	defer grpcServer.Stop()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
 
 	// Create gRPC client to connect to the churner
 	conn, err := grpc.NewClient(
-		fmt.Sprintf("localhost:%s", grpcPort),
+		fmt.Sprintf("localhost:%s", churnerConfig.GRPCPort),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial churner")
 	defer func() {
