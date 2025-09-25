@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core/payments"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -95,7 +96,7 @@ func (pv *ReservationPaymentValidator) Debit(
 		return false, err
 	}
 
-	var timeMovedBackwardErr *reservation.TimeMovedBackwardError
+	var timeMovedBackwardErr *ratelimit.TimeMovedBackwardError
 	if errors.As(err, &timeMovedBackwardErr) {
 		pv.metrics.IncrementTimeMovedBackward()
 		return false, err
