@@ -177,61 +177,110 @@ func setupSuite() error {
 	testHarness.TestConfig = deploy.ReadTestConfig(testHarness.TestName, rootPath)
 
 	if testHarness.TestConfig.Environment.IsLocal() {
-		// Create a shared Docker network for all containers
-		testHarness.ChainDockerNetwork, err = network.New(context.Background(),
-			network.WithDriver("bridge"),
-			network.WithAttachable())
+		err = setupLocalEnvironment(ctx, testHarness, logger)
 		if err != nil {
-			return fmt.Errorf("failed to create docker network: %w", err)
+			return err
 		}
-		logger.Info("Created Docker network", "name", testHarness.ChainDockerNetwork.Name)
+	}
+	return nil
+}
 
-		if !testHarness.InMemoryBlobStore {
-			logger.Info("Using shared Blob Store")
-			testHarness.LocalStackPort = "4570"
-			// Use the timeout context for container creation
-			testHarness.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
-				ExposeHostPort: true,
-				HostPort:       testHarness.LocalStackPort,
-				Logger:         logger,
-				Network:        testHarness.ChainDockerNetwork,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to start localstack: %w", err)
-			}
+func setupLocalEnvironment(ctx context.Context, testHarness *TestHarness, logger logging.Logger) error {
+	// Create a shared Docker network for all containers
+	var err error
+	testHarness.ChainDockerNetwork, err = network.New(context.Background(),
+		network.WithDriver("bridge"),
+		network.WithAttachable())
+	if err != nil {
+		return fmt.Errorf("failed to create docker network: %w", err)
+	}
+	logger.Info("Created Docker network", "name", testHarness.ChainDockerNetwork.Name)
 
-			deployConfig := testbed.DeployResourcesConfig{
-				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", testHarness.LocalStackPort),
-				MetadataTableName:   testHarness.MetadataTableName,
-				BucketTableName:     testHarness.BucketTableName,
-				V2MetadataTableName: testHarness.MetadataTableNameV2,
-				Logger:              logger,
-			}
-			err = testbed.DeployResources(ctx, deployConfig)
-			if err != nil {
-				return fmt.Errorf("failed to deploy resources: %w", err)
-			}
-		} else {
-			logger.Info("Using in-memory Blob Store")
-		}
+	err = setupBlobStore(ctx, testHarness, logger)
+	if err != nil {
+		return err
+	}
 
-		logger.Info("Starting anvil")
-		testHarness.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
+	err = setupAnvil(ctx, testHarness, logger)
+	if err != nil {
+		return err
+	}
+
+	err = deployAndStartServices(ctx, testHarness, logger)
+	if err != nil {
+		return err
+	}
+
+	err = setupVerifiers(testHarness, logger)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setupBlobStore(ctx context.Context, testHarness *TestHarness, logger logging.Logger) error {
+	if !testHarness.InMemoryBlobStore {
+		logger.Info("Using shared Blob Store")
+		testHarness.LocalStackPort = "4570"
+		var err error
+		// Use the timeout context for container creation
+		testHarness.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 			ExposeHostPort: true,
-			HostPort:       "8545",
+			HostPort:       testHarness.LocalStackPort,
 			Logger:         logger,
 			Network:        testHarness.ChainDockerNetwork,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to start anvil: %w", err)
+			return fmt.Errorf("failed to start localstack: %w", err)
 		}
-		anvilInternalEndpoint := testHarness.AnvilContainer.InternalEndpoint()
-		logger.Info("Anvil RPC URL", "url", testHarness.AnvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
-		deployer, ok := testHarness.TestConfig.GetDeployer(testHarness.TestConfig.EigenDA.Deployer)
-		if ok && deployer.DeploySubgraphs {
-			logger.Info("Starting graph node")
-			testHarness.GraphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+		deployConfig := testbed.DeployResourcesConfig{
+			LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", testHarness.LocalStackPort),
+			MetadataTableName:   testHarness.MetadataTableName,
+			BucketTableName:     testHarness.BucketTableName,
+			V2MetadataTableName: testHarness.MetadataTableNameV2,
+			Logger:              logger,
+		}
+		err = testbed.DeployResources(ctx, deployConfig)
+		if err != nil {
+			return fmt.Errorf("failed to deploy resources: %w", err)
+		}
+	} else {
+		logger.Info("Using in-memory Blob Store")
+	}
+	return nil
+}
+
+func setupAnvil(ctx context.Context, testHarness *TestHarness, logger logging.Logger) error {
+	logger.Info("Starting anvil")
+	var err error
+	testHarness.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
+		ExposeHostPort: true,
+		HostPort:       "8545",
+		Logger:         logger,
+		Network:        testHarness.ChainDockerNetwork,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start anvil: %w", err)
+	}
+	return nil
+}
+
+func deployAndStartServices(ctx context.Context, testHarness *TestHarness, logger logging.Logger) error {
+	anvilInternalEndpoint := testHarness.AnvilContainer.InternalEndpoint()
+	logger.Info("Anvil RPC URL", "url", testHarness.AnvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
+
+	deployer, ok := testHarness.TestConfig.GetDeployer(testHarness.TestConfig.EigenDA.Deployer)
+	if !ok {
+		return fmt.Errorf("failed to get deployer")
+	}
+
+	if deployer.DeploySubgraphs {
+		logger.Info("Starting graph node")
+		var err error
+		testHarness.GraphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(
+			context.Background(), testbed.GraphNodeOptions{
 				PostgresDB:     "graph-node",
 				PostgresUser:   "graph-node",
 				PostgresPass:   "let-me-in",
@@ -244,124 +293,132 @@ func setupSuite() error {
 				Logger:         logger,
 				Network:        testHarness.ChainDockerNetwork,
 			})
-			if err != nil {
-				return fmt.Errorf("failed to start graph node: %w", err)
-			}
-		}
-
-		logger.Info("Deploying experiment")
-		testHarness.TestConfig.DeployExperiment()
-		pk := testHarness.TestConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
-		pk = strings.TrimPrefix(pk, "0x")
-		pk = strings.TrimPrefix(pk, "0X")
-		testHarness.EthClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
-			RPCURLs:          []string{testHarness.TestConfig.Deployers[0].RPC},
-			PrivateKeyString: pk,
-			NumConfirmations: testHarness.NumConfirmations,
-			NumRetries:       testHarness.NumRetries,
-		}, gethcommon.Address{}, logger)
 		if err != nil {
-			return fmt.Errorf("failed to create eth client: %w", err)
+			return fmt.Errorf("failed to start graph node: %w", err)
 		}
-
-		testHarness.RPCClient, err = ethrpc.Dial(testHarness.TestConfig.Deployers[0].RPC)
-		if err != nil {
-			return fmt.Errorf("failed to create rpc client: %w", err)
-		}
-
-		// Force foundry to mine a block since it isn't auto-mining
-		err = testHarness.RPCClient.CallContext(ctx, nil, "evm_mine")
-		if err != nil {
-			return fmt.Errorf("failed to mine block: %w", err)
-		}
-
-		logger.Info("Starting churner server")
-		err = startChurnerServer(testHarness)
-		if err != nil {
-			return fmt.Errorf("failed to start churner server: %w", err)
-		}
-		logger.Info("Churner server started", "port", "32002")
-
-		logger.Info("Starting binaries")
-		testHarness.TestConfig.StartBinaries(true) // true = for tests, will skip churner
-
-		testHarness.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testHarness.TestConfig.EigenDAV1CertVerifier), testHarness.EthClient)
-		if err != nil {
-			return fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
-		}
-		err = setupRetrievalClients(testHarness)
-		if err != nil {
-			return fmt.Errorf("failed to setup retrieval clients: %w", err)
-		}
-
-		logger.Info("Building client verification and interaction components")
-
-		testHarness.CertBuilder, err = clientsv2.NewCertBuilder(
-			logger,
-			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.OperatorStateRetriever),
-			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.RegistryCoordinator),
-			testHarness.EthClient,
-		)
-
-		if err != nil {
-			return fmt.Errorf("failed to create cert builder: %w", err)
-		}
-
-		routerAddressProvider, err := verification.BuildRouterAddressProvider(
-			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter),
-			testHarness.EthClient,
-			logger)
-
-		if err != nil {
-			return fmt.Errorf("failed to build router address provider: %w", err)
-		}
-
-		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
-			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifier))
-
-		// No error to check for NewStaticCertVerifierAddressProvider
-
-		testHarness.StaticCertVerifier, err = verification.NewCertVerifier(
-			logger,
-			testHarness.EthClient,
-			staticAddressProvider)
-
-		if err != nil {
-			return fmt.Errorf("failed to create static cert verifier: %w", err)
-		}
-
-		testHarness.RouterCertVerifier, err = verification.NewCertVerifier(
-			logger,
-			testHarness.EthClient,
-			routerAddressProvider)
-
-		if err != nil {
-			return fmt.Errorf("failed to create router cert verifier: %w", err)
-		}
-
-		testHarness.EigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter), testHarness.EthClient)
-		if err != nil {
-			return fmt.Errorf("failed to create router transactor: %w", err)
-		}
-
-		testHarness.EigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter), testHarness.EthClient)
-		if err != nil {
-			return fmt.Errorf("failed to create router caller: %w", err)
-		}
-
-		chainID, err := testHarness.EthClient.ChainID(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get chain ID: %w", err)
-		}
-
-		testHarness.DeployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
-
-		err = setupPayloadDisperserWithRouter(testHarness)
-		if err != nil {
-			return fmt.Errorf("failed to setup payload disperser: %w", err)
-		}
-
 	}
+
+	logger.Info("Deploying experiment")
+	err := testHarness.TestConfig.DeployExperiment()
+	if err != nil {
+		return fmt.Errorf("failed to deploy experiment: %w", err)
+	}
+
+	pk := testHarness.TestConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
+	pk = strings.TrimPrefix(pk, "0x")
+	pk = strings.TrimPrefix(pk, "0X")
+	testHarness.EthClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{testHarness.TestConfig.Deployers[0].RPC},
+		PrivateKeyString: pk,
+		NumConfirmations: testHarness.NumConfirmations,
+		NumRetries:       testHarness.NumRetries,
+	}, gethcommon.Address{}, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create eth client: %w", err)
+	}
+
+	testHarness.RPCClient, err = ethrpc.Dial(testHarness.TestConfig.Deployers[0].RPC)
+	if err != nil {
+		return fmt.Errorf("failed to create rpc client: %w", err)
+	}
+
+	// Force foundry to mine a block since it isn't auto-mining
+	err = testHarness.RPCClient.CallContext(ctx, nil, "evm_mine")
+	if err != nil {
+		return fmt.Errorf("failed to mine block: %w", err)
+	}
+
+	logger.Info("Starting churner server")
+	err = startChurnerServer(testHarness)
+	if err != nil {
+		return fmt.Errorf("failed to start churner server: %w", err)
+	}
+	logger.Info("Churner server started", "port", "32002")
+
+	logger.Info("Starting binaries")
+	testHarness.TestConfig.StartBinaries(true) // true = for tests, will skip churner
+
+	testHarness.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDAV1CertVerifier),
+		testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
+	}
+
+	err = setupRetrievalClients(testHarness)
+	if err != nil {
+		return fmt.Errorf("failed to setup retrieval clients: %w", err)
+	}
+
+	chainID, err := testHarness.EthClient.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get chain ID: %w", err)
+	}
+
+	testHarness.DeployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
+	return nil
+}
+
+func setupVerifiers(testHarness *TestHarness, logger logging.Logger) error {
+	logger.Info("Building client verification and interaction components")
+
+	var err error
+	testHarness.CertBuilder, err = clientsv2.NewCertBuilder(
+		logger,
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.OperatorStateRetriever),
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.RegistryCoordinator),
+		testHarness.EthClient,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create cert builder: %w", err)
+	}
+
+	routerAddressProvider, err := verification.BuildRouterAddressProvider(
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter),
+		testHarness.EthClient,
+		logger)
+	if err != nil {
+		return fmt.Errorf("failed to build router address provider: %w", err)
+	}
+
+	staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifier))
+
+	testHarness.StaticCertVerifier, err = verification.NewCertVerifier(
+		logger,
+		testHarness.EthClient,
+		staticAddressProvider)
+	if err != nil {
+		return fmt.Errorf("failed to create static cert verifier: %w", err)
+	}
+
+	testHarness.RouterCertVerifier, err = verification.NewCertVerifier(
+		logger,
+		testHarness.EthClient,
+		routerAddressProvider)
+	if err != nil {
+		return fmt.Errorf("failed to create router cert verifier: %w", err)
+	}
+
+	testHarness.EigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter),
+		testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("failed to create router transactor: %w", err)
+	}
+
+	testHarness.EigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(
+		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter),
+		testHarness.EthClient)
+	if err != nil {
+		return fmt.Errorf("failed to create router caller: %w", err)
+	}
+
+	err = setupPayloadDisperserWithRouter(testHarness)
+	if err != nil {
+		return fmt.Errorf("failed to setup payload disperser: %w", err)
+	}
+
 	return nil
 }
 
@@ -468,7 +525,10 @@ func setupRetrievalClients(harness *TestHarness) error {
 		}
 	}
 	tx, err := coreeth.NewWriter(
-		harness.Logger, harness.EthClient, harness.TestConfig.EigenDA.OperatorStateRetriever, harness.TestConfig.EigenDA.ServiceManager)
+		harness.Logger,
+		harness.EthClient,
+		harness.TestConfig.EigenDA.OperatorStateRetriever,
+		harness.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return err
 	}
@@ -516,7 +576,8 @@ func setupRetrievalClients(harness *TestHarness) error {
 	}
 
 	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(harness.Logger, harness.ChainReader, cs, kzgVerifierV2, clientConfig, nil)
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(
+		harness.Logger, harness.ChainReader, cs, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
