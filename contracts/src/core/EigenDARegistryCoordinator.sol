@@ -126,7 +126,7 @@ contract EigenDARegistryCoordinator is
         string calldata socket,
         IBLSApkRegistry.PubkeyRegistrationParams calldata params,
         SignatureWithSaltAndExpiry memory operatorSignature
-    ) external onlyWhenNotPaused(PAUSED_REGISTER_OPERATOR) {
+    ) public onlyWhenNotPaused(PAUSED_REGISTER_OPERATOR) {
         /**
          * If the operator has NEVER registered a pubkey before, use `params` to register
          * their pubkey in blsApkRegistry
@@ -158,64 +158,16 @@ contract EigenDARegistryCoordinator is
         }
     }
 
+    /// @notice Deprecated function. Use `registerOperator` instead.
     function registerOperatorWithChurn(
         bytes calldata quorumNumbers,
         string calldata socket,
         IBLSApkRegistry.PubkeyRegistrationParams calldata params,
+        OperatorKickParam[] memory,
+        SignatureWithSaltAndExpiry memory,
         SignatureWithSaltAndExpiry memory operatorSignature
-    ) external {
-        /**
-         * If the operator has NEVER registered a pubkey before, use `params` to register
-         * their pubkey in blsApkRegistry
-         *
-         * If the operator HAS registered a pubkey, `params` is ignored and the pubkey hash
-         * (operatorId) is fetched instead
-         */
-        bytes32 operatorId = _getOrCreateOperatorId(msg.sender, params);
-
-        // Register the operator in each of the registry contracts and update the operator's
-        // quorum bitmap and registration status
-        uint32[] memory numOperatorsPerQuorum = _registerOperator({
-            operator: msg.sender,
-            operatorId: operatorId,
-            quorumNumbers: quorumNumbers,
-            socket: socket,
-            operatorSignature: operatorSignature
-        }).numOperatorsPerQuorum;
-
-        // For each quorum, validate that the new operator count does not exceed the maximum
-        // If it does, churns an operator via an exhaustive search through the operator set.
-        for (uint256 i; i < quorumNumbers.length; i++) {
-            uint8 quorumNumber = uint8(quorumNumbers[i]);
-
-            if (numOperatorsPerQuorum[i] > _quorumParams[quorumNumber].maxOperatorCount) {
-                _churnOperator(quorumNumber);
-            }
-        }
-    }
-
-    function _churnOperator(uint8 quorumNumber) internal {
-        bytes32[] memory operatorList = indexRegistry.getOperatorListAtBlockNumber(quorumNumber, uint32(block.number));
-        require(operatorList.length > 0, "RegCoord._churnOperator: no operators to churn");
-
-        // Find the operator with the lowest stake
-        bytes32 operatorToChurn;
-        uint96 lowestStake = type(uint96).max;
-        for (uint256 i; i < operatorList.length; i++) {
-            uint96 operatorStake = stakeRegistry.getCurrentStake(operatorList[i], quorumNumber);
-            if (operatorStake < lowestStake) {
-                lowestStake = operatorStake;
-                operatorToChurn = operatorList[i];
-            }
-        }
-
-        // Deregister the operator with the lowest stake
-        bytes memory quorumNumbers = new bytes(1);
-        quorumNumbers[0] = bytes1(uint8(quorumNumber));
-        _deregisterOperator({
-            operator: blsApkRegistry.pubkeyHashToOperator(operatorToChurn),
-            quorumNumbers: quorumNumbers
-        });
+    ) external virtual {
+        registerOperator(quorumNumbers, socket, params, operatorSignature);
     }
 
     /**
@@ -827,6 +779,15 @@ contract EigenDARegistryCoordinator is
     /// @notice Returns the number of registries
     function numRegistries() external view returns (uint256) {
         return registries.length;
+    }
+
+    /// @notice Deprecated function.
+    function calculateOperatorChurnApprovalDigestHash(address, bytes32, OperatorKickParam[] memory, bytes32, uint256)
+        external
+        pure
+        returns (bytes32)
+    {
+        return bytes32(0);
     }
 
     /**
