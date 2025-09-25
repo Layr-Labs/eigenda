@@ -147,14 +147,13 @@ contract EigenDARegistryCoordinator is
         }).numOperatorsPerQuorum;
 
         // For each quorum, validate that the new operator count does not exceed the maximum
-        // (If it does, an operator needs to be replaced -- see `registerOperatorWithChurn`)
-        for (uint256 i = 0; i < quorumNumbers.length; i++) {
+        // If it does, churns an operator via an exhaustive search through the operator set.
+        for (uint256 i; i < quorumNumbers.length; i++) {
             uint8 quorumNumber = uint8(quorumNumbers[i]);
 
-            require(
-                numOperatorsPerQuorum[i] <= _quorumParams[quorumNumber].maxOperatorCount,
-                "RegCoord.registerOperator: operator count exceeds maximum"
-            );
+            if (numOperatorsPerQuorum[i] > _quorumParams[quorumNumber].maxOperatorCount) {
+                _churnOperator(quorumNumber);
+            }
         }
     }
 
@@ -168,6 +167,30 @@ contract EigenDARegistryCoordinator is
         SignatureWithSaltAndExpiry memory operatorSignature
     ) external virtual {
         registerOperator(quorumNumbers, socket, params, operatorSignature);
+    }
+
+    function _churnOperator(uint8 quorumNumber) internal {
+        bytes32[] memory operatorList = indexRegistry.getOperatorListAtBlockNumber(quorumNumber, uint32(block.number));
+        require(operatorList.length > 0, "RegCoord._churnOperator: no operators to churn");
+
+        // Find the operator with the lowest stake
+        bytes32 operatorToChurn;
+        uint96 lowestStake = type(uint96).max;
+        for (uint256 i; i < operatorList.length; i++) {
+            uint96 operatorStake = stakeRegistry.getCurrentStake(operatorList[i], quorumNumber);
+            if (operatorStake < lowestStake) {
+                lowestStake = operatorStake;
+                operatorToChurn = operatorList[i];
+            }
+        }
+
+        // Deregister the operator with the lowest stake
+        bytes memory quorumNumbers = new bytes(1);
+        quorumNumbers[0] = bytes1(uint8(quorumNumber));
+        _deregisterOperator({
+            operator: blsApkRegistry.pubkeyHashToOperator(operatorToChurn),
+            quorumNumbers: quorumNumbers
+        });
     }
 
     /**
