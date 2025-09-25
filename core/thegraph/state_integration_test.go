@@ -167,7 +167,9 @@ func TestIndexerIntegration(t *testing.T) {
 
 	state, err := cs.GetIndexedOperatorState(ctx, headerNum, testQuorums)
 	require.NoError(t, err, "failed to get indexed operator state")
-	require.Equal(t, len(testConfig.Operators), len(state.IndexedOperators), "operator count mismatch")
+	// The testconfig-anvil.yaml config specifies 4 operators, with maxOperatorCount 3 to test churning.
+	// So the number of indexed operators should be NumMaxOperatorCount (also specified in the yaml file).
+	require.Equal(t, testConfig.Services.Counts.NumMaxOperatorCount, len(state.IndexedOperators), "operator count mismatch")
 }
 
 func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) common.EthClient {
