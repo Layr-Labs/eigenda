@@ -9,7 +9,7 @@ clean:
 
 # Below are example run commands. They are not maintained so likely to be out of date.
 
-run_batcher: build_batcher
+run_batcher: build
 	./bin/batcher \
 	--batcher.pull-interval 10s \
 	--batcher.bls-operator-state-retriever 0x9d4454B023096f34B160D6B654540c56A1F81688 \
@@ -33,7 +33,7 @@ run_batcher: build_batcher
 	--chain-read-timeout 12s \
 	--chain-write-timeout 13s
 
-run_server: build_server
+run_server: build
 	./bin/server \
 	--grpc-port 51001 \
 	--aws.region us-east-1 \
@@ -41,7 +41,7 @@ run_server: build_server
 	--aws.secret-access-key hello \
 	--aws.endpoint-url http://0.0.0.0:4566
 
-run_encoder: build_encoder
+run_encoder: build
 	./bin/encoder \
 	--disperser-encoder.grpc-port 34000 \
   --disperser-encoder.metrics-http-port 9109 \
@@ -54,7 +54,7 @@ run_encoder: build_encoder
   --disperser-encoder.log.level-file debug
 
 # You can override these defaults via CLI or environment variables
-run_blobapi: build_blobapi
+run_blobapi: build
 	./bin/blobapi \
 	--disperser-server.grpc-port 51002 \
 	--disperser-server.enable-metrics=false \
