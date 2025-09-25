@@ -265,8 +265,10 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	if config.ServerConfig.EnableServer {
+		logger.Info("Controller gRPC server ENABLED", "port", config.ServerConfig.GrpcPort)
 		var paymentAuthorizationHandler *controllerpayments.PaymentAuthorizationHandler
 		if config.ServerConfig.EnablePaymentAuthentication {
+			logger.Info("Payment authentication ENABLED - building payment authorization handler")
 			paymentAuthorizationHandler, err = buildPaymentAuthorizationHandler(
 				c,
 				logger,
@@ -280,6 +282,8 @@ func RunController(ctx *cli.Context) error {
 			if err != nil {
 				return fmt.Errorf("build payment authorization handler: %w", err)
 			}
+		} else {
+			logger.Warn("Payment authentication DISABLED - payment requests will fail")
 		}
 
 		grpcServer, err := server.NewServer(

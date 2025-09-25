@@ -110,6 +110,9 @@ func (s *Server) AuthorizePayment(
 	ctx context.Context,
 	request *controller.AuthorizePaymentRequest,
 ) (*controller.AuthorizePaymentResponse, error) {
+	s.logger.Debug("Processing payment authorization request",
+		"accountId", request.GetBlobHeader().GetPaymentHeader().GetAccountId())
+
 	if s.paymentAuthorizationHandler == nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf(
 			"payment authorization handler not configured, request=%s", request.String()))
