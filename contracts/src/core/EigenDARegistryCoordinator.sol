@@ -163,7 +163,7 @@ contract EigenDARegistryCoordinator is
         bytes calldata quorumNumbers,
         string calldata socket,
         IBLSApkRegistry.PubkeyRegistrationParams calldata params,
-        OperatorKickParam[] memory,
+        OperatorKickParam[] calldata,
         SignatureWithSaltAndExpiry memory,
         SignatureWithSaltAndExpiry memory operatorSignature
     ) external virtual {
