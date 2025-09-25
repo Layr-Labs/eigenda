@@ -1,4 +1,4 @@
-package reservation
+package ratelimit
 
 import (
 	"testing"
@@ -40,7 +40,7 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity+10))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity+10)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity+10, leakyBucket.currentFillLevel, "first overfill should succeed")
@@ -51,7 +51,7 @@ func TestFill(t *testing.T) {
 		require.False(t, success, "overfill should fail, if bucket is already over capacity")
 
 		// let some time elapse, so there is a little bit of available capacity
-		success, err = leakyBucket.Fill(testStartTime.Add(time.Second), uint32(leakyBucket.bucketCapacity+10))
+		success, err = leakyBucket.Fill(testStartTime.Add(time.Second), leakyBucket.bucketCapacity+10)
 		require.NoError(t, err)
 		require.True(t, success, "any available capacity should permit overfill")
 	})
@@ -61,7 +61,7 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leakyBucket)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity-10))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity-10)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity-10, leakyBucket.currentFillLevel)
@@ -76,7 +76,7 @@ func TestFill(t *testing.T) {
 		leakyBucket, err := NewLeakyBucket(100, 10*time.Second, false, OverfillNotPermitted, testStartTime)
 		require.NoError(t, err)
 
-		success, err := leakyBucket.Fill(testStartTime, uint32(leakyBucket.bucketCapacity))
+		success, err := leakyBucket.Fill(testStartTime, leakyBucket.bucketCapacity)
 		require.NoError(t, err)
 		require.True(t, success)
 		require.Equal(t, leakyBucket.bucketCapacity, leakyBucket.currentFillLevel)
@@ -154,7 +154,7 @@ func TestRevertFill(t *testing.T) {
 }
 
 func TestLeak(t *testing.T) {
-	leakRate := uint64(5)
+	leakRate := float64(5)
 
 	// This test uses a large capacity, to make sure that none of the fills or leaks are bumping up against the
 	// limits of the bucket
@@ -181,7 +181,7 @@ func TestLeak(t *testing.T) {
 
 	// compute how much should have leaked throughout the test duration
 	timeDelta := workingTime.Sub(testStartTime)
-	expectedLeak := timeDelta.Seconds() * float64(leakRate)
+	expectedLeak := timeDelta.Seconds() * leakRate
 
 	// original fill, minus what we expected to leak, plus what we filled during iteration
 	expectedFill := halfFull - expectedLeak + float64(iterations)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/require"
 )
@@ -237,7 +238,7 @@ func createTestLedger(t *testing.T, symbolsPerSecond uint64, startFull bool, sta
 		*reservation,
 		10, // minNumSymbols
 		startFull,
-		OverfillOncePermitted,
+		ratelimit.OverfillOncePermitted,
 		10*time.Second,
 	)
 	require.NoError(t, err)

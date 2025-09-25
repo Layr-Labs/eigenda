@@ -3,6 +3,8 @@ package reservation
 import (
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common/ratelimit"
 )
 
 // Configuration for a [ReservationLedger], which manages the reservation of a single account
@@ -37,7 +39,7 @@ type ReservationLedgerConfig struct {
 	//
 	// This configuration parameter exists just in case we want to limit the cases that overfill is permitted in the
 	// future, but the current intention is for all entities to run with [OverfillBehavior] == [OverfillOncePermitted]
-	overfillBehavior OverfillBehavior
+	overfillBehavior ratelimit.OverfillBehavior
 	// Determines the maximum burst capacity of the [LeakyBucket].
 	//
 	// The actual bucket capacity in symbols = symbolsPerSecond * bucketCapacityDuration
@@ -51,7 +53,7 @@ func NewReservationLedgerConfig(
 	reservation Reservation,
 	minNumSymbols uint32,
 	startFull bool,
-	overfillBehavior OverfillBehavior,
+	overfillBehavior ratelimit.OverfillBehavior,
 	bucketCapacityDuration time.Duration,
 ) (*ReservationLedgerConfig, error) {
 	if bucketCapacityDuration <= 0 {

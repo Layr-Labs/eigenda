@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"testing"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpclogging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli"
 )
 
@@ -135,6 +137,13 @@ func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 		return logging.NewTextSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
 	return nil, fmt.Errorf("unknown log format: %s", cfg.Format)
+}
+
+// Test-only utility for getting a logger instance.
+func TestLogger(t *testing.T) logging.Logger {
+	logger, err := NewLogger(DefaultTextLoggerConfig())
+	require.NoError(t, err)
+	return logger
 }
 
 // InterceptorLogger returns a grpclogging.Logger that uses the provided logging.Logger.

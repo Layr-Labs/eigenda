@@ -1,4 +1,4 @@
-package reservation
+package ratelimit
 
 // OverfillBehavior describes how leaky bucket overfills are handled
 type OverfillBehavior string
