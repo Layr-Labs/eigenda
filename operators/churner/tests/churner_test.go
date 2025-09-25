@@ -4,19 +4,20 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"flag"
 	"fmt"
+	"log/slog"
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigenda/test"
@@ -27,19 +28,12 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
-	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
-}
-
 var (
-	templateName string
-	testName     string
-
 	localstackPort                 = "4570"
-	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
 	operatorAddr                   = ""
@@ -50,26 +44,26 @@ var (
 	logger = test.GetLogger()
 )
 
-func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContainer, *deploy.Config) {
+// testHarness contains all the test infrastructure needed for churner tests
+type testHarness struct {
+	AnvilContainer      *testbed.AnvilContainer
+	LocalstackContainer *testbed.LocalStackContainer
+	Contracts           *testbed.DeploymentResult
+	Operators           []testbed.OperatorInfo
+	PrivateKeys         *testbed.PrivateKeyMaps
+}
+
+func setupTest(t *testing.T) *testHarness {
 	t.Helper()
 
 	if testing.Short() {
 		t.Skip("Skipping churner test in short mode")
 	}
 
-	flag.Parse()
 	ctx := t.Context()
-	rootPath := "../../../"
+	numOperators := 4
 
-	if testName == "" {
-		var err error
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
-		require.NoError(t, err, "failed to create test directory")
-	}
-
-	testConfig := deploy.NewTestConfig(testName, rootPath)
-	testConfig.Deployers[0].DeploySubgraphs = false
-
+	// Start localstack container
 	localstackContainer, err := testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 		ExposeHostPort: true,
 		HostPort:       localstackPort,
@@ -78,15 +72,42 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 	})
 	require.NoError(t, err, "failed to start localstack container")
 
+	// Start anvil container
 	anvilContainer, err := testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
-		ExposeHostPort: true, // This will bind container port 8545 to host port 8545
+		ExposeHostPort: true,
 		Logger:         logger,
 	})
 	require.NoError(t, err, "failed to start anvil container")
 
-	logger.Info("Deploying experiment")
-	err = testConfig.DeployExperiment()
-	require.NoError(t, err, "failed to deploy experiment")
+	// Load private keys using testbed
+	privateKeys, err := testbed.LoadPrivateKeys(testbed.LoadPrivateKeysInput{
+		NumOperators: numOperators,
+		NumRelays:    0,
+	})
+	require.NoError(t, err, "failed to load private keys")
+
+	// Get deployer key from Anvil's default accounts
+	deployerKey, _ := testbed.GetAnvilDefaultKeys()
+
+	// Deploy contracts
+	logger.Info("Deploying contracts")
+	deploymentResult, err := testbed.DeployEigenDAContracts(testbed.DeploymentConfig{
+		AnvilRPCURL:      "http://localhost:8545",
+		DeployerKey:      deployerKey,
+		NumOperators:     numOperators,
+		NumRelays:        0,
+		MaxOperatorCount: 3, // Set max to 3 so the 4th operator can churn
+		Stakes: []testbed.Stakes{
+			{Total: 100e18, Distribution: []float32{1, 4, 6, 10}},
+			{Total: 100e18, Distribution: []float32{1, 3, 8, 9}},
+		},
+		PrivateKeys: privateKeys,
+		Logger:      logger,
+	})
+	require.NoError(t, err, "failed to deploy contracts")
+
+	// Generate operators using testbed helper function
+	operators := testbed.GenerateOperators(privateKeys)
 
 	t.Cleanup(func() {
 		logger.Info("Stopping containers")
@@ -96,30 +117,125 @@ func setupTest(t *testing.T) (*testbed.AnvilContainer, *testbed.LocalStackContai
 		_ = localstackContainer.Terminate(ctx)
 	})
 
-	return anvilContainer, localstackContainer, testConfig
+	return &testHarness{
+		AnvilContainer:      anvilContainer,
+		LocalstackContainer: localstackContainer,
+		Contracts:           deploymentResult,
+		Operators:           operators,
+		PrivateKeys:         privateKeys,
+	}
 }
 
 func TestChurner(t *testing.T) {
 	ctx := t.Context()
-	_, _, testConfig := setupTest(t)
+	testSetup := setupTest(t)
 
-	server := newTestServer(t, testConfig)
+	// Create mock indexer
+	mockIndexer := &indexermock.MockIndexedChainState{}
+
+	// Create churner config directly (no CLI parsing needed)
+	churnerConfig := &churner.Config{
+		EthClientConfig: geth.EthClientConfig{
+			RPCURLs:          []string{"http://localhost:8545"},
+			PrivateKeyString: churnerPrivateKeyHex,
+		},
+		LoggerConfig: common.LoggerConfig{
+			Format: common.TextLogFormat,
+			HandlerOpts: logging.SLoggerOptions{
+				Level:   slog.LevelDebug,
+				NoColor: true,
+			},
+		},
+		MetricsConfig: churner.MetricsConfig{
+			HTTPPort:      "9095",
+			EnableMetrics: true,
+		},
+		OperatorStateRetrieverAddr: testSetup.Contracts.EigenDA.OperatorStateRetriever,
+		EigenDAServiceManagerAddr:  testSetup.Contracts.EigenDA.ServiceManager,
+		EigenDADirectory:           testSetup.Contracts.EigenDA.EigenDADirectory,
+		ChurnApprovalInterval:      15 * time.Minute,
+		PerPublicKeyRateLimit:      1 * time.Second,
+		GRPCPort:                   "32000",
+	}
+
+	// Create geth client
+	gethClient, err := geth.NewMultiHomingClient(churnerConfig.EthClientConfig, gethcommon.Address{}, logger)
+	require.NoError(t, err, "failed to create geth client")
+
+	// Create writer
+	churnerTx, err := coreeth.NewWriter(
+		logger,
+		gethClient,
+		churnerConfig.OperatorStateRetrieverAddr,
+		churnerConfig.EigenDAServiceManagerAddr)
+	require.NoError(t, err, "failed to create writer")
+
+	// Create churner with mock indexer
+	churnerMetrics := churner.NewMetrics(churnerConfig.MetricsConfig.HTTPPort, logger)
+	churnerInstance, err := churner.NewChurner(churnerConfig, mockIndexer, churnerTx, logger, churnerMetrics)
+	require.NoError(t, err, "failed to create churner")
+
+	// Create churner server
+	churnerServer := churner.NewServer(churnerConfig, churnerInstance, logger, churnerMetrics)
+	err = churnerServer.Start(churnerConfig.MetricsConfig)
+	require.NoError(t, err, "failed to start churner server metrics")
+
+	// Create and start gRPC server
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
+	pb.RegisterChurnerServer(grpcServer, churnerServer)
+	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, grpcServer)
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", churnerConfig.GRPCPort))
+	require.NoError(t, err, "failed to listen on port")
+	defer func() {
+		if err := listener.Close(); err != nil {
+			t.Logf("failed to close listener: %v", err)
+		}
+	}()
+
+	// Start serving in goroutine
+	go func() {
+		if err := grpcServer.Serve(listener); err != nil {
+			t.Logf("gRPC server stopped: %v", err)
+		}
+	}()
+	defer grpcServer.Stop()
+
+	// Give server time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Create gRPC client to connect to the churner
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("localhost:%s", churnerConfig.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err, "failed to dial churner")
+	defer func() {
+		if err := conn.Close(); err != nil {
+			t.Logf("failed to close connection: %v", err)
+		}
+	}()
+
+	churnerClient := pb.NewChurnerClient(conn)
+
 	quorumIDsUint8 := make([]uint8, len(quorumIds))
 	for i, id := range quorumIds {
 		quorumIDsUint8[i] = uint8(id)
 	}
 	var lowestStakeOperatorAddr gethcommon.Address
 	var lowestStakeOperatorPubKey *core.G1Point
-	var tx *eth.Writer
+	var tx *coreeth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
 	var signer blssigner.Signer
 	var g1PointBytes []byte
 	var g2PointBytes []byte
-	for i, op := range testConfig.Operators {
-		socket := fmt.Sprintf("%s:%s:%s", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT, op.NODE_RETRIEVAL_PORT)
+
+	for i, op := range testSetup.Operators {
+		socket := fmt.Sprintf("localhost:%d:%d", 32000+i, 32100+i) // Simple port assignment
+
+		// Create BLS signer from key file
 		opSigner, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
-			Path:       op.NODE_BLS_KEY_FILE,
-			Password:   op.NODE_BLS_KEY_PASSWORD,
+			Path:       op.BLSKeyPath,
+			Password:   op.BLSPassword,
 			SignerType: blssignerTypes.Local,
 		})
 		require.NoError(t, err)
@@ -136,8 +252,9 @@ func TestChurner(t *testing.T) {
 		opG2Point := new(core.G2Point)
 		opG2Point, err = opG2Point.Deserialize(opG2PointBytes)
 		require.NoError(t, err)
-		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
+		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.ECDSAKeyFile, op.ECDSAPassword)
 		require.NoError(t, err)
+
 		if i == 0 {
 			// This is the lowest stake operator that will be eventually churned
 			lowestStakeOperatorAddr = sk.Address
@@ -146,9 +263,13 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
+		// Use the hex private key from plugin.GetECDSAPrivateKey for the transactor
 		tx = mustCreateTransactorFromScratch(
-			t, *privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
-		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
+			t, *privateKey,
+			testSetup.Contracts.EigenDA.OperatorStateRetriever,
+			testSetup.Contracts.EigenDA.ServiceManager,
+			logger)
+		if i >= 3 { // MaxOperatorCount is 3, so the 4th operator (index 3) will churn
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
 			signer = opSigner
@@ -185,11 +306,13 @@ func TestChurner(t *testing.T) {
 	require.NoError(t, err)
 	request.OperatorRequestSignature = signature
 
+	// Set up mock expectation for the lowest stake operator
 	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
 		PubkeyG1: lowestStakeOperatorPubKey,
 	}, nil)
 
-	reply, err := server.Churn(ctx, request)
+	// Call churner via gRPC instead of direct server call
+	reply, err := churnerClient.Churn(ctx, request)
 	require.NoError(t, err)
 	require.NotNil(t, reply)
 	require.NotNil(t, reply.GetSignatureWithSaltAndExpiry().GetSalt())
@@ -218,7 +341,7 @@ func mustCreateTransactorFromScratch(
 	operatorStateRetriever string,
 	serviceManager string,
 	logger logging.Logger,
-) *eth.Writer {
+) *coreeth.Writer {
 	t.Helper()
 
 	ethClientCfg := geth.EthClientConfig{
@@ -231,39 +354,8 @@ func mustCreateTransactorFromScratch(
 	gethClient, err := geth.NewMultiHomingClient(ethClientCfg, gethcommon.Address{}, logger)
 	require.NoError(t, err, "failed to create eth client")
 
-	writer, err := eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	writer, err := coreeth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
 	require.NoError(t, err, "failed to create eth writer")
 
 	return writer
-}
-
-func newTestServer(t *testing.T, testConfig *deploy.Config) *churner.Server {
-	t.Helper()
-
-	config := &churner.Config{
-		EthClientConfig: geth.EthClientConfig{
-			RPCURLs:          []string{rpcURL},
-			PrivateKeyString: churnerPrivateKeyHex,
-			NumRetries:       numRetries,
-		},
-		LoggerConfig:               *common.DefaultLoggerConfig(),
-		OperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
-		EigenDAServiceManagerAddr:  testConfig.EigenDA.ServiceManager,
-		EigenDADirectory:           testConfig.EigenDA.EigenDADirectory,
-		ChurnApprovalInterval:      15 * time.Minute,
-	}
-
-	operatorTransactorChurner := mustCreateTransactorFromScratch(
-		t,
-		churnerPrivateKeyHex,
-		testConfig.EigenDA.OperatorStateRetriever,
-		testConfig.EigenDA.ServiceManager,
-		logger,
-	)
-
-	metrics := churner.NewMetrics("9001", logger)
-	cn, err := churner.NewChurner(config, mockIndexer, operatorTransactorChurner, logger, metrics)
-	require.NoError(t, err)
-
-	return churner.NewServer(config, cn, logger, metrics)
 }
