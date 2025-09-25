@@ -51,53 +51,68 @@ import (
 	"google.golang.org/grpc"
 )
 
-/*
-These global vars are shared across tests in the integration suite to provide
-communication entrypoints into the local inabox test environment
-TODO: Put these into a testSuite object which is initialized per inabox E2E test. Currently this would only enable
+// TestHarness contains all test infrastructure needed for integration tests
+type TestHarness struct {
+	// Infrastructure containers
+	AnvilContainer      *testbed.AnvilContainer
+	GraphNodeContainer  *testbed.GraphNodeContainer
+	LocalstackContainer *testbed.LocalStackContainer
+	ChainDockerNetwork  *testcontainers.DockerNetwork
 
-	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
-*/
+	// Churner components
+	ChurnerServer   *grpc.Server
+	ChurnerListener net.Listener
+
+	// Test configuration
+	TestConfig          *deploy.Config
+	TestName            string
+	TemplateName        string
+	InMemoryBlobStore   bool
+	LocalStackPort      string
+	MetadataTableName   string
+	BucketTableName     string
+	MetadataTableNameV2 string
+
+	// Ethereum clients and contracts
+	EthClient                       common.EthClient
+	RPCClient                       common.RPCEthClient
+	CertBuilder                     *clientsv2.CertBuilder
+	RouterCertVerifier              *verification.CertVerifier
+	StaticCertVerifier              *verification.CertVerifier
+	EigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
+	EigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
+	EigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
+	DeployerTransactorOpts          *bind.TransactOpts
+
+	// Retrieval clients
+	RetrievalClient            clients.RetrievalClient
+	RelayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
+	ValidatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
+	PayloadDisperser           *payloaddispersal.PayloadDisperser
+
+	// Core components
+	ChainReader core.Reader
+
+	// Context management
+	Cancel context.CancelFunc
+
+	// Configuration constants
+	NumConfirmations int
+	NumRetries       int
+
+	// Logger
+	Logger logging.Logger
+}
+
+// Global test harness instance - will be initialized once per test suite
+var testHarness *TestHarness
+
+// Configuration constants from command line flags
 var (
-	anvilContainer     *testbed.AnvilContainer
-	graphNodeContainer *testbed.GraphNodeContainer
-	churnerServer      *grpc.Server
-	churnerListener    net.Listener
-	// chainDockerNetwork is only used by anvil and graphNode
-	chainDockerNetwork *testcontainers.DockerNetwork
-
 	templateName      string
 	testName          string
 	inMemoryBlobStore bool
-
-	testConfig          *deploy.Config
-	localstackContainer *testbed.LocalStackContainer
-	localStackPort      string
-
-	metadataTableName               = "test-BlobMetadata"
-	bucketTableName                 = "test-BucketStore"
-	metadataTableNameV2             = "test-BlobMetadata-v2"
-	logger                          = test.GetLogger()
-	ethClient                       common.EthClient
-	rpcClient                       common.RPCEthClient
-	certBuilder                     *clientsv2.CertBuilder
-	routerCertVerifier              *verification.CertVerifier
-	staticCertVerifier              *verification.CertVerifier
-	eigenDACertVerifierRouter       *routerbindings.ContractEigenDACertVerifierRouterTransactor
-	eigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
-	eigenDACertVerifierV1           *verifierv1bindings.ContractEigenDACertVerifierV1
-	deployerTransactorOpts          *bind.TransactOpts
-
-	retrievalClient clients.RetrievalClient
-
-	relayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
-	validatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
-	payloadDisperser           *payloaddispersal.PayloadDisperser
-	numConfirmations           int = 3
-	numRetries                     = 0
-	chainReader                core.Reader
-
-	cancel context.CancelFunc
+	logger            = test.GetLogger()
 )
 
 func init() {
@@ -134,49 +149,62 @@ func TestMain(m *testing.M) {
 func setupSuite() error {
 	logger.Info("bootstrapping test environment")
 
+	// Initialize the test harness
+	testHarness = &TestHarness{
+		TestName:            testName,
+		TemplateName:        templateName,
+		InMemoryBlobStore:   inMemoryBlobStore,
+		Logger:              logger,
+		NumConfirmations:    1,
+		NumRetries:          5,
+		MetadataTableName:   "test-BlobMetadata",
+		BucketTableName:     "test-BucketStore",
+		MetadataTableNameV2: "test-BlobMetadata-v2",
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	rootPath := "../../"
 
 	var err error
-	if testName == "" {
-		testName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
+	if testHarness.TestName == "" {
+		testHarness.TestName, err = deploy.CreateNewTestDirectory(templateName, rootPath)
 		if err != nil {
 			return fmt.Errorf("failed to create test directory: %w", err)
 		}
 	}
 
-	testConfig = deploy.ReadTestConfig(testName, rootPath)
+	testHarness.TestConfig = deploy.ReadTestConfig(testHarness.TestName, rootPath)
 
-	if testConfig.Environment.IsLocal() {
+	if testHarness.TestConfig.Environment.IsLocal() {
 		// Create a shared Docker network for all containers
-		chainDockerNetwork, err = network.New(context.Background(),
+		testHarness.ChainDockerNetwork, err = network.New(context.Background(),
 			network.WithDriver("bridge"),
 			network.WithAttachable())
 		if err != nil {
 			return fmt.Errorf("failed to create docker network: %w", err)
 		}
-		logger.Info("Created Docker network", "name", chainDockerNetwork.Name)
+		logger.Info("Created Docker network", "name", testHarness.ChainDockerNetwork.Name)
 
-		if !inMemoryBlobStore {
+		if !testHarness.InMemoryBlobStore {
 			logger.Info("Using shared Blob Store")
-			localStackPort = "4570"
+			testHarness.LocalStackPort = "4570"
 			// Use the timeout context for container creation
-			localstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
+			testHarness.LocalstackContainer, err = testbed.NewLocalStackContainerWithOptions(ctx, testbed.LocalStackOptions{
 				ExposeHostPort: true,
-				HostPort:       localStackPort,
+				HostPort:       testHarness.LocalStackPort,
 				Logger:         logger,
-				Network:        chainDockerNetwork,
+				Network:        testHarness.ChainDockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start localstack: %w", err)
 			}
 
 			deployConfig := testbed.DeployResourcesConfig{
-				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-				MetadataTableName:   metadataTableName,
-				BucketTableName:     bucketTableName,
-				V2MetadataTableName: metadataTableNameV2,
+				LocalStackEndpoint:  fmt.Sprintf("http://0.0.0.0:%s", testHarness.LocalStackPort),
+				MetadataTableName:   testHarness.MetadataTableName,
+				BucketTableName:     testHarness.BucketTableName,
+				V2MetadataTableName: testHarness.MetadataTableNameV2,
 				Logger:              logger,
 			}
 			err = testbed.DeployResources(ctx, deployConfig)
@@ -188,22 +216,22 @@ func setupSuite() error {
 		}
 
 		logger.Info("Starting anvil")
-		anvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
+		testHarness.AnvilContainer, err = testbed.NewAnvilContainerWithOptions(ctx, testbed.AnvilOptions{
 			ExposeHostPort: true,
 			HostPort:       "8545",
 			Logger:         logger,
-			Network:        chainDockerNetwork,
+			Network:        testHarness.ChainDockerNetwork,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start anvil: %w", err)
 		}
-		anvilInternalEndpoint := anvilContainer.InternalEndpoint()
-		logger.Info("Anvil RPC URL", "url", anvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
+		anvilInternalEndpoint := testHarness.AnvilContainer.InternalEndpoint()
+		logger.Info("Anvil RPC URL", "url", testHarness.AnvilContainer.RpcURL(), "internal", anvilInternalEndpoint)
 
-		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+		deployer, ok := testHarness.TestConfig.GetDeployer(testHarness.TestConfig.EigenDA.Deployer)
 		if ok && deployer.DeploySubgraphs {
 			logger.Info("Starting graph node")
-			graphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+			testHarness.GraphNodeContainer, err = testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
 				PostgresDB:     "graph-node",
 				PostgresUser:   "graph-node",
 				PostgresPass:   "let-me-in",
@@ -214,7 +242,7 @@ func setupSuite() error {
 				HostAdminPort:  "8020",
 				HostIPFSPort:   "5001",
 				Logger:         logger,
-				Network:        chainDockerNetwork,
+				Network:        testHarness.ChainDockerNetwork,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to start graph node: %w", err)
@@ -222,57 +250,57 @@ func setupSuite() error {
 		}
 
 		logger.Info("Deploying experiment")
-		testConfig.DeployExperiment()
-		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
+		testHarness.TestConfig.DeployExperiment()
+		pk := testHarness.TestConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
-		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
-			RPCURLs:          []string{testConfig.Deployers[0].RPC},
+		testHarness.EthClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+			RPCURLs:          []string{testHarness.TestConfig.Deployers[0].RPC},
 			PrivateKeyString: pk,
-			NumConfirmations: numConfirmations,
-			NumRetries:       numRetries,
+			NumConfirmations: testHarness.NumConfirmations,
+			NumRetries:       testHarness.NumRetries,
 		}, gethcommon.Address{}, logger)
 		if err != nil {
 			return fmt.Errorf("failed to create eth client: %w", err)
 		}
 
-		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		testHarness.RPCClient, err = ethrpc.Dial(testHarness.TestConfig.Deployers[0].RPC)
 		if err != nil {
 			return fmt.Errorf("failed to create rpc client: %w", err)
 		}
 
 		// Force foundry to mine a block since it isn't auto-mining
-		err = rpcClient.CallContext(ctx, nil, "evm_mine")
+		err = testHarness.RPCClient.CallContext(ctx, nil, "evm_mine")
 		if err != nil {
 			return fmt.Errorf("failed to mine block: %w", err)
 		}
 
 		logger.Info("Starting churner server")
-		err = startChurnerServer(testConfig)
+		err = startChurnerServer(testHarness)
 		if err != nil {
 			return fmt.Errorf("failed to start churner server: %w", err)
 		}
 		logger.Info("Churner server started", "port", "32002")
 
 		logger.Info("Starting binaries")
-		testConfig.StartBinaries(true) // true = for tests, will skip churner
+		testHarness.TestConfig.StartBinaries(true) // true = for tests, will skip churner
 
-		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
+		testHarness.EigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gethcommon.HexToAddress(testHarness.TestConfig.EigenDAV1CertVerifier), testHarness.EthClient)
 		if err != nil {
 			return fmt.Errorf("failed to create EigenDA cert verifier V1: %w", err)
 		}
-		err = setupRetrievalClients(testConfig)
+		err = setupRetrievalClients(testHarness)
 		if err != nil {
 			return fmt.Errorf("failed to setup retrieval clients: %w", err)
 		}
 
 		logger.Info("Building client verification and interaction components")
 
-		certBuilder, err = clientsv2.NewCertBuilder(
+		testHarness.CertBuilder, err = clientsv2.NewCertBuilder(
 			logger,
-			gethcommon.HexToAddress(testConfig.EigenDA.OperatorStateRetriever),
-			gethcommon.HexToAddress(testConfig.EigenDA.RegistryCoordinator),
-			ethClient,
+			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.OperatorStateRetriever),
+			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.RegistryCoordinator),
+			testHarness.EthClient,
 		)
 
 		if err != nil {
@@ -280,8 +308,8 @@ func setupSuite() error {
 		}
 
 		routerAddressProvider, err := verification.BuildRouterAddressProvider(
-			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
-			ethClient,
+			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter),
+			testHarness.EthClient,
 			logger)
 
 		if err != nil {
@@ -289,46 +317,46 @@ func setupSuite() error {
 		}
 
 		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
-			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
+			gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifier))
 
 		// No error to check for NewStaticCertVerifierAddressProvider
 
-		staticCertVerifier, err = verification.NewCertVerifier(
+		testHarness.StaticCertVerifier, err = verification.NewCertVerifier(
 			logger,
-			ethClient,
+			testHarness.EthClient,
 			staticAddressProvider)
 
 		if err != nil {
 			return fmt.Errorf("failed to create static cert verifier: %w", err)
 		}
 
-		routerCertVerifier, err = verification.NewCertVerifier(
+		testHarness.RouterCertVerifier, err = verification.NewCertVerifier(
 			logger,
-			ethClient,
+			testHarness.EthClient,
 			routerAddressProvider)
 
 		if err != nil {
 			return fmt.Errorf("failed to create router cert verifier: %w", err)
 		}
 
-		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		testHarness.EigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter), testHarness.EthClient)
 		if err != nil {
 			return fmt.Errorf("failed to create router transactor: %w", err)
 		}
 
-		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		testHarness.EigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifierRouter), testHarness.EthClient)
 		if err != nil {
 			return fmt.Errorf("failed to create router caller: %w", err)
 		}
 
-		chainID, err := ethClient.ChainID(ctx)
+		chainID, err := testHarness.EthClient.ChainID(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get chain ID: %w", err)
 		}
 
-		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
+		testHarness.DeployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
-		err = setupPayloadDisperserWithRouter()
+		err = setupPayloadDisperserWithRouter(testHarness)
 		if err != nil {
 			return fmt.Errorf("failed to setup payload disperser: %w", err)
 		}
@@ -337,9 +365,9 @@ func setupSuite() error {
 	return nil
 }
 
-func setupPayloadDisperserWithRouter() error {
+func setupPayloadDisperserWithRouter(harness *TestHarness) error {
 	// Set up the block monitor
-	blockMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*1)
+	blockMonitor, err := verification.NewBlockNumberMonitor(harness.Logger, harness.EthClient, time.Second*1)
 	if err != nil {
 		return err
 	}
@@ -372,7 +400,7 @@ func setupPayloadDisperserWithRouter() error {
 		metrics.NoopAccountantMetrics,
 	)
 	disperserClient, err := clientsv2.NewDisperserClient(
-		logger,
+		harness.Logger,
 		disperserClientConfig,
 		signer,
 		nil, // no prover so will query disperser for generating commitments
@@ -391,13 +419,13 @@ func setupPayloadDisperserWithRouter() error {
 		ContractCallTimeout:    5 * time.Second,
 	}
 
-	payloadDisperser, err = payloaddispersal.NewPayloadDisperser(
-		logger,
+	harness.PayloadDisperser, err = payloaddispersal.NewPayloadDisperser(
+		harness.Logger,
 		payloadDisperserConfig,
 		disperserClient,
 		blockMonitor,
-		certBuilder,
-		routerCertVerifier,
+		harness.CertBuilder,
+		harness.RouterCertVerifier,
 		nil,
 		nil,
 	)
@@ -419,43 +447,43 @@ func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind
 	return opts
 }
 
-func setupRetrievalClients(testConfig *deploy.Config) error {
+func setupRetrievalClients(harness *TestHarness) error {
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
+		RPCURLs:          []string{harness.TestConfig.Deployers[0].RPC},
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
-		NumConfirmations: numConfirmations,
-		NumRetries:       numRetries,
+		NumConfirmations: harness.NumConfirmations,
+		NumRetries:       harness.NumRetries,
 	}
 	var err error
-	if ethClient == nil {
-		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, logger)
+	if harness.EthClient == nil {
+		harness.EthClient, err = geth.NewMultiHomingClient(ethClientConfig, gethcommon.Address{}, harness.Logger)
 		if err != nil {
 			return err
 		}
 	}
-	if rpcClient == nil {
-		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+	if harness.RPCClient == nil {
+		harness.RPCClient, err = ethrpc.Dial(harness.TestConfig.Deployers[0].RPC)
 		if err != nil {
 			log.Fatalln("could not start tcp listener", err)
 		}
 	}
 	tx, err := coreeth.NewWriter(
-		logger, ethClient, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager)
+		harness.Logger, harness.EthClient, harness.TestConfig.EigenDA.OperatorStateRetriever, harness.TestConfig.EigenDA.ServiceManager)
 	if err != nil {
 		return err
 	}
 
-	cs := coreeth.NewChainState(tx, ethClient)
+	cs := coreeth.NewChainState(tx, harness.EthClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
-	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
+	srsOrder, err := strconv.Atoi(harness.TestConfig.Retriever.RETRIEVER_SRS_ORDER)
 	if err != nil {
 		return err
 	}
 	kzgConfig := &kzg.KzgConfig{
-		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
-		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
-		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
+		G1Path:          harness.TestConfig.Retriever.RETRIEVER_G1_PATH,
+		G2Path:          harness.TestConfig.Retriever.RETRIEVER_G2_PATH,
+		CacheDir:        harness.TestConfig.Retriever.RETRIEVER_CACHE_PATH,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
 		NumWorker:       1,
@@ -468,15 +496,15 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, kzgVerifier, 10)
+	harness.RetrievalClient, err = clients.NewRetrievalClient(harness.Logger, cs, agn, nodeClient, kzgVerifier, 10)
 	if err != nil {
 		return err
 	}
-	chainReader, err = coreeth.NewReader(
-		logger,
-		ethClient,
-		testConfig.EigenDA.OperatorStateRetriever,
-		testConfig.EigenDA.ServiceManager,
+	harness.ChainReader, err = coreeth.NewReader(
+		harness.Logger,
+		harness.EthClient,
+		harness.TestConfig.EigenDA.OperatorStateRetriever,
+		harness.TestConfig.EigenDA.ServiceManager,
 	)
 	if err != nil {
 		return err
@@ -488,15 +516,15 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	}
 
 	clientConfig := validatorclientsv2.DefaultClientConfig()
-	retrievalClientV2 := validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifierV2, clientConfig, nil)
+	retrievalClientV2 := validatorclientsv2.NewValidatorClient(harness.Logger, harness.ChainReader, cs, kzgVerifierV2, clientConfig, nil)
 
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
 		RetrievalTimeout:    1 * time.Minute,
 	}
 
-	validatorRetrievalClientV2, err = payloadretrieval.NewValidatorPayloadRetriever(
-		logger,
+	harness.ValidatorRetrievalClientV2, err = payloadretrieval.NewValidatorPayloadRetriever(
+		harness.Logger,
 		validatorPayloadRetrieverConfig,
 		retrievalClientV2,
 		kzgVerifier.G1SRS,
@@ -510,12 +538,12 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit,
 	}
 
-	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+	relayUrlProvider, err := relay.NewRelayUrlProvider(harness.EthClient, harness.ChainReader.GetRelayRegistryAddress())
 	if err != nil {
 		return err
 	}
 
-	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+	relayClient, err := relay.NewRelayClient(relayClientConfig, harness.Logger, relayUrlProvider)
 	if err != nil {
 		return err
 	}
@@ -525,8 +553,8 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 		RelayTimeout:        5 * time.Second,
 	}
 
-	relayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
-		logger,
+	harness.RelayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
+		harness.Logger,
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		relayPayloadRetrieverConfig,
 		relayClient,
@@ -536,17 +564,17 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	return err
 }
 
-func startChurnerServer(testConfig *deploy.Config) error {
+func startChurnerServer(harness *TestHarness) error {
 	// Get deployer's private key
 	var privateKey string
-	deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+	deployer, ok := harness.TestConfig.GetDeployer(harness.TestConfig.EigenDA.Deployer)
 	if ok && deployer.Name != "" {
-		privateKey = strings.TrimPrefix(testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey, "0x")
+		privateKey = strings.TrimPrefix(harness.TestConfig.Pks.EcdsaMap[deployer.Name].PrivateKey, "0x")
 	}
 
 	// Create churner config directly
 	// Create logs directory in the test directory
-	logsDir := fmt.Sprintf("testdata/%s/logs", testName)
+	logsDir := fmt.Sprintf("testdata/%s/logs", harness.TestName)
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
@@ -574,16 +602,16 @@ func startChurnerServer(testConfig *deploy.Config) error {
 			HTTPPort:      "9095",
 			EnableMetrics: true,
 		},
-		OperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
-		EigenDAServiceManagerAddr:  testConfig.EigenDA.ServiceManager,
-		EigenDADirectory:           testConfig.EigenDA.EigenDADirectory,
+		OperatorStateRetrieverAddr: harness.TestConfig.EigenDA.OperatorStateRetriever,
+		EigenDAServiceManagerAddr:  harness.TestConfig.EigenDA.ServiceManager,
+		EigenDADirectory:           harness.TestConfig.EigenDA.EigenDADirectory,
 		GRPCPort:                   "32002",
 		ChurnApprovalInterval:      15 * time.Minute,
 		PerPublicKeyRateLimit:      1 * time.Second,
 	}
 
 	// Set graph URL if graph node is enabled
-	if deployer.DeploySubgraphs && graphNodeContainer != nil {
+	if deployer.DeploySubgraphs && harness.GraphNodeContainer != nil {
 		churnerConfig.ChainStateConfig = thegraph.Config{
 			Endpoint: "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state",
 		}
@@ -634,17 +662,17 @@ func startChurnerServer(testConfig *deploy.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on port %s: %w", churnerConfig.GRPCPort, err)
 	}
-	churnerListener = listener
+	harness.ChurnerListener = listener
 
 	// Create and start gRPC server
-	churnerServer = grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
-	pb.RegisterChurnerServer(churnerServer, churnerSvr)
-	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, churnerServer)
+	harness.ChurnerServer = grpc.NewServer(grpc.MaxRecvMsgSize(1024 * 1024 * 300))
+	pb.RegisterChurnerServer(harness.ChurnerServer, churnerSvr)
+	healthcheck.RegisterHealthServer(pb.Churner_ServiceDesc.ServiceName, harness.ChurnerServer)
 
 	// Start serving in goroutine
 	go func() {
 		churnerLogger.Info("Starting churner gRPC server", "port", churnerConfig.GRPCPort)
-		if err := churnerServer.Serve(churnerListener); err != nil {
+		if err := harness.ChurnerServer.Serve(harness.ChurnerListener); err != nil {
 			churnerLogger.Info("Churner gRPC server stopped", "error", err)
 		}
 	}()
@@ -659,48 +687,48 @@ func startChurnerServer(testConfig *deploy.Config) error {
 func teardownSuite() {
 	logger.Info("Tearing down test environment")
 
-	if testConfig == nil || !testConfig.Environment.IsLocal() {
+	if testHarness == nil || testHarness.TestConfig == nil || !testHarness.TestConfig.Environment.IsLocal() {
 		return
 	}
 
 	ctx, teardownCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer teardownCancel()
 
-	if cancel != nil {
-		cancel()
+	if testHarness.Cancel != nil {
+		testHarness.Cancel()
 	}
 
 	logger.Info("Stopping binaries")
-	testConfig.StopBinaries()
+	testHarness.TestConfig.StopBinaries()
 
-	if churnerServer != nil {
+	if testHarness.ChurnerServer != nil {
 		logger.Info("Stopping churner server")
-		churnerServer.GracefulStop()
-		if churnerListener != nil {
-			_ = churnerListener.Close()
+		testHarness.ChurnerServer.GracefulStop()
+		if testHarness.ChurnerListener != nil {
+			_ = testHarness.ChurnerListener.Close()
 		}
 	}
 
 	logger.Info("Stopping anvil")
-	if anvilContainer != nil {
-		if err := anvilContainer.Terminate(ctx); err != nil {
+	if testHarness.AnvilContainer != nil {
+		if err := testHarness.AnvilContainer.Terminate(ctx); err != nil {
 			logger.Warn("Failed to terminate anvil container", "error", err)
 		}
 	}
 
-	if graphNodeContainer != nil {
+	if testHarness.GraphNodeContainer != nil {
 		logger.Info("Stopping graph node")
-		_ = graphNodeContainer.Terminate(context.Background())
+		_ = testHarness.GraphNodeContainer.Terminate(context.Background())
 	}
 
-	if chainDockerNetwork != nil {
+	if testHarness.ChainDockerNetwork != nil {
 		logger.Info("Removing Docker network")
-		_ = chainDockerNetwork.Remove(context.Background())
+		_ = testHarness.ChainDockerNetwork.Remove(context.Background())
 	}
 
-	if localstackContainer != nil {
+	if testHarness.LocalstackContainer != nil {
 		logger.Info("Stopping localstack container")
-		if err := localstackContainer.Terminate(ctx); err != nil {
+		if err := testHarness.LocalstackContainer.Terminate(ctx); err != nil {
 			logger.Warn("Failed to terminate localstack container", "error", err)
 		}
 	}
