@@ -1,25 +1,13 @@
+build:
+# We build the apiserver individually to change its name to "server" instead of "apiserver"
+	go build -o ./bin/server ./cmd/apiserver
+# All the other binaries (dataapi, encoder, batcher, etc) are then built together.
+	go build -o ./bin ./...
+
 clean:
 	rm -rf ./bin
 
-build: build_server build_batcher build_encoder build_dataapi build_controller build_blobapi
-
-build_batcher:
-	go build -o ./bin/batcher ./cmd/batcher
-
-build_server:
-	go build -o ./bin/server ./cmd/apiserver
-
-build_encoder:
-	go build -o ./bin/encoder ./cmd/encoder
-
-build_dataapi:
-	go build -o ./bin/dataapi ./cmd/dataapi
-
-build_controller:
-	go build -o ./bin/controller ./cmd/controller
-
-build_blobapi:
-	go build -o ./bin/blobapi ./cmd/blobapi
+# Below are example run commands. They are not maintained so likely to be out of date.
 
 run_batcher: build_batcher
 	./bin/batcher \
@@ -64,9 +52,6 @@ run_encoder: build_encoder
   --kzg.num-workers 12 \
   --disperser-encoder.log.level-std debug \
   --disperser-encoder.log.level-file debug
-
-run_dataapi_tests:
-	go test -v disperser/dataapi
 
 # You can override these defaults via CLI or environment variables
 run_blobapi: build_blobapi
