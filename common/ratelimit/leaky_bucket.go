@@ -1,4 +1,4 @@
-package reservation
+package ratelimit
 
 import (
 	"errors"
@@ -6,15 +6,25 @@ import (
 	"time"
 )
 
+// TimeMovedBackwardError indicates a timestamp was observed that is before a previously observed timestamp.
+type TimeMovedBackwardError struct {
+	PreviousTime time.Time
+	CurrentTime  time.Time
+}
+
+func (e *TimeMovedBackwardError) Error() string {
+	return fmt.Sprintf("time moved backward: previous=%v, current=%v", e.PreviousTime, e.CurrentTime)
+}
+
 // This struct implements the [leaky bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm as a meter.
 //
-// Symbols "leak out" of the bucket at a constant rate, creating capacity for new symbols. The bucket can be "filled"
-// with additional symbols if there is enough available capacity.
+// A leaky bucket is a metaphor for rate limiting. The bucket has a fixed capacity, and it leaks at a constant rate.
+// When work is done, the bucket is "filled" with an amount of "water" proportional to the work done.
+// Water "leaks out" of the bucket at a constant rate, creating capacity for new work.
 //
-// The standard golang golang.org/x/time/rate.Limiter is not suitable for our use-case, since the Limiter doesn't
+// The standard golang golang.org/x/time/rate.Limiter is not suitable for some use cases, since the Limiter doesn't
 // support the concept of overfilling the bucket. We require the concept of overfill, for cases where a bucket size
-// might be too small to fit the largest permissible blob size. We don't want to prevent users with a small reservation
-// size from submitting large blobs.
+// might be too small to fit the largest permissible quantity of work.
 //
 // NOTE: This struct doesn't do any synchronization! The caller is responsible for making sure that only one goroutine
 // is using it at a time.
@@ -22,24 +32,24 @@ type LeakyBucket struct {
 	// Defines different ways that overfilling the bucket should be handled
 	overfillBehavior OverfillBehavior
 
-	// The total number of symbols that fit in the bucket
+	// The total quantity of "water" that fit in the bucket
 	bucketCapacity float64
 
-	// The number of symbols that leak out of the bucket each second, as determined by the reservation.
-	symbolsPerSecondLeakRate float64
+	// The quantity of "water" that leaks out of the bucket each second, as determined by the configuration.
+	leakRate float64
 
-	// The number of symbols currently in the bucket
+	// The amount of "water" currently in the bucket
 	currentFillLevel float64
 
 	// The time at which the previous leak calculation was made
 	previousLeakTime time.Time
 }
 
-// Creates a new instance of the [LeakyBucket] algorithm
+// Creates a new instance of the LeakyBucket algorithm
 func NewLeakyBucket(
-	// how fast symbols leak out of the bucket
-	symbolsPerSecondLeakRate uint64,
-	// bucketCapacityDuration * symbolsPerSecondLeakRate becomes the bucket capacity
+	// how fast "water" leaks out of the bucket per second
+	leakRate float64,
+	// bucketCapacityDuration * leakRate becomes the bucket capacity
 	bucketCapacityDuration time.Duration,
 	// whether the bucket should start full or empty
 	startFull bool,
@@ -48,14 +58,14 @@ func NewLeakyBucket(
 	// the current time, when this is being constructed
 	now time.Time,
 ) (*LeakyBucket, error) {
-	if symbolsPerSecondLeakRate == 0 {
-		return nil, errors.New("symbolsPerSecondLeakRate must be > 0")
+	if leakRate == 0 {
+		return nil, errors.New("leakRate must be > 0")
 	}
 
-	bucketCapacity := float64(symbolsPerSecondLeakRate) * bucketCapacityDuration.Seconds()
+	bucketCapacity := leakRate * bucketCapacityDuration.Seconds()
 	if bucketCapacity <= 0 {
-		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %d symbols/sec * duration %s)",
-			symbolsPerSecondLeakRate, bucketCapacityDuration)
+		return nil, fmt.Errorf("bucket capacity must be > 0 (from leak rate %f * duration %s)",
+			leakRate, bucketCapacityDuration)
 	}
 
 	currentFillLevel := float64(0)
@@ -65,15 +75,15 @@ func NewLeakyBucket(
 	}
 
 	return &LeakyBucket{
-		overfillBehavior:         overfillBehavior,
-		bucketCapacity:           bucketCapacity,
-		symbolsPerSecondLeakRate: float64(symbolsPerSecondLeakRate),
-		currentFillLevel:         currentFillLevel,
-		previousLeakTime:         now,
+		overfillBehavior: overfillBehavior,
+		bucketCapacity:   bucketCapacity,
+		leakRate:         leakRate,
+		currentFillLevel: currentFillLevel,
+		previousLeakTime: now,
 	}, nil
 }
 
-// Fill the bucket with a number of symbols.
+// Fill the bucket with "water", symbolizing work being done.
 //
 // Use a time source that includes monotonic time for best results.
 //
@@ -83,11 +93,11 @@ func NewLeakyBucket(
 //   - [TimeMovedBackwardError] if input time is before previous leak time (only possible if monotonic time isn't used).
 //   - Generic error for all other modes of failure.
 //
-// If the bucket doesn't have enough capacity to accommodate the fill, symbolCount IS NOT added to the bucket, i.e. a
+// If the bucket doesn't have enough capacity to accommodate the fill, "water" IS NOT added to the bucket, i.e. a
 // failed fill doesn't count against the meter.
-func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
-	if symbolCount == 0 {
-		return false, errors.New("symbolCount must be > 0")
+func (lb *LeakyBucket) Fill(now time.Time, quantity float64) (bool, error) {
+	if quantity <= 0 {
+		return false, errors.New("quantity must be > 0")
 	}
 
 	err := lb.leak(now)
@@ -96,7 +106,7 @@ func (lb *LeakyBucket) Fill(now time.Time, symbolCount uint32) (bool, error) {
 	}
 
 	// this is how full the bucket would be, if the fill were to be accepted
-	newFillLevel := lb.currentFillLevel + float64(symbolCount)
+	newFillLevel := lb.currentFillLevel + quantity
 
 	// if newFillLevel is <= the total bucket capacity, no further checks are required
 	if newFillLevel <= lb.bucketCapacity {
@@ -133,7 +143,23 @@ func (lb *LeakyBucket) CheckFillLevel(now time.Time) float64 {
 	return lb.currentFillLevel
 }
 
-// Reverts a previous fill, i.e. removes the number of symbols that got added to the bucket
+// Overrides the current fill level of the bucket, setting it to the specified value.
+func (lb *LeakyBucket) SetFillLevel(now time.Time, fillLevel float64) error {
+	if fillLevel < 0 {
+		return errors.New("fill level must be >= 0")
+	}
+
+	if fillLevel > lb.bucketCapacity && lb.overfillBehavior == OverfillNotPermitted {
+		return fmt.Errorf("fill level %f exceeds bucket capacity %f, but overfilling is not permitted",
+			fillLevel, lb.bucketCapacity)
+	}
+
+	lb.previousLeakTime = now
+	lb.currentFillLevel = fillLevel
+	return nil
+}
+
+// Reverts a previous fill, i.e. removes a quantity of "water" that got added to the bucket
 //
 // Use a time source that includes monotonic time for best results.
 //
@@ -142,9 +168,9 @@ func (lb *LeakyBucket) CheckFillLevel(now time.Time) float64 {
 // - Returns a generic error for all other modes of failure.
 //
 // The input time should be the most up-to-date time, NOT the time of the original fill.
-func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
-	if symbolCount == 0 {
-		return errors.New("symbolCount must be > 0")
+func (lb *LeakyBucket) RevertFill(now time.Time, quantity float64) error {
+	if quantity <= 0 {
+		return errors.New("quantity must be > 0")
 	}
 
 	err := lb.leak(now)
@@ -152,7 +178,7 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 		return fmt.Errorf("leak: %w", err)
 	}
 
-	lb.currentFillLevel = lb.currentFillLevel - float64(symbolCount)
+	lb.currentFillLevel = lb.currentFillLevel - quantity
 
 	// Ensure fill level doesn't go negative
 	if lb.currentFillLevel < 0 {
@@ -162,7 +188,7 @@ func (lb *LeakyBucket) RevertFill(now time.Time, symbolCount uint32) error {
 	return nil
 }
 
-// Lets the correct number of symbols leak out of the bucket, based on when we last leaked
+// Lets the correct quantity of "water" leak out of the bucket, based on when we last leaked
 //
 // Returns [TimeMovedBackwardError] if input time is before previous leak time.
 func (lb *LeakyBucket) leak(now time.Time) error {
@@ -181,7 +207,7 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 		return nil
 	}
 
-	leakage := elapsed.Seconds() * lb.symbolsPerSecondLeakRate
+	leakage := elapsed.Seconds() * lb.leakRate
 	lb.currentFillLevel = lb.currentFillLevel - leakage
 
 	if lb.currentFillLevel < 0 {
@@ -192,9 +218,15 @@ func (lb *LeakyBucket) leak(now time.Time) error {
 	return nil
 }
 
-// Gets the amount of capacity available in the bucket, i.e. how much could be dispersed right now.
+// Gets the amount of capacity available in the bucket, i.e. how much "water" must be added to make the bucket
+// exactly full.
 //
 // May be negative if the bucket is currently overfilled
 func (lb *LeakyBucket) GetRemainingCapacity() float64 {
 	return lb.bucketCapacity - lb.currentFillLevel
+}
+
+// Gets the total capacity of the bucket.
+func (lb *LeakyBucket) GetBucketCapacity() float64 {
+	return lb.bucketCapacity
 }
