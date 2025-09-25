@@ -158,7 +158,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 	}
 
-	// Validate reservation payments (on-demand payments are validated on the controller)
+	// Validate reservation payments (on-demand payments are validated on the the disperser's controller service)
 	err = s.node.ValidateReservationPayment(ctx, batch, probe)
 	if err != nil {
 		return nil, fmt.Errorf("validate reservation payment: %w", err)
