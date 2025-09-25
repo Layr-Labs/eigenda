@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/tools/srs-utils/downloader"
 	"github.com/Layr-Labs/eigenda/tools/srs-utils/parser"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/table_downloader"
 	"github.com/Layr-Labs/eigenda/tools/srs-utils/verifier"
 	"github.com/urfave/cli"
 )
@@ -51,6 +52,25 @@ func main() {
 					err = downloader.DownloadSRSFiles(config)
 					if err != nil {
 						return fmt.Errorf("download SRS files: %w", err)
+					}
+
+					return nil
+				},
+			},
+			{
+				Name:    "download-tables",
+				Aliases: []string{"dt"},
+				Usage:   "download SRS table files for specified dimension",
+				Flags:   table_downloader.Flags,
+				Action: func(cCtx *cli.Context) error {
+					config, err := table_downloader.ReadCLIConfig(cCtx)
+					if err != nil {
+						return fmt.Errorf("error in configuration: %w", err)
+					}
+
+					err = table_downloader.DownloadSRSTables(config)
+					if err != nil {
+						return fmt.Errorf("download SRS tables: %w", err)
 					}
 
 					return nil

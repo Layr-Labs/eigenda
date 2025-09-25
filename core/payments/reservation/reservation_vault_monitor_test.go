@@ -113,26 +113,15 @@ func TestReservationVaultMonitor(t *testing.T) {
 		QuorumSplits:     []byte{100},
 	})
 
-	// Clear captured updates to verify new updates
-	mu.Lock()
-	capturedUpdates = make(map[gethcommon.Address]*Reservation)
-	mu.Unlock()
-
 	// Wait for the monitor to fetch the updated reservation
-	test.AssertEventuallyEquals(t, len(accounts), func() int {
+	test.AssertEventuallyEquals(t, uint64(999), func() uint64 {
 		mu.Lock()
 		defer mu.Unlock()
-		return len(capturedUpdates)
+		return capturedUpdates[testAccount].symbolsPerSecond
 	}, time.Second)
 
-	// Check that the specific account was updated correctly
-	mu.Lock()
-	updatedReservation, ok := capturedUpdates[testAccount]
-	require.True(t, ok, "account %s should have been updated", testAccount.Hex())
-	require.NotNil(t, updatedReservation)
-	require.Equal(t, uint64(999), updatedReservation.symbolsPerSecond)
-
 	// Other accounts should remain unchanged
+	mu.Lock()
 	for i, addr := range accounts {
 		if addr != testAccount {
 			reservation, ok := capturedUpdates[addr]

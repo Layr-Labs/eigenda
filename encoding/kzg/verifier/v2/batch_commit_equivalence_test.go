@@ -29,7 +29,7 @@ func TestBatchEquivalence(t *testing.T) {
 	inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 	require.NoError(t, err)
 
-	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
+	commit, g2commit, _, err := enc.GetCommitments(inputFr)
 	require.NoError(t, err)
 
 	numBlob := 5

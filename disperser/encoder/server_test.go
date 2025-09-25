@@ -86,10 +86,10 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 	}
 	coordinator := &core.StdAssignmentCoordinator{}
 
-	blobSize := uint(len(testBlob.Data))
-	blobLength := encoding.GetBlobLength(uint(blobSize))
+	blobSize := uint32(len(testBlob.Data))
+	blobLength := encoding.GetBlobLength(blobSize)
 
-	chunkLength, err := coordinator.CalculateChunkLength(operatorState, blobLength, 0, securityParams[0])
+	chunkLength, err := coordinator.CalculateChunkLength(operatorState, uint(blobLength), 0, securityParams[0])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func getTestData(t *testing.T) (core.Blob, encoding.EncodingParams) {
 		ChunkLength:   chunkLength,
 	}
 
-	_, info, err := coordinator.GetAssignments(operatorState, blobLength, blobQuorumInfo)
+	_, info, err := coordinator.GetAssignments(operatorState, uint(blobLength), blobQuorumInfo)
 	if err != nil {
 		log.Fatal(err)
 	}

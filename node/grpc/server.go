@@ -206,7 +206,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	params := []common.RequestParams{
 		{
 			RequesterID: retrieverID,
-			BlobSize:    encodedBlobSize,
+			BlobSize:    uint(encodedBlobSize),
 			Rate:        rate,
 		},
 	}

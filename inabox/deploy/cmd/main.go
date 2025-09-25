@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/test"
 	"github.com/Layr-Labs/eigenda/test/testbed"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/urfave/cli/v2"
 )
 
@@ -139,10 +140,25 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 		return fmt.Errorf("failed to set environment variable: %w", err)
 	}
 
-	_, err := testbed.NewAnvilContainerWithOptions(context.Background(), testbed.AnvilOptions{
+	// Create a shared Docker network for all containers
+	// TODO(samlaf): seems like there's no way with testcontainers-go@v0.38 to give this network a name...
+	// https://pkg.go.dev/github.com/testcontainers/testcontainers-go@v0.38.0/network#WithNetworkName
+	// only returns an option to be passed to container requests... so we would have to use it on the first container
+	// we create, which would require changing our testbed package.
+	dockerNetwork, err := network.New(ctx.Context,
+		network.WithDriver("bridge"),
+		network.WithAttachable(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create docker network: %w", err)
+	}
+	logger.Info("Created Docker network", "name", dockerNetwork.Name)
+
+	anvilC, err := testbed.NewAnvilContainerWithOptions(ctx.Context, testbed.AnvilOptions{
 		ExposeHostPort: true,
 		HostPort:       "8545",
 		Logger:         logger,
+		Network:        dockerNetwork,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start anvil container: %w", err)
@@ -150,17 +166,19 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		fmt.Println("Starting graph node")
-		_, err := testbed.NewGraphNodeContainerWithOptions(context.Background(), testbed.GraphNodeOptions{
+		_, err := testbed.NewGraphNodeContainerWithOptions(ctx.Context, testbed.GraphNodeOptions{
 			PostgresDB:     "graph-node",
 			PostgresUser:   "graph-node",
 			PostgresPass:   "let-me-in",
-			EthereumRPC:    "http://localhost:8545",
 			ExposeHostPort: true,
 			HostHTTPPort:   "8000",
 			HostWSPort:     "8001",
 			HostAdminPort:  "8020",
 			HostIPFSPort:   "5001",
 			Logger:         logger,
+			Network:        dockerNetwork,
+			// internal endpoint will work because they are in the same dockerNetwork
+			EthereumRPC: anvilC.InternalEndpoint(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start graph node: %w", err)
@@ -206,18 +224,27 @@ func localstack(ctx *cli.Context, config *deploy.Config) error {
 }
 
 func all(ctx *cli.Context, config *deploy.Config) error {
+	// Disable Ryuk since we likely want to run the test for a long time
+	// This needs to run before ANY testcontainer library call is made.
+	// Even creating a network will spin up a Ryuk container.
+	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
+		return fmt.Errorf("failed to set environment variable: %w", err)
+	}
 
 	err := chainInfra(ctx, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("deploy chain infra: %w", err)
 	}
 
 	err = localstack(ctx, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("deploy localstack: %w", err)
 	}
 
-	config.DeployExperiment()
+	err = config.DeployExperiment()
+	if err != nil {
+		return fmt.Errorf("deploy experiment: %w", err)
+	}
 
 	return nil
 
