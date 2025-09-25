@@ -212,6 +212,7 @@ func (em *ejectionManager) BeginEjection(
 		err = em.transactor.StartEjection(em.ctx, validatorAddress)
 		if err != nil {
 			em.logger.Errorf("failed to start ejection for validator %s: %v", validatorAddress.Hex(), err)
+			em.cleanUpFailedEjection(validatorAddress, stakes)
 			return
 		}
 		em.logger.Infof("started ejection proceedings against %s", validatorAddress.Hex())
@@ -282,6 +283,7 @@ func (em *ejectionManager) checkRateLimits(
 				validatorAddress.Hex(), qid)
 			return false
 		}
+		permittedQuorums = append(permittedQuorums, qid)
 	}
 
 	return true
@@ -318,7 +320,7 @@ func (em *ejectionManager) getLeakyBucketForQuorum(qid core.QuorumID) *ratelimit
 		var err error
 		leakyBucket, err = ratelimit.NewLeakyBucket(
 			em.maxEjectionRate,
-			time.Minute,
+			em.throttleBucketInterval,
 			em.startThrottleFull,
 			ratelimit.OverfillOncePermitted,
 			em.timeSource())
