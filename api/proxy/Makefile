@@ -11,7 +11,7 @@ build:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
 
 clean:
-	rm bin/eigenda-proxy
+	rm -rf bin/eigenda-proxy
 
 docker-build:
 	# we only use this to build the docker image locally, so we give it the dev tag as a reminder
