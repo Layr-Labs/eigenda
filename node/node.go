@@ -451,7 +451,7 @@ func (n *Node) ValidateReservationPayment(ctx context.Context, batch *corev2.Bat
 		success, err := n.reservationPaymentValidator.Debit(
 			ctx,
 			blobCert.BlobHeader.PaymentMetadata.AccountID,
-			uint32(blobCert.BlobHeader.BlobCommitments.Length),
+			blobCert.BlobHeader.BlobCommitments.Length,
 			blobCert.BlobHeader.QuorumNumbers,
 			time.Unix(0, blobCert.BlobHeader.PaymentMetadata.Timestamp),
 		)
