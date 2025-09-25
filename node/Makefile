@@ -25,10 +25,6 @@ build-plugin: clean
 	go mod tidy
 	go build -o ./bin/node_plugin ./plugin/cmd
 
-proto:
-	cd .. && make protoc
-
-
 lint:
 	golangci-lint run
 

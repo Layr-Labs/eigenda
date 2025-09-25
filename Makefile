@@ -54,7 +54,9 @@ clean:
 	$(MAKE) -C relay clean
 	$(MAKE) -C litt clean
 	$(MAKE) -C api/proxy clean
+	$(MAKE) -C contracts clean
 
+# Compiles the contracts and builds the golang bindings.
 contract-bindings:
 	$(MAKE) -C contracts bindings
 
