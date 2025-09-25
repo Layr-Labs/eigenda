@@ -44,7 +44,6 @@ test-e2e-preprod:
 test-e2e-sepolia:
 	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
-# Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
 test-fuzz:
 	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m

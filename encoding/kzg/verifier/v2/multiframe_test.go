@@ -30,7 +30,9 @@ func TestUniversalVerify(t *testing.T) {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
 
-		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+		commit, _, _, err := enc.GetCommitments(inputFr)
+		require.Nil(t, err)
+		frames, fIndices, err := enc.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
@@ -75,7 +77,9 @@ func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 		inputFr, err := rs.ToFrArray(harness.paddedGettysburgAddressBytes)
 		require.Nil(t, err)
 
-		commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+		commit, _, _, err := enc.GetCommitments(inputFr)
+		require.Nil(t, err)
+		frames, fIndices, err := enc.GetFrames(inputFr)
 		require.Nil(t, err)
 
 		// create samples
