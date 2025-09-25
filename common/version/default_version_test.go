@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// If the current branch has the format "release/SEMVER", then verify that the current defaultVersion matches SEMVER.
+// If the current branch has the format "release/SEMVER", then verify that the current version matches SEMVER.
 func TestCurrentVersion(t *testing.T) {
 	// Get the current git branch name
 	branch, err := getBranchName()
@@ -21,7 +21,7 @@ func TestCurrentVersion(t *testing.T) {
 	// Check if branch follows the release/SEMVER pattern
 	const releasePrefix = "release/"
 	if !strings.HasPrefix(branch, releasePrefix) {
-		t.Skipf("Current branch '%s' is not a release branch, skipping defaultVersion check", branch)
+		t.Skipf("Current branch '%s' is not a release branch, skipping version check", branch)
 		return
 	}
 
@@ -38,7 +38,7 @@ func TestCurrentVersion(t *testing.T) {
 
 	// Verify they match
 	require.True(t, actualVersion.Equals(expectedVersion),
-		"Current defaultVersion %s does not match branch defaultVersion %s",
+		"Current version %s does not match branch version %s",
 		actualVersion.String(), expectedVersion.String())
 }
 
