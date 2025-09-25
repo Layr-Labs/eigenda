@@ -10,6 +10,7 @@ resources/srs/SRSTables/*
 # but when running tests locally from other dirs they might write them locally.
 **/SRSTable
 
+dist
 **/bin/*
 coverage.*
 
