@@ -140,3 +140,24 @@ func ReadConfig(ctx *cli.Context, clientConfigV1 common.ClientConfigV1) Config {
 		WaitForFinalization:  clientConfigV1.EdaClientCfg.WaitForFinalization,
 	}
 }
+
+// ValidateVerifierConfig validates certificate verification configuration
+// This logic was moved from api/proxy/store/builder/config.go to centralize validation
+func ValidateVerifierConfig(verifierConfig Config, memstoreEnabled bool, ethRpcUrl string, svcManagerAddr string) error {
+	// cert verification is enabled
+	if verifierConfig.VerifyCerts {
+		if memstoreEnabled {
+			return fmt.Errorf(
+				"cannot enable cert verification when memstore is enabled. use --%s",
+				CertVerificationDisabledFlagName)
+		}
+		if verifierConfig.RPCURL == "" {
+			return fmt.Errorf("cert verification enabled but eth rpc is not set")
+		}
+		if ethRpcUrl == "" || svcManagerAddr == "" || verifierConfig.SvcManagerAddr == "" {
+			return fmt.Errorf("cert verification enabled but svc manager address is not set")
+		}
+	}
+
+	return nil
+}
