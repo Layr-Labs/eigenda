@@ -36,7 +36,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&templateName, "config", "testconfig-anvil.yaml", "Name of the config file (in `inabox/templates`)")
+	flag.StringVar(&templateName, "config", "testconfig-anvil-nochurner.yaml", "Name of the config file (in `inabox/templates`)")
 	flag.StringVar(&testName, "testname", "", "Name of the test (in `inabox/testdata`)")
 	flag.StringVar(&graphUrl, "graphurl", "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state", "")
 }
@@ -167,11 +167,7 @@ func TestIndexerIntegration(t *testing.T) {
 
 	state, err := cs.GetIndexedOperatorState(ctx, headerNum, testQuorums)
 	require.NoError(t, err, "failed to get indexed operator state")
-	// The testconfig-anvil.yaml config specifies 4 operators, with maxOperatorCount 3 to test churning.
-	// So the number of indexed operators should be NumMaxOperatorCount (also specified in the yaml file).
-	require.Equal(t,
-		testConfig.Services.Counts.NumMaxOperatorCount,
-		len(state.IndexedOperators), "operator count mismatch")
+	require.Equal(t, len(testConfig.Operators), len(state.IndexedOperators), "operator count mismatch")
 }
 
 func mustMakeTestClient(t *testing.T, env *deploy.Config, privateKey string, logger logging.Logger) common.EthClient {
