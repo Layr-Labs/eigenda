@@ -178,7 +178,7 @@ func (c *DisperserClient) DisperseBlob(
 		}
 	}
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint32(len(data)))
 
 	if paymentMetadata == nil {
 		// we are using the legacy payment system

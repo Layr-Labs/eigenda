@@ -92,7 +92,7 @@ func (group *Verifier) BatchVerifyCommitEquivalence(commitmentsPair []Commitment
 	}
 	rhsG1 := &kzg.GenG1
 
-	err = PairingsVerify(&lhsG1, lhsG2, rhsG1, &rhsG2)
+	err = pairingsVerify(&lhsG1, lhsG2, rhsG1, &rhsG2)
 	if err == nil {
 		return nil
 	} else {

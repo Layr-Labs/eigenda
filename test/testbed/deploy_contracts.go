@@ -34,15 +34,17 @@ type LoadPrivateKeysInput struct {
 }
 
 // GetAnvilDefaultKeys returns the default private keys from Anvil's test mnemonic
+// Key for account #0 is used for deployer
+// Key for account #1 is used for batcher
 // These keys are from: "test test test test test test test test test junk"
-func GetAnvilDefaultKeys() (defaultKey string, batcher0Key string) {
+func GetAnvilDefaultKeys() (deployerKey string, batcher0Key string) {
 	// Account #0: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (10,000 ETH)
-	defaultKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	deployerKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 	// Account #1: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 (10,000 ETH)
 	batcher0Key = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 
-	return defaultKey, batcher0Key
+	return deployerKey, batcher0Key
 }
 
 // LoadPrivateKeys constructs a mapping between service names (e.g., 'deployer', 'dis0', 'opr1') and private keys

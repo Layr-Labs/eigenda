@@ -31,8 +31,9 @@ Secure interaction between a rollup and EigenDA is composed of three distinct sy
 
 7. *[EigenDA Client](../../glossary.md#eigenda-client)* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
 
-8. Using the `verification_status_code`, *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
-
+8. Using the `verification_status_code`, the *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to:
+   - Return the certificate (i.e., `CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher*, or
+   - [Failover](#failover-to-native-rollup-da) if any other status code is returned.
 
 ### Payload to Blob Encoding
 
@@ -82,7 +83,12 @@ Any other terminal status indicates failure, and a new blob dispersal will need 
 
 #### Failover to Native Rollup DA
 
-*Proxy* can be configured to retry `BlobStatus.UNKNOWN`, `BlobStatus.FAILED`, & `BlobStatus.COMPLETE` (if threshold check failed) dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
+*Proxy* can be configured to retry `BlobStatus.UNKNOWN`, `BlobStatus.FAILED`, & `BlobStatus.COMPLETE` (if threshold check failed) dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust).
+
+The *Proxy* will return a `503 Service Unavailable` status code in cases where a dispersal succeeds against the *Disperser* but verification fails against the `EigenDACertVerifier` contract (i.e, any status code != `SUCCESS`).
+
+
+*See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum.*
 
 ### BlobStatusReply → Cert
 

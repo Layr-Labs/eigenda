@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/controller"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/payments/ondemand"
+	"github.com/Layr-Labs/eigenda/core/payments/ondemand/ondemandvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation"
+	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,15 +25,15 @@ import (
 // Handles payment authorization requests received from API servers.
 type PaymentAuthorizationHandler struct {
 	onDemandMeterer      *meterer.OnDemandMeterer
-	onDemandValidator    *ondemand.OnDemandPaymentValidator
-	reservationValidator *reservation.ReservationPaymentValidator
+	onDemandValidator    *ondemandvalidation.OnDemandPaymentValidator
+	reservationValidator *reservationvalidation.ReservationPaymentValidator
 }
 
 // Panics if construction fails: we cannot operate if we cannot handle payments
 func NewPaymentAuthorizationHandler(
 	onDemandMeterer *meterer.OnDemandMeterer,
-	onDemandValidator *ondemand.OnDemandPaymentValidator,
-	reservationValidator *reservation.ReservationPaymentValidator,
+	onDemandValidator *ondemandvalidation.OnDemandPaymentValidator,
+	reservationValidator *reservationvalidation.ReservationPaymentValidator,
 ) *PaymentAuthorizationHandler {
 	if onDemandMeterer == nil {
 		panic("onDemandMeterer cannot be nil")
@@ -57,45 +60,57 @@ func NewPaymentAuthorizationHandler(
 // - global on-demand throughput meter
 func (h *PaymentAuthorizationHandler) AuthorizePayment(
 	ctx context.Context,
-	blobHeader *common.BlobHeader,
+	blobHeader *grpccommon.BlobHeader,
 	clientSignature []byte,
+	probe *common.SequenceProbe,
 ) (*controller.AuthorizePaymentResponse, error) {
+	probe.SetStage("request_validation")
+
 	if len(clientSignature) != 65 {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("signature length is unexpected: %d", len(clientSignature)))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("signature length %d is unexpected, signature: %s",
+			len(clientSignature), hex.EncodeToString(clientSignature)))
 	}
 
 	coreHeader, err := core.BlobHeaderFromProtobuf(blobHeader)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %v", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"invalid blob header: %v, blobHeader: %s", err, blobHeader.String()))
 	}
 
 	blobKey, err := coreHeader.BlobKey()
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to compute blob key: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"failed to compute blob key: %v, blobHeader: %s", err, blobHeader.String()))
 	}
+
+	probe.SetStage("client_signature_verification")
 
 	signerPubkey, err := crypto.SigToPub(blobKey[:], clientSignature)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to recover public key from signature: %v", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"failed to recover public key from signature: %v, accountID: %s, signature: %s, blobKey: %s",
+			err, coreHeader.PaymentMetadata.AccountID.Hex(),
+			hex.EncodeToString(clientSignature), hex.EncodeToString(blobKey[:])))
 	}
 
 	accountID := coreHeader.PaymentMetadata.AccountID
 	signerAddress := crypto.PubkeyToAddress(*signerPubkey)
 
 	if accountID.Cmp(signerAddress) != 0 {
-		return nil, api.NewErrorUnauthenticated(fmt.Sprintf("signature %s doesn't match with provided account %s",
-			hex.EncodeToString(clientSignature), accountID.Hex()))
+		return nil, api.NewErrorUnauthenticated(fmt.Sprintf(
+			"signature %s doesn't match provided account, signerAddress: %s, accountID: %s",
+			hex.EncodeToString(clientSignature), signerAddress.Hex(), accountID.Hex()))
 	}
 
 	symbolCount := uint32(coreHeader.BlobCommitments.Length)
 
 	if coreHeader.PaymentMetadata.IsOnDemand() {
 		err = h.authorizeOnDemandPayment(
-			ctx, coreHeader.PaymentMetadata.AccountID, symbolCount, coreHeader.QuorumNumbers)
+			ctx, coreHeader.PaymentMetadata.AccountID, symbolCount, coreHeader.QuorumNumbers, probe)
 	} else {
 		dispersalTime := time.Unix(0, coreHeader.PaymentMetadata.Timestamp)
 		err = h.authorizeReservationPayment(
-			ctx, coreHeader.PaymentMetadata.AccountID, symbolCount, coreHeader.QuorumNumbers, dispersalTime)
+			ctx, coreHeader.PaymentMetadata.AccountID, symbolCount, coreHeader.QuorumNumbers, dispersalTime, probe)
 	}
 
 	if err != nil {
@@ -116,12 +131,15 @@ func (h *PaymentAuthorizationHandler) authorizeOnDemandPayment(
 	accountID gethcommon.Address,
 	symbolCount uint32,
 	quorumNumbers []uint8,
+	probe *common.SequenceProbe,
 ) error {
+	probe.SetStage("global_meter_check")
 	reservation, err := h.onDemandMeterer.MeterDispersal(symbolCount)
 	if err != nil {
 		return api.NewErrorResourceExhausted(fmt.Sprintf("global rate limit exceeded: %v", err))
 	}
 
+	probe.SetStage("on_demand_validation")
 	err = h.onDemandValidator.Debit(ctx, accountID, symbolCount, quorumNumbers)
 	if err == nil {
 		return nil
@@ -138,7 +156,9 @@ func (h *PaymentAuthorizationHandler) authorizeOnDemandPayment(
 		return api.NewErrorInvalidArg(err.Error())
 	}
 
-	return api.NewErrorInternal(fmt.Sprintf("on-demand payment validation failed: %v", err))
+	return api.NewErrorInternal(fmt.Sprintf(
+		"on-demand payment validation failed for account %s, symbolCount: %d, quorums: %v: %v",
+		accountID.Hex(), symbolCount, quorumNumbers, err))
 
 }
 
@@ -151,13 +171,18 @@ func (h *PaymentAuthorizationHandler) authorizeReservationPayment(
 	symbolCount uint32,
 	quorumNumbers []uint8,
 	dispersalTime time.Time,
+	probe *common.SequenceProbe,
 ) error {
+	probe.SetStage("reservation_validation")
+
 	success, err := h.reservationValidator.Debit(ctx, accountID, symbolCount, quorumNumbers, dispersalTime)
 	if success {
 		return nil
 	}
 	if err == nil {
-		return api.NewErrorPermissionDenied("reservation payment validation failed: insufficient bandwidth")
+		return api.NewErrorPermissionDenied(fmt.Sprintf(
+			"reservation payment validation failed for account %s: insufficient bandwidth for %d symbols, time: %s",
+			accountID.Hex(), symbolCount, dispersalTime.Format(time.RFC3339)))
 	}
 
 	var quorumNotPermittedErr *reservation.QuorumNotPermittedError
@@ -173,5 +198,7 @@ func (h *PaymentAuthorizationHandler) authorizeReservationPayment(
 		return api.NewErrorInternal(err.Error())
 	}
 
-	return api.NewErrorInternal(fmt.Sprintf("reservation payment validation failed: %v", err))
+	return api.NewErrorInternal(fmt.Sprintf(
+		"reservation payment validation failed for account %s, symbolCount: %d, quorums: %v, time: %s: %v",
+		accountID.Hex(), symbolCount, quorumNumbers, dispersalTime.Format(time.RFC3339), err))
 }

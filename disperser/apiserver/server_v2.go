@@ -20,7 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,7 +59,7 @@ type DispersalServerV2 struct {
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob        uint64
+	maxNumSymbolsPerBlob        uint32
 	onchainStateRefreshInterval time.Duration
 
 	metricsConfig disperser.MetricsConfig
@@ -89,7 +89,7 @@ func NewDispersalServerV2(
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
 	prover *prover.Prover,
-	maxNumSymbolsPerBlob uint64,
+	maxNumSymbolsPerBlob uint32,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
@@ -259,11 +259,11 @@ func (s *DispersalServerV2) getBlobCommitment(
 	if s.prover == nil {
 		return nil, status.New(codes.Internal, "prover is not configured")
 	}
-	blobSize := uint(len(req.GetBlob()))
+	blobSize := uint32(len(req.GetBlob()))
 	if blobSize == 0 {
 		return nil, status.New(codes.InvalidArgument, "blob cannot be empty")
 	}
-	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+	if encoding.GetBlobLengthPowerOf2(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
 		return nil, status.Newf(codes.InvalidArgument, "blob size cannot exceed %v bytes",
 			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL)
 	}

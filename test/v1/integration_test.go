@@ -264,8 +264,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	require.NoError(t, err)
 
-	blobLength := encoding.GetBlobLength(uint(len(blob.Data)))
-	chunkLength, err := asn.CalculateChunkLength(operatorState, blobLength, 0, blob.RequestHeader.SecurityParams[0])
+	blobLength := encoding.GetBlobLength(uint32(len(blob.Data)))
+	chunkLength, err := asn.CalculateChunkLength(operatorState, uint(blobLength), 0, blob.RequestHeader.SecurityParams[0])
 	require.NoError(t, err)
 
 	blobQuorumInfo := &core.BlobQuorumInfo{
@@ -277,7 +277,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		ChunkLength: chunkLength,
 	}
 
-	assignments, info, err := asn.GetAssignments(operatorState, blobLength, blobQuorumInfo)
+	assignments, info, err := asn.GetAssignments(operatorState, uint(blobLength), blobQuorumInfo)
 	require.NoError(t, err)
 
 	var indices []encoding.ChunkNumber
@@ -336,7 +336,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assignment, ok := assignments[op.Node.Config.ID]
 		require.True(t, ok)
 		for _, data := range chunksReply.GetChunks() {
-			chunk, err := new(encoding.Frame).Deserialize(data)
+			chunk, err := new(encoding.Frame).DeserializeGob(data)
 			require.NoError(t, err)
 			chunks = append(chunks, chunk)
 		}

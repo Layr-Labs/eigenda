@@ -206,7 +206,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 	params := []common.RequestParams{
 		{
 			RequesterID: retrieverID,
-			BlobSize:    encodedBlobSize,
+			BlobSize:    uint(encodedBlobSize),
 			Rate:        rate,
 		},
 	}
@@ -239,7 +239,7 @@ func (s *Server) RetrieveChunks(ctx context.Context, in *pb.RetrieveChunksReques
 			if err != nil {
 				return nil, fmt.Errorf("the chunks are in Gnark but cannot be decoded: %v", err)
 			}
-			encoded, err := decoded.Serialize()
+			encoded, err := decoded.SerializeGob()
 			if err != nil {
 				return nil, err
 			}
