@@ -39,7 +39,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/core/payments/reservation"
 	"github.com/Layr-Labs/eigenda/core/payments/reservation/reservationvalidation"
 	"github.com/Layr-Labs/eigenda/core/payments/vault"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -308,21 +307,10 @@ func NewNode(
 			return nil, fmt.Errorf("create payment vault: %w", err)
 		}
 
-		reservationConfig, err := reservationvalidation.NewReservationLedgerCacheConfig(
-			config.ReservationMaxLedgers,
-			config.ReservationBucketCapacityPeriod,
-			// this is hardcoded: it's a parameter just in case, but it's never expected to change
-			reservation.OverfillOncePermitted,
-			config.PaymentVaultUpdateInterval,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create reservation ledger cache config: %w", err)
-		}
-
 		reservationPaymentValidator, err = reservationvalidation.NewReservationPaymentValidator(
 			ctx,
 			logger,
-			reservationConfig,
+			config.ReservationLedgerCacheConfig,
 			paymentVault,
 			time.Now,
 			reservationvalidation.NewReservationValidatorMetrics(reg, Namespace, PaymentsSubsystem),
