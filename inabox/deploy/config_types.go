@@ -211,7 +211,7 @@ func (env *Config) IsEigenDADeployed() bool {
 	return env.EigenDA.ServiceManager != ""
 }
 
-func NewTestConfig(testName, rootPath string) (testEnv *Config) {
+func ReadTestConfig(testName, rootPath string) (testEnv *Config) {
 	rootPath, err := filepath.Abs(rootPath)
 	if err != nil {
 		log.Panicf("Error %s:", err.Error())
