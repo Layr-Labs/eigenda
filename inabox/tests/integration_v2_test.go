@@ -28,32 +28,37 @@ func TestEndToEndV2Scenario(t *testing.T) {
 
 		TODO: Decompose this test into smaller tests that cover each of the above steps individually.
 	*/
+	// Create a fresh test context for this test
+	testCtx, err := NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err, "Failed to create test context")
+	defer testCtx.Cleanup()
+
 	ctx := t.Context()
 	// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
 	// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
-	mineAnvilBlocks(t, 6)
+	mineAnvilBlocks(t, testCtx, 6)
 
 	payload1 := randomPayload(992)
 	payload2 := randomPayload(123)
 
 	// certificates are verified within the payload disperser client
-	cert1, err := testHarness.PayloadDisperser.SendPayload(ctx, payload1)
+	cert1, err := testCtx.PayloadDisperser.SendPayload(ctx, payload1)
 	require.NoError(t, err)
 
-	cert2, err := testHarness.PayloadDisperser.SendPayload(ctx, payload2)
+	cert2, err := testCtx.PayloadDisperser.SendPayload(ctx, payload2)
 	require.NoError(t, err)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert1)
+	err = testCtx.StaticCertVerifier.CheckDACert(ctx, cert1)
 	require.NoError(t, err)
 
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert1)
+	err = testCtx.RouterCertVerifier.CheckDACert(ctx, cert1)
 	require.NoError(t, err)
 
 	// test onchain verification using cert #2
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert2)
+	err = testCtx.StaticCertVerifier.CheckDACert(ctx, cert2)
 	require.NoError(t, err)
 
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert2)
+	err = testCtx.RouterCertVerifier.CheckDACert(ctx, cert2)
 	require.NoError(t, err)
 
 	eigenDAV3Cert1, ok := cert1.(*coretypes.EigenDACertV3)
@@ -63,18 +68,18 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.True(t, ok)
 
 	// test retrieval from disperser relay subnet
-	actualPayload1, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
+	actualPayload1, err := testCtx.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload1)
 	require.Equal(t, payload1, actualPayload1)
 
-	actualPayload2, err := testHarness.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
+	actualPayload2, err := testCtx.RelayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
 	require.NoError(t, err)
 	require.NotNil(t, actualPayload2)
 	require.Equal(t, payload2, actualPayload2)
 
 	// test distributed retrieval from DA network validator nodes
-	actualPayload1, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
+	actualPayload1, err = testCtx.ValidatorRetrievalClientV2.GetPayload(
 		ctx,
 		eigenDAV3Cert1,
 	)
@@ -82,7 +87,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.NotNil(t, actualPayload1)
 	require.Equal(t, payload1, actualPayload1)
 
-	actualPayload2, err = testHarness.ValidatorRetrievalClientV2.GetPayload(
+	actualPayload2, err = testCtx.ValidatorRetrievalClientV2.GetPayload(
 		ctx,
 		eigenDAV3Cert2,
 	)
@@ -100,10 +105,10 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	*/
 
 	// ensure that a verifier can't be added at the latest block number
-	latestBlock, err := testHarness.EthClient.BlockNumber(ctx)
+	latestBlock, err := testCtx.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
-	_, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+	_, err = testCtx.EigenDACertVerifierRouter.AddCertVerifier(
+		testCtx.DeployerTransactorOpts,
 		uint32(latestBlock),
 		gethcommon.HexToAddress("0x0"),
 	)
@@ -111,62 +116,62 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Contains(t, err.Error(), getSolidityFunctionSig("ABNNotInFuture(uint32)"))
 
 	// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
-	tx, err := testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+	tx, err := testCtx.EigenDACertVerifierRouter.AddCertVerifier(
+		testCtx.DeployerTransactorOpts,
 		uint32(latestBlock)+2,
 		gethcommon.HexToAddress("0x0"),
 	)
 	require.NoError(t, err)
-	mineAnvilBlocks(t, 1)
+	mineAnvilBlocks(t, testCtx, 1)
 
 	// ensure that tx successfully executed
-	err = validateTxReceipt(ctx, tx.Hash())
+	err = validateTxReceipt(ctx, testCtx, tx.Hash())
 	require.NoError(t, err)
 
 	// ensure that new verifier can be read from the contract at the future rbn
-	verifier, err := testHarness.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+2))
+	verifier, err := testCtx.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+2))
 	require.NoError(t, err)
 	require.Equal(t, gethcommon.HexToAddress("0x0"), verifier)
 
 	// and that old one still lives at the latest block number - 1
-	verifier, err = testHarness.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
+	verifier, err = testCtx.EigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
 	require.NoError(t, err)
-	require.Equal(t, testHarness.TestConfig.EigenDA.CertVerifier, verifier.String())
+	require.Equal(t, globalInfra.TestConfig.EigenDA.CertVerifier, verifier.String())
 
 	// progress anvil chain 10 blocks
-	mineAnvilBlocks(t, 10)
+	mineAnvilBlocks(t, testCtx, 10)
 
 	// disperse blob #3 to trigger the new cert verifier which should fail
 	// since the address is not a valid cert verifier and the GetQuorums call will fail
 	payload3 := randomPayload(1234)
-	cert3, err := testHarness.PayloadDisperser.SendPayload(ctx, payload3)
+	cert3, err := testCtx.PayloadDisperser.SendPayload(ctx, payload3)
 	require.Contains(t, err.Error(), "no contract code at given address")
 	require.Nil(t, cert3)
 
-	latestBlock, err = testHarness.EthClient.BlockNumber(ctx)
+	latestBlock, err = testCtx.EthClient.BlockNumber(ctx)
 	require.NoError(t, err)
 
-	tx, err = testHarness.EigenDACertVerifierRouter.AddCertVerifier(
-		testHarness.DeployerTransactorOpts,
+	tx, err = testCtx.EigenDACertVerifierRouter.AddCertVerifier(
+		testCtx.DeployerTransactorOpts,
 		uint32(latestBlock)+2,
-		gethcommon.HexToAddress(testHarness.TestConfig.EigenDA.CertVerifier),
+		gethcommon.HexToAddress(globalInfra.TestConfig.EigenDA.CertVerifier),
 	)
 	require.NoError(t, err)
-	mineAnvilBlocks(t, 10)
+	mineAnvilBlocks(t, testCtx, 10)
 
-	err = validateTxReceipt(ctx, tx.Hash())
+	err = validateTxReceipt(ctx, testCtx, tx.Hash())
 	require.NoError(t, err)
 
 	// ensure that new verifier #3 can be used for successful verification
 	// now disperse blob #4 to trigger the new cert verifier which should pass
 	// ensure that a verifier can be added two blocks in the future
 	payload4 := randomPayload(1234)
-	cert4, err := testHarness.PayloadDisperser.SendPayload(ctx, payload4)
+	cert4, err := testCtx.PayloadDisperser.SendPayload(ctx, payload4)
 	require.NoError(t, err)
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, cert4)
+	err = testCtx.RouterCertVerifier.CheckDACert(ctx, cert4)
 	require.NoError(t, err)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, cert4)
+	err = testCtx.StaticCertVerifier.CheckDACert(ctx, cert4)
 	require.NoError(t, err)
 
 	// now force verification to fail by modifying the cert contents
@@ -178,14 +183,14 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
 
 	var certErr *verification.CertVerifierInvalidCertError
-	err = testHarness.RouterCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testCtx.RouterCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
 	// we should check that extra bytes returned start with signature of the InvalidInclusionProof error
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 
-	err = testHarness.StaticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+	err = testCtx.StaticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
 	require.IsType(t, &verification.CertVerifierInvalidCertError{}, err)
 	require.True(t, errors.As(err, &certErr))
 	// TODO(samlaf): after we update to CertVerifier 4.0.0 whose checkDACert will return error bytes,
@@ -193,7 +198,7 @@ func TestEndToEndV2Scenario(t *testing.T) {
 	require.Equal(t, verification.StatusInvalidCert, certErr.StatusCode)
 }
 
-func validateTxReceipt(ctx context.Context, txHash gethcommon.Hash) error {
+func validateTxReceipt(ctx context.Context, testHarness *TestHarness, txHash gethcommon.Hash) error {
 	receipt, err := testHarness.EthClient.TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return err

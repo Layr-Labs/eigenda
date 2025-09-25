@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mineAnvilBlocks(t *testing.T, numBlocks int) {
+func mineAnvilBlocks(t *testing.T, testHarness *TestHarness, numBlocks int) {
 	t.Helper()
 	for i := 0; i < numBlocks; i++ {
 		err := testHarness.RPCClient.CallContext(t.Context(), nil, "evm_mine")
@@ -29,6 +29,11 @@ func mineAnvilBlocks(t *testing.T, numBlocks int) {
 }
 
 func TestEndToEndScenario(t *testing.T) {
+	// Create a fresh test context for this test
+	testCtx, err := NewTestHarnessWithSetup(globalInfra)
+	require.NoError(t, err, "Failed to create test context")
+	defer testCtx.Cleanup()
+
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second*15)
 	defer cancel()
 
@@ -85,18 +90,18 @@ func TestEndToEndScenario(t *testing.T) {
 			require.NoError(t, err)
 
 			if *blobStatus1 != disperser.Confirmed || *blobStatus2 != disperser.Confirmed {
-				mineAnvilBlocks(t, testHarness.NumConfirmations+1)
+				mineAnvilBlocks(t, testCtx, testCtx.NumConfirmations+1)
 				continue
 			}
 			blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
 			verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
-			err = testHarness.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
+			err = testCtx.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
 			require.NoError(t, err)
-			mineAnvilBlocks(t, testHarness.NumConfirmations+1)
+			mineAnvilBlocks(t, testCtx, testCtx.NumConfirmations+1)
 
 			blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
 			verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())
-			err = testHarness.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
+			err = testCtx.EigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
 			require.NoError(t, err)
 			loop = false
 		}
@@ -106,7 +111,7 @@ func TestEndToEndScenario(t *testing.T) {
 
 	ctx, cancel = context.WithTimeout(t.Context(), time.Second*5)
 	defer cancel()
-	retrieved, err := testHarness.RetrievalClient.RetrieveBlob(ctx,
+	retrieved, err := testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -118,7 +123,7 @@ func TestEndToEndScenario(t *testing.T) {
 	restored := codec.RemoveEmptyByteFromPaddedBytes(retrieved)
 	require.Equal(t, bytes.TrimRight(data, "\x00"), bytes.TrimRight(restored, "\x00"))
 
-	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+	_, err = testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -127,7 +132,7 @@ func TestEndToEndScenario(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+	_, err = testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -136,7 +141,7 @@ func TestEndToEndScenario(t *testing.T) {
 	)
 	require.Error(t, err)
 
-	retrieved, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+	retrieved, err = testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -146,7 +151,7 @@ func TestEndToEndScenario(t *testing.T) {
 	require.NoError(t, err)
 	restored = codec.RemoveEmptyByteFromPaddedBytes(retrieved)
 	require.Equal(t, bytes.TrimRight(data, "\x00"), bytes.TrimRight(restored, "\x00"))
-	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+	_, err = testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
@@ -154,7 +159,7 @@ func TestEndToEndScenario(t *testing.T) {
 		1, // retrieve from quorum 1
 	)
 	require.NoError(t, err)
-	_, err = testHarness.RetrievalClient.RetrieveBlob(ctx,
+	_, err = testCtx.RetrievalClient.RetrieveBlob(ctx,
 		[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
 		reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
 		uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
